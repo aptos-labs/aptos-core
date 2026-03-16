@@ -302,6 +302,7 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
 
     // Latency tracking (for Grafana metrics)
     slot_start_time: Option<Instant>,
+    proposal_wait_start: Option<Instant>,
     spc_start_time: Option<Instant>,
     vlow_received_time: Option<Instant>,
 }
@@ -353,6 +354,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             slot_timer: None,
             proposal_timeout: Duration::from_millis(SLOT_PROPOSAL_TIMEOUT_MS),
             slot_start_time: None,
+            proposal_wait_start: None,
             spc_start_time: None,
             vlow_received_time: None,
         }
@@ -586,6 +588,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .broadcast(SlotConsensusMsg::SlotProposal(Box::new(proposal)))
             .await;
 
+        self.proposal_wait_start = Some(Instant::now());
+
         // Start 2Δ timer
         self.slot_timer = Some((slot, Box::pin(tokio::time::sleep(self.proposal_timeout))));
 
@@ -693,14 +697,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     // ========================================================================
 
     async fn run_spc(&mut self, slot: u64) {
-        // Record proposal_wait: time from slot start (after payload pull + broadcast) to SPC start.
-        // slot_start_time includes payload_pull, but proposal_wait is measured from after broadcast.
-        // We approximate by using slot_start_time — the pull + broadcast overhead is small.
-        if let Some(slot_start) = self.slot_start_time {
-            let elapsed = slot_start.elapsed().as_secs_f64();
+        // Record proposal_wait: time from after broadcast to SPC start.
+        if let Some(wait_start) = self.proposal_wait_start {
             SLOT_DURATION
                 .with_label_values(&["proposal_wait"])
-                .observe(elapsed);
+                .observe(wait_start.elapsed().as_secs_f64());
         }
         self.spc_start_time = Some(Instant::now());
 
@@ -799,7 +800,6 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 .with_label_values(&["spc_to_vlow"])
                 .observe(spc_start.elapsed().as_secs_f64());
         }
-        self.vlow_received_time = Some(Instant::now());
 
         let v_low_non_bot: Vec<String> = v_low
             .iter()
@@ -827,11 +827,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .observe(resolve_start.elapsed().as_secs_f64());
 
         if missing.is_empty() {
-            let wave_start = Instant::now();
             self.commit_wave(slot, &v_low, &resolved, None).await;
-            SLOT_DURATION
-                .with_label_values(&["vlow_commit_wave"])
-                .observe(wave_start.elapsed().as_secs_f64());
+            // Start vlow_to_vhigh timer AFTER v_low processing is done,
+            // so it measures actual wait for v_high on the critical path.
+            self.vlow_received_time = Some(Instant::now());
             // Check if v_high was buffered (shouldn't happen if v_low resolves instantly,
             // but handle it for robustness)
             if let Some((vhigh_slot, v_high, proof)) = self.buffered_v_high.take() {
@@ -920,11 +919,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 v_low_committed_positions = ?v_low_positions,
                 "No delta entries in v_high, finalizing slot"
             );
-            let finalize_start = Instant::now();
             self.finalize_slot(slot, &v_high).await;
-            SLOT_DURATION
-                .with_label_values(&["finalization"])
-                .observe(finalize_start.elapsed().as_secs_f64());
             return;
         }
 
@@ -939,12 +934,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .observe(resolve_start.elapsed().as_secs_f64());
 
         if missing.is_empty() {
-            let wave_start = Instant::now();
             self.commit_wave(slot, &v_high, &resolved, Some(&v_high))
                 .await;
-            SLOT_DURATION
-                .with_label_values(&["vhigh_commit_wave"])
-                .observe(wave_start.elapsed().as_secs_f64());
         } else {
             info!(
                 epoch = self.epoch,
@@ -989,6 +980,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         entry_data_map: &HashMap<HashValue, ProposalData>,
         finalize_with_v_high: Option<&PrefixVector>,
     ) {
+        let wave_start = Instant::now();
+        let is_vhigh_wave = finalize_with_v_high.is_some();
         let ranking = self.ranking_manager.current_ranking();
         let mut blocks: Vec<Arc<PipelinedBlock>> = Vec::new();
         let mut newly_committed_positions: Vec<usize> = Vec::new();
@@ -1124,12 +1117,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             );
         }
 
+        // Record commit_wave duration (block building + execution send only, excludes finalization)
+        let stage = if is_vhigh_wave { "vhigh_commit_wave" } else { "vlow_commit_wave" };
+        SLOT_DURATION
+            .with_label_values(&[stage])
+            .observe(wave_start.elapsed().as_secs_f64());
+
         if let Some(v_high) = finalize_with_v_high {
-            let finalize_start = Instant::now();
             self.finalize_slot(slot, v_high).await;
-            SLOT_DURATION
-                .with_label_values(&["finalization"])
-                .observe(finalize_start.elapsed().as_secs_f64());
         }
     }
 
@@ -1140,6 +1135,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     /// necessary because different validators can commit the same SPC in different
     /// views — using a locally-stored proof would cause ranking divergence.
     async fn finalize_slot(&mut self, slot: u64, v_high: &PrefixVector) {
+        let finalize_start = Instant::now();
         let non_bot_count = v_high.iter().filter(|h| **h != HashValue::zero()).count();
         let has_commit_proof = self.current_slot_commit_proof.is_some();
         let has_last_ranking = self.last_spc_initial_ranking.is_some();
@@ -1156,10 +1152,12 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         let current_slot_ranking = self.current_slot_ranking.take()
             .unwrap_or_else(|| self.ranking_manager.current_ranking().to_vec());
 
-        // Extract the canonical commit proof from the first non-⊥ entry in v_high.
-        // This is deterministic: v_high entries are SPC-agreed entry_hashes, and
-        // the ProposalData (including prev_commit_proof) is pinned by the entry_hash.
+        // Sub-stage: extract canonical proof
+        let t0 = Instant::now();
         let canonical_proof = self.extract_canonical_proof(slot, v_high);
+        SLOT_DURATION
+            .with_label_values(&["fin_extract_proof"])
+            .observe(t0.elapsed().as_secs_f64());
 
         let (committing_view, spc_initial_ranking) = if let Some(ref prev_ranking) = self.last_spc_initial_ranking {
             let cv = match &canonical_proof {
@@ -1186,12 +1184,17 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             (1, current_slot_ranking.clone())
         };
 
+        // Sub-stage: ranking update
+        let t1 = Instant::now();
         self.ranking_manager.update_with_proof(
             committing_view,
             &spc_initial_ranking,
             &current_slot_ranking,
             v_high.len(),
         );
+        SLOT_DURATION
+            .with_label_values(&["fin_ranking_update"])
+            .observe(t1.elapsed().as_secs_f64());
 
         // Store current slot's commit proof and ranking for the next slot.
         // last_commit_proof: embedded in this validator's own proposals for slot S+1.
@@ -1212,7 +1215,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             "finalize_slot: ranking updated, proof state for next slot"
         );
 
-        // Clean up slot state, SPC channels, message buffers, and pending state
+        // Sub-stage: cleanup (drop slot state, SPC channels, buffers)
+        let t2 = Instant::now();
         self.spc_msg_tx.take();
         self.spc_priority_tx.take();
         self.spc_output_rx.take();
@@ -1222,6 +1226,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         self.pending_wave = None;
         self.buffered_v_high = None;
         self.slot_states.remove(&slot);
+        SLOT_DURATION
+            .with_label_values(&["fin_cleanup"])
+            .observe(t2.elapsed().as_secs_f64());
 
         info!(
             epoch = self.epoch,
@@ -1230,6 +1237,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             next_round = self.next_round,
             "Slot finalized, advancing to next slot"
         );
+
+        SLOT_DURATION
+            .with_label_values(&["finalization"])
+            .observe(finalize_start.elapsed().as_secs_f64());
 
         self.start_new_slot(slot + 1).await;
     }

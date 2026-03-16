@@ -153,6 +153,7 @@ consensus/prefix-consensus/src/
 
 consensus/src/prefix_consensus/
 ├── mod.rs                - Module declarations
+├── counters.rs           - Prometheus metrics (pc_slot_duration_s histogram) for Grafana latency breakdown
 └── slot_manager.rs       - SlotManager orchestrator, SPCSpawner trait, RealSPCSpawner, two-wave commit, canonical proof extraction + 15 unit tests (~1050 lines) — Phases 5-6, v_low early commit, Phases 12-13
 
 testsuite/smoke-test/src/consensus/
@@ -178,6 +179,18 @@ testsuite/smoke-test/src/consensus/
 - `.plans/phase12-verifiable-ranking.md` — Phase 13: Verifiable ranking with SPC-aware demotion (after end-to-end)
 - `.plans/vlow-early-commit.md` — v_low early commit: two-wave commit flow (complete)
 - `.plans/phase13-composite-entry-hash.md` — Phase 13: Composite entry hash for SPC input vector (complete)
+- `.plans/grafana-metrics.md` — Prometheus metrics for Grafana slot latency breakdown
+
+---
+
+## Grafana Metrics
+
+**Metric**: `pc_slot_duration_s` (histogram with `stage` label)
+**File**: `consensus/src/prefix_consensus/counters.rs`
+**Reference**: `.plans/grafana-metrics.md` (full stage descriptions, PromQL queries, verification property)
+
+Stages: `payload_pull`, `proposal_wait`, `spc_to_vlow`, `vlow_entry_resolution`, `vlow_commit_wave`, `vlow_to_vhigh`, `vhigh_entry_resolution`, `vhigh_commit_wave`, `finalization`, `total`
+Finalization sub-stages: `fin_extract_proof`, `fin_ranking_update`, `fin_cleanup`
 
 ---
 
