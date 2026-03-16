@@ -32,7 +32,7 @@ pub fn optimize_module_v2(module_ir: &mut ModuleIR) {
 /// Pre: allocated instruction stream (physical registers).
 /// Post: Copy/Move sources propagated to downstream uses; no instructions removed.
 fn copy_propagation(func: &mut FunctionIR) {
-    let num_params = func.num_params;
+    let num_pinned = func.num_params + func.num_locals;
     let blocks = split_into_blocks(&func.instrs);
 
     for (start, end) in blocks {
@@ -49,7 +49,7 @@ fn copy_propagation(func: &mut FunctionIR) {
 
             match &func.instrs[i] {
                 Instr::Copy(dst, src) | Instr::Move(dst, src)
-                    if matches!(dst, Reg::Home(i) if *i >= num_params) || dst.is_arg() =>
+                    if matches!(dst, Reg::Home(i) if *i >= num_pinned) || dst.is_arg() =>
                 {
                     subst.insert(*dst, *src);
                 },
@@ -69,9 +69,9 @@ fn eliminate_identity_moves(func: &mut FunctionIR) {
 /// Pass 5: Backward dead-code elimination within each basic block.
 ///
 /// Pre: after copy propagation and identity move elimination.
-/// Post: dead Copy/Move to non-param registers removed.
+/// Post: dead Copy/Move to non-pinned registers removed.
 fn dead_instruction_elimination(func: &mut FunctionIR) {
-    let num_params = func.num_params;
+    let num_pinned = func.num_params + func.num_locals;
     let blocks = split_into_blocks(&func.instrs);
 
     let mut dead_indices: BTreeSet<usize> = BTreeSet::new();
@@ -84,7 +84,7 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
 
             let is_removable = match &func.instrs[i] {
                 Instr::Copy(dst, _) | Instr::Move(dst, _)
-                    if matches!(dst, Reg::Home(i) if *i >= num_params) || dst.is_arg() =>
+                    if matches!(dst, Reg::Home(i) if *i >= num_pinned) || dst.is_arg() =>
                 {
                     !live.contains(dst)
                 },
@@ -115,13 +115,13 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
     }
 }
 
-/// Pass 6: Compact Home register indices while preserving param registers.
+/// Pass 6: Compact Home register indices while preserving pinned registers.
 ///
 /// Pre: after DCE (some registers may be unused).
-/// Post: Home registers renumbered contiguously starting at num_params;
+/// Post: Home registers renumbered contiguously starting at num_pinned;
 ///       reg_types and num_regs updated.
 fn renumber_registers(func: &mut FunctionIR) {
-    let num_params = func.num_params;
+    let num_pinned = func.num_params + func.num_locals;
 
     let mut used_home_regs: BTreeSet<u16> = BTreeSet::new();
     for instr in &func.instrs {
@@ -134,9 +134,9 @@ fn renumber_registers(func: &mut FunctionIR) {
     }
 
     let mut rename_map: BTreeMap<Reg, Reg> = BTreeMap::new();
-    let mut next_reg = num_params;
+    let mut next_reg = num_pinned;
     for &i in &used_home_regs {
-        if i < num_params {
+        if i < num_pinned {
             rename_map.insert(Reg::Home(i), Reg::Home(i));
         } else {
             rename_map.insert(Reg::Home(i), Reg::Home(next_reg));

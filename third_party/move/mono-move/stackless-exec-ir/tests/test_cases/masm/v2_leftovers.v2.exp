@@ -34,23 +34,27 @@ fun move_to_call(r0): u64 {
 }
 
 fun multi_use_local_alias(r0): u64 {
-  slots: params(1), locals(1), temps(0)
+  slots: params(1), locals(1), temps(1)
     r0: u64
     r1: u64
+    r2: u64
   code:
-    0: r1 := add r0, #1
-    1: r1 := add r1, r0
-    2: ret [r1]
+    0: r1 := copy r0
+    1: r2 := add r1, #1
+    2: r2 := add r2, r1
+    3: ret [r2]
 }
 
 fun copy_call_then_use(r0): u64 {
-  slots: params(1), locals(1), temps(0), args(1)
+  slots: params(1), locals(1), temps(1), args(1)
     r0: u64
     r1: u64
+    r2: u64
   code:
-    0: [a0] := call identity, [r0]
-    1: r1 := add a0, r0
-    2: ret [r1]
+    0: r1 := copy r0
+    1: [a0] := call identity, [r1]
+    2: r2 := add a0, r1
+    3: ret [r2]
 }
 
 fun two_copies_to_call(r0, r1): u64 {
@@ -98,22 +102,24 @@ fun move_to_call() {
 }
 
 fun multi_use_local_alias() {
-  frame_data_size: 16
+  frame_data_size: 24
   code:
-    0: AddU64Imm [8] <- [0] + #1
-    1: AddU64 [8] <- [8] + [0]
-    2: Move8 [0] <- [8]
-    3: Return
+    0: Move8 [8] <- [0]
+    1: AddU64Imm [16] <- [8] + #1
+    2: AddU64 [16] <- [16] + [8]
+    3: Move8 [0] <- [16]
+    4: Return
 }
 
 fun copy_call_then_use() {
-  frame_data_size: 16
+  frame_data_size: 24
   code:
-    0: Move8 [40] <- [0]
-    1: CallFunc #0
-    2: AddU64 [8] <- [40] + [0]
-    3: Move8 [0] <- [8]
-    4: Return
+    0: Move8 [8] <- [0]
+    1: Move8 [48] <- [8]
+    2: CallFunc #0
+    3: AddU64 [16] <- [48] + [8]
+    4: Move8 [0] <- [16]
+    5: Return
 }
 
 fun two_copies_to_call() {
