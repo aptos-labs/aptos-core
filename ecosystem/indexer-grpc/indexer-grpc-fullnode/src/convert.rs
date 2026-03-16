@@ -229,12 +229,9 @@ pub fn convert_transaction_payload(
                 EncryptedTransactionPayload::Encrypted(_) => {
                     unreachable!("Encrypted state should not reach indexer gRPC")
                 },
-                EncryptedTransactionPayload::FailedDecryption(p) => {
+                EncryptedTransactionPayload::FailedDecryption(_) => {
                     transaction::encrypted_transaction_payload::State::FailedDecryption(
-                        transaction::FailedDecryptionPayloadState {
-                            payload_hash: p.payload_hash.0.to_vec(),
-                            ciphertext: p.ciphertext.0.clone(),
-                        },
+                        transaction::FailedDecryptionPayloadState {},
                     )
                 },
                 EncryptedTransactionPayload::Decrypted(p) => {
@@ -257,9 +254,6 @@ pub fn convert_transaction_payload(
                     };
                     transaction::encrypted_transaction_payload::State::Decrypted(
                         transaction::DecryptedPayloadState {
-                            payload_hash: p.payload_hash.0.to_vec(),
-                            ciphertext: p.ciphertext.0.clone(),
-                            decryption_nonce: p.decryption_nonce.0,
                             decrypted_payload: Some(decrypted_payload),
                         },
                     )

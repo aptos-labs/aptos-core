@@ -335,19 +335,14 @@ message EncryptedTransactionPayload {
 }
 
 message FailedDecryptionPayloadState {
-  bytes payload_hash = 1;
-  bytes ciphertext = 2;
 }
 
 message DecryptedPayloadState {
-  bytes payload_hash = 1;
-  bytes ciphertext = 2;
   oneof decrypted_payload {
     EntryFunctionPayload entry_function_payload = 3;
     ScriptPayload script_payload = 4;
     MultisigPayload multisig_payload = 5;
   }
-  uint64 decryption_nonce = 6;
 }
 
 message EntryFunctionPayload {

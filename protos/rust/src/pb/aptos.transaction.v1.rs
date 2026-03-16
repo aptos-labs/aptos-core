@@ -674,20 +674,10 @@ pub mod encrypted_transaction_payload {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FailedDecryptionPayloadState {
-    #[prost(bytes="vec", tag="1")]
-    pub payload_hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(bytes="vec", tag="2")]
-    pub ciphertext: ::prost::alloc::vec::Vec<u8>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DecryptedPayloadState {
-    #[prost(bytes="vec", tag="1")]
-    pub payload_hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(bytes="vec", tag="2")]
-    pub ciphertext: ::prost::alloc::vec::Vec<u8>,
-    #[prost(uint64, tag="6")]
-    pub decryption_nonce: u64,
     #[prost(oneof="decrypted_payload_state::DecryptedPayload", tags="3, 4, 5")]
     pub decrypted_payload: ::core::option::Option<decrypted_payload_state::DecryptedPayload>,
 }
