@@ -463,6 +463,10 @@ pub(crate) fn realistic_env_max_load_test(
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Allow validator-PFN connections
+            config.base.enable_validator_pfn_connections = true;
+        }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             // Increase the consensus observer fallback thresholds
             config
@@ -473,6 +477,9 @@ pub(crate) fn realistic_env_max_load_test(
                 .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
         }))
         .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            // Allow validator-PFN connections
+            config.base.enable_validator_pfn_connections = true;
+
             // Increase the consensus observer fallback thresholds
             config
                 .consensus_observer
