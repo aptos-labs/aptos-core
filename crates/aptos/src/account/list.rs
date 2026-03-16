@@ -73,7 +73,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let account = if let Some(account) = self.account {
             account
-        } else if let Some(Some(account)) = CliConfig::load_profile(
+        } else if let Some(Some(account)) = CliConfig::load_profile_public(
             self.profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?

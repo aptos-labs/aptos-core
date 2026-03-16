@@ -47,7 +47,10 @@ impl AccountTool {
     }
 }
 
-/// Tool for interacting with multisig accounts
+/// Tool for interacting with multisig (v2) accounts
+///
+/// Multisig accounts require multiple owner signatures to execute transactions.
+/// The typical workflow is: create → create-transaction → approve → execute.
 #[derive(Debug, Subcommand)]
 pub enum MultisigAccountTool {
     Approve(multisig_account::Approve),

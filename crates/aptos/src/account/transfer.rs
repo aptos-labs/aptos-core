@@ -13,10 +13,10 @@ use clap::Parser;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-// TODO: Add ability to transfer non-APT coins
-// TODO: Add ability to not create account by default
 /// Transfer APT between accounts
 ///
+/// If the receiving account does not exist, it will be created automatically.
+/// Amounts are specified in Octas (10^-8 APT).
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
     /// Address of account to send APT to

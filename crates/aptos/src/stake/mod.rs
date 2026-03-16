@@ -22,7 +22,6 @@ use async_trait::async_trait;
 use clap::Parser;
 
 /// Tool for manipulating stake and stake pools
-///
 #[derive(Parser)]
 pub enum StakeTool {
     AddStake(AddStake),
@@ -495,22 +494,23 @@ impl CliCommand<Vec<TransactionSummary>> for SetDelegatedVoter {
 
 /// Create a staking contract stake pool
 ///
-///
+/// Creates a new staking contract between an owner, operator, and voter.
+/// The operator runs the validator node, and the voter participates in governance.
 #[derive(Parser)]
 pub struct CreateStakingContract {
-    /// Account Address of operator
+    /// Account address of the operator who will run the validator
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub operator: AccountAddress,
 
-    /// Account Address of delegated voter
+    /// Account address of the delegated voter for governance
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub voter: AccountAddress,
 
-    /// Amount to create the staking contract with
+    /// Amount of Octas (10^-8 APT) to stake in the new contract
     #[clap(long)]
     pub amount: u64,
 
-    /// Percentage of accumulated rewards to pay the operator as commission
+    /// Percentage of accumulated rewards to pay the operator as commission (0-100)
     #[clap(long)]
     pub commission_percentage: u64,
 

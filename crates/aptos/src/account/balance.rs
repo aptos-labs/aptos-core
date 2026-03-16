@@ -16,15 +16,16 @@ use move_core_types::{
 use serde::Serialize;
 
 /// Show the account's balance of different coins
-///
-/// TODO: Fungible assets
 #[derive(Debug, Parser)]
 pub struct Balance {
     /// Address of the account you want to list resources/modules/balance for
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: Option<AccountAddress>,
 
-    /// Coin type to lookup.  Defaults to 0x1::aptos_coin::AptosCoin
+    /// Coin type or fungible asset address to look up
+    ///
+    /// Accepts a Move type tag (e.g. `0x1::aptos_coin::AptosCoin`) or a fungible asset
+    /// object address (hex literal). Defaults to `0x1::aptos_coin::AptosCoin`.
     #[clap(long)]
     pub(crate) coin_type: Option<String>,
 
@@ -51,7 +52,7 @@ impl CliCommand<Vec<AccountBalance>> for Balance {
     async fn execute(self) -> CliTypedResult<Vec<AccountBalance>> {
         let account = if let Some(account) = self.account {
             account
-        } else if let Some(Some(account)) = CliConfig::load_profile(
+        } else if let Some(Some(account)) = CliConfig::load_profile_public(
             self.profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?

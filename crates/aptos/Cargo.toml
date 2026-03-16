@@ -92,6 +92,7 @@ jemallocator = { workspace = true }
 
 [features]
 default = []
+keyring-cache = ["aptos-cli-common/keyring-cache"]
 fuzzing = []
 no-upload-proposal = []
 cli-framework-test-move = []

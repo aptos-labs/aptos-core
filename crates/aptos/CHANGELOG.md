@@ -4,6 +4,13 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 - Add linter rules `unused_function`, `unused_struct`, and `unused_constant`.
+- **Config encryption**: Encrypt sensitive fields (`private_key`, `node_api_key`, `faucet_auth_token`) in `.aptos/config.yaml` with AES-256-GCM using a password-derived key (Argon2id, 128 MiB memory cost). New commands: `aptos config encrypt` and `aptos config decrypt`.
+- **Optional OS keyring caching**: Pass `--use-keyring` during encryption to store the password in macOS Keychain, Windows Credential Manager, or Linux Secret Service. Requires the `keyring-cache` build feature (opt-in, not default).
+- **`--network` flag**: `--network mainnet|testnet|devnet` auto-resolves well-known REST and faucet URLs, so `--rest-url` and `--faucet-url` are no longer required for standard networks.
+- **Lazy decryption**: Read-only commands (`account balance`, `account list`, `config show-profiles`, etc.) skip encrypted fields entirely and never prompt for a password.
+- **`aptos init --encrypt`**: Encrypt the config immediately after initialization.
+- Improved `--help` documentation across CLI commands (governance, staking, accounts, config).
+- Security: constant-time key verification, AES-GCM AAD field binding, `DerivedKey` zeroized on drop, password cache wrapped in `Zeroizing<String>`, AIP-80 key format preserved during encryption round-trips.
 
 ## [8.1.0]
 - Transaction Simulation Session: add gas profiler support

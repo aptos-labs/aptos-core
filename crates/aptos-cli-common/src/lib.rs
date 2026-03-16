@@ -5,7 +5,9 @@
 //! and the standalone Move CLI.
 
 mod config;
+pub mod encryption;
 mod options;
+pub mod raw_config;
 mod types;
 mod utils;
 

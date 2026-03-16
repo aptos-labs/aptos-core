@@ -57,6 +57,9 @@ pub(crate) struct NewAuthKeyOptions {
     pub(crate) new_private_key_file: Option<PathBuf>,
 
     /// New private key encoded in the type from `--encoding`
+    ///
+    /// Mutually exclusive with `--new-private-key-file`, `--new-derivation-path`,
+    /// and `--new-derivation-index`
     #[clap(long)]
     pub(crate) new_private_key: Option<String>,
 
@@ -81,7 +84,7 @@ pub(crate) struct NewProfileOptions {
     #[clap(long)]
     pub(crate) skip_saving_profile: bool,
 
-    /// Name of new the profile to save for the new authentication key
+    /// Name of the new profile to save for the new authentication key
     #[clap(long)]
     pub(crate) save_to_profile: Option<String>,
 }

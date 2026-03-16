@@ -50,7 +50,13 @@ impl CliCommand<String> for FundWithFaucet {
         };
         let client = self.rest_options.client(&self.profile_options)?;
         self.faucet_options
-            .fund_account(client, &self.profile_options, self.amount, address)
+            .fund_account(
+                client,
+                &self.profile_options,
+                self.rest_options.network,
+                self.amount,
+                address,
+            )
             .await?;
         return Ok(format!(
             "Added {} Octas to account {}",

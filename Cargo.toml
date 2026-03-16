@@ -496,6 +496,7 @@ atty = "0.2.14"
 nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
+argon2 = "0.5"
 ambassador = "0.4.1"
 annotate-snippets = "0.11.5"
 anyhow = "1.0.98"
@@ -669,6 +670,7 @@ jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
 jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 jwt = "0.16.0"
 lazy_static = "1.4.0"
 libc = "0.2.147"
@@ -756,6 +758,7 @@ redis = { version = "0.22.3", features = [
 redis-test = { version = "0.1.1", features = ["aio"] }
 ref-cast = "1.0.6"
 regex = "1.9.3"
+rpassword = "7"
 reqwest = { version = "0.11.11", features = [
     "blocking",
     "cookies",

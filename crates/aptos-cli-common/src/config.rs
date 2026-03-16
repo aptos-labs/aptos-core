@@ -4,10 +4,14 @@
 //! CLI configuration management: profiles, network selection, and persistent settings.
 //!
 //! Handles loading and saving `CliConfig` profiles (stored in `.aptos/config.yaml`),
-//! including network endpoints, keys, and account addresses.
+//! including network endpoints, keys, and account addresses. Supports optional
+//! password-based encryption for sensitive fields.
 
 use crate::{
-    create_dir_if_not_exist, current_dir, read_from_file,
+    create_dir_if_not_exist, current_dir,
+    encryption::{get_password, DerivedKey, EncryptionConfig},
+    raw_config::{profile_config_to_raw, RawCliConfig},
+    read_from_file,
     types::{APTOS_FOLDER_GIT_IGNORE, CONFIG_FOLDER, DEFAULT_PROFILE, GIT_IGNORE},
     utils::{
         deserialize_address_str, deserialize_material_with_prefix, serialize_material_with_prefix,
@@ -38,6 +42,28 @@ pub enum Network {
     Devnet,
     Local,
     Custom,
+}
+
+impl Network {
+    /// Returns the default REST API URL for well-known networks.
+    pub fn default_rest_url(&self) -> Option<&'static str> {
+        match self {
+            Network::Mainnet => Some("https://api.mainnet.aptoslabs.com"),
+            Network::Testnet => Some("https://api.testnet.aptoslabs.com"),
+            Network::Devnet => Some("https://api.devnet.aptoslabs.com"),
+            Network::Local => Some("http://localhost:8080"),
+            Network::Custom => None,
+        }
+    }
+
+    /// Returns the default faucet URL for networks that have one.
+    pub fn default_faucet_url(&self) -> Option<&'static str> {
+        match self {
+            Network::Devnet => Some("https://faucet.devnet.aptoslabs.com"),
+            Network::Local => Some("http://localhost:8081"),
+            _ => None,
+        }
+    }
 }
 
 impl Display for Network {
@@ -75,8 +101,11 @@ impl FromStr for Network {
 // ── ProfileConfig ──
 
 /// An individual profile
-#[derive(Debug, Default, Serialize, DeserializeTrait)]
+#[derive(Debug, Serialize, DeserializeTrait)]
 pub struct ProfileConfig {
+    /// Profile schema version (managed by the raw config layer, not serialized directly).
+    #[serde(skip, default = "crate::raw_config::default_profile_version")]
+    pub version: u32,
     /// Name of network being used, if setup from aptos init
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
@@ -110,6 +139,29 @@ pub struct ProfileConfig {
     /// Derivation path index of the account on ledger
     #[serde(skip_serializing_if = "Option::is_none")]
     pub derivation_path: Option<String>,
+    /// API key for the node REST endpoint (encrypted when encryption is enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_api_key: Option<String>,
+    /// Auth token for the faucet endpoint (encrypted when encryption is enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub faucet_auth_token: Option<String>,
+}
+
+impl Default for ProfileConfig {
+    fn default() -> Self {
+        Self {
+            version: crate::raw_config::CURRENT_PROFILE_VERSION,
+            network: None,
+            private_key: None,
+            public_key: None,
+            account: None,
+            rest_url: None,
+            faucet_url: None,
+            derivation_path: None,
+            node_api_key: None,
+            faucet_auth_token: None,
+        }
+    }
 }
 
 // ── ProfileSummary ──
@@ -117,6 +169,7 @@ pub struct ProfileConfig {
 /// ProfileConfig but without the private parts
 #[derive(Debug, Serialize)]
 pub struct ProfileSummary {
+    pub version: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     pub has_private_key: bool,
@@ -135,17 +188,24 @@ pub struct ProfileSummary {
     pub rest_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub faucet_url: Option<String>,
+    pub has_node_api_key: bool,
+    pub has_faucet_auth_token: bool,
+    pub encrypted: bool,
 }
 
 impl From<&ProfileConfig> for ProfileSummary {
     fn from(config: &ProfileConfig) -> Self {
         ProfileSummary {
+            version: config.version,
             network: config.network,
             has_private_key: config.private_key.is_some(),
             public_key: config.public_key.clone(),
             account: config.account,
             rest_url: config.rest_url.clone(),
             faucet_url: config.faucet_url.clone(),
+            has_node_api_key: config.node_api_key.is_some(),
+            has_faucet_auth_token: config.faucet_auth_token.is_some(),
+            encrypted: false, // Will be set by the caller when applicable
         }
     }
 }
@@ -166,6 +226,9 @@ const LEGACY_CONFIG_FILE: &str = "config.yml";
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, DeserializeTrait)]
 pub struct CliConfig {
+    /// Encryption metadata (present when config fields are encrypted)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encryption: Option<EncryptionConfig>,
     /// Map of profile configs
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profiles: Option<BTreeMap<String, ProfileConfig>>,
@@ -174,6 +237,7 @@ pub struct CliConfig {
 impl Default for CliConfig {
     fn default() -> Self {
         CliConfig {
+            encryption: None,
             profiles: Some(BTreeMap::new()),
         }
     }
@@ -191,30 +255,178 @@ impl CliConfig {
         }
     }
 
-    /// Loads the config from the current working directory or one of its parents.
+    /// Two-phase load: read YAML as raw strings, detect encryption, decrypt if needed,
+    /// then parse into typed ProfileConfig. All downstream code sees typed profiles.
     pub fn load(mode: ConfigSearchMode) -> CliTypedResult<Self> {
         let folder = Self::aptos_folder(mode)?;
-
         let config_file = folder.join(CONFIG_FILE);
         let old_config_file = folder.join(LEGACY_CONFIG_FILE);
-        if config_file.exists() {
-            serde_yaml::from_str(
-                &String::from_utf8(read_from_file(config_file.as_path())?)
-                    .map_err(CliError::from)?,
-            )
-            .map_err(|e| CliError::UnexpectedError(e.to_string()))
+
+        let yaml_str = if config_file.exists() {
+            String::from_utf8(read_from_file(config_file.as_path())?).map_err(CliError::from)?
         } else if old_config_file.exists() {
-            serde_yaml::from_str(
-                &String::from_utf8(read_from_file(old_config_file.as_path())?)
-                    .map_err(CliError::from)?,
-            )
-            .map_err(|e| CliError::UnexpectedError(e.to_string()))
+            String::from_utf8(read_from_file(old_config_file.as_path())?).map_err(CliError::from)?
         } else {
-            Err(CliError::ConfigNotFoundError(format!(
+            return Err(CliError::ConfigNotFoundError(format!(
                 "{}",
                 config_file.display()
-            )))
+            )));
+        };
+
+        // Phase 1: Deserialize to raw config (all string values).
+        let raw: RawCliConfig = serde_yaml::from_str(&yaml_str)
+            .map_err(|e| CliError::UnexpectedError(e.to_string()))?;
+
+        // Phase 2: If encryption section is present and fields are encrypted, derive key.
+        let has_encrypted = raw.has_any_encrypted_fields();
+        let derived_key = if has_encrypted {
+            let enc_config = raw.encryption.as_ref().ok_or_else(|| {
+                CliError::EncryptionError(
+                    "Config contains encrypted fields but no encryption section".to_string(),
+                )
+            })?;
+            let password = get_password(enc_config, &folder)?;
+            let key = DerivedKey::derive(&password, enc_config)?;
+            if !key.verify_key_check(enc_config) {
+                return Err(CliError::WrongPassword);
+            }
+            Some(key)
+        } else {
+            None
+        };
+
+        // Phase 3: Convert raw profiles to typed ProfileConfig.
+        let profiles = raw
+            .profiles
+            .map(|raw_profiles| {
+                raw_profiles
+                    .into_iter()
+                    .map(|(name, raw_profile)| {
+                        let typed = raw_profile.into_profile_config(derived_key.as_ref())?;
+                        Ok((name, typed))
+                    })
+                    .collect::<CliTypedResult<BTreeMap<String, ProfileConfig>>>()
+            })
+            .transpose()?;
+
+        Ok(CliConfig {
+            encryption: raw.encryption,
+            profiles,
+        })
+    }
+
+    /// Load config without decrypting sensitive fields.
+    ///
+    /// Encrypted fields become `None` in the resulting `ProfileConfig`.
+    /// Use this for commands that only need public config data (rest_url,
+    /// network, account, public_key) and don't need private_key, node_api_key,
+    /// or faucet_auth_token.
+    pub fn load_public(mode: ConfigSearchMode) -> CliTypedResult<Self> {
+        let folder = Self::aptos_folder(mode)?;
+        let config_file = folder.join(CONFIG_FILE);
+        let old_config_file = folder.join(LEGACY_CONFIG_FILE);
+
+        let yaml_str = if config_file.exists() {
+            String::from_utf8(read_from_file(config_file.as_path())?).map_err(CliError::from)?
+        } else if old_config_file.exists() {
+            String::from_utf8(read_from_file(old_config_file.as_path())?).map_err(CliError::from)?
+        } else {
+            return Err(CliError::ConfigNotFoundError(format!(
+                "{}",
+                config_file.display()
+            )));
+        };
+
+        let raw: RawCliConfig = serde_yaml::from_str(&yaml_str)
+            .map_err(|e| CliError::UnexpectedError(e.to_string()))?;
+
+        // Detect corrupted config: encrypted fields without encryption section
+        if raw.has_any_encrypted_fields() && raw.encryption.is_none() {
+            return Err(CliError::EncryptionError(
+                "Config contains encrypted fields but no encryption section".to_string(),
+            ));
         }
+
+        // Skip password/KDF — pass None as key so encrypted fields become None.
+        let profiles = raw
+            .profiles
+            .map(|raw_profiles| {
+                raw_profiles
+                    .into_iter()
+                    .map(|(name, raw_profile)| {
+                        let typed = raw_profile.into_profile_config(None)?;
+                        Ok((name, typed))
+                    })
+                    .collect::<CliTypedResult<BTreeMap<String, ProfileConfig>>>()
+            })
+            .transpose()?;
+
+        Ok(CliConfig {
+            encryption: raw.encryption,
+            profiles,
+        })
+    }
+
+    /// Load a single profile without decrypting sensitive fields.
+    ///
+    /// Encrypted fields become `None`. Use for commands that only need
+    /// public config data.
+    pub fn load_profile_public(
+        profile: Option<&str>,
+        mode: ConfigSearchMode,
+    ) -> CliTypedResult<Option<ProfileConfig>> {
+        let mut config = Self::load_public(mode)?;
+
+        if let Some(profile) = profile {
+            if let Some(account_profile) = config.remove_profile(profile) {
+                Ok(Some(account_profile))
+            } else {
+                Err(CliError::CommandArgumentError(format!(
+                    "Profile {} not found",
+                    profile
+                )))
+            }
+        } else {
+            Ok(config.remove_profile(DEFAULT_PROFILE))
+        }
+    }
+
+    /// Check whether a specific field in a profile is encrypted in the raw YAML.
+    pub fn is_profile_field_encrypted(
+        profile: Option<&str>,
+        mode: ConfigSearchMode,
+        field_name: &str,
+    ) -> bool {
+        let Ok(folder) = Self::aptos_folder(mode) else {
+            return false;
+        };
+        let config_file = folder.join(CONFIG_FILE);
+        let old_config_file = folder.join(LEGACY_CONFIG_FILE);
+
+        let yaml_str = if config_file.exists() {
+            read_from_file(config_file.as_path())
+                .ok()
+                .and_then(|b| String::from_utf8(b).ok())
+        } else if old_config_file.exists() {
+            read_from_file(old_config_file.as_path())
+                .ok()
+                .and_then(|b| String::from_utf8(b).ok())
+        } else {
+            None
+        };
+
+        let Some(yaml_str) = yaml_str else {
+            return false;
+        };
+        let Ok(raw) = serde_yaml::from_str::<RawCliConfig>(&yaml_str) else {
+            return false;
+        };
+
+        let profile_name = profile.unwrap_or(DEFAULT_PROFILE);
+        raw.profiles
+            .as_ref()
+            .and_then(|p| p.get(profile_name))
+            .is_some_and(|p| p.is_field_encrypted(field_name))
     }
 
     pub fn load_profile(
@@ -246,7 +458,8 @@ impl CliConfig {
         }
     }
 
-    /// Saves the config to ./.aptos/config.yaml
+    /// Two-phase save: convert typed profiles to raw strings, encrypt sensitive fields
+    /// if encryption is enabled, then serialize to YAML.
     pub fn save(&self) -> CliTypedResult<()> {
         let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
@@ -264,9 +477,41 @@ impl CliConfig {
             )?;
         }
 
+        // Derive key if encryption is enabled, and verify it matches the stored key check
+        let derived_key = if let Some(ref enc_config) = self.encryption {
+            let password = get_password(enc_config, &aptos_folder)?;
+            let key = DerivedKey::derive(&password, enc_config)?;
+            if !key.verify_key_check(enc_config) {
+                return Err(CliError::WrongPassword);
+            }
+            Some(key)
+        } else {
+            None
+        };
+
+        // Convert typed profiles to raw (encrypting sensitive fields if needed)
+        let raw_profiles = self
+            .profiles
+            .as_ref()
+            .map(|profiles| {
+                profiles
+                    .iter()
+                    .map(|(name, profile)| {
+                        let raw = profile_config_to_raw(profile, derived_key.as_ref())?;
+                        Ok((name.clone(), raw))
+                    })
+                    .collect::<CliTypedResult<BTreeMap<String, _>>>()
+            })
+            .transpose()?;
+
+        let raw_config = RawCliConfig {
+            encryption: self.encryption.clone(),
+            profiles: raw_profiles,
+        };
+
         // Save over previous config file
         let config_file = aptos_folder.join(CONFIG_FILE);
-        let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
+        let config_bytes = serde_yaml::to_string(&raw_config).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to serialize config {}", err))
         })?;
         write_to_user_only_file(&config_file, CONFIG_FILE, config_bytes.as_bytes())?;
@@ -281,7 +526,7 @@ impl CliConfig {
     }
 
     /// Finds the current directory's .aptos folder
-    fn aptos_folder(mode: ConfigSearchMode) -> CliTypedResult<PathBuf> {
+    pub fn aptos_folder(mode: ConfigSearchMode) -> CliTypedResult<PathBuf> {
         let global_config = GlobalConfig::load()?;
         global_config.get_config_location(mode)
     }

@@ -17,6 +17,7 @@ use crate::{
         },
     },
 };
+use aptos_cli_common::encryption::{self, EncryptionConfig};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_ledger;
 use async_trait::async_trait;
@@ -69,6 +70,17 @@ pub struct InitTool {
     pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
     pub(crate) encoding_options: EncodingOptions,
+
+    /// Encrypt the config with a password after initialization
+    ///
+    /// Sensitive fields (private keys, API keys, auth tokens) will be encrypted
+    /// using AES-256-GCM with a key derived from your password via Argon2id.
+    #[clap(long)]
+    pub encrypt: bool,
+
+    /// Cache the encryption password in the OS keyring (requires --encrypt)
+    #[clap(long, requires = "encrypt")]
+    pub use_keyring: bool,
 }
 
 #[async_trait]
@@ -79,6 +91,16 @@ impl CliCommand<()> for InitTool {
 
     #[allow(clippy::literal_string_with_formatting_args)]
     async fn execute(self) -> CliTypedResult<()> {
+        #[cfg(not(feature = "keyring-cache"))]
+        if self.use_keyring {
+            return Err(CliError::CommandArgumentError(
+                "--use-keyring requires the `keyring-cache` build feature. Pre-built releases \
+                 for macOS and Windows include it. On Linux, build with \
+                 `--features keyring-cache` after installing libdbus-1-dev."
+                    .to_string(),
+            ));
+        }
+
         let mut config = if CliConfig::config_exists(ConfigSearchMode::CurrentDir) {
             CliConfig::load(ConfigSearchMode::CurrentDir)?
         } else {
@@ -135,30 +157,11 @@ impl CliCommand<()> for InitTool {
 
         // Ensure that there is at least a REST URL set for the network
         match network {
-            Network::Mainnet => {
-                profile_config.rest_url =
-                    Some("https://fullnode.mainnet.aptoslabs.com".to_string());
-                profile_config.faucet_url = None;
-            },
-            Network::Testnet => {
-                profile_config.rest_url =
-                    Some("https://fullnode.testnet.aptoslabs.com".to_string());
-                // The faucet in testnet is only accessible with some kind of bypass.
-                // For regular users this can only really mean an auth token. So if
-                // there is no auth token set, we don't set the faucet URL. If the user
-                // is confident they want to use the testnet faucet without a token
-                // they can set it manually with `--network custom` and `--faucet-url`.
-                profile_config.faucet_url = None;
-            },
-            Network::Devnet => {
-                profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
-                profile_config.faucet_url = Some("https://faucet.devnet.aptoslabs.com".to_string());
-            },
-            Network::Local => {
-                profile_config.rest_url = Some("http://localhost:8080".to_string());
-                profile_config.faucet_url = Some("http://localhost:8081".to_string());
-            },
             Network::Custom => self.custom_network(&mut profile_config)?,
+            _ => {
+                profile_config.rest_url = network.default_rest_url().map(|s| s.to_string());
+                profile_config.faucet_url = network.default_faucet_url().map(|s| s.to_string());
+            },
         }
 
         // Check if any ledger flag is set
@@ -366,6 +369,35 @@ impl CliCommand<()> for InitTool {
                 "See the account here: {}",
                 explorer_account_link(address, Some(network))
             );
+        }
+
+        // Encrypt config if requested
+        if self.encrypt {
+            let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+            let password = encryption::prompt_new_password()?;
+
+            let use_keyring = self.use_keyring;
+            #[cfg(feature = "keyring-cache")]
+            let use_keyring = if !use_keyring && std::env::var("APTOS_CONFIG_PASSWORD").is_err() {
+                crate::common::utils::prompt_yes(
+                    "Would you like to store the password in your OS keyring?",
+                )
+            } else {
+                use_keyring
+            };
+
+            let enc_config = EncryptionConfig::new(&password, use_keyring)?;
+
+            #[cfg(feature = "keyring-cache")]
+            if use_keyring {
+                let config_dir = CliConfig::aptos_folder(ConfigSearchMode::CurrentDir)?;
+                encryption::keyring_store(&password, &config_dir)?;
+                eprintln!("Password stored in OS keyring.");
+            }
+
+            config.encryption = Some(enc_config);
+            config.save()?;
+            eprintln!("Config encrypted successfully.");
         }
 
         Ok(())

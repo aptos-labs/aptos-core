@@ -12,7 +12,12 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+keyring-cache = ["keyring"]
+
 [dependencies]
+aes-gcm = { workspace = true }
 anstyle = { workspace = true }
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
@@ -24,6 +29,7 @@ aptos-ledger = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
+argon2 = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
@@ -31,11 +37,19 @@ clap = { workspace = true, features = ["env", "unstable-styles", "wrap_help"] }
 clap_complete = { workspace = true }
 dirs = { workspace = true }
 hex = { workspace = true }
+hmac = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
+keyring = { workspace = true, optional = true }
 move-core-types = { workspace = true }
+rand = { workspace = true }
 reqwest = { workspace = true }
+rpassword = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+# Pinned: workspace sha2 0.9.3 is incompatible with hmac 0.12 (needs digest 0.10)
+sha2 = { version = "0.10.6" }
+subtle = "2"
 thiserror = { workspace = true }
+zeroize = "1"

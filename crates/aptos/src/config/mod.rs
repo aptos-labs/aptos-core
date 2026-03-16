@@ -12,7 +12,10 @@ use crate::{
     genesis::git::{from_yaml, to_yaml},
     Tool,
 };
-use aptos_cli_common::generate_cli_completions;
+use aptos_cli_common::{
+    encryption::{self, EncryptionConfig},
+    generate_cli_completions,
+};
 use aptos_crypto::ValidCryptoMaterialStringExt;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
@@ -33,12 +36,16 @@ pub enum ConfigTool {
     ShowPrivateKey(ShowPrivateKey),
     RenameProfile(RenameProfile),
     DeleteProfile(DeleteProfile),
+    Encrypt(EncryptConfig),
+    Decrypt(DecryptConfig),
 }
 
 impl ConfigTool {
     pub async fn execute(self) -> CliResult {
         match self {
             ConfigTool::DeleteProfile(tool) => tool.execute_serialized().await,
+            ConfigTool::Encrypt(tool) => tool.execute_serialized_success().await,
+            ConfigTool::Decrypt(tool) => tool.execute_serialized_success().await,
             ConfigTool::GenerateShellCompletions(tool) => tool.execute_serialized_success().await,
             ConfigTool::RenameProfile(tool) => tool.execute_serialized().await,
             ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized().await,
@@ -120,6 +127,9 @@ impl CliCommand<GlobalConfig> for SetGlobalConfig {
 }
 
 /// Show the private key for the given profile
+///
+/// WARNING: This outputs the private key to stdout in plaintext. Anyone with access
+/// to this key can control the associated account. Use with caution.
 #[derive(Parser, Debug)]
 pub struct ShowPrivateKey {
     /// Which profile's private key to show
@@ -180,8 +190,9 @@ impl CliCommand<BTreeMap<String, ProfileSummary>> for ShowProfiles {
     }
 
     async fn execute(self) -> CliTypedResult<BTreeMap<String, ProfileSummary>> {
-        // Load the profile config
-        let config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+        // Use load_public so listing profiles never requires a password
+        let config = CliConfig::load_public(ConfigSearchMode::CurrentDir)?;
+        let is_encrypted = config.encryption.is_some();
         Ok(config
             .profiles
             .unwrap_or_default()
@@ -193,12 +204,16 @@ impl CliCommand<BTreeMap<String, ProfileSummary>> for ShowProfiles {
                     true
                 }
             })
-            .map(|(key, profile)| (key, ProfileSummary::from(&profile)))
+            .map(|(key, profile)| {
+                let mut summary = ProfileSummary::from(&profile);
+                summary.encrypted = is_encrypted;
+                (key, summary)
+            })
             .collect())
     }
 }
 
-/// Delete the specified profile.
+/// Delete the specified profile
 #[derive(Parser, Debug)]
 pub struct DeleteProfile {
     /// Which profile to delete
@@ -238,7 +253,7 @@ impl CliCommand<String> for DeleteProfile {
     }
 }
 
-/// Rename the specified profile.
+/// Rename the specified profile
 #[derive(Parser, Debug)]
 pub struct RenameProfile {
     /// Which profile to rename
@@ -291,7 +306,144 @@ impl CliCommand<String> for RenameProfile {
     }
 }
 
-/// Shows the properties in the global config
+/// Encrypt all sensitive fields in the current config
+///
+/// Prompts for a new password (entered twice for confirmation), derives an
+/// AES-256-GCM encryption key via Argon2id, and encrypts sensitive fields in
+/// `.aptos/config.yaml` in place.
+///
+/// Encrypted fields: `private_key`, `node_api_key`, `faucet_auth_token`.
+/// Non-sensitive fields remain in plaintext: `network`, `rest_url`, `faucet_url`,
+/// `public_key`, `account`, `derivation_path`.
+///
+/// Read-only commands (e.g. `account balance`, `account list`) do not require
+/// the password — they skip encrypted fields automatically.
+///
+/// The password can be provided in three ways (checked in order):
+///   1. `APTOS_CONFIG_PASSWORD` environment variable
+///   2. OS keyring (if `--use-keyring` was set during encryption)
+///   3. Interactive terminal prompt
+///
+/// To change your password, decrypt first then re-encrypt:
+///   `aptos config decrypt && aptos config encrypt`
+#[derive(Parser, Debug)]
+pub struct EncryptConfig {
+    /// Cache the password in the OS keyring so you don't have to re-enter it
+    ///
+    /// Uses macOS Keychain, Windows Credential Manager, or Linux Secret Service.
+    /// The password persists across terminal sessions until you decrypt or
+    /// clear it manually.
+    ///
+    /// Requires the `keyring-cache` build feature (included in pre-built releases
+    /// for macOS and Windows). On Linux, build with `--features keyring-cache`
+    /// after installing libdbus-1-dev.
+    #[clap(long)]
+    pub use_keyring: bool,
+}
+
+#[async_trait]
+impl CliCommand<()> for EncryptConfig {
+    fn command_name(&self) -> &'static str {
+        "EncryptConfig"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        #[cfg(not(feature = "keyring-cache"))]
+        if self.use_keyring {
+            return Err(CliError::CommandArgumentError(
+                "--use-keyring requires the `keyring-cache` build feature. Pre-built releases \
+                 for macOS and Windows include it. On Linux, build with \
+                 `--features keyring-cache` after installing libdbus-1-dev."
+                    .to_string(),
+            ));
+        }
+
+        // Use load_public to avoid prompting for password just to detect already-encrypted state
+        let mut config = CliConfig::load_public(ConfigSearchMode::CurrentDir)?;
+
+        if config.encryption.is_some() {
+            return Err(CliError::CommandArgumentError(
+                "Config is already encrypted. Decrypt first with `aptos config decrypt`."
+                    .to_string(),
+            ));
+        }
+
+        let password = encryption::prompt_new_password()?;
+
+        // If keyring feature is available and user didn't pass --use-keyring,
+        // offer it interactively (skip if password came from env var / cache).
+        let use_keyring = self.use_keyring;
+        #[cfg(feature = "keyring-cache")]
+        let use_keyring = if !use_keyring && std::env::var("APTOS_CONFIG_PASSWORD").is_err() {
+            crate::common::utils::prompt_yes(
+                "Would you like to store the password in your OS keyring?",
+            )
+        } else {
+            use_keyring
+        };
+
+        let enc_config = EncryptionConfig::new(&password, use_keyring)?;
+
+        #[cfg(feature = "keyring-cache")]
+        if use_keyring {
+            let config_dir = CliConfig::aptos_folder(ConfigSearchMode::CurrentDir)?;
+            encryption::keyring_store(&password, &config_dir)?;
+            eprintln!("Password stored in OS keyring.");
+        }
+
+        config.encryption = Some(enc_config);
+        config.save()?;
+
+        eprintln!("Config encrypted successfully.");
+        Ok(())
+    }
+}
+
+/// Decrypt all sensitive fields and remove encryption from the config
+///
+/// Prompts for the config password (or reads it from `APTOS_CONFIG_PASSWORD` /
+/// OS keyring), decrypts all encrypted fields, removes the `encryption:` section
+/// from `.aptos/config.yaml`, and saves as plaintext. Also clears the OS keyring
+/// entry if one was stored.
+///
+/// After decryption, sensitive fields (private keys, API keys, auth tokens) will
+/// be visible in plaintext in the config file.
+#[derive(Parser, Debug)]
+pub struct DecryptConfig {}
+
+#[async_trait]
+impl CliCommand<()> for DecryptConfig {
+    fn command_name(&self) -> &'static str {
+        "DecryptConfig"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        // Load will decrypt in memory
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if config.encryption.is_none() {
+            return Err(CliError::CommandArgumentError(
+                "Config is not encrypted.".to_string(),
+            ));
+        }
+
+        // Clear keyring entry if it was stored
+        #[cfg(feature = "keyring-cache")]
+        {
+            let config_dir = CliConfig::aptos_folder(ConfigSearchMode::CurrentDir)?;
+            encryption::keyring_clear(&config_dir)?;
+        }
+
+        // Remove encryption section and save as plaintext
+        config.encryption = None;
+        config.save()?;
+
+        eprintln!("Config decrypted successfully.");
+        Ok(())
+    }
+}
+
+/// Show the global configuration stored in ~/.aptos/global_config.yaml
 #[derive(Parser, Debug)]
 pub struct ShowGlobalConfig {}
 

@@ -88,6 +88,10 @@ pub enum CliError {
     SimulationError(String),
     #[error("Coverage failed with status: {0}")]
     CoverageError(String),
+    #[error("Encryption error: {0}")]
+    EncryptionError(String),
+    #[error("Wrong password or corrupted encrypted config")]
+    WrongPassword,
 }
 
 impl CliError {
@@ -109,6 +113,8 @@ impl CliError {
             CliError::UnexpectedError(_) => "UnexpectedError",
             CliError::SimulationError(_) => "SimulationError",
             CliError::CoverageError(_) => "CoverageError",
+            CliError::EncryptionError(_) => "EncryptionError",
+            CliError::WrongPassword => "WrongPassword",
         }
     }
 }

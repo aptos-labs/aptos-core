@@ -147,7 +147,10 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
     }
 }
 
-/// Verify entry function matches on-chain transaction proposal.
+/// Verify that a local entry function matches an on-chain multisig transaction proposal
+///
+/// Compares the payload hash of the provided entry function arguments against the on-chain
+/// transaction proposal to confirm they match before approving or executing.
 #[derive(Debug, Parser)]
 pub struct VerifyProposal {
     #[clap(flatten)]

@@ -839,6 +839,7 @@ dependencies = [
 name = "aptos-cli-common"
 version = "1.0.0"
 dependencies = [
+ "aes-gcm",
  "anstyle",
  "anyhow",
  "aptos-api-types",
@@ -850,6 +851,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-types",
+ "argon2",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -857,14 +859,21 @@ dependencies = [
  "clap_complete",
  "dirs 5.0.1",
  "hex",
+ "hmac 0.12.1",
  "indoc",
  "itertools 0.13.0",
+ "keyring",
  "move-core-types",
+ "rand 0.7.3",
  "reqwest 0.11.23",
+ "rpassword",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
+ "sha2 0.10.9",
+ "subtle",
  "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -5253,6 +5262,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bddcadddf5e9015d310179a59bb28c4d4b9920ad0f11e8e14dbadf654890c9a6"
 
 [[package]]
+name = "argon2"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c3610892ee6e0cbce8ae2700349fcf8f98adb0dbfbee85aec3c9179d29cc072"
+dependencies = [
+ "base64ct",
+ "blake2",
+ "cpufeatures",
+ "password-hash 0.5.0",
+]
+
+[[package]]
 name = "ark-bls12-381"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8082,6 +8103,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "dbus"
+version = "0.9.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21b3aa68d7e7abee336255bd7248ea965cc393f3e70411135a6f6a4b651345d4"
+dependencies = [
+ "libc",
+ "libdbus-sys",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "dbus-secret-service"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "708b509edf7889e53d7efb0ffadd994cc6c2345ccb62f55cfd6b0682165e4fa6"
+dependencies = [
+ "dbus",
+ "zeroize",
+]
+
+[[package]]
 name = "deadpool"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8350,7 +8392,7 @@ dependencies = [
  "pq-sys",
  "r2d2",
  "serde_json",
- "uuid 0.8.2",
+ "uuid 1.11.0",
 ]
 
 [[package]]
@@ -9534,7 +9576,7 @@ checksum = "e29e5681dc8556fb9df1409e95eae050e12e8776394313da3546dcb8cf390c73"
 dependencies = [
  "az",
  "bytemuck",
- "half 1.8.2",
+ "half 2.2.1",
  "typenum",
 ]
 
@@ -11747,6 +11789,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "keyring"
+version = "3.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eebcc3aff044e5944a8fbaf69eb277d11986064cba30c468730e8b9909fb551c"
+dependencies = [
+ "byteorder",
+ "dbus-secret-service",
+ "log",
+ "security-framework 2.9.2",
+ "security-framework 3.7.0",
+ "windows-sys 0.60.2",
+ "zeroize",
+]
+
+[[package]]
 name = "kqueue"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12023,6 +12080,15 @@ name = "libc"
 version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
+
+[[package]]
+name = "libdbus-sys"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "328c4789d42200f1eeec05bd86c9c13c7f091d2ba9a6ea35acdf51f31bc0f043"
+dependencies = [
+ "pkg-config",
+]
 
 [[package]]
 name = "libfuzzer-sys"
@@ -14509,6 +14575,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "password-hash"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "346f04948ba92c43e8469c1ee6736c7563d71012b17d40745260fe106aac2166"
+dependencies = [
+ "base64ct",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
 name = "pasta_curves"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14589,7 +14666,7 @@ checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.7",
  "hmac 0.12.1",
- "password-hash",
+ "password-hash 0.4.2",
  "sha2 0.10.9",
 ]
 
@@ -16616,6 +16693,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rpassword"
+version = "7.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66d4c8b64f049c6721ec8ccec37ddfc3d641c4a7fca57e8f2a89de509c73df39"
+dependencies = [
+ "libc",
+ "rtoolbox",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "rsa"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16717,6 +16805,16 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "rtoolbox"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7cc970b249fbe527d6e02e0a227762c9108b2f49d81094fe357ffc6d14d7f6f"
+dependencies = [
+ "libc",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -19945,7 +20043,7 @@ dependencies = [
  "errno",
  "js-sys",
  "libc",
- "rustix 0.37.27",
+ "rustix 0.38.28",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
  "winapi 0.3.9",

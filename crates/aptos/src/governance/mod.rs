@@ -280,6 +280,10 @@ async fn get_proposal(
 }
 
 /// Submit a governance proposal
+///
+/// The proposer must have a staked amount that meets the on-chain minimum proposal threshold.
+/// Requires a compiled Move script and JSON metadata hosted at a publicly accessible URL.
+/// Use `--is-multi-step` for proposals that require multiple execution steps (e.g. framework upgrades).
 #[derive(Parser)]
 pub struct SubmitProposal {
     #[clap(flatten)]
@@ -305,6 +309,7 @@ pub struct SubmitProposalArgs {
     #[clap(long)]
     pub(crate) metadata_path: Option<PathBuf>,
 
+    /// Use multi-step proposal format (required for framework upgrades and large packages)
     #[clap(long)]
     pub(crate) is_multi_step: bool,
 
@@ -717,11 +722,14 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
     }
 }
 
-/// Submit a transaction to approve a proposal's script hash to bypass the transaction size limit.
-/// This is needed for upgrading large packages such as aptos-framework.
+/// Approve a proposal's execution hash for multi-step execution
+///
+/// Registers the script hash on-chain so the proposal can be executed without including
+/// the full script in the execution transaction. Required for large packages like
+/// aptos-framework that exceed the transaction size limit.
 #[derive(Parser)]
 pub struct ApproveExecutionHash {
-    /// Id of the proposal to vote on
+    /// Id of the proposal to approve the execution hash for
     #[clap(long)]
     pub(crate) proposal_id: u64,
 
@@ -806,7 +814,11 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 }
 
-/// Generates a package upgrade proposal script.
+/// Generate a Move script for a framework upgrade governance proposal
+///
+/// Builds the specified Move package, then generates a proposal script that can be
+/// submitted via `aptos governance propose`. Use `--testnet` for testnet single-step
+/// proposals, or provide `--next-execution-hash` for multi-step proposals.
 #[derive(Parser)]
 pub struct GenerateUpgradeProposal {
     /// Address of the account which the proposal addresses.
@@ -827,10 +839,13 @@ pub struct GenerateUpgradeProposal {
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
     pub(crate) included_artifacts: IncludedArtifacts,
 
-    /// Generate the script for mainnet governance proposal by default or generate the upgrade script for testnet.
+    /// Generate a single-step testnet upgrade script instead of the default mainnet format
     #[clap(long)]
     pub(crate) testnet: bool,
 
+    /// Hex-encoded hash of the next execution step for multi-step proposals
+    ///
+    /// When provided, generates a multi-step proposal script. Leave empty for single-step proposals.
     #[clap(long, default_value = "")]
     pub(crate) next_execution_hash: String,
 
