@@ -386,9 +386,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         (prk, vk)
     }
 
-    // By the way, this approach seems a bit convoluted. Simpler to already generate the beta mask here in
-    // the commit_with_randomness() function, and then add it into the main sigma protocol of chunky,
-    // rather than doing this blinding / re-randomising stuff here in DeKART by default.
+    // By the way, this blinding approach seems a bit convoluted. Simpler to already generate the beta mask
+    // here in the commit_with_randomness() function, and then add it into the main sigma protocol of chunky,
+    // rather than doing this blinding / re-randomising stuff inside DeKART during prove() and verify().
     #[allow(non_snake_case)]
     fn commit_with_randomness(
         ck_S: &Self::CommitmentKey,
@@ -440,7 +440,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
-        // Step 1a
+        // Step 1a: parse the prover key
         let ProverKey {
             vk,
             ck_S,
@@ -457,7 +457,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             n,
             max_n
         );
-        // TODO: Use a subdomain to make the FFTs smaller, when n is much smaller than max_n
+        // TODO: Use an appropriate subdomain to make the FFTs smaller, when n is much smaller than max_n
         assert!(
             ell <= max_ell,
             "ell (got {}) must be ≤ max_ell (which is {})",
@@ -491,7 +491,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_initial_data(&mut fs_t, Self::DST, vk, PublicStatement {
             n,
             ell,
-            comm: TrivialShape(comm_g1),
+            comm: TrivialShape(comm_g1), // TODO: it's already normalised...
         });
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative("unpack pk + append_initial_data", start.elapsed());
@@ -521,11 +521,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 poly_randomness: Scalar(r),
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
-            two_term_msm::CodomainShape(hatC_proj - comm_g1),
+            two_term_msm::CodomainShape(hatC_proj - comm_g1), // This one is going to be projective
             &Self::DST,
             rng,
         )
-        .0; // TODO: we're throwing away the normalised statment here, fix it
+        .0; // We're throwing away the normalised statement here; I don't think storing it in the proof would ultimately decrease verification time
 
         // Step 3b
         fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
@@ -1032,7 +1032,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 }
 
-// TODO: move this to the range proof trait in the fiat_shamir file?
+// TODO: Move some of this to the range proof trait in the fiat_shamir file? Or not?
 mod fiat_shamir {
     use super::*;
     use crate::fiat_shamir::RangeProof;
