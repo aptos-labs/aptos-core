@@ -11,7 +11,9 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
-    state::State, state_delta::StateDelta, state_view::hot_state_view::HotStateView,
+    state::State,
+    state_delta::StateDelta,
+    state_view::hot_state_view::{HotStateRevoked, HotStateView},
 };
 use aptos_types::{
     state_store::{
@@ -23,17 +25,13 @@ use arr_macro::arr;
 use dashmap::{mapref::one::Ref, DashMap};
 #[cfg(test)]
 use std::collections::BTreeMap;
-use std::{
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        mpsc::{Receiver, RecvTimeoutError, Sender, SyncSender},
-        Arc, Weak,
-    },
-    time::Duration,
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64, Ordering},
+    mpsc::{Receiver, Sender, SyncSender},
+    Arc,
 };
 
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
-const DEFERRED_MERGE_RETRY_INTERVAL: Duration = Duration::from_millis(10);
 
 #[derive(Debug)]
 struct Shard<K, V>
@@ -106,37 +104,55 @@ where
     }
 }
 
-/// A composite HotStateView: checks the delta first, falls back to the base DashMaps. The delta
-/// covers changes from what's actually in the DashMaps (`merged_state`) to the current committed
-/// state. This enables RCU semantics: the new committed state is published immediately via the
-/// delta overlay, while DashMap mutations are deferred until all old readers are gone.
+/// A composite HotStateView: checks the delta first, falls back to the base DashMaps.
+/// Carries a revocation flag — when the Committer flips it to `true`, DashMap reads are
+/// no longer trusted (the Committer may be mutating them). Delta reads remain safe because
+/// the delta is immutable.
 struct LayeredHotStateView {
     /// If `Some`, overlay these changes on top of base. If `None`, base is up-to-date.
     delta: Option<StateDelta>,
     base: Arc<HotStateBase>,
+    /// Flipped to `true` by the Committer before it mutates DashMaps. Readers use a
+    /// post-read fence to detect revocation.
+    revoked: Arc<AtomicBool>,
 }
 
 impl HotStateView for LayeredHotStateView {
-    fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
+    fn get_state_slot(&self, state_key: &StateKey) -> Result<Option<StateSlot>> {
+        // Delta is immutable — always safe.
         if let Some(delta) = &self.delta {
             if let Some(slot) = delta.get_state_slot(state_key) {
-                // Delta says this key changed. If hot, return it. If cold/evicted, return None —
-                // do NOT fall through to base, the key was explicitly evicted in committed state.
-                return if slot.is_hot() { Some(slot) } else { None };
+                return Ok(if slot.is_hot() { Some(slot) } else { None });
             }
         }
-        // Key not in delta (unchanged) — read from base DashMap.
+
+        // Pre-check: fast-path reject if already revoked (optimization, not for correctness).
+        if self.revoked.load(Ordering::Relaxed) {
+            return Err(HotStateRevoked.into());
+        }
+
+        // Read from base DashMap.
         let shard_id = state_key.get_shard_id();
-        self.base
+        let result = self
+            .base
             .get_from_shard(shard_id, state_key.crypto_hash_ref())
-            .map(|v| v.clone())
+            .map(|v| v.clone());
+
+        // Post-read fence: if revoked, the DashMap value may be stale.
+        // Happens-before: flag.store(Release) →po write_unlock →lock read_lock →po flag.load(Acquire)
+        if self.revoked.load(Ordering::Acquire) {
+            return Err(HotStateRevoked.into());
+        }
+
+        Ok(result)
     }
 }
 
 enum CommitMsg {
     Commit(State),
-    /// Sent by `hack_reset` to synchronously reset the Committer's `merged_state` and `old_views`.
-    /// The caller blocks on `ack` until the Committer has finished processing the reset.
+    /// Sent by `hack_reset` to synchronously reset the Committer's `merged_state` and
+    /// `old_revoked_flags`. The caller blocks on `ack` until the Committer has finished
+    /// processing the reset.
     HackReset {
         state: State,
         ack: Sender<()>,
@@ -165,6 +181,7 @@ impl HotState {
         let view = Arc::new(LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
+            revoked: Arc::new(AtomicBool::new(false)),
         });
         let committed = Arc::new(Mutex::new(CommittedSnapshot {
             state: state.clone(),
@@ -191,15 +208,14 @@ impl HotState {
         {
             let mut committed = self.committed.lock();
             committed.state = state.clone();
-            // Reset view to base-only (no delta). hack_reset is only called when no commits are in
-            // flight, so DashMaps and committed state are in sync from the readers' perspective.
+            // Reset view to base-only (no delta) with a fresh revocation flag.
             committed.view = Arc::new(LayeredHotStateView {
                 delta: None,
                 base: Arc::clone(&self.base),
+                revoked: Arc::new(AtomicBool::new(false)),
             });
         }
-        // Synchronously reset the Committer's merged_state and old_views. Block until processed,
-        // so the caller has a hard guarantee that no stale Committer state remains.
+        // Synchronously reset the Committer's merged_state and old_revoked_flags.
         let (ack_tx, ack_rx) = std::sync::mpsc::channel();
         self.commit_tx
             .send(CommitMsg::HackReset { state, ack: ack_tx })
@@ -241,29 +257,10 @@ impl HotState {
 
 /// Background thread that merges committed state into the base DashMaps.
 ///
-/// ```text
-///   merged_state ──[delta overlay]──> committed.state <── to_commit (incoming)
-///        |                                  |
-///   base DashMaps                     what readers see
-///   (physical store)                  (via LayeredHotStateView)
-/// ```
-///
-/// The Committer tracks three `State` references:
-///
-/// - **`merged_state`** — what the base DashMaps currently reflect.
-/// - **`committed.state`** — latest state published to readers, possibly ahead of `merged_state`.
-///   Readers see it through a `LayeredHotStateView` that overlays
-///   `StateDelta(merged_state -> committed)` on the DashMaps.
-/// - **incoming `to_commit`** — the next state received from the channel.
-///
-/// On each incoming state the Committer builds a new `LayeredHotStateView`, atomically swaps it
-/// into `committed`, and tracks the old view via `Weak`. The Committer can advance `merged_state`
-/// (apply deltas to DashMaps) only when **all** old views have been dropped: each old view's delta
-/// assumes DashMaps = `merged_state`, and keys outside the delta fall through to the DashMaps
-/// directly. Advancing DashMaps while any such view is live would corrupt those fall-through reads.
-///
-/// In steady state (no forks, fast readers), `old_views` drains immediately and merges are inline.
-/// During a fork or under load, merges are deferred and the Committer retries via `recv_timeout`.
+/// Uses epoch-revocation instead of deferred merge: before mutating DashMaps,
+/// the Committer flips the `revoked` flag on all old views. Readers detect
+/// revocation via a post-read fence and fall through to cold storage.
+/// The Committer always merges inline — no waiting, no spin loop, no back-pressure.
 struct Committer {
     base: Arc<HotStateBase>,
     committed: Arc<Mutex<CommittedSnapshot>>,
@@ -275,13 +272,11 @@ struct Committer {
     /// Points to the oldest entry. `None` if empty.
     tails: [Option<HashValue>; NUM_STATE_SHARDS],
 
-    /// What the base DashMaps currently reflect. May lag behind `committed.state` while a merge
-    /// is deferred.
+    /// What the base DashMaps currently reflect.
     merged_state: State,
 
-    /// Weak refs to all previously published views. Merge is deferred until every one is dropped
-    /// (strong_count == 0). See struct doc.
-    old_views: Vec<Weak<LayeredHotStateView>>,
+    /// Revocation flags for all previously published views. Flipped before DashMap mutations.
+    old_revoked_flags: Vec<Arc<AtomicBool>>,
 
     /// Shared with HotState; updated after each successful DashMap merge.
     merged_version: Arc<AtomicU64>,
@@ -319,7 +314,7 @@ impl Committer {
             heads: arr![None; 16],
             tails: arr![None; 16],
             merged_state: initial_state,
-            old_views: Vec::new(),
+            old_revoked_flags: Vec::new(),
             merged_version,
         }
     }
@@ -327,11 +322,30 @@ impl Committer {
     fn run(&mut self) {
         info!("HotState committer thread started.");
 
-        while let Some(to_commit) = self.next_to_commit() {
-            self.try_merge(); // merge any deferred delta to shrink the next one
+        while let Some(batch) = self.next_to_commit() {
+            self.process_batch(batch);
+        }
 
-            // Skip if DashMaps already reflect this state (unlikely).
-            if self.merged_state.is_the_same(&to_commit) {
+        info!("HotState committer quitting.");
+    }
+
+    fn process_batch(&mut self, batch: Vec<State>) {
+        // Try to skip to the latest: if merged_state can be delta base of the last item,
+        // process only the last (skipping intermediate states).
+        let to_process = if batch.len() > 1
+            && self
+                .merged_state
+                .can_be_delta_base_of(batch.last().unwrap())
+        {
+            &batch[batch.len() - 1..]
+        } else {
+            // Iterate from oldest to newest. This handles layer advancement without
+            // spin-waiting: intermediate states bridge the layer gap.
+            &batch
+        };
+
+        for to_commit in to_process {
+            if self.merged_state.is_the_same(to_commit) {
                 warn!(
                     incoming_version = to_commit.next_version(),
                     "Incoming state already merged.",
@@ -339,56 +353,70 @@ impl Committer {
                 continue;
             }
 
-            // If merged_state is too old for to_commit (persisted snapshot advanced
-            // while merge was deferred), wait for old views to drain so try_merge
-            // can advance merged_state.
-            while !self.merged_state.can_be_delta_base_of(&to_commit) {
-                if !self.try_merge() {
-                    std::thread::sleep(DEFERRED_MERGE_RETRY_INTERVAL);
-                }
+            if !self.merged_state.can_be_delta_base_of(to_commit) {
+                // This can happen if we skipped intermediate states but shouldn't happen
+                // when iterating from oldest to newest.
+                warn!(
+                    merged_version = self.merged_state.next_version(),
+                    incoming_version = to_commit.next_version(),
+                    "Skipping incompatible state (merged_state cannot be delta base).",
+                );
+                continue;
             }
 
-            // Build a layered view: delta(merged_state -> to_commit) over base DashMaps.
+            // Step 1: Publish delta view with fresh revocation flag.
             let delta = to_commit.make_delta(&self.merged_state);
+            let revoked = Arc::new(AtomicBool::new(false));
             let new_view = Arc::new(LayeredHotStateView {
                 delta: Some(delta),
                 base: Arc::clone(&self.base),
+                revoked: Arc::clone(&revoked),
             });
 
-            // Atomically publish new view + state; track the old view for deferred merge.
             {
                 let mut committed = self.committed.lock();
-                Self::swap_view(&mut self.old_views, &mut committed, new_view);
-                committed.state = to_commit;
+                // Track the old view's revocation flag.
+                self.old_revoked_flags
+                    .push(Arc::clone(&committed.view.revoked));
+                committed.view = new_view;
+                committed.state = to_commit.clone();
             }
 
-            self.try_merge();
-        }
+            // Step 2: Revoke all old views BEFORE mutating DashMaps.
+            for flag in &self.old_revoked_flags {
+                flag.store(true, Ordering::Release);
+            }
+            self.old_revoked_flags.clear();
+            // Keep the current view's flag for future revocation.
+            self.old_revoked_flags.push(revoked);
 
-        self.try_merge(); // flush any remaining deferred merge before exit
-        info!("HotState committer quitting.");
+            // Step 3: Apply delta to base DashMaps.
+            self.apply_delta_to_base(to_commit);
+            self.merged_state = to_commit.clone();
+            self.merged_version
+                .store(self.merged_state.next_version(), Ordering::Release);
+            info!(
+                next_version = self.merged_state.next_version(),
+                "Advanced merged_state.",
+            );
+        }
     }
 
-    /// Process a `HackReset` message: synchronize `merged_state` / `old_views` with the caller and
-    /// ack.
-    ///
-    /// `HackReset` is a hack used by `hack_reset` and is only sent when no commits are in flight,
-    /// so it must be the sole message in the channel. `next_to_commit` asserts this before
-    /// calling.
+    /// Process a `HackReset` message.
     fn handle_reset(&mut self, state: State, ack: Sender<()>) {
         self.merged_state = state;
         self.merged_version
             .store(self.merged_state.next_version(), Ordering::Release);
-        self.old_views.clear();
+        self.old_revoked_flags.clear();
         let _ = ack.send(());
     }
 
-    fn next_to_commit(&mut self) -> Option<State> {
-        // Block until we receive the first Commit, retrying merges on timeout.
-        // HackReset messages are processed inline — they are only sent when no commits are in
-        // flight, so we assert the channel is empty after processing one.
+    /// Block until the first Commit arrives, then drain the backlog.
+    /// Returns the full batch (oldest to newest) or `None` on disconnect.
+    fn next_to_commit(&mut self) -> Option<Vec<State>> {
+        // Block until we receive the first Commit.
         let first = loop {
-            match self.rx.recv_timeout(DEFERRED_MERGE_RETRY_INTERVAL) {
+            match self.rx.recv() {
                 Ok(CommitMsg::Commit(state)) => break state,
                 Ok(CommitMsg::HackReset { state, ack }) => {
                     assert!(
@@ -398,21 +426,16 @@ impl Committer {
                     );
                     self.handle_reset(state, ack);
                 },
-                Err(RecvTimeoutError::Timeout) => {
-                    self.try_merge();
-                },
-                Err(RecvTimeoutError::Disconnected) => return None,
+                Err(_) => return None,
             }
         };
 
-        // Drain backlog — only the latest Commit matters. HackReset must not appear here.
-        let mut ret = first;
-        let mut n_backlog = 0;
+        // Drain backlog — collect all states, oldest to newest.
+        let mut batch = vec![first];
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
                 CommitMsg::Commit(state) => {
-                    n_backlog += 1;
-                    ret = state;
+                    batch.push(state);
                 },
                 CommitMsg::HackReset { .. } => {
                     unreachable!(
@@ -423,70 +446,8 @@ impl Committer {
             }
         }
 
-        GAUGE.set_with(&["hot_state_commit_backlog"], n_backlog);
-        Some(ret)
-    }
-
-    /// Replace `committed.view` with `new_view`, tracking the old view via a `Weak` ref so that
-    /// `try_merge` defers DashMap mutations while any reader still holds it.
-    fn swap_view(
-        old_views: &mut Vec<Weak<LayeredHotStateView>>,
-        committed: &mut CommittedSnapshot,
-        new_view: Arc<LayeredHotStateView>,
-    ) {
-        let old_view = std::mem::replace(&mut committed.view, new_view);
-        old_views.push(Arc::downgrade(&old_view));
-    }
-
-    /// Advance `merged_state` toward `committed.state` by applying deltas to the base DashMaps —
-    /// but only when all old views have been dropped. After merge, replaces `committed.view` with
-    /// a clean (no-delta) view. Readers who already cloned the old delta-bearing view are
-    /// unaffected: the delta shadows changed keys, and unchanged keys agree between the delta's
-    /// target and the updated DashMaps.
-    /// Returns `false` if blocked by lingering old views, `true` otherwise.
-    fn try_merge(&mut self) -> bool {
-        self.old_views.retain(|v| v.strong_count() > 0);
-        if !self.old_views.is_empty() {
-            self.update_deferred_merge_gauges(self.committed.lock().state.next_version());
-            return false;
-        }
-
-        let target = self.committed.lock().state.clone();
-        if self.merged_state.is_the_same(&target) {
-            self.update_deferred_merge_gauges(self.merged_state.next_version());
-            return true;
-        }
-
-        self.apply_delta_to_base(&target);
-        self.merged_state = target;
-        self.merged_version
-            .store(self.merged_state.next_version(), Ordering::Release);
-        info!(
-            next_version = self.merged_state.next_version(),
-            "Advanced merged_state.",
-        );
-
-        // Publish a clean (delta-free) view so future readers hit the DashMaps directly without
-        // the overhead of a delta lookup, now that the DashMaps are up to date.
-        let clean_view = Arc::new(LayeredHotStateView {
-            delta: None,
-            base: Arc::clone(&self.base),
-        });
-        Self::swap_view(&mut self.old_views, &mut self.committed.lock(), clean_view);
-        self.update_deferred_merge_gauges(self.merged_state.next_version());
-
-        true
-    }
-
-    fn update_deferred_merge_gauges(&self, committed_version: Version) {
-        GAUGE.set_with(
-            &["hot_state_deferred_merge_old_views"],
-            self.old_views.len() as i64,
-        );
-        GAUGE.set_with(
-            &["hot_state_deferred_merge_version_lag"],
-            (committed_version - self.merged_state.next_version()) as i64,
-        );
+        GAUGE.set_with(&["hot_state_commit_backlog"], (batch.len() - 1) as i64);
+        Some(batch)
     }
 
     /// Apply the delta between `merged_state` and `target` to the base DashMaps.
@@ -622,7 +583,9 @@ mod tests {
     use super::*;
     use aptos_config::config::HotStateConfig;
     use aptos_experimental_layered_map::MapLayer;
-    use aptos_storage_interface::state_store::{state::State, state_delta::StateDelta};
+    use aptos_storage_interface::state_store::{
+        state::State, state_delta::StateDelta, state_view::hot_state_view::HotStateRevoked,
+    };
     use aptos_types::state_store::{
         hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot,
         state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -652,7 +615,6 @@ mod tests {
     }
 
     /// Create a `StateDelta` for testing `LayeredHotStateView`.
-    /// The delta's shards contain exactly the given entries.
     fn make_test_delta(entries: &[(StateKey, StateSlot)]) -> StateDelta {
         let mut shard_entries: [Vec<(StateKey, StateSlot)>; NUM_STATE_SHARDS] =
             std::array::from_fn(|_| Vec::new());
@@ -676,9 +638,7 @@ mod tests {
         }
     }
 
-    /// Create an empty `State` that is a descendant of `parent` at the given version. `root` must
-    /// be the original ancestor — it's used as the base layer when spawning children so that
-    /// `make_delta(root)` remains valid for all descendants.
+    /// Create an empty `State` that is a descendant of `parent` at the given version.
     fn build_empty_descendant(root: &State, parent: &State, version: Version) -> State {
         let shards: [MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS] =
             std::array::from_fn(|shard_id| {
@@ -708,10 +668,11 @@ mod tests {
         let view = LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
+            revoked: Arc::new(AtomicBool::new(false)),
         };
 
         // Key in base -> returns base value.
-        let result = view.get_state_slot(&key);
+        let result = view.get_state_slot(&key).unwrap();
         assert!(result.is_some());
         assert_eq!(
             result.unwrap().as_state_value_opt(),
@@ -720,7 +681,7 @@ mod tests {
 
         // Key not in base -> returns None.
         let missing = StateKey::raw(b"missing");
-        assert!(view.get_state_slot(&missing).is_none());
+        assert!(view.get_state_slot(&missing).unwrap().is_none());
     }
 
     #[test]
@@ -761,10 +722,11 @@ mod tests {
         let view = LayeredHotStateView {
             delta: Some(delta),
             base,
+            revoked: Arc::new(AtomicBool::new(false)),
         };
 
         // Key only in base -> falls through to base.
-        let result = view.get_state_slot(&key_base_only);
+        let result = view.get_state_slot(&key_base_only).unwrap();
         assert!(result.is_some());
         assert_eq!(
             result.unwrap().as_state_value_opt(),
@@ -772,7 +734,7 @@ mod tests {
         );
 
         // Key updated in delta -> returns delta value.
-        let result = view.get_state_slot(&key_updated);
+        let result = view.get_state_slot(&key_updated).unwrap();
         assert!(result.is_some());
         assert_eq!(
             result.unwrap().as_state_value_opt(),
@@ -780,10 +742,10 @@ mod tests {
         );
 
         // Key evicted in delta -> returns None (even though in base).
-        assert!(view.get_state_slot(&key_evicted).is_none());
+        assert!(view.get_state_slot(&key_evicted).unwrap().is_none());
 
         // New key in delta -> returns delta value.
-        let result = view.get_state_slot(&key_new);
+        let result = view.get_state_slot(&key_new).unwrap();
         assert!(result.is_some());
         assert_eq!(
             result.unwrap().as_state_value_opt(),
@@ -791,7 +753,7 @@ mod tests {
         );
 
         // Key neither in delta nor base -> returns None.
-        assert!(view.get_state_slot(&key_missing).is_none());
+        assert!(view.get_state_slot(&key_missing).unwrap().is_none());
     }
 
     #[test]
@@ -805,28 +767,88 @@ mod tests {
         let view = LayeredHotStateView {
             delta: Some(delta),
             base,
+            revoked: Arc::new(AtomicBool::new(false)),
         };
 
-        let result = view.get_state_slot(&key);
+        let result = view.get_state_slot(&key).unwrap();
         assert!(result.is_some());
         assert!(result.unwrap().is_hot());
     }
 
-    // ===== Deferred merge tests =====
+    // ===== Revocation tests =====
 
-    /// Helper: wait for `get_committed()` to return a state at the given version.
-    fn wait_for_committed_version(hot_state: &HotState, target_next_version: Version) {
-        loop {
-            let (_, committed) = hot_state.get_committed();
-            if committed.next_version() >= target_next_version {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(1));
-        }
+    #[test]
+    fn test_revoked_view_returns_error() {
+        let base = Arc::new(HotStateBase::new_empty(100));
+        let key_in_base = StateKey::raw(b"in_base");
+        let slot = make_hot_slot(1, b"value");
+        base.shards[key_in_base.get_shard_id()]
+            .insert(*key_in_base.crypto_hash_ref(), slot.clone());
+
+        let key_in_delta = StateKey::raw(b"in_delta");
+        let delta_slot = make_hot_slot(2, b"delta_val");
+        let delta = make_test_delta(&[(key_in_delta.clone(), delta_slot.clone())]);
+
+        let revoked = Arc::new(AtomicBool::new(false));
+        let view = LayeredHotStateView {
+            delta: Some(delta),
+            base: Arc::clone(&base),
+            revoked: Arc::clone(&revoked),
+        };
+
+        // Before revocation: both keys work.
+        assert!(view.get_state_slot(&key_in_base).unwrap().is_some());
+        assert!(view.get_state_slot(&key_in_delta).unwrap().is_some());
+
+        // Revoke the view.
+        revoked.store(true, Ordering::Release);
+
+        // Delta-covered keys still work (delta is immutable).
+        let result = view.get_state_slot(&key_in_delta).unwrap();
+        assert!(result.is_some());
+        assert_eq!(
+            result.unwrap().as_state_value_opt(),
+            delta_slot.as_state_value_opt()
+        );
+
+        // Base fall-through keys return Err.
+        let err = view.get_state_slot(&key_in_base).unwrap_err();
+        assert!(err.downcast_ref::<HotStateRevoked>().is_some());
     }
 
     #[test]
-    fn test_deferred_merge_basic() {
+    fn test_revocation_does_not_block_merge() {
+        let state0 = State::new_empty(TEST_CONFIG);
+        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
+
+        // Hold a view — in the old deferred-merge scheme this would block merge.
+        let (held_view, _) = hot_state.get_committed();
+
+        // Enqueue commits.
+        let state1 = build_empty_descendant(&state0, &state0, 0);
+        let state2 = build_empty_descendant(&state0, &state1, 1);
+        hot_state.enqueue_commit(state1);
+        hot_state.enqueue_commit(state2);
+
+        // Merge should proceed immediately — no blocking on held_view.
+        hot_state.wait_for_merge(2);
+        assert_eq!(hot_state.merged_version.load(Ordering::Acquire), 2);
+
+        // The held view should be revoked — base fall-through returns Err.
+        let key = StateKey::raw(b"test_key");
+        match held_view.get_state_slot(&key) {
+            Ok(None) => {}, // View had no delta, key not in base — Ok(None) before revocation check
+            Err(e) => assert!(e.downcast_ref::<HotStateRevoked>().is_some()),
+            Ok(Some(_)) => panic!("Expected revoked error or None, got Some"),
+        }
+
+        drop(held_view);
+    }
+
+    // ===== Integration tests =====
+
+    #[test]
+    fn test_basic_commit() {
         let state0 = State::new_empty(TEST_CONFIG);
         let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
 
@@ -839,140 +861,18 @@ mod tests {
     }
 
     #[test]
-    fn test_deferred_merge_with_lingering_reader() {
-        let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
-
-        // Grab a view — this reader holds a strong ref to the initial view.
-        let (held_view, _) = hot_state.get_committed();
-
-        // Enqueue two commits.
-        let state1 = build_empty_descendant(&state0, &state0, 0);
-        let state2 = build_empty_descendant(&state0, &state1, 1);
-        hot_state.enqueue_commit(state1);
-        hot_state.enqueue_commit(state2);
-
-        // Wait for the Committer to process the commits (view swap).
-        wait_for_committed_version(&hot_state, 2);
-
-        // Give the Committer time to attempt try_merge (should fail because we hold the old view).
-        std::thread::sleep(Duration::from_millis(100));
-
-        // Merge should NOT have happened yet.
-        assert!(hot_state.merged_version.load(Ordering::Acquire) < 2);
-
-        // Drop the old view.
-        drop(held_view);
-
-        // Now merge should proceed.
-        hot_state.wait_for_merge(2);
-        assert_eq!(hot_state.merged_version.load(Ordering::Acquire), 2);
-    }
-
-    /// Regression test: `try_merge()` must track the delta view it replaces with a clean view.
-    ///
-    /// Without tracking, a reader holding that delta view becomes invisible to the Committer.
-    /// A subsequent merge advances the DashMaps past the view's target state, corrupting
-    /// fall-through reads for keys not covered by the delta.
-    ///
-    /// Timeline (states are empty so deltas are no-ops, but tracking still matters):
-    ///
-    /// ```text
-    ///   r0 holds V0_clean ──► blocks merge of S1
-    ///   S1 committed        ──► V1_delta published
-    ///   r1 grabs V1_delta
-    ///   drop(r0)            ──► merge to S1 proceeds, try_merge replaces V1_delta with V1_clean
-    ///   S2 committed        ──► V2_delta published
-    ///   assert: merge to S2 blocked by r1 (V1_delta must be tracked)
-    /// ```
-    #[test]
-    fn test_try_merge_tracks_replaced_view() {
-        let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
-
-        // Hold the initial view (V0_clean). This blocks merge while S1 is committed,
-        // keeping V1_delta in committed.view long enough for us to grab it.
-        let (r0_view, _) = hot_state.get_committed();
-
-        // Commit S1. The Committer publishes V1_delta and tracks Weak(V0_clean).
-        // Merge is deferred because r0_view holds V0_clean.
-        let state1 = build_empty_descendant(&state0, &state0, 0);
-        hot_state.enqueue_commit(state1.clone());
-        wait_for_committed_version(&hot_state, 1);
-
-        // Grab V1_delta — the delta view currently in committed.view.
-        let (r1_view, r1_state) = hot_state.get_committed();
-        assert_eq!(r1_state.next_version(), 1);
-
-        // Drop r0_view: unblocks merge to S1. The Committer's try_merge() will:
-        //   1. Apply delta S0→S1 to DashMaps (no-op for empty states)
-        //   2. Replace V1_delta with a clean V1_clean via swap_view
-        //   3. swap_view pushes Weak(V1_delta) into old_views
-        drop(r0_view);
-        hot_state.wait_for_merge(1);
-
-        // Commit S2. The Committer publishes V2_delta and tracks Weak(V1_clean).
-        let state2 = build_empty_descendant(&state0, &state1, 1);
-        hot_state.enqueue_commit(state2);
-        wait_for_committed_version(&hot_state, 2);
-
-        // Give the Committer time to attempt try_merge for S2.
-        // V1_delta is tracked in old_views (r1_view holds it), so merge must be deferred.
-        std::thread::sleep(Duration::from_millis(100));
-        assert!(
-            hot_state.merged_version.load(Ordering::Acquire) < 2,
-            "DashMaps must not advance past S1 while a reader holds V1_delta"
-        );
-
-        // Drop r1_view. Now merge to S2 should proceed.
-        drop(r1_view);
-        hot_state.wait_for_merge(2);
-        assert_eq!(hot_state.merged_version.load(Ordering::Acquire), 2);
-    }
-
-    /// Regression test: the committer must not crash when `merged_state` lags behind
-    /// the `base_layer` of an incoming `to_commit`.
-    ///
-    /// In production, `State::update()` spawns new `MapLayer` shards with
-    /// `base_layer = persisted_snapshot.layer()`. When old readers prevent
-    /// `try_merge()` from advancing `merged_state`, and `persisted_snapshot`
-    /// has advanced, the committer's `merged_state` can be at a lower layer than
-    /// `to_commit.base_layer`. The fix makes the committer wait for merge before
-    /// building the delta.
-    ///
-    /// Timeline:
-    /// ```text
-    ///   r0 holds V0_clean ──► blocks all merges (merged_state stuck at S0)
-    ///   S1 committed (base_layer=0) ──► delta(S0→S1) OK
-    ///   S2 committed (base_layer=1) ──► delta(S0→S2) would crash without fix
-    ///   drop(r0) ──► merge to S1 proceeds, then delta(S1→S2) OK
-    /// ```
-    #[test]
     fn test_commit_with_advanced_base_layer() {
+        // Tests that batch iteration handles layer boundaries without spin-waiting.
         let state0 = State::new_empty(TEST_CONFIG);
         let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
 
-        // Hold a view to block all merges (merged_state stays at S0).
-        let (held_view, _) = hot_state.get_committed();
-
-        // S1: spawned with root=S0, so base_layer = S0.layer = 0.
-        // Compatible with merged_state at S0.
+        // S1: base_layer = S0.layer = 0.
         let state1 = build_empty_descendant(&state0, &state0, 0);
         hot_state.enqueue_commit(state1.clone());
-        wait_for_committed_version(&hot_state, 1);
 
-        // S2: spawned with root=S1, simulating persisted_snapshot advancing to S1.
-        // This gives base_layer = S1.layer = 1, incompatible with merged_state
-        // still at S0 (layer 0). Without the fix this panics.
+        // S2: base_layer = S1.layer = 1 (persisted snapshot advanced).
         let state2 = build_empty_descendant(&state1, &state1, 1);
         hot_state.enqueue_commit(state2);
-
-        // Give the committer time to pick up S2 and hit the incompatible
-        // merged_state. Without the fix, this would panic.
-        std::thread::sleep(Duration::from_millis(100));
-
-        // Drop the held view so the committer can merge S0→S1, then process S2.
-        drop(held_view);
 
         hot_state.wait_for_merge(2);
         let (_, committed) = hot_state.get_committed();
@@ -995,20 +895,14 @@ mod tests {
             parent = child;
         }
 
-        // Wait for committed version to advance to the last enqueued state.
-        wait_for_committed_version(&hot_state, 5);
+        // Merge should proceed immediately without waiting for held_view to drop.
+        hot_state.wait_for_merge(5);
+        assert_eq!(hot_state.merged_version.load(Ordering::Acquire), 5);
 
-        // get_committed() returns the latest state even while merge is deferred.
         let (_, committed) = hot_state.get_committed();
         assert_eq!(committed.next_version(), 5);
 
-        // Merge deferred because old view is held.
-        std::thread::sleep(Duration::from_millis(100));
-        assert!(hot_state.merged_version.load(Ordering::Acquire) < 5);
-
-        // Drop old view -> merge should proceed.
+        // The held view is revoked.
         drop(held_view);
-        hot_state.wait_for_merge(5);
-        assert_eq!(hot_state.merged_version.load(Ordering::Acquire), 5);
     }
 }

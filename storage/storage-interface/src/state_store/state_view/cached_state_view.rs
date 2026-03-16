@@ -236,20 +236,36 @@ impl CachedStateView {
         let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
             slot
-        } else if let Some(slot) = self.hot.get_state_slot(state_key) {
-            COUNTER.inc_with(&["sv_hit_hot"]);
-            slot
-        } else if let Some(base_version) = self.base_version() {
-            COUNTER.inc_with(&["sv_cold"]);
-            StateSlot::from_db_get(
-                self.cold
-                    .get_state_value_with_version_by_version(state_key, base_version)?,
-            )
         } else {
-            StateSlot::ColdVacant
+            match self.hot.get_state_slot(state_key) {
+                Ok(Some(slot)) => {
+                    COUNTER.inc_with(&["sv_hit_hot"]);
+                    slot
+                },
+                Ok(None) => self.read_from_cold(state_key)?,
+                Err(_) => {
+                    // Revocation — fall through to cold.
+                    // Safe: speculative delta covers all persisted→current changes;
+                    // fall-through only reaches keys unchanged since persisted.
+                    COUNTER.inc_with(&["sv_hot_revoked"]);
+                    self.read_from_cold(state_key)?
+                },
+            }
         };
 
         Ok(ret)
+    }
+
+    fn read_from_cold(&self, state_key: &StateKey) -> Result<StateSlot> {
+        if let Some(base_version) = self.base_version() {
+            COUNTER.inc_with(&["sv_cold"]);
+            Ok(StateSlot::from_db_get(
+                self.cold
+                    .get_state_value_with_version_by_version(state_key, base_version)?,
+            ))
+        } else {
+            Ok(StateSlot::ColdVacant)
+        }
     }
 
     pub fn next_version(&self) -> Version {

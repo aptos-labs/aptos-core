@@ -194,10 +194,7 @@ impl State {
         assert!(self.next_version() >= state_cache.next_version());
 
         let overlay = self.make_delta(persisted);
-        let (((shards, new_metadata), usage_delta_per_shard), hot_state_updates): (
-            ((Vec<_>, Vec<_>), Vec<_>),
-            Vec<_>,
-        ) = (
+        let results: Result<Vec<_>> = (
             state_cache.shards.as_slice(),
             overlay.shards.as_slice(),
             self.hot_state_metadata.as_slice(),
@@ -230,12 +227,12 @@ impl State {
                                 key,
                                 update,
                                 self.hot_state_config.refresh_interval_versions,
-                            ) {
+                            )? {
                                 insertions.insert((*key).clone(), hot_state_value);
                             }
                         }
                         // Only evict at the checkpoints.
-                        evictions.extend(lru.maybe_evict().into_iter().map(|(key, slot)| {
+                        evictions.extend(lru.maybe_evict()?.into_iter().map(|(key, slot)| {
                             insertions.remove(&key);
                             assert!(slot.is_hot());
                             key
@@ -250,7 +247,7 @@ impl State {
                             key,
                             update,
                             self.hot_state_config.refresh_interval_versions,
-                        ) {
+                        )? {
                             insertions.insert((*key).clone(), hot_state_value);
                         }
                     }
@@ -266,13 +263,17 @@ impl State {
                         num_items: new_num_items,
                     };
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
-                    (
+                    Ok((
                         ((new_layer, new_metadata), new_usage),
                         HotStateShardUpdates::new(insertions, evictions),
-                    )
+                    ))
                 },
             )
-            .unzip();
+            .collect();
+        let (((shards, new_metadata), usage_delta_per_shard), hot_state_updates): (
+            ((Vec<_>, Vec<_>), Vec<_>),
+            Vec<_>,
+        ) = results?.into_iter().unzip();
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let new_metadata = new_metadata.try_into().expect("Known to be 16 shards.");
         let usage = self.update_usage(usage_delta_per_shard);
@@ -303,13 +304,16 @@ impl State {
         key: &StateKey,
         update: &StateUpdateRef,
         refresh_interval: Version,
-    ) -> Option<HotStateValue> {
+    ) -> Result<Option<HotStateValue>> {
         if let Some(state_value_opt) = update.state_op.as_state_value_opt() {
-            lru.insert((*key).clone(), update.to_result_slot().unwrap());
-            return Some(HotStateValue::new(state_value_opt.cloned(), update.version));
+            lru.insert((*key).clone(), update.to_result_slot().unwrap())?;
+            return Ok(Some(HotStateValue::new(
+                state_value_opt.cloned(),
+                update.version,
+            )));
         }
 
-        if let Some(mut slot) = lru.get_slot(key) {
+        if let Some(mut slot) = lru.get_slot(key)? {
             let mut refreshed = true;
             let slot_to_insert = if slot.is_hot() {
                 if slot.expect_hot_since_version() + refresh_interval <= update.version {
@@ -323,18 +327,18 @@ impl State {
             };
             if refreshed {
                 let ret = HotStateValue::clone_from_slot(&slot_to_insert);
-                lru.insert((*key).clone(), slot_to_insert);
-                Some(ret)
+                lru.insert((*key).clone(), slot_to_insert)?;
+                Ok(Some(ret))
             } else {
-                None
+                Ok(None)
             }
         } else {
             let slot = Self::expect_old_slot(overlay, read_cache, key);
             assert!(slot.is_cold());
             let slot = slot.to_hot(update.version);
             let ret = HotStateValue::clone_from_slot(&slot);
-            lru.insert((*key).clone(), slot);
-            Some(ret)
+            lru.insert((*key).clone(), slot)?;
+            Ok(Some(ret))
         }
     }
 

@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::state_view::hot_state_view::HotStateView;
+use anyhow::{Context, Result};
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::state_store::{
     hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
@@ -46,21 +47,22 @@ impl<'a> HotStateLRU<'a> {
         }
     }
 
-    pub fn insert(&mut self, key: StateKey, slot: StateSlot) {
+    pub fn insert(&mut self, key: StateKey, slot: StateSlot) -> Result<()> {
         assert!(
             slot.is_hot(),
             "Should not insert cold slots into hot state."
         );
-        if self.delete(&key).is_none() {
+        if self.delete(&key)?.is_none() {
             self.num_items += 1;
         }
-        self.insert_as_head(key, slot);
+        self.insert_as_head(key, slot)?;
+        Ok(())
     }
 
-    fn insert_as_head(&mut self, key: StateKey, mut slot: StateSlot) {
+    fn insert_as_head(&mut self, key: StateKey, mut slot: StateSlot) -> Result<()> {
         match self.head.take() {
             Some(head) => {
-                let mut old_head_slot = self.expect_hot_slot(&head);
+                let mut old_head_slot = self.expect_hot_slot(&head)?;
                 old_head_slot.set_prev(Some(key.clone()));
                 slot.set_prev(None);
                 slot.set_next(Some(head.clone()));
@@ -76,22 +78,23 @@ impl<'a> HotStateLRU<'a> {
                 self.tail = Some(key);
             },
         }
+        Ok(())
     }
 
     /// Returns the list of entries evicted, beginning from the LRU.
-    pub fn maybe_evict(&mut self) -> Vec<(StateKey, StateSlot)> {
+    pub fn maybe_evict(&mut self) -> Result<Vec<(StateKey, StateSlot)>> {
         let mut current = match &self.tail {
             Some(tail) => tail.clone(),
             None => {
                 assert_eq!(self.num_items, 0);
-                return Vec::new();
+                return Ok(Vec::new());
             },
         };
 
         let mut evicted = Vec::new();
         while self.num_items > self.capacity.get() {
             let slot = self
-                .delete(&current)
+                .delete(&current)?
                 .expect("There must be entries to evict when current size is above capacity.");
             let prev_key = slot
                 .prev()
@@ -102,22 +105,22 @@ impl<'a> HotStateLRU<'a> {
             current = prev_key;
             self.num_items -= 1;
         }
-        evicted
+        Ok(evicted)
     }
 
     /// Returns the deleted slot, or `None` if the key doesn't exist or is not hot.
-    fn delete(&mut self, key: &StateKey) -> Option<StateSlot> {
+    fn delete(&mut self, key: &StateKey) -> Result<Option<StateSlot>> {
         // Fetch the slot corresponding to the given key. Note that `self.pending` and
         // `self.overlay` may contain cold slots, like the ones recently evicted, and we need to
         // ignore them.
-        let old_slot = match self.get_slot(key) {
+        let old_slot = match self.get_slot(key)? {
             Some(slot) if slot.is_hot() => slot,
-            _ => return None,
+            _ => return Ok(None),
         };
 
         match old_slot.prev() {
             Some(prev_key) => {
-                let mut prev_slot = self.expect_hot_slot(prev_key);
+                let mut prev_slot = self.expect_hot_slot(prev_key)?;
                 prev_slot.set_next(old_slot.next().cloned());
                 self.pending.insert(prev_key.clone(), prev_slot);
             },
@@ -129,7 +132,7 @@ impl<'a> HotStateLRU<'a> {
 
         match old_slot.next() {
             Some(next_key) => {
-                let mut next_slot = self.expect_hot_slot(next_key);
+                let mut next_slot = self.expect_hot_slot(next_key)?;
                 next_slot.set_prev(old_slot.prev().cloned());
                 self.pending.insert(next_key.clone(), next_slot);
             },
@@ -139,25 +142,27 @@ impl<'a> HotStateLRU<'a> {
             },
         }
 
-        Some(old_slot)
+        Ok(Some(old_slot))
     }
 
-    pub(crate) fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
+    pub(crate) fn get_slot(&self, key: &StateKey) -> Result<Option<StateSlot>> {
         if let Some(slot) = self.pending.get(key) {
-            return Some(slot.clone());
+            return Ok(Some(slot.clone()));
         }
 
         if let Some(slot) = self.overlay.get(key) {
-            return Some(slot);
+            return Ok(Some(slot));
         }
 
         self.committed.get_state_slot(key)
     }
 
-    fn expect_hot_slot(&self, key: &StateKey) -> StateSlot {
-        let slot = self.get_slot(key).expect("Given key is expected to exist.");
+    fn expect_hot_slot(&self, key: &StateKey) -> Result<StateSlot> {
+        let slot = self
+            .get_slot(key)?
+            .context("Given key is expected to exist.")?;
         assert!(slot.is_hot(), "Given key is expected to be hot.");
-        slot
+        Ok(slot)
     }
 
     pub fn into_updates(
@@ -194,7 +199,7 @@ impl<'a> HotStateLRU<'a> {
         let mut current = start;
         let mut num_visited = 0;
         while let Some(key) = current {
-            let slot = self.expect_hot_slot(&key);
+            let slot = self.expect_hot_slot(&key).unwrap();
             num_visited += 1;
             current = func(&slot).cloned();
         }
@@ -214,7 +219,7 @@ impl<'a, 'b> Iterator for Iter<'a, 'b> {
 
     fn next(&mut self) -> Option<(StateKey, StateSlot)> {
         let key = self.current_key.take()?;
-        let slot = self.lru.expect_hot_slot(&key);
+        let slot = self.lru.expect_hot_slot(&key).unwrap();
         self.current_key = slot.next().cloned();
         Some((key, slot))
     }
@@ -253,8 +258,8 @@ mod tests {
     }
 
     impl HotStateView for Mutex<HotState> {
-        fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
-            self.lock().unwrap().inner.get(state_key).cloned()
+        fn get_state_slot(&self, state_key: &StateKey) -> anyhow::Result<Option<StateSlot>> {
+            Ok(self.lock().unwrap().inner.get(state_key).cloned())
         }
     }
 
@@ -381,13 +386,13 @@ mod tests {
                 lru.validate();
 
                 for (key, slot) in updates {
-                    lru.insert(key.clone(), slot.clone());
+                    lru.insert(key.clone(), slot.clone()).unwrap();
                     naive_lru.put(key, slot);
                     lru.validate();
                     assert_lru_equal(&lru, &naive_lru);
                 }
 
-                let actual_evicted = lru.maybe_evict();
+                let actual_evicted = lru.maybe_evict().unwrap();
                 let mut expected_evicted = Vec::new();
                 while naive_lru.len() > capacity.get() {
                     expected_evicted.push(naive_lru.pop_lru().unwrap());

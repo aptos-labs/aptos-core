@@ -11,8 +11,11 @@ use aptos_config::config::{
 use aptos_crypto::hash::CryptoHash;
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, state_store::state_summary::ProvableStateSummary, DbReader,
-    DbWriter, Result,
+    chunk_to_commit::ChunkToCommit,
+    state_store::{
+        state_summary::ProvableStateSummary, state_view::hot_state_view::HotStateRevoked,
+    },
+    DbReader, DbWriter, Result,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -132,13 +135,19 @@ impl AptosDB {
         );
 
         let current = self.state_store.current_state_locked().clone();
-        let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
-        let (new_state, reads, hot_state_updates) = current.ledger_state().update_with_db_reader(
-            &persisted_state,
-            hot_state,
-            transactions_to_keep.state_update_refs(),
-            self.state_store.clone(),
-        )?;
+        let (new_state, reads, hot_state_updates) = loop {
+            let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
+            match current.ledger_state().update_with_db_reader(
+                &persisted_state,
+                hot_state,
+                transactions_to_keep.state_update_refs(),
+                self.state_store.clone(),
+            ) {
+                Ok(result) => break result,
+                Err(e) if e.downcast_ref::<HotStateRevoked>().is_some() => continue,
+                Err(e) => return Err(e.into()),
+            }
+        };
         let persisted_summary = self.state_store.get_persisted_state_summary()?;
         let new_state_summary = current.ledger_state_summary().update(
             &ProvableStateSummary::new(persisted_summary, self),

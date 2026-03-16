@@ -5,7 +5,7 @@
 
 use crate::{
     ledger_db::LedgerDb,
-    metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
+    metrics::{COUNTER, OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
     pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -44,7 +44,7 @@ use aptos_jellyfish_merkle::{
     TreeUpdateBatch,
 };
 use aptos_logger::info;
-use aptos_metrics_core::TimerHelper;
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_schemadb::batch::{NativeBatch, SchemaBatch, WriteBatch};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
@@ -55,7 +55,7 @@ use aptos_storage_interface::{
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
             cached_state_view::{ShardedStateCache, StateCacheShard},
-            hot_state_view::HotStateView,
+            hot_state_view::{HotStateRevoked, HotStateView},
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
@@ -689,10 +689,22 @@ impl StateStore {
                 all_checkpoint_indices,
             );
             let current_state = out_current_state.lock().clone();
-            let (hot_state, state) = out_persisted_state.get_state();
-            let (new_state, _state_reads, hot_state_updates) = current_state
-                .ledger_state()
-                .update_with_db_reader(&state, hot_state, &state_update_refs, state_db.clone())?;
+            let (new_state, _state_reads, hot_state_updates) = loop {
+                let (hot_state, state) = out_persisted_state.get_state();
+                match current_state.ledger_state().update_with_db_reader(
+                    &state,
+                    hot_state,
+                    &state_update_refs,
+                    state_db.clone(),
+                ) {
+                    Ok(result) => break result,
+                    Err(e) if e.downcast_ref::<HotStateRevoked>().is_some() => {
+                        COUNTER.inc_with(&["hot_state_revoked_retry"]);
+                        continue;
+                    },
+                    Err(e) => return Err(e.into()),
+                }
+            };
             let state_summary = out_persisted_state.get_state_summary();
             let new_state_summary = current_state.ledger_state_summary().update(
                 &ProvableStateSummary::new(state_summary, state_db.as_ref()),
@@ -764,13 +776,22 @@ impl StateStore {
         sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<(LedgerState, HotStateUpdates)> {
         let current = self.current_state_locked().ledger_state();
-        let (hot_state, persisted) = self.get_persisted_state()?;
-        let (new_state, reads, hot_state_updates) = current.update_with_db_reader(
-            &persisted,
-            hot_state,
-            state_update_refs,
-            self.state_db.clone(),
-        )?;
+        let (new_state, reads, hot_state_updates) = loop {
+            let (hot_state, persisted) = self.get_persisted_state()?;
+            match current.update_with_db_reader(
+                &persisted,
+                hot_state,
+                state_update_refs,
+                self.state_db.clone(),
+            ) {
+                Ok(result) => break result,
+                Err(e) if e.downcast_ref::<HotStateRevoked>().is_some() => {
+                    COUNTER.inc_with(&["hot_state_revoked_retry"]);
+                    continue;
+                },
+                Err(e) => return Err(e.into()),
+            }
+        };
 
         self.put_state_updates(
             &new_state,
