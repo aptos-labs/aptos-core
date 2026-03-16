@@ -228,6 +228,7 @@ async fn decrypt_validator_path(
         .collect();
 
     // TODO(ibalajiarun): Consider using commit block height to reduce trusted setup size
+    // TODO(ibalajiarun): Fix this wrapping
     let num_rounds = secret_share_config.digest_key().num_rounds() as u64;
     let encryption_round = block.round() % num_rounds;
     let (digest, proofs_promise) = FPTXWeighted::digest(
