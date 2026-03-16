@@ -36,6 +36,7 @@ pub mod delayed_values;
 pub mod gas;
 pub mod instr;
 pub mod interner;
+pub mod limits;
 pub mod loaded_data;
 pub mod module_id_interner;
 pub mod natives;
