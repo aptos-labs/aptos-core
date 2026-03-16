@@ -15,7 +15,7 @@ use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
-use std::{any::type_name, fmt::Debug};
+use std::any::type_name;
 
 #[cfg(test)]
 fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
@@ -83,10 +83,7 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
 #[cfg(test)]
 fn assert_keys_serialization<E: Pairing, B: BatchedRangeProof<E>>(
     setup: &RangeProofUniversalSetup<E, B>,
-) where
-    B::ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug, // TODO: make these part of the traits?
-    B::VerificationKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
-{
+) {
     let RangeProofUniversalSetup { pk, vk } = setup;
 
     // === Prover key serialization/deserialization ===
@@ -158,8 +155,6 @@ fn assert_correctness_and_serialization_for_range_proof_and_curve<E, B>()
 where
     E: Pairing,
     B: BatchedRangeProof<E>,
-    B::ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
-    B::VerificationKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
 {
     let setups = make_single_curve_setup::<E, B>(31, 16);
     for &(n, ell) in TEST_CASES {

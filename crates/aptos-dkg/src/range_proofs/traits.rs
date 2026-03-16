@@ -7,12 +7,18 @@ use ark_ec::pairing::{Pairing, PairingOutput};
 use ark_ff::AdditiveGroup;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
+use std::fmt::Debug;
 
 // TODO: split this into `BatchedRangeProof` and `PairingBatchedRangeProof: BatchedRangeProof`? Or only do PairingBatchedRangeProof for now?
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
     type PublicStatement: CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
-    type ProverKey;
-    type VerificationKey: Clone + SerializeForFiatShamirTranscript; // This is often appended to a Fiat-Shamir transcript
+    type ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug;
+    type VerificationKey: CanonicalSerialize
+        + CanonicalDeserialize
+        + Eq
+        + Debug
+        + Clone
+        + SerializeForFiatShamirTranscript; // This is often appended to a Fiat-Shamir transcript
     type Input: From<u64>; // Slightly hacky. It's used in `range_proof_random_instance()` to generate (chunks of) inputs that have a certain bit size
     type Commitment: Clone + Into<Self::CommitmentNormalised>;
     type CommitmentNormalised: Clone;

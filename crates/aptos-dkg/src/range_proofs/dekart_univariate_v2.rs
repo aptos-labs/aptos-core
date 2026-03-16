@@ -202,6 +202,7 @@ pub struct VerifierPrecomputed<E: Pairing> {
 }
 
 // Custom `CanonicalSerialize/CanonicalDeserialize` for `VerifierPrecomputed` because most of it can be recomputed
+// TODO: similarly, not resistant to DoS attacks etc
 impl<E: Pairing> CanonicalSerialize for VerifierPrecomputed<E> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -1031,6 +1032,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 }
 
+// TODO: move this to the range proof trait in the fiat_shamir file?
 mod fiat_shamir {
     use super::*;
     use crate::fiat_shamir::RangeProof;
