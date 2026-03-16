@@ -33,6 +33,7 @@ use std::{
 
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 const DEFERRED_MERGE_RETRY_INTERVAL: Duration = Duration::from_millis(10);
+const FORCE_MERGE_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug)]
 struct Shard<K, V>
@@ -369,29 +370,21 @@ impl Committer {
             // If merged_state is too old for to_commit (persisted snapshot advanced
             // while merge was deferred), wait for old views to drain so try_merge
             // can advance merged_state.
-            let mut num_iter = 0u64;
-            if !self.merged_state.can_be_delta_base_of(&to_commit) {
-                info!(
-                    "[hs_debug] committer: merged_state too old for version={}, waiting for old views to drain...",
-                    incoming_version,
-                );
-            }
+            let wait_start = std::time::Instant::now();
             while !self.merged_state.can_be_delta_base_of(&to_commit) {
                 if !self.try_merge() {
-                    num_iter += 1;
-                    if num_iter % 100 == 0 {
-                        info!(
-                            "[hs_debug] committer: still waiting for old views, iter={}, old_views={}, merged_version={}",
-                            num_iter,
-                            self.old_views.len(),
-                            self.merged_state.next_version(),
-                        );
-                    }
                     std::thread::sleep(DEFERRED_MERGE_RETRY_INTERVAL);
+                    if wait_start.elapsed() >= FORCE_MERGE_TIMEOUT {
+                        error!(
+                            wait_secs = wait_start.elapsed().as_secs(),
+                            old_views = self.old_views.len(),
+                            merged_version = self.merged_state.next_version(),
+                            commit_version = to_commit.next_version(),
+                            "Hot-state merge blocked too long, force-clearing old views.",
+                        );
+                        self.old_views.clear();
+                    }
                 }
-            }
-            if num_iter > 0 {
-                info!("[hs_debug] committer: wait done after {} iters", num_iter);
             }
 
             // Build a layered view: delta(merged_state -> to_commit) over base DashMaps.
