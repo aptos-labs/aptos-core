@@ -14,7 +14,7 @@ use aptos_consensus_types::{
     common::Author,
     pipelined_block::{DecryptionResult, MaterializeResult, TaskError, TaskFuture, TaskResult},
 };
-use aptos_logger::{error, info};
+use aptos_logger::{error, info, warn};
 use aptos_types::{
     decryption::BlockTxnDecryptionKey,
     secret_sharing::{
@@ -166,13 +166,28 @@ async fn decrypt_validator_path(
         .into_iter()
         .partition(|txn| txn.is_encrypted_txn());
 
-    // TODO(ibalajiarun): figure out handling of empty encrypted txn vec
+    // Short-circuit if no encrypted transactions: skip all crypto operations
+    if encrypted_txns.is_empty() {
+        let _ = derived_self_key_share_tx.send(None);
+        return Ok(DecryptionResult {
+            decrypted_txns: vec![],
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key: Some(None),
+        });
+    }
 
-    // TODO(ibalajiarun): FIXME
-    let len = 32;
-    let encrypted_txns = if encrypted_txns.len() > len {
+    let max_encrypted_txns = secret_share_config.digest_key().max_batch_size();
+    let encrypted_txns = if encrypted_txns.len() > max_encrypted_txns {
+        warn!(
+            "Truncating {} encrypted txns to {} for block {}",
+            encrypted_txns.len(),
+            max_encrypted_txns,
+            block.round()
+        );
         let mut to_truncate = encrypted_txns;
-        to_truncate.truncate(len);
+        to_truncate.truncate(max_encrypted_txns);
         to_truncate
     } else {
         encrypted_txns
@@ -222,21 +237,55 @@ async fn decrypt_validator_path(
         );
     }
 
-    // TODO(ibalajiarun): improve perf
-    let proofs =
-        FPTXWeighted::eval_proofs_compute_all(&proofs_promise, secret_share_config.digest_key());
+    // Overlap eval_proofs (CPU-heavy, O(n^2 log n)) with secret key reception (network wait).
+    // spawn_blocking prevents starving the async runtime during proof computation.
+    let digest_key = secret_share_config.digest_key_arc();
+    let proofs_handle = tokio::task::spawn_blocking(move || {
+        FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key)
+    });
 
-    let prepared_txn_ciphertexts: Vec<Result<PreparedCiphertext, MissingEvalProofError>> =
-        txn_ciphertexts
+    let (proofs, maybe_decryption_key) = tokio::try_join!(
+        async {
+            proofs_handle
+                .await
+                .map_err(|e| anyhow!("proof computation panicked: {e}"))
+        },
+        async {
+            secret_shared_key_rx
+                .await
+                .map_err(|_| anyhow!("secret_shared_key_rx dropped"))
+        },
+    )?;
+
+    // Handle missing decryption key gracefully instead of panicking.
+    // Mark all encrypted txns as failed-decryption so downstream can handle them.
+    let Some(decryption_key) = maybe_decryption_key else {
+        error!(
+            "Decryption key unavailable for block {}; marking {} encrypted txns as failed",
+            block.round(),
+            encrypted_txns.len()
+        );
+        let failed_txns: Vec<_> = encrypted_txns
             .into_par_iter()
-            .map(|ciphertext| FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs))
+            .zip(txn_ciphertexts.into_par_iter())
+            .map(|(mut txn, ciphertext)| {
+                let id = ciphertext.id();
+                let eval_proof = proofs.get(&id).expect("must exist");
+                txn.payload_mut()
+                    .as_encrypted_payload_mut()
+                    .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
+                    .expect("must exist");
+                txn
+            })
             .collect();
-
-    let maybe_decryption_key = secret_shared_key_rx
-        .await
-        .map_err(|_| anyhow!("secret_shared_key_rx dropped"))?;
-    // TODO(ibalajiarun): account for the case where decryption key is not available
-    let decryption_key = maybe_decryption_key.expect("decryption key should be available");
+        return Ok(DecryptionResult {
+            decrypted_txns: failed_txns,
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key: Some(None),
+        });
+    };
 
     info!(
         "Successfully received decryption key for block {}: metadata={:?}",
@@ -244,10 +293,16 @@ async fn decrypt_validator_path(
         decryption_key.metadata
     );
 
+    // Fused prepare_ct + decrypt in a single parallel pass.
+    // Eliminates the intermediate Vec<PreparedCiphertext> allocation
+    // and improves cache locality.
     let decrypted_txns: Vec<_> = encrypted_txns
         .into_par_iter()
-        .zip(prepared_txn_ciphertexts)
-        .map(|(mut txn, prepared_ciphertext_or_error)| {
+        .zip(txn_ciphertexts.into_par_iter())
+        .map(|(mut txn, ciphertext)| {
+            let prepared_ciphertext_or_error =
+                FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs);
+
             let id: Id = prepared_ciphertext_or_error
                 .as_ref()
                 .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
