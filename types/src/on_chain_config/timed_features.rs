@@ -46,6 +46,11 @@ pub enum TimedFeatureFlag {
 
     /// Revise some bounds in prod config which have been established by previous configs.
     RevisedBoundsInProdConfig,
+
+    /// If enabled, `bcs::constant_serialized_size` uses local cache to deduplicate traversals
+    /// of same struct nodes, counting cache hits as 1 node instead of re-expanding its full
+    /// subtree.
+    ConstantSerializedSizeLocalCache,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -91,7 +96,8 @@ impl TimedFeatureOverride {
                 | FixCryptoAlgebraNativesResultHandling
                 | UseFullTransactionSizeForGasCheck
                 | EnableStrictBoundsInProdConfig
-                | RevisedBoundsInProdConfig,
+                | RevisedBoundsInProdConfig
+                | ConstantSerializedSizeLocalCache,
             ) => None,
         }
     }
@@ -218,6 +224,15 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (RevisedBoundsInProdConfig, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 3, 5, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (ConstantSerializedSizeLocalCache, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 3, 11, 21, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (ConstantSerializedSizeLocalCache, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 3, 13, 10, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
