@@ -691,7 +691,16 @@ impl AptosVM {
                 .ok()
                 .flatten()
                 .and_then(|module| get_metadata(&module.metadata))
-                .and_then(|m| m.extract_abort_info(code));
+                .and_then(|m| {
+                    if self
+                        .features()
+                        .is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10)
+                    {
+                        m.extract_abort_info(code)
+                    } else {
+                        m.extract_abort_info_legacy(code)
+                    }
+                });
 
             // If the abort had a message, override the description with the message.
             if let Some(mut current_info) = current_info {
