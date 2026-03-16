@@ -3,12 +3,11 @@
 
 //! Lowers stackless exec IR to micro-ops.
 
-use anyhow::{bail, Result};
-
 use crate::{
     ir::{BinaryOp, FunctionIR, ImmValue, Instr, Label, Reg},
     lowering_context::{slot_info_for_reg, LoweringContext, SlotInfo},
 };
+use anyhow::{bail, Result};
 use mono_move_micro_ops::instruction::{CodeOffset, FrameOffset, MicroOp};
 use move_vm_types::loaded_data::runtime_types::Type;
 
@@ -46,7 +45,9 @@ impl<'a> LoweringState<'a> {
             .instrs
             .iter()
             .filter_map(|instr| match instr {
-                Instr::Label(Label(l)) | Instr::Branch(Label(l)) | Instr::BrTrue(Label(l), _)
+                Instr::Label(Label(l))
+                | Instr::Branch(Label(l))
+                | Instr::BrTrue(Label(l), _)
                 | Instr::BrFalse(Label(l), _) => Some(*l as usize),
                 _ => None,
             })
@@ -100,8 +101,17 @@ impl<'a> LoweringState<'a> {
     fn is_u64_type(ty: &Type) -> bool {
         matches!(
             ty,
-            Type::U64 | Type::Bool | Type::U8 | Type::I8 | Type::U16 | Type::I16 | Type::U32
-                | Type::I32 | Type::I64 | Type::Address | Type::Signer
+            Type::U64
+                | Type::Bool
+                | Type::U8
+                | Type::I8
+                | Type::U16
+                | Type::I16
+                | Type::U32
+                | Type::I32
+                | Type::I64
+                | Type::Address
+                | Type::Signer
         )
     }
 
@@ -215,10 +225,7 @@ impl<'a> LoweringState<'a> {
                             lhs: FrameOffset(l.offset),
                             rhs: FrameOffset(r.offset),
                         }),
-                        _ => bail!(
-                            "BinaryOp {:?} for u64-sized type not yet lowered",
-                            op
-                        ),
+                        _ => bail!("BinaryOp {:?} for u64-sized type not yet lowered", op),
                     }
                 } else {
                     bail!("BinaryOp for non-u64 type not yet lowered");
@@ -230,8 +237,7 @@ impl<'a> LoweringState<'a> {
                 let src_ty = self.reg_type(*src);
                 if Self::is_u64_type(src_ty) {
                     // Try compare+branch fusion
-                    if let Some(fused) =
-                        self.try_fuse_compare_branch_imm(op, dst, *src, imm, next)
+                    if let Some(fused) = self.try_fuse_compare_branch_imm(op, dst, *src, imm, next)
                     {
                         return Ok(fused);
                     }
@@ -249,10 +255,7 @@ impl<'a> LoweringState<'a> {
                             src: FrameOffset(s.offset),
                             imm: v,
                         }),
-                        _ => bail!(
-                            "BinaryOpImm {:?} for u64-sized type not yet lowered",
-                            op
-                        ),
+                        _ => bail!("BinaryOpImm {:?} for u64-sized type not yet lowered", op),
                     }
                 } else {
                     bail!("BinaryOpImm for non-u64 type not yet lowered");
@@ -281,11 +284,11 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Calls ---
-            Instr::Call(rets, _handle_idx, _args) => {
-                self.lower_call(func_ir, rets);
+            Instr::Call(rets, _handle_idx, args) => {
+                self.lower_call(func_ir, args, rets);
             },
-            Instr::CallGeneric(rets, _inst_idx, _args) => {
-                self.lower_call(func_ir, rets);
+            Instr::CallGeneric(rets, _inst_idx, args) => {
+                self.lower_call(func_ir, args, rets);
             },
 
             // --- Return ---
@@ -303,8 +306,17 @@ impl<'a> LoweringState<'a> {
         Ok(false)
     }
 
-    fn lower_call(&mut self, _func_ir: &FunctionIR, rets: &[Reg]) {
+    fn lower_call(&mut self, _func_ir: &FunctionIR, args: &[Reg], rets: &[Reg]) {
         let call_site = &self.ctx.call_sites[self.call_site_cursor];
+
+        // Copy arguments into callee's parameter slots.
+        // [TODO] This is also a spot to insert a bulk move micro-op insertion.
+        for (k, arg_reg) in args.iter().enumerate() {
+            let src = self.slot(*arg_reg);
+            let dst = call_site.arg_write_slots[k];
+            self.emit_move(dst, src);
+        }
+
         self.emit(MicroOp::CallFunc {
             func_id: call_site.callee_func_id,
         });
@@ -395,7 +407,11 @@ impl<'a> LoweringState<'a> {
                 MicroOp::JumpNotZeroU64 { target, .. } => target.0,
                 MicroOp::JumpGreaterEqualU64Imm { target, .. } => target.0,
                 MicroOp::JumpLessU64 { target, .. } => target.0,
-                other => bail!("unexpected non-branch op at fixup index {}: {:?}", idx, other),
+                other => bail!(
+                    "unexpected non-branch op at fixup index {}: {:?}",
+                    idx,
+                    other
+                ),
             };
             let label = decode_label(encoded);
             let resolved = self.resolve_label(label)?;

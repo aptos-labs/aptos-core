@@ -271,9 +271,10 @@ fun two_inner_calls() {
     3: StoreImm8 [32] <- #20
     4: CallFunc #0
     5: Move8 [40] <- [32]
-    6: CallFunc #1
-    7: Move8 [0] <- [32]
-    8: Return
+    6: Move8 [32] <- [0]
+    7: CallFunc #1
+    8: Move8 [0] <- [32]
+    9: Return
 }
 
 fun computed_arg() {
@@ -289,27 +290,30 @@ fun partial_promotion() {
   frame_data_size: 8
   code:
     0: AddU64Imm [40] <- [0] + #1
-    1: CallFunc #1
-    2: Move8 [0] <- [32]
-    3: Return
+    1: Move8 [32] <- [0]
+    2: CallFunc #1
+    3: Move8 [0] <- [32]
+    4: Return
 }
 
 fun call_with_param() {
   frame_data_size: 8
   code:
-    0: CallFunc #0
-    1: Move8 [0] <- [32]
-    2: Return
+    0: Move8 [32] <- [0]
+    1: CallFunc #0
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
 fun arg_live_after_call() {
   frame_data_size: 24
   code:
-    0: CallFunc #0
-    1: Move8 [8] <- [48]
-    2: AddU64 [16] <- [0] + [8]
-    3: Move8 [0] <- [16]
-    4: Return
+    0: Move8 [48] <- [0]
+    1: CallFunc #0
+    2: Move8 [8] <- [48]
+    3: AddU64 [16] <- [0] + [8]
+    4: Move8 [0] <- [16]
+    5: Return
 }
 
 fun ret_used_past_next_call() {
@@ -357,9 +361,10 @@ fun mixed_at_callsite() {
   code:
     0: StoreImm8 [32] <- #10
     1: StoreImm8 [48] <- #30
-    2: CallFunc #3
-    3: Move8 [0] <- [32]
-    4: Return
+    2: Move8 [40] <- [0]
+    3: CallFunc #3
+    4: Move8 [0] <- [32]
+    5: Return
 }
 
 fun mixed_intervening_call() {
@@ -372,9 +377,10 @@ fun mixed_intervening_call() {
     4: CallFunc #0
     5: Move8 [40] <- [32]
     6: StoreImm8 [48] <- #30
-    7: CallFunc #3
-    8: Move8 [0] <- [32]
-    9: Return
+    7: Move8 [32] <- [0]
+    8: CallFunc #3
+    9: Move8 [0] <- [32]
+    10: Return
 }
 
 fun no_calls() {

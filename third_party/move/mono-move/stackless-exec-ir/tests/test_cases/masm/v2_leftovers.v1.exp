@@ -83,17 +83,19 @@ fun add_two() {
 fun copy_to_call() {
   frame_data_size: 8
   code:
-    0: CallFunc #0
-    1: Move8 [0] <- [32]
-    2: Return
+    0: Move8 [32] <- [0]
+    1: CallFunc #0
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
 fun move_to_call() {
   frame_data_size: 8
   code:
-    0: CallFunc #0
-    1: Move8 [0] <- [32]
-    2: Return
+    0: Move8 [32] <- [0]
+    1: CallFunc #0
+    2: Move8 [0] <- [32]
+    3: Return
 }
 
 fun multi_use_local_alias() {
@@ -108,16 +110,19 @@ fun multi_use_local_alias() {
 fun copy_call_then_use() {
   frame_data_size: 16
   code:
-    0: CallFunc #0
-    1: AddU64 [8] <- [40] + [0]
-    2: Move8 [0] <- [8]
-    3: Return
+    0: Move8 [40] <- [0]
+    1: CallFunc #0
+    2: AddU64 [8] <- [40] + [0]
+    3: Move8 [0] <- [8]
+    4: Return
 }
 
 fun two_copies_to_call() {
   frame_data_size: 16
   code:
-    0: CallFunc #1
-    1: Move8 [0] <- [40]
-    2: Return
+    0: Move8 [40] <- [0]
+    1: Move8 [48] <- [8]
+    2: CallFunc #1
+    3: Move8 [0] <- [40]
+    4: Return
 }
