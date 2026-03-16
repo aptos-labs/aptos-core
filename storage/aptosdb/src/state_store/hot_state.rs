@@ -29,11 +29,12 @@ use std::{
         mpsc::{Receiver, RecvTimeoutError, Sender, SyncSender},
         Arc, Weak,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 const DEFERRED_MERGE_RETRY_INTERVAL: Duration = Duration::from_millis(10);
+const FORCE_MERGE_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug)]
 struct Shard<K, V>
@@ -342,9 +343,24 @@ impl Committer {
             // If merged_state is too old for to_commit (persisted snapshot advanced
             // while merge was deferred), wait for old views to drain so try_merge
             // can advance merged_state.
+            let wait_start = Instant::now();
             while !self.merged_state.can_be_delta_base_of(&to_commit) {
                 if !self.try_merge() {
                     std::thread::sleep(DEFERRED_MERGE_RETRY_INTERVAL);
+                    if wait_start.elapsed() >= FORCE_MERGE_TIMEOUT {
+                        error!(
+                            wait_secs = wait_start.elapsed().as_secs(),
+                            old_views = self.old_views.len(),
+                            merged_version = self.merged_state.next_version(),
+                            commit_version = to_commit.next_version(),
+                            "Hot-state merge blocked too long, force-clearing old views.",
+                        );
+                        // NOTE: this means that we force the base DashMaps to advance and the
+                        // lingering old readers might get inconsistent data from now on, but we
+                        // have to move on to prevent the backpressure from building up.
+                        self.old_views.clear();
+                        COUNTER.inc_with(&["hot_state_force_merge_clear"]);
+                    }
                 }
             }
 
