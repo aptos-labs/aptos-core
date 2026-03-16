@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::pipeline::pipeline_builder::{PipelineBuilder, Tracker};
+use crate::{counters, pipeline::pipeline_builder::{PipelineBuilder, Tracker}};
 use anyhow::{anyhow, Context};
 use aptos_batch_encryption::{
     errors::MissingEvalProofError,
@@ -27,7 +27,10 @@ use aptos_types::{
     },
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use tokio::sync::oneshot;
 
 impl PipelineBuilder {
@@ -288,6 +291,7 @@ async fn decrypt_validator_path(
             block.round(),
             encrypted_txns.len()
         );
+        let num_failed = encrypted_txns.len();
         let failed_txns: Vec<_> = encrypted_txns
             .into_par_iter()
             .zip(txn_ciphertexts.into_par_iter())
@@ -301,6 +305,15 @@ async fn decrypt_validator_path(
                 txn
             })
             .collect();
+        counters::DECRYPTION_PIPELINE_TXNS_COUNT
+            .with_label_values(&["failed_decryption"])
+            .inc_by(num_failed as u64);
+        counters::DECRYPTION_PIPELINE_TXNS_COUNT
+            .with_label_values(&["batch_limit_exceeded"])
+            .inc_by(batch_limit_exceeded_txns.len() as u64);
+        counters::DECRYPTION_PIPELINE_TXNS_COUNT
+            .with_label_values(&["unencrypted"])
+            .inc_by(regular_txns.len() as u64);
         let decrypted_txns = [failed_txns, batch_limit_exceeded_txns].concat();
         return Ok(DecryptionResult {
             decrypted_txns,
@@ -320,6 +333,7 @@ async fn decrypt_validator_path(
     // Fused prepare_ct + decrypt in a single parallel pass.
     // Eliminates the intermediate Vec<PreparedCiphertext> allocation
     // and improves cache locality.
+    let num_failed_decryptions = AtomicUsize::new(0);
     let decrypted_txns: Vec<_> = encrypted_txns
         .into_par_iter()
         .zip(txn_ciphertexts.into_par_iter())
@@ -348,6 +362,7 @@ async fn decrypt_validator_path(
                         "Failed to decrypt transaction with ciphertext id {:?}: {:?}",
                         id, e
                     );
+                    num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
                     txn.payload_mut()
                         .as_encrypted_payload_mut()
                         .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
@@ -358,11 +373,27 @@ async fn decrypt_validator_path(
         })
         .collect();
 
+    let num_failed = num_failed_decryptions.into_inner();
+    let num_decrypted = decrypted_txns.len() - num_failed;
+    counters::DECRYPTION_PIPELINE_TXNS_COUNT
+        .with_label_values(&["decrypted"])
+        .inc_by(num_decrypted as u64);
+    counters::DECRYPTION_PIPELINE_TXNS_COUNT
+        .with_label_values(&["failed_decryption"])
+        .inc_by(num_failed as u64);
+    counters::DECRYPTION_PIPELINE_TXNS_COUNT
+        .with_label_values(&["batch_limit_exceeded"])
+        .inc_by(batch_limit_exceeded_txns.len() as u64);
+    counters::DECRYPTION_PIPELINE_TXNS_COUNT
+        .with_label_values(&["unencrypted"])
+        .inc_by(regular_txns.len() as u64);
     info!(
-        "Decryption complete for block {}: {} encrypted, {} unencrypted",
+        "Decryption complete for block {}: {} decrypted, {} failed, {} batch_limit_exceeded, {} unencrypted",
         block.round(),
-        decrypted_txns.len(),
-        regular_txns.len()
+        num_decrypted,
+        num_failed,
+        batch_limit_exceeded_txns.len(),
+        regular_txns.len(),
     );
     let decrypted_txns = [decrypted_txns, batch_limit_exceeded_txns].concat();
 
