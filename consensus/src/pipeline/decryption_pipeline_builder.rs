@@ -21,7 +21,10 @@ use aptos_types::{
         Ciphertext, DecryptionKey, SecretShare, SecretShareConfig, SecretShareMetadata,
         SecretSharedKey,
     },
-    transaction::{encrypted_payload::DecryptedPayload, SignedTransaction},
+    transaction::{
+        encrypted_payload::{DecryptedPayload, DecryptionFailureReason},
+        SignedTransaction,
+    },
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
@@ -179,19 +182,38 @@ async fn decrypt_validator_path(
     }
 
     let max_encrypted_txns = secret_share_config.digest_key().max_batch_size();
-    let encrypted_txns = if encrypted_txns.len() > max_encrypted_txns {
-        warn!(
-            "Truncating {} encrypted txns to {} for block {}",
-            encrypted_txns.len(),
-            max_encrypted_txns,
-            block.round()
-        );
-        let mut to_truncate = encrypted_txns;
-        to_truncate.truncate(max_encrypted_txns);
-        to_truncate
-    } else {
-        encrypted_txns
-    };
+    let (encrypted_txns, batch_limit_exceeded_txns) =
+        if encrypted_txns.len() > max_encrypted_txns {
+            warn!(
+                "Block {} has {} encrypted txns exceeding batch limit {}; marking excess as BatchLimitReached",
+                block.round(),
+                encrypted_txns.len(),
+                max_encrypted_txns,
+            );
+            let mut all = encrypted_txns;
+            let exceeded = all.split_off(max_encrypted_txns);
+            (all, exceeded)
+        } else {
+            (encrypted_txns, Vec::new())
+        };
+
+    // Mark batch-limit-exceeded txns as failed decryption with retry reason.
+    let batch_limit_exceeded_txns: Vec<_> = batch_limit_exceeded_txns
+        .into_iter()
+        .map(|mut txn| {
+            txn.payload_mut()
+                .as_encrypted_payload_mut()
+                .map(|p| {
+                    p.into_failed_decryption_with_reason(
+                        None,
+                        DecryptionFailureReason::BatchLimitReached,
+                    )
+                    .expect("must be in Encrypted state")
+                })
+                .expect("must be encrypted txn");
+            txn
+        })
+        .collect();
 
     let txn_ciphertexts: Vec<Ciphertext> = encrypted_txns
         .iter()
@@ -206,8 +228,8 @@ async fn decrypt_validator_path(
         .collect();
 
     // TODO(ibalajiarun): Consider using commit block height to reduce trusted setup size
-    // TODO(ibalajiarun): Fix this wrapping
-    let encryption_round = block.round() % 200;
+    let num_rounds = secret_share_config.digest_key().num_rounds() as u64;
+    let encryption_round = block.round() % num_rounds;
     let (digest, proofs_promise) = FPTXWeighted::digest(
         secret_share_config.digest_key(),
         &txn_ciphertexts,
@@ -278,8 +300,9 @@ async fn decrypt_validator_path(
                 txn
             })
             .collect();
+        let decrypted_txns = [failed_txns, batch_limit_exceeded_txns].concat();
         return Ok(DecryptionResult {
-            decrypted_txns: failed_txns,
+            decrypted_txns,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
@@ -340,6 +363,7 @@ async fn decrypt_validator_path(
         decrypted_txns.len(),
         regular_txns.len()
     );
+    let decrypted_txns = [decrypted_txns, batch_limit_exceeded_txns].concat();
 
     let block_txn_dec_key = BlockTxnDecryptionKey::from_secret_shared_key(&decryption_key)
         .context("Decryption key serialization failed")?;
