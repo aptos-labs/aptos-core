@@ -59,8 +59,9 @@ fun fib() {
     3: CallFunc #0
     4: Move8 [16] <- [56]
     5: SubU64Imm [24] <- [0] - #2
-    6: CallFunc #0
-    7: AddU64 [24] <- [16] + [56]
-    8: Move8 [0] <- [24]
-    9: Return
+    6: Move8 [56] <- [24]
+    7: CallFunc #0
+    8: AddU64 [24] <- [16] + [56]
+    9: Move8 [0] <- [24]
+    10: Return
 }
