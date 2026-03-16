@@ -6,9 +6,13 @@ use crate::{
     storage::loader::traits::StructDefinitionLoader, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use claims::assert_none;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::{PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
-    ability::AbilitySet, identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode,
+    ability::AbilitySet,
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
+    vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::DependencyGasMeter,
@@ -168,6 +172,14 @@ impl WithRuntimeEnvironment for MockStructDefinitionLoader {
 impl StructDefinitionLoader for MockStructDefinitionLoader {
     fn is_lazy_loading_enabled(&self) -> bool {
         self.runtime_environment().vm_config().enable_lazy_loading
+    }
+
+    fn unmetered_get_module_hash(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<[u8; 32]> {
+        Ok([0u8; 32])
     }
 
     fn load_struct_definition(

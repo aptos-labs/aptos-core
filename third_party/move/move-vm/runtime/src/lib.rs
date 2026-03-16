@@ -59,7 +59,7 @@ pub use storage::{
         ModuleStorage,
     },
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
-    ty_layout_converter::LayoutWithDelayedFields,
+    ty_layout_converter::{constant_serialized_size, LayoutWithDelayedFields},
 };
 
 // TODO(lazy-loading): revisit this macro in favour of a callback or an enum.

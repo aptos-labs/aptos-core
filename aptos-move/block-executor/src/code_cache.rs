@@ -261,4 +261,8 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> LayoutCache for LatestView<'_,
             .store_struct_layout_entry(key, entry)?;
         Ok(())
     }
+
+    fn remove_struct_layout(&self, key: &StructKey) {
+        self.global_module_cache.remove_struct_layout_entry(key);
+    }
 }
