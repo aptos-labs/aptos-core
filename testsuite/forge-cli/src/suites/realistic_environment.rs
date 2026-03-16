@@ -42,7 +42,9 @@ pub(crate) fn get_realistic_env_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
+        "realistic_env_max_load_large" => {
+            realistic_env_max_load_test(duration, test_cmd, 20, 10, 0)
+        },
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_orderbook_workload_sweep" => realistic_env_orderbook_workload_sweep_bench(),
@@ -362,7 +364,8 @@ pub(crate) fn realistic_env_max_load_test(
     duration: Duration,
     test_cmd: &TestCommand,
     num_validators: usize,
-    num_fullnodes: usize,
+    num_vfns: usize,
+    num_pfns: usize,
 ) -> ForgeConfig {
     // Check if HAProxy is enabled
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
@@ -432,7 +435,7 @@ pub(crate) fn realistic_env_max_load_test(
     let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(num_fullnodes)
+        .with_initial_fullnode_count(num_vfns)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
@@ -469,6 +472,15 @@ pub(crate) fn realistic_env_max_load_test(
                 .consensus_observer
                 .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
         }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the consensus observer fallback thresholds
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
+        }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
@@ -479,7 +491,7 @@ pub(crate) fn realistic_env_max_load_test(
         .with_success_criteria(success_criteria)
         .with_validator_resource_override(resource_override)
         .with_fullnode_resource_override(resource_override)
-        .with_num_pfns(1)
+        .with_num_pfns(num_pfns)
 }
 
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
