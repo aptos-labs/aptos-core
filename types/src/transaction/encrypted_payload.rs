@@ -55,6 +55,10 @@ pub enum DecryptionFailureReason {
     /// Transaction exceeded the per-block encrypted transaction batch limit.
     /// Should be retried in a subsequent block.
     BatchLimitReached,
+    /// The decryption key is not available.
+    ConfigUnavailable,
+    /// The decryption key is not available.
+    DecryptionKeyUnavailable,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -153,13 +157,6 @@ impl EncryptedPayload {
             decryption_nonce: nonce,
         };
         Ok(())
-    }
-
-    pub fn into_failed_decryption(&mut self, eval_proof: EvalProof) -> anyhow::Result<()> {
-        self.into_failed_decryption_with_reason(
-            Some(eval_proof),
-            DecryptionFailureReason::CryptoFailure,
-        )
     }
 
     pub fn into_failed_decryption_with_reason(
