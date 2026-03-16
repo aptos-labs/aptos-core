@@ -57,8 +57,9 @@ fn check_exp(env: &GlobalEnv, exp: &move_model::ast::Exp) {
 
 /// Check a single match arm pattern. Top-level literals and
 /// wildcards/vars are fine. For tuples, recurse into each element
-/// (still top-level context). For structs/enums, any nested literal
-/// is invalid.
+/// (still top-level context). For structs/enums, nested literals are
+/// allowed starting from `LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH`;
+/// on earlier versions any nested literal is invalid.
 fn check_match_arm_pattern(env: &GlobalEnv, pat: &Pattern) {
     match pat {
         Pattern::LiteralValue(..)
