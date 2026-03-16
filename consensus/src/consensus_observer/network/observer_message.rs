@@ -353,7 +353,6 @@ impl ExecutionPoolWindow {
 }
 
 /// Borrowed V2 wire format for serialization (avoids cloning PipelinedBlock fields).
-/// Note: `input_transactions` is omitted; the observer uses `decrypted_txns` instead.
 #[derive(Serialize)]
 struct PipelinedBlockV2Ref<'a> {
     block: &'a Block,
@@ -363,13 +362,11 @@ struct PipelinedBlockV2Ref<'a> {
 }
 
 /// Owned V2 wire format for deserialization.
-/// Note: `input_transactions` is not on the wire; observer constructs PipelinedBlock with empty vec.
 #[derive(Deserialize)]
 struct PipelinedBlockV2Owned {
     block: Block,
     randomness: Option<Randomness>,
     secret_shared_key: Option<SecretSharedKey>,
-    #[serde(default)]
     decrypted_txns: Vec<SignedTransaction>,
 }
 

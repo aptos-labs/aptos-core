@@ -57,9 +57,6 @@ impl PipelineBuilder {
                 decryption_key: None,
             });
         }
-        // If the config is None, then we are on the observer path:
-        // no local secret share config available, so receive the pre-computed
-        // decryption key via channel instead of deriving locally.
         // Assumption: `input_txns` is free of Encrypted Transactions
         // due to VM validation checks
         let Some(secret_share_config) = maybe_secret_share_config else {
