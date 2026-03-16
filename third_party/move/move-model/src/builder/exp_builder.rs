@@ -2916,10 +2916,18 @@ impl ExpTranslator<'_, '_, '_> {
                 )
             },
             EA::LValue_::Literal(val) => {
-                // Translate literal value pattern (for primitive pattern matching)
-                if let Some((value, ty)) = self.translate_value(val, expected_type, context) {
-                    let id = self.new_node_id_with_type_loc(&ty, loc);
-                    self.check_type_with_order(expected_order, loc, &ty, expected_type, context);
+                // Translate literal value pattern (for primitive pattern matching).
+                // Strip reference from expected type so `translate_value` sees the
+                // base type (e.g. `u64` instead of `&u64`), then assign the pattern
+                // node the original (possibly reference) type for AST consistency.
+                let inner_expected = expected_type.skip_reference();
+                if let Some((value, ty)) = self.translate_value(val, inner_expected, context) {
+                    let pat_ty = if expected_type.is_reference() {
+                        expected_type.clone()
+                    } else {
+                        ty
+                    };
+                    let id = self.new_node_id_with_type_loc(&pat_ty, loc);
                     Pattern::LiteralValue(id, value)
                 } else {
                     self.new_error_pat(loc)
@@ -3285,9 +3293,18 @@ impl ExpTranslator<'_, '_, '_> {
             EA::Value_::InferredNum(x) => {
                 self.translate_number(&loc, BigInt::from(*x), None, expected_type, context)
             },
-            EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
+            EA::Value_::Bool(x) => {
+                let ty = self.check_type(
+                    &loc,
+                    &Type::new_prim(PrimitiveType::Bool),
+                    expected_type,
+                    context,
+                );
+                Some((Value::Bool(*x), ty))
+            },
             EA::Value_::Bytearray(x) => {
-                let ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
+                let actual_ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
+                let ty = self.check_type(&loc, &actual_ty, expected_type, context);
                 Some((Value::ByteArray(x.clone()), ty))
             },
         }

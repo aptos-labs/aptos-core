@@ -98,6 +98,23 @@ fn make_eq(env: &GlobalEnv, loc: &Loc, lhs: Exp, rhs: Exp) -> Exp {
     ExpData::Call(id, Operation::Eq, vec![lhs, rhs]).into_exp()
 }
 
+/// Create an equality comparison, inserting `Deref` if `lhs` has reference type.
+/// The literal `Value` node always gets the base (non-reference) type.
+fn make_deref_eq(env: &GlobalEnv, loc: &Loc, lhs: Exp, val: &Value) -> Exp {
+    let ty = env.get_node_type(lhs.node_id());
+    let (cmp_lhs, base_ty) = if let Type::Reference(_, inner) = &ty {
+        let inner_ty = inner.as_ref().clone();
+        let deref_id = env.new_node(loc.clone(), inner_ty.clone());
+        let deref_exp = ExpData::Call(deref_id, Operation::Deref, vec![lhs]).into_exp();
+        (deref_exp, inner_ty)
+    } else {
+        (lhs, ty)
+    };
+    let val_id = env.new_node(loc.clone(), base_ty);
+    let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
+    make_eq(env, loc, cmp_lhs, val_exp)
+}
+
 /// Combine a list of boolean conditions with `&&`. Returns `None` if the list is empty.
 fn conjoin(env: &GlobalEnv, loc: &Loc, conditions: Vec<Exp>) -> Option<Exp> {
     conditions.into_iter().reduce(|acc, cond| {
@@ -241,7 +258,8 @@ fn is_match_fully_transformable(env: &GlobalEnv, discriminator: &Exp, arms: &[Ma
     arms.iter().all(|arm| is_suitable_pattern(&arm.pattern))
 }
 
-/// Check if a type is suitable (bool, integer, byte string, or tuple of suitable types).
+/// Check if a type is suitable (bool, integer, byte string, reference to a suitable type,
+/// or tuple of suitable types).
 fn is_suitable_type(ty: &Type) -> bool {
     match ty {
         Type::Primitive(prim) => matches!(
@@ -261,6 +279,7 @@ fn is_suitable_type(ty: &Type) -> bool {
                 | PrimitiveType::I256
         ),
         Type::Vector(inner) => matches!(inner.as_ref(), Type::Primitive(PrimitiveType::U8)),
+        Type::Reference(_, inner) => is_suitable_type(inner),
         Type::Tuple(tys) => tys.iter().all(is_suitable_type),
         _ => false,
     }
@@ -374,13 +393,9 @@ fn extract_literals_from_pattern(
             let loc = env.get_node_loc(*id);
             let sym = TempSymbol::NestedLiteralTemp(*counter).create(env);
             *counter += 1;
-            // Create var pattern to replace the literal
             let var_id = env.new_node(loc.clone(), ty.clone());
-            // Create equality condition: _$nlit_N == literal_value
             let var_exp = make_local_var(env, &loc, ty.clone(), sym);
-            let val_id = env.new_node(loc.clone(), ty);
-            let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
-            conditions.push(make_eq(env, &loc, var_exp, val_exp));
+            conditions.push(make_deref_eq(env, &loc, var_exp, val));
             Pattern::Var(var_id, sym)
         },
         Pattern::Struct(id, sid, variant, pats) => {
@@ -512,17 +527,12 @@ fn generate_pattern_condition(env: &GlobalEnv, discriminator: &Exp, pattern: &Pa
     match pattern {
         Pattern::Wildcard(_) | Pattern::Var(_, _) => make_true(env, &loc),
 
-        Pattern::LiteralValue(_, val) => {
-            let discriminator_ty = env.get_node_type(discriminator.node_id());
-            let val_id = env.new_node(loc.clone(), discriminator_ty);
-            let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
-            make_eq(env, &loc, discriminator.clone(), val_exp)
-        },
+        Pattern::LiteralValue(_, val) => make_deref_eq(env, &loc, discriminator.clone(), val),
 
         Pattern::Tuple(_, pats) => {
             let discriminator_ty = env.get_node_type(discriminator.node_id());
-            if let Type::Tuple(tys) = discriminator_ty {
-                generate_tuple_condition(env, discriminator, &tys, pats)
+            if let Type::Tuple(_) = discriminator_ty {
+                generate_tuple_condition(env, discriminator, pats)
             } else {
                 let bool_id = env.new_node(loc, Type::Primitive(PrimitiveType::Bool));
                 ExpData::Invalid(bool_id).into_exp()
@@ -541,12 +551,7 @@ fn generate_pattern_condition(env: &GlobalEnv, discriminator: &Exp, pattern: &Pa
 /// After `bind_discriminator`, the tuple expression is always
 /// `Call(_, Tuple, args)` with `LocalVar` elements, so element expressions
 /// are extracted directly and compared against pattern literals.
-fn generate_tuple_condition(
-    env: &GlobalEnv,
-    tuple_exp: &Exp,
-    tys: &[Type],
-    patterns: &[Pattern],
-) -> Exp {
+fn generate_tuple_condition(env: &GlobalEnv, tuple_exp: &Exp, patterns: &[Pattern]) -> Exp {
     let loc = env.get_node_loc(tuple_exp.node_id());
 
     if patterns.is_empty() {
@@ -579,9 +584,7 @@ fn generate_tuple_condition(
         .enumerate()
         .filter_map(|(idx, pat)| {
             if let Pattern::LiteralValue(_, val) = pat {
-                let val_id = env.new_node(loc.clone(), tys[idx].clone());
-                let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
-                Some(make_eq(env, &loc, elem_exps[idx].clone(), val_exp))
+                Some(make_deref_eq(env, &loc, elem_exps[idx].clone(), val))
             } else {
                 None
             }
@@ -924,9 +927,7 @@ fn transform_mixed_arm(
                     Pattern::LiteralValue(_, val) => {
                         let (sym, _) = &prim_temps[seq];
                         let var_exp = make_local_var(env, &loc, elem_tys[pos].clone(), *sym);
-                        let val_id = env.new_node(loc.clone(), elem_tys[pos].clone());
-                        let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
-                        conditions.push(make_eq(env, &loc, var_exp, val_exp));
+                        conditions.push(make_deref_eq(env, &loc, var_exp, val));
                     },
                     Pattern::Var(_, var_sym) => {
                         var_bindings.push((*var_sym, seq));
