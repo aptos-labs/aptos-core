@@ -68,7 +68,7 @@ pub fn run_pipeline(
             Ok(module_ir)
         },
         PipelineVersion::V2 => {
-            Ok(pipeline_v2::run_v2_pipeline(module, struct_name_table))
+            pipeline_v2::run_v2_pipeline(module, struct_name_table)
         },
     }
 }
