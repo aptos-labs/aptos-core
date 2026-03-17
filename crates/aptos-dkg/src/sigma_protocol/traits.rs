@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use anyhow::anyhow;
 use crate::{
     fiat_shamir,
     sigma_protocol::{
@@ -13,7 +12,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::arkworks::{
     msm::{merge_msm_inputs, MsmInput},
     random::sample_field_element,

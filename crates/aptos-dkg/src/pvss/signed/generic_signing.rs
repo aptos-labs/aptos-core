@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use anyhow::{anyhow, Result};
 use crate::pvss::{
     test_utils::NoAux,
     traits::{transcript::HasAggregatableSubtranscript, Transcript, TranscriptCore},
 };
+use anyhow::{anyhow, Result};
 use aptos_crypto::{
     bls12381, player::Player, CryptoMaterialError, Signature, SigningKey, Uniform,
     ValidCryptoMaterial,
@@ -179,9 +179,13 @@ impl<
             .first()
             .ok_or_else(|| anyhow!("signed transcript has no dealers"))?;
         let idx = dealer.id;
-        let spk = spks
-            .get(idx)
-            .ok_or_else(|| anyhow!("dealer index {} out of range for spks (len {})", idx, spks.len()))?;
+        let spk = spks.get(idx).ok_or_else(|| {
+            anyhow!(
+                "dealer index {} out of range for spks (len {})",
+                idx,
+                spks.len()
+            )
+        })?;
         self.sig.verify(
             &SessionContribution {
                 contrib: self.trs.get_dealt_public_key(),
