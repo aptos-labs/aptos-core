@@ -480,7 +480,8 @@ pub(crate) fn realistic_env_max_load_test(
             // Allow validator-PFN connections
             config.base.enable_validator_pfn_connections = true;
 
-            // Increase the consensus observer fallback thresholds
+            // Enable consensus observer and increase fallback thresholds
+            config.consensus_observer.observer_enabled = true;
             config
                 .consensus_observer
                 .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
