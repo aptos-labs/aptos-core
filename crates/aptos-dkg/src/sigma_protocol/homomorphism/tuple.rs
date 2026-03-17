@@ -200,14 +200,6 @@ where
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
-    where
-        F: FnMut(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
-    {
-        TupleCodomainShape(self.0.map(&mut f), self.1.map(f))
-    }
-
     fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
     where
         F: FnMut(T) -> Result<U, E>,

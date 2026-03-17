@@ -96,14 +96,6 @@ where
     where
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
-    where
-        F: FnMut(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
-    {
-        CodomainShape(self.0.into_iter().map(f).collect())
-    }
-
     fn try_map<U, E, F>(self, f: F) -> Result<Self::Output<U>, E>
     where
         F: FnMut(T) -> Result<U, E>,

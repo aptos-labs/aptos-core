@@ -5,7 +5,7 @@ use anyhow::Result;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
-use std::fmt::Debug;
+use std::{convert::Infallible, fmt::Debug};
 
 pub mod fixed_base_msms;
 pub mod tuple;
@@ -122,10 +122,14 @@ pub trait EntrywiseMap<T> {
     /// The resulting type after mapping the inner elements to type `U`.
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
+    /// Map each entry with `f`. Default implementation delegates to `try_map` with `Infallible`.
+    fn map<U, F>(self, mut f: F) -> Self::Output<U>
     where
         F: FnMut(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        self.try_map::<U, Infallible, _>(|x| Ok(f(x))).unwrap()
+    }
 
     /// Like `map`, but the closure returns a `Result`; short-circuits on first error.
     fn try_map<U, E, F>(self, f: F) -> Result<Self::Output<U>, E>
@@ -148,14 +152,6 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
 {
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TrivialShape<U>;
-
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
-    where
-        F: FnMut(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
-    {
-        TrivialShape(f(self.0))
-    }
 
     fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
     where

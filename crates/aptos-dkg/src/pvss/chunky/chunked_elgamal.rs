@@ -178,30 +178,6 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         CodomainShape<U>;
 
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
-    where
-        F: FnMut(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
-    {
-        let chunks = self
-            .chunks
-            .into_iter()
-            .map(|row| {
-                row.into_iter()
-                    .map(|inner_row| inner_row.into_iter().map(&mut f).collect::<Vec<_>>())
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        let randomness = self
-            .randomness
-            .into_iter()
-            .map(|inner_vec| inner_vec.into_iter().map(&mut f).collect::<Vec<_>>())
-            .collect();
-
-        CodomainShape { chunks, randomness }
-    }
-
     fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
     where
         F: FnMut(T) -> Result<U, E>,
