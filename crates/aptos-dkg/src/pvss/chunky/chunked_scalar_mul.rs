@@ -10,7 +10,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_crypto::arkworks::{self, msm::MsmInput};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{scalar_mul::BatchMulPreprocessing, CurveGroup};
@@ -103,6 +103,16 @@ where
     {
         CodomainShape(self.0.into_iter().map(f).collect())
     }
+
+    fn try_map<U, E, F>(self, f: F) -> Result<Self::Output<U>, E>
+    where
+        F: FnMut(T) -> Result<U, E>,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        Ok(CodomainShape(
+            self.0.into_iter().map(f).collect::<Result<Vec<_>, _>>()?,
+        ))
+    }
 }
 
 impl<T> IntoIterator for CodomainShape<T>
@@ -177,8 +187,9 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
         Ok(CodomainShape(terms))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr") // TODO: custom MSM here, because only length 1 MSM except during verification
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        C::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

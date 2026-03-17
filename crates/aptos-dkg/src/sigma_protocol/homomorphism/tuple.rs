@@ -207,6 +207,17 @@ where
     {
         TupleCodomainShape(self.0.map(&mut f), self.1.map(f))
     }
+
+    fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
+    where
+        F: FnMut(T) -> Result<U, E>,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        Ok(TupleCodomainShape(
+            self.0.try_map(&mut f)?,
+            self.1.try_map(f)?,
+        ))
+    }
 }
 
 /// Implementation of `FixedBaseMsms` for a tuple of two homomorphisms over the same group.
@@ -245,7 +256,7 @@ where
         Ok(TupleCodomainShape(terms1, terms2))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
         H1::msm_eval(input)
     }
 

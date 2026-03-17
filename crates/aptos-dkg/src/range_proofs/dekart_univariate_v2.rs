@@ -1224,8 +1224,9 @@ pub mod two_term_msm {
             Ok(CodomainShape(MsmInput { bases, scalars }))
         }
 
-        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-            C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
+        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+            C::msm(input.bases(), input.scalars())
+                .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
         }
 
         fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

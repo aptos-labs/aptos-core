@@ -10,7 +10,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 #[allow(unused_imports)] // This is used but due to some bug it is not noticed by the compiler
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
@@ -80,7 +80,6 @@ impl<E: Pairing> OpeningProof<E> {
     pub fn generate<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         Self {
             pi_1: unsafe_random_point(rng),
-
             pi_2: unsafe_random_point(rng),
         }
     }
@@ -93,7 +92,7 @@ pub struct VerificationKey<E: Pairing> {
     pub group_generators: GroupGenerators<E>,
 }
 
-// For Zeromorph one also need powers of tau in g2
+// For Zeromorph one also need powers of tau in G_2
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKeyExtra<E: Pairing> {
     pub vk: VerificationKey<E>,
@@ -412,8 +411,7 @@ impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
-        // CommitmentHomomorphism::<'_, E>::normalize_output(self.apply_msm(self.msm_terms(input)))
-        Ok(self.apply_msm(self.msm_terms(input)?))
+        self.apply_msm(self.msm_terms(input)?)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -452,9 +450,9 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
         Ok(CodomainShape(MsmInput { bases, scalars }))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
         E::G1::msm(input.bases(), input.scalars())
-            .expect("MSM computation failed in univariate KZG")
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

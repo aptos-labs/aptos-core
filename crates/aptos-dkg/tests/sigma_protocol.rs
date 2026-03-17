@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_crypto::arkworks::{
     msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
@@ -112,7 +112,7 @@ mod schnorr {
         type Domain = Fp<P, N>;
 
         fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
-            Ok(self.apply_msm(self.msm_terms(input)?))
+            self.apply_msm(self.msm_terms(input)?)
         }
 
         fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -141,10 +141,10 @@ mod schnorr {
             }))
         }
 
-        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
             // for the homomorphism we only need `input.bases()[0] * input.scalars()[0]`
             // but the verification needs a 3-term MSM... so we should really do a custom MSM which dispatches based on length TODO
-            C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
+            C::msm(input.bases(), input.scalars()).map_err(|e| anyhow!("MSM failed: {}", e))
         }
 
         fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

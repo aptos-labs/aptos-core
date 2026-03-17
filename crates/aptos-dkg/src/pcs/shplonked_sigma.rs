@@ -19,7 +19,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::arkworks::{
     msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
@@ -155,7 +155,7 @@ impl<E: Pairing> HomTrait for EvalPointCommitHom<E> {
 
     fn apply(&self, w: &Self::Domain) -> Result<Self::Codomain> {
         let input = self.msm_terms(w)?.0;
-        let out = Self::msm_eval(input);
+        let out = Self::msm_eval(input)?;
         Ok(CodomainShape(out))
     }
 
@@ -212,9 +212,9 @@ impl<E: Pairing> fixed_base_msms::Trait for EvalPointCommitHom<E> {
         ))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), input.scalars()).expect("EvalPointCommitHom msm_eval")
-        // TODO: not sure we should be doing this because size-2 MSMs in arkworks might not be faster than elementwise multiplication
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        E::G1::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

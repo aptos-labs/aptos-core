@@ -126,6 +126,12 @@ pub trait EntrywiseMap<T> {
     where
         F: FnMut(T) -> U,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+
+    /// Like `map`, but the closure returns a `Result`; short-circuits on first error.
+    fn try_map<U, E, F>(self, f: F) -> Result<Self::Output<U>, E>
+    where
+        F: FnMut(T) -> Result<U, E>,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 }
 
 // ===============================================================================
@@ -149,6 +155,14 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         TrivialShape(f(self.0))
+    }
+
+    fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
+    where
+        F: FnMut(T) -> Result<U, E>,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        Ok(TrivialShape(f(self.0)?))
     }
 }
 

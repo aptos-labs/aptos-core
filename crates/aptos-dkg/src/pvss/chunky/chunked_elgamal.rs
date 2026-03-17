@@ -9,7 +9,7 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
     Scalar,
 };
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::arkworks::{self, msm::MsmInput, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::CurveGroup;
@@ -201,6 +201,40 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
 
         CodomainShape { chunks, randomness }
     }
+
+    fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
+    where
+        F: FnMut(T) -> Result<U, E>,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        let chunks = self
+            .chunks
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|inner_row| {
+                        inner_row
+                            .into_iter()
+                            .map(&mut f)
+                            .collect::<Result<Vec<_>, _>>()
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let randomness = self
+            .randomness
+            .into_iter()
+            .map(|inner_vec| {
+                inner_vec
+                    .into_iter()
+                    .map(&mut f)
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(CodomainShape { chunks, randomness })
+    }
 }
 
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
@@ -323,8 +357,9 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
         })
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        C::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

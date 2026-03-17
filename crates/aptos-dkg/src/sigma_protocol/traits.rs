@@ -196,7 +196,7 @@ pub trait CurveGroupTrait:
             <Self::Group as PrimeGroup>::ScalarField,
         >,
     ) -> Result<()> {
-        let result = Self::msm_eval(input);
+        let result = Self::msm_eval(input)?;
         ensure!(result == <Self::Group as AdditiveGroup>::ZERO);
         Ok(())
     }

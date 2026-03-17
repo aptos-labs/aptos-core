@@ -5,7 +5,7 @@ use crate::sigma_protocol::{
     homomorphism,
     homomorphism::{fixed_base_msms, fixed_base_msms::Trait, TrivialShape as CodomainShape},
 };
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::arkworks::msm::MsmInput;
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -33,7 +33,7 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
     fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
-        Ok(self.apply_msm(self.msm_terms(input)?))
+        self.apply_msm(self.msm_terms(input)?)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -71,8 +71,9 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         }))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in univariate KZG")
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        E::G1::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
