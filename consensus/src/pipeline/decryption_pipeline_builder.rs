@@ -42,8 +42,7 @@ impl PipelineBuilder {
         observer_decrypted_txns: Option<Vec<SignedTransaction>>,
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
-        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) =
-            materialize_fut.await?;
+        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = materialize_fut.await?;
         tracker.start_working();
 
         // TODO(ibalajiarun): if decryption is disabled, convert encrypted txns to failed decryption.
@@ -218,17 +217,14 @@ async fn decrypt_validator_path(
         )))
         .is_err()
     {
-        return Err(anyhow!(
-            "derived_self_key_share_tx receiver dropped, pipeline likely aborted"
-        )
-        .into());
+        return Err(
+            anyhow!("derived_self_key_share_tx receiver dropped, pipeline likely aborted").into(),
+        );
     }
 
     // TODO(ibalajiarun): improve perf
-    let proofs = FPTXWeighted::eval_proofs_compute_all(
-        &proofs_promise,
-        secret_share_config.digest_key(),
-    );
+    let proofs =
+        FPTXWeighted::eval_proofs_compute_all(&proofs_promise, secret_share_config.digest_key());
 
     let prepared_txn_ciphertexts: Vec<Result<PreparedCiphertext, MissingEvalProofError>> =
         txn_ciphertexts

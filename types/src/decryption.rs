@@ -1,11 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    block_info::Round,
-    on_chain_config::OnChainConfig,
-    secret_sharing::SecretSharedKey,
-};
+use crate::{block_info::Round, on_chain_config::OnChainConfig, secret_sharing::SecretSharedKey};
 use anyhow::Context;
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveResource};
 use serde::{Deserialize, Serialize};
