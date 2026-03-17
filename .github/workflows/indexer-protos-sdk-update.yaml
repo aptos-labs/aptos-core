@@ -77,10 +77,8 @@ jobs:
       - name: Capture the commit hash
         id: commit_hash
         run: |
-          # Echo the commit hash to the output
-          echo "::set-output name=commit_hash::$(echo $GITHUB_SHA)"
-          # Echo the PR branch name to the output
-          echo "::set-output name=branch_name::${{ github.head_ref }}"
+          echo "commit_hash=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "branch_name=${{ github.head_ref }}" >> $GITHUB_OUTPUT
       
       - name: Google Cloud Auth
         id: auth
