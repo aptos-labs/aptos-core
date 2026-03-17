@@ -290,6 +290,13 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
             .enumerate()
             .map(|(i, z_i)| {
                 // here `i` is the player's id; bounds check above ensures self.eks[i] is valid
+                ensure!(
+                    input.plaintext_randomness.len() >= z_i.len(),
+                    "plaintext_randomness has {} rows but need {} for player {}",
+                    input.plaintext_randomness.len(),
+                    z_i.len(),
+                    i
+                );
                 let randomness_slice = &input.plaintext_randomness[0..z_i.len()];
                 chunks_vec_msm_terms::<C>(self.pp, self.eks[i], z_i, randomness_slice)
             })
