@@ -187,6 +187,7 @@ fn struct_with_vector_field() {
     let ctr: u32 = 8;
     let items: u32 = 16;
     let tmp: u32 = 24;
+    let vec_ref: u32 = 32; // 16-byte fat pointer referencing the vector
 
     #[rustfmt::skip]
     let code = vec![
@@ -194,27 +195,28 @@ fn struct_with_vector_field() {
         StoreImm8 { dst: FO(tmp), imm: 999 },
         MicroOp::struct_store8(FO(ctr), 0, FO(tmp)),
         VecNew { dst: FO(items), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(items) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { heap_ptr: FO(items), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { heap_ptr: FO(items), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { heap_ptr: FO(items), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
         MicroOp::struct_store8(FO(ctr), 8, FO(items)),
         ForceGC,
-        MicroOp::struct_load8(FO(ctr), 8, FO(items)),
+        MicroOp::struct_borrow(FO(ctr), 8, FO(vec_ref)),
         MicroOp::struct_load8(FO(ctr), 0, FO(result)),
-        VecLen { dst: FO(tmp), heap_ptr: FO(items) },
+        VecLen { dst: FO(tmp), vec_ref: FO(vec_ref) },
         Return,
     ];
 
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 56,
+        data_size: 48,
+        extended_frame_size: 72,
         zero_locals: true,
-        pointer_slots: vec![FO(ctr), FO(items)],
+        pointer_slots: vec![FO(ctr), FO(items), FO(vec_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Struct {

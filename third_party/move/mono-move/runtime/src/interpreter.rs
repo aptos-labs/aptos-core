@@ -389,33 +389,48 @@ impl InterpreterContext<'_> {
                 // ----- Vector instructions -----
                 MicroOp::VecNew {
                     dst,
-                    descriptor_id,
-                    elem_size,
-                    initial_capacity,
+                    descriptor_id: _,
+                    elem_size: _,
+                    initial_capacity: _,
                 } => {
-                    let ptr = self.alloc_vec(descriptor_id, elem_size, initial_capacity)?;
-                    write_ptr(fp, dst, ptr);
+                    write_ptr(fp, dst, std::ptr::null());
                 },
 
-                MicroOp::VecLen { dst, heap_ptr } => {
-                    let vec_ptr = read_ptr(fp, heap_ptr);
-                    let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
+                MicroOp::VecLen { dst, vec_ref } => {
+                    let ref_base = read_ptr(fp, vec_ref);
+                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
+                    let vec_ptr = read_ptr(ref_base, ref_off);
+                    let len = if vec_ptr.is_null() {
+                        0
+                    } else {
+                        read_u64(vec_ptr, VEC_LENGTH_OFFSET)
+                    };
                     write_u64(fp, dst, len);
                 },
 
                 MicroOp::VecPushBack {
-                    heap_ptr,
+                    vec_ref,
                     elem,
                     elem_size,
+                    descriptor_id,
                 } => {
-                    let vec_slot = fp.add(heap_ptr.into()) as *mut u64;
-                    let mut vec_ptr = read_ptr(fp, heap_ptr);
+                    let ref_base = read_ptr(fp, vec_ref);
+                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
+                    let mut vec_ptr = read_ptr(ref_base, ref_off);
+
+                    if vec_ptr.is_null() {
+                        vec_ptr = self.alloc_vec(descriptor_id, elem_size, 4)?;
+                        // Re-read base after potential GC.
+                        let ref_base = read_ptr(fp, vec_ref);
+                        let ref_off = read_u64(fp, vec_ref + 8) as usize;
+                        write_ptr(ref_base, ref_off, vec_ptr);
+                    }
 
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
                     let cap = read_u64(vec_ptr, VEC_CAPACITY_OFFSET);
 
                     if len >= cap {
-                        vec_ptr = self.grow_vec(vec_slot, elem_size, len + 1)?;
+                        vec_ptr = self.grow_vec_ref(fp, vec_ref.into(), elem_size, len + 1)?;
                     }
 
                     std::ptr::copy_nonoverlapping(
@@ -428,10 +443,15 @@ impl InterpreterContext<'_> {
 
                 MicroOp::VecPopBack {
                     dst,
-                    heap_ptr,
+                    vec_ref,
                     elem_size,
                 } => {
-                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let ref_base = read_ptr(fp, vec_ref);
+                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
+                    let vec_ptr = read_ptr(ref_base, ref_off);
+                    if vec_ptr.is_null() {
+                        bail!("VecPopBack on empty vector");
+                    }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
                     if len == 0 {
                         bail!("VecPopBack on empty vector");
@@ -447,12 +467,20 @@ impl InterpreterContext<'_> {
 
                 MicroOp::VecLoadElem {
                     dst,
-                    heap_ptr,
+                    vec_ref,
                     idx,
                     elem_size,
                 } => {
-                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let ref_base = read_ptr(fp, vec_ref);
+                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
+                    let vec_ptr = read_ptr(ref_base, ref_off);
                     let idx_val = read_u64(fp, idx);
+                    if vec_ptr.is_null() {
+                        bail!(
+                            "VecLoadElem index out of bounds: idx={} len=0",
+                            idx_val,
+                        );
+                    }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
                     if idx_val >= len {
                         bail!(
@@ -469,13 +497,21 @@ impl InterpreterContext<'_> {
                 },
 
                 MicroOp::VecStoreElem {
-                    heap_ptr,
+                    vec_ref,
                     idx,
                     src,
                     elem_size,
                 } => {
-                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let ref_base = read_ptr(fp, vec_ref);
+                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
+                    let vec_ptr = read_ptr(ref_base, ref_off);
                     let idx_val = read_u64(fp, idx);
+                    if vec_ptr.is_null() {
+                        bail!(
+                            "VecStoreElem index out of bounds: idx={} len=0",
+                            idx_val,
+                        );
+                    }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
                     if idx_val >= len {
                         bail!(
@@ -494,12 +530,17 @@ impl InterpreterContext<'_> {
                 // ----- Reference (fat pointer) instructions -----
                 MicroOp::VecBorrow {
                     dst,
-                    heap_ptr,
+                    vec_ref,
                     idx,
                     elem_size,
                 } => {
-                    let vec_ptr = read_ptr(fp, heap_ptr);
+                    let ref_base = read_ptr(fp, vec_ref);
+                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
+                    let vec_ptr = read_ptr(ref_base, ref_off);
                     let idx_val = read_u64(fp, idx);
+                    if vec_ptr.is_null() {
+                        bail!("VecBorrow index out of bounds: idx={} len=0", idx_val);
+                    }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
                     if idx_val >= len {
                         bail!("VecBorrow index out of bounds: idx={} len={}", idx_val, len);

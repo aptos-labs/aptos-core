@@ -77,21 +77,23 @@ mod micro_op {
         //   merge_sort_range(vec, 0, len);
         //
         // Frame layout:
-        //   [0]  vec  [8]  len
-        //   [16] metadata (24 bytes)
-        //   [40] callee: vec  [48] callee: lo  [56] callee: hi
+        //   [0]  vec  [8]  len  [16] vec_ref (16 bytes)
+        //   [32] metadata (24 bytes)
+        //   [56] callee: vec  [64] callee: lo  [72] callee: hi
         // =================================================================
         let func_merge_sort = {
             let vec = 0u32;
             let len = 8u32;
-            let data_size = 16u32;
+            let vec_ref = 16u32;
+            let data_size = 32u32;
             let callee_vec = data_size + meta;
             let callee_lo = callee_vec + 8;
             let callee_hi = callee_lo + 8;
 
             #[rustfmt::skip]
             let code = vec![
-                VecLen { dst: FO(len), heap_ptr: FO(vec) },
+                SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
+                VecLen { dst: FO(len), vec_ref: FO(vec_ref) },
                 Move8 { dst: FO(callee_vec), src: FO(vec) },
                 StoreImm8 { dst: FO(callee_lo), imm: 0 },
                 Move8 { dst: FO(callee_hi), src: FO(len) },
@@ -105,7 +107,7 @@ mod micro_op {
                 data_size: data_size as usize,
                 extended_frame_size: (callee_hi + 8) as usize,
                 zero_locals: true,
-                pointer_slots: vec![FO(vec)],
+                pointer_slots: vec![FO(vec), FO(vec_ref)],
             }
         };
 
@@ -190,6 +192,7 @@ mod micro_op {
         //   [0]  vec      [8]  lo       [16] mid      [24] hi
         //   [32] tmp      [40] i        [48] j
         //   [56] elem_a   [64] elem_b   [72] k        [80] tmp_idx
+        //   [88] vec_ref (16 bytes)     [104] tmp_ref (16 bytes)
         // =================================================================
         let func_merge = {
             let vec = 0u32;
@@ -203,6 +206,8 @@ mod micro_op {
             let elem_b = 64u32;
             let k = 72u32;
             let tmp_idx = 80u32;
+            let vec_ref = 88u32;
+            let tmp_ref = 104u32;
 
             #[rustfmt::skip]
             let code = vec![
@@ -211,70 +216,72 @@ mod micro_op {
                 Move8 { dst: FO(j), src: FO(mid) },                             // 1
                 VecNew { dst: FO(tmp), descriptor_id: DescriptorId(0), elem_size: 8,
                          initial_capacity: 4 },                                  // 2
+                SlotBorrow { dst: FO(vec_ref), local: FO(vec) },                 // 3
+                SlotBorrow { dst: FO(tmp_ref), local: FO(tmp) },                 // 4
 
-                // MERGE_LOOP (3): both halves have elements?
-                JumpLessU64 { target: CO(6), lhs: FO(i), rhs: FO(mid) },        // 3
-                JumpLessU64 { target: CO(23), lhs: FO(j), rhs: FO(hi) },        // 4: drain right
-                Jump { target: CO(29) },                                         // 5: copy back
-                JumpLessU64 { target: CO(8), lhs: FO(j), rhs: FO(hi) },         // 6
-                Jump { target: CO(17) },                                         // 7: drain left
+                // MERGE_LOOP (5): both halves have elements?
+                JumpLessU64 { target: CO(8), lhs: FO(i), rhs: FO(mid) },        // 5
+                JumpLessU64 { target: CO(25), lhs: FO(j), rhs: FO(hi) },        // 6: drain right
+                Jump { target: CO(31) },                                         // 7: copy back
+                JumpLessU64 { target: CO(10), lhs: FO(j), rhs: FO(hi) },        // 8
+                Jump { target: CO(19) },                                         // 9: drain left
 
-                // COMPARE (8): both i and j valid
-                VecLoadElem { dst: FO(elem_a), heap_ptr: FO(vec),
-                              idx: FO(i), elem_size: 8 },                       // 8
-                VecLoadElem { dst: FO(elem_b), heap_ptr: FO(vec),
-                              idx: FO(j), elem_size: 8 },                       // 9
-                JumpLessU64 { target: CO(14), lhs: FO(elem_a), rhs: FO(elem_b) }, // 10
+                // COMPARE (10): both i and j valid
+                VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
+                              idx: FO(i), elem_size: 8 },                       // 10
+                VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
+                              idx: FO(j), elem_size: 8 },                       // 11
+                JumpLessU64 { target: CO(16), lhs: FO(elem_a), rhs: FO(elem_b) }, // 12
                 // a >= b: push b
-                VecPushBack { heap_ptr: FO(tmp), elem: FO(elem_b), elem_size: 8 }, // 11
-                AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 12
-                Jump { target: CO(3) },                                          // 13
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: DescriptorId(0) }, // 13
+                AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 14
+                Jump { target: CO(5) },                                          // 15
 
-                // PUSH_LEFT (14): a < b, push a
-                VecPushBack { heap_ptr: FO(tmp), elem: FO(elem_a), elem_size: 8 }, // 14
-                AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 15
-                Jump { target: CO(3) },                                          // 16
+                // PUSH_LEFT (16): a < b, push a
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: DescriptorId(0) }, // 16
+                AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 17
+                Jump { target: CO(5) },                                          // 18
 
-                // DRAIN_LEFT (17): right exhausted
-                JumpLessU64 { target: CO(19), lhs: FO(i), rhs: FO(mid) },       // 17
-                Jump { target: CO(29) },                                         // 18
-                VecLoadElem { dst: FO(elem_a), heap_ptr: FO(vec),
-                              idx: FO(i), elem_size: 8 },                       // 19
-                VecPushBack { heap_ptr: FO(tmp), elem: FO(elem_a), elem_size: 8 }, // 20
-                AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 21
-                Jump { target: CO(17) },                                         // 22
+                // DRAIN_LEFT (19): right exhausted
+                JumpLessU64 { target: CO(21), lhs: FO(i), rhs: FO(mid) },       // 19
+                Jump { target: CO(31) },                                         // 20
+                VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
+                              idx: FO(i), elem_size: 8 },                       // 21
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: DescriptorId(0) }, // 22
+                AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 23
+                Jump { target: CO(19) },                                         // 24
 
-                // DRAIN_RIGHT (23): left exhausted
-                JumpLessU64 { target: CO(25), lhs: FO(j), rhs: FO(hi) },        // 23
-                Jump { target: CO(29) },                                         // 24
-                VecLoadElem { dst: FO(elem_b), heap_ptr: FO(vec),
-                              idx: FO(j), elem_size: 8 },                       // 25
-                VecPushBack { heap_ptr: FO(tmp), elem: FO(elem_b), elem_size: 8 }, // 26
-                AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 27
-                Jump { target: CO(23) },                                         // 28
+                // DRAIN_RIGHT (25): left exhausted
+                JumpLessU64 { target: CO(27), lhs: FO(j), rhs: FO(hi) },        // 25
+                Jump { target: CO(31) },                                         // 26
+                VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
+                              idx: FO(j), elem_size: 8 },                       // 27
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: DescriptorId(0) }, // 28
+                AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 29
+                Jump { target: CO(25) },                                         // 30
 
-                // COPY_BACK (29): copy tmp back into vec[lo..hi)
-                Move8 { dst: FO(k), src: FO(lo) },                              // 29
-                StoreImm8 { dst: FO(tmp_idx), imm: 0 },                         // 30
-                // COPY_LOOP (31)
-                JumpLessU64 { target: CO(33), lhs: FO(k), rhs: FO(hi) },        // 31
-                Return,                                                          // 32
-                VecLoadElem { dst: FO(elem_a), heap_ptr: FO(tmp),
-                              idx: FO(tmp_idx), elem_size: 8 },                 // 33
-                VecStoreElem { heap_ptr: FO(vec), idx: FO(k),
-                               src: FO(elem_a), elem_size: 8 },                 // 34
-                AddU64Imm { dst: FO(k), src: FO(k), imm: 1 },                  // 35
-                AddU64Imm { dst: FO(tmp_idx), src: FO(tmp_idx), imm: 1 },      // 36
-                Jump { target: CO(31) },                                         // 37
+                // COPY_BACK (31): copy tmp back into vec[lo..hi)
+                Move8 { dst: FO(k), src: FO(lo) },                              // 31
+                StoreImm8 { dst: FO(tmp_idx), imm: 0 },                         // 32
+                // COPY_LOOP (33)
+                JumpLessU64 { target: CO(35), lhs: FO(k), rhs: FO(hi) },        // 33
+                Return,                                                          // 34
+                VecLoadElem { dst: FO(elem_a), vec_ref: FO(tmp_ref),
+                              idx: FO(tmp_idx), elem_size: 8 },                 // 35
+                VecStoreElem { vec_ref: FO(vec_ref), idx: FO(k),
+                               src: FO(elem_a), elem_size: 8 },                 // 36
+                AddU64Imm { dst: FO(k), src: FO(k), imm: 1 },                  // 37
+                AddU64Imm { dst: FO(tmp_idx), src: FO(tmp_idx), imm: 1 },      // 38
+                Jump { target: CO(33) },                                         // 39
             ];
 
             Function {
                 code,
                 args_size: 32,
-                data_size: 88,
-                extended_frame_size: 112,
+                data_size: 120,
+                extended_frame_size: 144,
                 zero_locals: true,
-                pointer_slots: vec![FO(vec), FO(tmp)],
+                pointer_slots: vec![FO(vec), FO(tmp), FO(vec_ref), FO(tmp_ref)],
             }
         };
 

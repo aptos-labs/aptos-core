@@ -6,11 +6,12 @@ use mono_move_runtime::{
     ObjectDescriptor,
 };
 
-/// Data segment (32 bytes):
+/// Data segment (48 bytes):
 ///   [fp + 0 ] : result (output) / scratch
 ///   [fp + 8 ] : vec_ptr (heap pointer to vector<u64>)
 ///   [fp + 16] : i (loop counter / len)
 ///   [fp + 24] : tmp (scratch)
+///   [fp + 32] : vec_ref (16-byte fat pointer referencing vec_ptr)
 fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
     use MicroOp::*;
 
@@ -18,35 +19,37 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
     let slot_vec: u32 = 8;
     let slot_i: u32 = 16;
     let slot_tmp: u32 = 24;
+    let slot_vec_ref: u32 = 32;
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(slot_vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(slot_vec_ref), local: FO(slot_vec) },
         StoreImm8 { dst: FO(slot_i), imm: 0 },
-        JumpGreaterEqualU64Imm { target: CO(8), src: FO(slot_i), imm: n },
-        VecPushBack { heap_ptr: FO(slot_vec), elem: FO(slot_i), elem_size: 8 },
+        JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },
+        VecPushBack { vec_ref: FO(slot_vec_ref), elem: FO(slot_i), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(slot_tmp), imm: 1 },
         AddU64 { dst: FO(slot_i), lhs: FO(slot_i), rhs: FO(slot_tmp) },
-        JumpGreaterEqualU64Imm { target: CO(8), src: FO(slot_i), imm: n },
-        JumpNotZeroU64 { target: CO(3), src: FO(slot_i) },
+        JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },
+        JumpNotZeroU64 { target: CO(4), src: FO(slot_i) },
         StoreImm8 { dst: FO(slot_result), imm: 0 },
-        VecLen { dst: FO(slot_i), heap_ptr: FO(slot_vec) },
-        JumpNotZeroU64 { target: CO(12), src: FO(slot_i) },
+        VecLen { dst: FO(slot_i), vec_ref: FO(slot_vec_ref) },
+        JumpNotZeroU64 { target: CO(13), src: FO(slot_i) },
         Return,
-        VecPopBack { dst: FO(slot_tmp), heap_ptr: FO(slot_vec), elem_size: 8 },
+        VecPopBack { dst: FO(slot_tmp), vec_ref: FO(slot_vec_ref), elem_size: 8 },
         AddU64 { dst: FO(slot_result), lhs: FO(slot_result), rhs: FO(slot_tmp) },
-        VecLen { dst: FO(slot_i), heap_ptr: FO(slot_vec) },
-        JumpNotZeroU64 { target: CO(12), src: FO(slot_i) },
+        VecLen { dst: FO(slot_i), vec_ref: FO(slot_vec_ref) },
+        JumpNotZeroU64 { target: CO(13), src: FO(slot_i) },
         Return,
     ];
 
     let func = Function {
         code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 56,
+        data_size: 48,
+        extended_frame_size: 72,
         zero_locals: true,
-        pointer_slots: vec![FO(slot_vec)],
+        pointer_slots: vec![FO(slot_vec), FO(slot_vec_ref)],
     };
 
     let descriptors = vec![ObjectDescriptor::Trivial];

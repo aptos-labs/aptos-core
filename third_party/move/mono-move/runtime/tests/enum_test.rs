@@ -123,34 +123,36 @@ fn enum_gc_traces_refs() {
     let val: u32 = 8;
     let vec: u32 = 16;
     let tmp: u32 = 24;
+    let vec_ref: u32 = 32;
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
         HeapNew { dst: FO(val), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(val), 1),
         MicroOp::enum_store8(FO(val), 0, FO(vec)),
         ForceGC,
         MicroOp::enum_load8(FO(val), 0, FO(vec)),
-        VecLen { dst: FO(result), heap_ptr: FO(vec) },
+        VecLen { dst: FO(result), vec_ref: FO(vec_ref) },
         StoreImm8 { dst: FO(tmp), imm: 0 },
-        VecLoadElem { dst: FO(result), heap_ptr: FO(vec), idx: FO(tmp), elem_size: 8 },
+        VecLoadElem { dst: FO(result), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },
         Return,
     ];
 
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 56,
+        data_size: 48,
+        extended_frame_size: 72,
         zero_locals: true,
-        pointer_slots: vec![FO(val), FO(vec)],
+        pointer_slots: vec![FO(val), FO(vec), FO(vec_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Enum {
@@ -331,19 +333,21 @@ fn enum_gc_variant_switching() {
     let ctr: u32 = 8;
     let vec: u32 = 16;
     let tmp: u32 = 24;
+    let vec_ref: u32 = 32;
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
         HeapNew { dst: FO(ctr), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(ctr), 1),
         MicroOp::enum_store8(FO(ctr), 0, FO(vec)),
         ForceGC,
         MicroOp::enum_load8(FO(ctr), 0, FO(vec)),
         StoreImm8 { dst: FO(tmp), imm: 0 },
-        VecLoadElem { dst: FO(result), heap_ptr: FO(vec), idx: FO(tmp), elem_size: 8 },
+        VecLoadElem { dst: FO(result), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },
         MicroOp::enum_set_tag(FO(ctr), 0),
         StoreImm8 { dst: FO(tmp), imm: 0 },
         MicroOp::enum_store8(FO(ctr), 0, FO(tmp)),
@@ -355,10 +359,10 @@ fn enum_gc_variant_switching() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 56,
+        data_size: 48,
+        extended_frame_size: 72,
         zero_locals: true,
-        pointer_slots: vec![FO(ctr), FO(vec)],
+        pointer_slots: vec![FO(ctr), FO(vec), FO(vec_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Enum {
@@ -451,28 +455,30 @@ fn enum_in_vector() {
     let vec: u32 = 8;
     let e: u32 = 16;
     let tmp: u32 = 24;
+    let vec_ref: u32 = 32;
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 10 },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
-        VecPushBack { heap_ptr: FO(vec), elem: FO(e), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, descriptor_id: DescriptorId(1) },
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 1),
         StoreImm8 { dst: FO(tmp), imm: 30 },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 40 },
         MicroOp::enum_store8(FO(e), 8, FO(tmp)),
-        VecPushBack { heap_ptr: FO(vec), elem: FO(e), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, descriptor_id: DescriptorId(1) },
         ForceGC,
         StoreImm8 { dst: FO(tmp), imm: 0 },
-        VecLoadElem { dst: FO(e), heap_ptr: FO(vec), idx: FO(tmp), elem_size: 8 },
+        VecLoadElem { dst: FO(e), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },
         MicroOp::enum_load8(FO(e), 0, FO(result)),
         StoreImm8 { dst: FO(tmp), imm: 1 },
-        VecLoadElem { dst: FO(e), heap_ptr: FO(vec), idx: FO(tmp), elem_size: 8 },
+        VecLoadElem { dst: FO(e), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },
         MicroOp::enum_load8(FO(e), 0, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         MicroOp::enum_load8(FO(e), 8, FO(tmp)),
@@ -483,10 +489,10 @@ fn enum_in_vector() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 56,
+        data_size: 48,
+        extended_frame_size: 72,
         zero_locals: true,
-        pointer_slots: vec![FO(vec), FO(e)],
+        pointer_slots: vec![FO(vec), FO(e), FO(vec_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Enum {

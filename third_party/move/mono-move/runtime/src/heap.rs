@@ -129,20 +129,30 @@ impl InterpreterContext<'_> {
         Ok(ptr)
     }
 
-    /// Grow a vector to at least `required_cap` elements. The stack slot at
-    /// `vec_slot` is updated in place; returns the new object pointer.
-    pub(crate) fn grow_vec(
+    /// Grow a vector to at least `required_cap` elements, accessed through
+    /// a fat pointer reference at `fp + vec_ref_offset`. The vector pointer
+    /// is written back through the reference; returns the new object pointer.
+    ///
+    /// # Safety
+    ///
+    /// `fp` must point to a valid frame. `vec_ref_offset` must be the byte
+    /// offset of a 16-byte fat pointer `(base, offset)` whose target holds
+    /// the current vector heap pointer. `alloc_vec` may trigger GC which
+    /// relocates objects; the fat pointer's base in `pointer_slots` and the
+    /// vector pointer in the struct's `ref_offsets` are updated by the GC.
+    /// We re-read through the fat pointer after allocation.
+    pub(crate) fn grow_vec_ref(
         &mut self,
-        vec_slot: *mut u64,
+        fp: *mut u8,
+        vec_ref_offset: usize,
         elem_size: u32,
         required_cap: u64,
     ) -> Result<*mut u8> {
-        // SAFETY: vec_slot and the heap pointers it references are valid for
-        // the duration of this call; alloc_vec may trigger GC which relocates
-        // objects but updates vec_slot (the root lives on the stack or inside
-        // another heap object, and the GC relocates both).
         unsafe {
-            let old_ptr = vec_slot.read() as *const u8;
+            let base = read_ptr(fp, vec_ref_offset);
+            let off = read_u64(fp, vec_ref_offset + 8) as usize;
+            let old_ptr = read_ptr(base, off);
+
             let old_len = read_u64(old_ptr, VEC_LENGTH_OFFSET);
             let old_cap = read_u64(old_ptr, VEC_CAPACITY_OFFSET);
             let descriptor_id = DescriptorId(read_u32(old_ptr, HEADER_DESCRIPTOR_OFFSET) as u16);
@@ -152,10 +162,11 @@ impl InterpreterContext<'_> {
                 new_cap = required_cap;
             }
 
-            // alloc_vec may trigger GC, which moves the old vector and updates
-            // vec_slot. Re-read the old pointer from the slot afterward.
+            // alloc_vec may trigger GC. Re-read through the fat pointer afterward.
             let new_ptr = self.alloc_vec(descriptor_id, elem_size, new_cap)?;
-            let old_ptr = vec_slot.read() as *const u8;
+            let base = read_ptr(fp, vec_ref_offset);
+            let off = read_u64(fp, vec_ref_offset + 8) as usize;
+            let old_ptr = read_ptr(base, off);
 
             let byte_count = old_len as usize * elem_size as usize;
             if byte_count > 0 {
@@ -166,7 +177,9 @@ impl InterpreterContext<'_> {
                 );
             }
             write_u64(new_ptr, VEC_LENGTH_OFFSET, old_len);
-            vec_slot.write(new_ptr as u64);
+
+            // Write new pointer back through the reference.
+            write_ptr(base, off, new_ptr);
             Ok(new_ptr)
         }
     }

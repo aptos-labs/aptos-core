@@ -66,16 +66,17 @@ fn valid_with_vec_and_pointer_slots() {
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(0), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(16), local: FO(0) },
         StoreImm8 { dst: FO(8), imm: 42 },
-        VecPushBack { heap_ptr: FO(0), elem: FO(8), elem_size: 8 },
+        VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, descriptor_id: DescriptorId(0) },
         Return,
     ];
 
     let func = Function {
         code,
         args_size: 0,
-        data_size: 16,
-        extended_frame_size: 40,
+        data_size: 32,
+        extended_frame_size: 56,
         zero_locals: true,
         pointer_slots: vec![FO(0)],
     };

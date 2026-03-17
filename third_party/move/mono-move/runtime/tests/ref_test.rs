@@ -23,32 +23,34 @@ fn ref_basic() {
     let tmp: u32 = 24;
     let r#ref: u32 = 32;
     let val: u32 = 48;
+    let vec_ref: u32 = 56;
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(idx), imm: 1 },
-        VecBorrow { dst: FO(r#ref), heap_ptr: FO(vec), idx: FO(idx), elem_size: 8 },
+        VecBorrow { dst: FO(r#ref), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         StoreImm8 { dst: FO(val), imm: 99 },
         WriteRef { ref_ptr: FO(r#ref), src: FO(val), size: 8 },
-        VecLoadElem { dst: FO(tmp), heap_ptr: FO(vec), idx: FO(idx), elem_size: 8 },
+        VecLoadElem { dst: FO(tmp), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         Return,
     ];
 
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 56,
-        extended_frame_size: 80,
+        data_size: 72,
+        extended_frame_size: 96,
         zero_locals: true,
-        pointer_slots: vec![FO(vec), FO(r#ref)],
+        pointer_slots: vec![FO(vec), FO(r#ref), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -78,33 +80,35 @@ fn ref_survives_gc() {
     let tmp: u32 = 24;
     let r#ref: u32 = 32;
     let ref_base: u32 = 32;
+    let vec_ref: u32 = 48;
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 3 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 200 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 300 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(idx), imm: 2 },
-        VecBorrow { dst: FO(r#ref), heap_ptr: FO(vec), idx: FO(idx), elem_size: 8 },
+        VecBorrow { dst: FO(r#ref), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 42 },
         WriteRef { ref_ptr: FO(r#ref), src: FO(tmp), size: 8 },
-        VecLoadElem { dst: FO(tmp), heap_ptr: FO(vec), idx: FO(idx), elem_size: 8 },
+        VecLoadElem { dst: FO(tmp), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         Return,
     ];
 
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
-        extended_frame_size: 72,
+        data_size: 64,
+        extended_frame_size: 88,
         zero_locals: true,
-        pointer_slots: vec![FO(vec), FO(ref_base)],
+        pointer_slots: vec![FO(vec), FO(ref_base), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -159,32 +163,34 @@ fn ref_cross_frame() {
     let m_vec: u32 = 8;
     let m_idx: u32 = 16;
     let m_tmp: u32 = 24;
-    let m_call_site: u32 = 32;
-    let m_callee_ref: u32 = m_call_site + FRAME_METADATA_SIZE as u32; // 56
+    let m_vec_ref: u32 = 32;
+    let m_call_site: u32 = 48;
+    let m_callee_ref: u32 = m_call_site + FRAME_METADATA_SIZE as u32; // 72
 
     #[rustfmt::skip]
     let main_code = vec![
         VecNew { dst: FO(m_vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(m_vec_ref), local: FO(m_vec) },
         StoreImm8 { dst: FO(m_tmp), imm: 10 },
-        VecPushBack { heap_ptr: FO(m_vec), elem: FO(m_tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(m_tmp), imm: 20 },
-        VecPushBack { heap_ptr: FO(m_vec), elem: FO(m_tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(m_tmp), imm: 30 },
-        VecPushBack { heap_ptr: FO(m_vec), elem: FO(m_tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(m_idx), imm: 1 },
-        VecBorrow { dst: FO(m_callee_ref), heap_ptr: FO(m_vec), idx: FO(m_idx), elem_size: 8 },
+        VecBorrow { dst: FO(m_callee_ref), vec_ref: FO(m_vec_ref), idx: FO(m_idx), elem_size: 8 },
         CallFunc { func_id: 1 },
-        VecLoadElem { dst: FO(m_result), heap_ptr: FO(m_vec), idx: FO(m_idx), elem_size: 8 },
+        VecLoadElem { dst: FO(m_result), vec_ref: FO(m_vec_ref), idx: FO(m_idx), elem_size: 8 },
         Return,
     ];
 
     let main_func = Function {
         code: main_code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 72,
+        data_size: 48,
+        extended_frame_size: 88,
         zero_locals: true,
-        pointer_slots: vec![FO(m_vec), FO(m_callee_ref)],
+        pointer_slots: vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)],
     };
 
     let descriptors = vec![ObjectDescriptor::Trivial];
@@ -224,22 +230,24 @@ fn ref_multiple_borrows() {
     let ref_b: u32 = 48;
     let ref_b_base: u32 = 48;
     let val: u32 = 64;
+    let vec_ref: u32 = 72;
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 40 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(idx), imm: 1 },
-        VecBorrow { dst: FO(ref_a), heap_ptr: FO(vec), idx: FO(idx), elem_size: 8 },
+        VecBorrow { dst: FO(ref_a), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         StoreImm8 { dst: FO(idx), imm: 3 },
-        VecBorrow { dst: FO(ref_b), heap_ptr: FO(vec), idx: FO(idx), elem_size: 8 },
+        VecBorrow { dst: FO(ref_b), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(ref_a), size: 8 },
         StoreImm8 { dst: FO(val), imm: 55 },
@@ -252,10 +260,10 @@ fn ref_multiple_borrows() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 72,
-        extended_frame_size: 96,
+        data_size: 88,
+        extended_frame_size: 112,
         zero_locals: true,
-        pointer_slots: vec![FO(vec), FO(ref_a_base), FO(ref_b_base)],
+        pointer_slots: vec![FO(vec), FO(ref_a_base), FO(ref_b_base), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -292,12 +300,14 @@ fn ref_borrow_local() {
     let ref_base: u32 = 16;
     let vec: u32 = 32;
     let tmp: u32 = 40;
+    let vec_ref: u32 = 48;
 
     #[rustfmt::skip]
     let code = vec![
         StoreImm8 { dst: FO(local_val), imm: 42 },
         SlotBorrow { dst: FO(r#ref), local: FO(local_val) },
         VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 99 },
@@ -309,12 +319,12 @@ fn ref_borrow_local() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
-        extended_frame_size: 72,
+        data_size: 64,
+        extended_frame_size: 88,
         // ref_base holds a stack address → is_heap_ptr returns false, GC skips it.
         // vec is a genuine heap root.
         zero_locals: true,
-        pointer_slots: vec![FO(ref_base), FO(vec)],
+        pointer_slots: vec![FO(ref_base), FO(vec), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -344,32 +354,38 @@ fn ref_nested_vectors() {
     let r#ref: u32 = 40;
     let ref_base: u32 = 40;
     let val: u32 = 56;
+    let outer_ref: u32 = 64;
+    let inner_ref: u32 = 80;
 
     #[rustfmt::skip]
     let code = vec![
         // -- Build inner0 = [100, 200] --
         VecNew { dst: FO(inner_ptr), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(inner_ref), local: FO(inner_ptr) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
-        VecPushBack { heap_ptr: FO(inner_ptr), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 200 },
-        VecPushBack { heap_ptr: FO(inner_ptr), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         // -- Build outer --
         VecNew { dst: FO(outer), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
-        VecPushBack { heap_ptr: FO(outer), elem: FO(inner_ptr), elem_size: 8 },
+        SlotBorrow { dst: FO(outer_ref), local: FO(outer) },
+        VecPushBack { vec_ref: FO(outer_ref), elem: FO(inner_ptr), elem_size: 8, descriptor_id: DescriptorId(1) },
         // -- Build inner1 = [300, 400, 500] --
         VecNew { dst: FO(inner_ptr), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        SlotBorrow { dst: FO(inner_ref), local: FO(inner_ptr) },
         StoreImm8 { dst: FO(tmp), imm: 300 },
-        VecPushBack { heap_ptr: FO(inner_ptr), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 400 },
-        VecPushBack { heap_ptr: FO(inner_ptr), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 500 },
-        VecPushBack { heap_ptr: FO(inner_ptr), elem: FO(tmp), elem_size: 8 },
-        VecPushBack { heap_ptr: FO(outer), elem: FO(inner_ptr), elem_size: 8 },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(outer_ref), elem: FO(inner_ptr), elem_size: 8, descriptor_id: DescriptorId(1) },
         // -- Load outer[1] → inner1 ptr, borrow inner1[2] --
         StoreImm8 { dst: FO(idx), imm: 1 },
-        VecLoadElem { dst: FO(inner_ptr), heap_ptr: FO(outer), idx: FO(idx), elem_size: 8 },
+        VecLoadElem { dst: FO(inner_ptr), vec_ref: FO(outer_ref), idx: FO(idx), elem_size: 8 },
+        SlotBorrow { dst: FO(inner_ref), local: FO(inner_ptr) },
         StoreImm8 { dst: FO(idx), imm: 2 },
-        VecBorrow { dst: FO(r#ref), heap_ptr: FO(inner_ptr), idx: FO(idx), elem_size: 8 },
+        VecBorrow { dst: FO(r#ref), vec_ref: FO(inner_ref), idx: FO(idx), elem_size: 8 },
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         StoreImm8 { dst: FO(val), imm: 999 },
@@ -380,10 +396,10 @@ fn ref_nested_vectors() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 64,
-        extended_frame_size: 88,
+        data_size: 96,
+        extended_frame_size: 120,
         zero_locals: true,
-        pointer_slots: vec![FO(outer), FO(inner_ptr), FO(ref_base)],
+        pointer_slots: vec![FO(outer), FO(inner_ptr), FO(ref_base), FO(outer_ref), FO(inner_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
         elem_size: 8,
@@ -437,18 +453,20 @@ fn ref_survives_double_gc() {
     let tmp: u32 = 24;
     let r#ref: u32 = 32;
     let ref_base: u32 = 32;
+    let vec_ref: u32 = 48;
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 3 },
+        SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(idx), imm: 1 },
-        VecBorrow { dst: FO(r#ref), heap_ptr: FO(vec), idx: FO(idx), elem_size: 8 },
+        VecBorrow { dst: FO(r#ref), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         ForceGC,
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
@@ -460,10 +478,10 @@ fn ref_survives_double_gc() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
-        extended_frame_size: 72,
+        data_size: 64,
+        extended_frame_size: 88,
         zero_locals: true,
-        pointer_slots: vec![FO(vec), FO(ref_base)],
+        pointer_slots: vec![FO(vec), FO(ref_base), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);

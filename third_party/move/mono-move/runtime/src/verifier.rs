@@ -195,8 +195,8 @@ impl FunctionVerifier<'_> {
                 self.check_descriptor(pc, descriptor_id);
             },
 
-            MicroOp::VecLen { dst, heap_ptr } => {
-                self.check_frame_access_8(pc, heap_ptr);
+            MicroOp::VecLen { dst, vec_ref } => {
+                self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_frame_access_8(pc, dst);
             },
 
@@ -210,23 +210,25 @@ impl FunctionVerifier<'_> {
                 self.check_frame_access_8(pc, src);
             },
 
-            // ----- Vec push/pop: heap_ptr + variable-width slot -----
+            // ----- Vec push/pop: vec_ref (16B fat pointer) + variable-width slot -----
             MicroOp::VecPushBack {
-                heap_ptr,
+                vec_ref,
                 elem,
                 elem_size,
+                descriptor_id,
             } => {
-                self.check_frame_access_8(pc, heap_ptr);
+                self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), elem, elem_size);
+                self.check_descriptor(pc, descriptor_id);
             },
 
             MicroOp::VecPopBack {
                 dst,
-                heap_ptr,
+                vec_ref,
                 elem_size,
             } => {
-                self.check_frame_access_8(pc, heap_ptr);
+                self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), dst, elem_size);
             },
@@ -234,23 +236,23 @@ impl FunctionVerifier<'_> {
             // ----- Vec indexed load/store -----
             MicroOp::VecLoadElem {
                 dst,
-                heap_ptr,
+                vec_ref,
                 idx,
                 elem_size,
             } => {
-                self.check_frame_access_8(pc, heap_ptr);
+                self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_frame_access_8(pc, idx);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), dst, elem_size);
             },
 
             MicroOp::VecStoreElem {
-                heap_ptr,
+                vec_ref,
                 idx,
                 src,
                 elem_size,
             } => {
-                self.check_frame_access_8(pc, heap_ptr);
+                self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_frame_access_8(pc, idx);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), src, elem_size);
@@ -259,11 +261,11 @@ impl FunctionVerifier<'_> {
             // ----- Borrow producing fat pointer (16B dst) -----
             MicroOp::VecBorrow {
                 dst,
-                heap_ptr,
+                vec_ref,
                 idx,
                 elem_size,
             } => {
-                self.check_frame_access_8(pc, heap_ptr);
+                self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_frame_access_8(pc, idx);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), dst, 16);

@@ -329,6 +329,7 @@ pub enum MicroOp {
     // Vector operations
     //======================================================================
     // Heap-allocated: [header | length | capacity | elements...].
+    // A null pointer represents an empty vector (no allocation).
     // `elem_size` is baked into each instruction (statically known).
     //
     // May want:
@@ -339,12 +340,11 @@ pub enum MicroOp {
     // - specializations for common element sizes (e.g. 1-byte for
     //   byte strings, 8-byte for primitives).
     //======================================================================
-    /// Allocate a new empty vector with the given initial capacity.
-    /// `descriptor_id = 0` indexes the **Trivial** variant in the heap
-    /// object descriptor table (element 0 is always the trivial
-    /// descriptor, meaning no internal heap pointers); `>= 1` indexes
-    /// other descriptors. Writes heap pointer to `dst`.
-    /// MAY TRIGGER GC.
+    /// Initialize an empty vector by writing a null pointer to `dst`.
+    /// No heap allocation occurs; the first `VecPushBack` allocates lazily.
+    /// `descriptor_id` and `elem_size` are retained for use by `VecPushBack`
+    /// (and may be used by future instructions). `initial_capacity` is
+    /// currently unused but reserved.
     VecNew {
         dst: FrameOffset,
         descriptor_id: DescriptorId,
@@ -353,41 +353,50 @@ pub enum MicroOp {
     },
 
     /// Write the length (u64) of the vector to `dst`.
+    /// `vec_ref` is a 16-byte fat pointer `(base, offset)` whose target
+    /// holds the vector's heap pointer.
     VecLen {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
     },
 
     /// Append an element. Copies `elem_size` bytes from `elem`
-    /// into the vector. If capacity is exceeded, reallocates (bump) and
-    /// updates `heap_ptr` in place. MAY TRIGGER GC.
+    /// into the vector. If the vector is null (empty), allocates a new
+    /// buffer using `descriptor_id`. If capacity is exceeded, reallocates
+    /// (bump) and writes the new pointer back through `vec_ref`.
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. MAY TRIGGER GC.
     VecPushBack {
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         elem: FrameOffset,
         elem_size: u32,
+        descriptor_id: DescriptorId,
     },
 
     /// Pop last element. Copies `elem_size` bytes to `dst`.
-    /// Aborts if empty.
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. Aborts if empty.
     VecPopBack {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         elem_size: u32,
     },
 
     /// Read vector[idx]. Copies `elem_size` bytes to `dst`.
-    /// Aborts if out of bounds.
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. Aborts if out of bounds.
     VecLoadElem {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         idx: FrameOffset,
         elem_size: u32,
     },
 
     /// Write vector[idx]. Copies `elem_size` bytes from `src`.
-    /// Aborts if out of bounds.
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. Aborts if out of bounds.
     VecStoreElem {
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         idx: FrameOffset,
         src: FrameOffset,
         elem_size: u32,
@@ -422,14 +431,15 @@ pub enum MicroOp {
     },
 
     /// Borrow a vector element, producing a fat pointer `(base, offset)`.
-    /// Writes 16 bytes at `[dst, dst+16)`:
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. Writes 16 bytes at `[dst, dst+16)`:
     ///   - base   = the vector's heap pointer
     ///   - offset = VEC_DATA_OFFSET + idx * elem_size
     ///
     /// Aborts if index is out of bounds.
     VecBorrow {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         idx: FrameOffset,
         elem_size: u32,
     },
@@ -440,6 +450,12 @@ pub enum MicroOp {
     ///   - offset = offset from the object's start
     ///
     /// Move semantics guarantee the offset is within bounds.
+    ///
+    /// TODO: Revisit whether `heap_ptr` should be a direct owned pointer
+    /// (as it is today) or a fat pointer reference, for consistency with
+    /// the vec instructions. Structs have fixed size so the pointer never
+    /// changes, but open enums switching to a larger variant could
+    /// potentially require reallocation. Too early to tell.
     HeapBorrow {
         dst: FrameOffset,
         heap_ptr: FrameOffset,

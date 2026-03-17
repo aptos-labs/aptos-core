@@ -70,22 +70,25 @@ fn simulate(n: u64, max_len: u64, seed: u64) -> Vec<(u64, Vec<u64>)> {
 // Bytecode program builder
 // ---------------------------------------------------------------------------
 
-/// Function 0 (main) frame layout (96 bytes):
+/// Function 0 (main) frame layout (128 bytes):
 ///   [fp +  0] : outer_vec     (ptr, descriptor 2 — vector of Entry pointers)
 ///   [fp +  8] : i             (loop counter)
 ///   [fp + 16] : r1            (scratch: action random, val, idx_raw)
 ///   [fp + 24] : len           (outer_vec length, computed per-branch)
 ///   [fp + 32] : tmp           (scratch for % results, indices)
 ///   [fp + 40] : const_hundred (= 100)
-///   [fp + 48] : call-site metadata (24 bytes: saved_pc, saved_fp, saved_func_id)
-///   [fp + 72] : callee arg: val       (= callee fp + 0)
-///   [fp + 80] : callee scratch: vec   (= callee fp + 8)
-///   [fp + 88] : callee result: entry  (= callee fp + 16)
+///   [fp + 48] : outer_vec_ref (16-byte fat pointer to outer_vec slot)
+///   [fp + 64] : call-site metadata (24 bytes: saved_pc, saved_fp, saved_func_id)
+///   [fp + 88] : callee arg: val       (= callee fp + 0)
+///   [fp + 96] : callee scratch: vec   (= callee fp + 8)
+///   [fp +104] : callee result: entry  (= callee fp + 16)
+///   [fp +112] : callee scratch: vec_ref (= callee fp + 24, 16 bytes)
 ///
-/// Function 1 (make_entry) data segment (24 bytes):
-///   [fp +  0] : val    (argument from caller)
-///   [fp +  8] : vec    (inner vector, scratch)
-///   [fp + 16] : entry  (result: heap pointer to Entry struct)
+/// Function 1 (make_entry) data segment (40 bytes):
+///   [fp +  0] : val      (argument from caller)
+///   [fp +  8] : vec      (inner vector, scratch)
+///   [fp + 16] : entry    (result: heap pointer to Entry struct)
+///   [fp + 24] : vec_ref  (16-byte fat pointer to vec slot)
 fn make_gc_stress_program(
     num_iterations: u64,
     max_len: u64,
@@ -96,30 +99,33 @@ fn make_gc_stress_program(
     let callee_val: u32 = 0;
     let callee_vec: u32 = 8;
     let callee_entry: u32 = 16;
+    let callee_vec_ref: u32 = 24;
 
     #[rustfmt::skip]
     let make_entry_code = vec![
         // PC 0: vec = VecNew(descriptor=0, elem_size=8)
         VecNew { dst: FO(callee_vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
-        // PC 1: VecPushBack(vec, val)
-        VecPushBack { heap_ptr: FO(callee_vec), elem: FO(callee_val), elem_size: 8 },
-        // PC 2: entry = HeapNew(descriptor=1)
+        // PC 1: vec_ref = SlotBorrow(vec)
+        SlotBorrow { dst: FO(callee_vec_ref), local: FO(callee_vec) },
+        // PC 2: VecPushBack(vec_ref, val)
+        VecPushBack { vec_ref: FO(callee_vec_ref), elem: FO(callee_val), elem_size: 8, descriptor_id: DescriptorId(0) },
+        // PC 3: entry = HeapNew(descriptor=1)
         HeapNew { dst: FO(callee_entry), descriptor_id: DescriptorId(1) },
-        // PC 3: entry.key = val
+        // PC 4: entry.key = val
         MicroOp::struct_store8(FO(callee_entry), 0, FO(callee_val)),
-        // PC 4: entry.values = vec
+        // PC 5: entry.values = vec
         MicroOp::struct_store8(FO(callee_entry), 8, FO(callee_vec)),
-        // PC 5: return
+        // PC 6: return
         Return,
     ];
 
     let callee_func = Function {
         code: make_entry_code,
         args_size: 8,
-        data_size: 24,
-        extended_frame_size: 48,
+        data_size: 40,
+        extended_frame_size: 64,
         zero_locals: true,
-        pointer_slots: vec![FO(callee_vec), FO(callee_entry)],
+        pointer_slots: vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)],
     };
 
     // -- Function 0: main --
@@ -129,95 +135,98 @@ fn make_gc_stress_program(
     let len: u32 = 24;
     let tmp: u32 = 32;
     let const_hundred: u32 = 40;
-    let callee_arg: u32 = 72; // data_size (48) + FRAME_METADATA_SIZE (24)
-    let entry_ptr: u32 = 88; // callee result slot (callee fp + 16)
+    let outer_vec_ref: u32 = 48; // 16-byte fat pointer to outer_vec slot
+    let callee_arg: u32 = 88; // data_size (64) + FRAME_METADATA_SIZE (24)
+    let entry_ptr: u32 = 104; // callee result slot (callee fp + 16)
 
     #[rustfmt::skip]
     let code = vec![
         // ---- Setup ----
         // PC 0: outer_vec = VecNew(descriptor=2, elem_size=8)
         VecNew { dst: FO(outer_vec), descriptor_id: DescriptorId(2), elem_size: 8, initial_capacity: 4 },
-        // PC 1: i = 0
+        // PC 1: outer_vec_ref = SlotBorrow(outer_vec)
+        SlotBorrow { dst: FO(outer_vec_ref), local: FO(outer_vec) },
+        // PC 2: i = 0
         StoreImm8 { dst: FO(i), imm: 0 },
-        // PC 2: const_hundred = 100
+        // PC 3: const_hundred = 100
         StoreImm8 { dst: FO(const_hundred), imm: 100 },
 
-        // ---- LOOP (PC 3) ----
-        JumpGreaterEqualU64Imm { target: CO(29), src: FO(i), imm: num_iterations },
+        // ---- LOOP (PC 4) ----
+        JumpGreaterEqualU64Imm { target: CO(30), src: FO(i), imm: num_iterations },
 
-        // PC 4: r1 = random (action)
+        // PC 5: r1 = random (action)
         StoreRandomU64 { dst: FO(r1) },
-        // PC 5: tmp = r1 % 100
+        // PC 6: tmp = r1 % 100
         ModU64 { dst: FO(tmp), lhs: FO(r1), rhs: FO(const_hundred) },
-        // PC 6: if tmp >= 45: goto GARBAGE (PC 24)
-        JumpGreaterEqualU64Imm { target: CO(24), src: FO(tmp), imm: 45 },
-        // PC 7: if tmp >= 30: goto POP (PC 19)
-        JumpGreaterEqualU64Imm { target: CO(19), src: FO(tmp), imm: 30 },
+        // PC 7: if tmp >= 45: goto GARBAGE (PC 25)
+        JumpGreaterEqualU64Imm { target: CO(25), src: FO(tmp), imm: 45 },
+        // PC 8: if tmp >= 30: goto POP (PC 20)
+        JumpGreaterEqualU64Imm { target: CO(20), src: FO(tmp), imm: 30 },
 
         // ---- PUSH_OR_REPLACE (action 0..29) ----
-        // PC 8: r1 = random (val)
+        // PC 9: r1 = random (val)
         StoreRandomU64 { dst: FO(r1) },
-        // PC 9: write val to callee's argument slot
+        // PC 10: write val to callee's argument slot
         Move8 { dst: FO(callee_arg), src: FO(r1) },
-        // PC 10: call make_entry (func 1)
+        // PC 11: call make_entry (func 1)
         CallFunc { func_id: 1 },
-        // After return: entry pointer is at fp+88 (callee's fp+16)
-        // PC 11: len = VecLen(outer_vec)
-        VecLen { dst: FO(len), heap_ptr: FO(outer_vec) },
-        // PC 12: if len >= max_len: goto REPLACE (PC 15)
-        JumpGreaterEqualU64Imm { target: CO(15), src: FO(len), imm: max_len },
-        // ---- PUSH (PC 13) ----
-        VecPushBack { heap_ptr: FO(outer_vec), elem: FO(entry_ptr), elem_size: 8 },
-        // PC 14: goto NEXT (PC 27)
-        Jump { target: CO(27) },
+        // After return: entry pointer is at fp+104 (callee's fp+16)
+        // PC 12: len = VecLen(outer_vec_ref)
+        VecLen { dst: FO(len), vec_ref: FO(outer_vec_ref) },
+        // PC 13: if len >= max_len: goto REPLACE (PC 16)
+        JumpGreaterEqualU64Imm { target: CO(16), src: FO(len), imm: max_len },
+        // ---- PUSH (PC 14) ----
+        VecPushBack { vec_ref: FO(outer_vec_ref), elem: FO(entry_ptr), elem_size: 8, descriptor_id: DescriptorId(2) },
+        // PC 15: goto NEXT (PC 28)
+        Jump { target: CO(28) },
 
-        // ---- REPLACE (PC 15) ----
-        // PC 15: r1 = random (idx_raw)
+        // ---- REPLACE (PC 16) ----
+        // PC 16: r1 = random (idx_raw)
         StoreRandomU64 { dst: FO(r1) },
-        // PC 16: tmp = r1 % len
+        // PC 17: tmp = r1 % len
         ModU64 { dst: FO(tmp), lhs: FO(r1), rhs: FO(len) },
-        // PC 17: outer_vec[tmp] = entry_ptr
-        VecStoreElem { heap_ptr: FO(outer_vec), idx: FO(tmp), src: FO(entry_ptr), elem_size: 8 },
-        // PC 18: goto NEXT (PC 27)
-        Jump { target: CO(27) },
+        // PC 18: outer_vec[tmp] = entry_ptr
+        VecStoreElem { vec_ref: FO(outer_vec_ref), idx: FO(tmp), src: FO(entry_ptr), elem_size: 8 },
+        // PC 19: goto NEXT (PC 28)
+        Jump { target: CO(28) },
 
-        // ---- POP (PC 19) ----
-        // PC 19: len = VecLen(outer_vec)
-        VecLen { dst: FO(len), heap_ptr: FO(outer_vec) },
-        // PC 20: if len > 0: goto DO_POP (PC 22)
-        JumpNotZeroU64 { target: CO(22), src: FO(len) },
-        // PC 21: len == 0, skip → goto NEXT (PC 27)
-        Jump { target: CO(27) },
-        // PC 22: VecPopBack(outer_vec) — discard into r1
-        VecPopBack { dst: FO(r1), heap_ptr: FO(outer_vec), elem_size: 8 },
-        // PC 23: goto NEXT (PC 27)
-        Jump { target: CO(27) },
+        // ---- POP (PC 20) ----
+        // PC 20: len = VecLen(outer_vec_ref)
+        VecLen { dst: FO(len), vec_ref: FO(outer_vec_ref) },
+        // PC 21: if len > 0: goto DO_POP (PC 23)
+        JumpNotZeroU64 { target: CO(23), src: FO(len) },
+        // PC 22: len == 0, skip → goto NEXT (PC 28)
+        Jump { target: CO(28) },
+        // PC 23: VecPopBack(outer_vec_ref) — discard into r1
+        VecPopBack { dst: FO(r1), vec_ref: FO(outer_vec_ref), elem_size: 8 },
+        // PC 24: goto NEXT (PC 28)
+        Jump { target: CO(28) },
 
-        // ---- GARBAGE (PC 24) ----
-        // PC 24: r1 = random (val)
+        // ---- GARBAGE (PC 25) ----
+        // PC 25: r1 = random (val)
         StoreRandomU64 { dst: FO(r1) },
-        // PC 25: write val to callee's argument slot
+        // PC 26: write val to callee's argument slot
         Move8 { dst: FO(callee_arg), src: FO(r1) },
-        // PC 26: call make_entry (func 1) — result becomes garbage
+        // PC 27: call make_entry (func 1) — result becomes garbage
         CallFunc { func_id: 1 },
         // falls through to NEXT
 
-        // ---- NEXT (PC 27) ----
+        // ---- NEXT (PC 28) ----
         AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },
-        // PC 28: goto LOOP (PC 3)
-        Jump { target: CO(3) },
+        // PC 29: goto LOOP (PC 4)
+        Jump { target: CO(4) },
 
-        // ---- DONE (PC 29) ----
+        // ---- DONE (PC 30) ----
         Return,
     ];
 
     let main_func = Function {
         code,
         args_size: 0,
-        data_size: 48,
-        extended_frame_size: 96,
+        data_size: 64,
+        extended_frame_size: 128,
         zero_locals: true,
-        pointer_slots: vec![FO(outer_vec), FO(entry_ptr)],
+        pointer_slots: vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)],
     };
 
     let descriptors = vec![
