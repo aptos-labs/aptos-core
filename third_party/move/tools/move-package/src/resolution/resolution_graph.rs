@@ -353,17 +353,6 @@ impl ResolvingGraph {
         }
 
         if self.build_options.dev_mode && is_root_package {
-            let mut addr_to_name_mapping = BTreeMap::new();
-            for (name, addr) in resolution_table
-                .iter()
-                .filter(|(_name, addr)| addr.value.borrow().is_some())
-            {
-                let names = addr_to_name_mapping
-                    .entry(addr.value.borrow().unwrap())
-                    .or_insert_with(Vec::new);
-                names.push(*name);
-            }
-
             for (name, addr) in package
                 .dev_address_assignments
                 .clone()
@@ -389,24 +378,6 @@ impl ResolvingGraph {
                             package_name
                         );
                     },
-                }
-
-                if let Some(conflicts) = addr_to_name_mapping.insert(addr, vec![name]) {
-                    bail!(
-                        "Found non-unique dev address assignment '{name} = 0x{addr}' in root \
-                        package '{pkg}'. Dev address assignments must not conflict with any other \
-                        assignments in order to ensure that the package will compile with any \
-                        possible address assignment. \
-                        Assignment conflicts with previous assignments: {conflicts} = 0x{addr}",
-                        name = name,
-                        addr = addr.short_str_lossless(),
-                        pkg = package_name,
-                        conflicts = conflicts
-                            .into_iter()
-                            .map(|n| n.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    )
                 }
             }
         }
