@@ -1384,11 +1384,6 @@ module aptos_framework::fungible_asset {
         borrow_global<Metadata>(addr)
     }
 
-    inline fun borrow_fungible_metadata_mut<T: key>(metadata: &Object<T>): &mut Metadata {
-        let addr = metadata.object_address();
-        borrow_global_mut<Metadata>(addr)
-    }
-
     inline fun borrow_store_resource<T: key>(store: &Object<T>): &FungibleStore {
         let store_addr = store.object_address();
         assert!(

@@ -99,6 +99,7 @@ module aptos_framework::stake {
     /// https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.rs#L20
     const MAX_VALIDATOR_SET_SIZE: u64 = 65536;
 
+    #[lint::skip(unused_constant)]
     /// Limit the maximum value of `rewards_rate` in order to avoid any arithmetic overflow.
     const MAX_REWARDS_RATE: u64 = 1000000;
 
@@ -232,6 +233,7 @@ module aptos_framework::stake {
     struct StakeManagementPermission has copy, drop, store {}
 
     #[event]
+    #[deprecated]
     struct RegisterValidatorCandidate has drop, store {
         pool_address: address
     }
@@ -1780,13 +1782,6 @@ module aptos_framework::stake {
         );
 
         validator_consensus_infos
-    }
-
-    fun addresses_from_validator_infos(infos: &vector<ValidatorInfo>): vector<address> {
-        infos.map_ref(|obj| {
-            let info: &ValidatorInfo = obj;
-            info.addr
-        })
     }
 
     /// Calculate the stake amount of a stake pool for the next epoch.

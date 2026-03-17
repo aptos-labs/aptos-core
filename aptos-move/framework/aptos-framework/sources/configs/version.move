@@ -76,6 +76,7 @@ module aptos_framework::version {
         }
     }
 
+    #[lint::skip(unused_function)]
     /// Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,
     /// to update the version.
     fun initialize_for_test(core_resources: &signer) {

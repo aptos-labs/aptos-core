@@ -59,6 +59,7 @@ module aptos_framework::block {
     }
 
     #[event]
+    #[deprecated]
     /// Should be in-sync with NewBlockEvent rust struct in new_block.rs
     struct NewBlock has drop, store {
         hash: address,
@@ -199,6 +200,7 @@ module aptos_framework::block {
         block_metadata_ref.epoch_interval
     }
 
+    #[lint::skip(unused_function)]
     /// Set the metadata for the current block.
     /// The runtime always runs this before executing the transactions in a block.
     fun block_prologue(
@@ -230,6 +232,7 @@ module aptos_framework::block {
         };
     }
 
+    #[lint::skip(unused_function)]
     /// `block_prologue()` but trigger reconfiguration with DKG after epoch timed out.
     fun block_prologue_ext(
         vm: signer,
@@ -261,6 +264,7 @@ module aptos_framework::block {
         };
     }
 
+    #[lint::skip(unused_function)]
     /// `block_prologue()` but also update the decryption key and trigger
     /// reconfiguration with DKG and Chunky DKG after epoch timed out.
     fun block_prologue_ext_v2(
@@ -294,6 +298,7 @@ module aptos_framework::block {
         };
     }
 
+    #[lint::skip(unused_function)]
     fun block_epilogue(
         vm: &signer,
         fee_distribution_validator_indices: vector<u64>,
@@ -336,6 +341,7 @@ module aptos_framework::block {
         event::emit_event<NewBlockEvent>(event_handle, new_block_event);
     }
 
+    #[lint::skip(unused_function)]
     /// Emit a `NewBlockEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_block_event(vm: signer) acquires BlockResource, CommitHistory {

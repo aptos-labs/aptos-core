@@ -151,6 +151,7 @@ module aptos_framework::code {
         from.policy <= to.policy
     }
 
+    #[lint::skip(unused_function)]
     /// Initialize package metadata for Genesis.
     fun initialize(aptos_framework: &signer, package_owner: &signer, metadata: PackageMetadata)
     acquires PackageRegistry {

@@ -64,7 +64,6 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
-    const PROLOGUE_EFEE_PAYER_NOT_ENABLED: u64 = 1010;
     const PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT: u64 = 1011;
     const PROLOGUE_ENONCE_ALREADY_USED: u64 = 1012;
     const PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
@@ -251,6 +250,7 @@ module aptos_framework::transaction_validation {
         assert!(nonce_validation::check_and_insert_nonce(sender, nonce, txn_expiration_time), error::invalid_argument(PROLOGUE_ENONCE_ALREADY_USED));
     }
 
+    #[lint::skip(unused_function)]
     fun script_prologue(
         sender: signer,
         txn_sequence_number: u64,
@@ -278,6 +278,7 @@ module aptos_framework::transaction_validation {
     // This function extends the script_prologue by adding a parameter to indicate simulation mode.
     // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
     // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
+    #[lint::skip(unused_function)]
     fun script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
@@ -302,6 +303,7 @@ module aptos_framework::transaction_validation {
         )
     }
 
+    #[lint::skip(unused_function)]
     fun multi_agent_script_prologue(
         sender: signer,
         txn_sequence_number: u64,
@@ -336,6 +338,7 @@ module aptos_framework::transaction_validation {
     // This function extends the multi_agent_script_prologue by adding a parameter to indicate simulation mode.
     // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
     // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
+    #[lint::skip(unused_function)]
     fun multi_agent_script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
@@ -426,6 +429,7 @@ module aptos_framework::transaction_validation {
         }
     }
 
+    #[lint::skip(unused_function)]
     fun fee_payer_script_prologue(
         sender: signer,
         txn_sequence_number: u64,
@@ -466,6 +470,7 @@ module aptos_framework::transaction_validation {
     // This function extends the fee_payer_script_prologue by adding a parameter to indicate simulation mode.
     // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
     // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
+    #[lint::skip(unused_function)]
     fun fee_payer_script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
@@ -504,6 +509,7 @@ module aptos_framework::transaction_validation {
         }
     }
 
+    #[lint::skip(unused_function)]
     /// Epilogue function is run after a transaction is successfully executed.
     /// Called by the Adapter
     fun epilogue(
@@ -527,6 +533,7 @@ module aptos_framework::transaction_validation {
     // This function extends the epilogue by adding a parameter to indicate simulation mode.
     // Once the transaction_simulation_enhancement feature is enabled, the Aptos VM will invoke this function instead.
     // Eventually, this function will be consolidated with the original function once the feature is fully enabled.
+    #[lint::skip(unused_function)]
     fun epilogue_extended(
         account: signer,
         storage_fee_refunded: u64,
@@ -622,9 +629,10 @@ module aptos_framework::transaction_validation {
     }
 
     ///////////////////////////////////////////////////////////
-    /// new set of functions
+    // new set of functions
     ///////////////////////////////////////////////////////////
 
+    #[lint::skip(unused_function)]
     fun unified_prologue(
         sender: signer,
         // None means no need to check, i.e. either AA (where it is already checked) or simulation
@@ -653,6 +661,7 @@ module aptos_framework::transaction_validation {
         )
     }
 
+    #[lint::skip(unused_function)]
     /// If there is no fee_payer, fee_payer = sender
     fun unified_prologue_fee_payer(
         sender: signer,
@@ -686,6 +695,7 @@ module aptos_framework::transaction_validation {
         )
     }
 
+    #[lint::skip(unused_function)]
     fun unified_epilogue(
         account: signer,
         gas_payer: signer,

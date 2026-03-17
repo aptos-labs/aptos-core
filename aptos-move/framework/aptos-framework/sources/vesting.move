@@ -221,6 +221,7 @@ module aptos_framework::vesting {
     }
 
     #[event]
+    #[deprecated]
     struct UnlockRewards has drop, store {
         admin: address,
         vesting_contract_address: address,

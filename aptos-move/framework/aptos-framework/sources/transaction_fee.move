@@ -110,6 +110,7 @@ module aptos_framework::transaction_fee {
     }
 
     // Called by the VM after epilogue.
+    #[lint::skip(unused_function)]
     fun emit_fee_statement(fee_statement: FeeStatement) {
         event::emit(fee_statement)
     }

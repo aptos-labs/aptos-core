@@ -25,9 +25,6 @@ module aptos_framework::randomness {
     /// `#[randomness]` annotation. Otherwise, malicious users can bias randomness result.
     const E_API_USE_IS_BIASIBLE: u64 = 1;
 
-    const MAX_U256: u256 =
-        115792089237316195423570985008687907853269984665640564039457584007913129639935;
-
     /// 32-byte randomness seed unique to every block.
     /// This resource is updated in every block prologue.
     struct PerBlockRandomness has drop, key {

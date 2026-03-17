@@ -64,6 +64,7 @@ module aptos_framework::genesis {
         join_during_genesis: bool,
     }
 
+    #[lint::skip(unused_function)]
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
     fun initialize(
         gas_schedule: vector<u8>,
@@ -134,6 +135,7 @@ module aptos_framework::genesis {
         nonce_validation::initialize(&aptos_framework_account);
     }
 
+    #[lint::skip(unused_function)]
     /// Genesis step 2: Initialize Aptos coin.
     fun initialize_aptos_coin(aptos_framework: &signer) {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
@@ -149,6 +151,7 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
     }
 
+    #[lint::skip(unused_function)]
     /// Only called for testnets and e2e tests.
     fun initialize_core_resources_and_aptos_coin(
         aptos_framework: &signer,
@@ -172,6 +175,7 @@ module aptos_framework::genesis {
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
     }
 
+    #[lint::skip(unused_function)]
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
         let unique_accounts = vector::empty();
         accounts.for_each_ref(|account_map| {
@@ -206,6 +210,7 @@ module aptos_framework::genesis {
         account
     }
 
+    #[lint::skip(unused_function)]
     fun create_employee_validators(
         employee_vesting_start: u64,
         employee_vesting_period_duration: u64,
@@ -311,6 +316,7 @@ module aptos_framework::genesis {
         stake::on_new_epoch();
     }
 
+    #[lint::skip(unused_function)]
     /// Sets up the initial validator set for the network.
     /// The validator "owner" accounts, and their authentication
     /// Addresses (and keys) are encoded in the `owners`
@@ -390,6 +396,7 @@ module aptos_framework::genesis {
         stake::join_validator_set_internal(operator, pool_address);
     }
 
+    #[lint::skip(unused_function)]
     /// The last step of genesis.
     fun set_genesis_end(aptos_framework: &signer) {
         chain_status::set_genesis_end(aptos_framework);

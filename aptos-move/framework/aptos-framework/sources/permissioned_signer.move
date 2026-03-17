@@ -383,21 +383,6 @@ module aptos_framework::permissioned_signer {
         }
     }
 
-    /// merge the two stored permission
-    fun merge(lhs: &mut StoredPermission, rhs: StoredPermission) {
-        match (rhs) {
-            StoredPermission::Capacity(new_capacity) => {
-                match (lhs) {
-                    StoredPermission::Capacity(current_capacity) => {
-                        *current_capacity += new_capacity;
-                    }
-                    StoredPermission::Unlimited => (),
-                }
-            }
-            StoredPermission::Unlimited => *lhs = StoredPermission::Unlimited,
-        }
-    }
-
     /// =====================================================================================================
     /// Permission Management
     ///

@@ -1,12 +1,10 @@
 /// This module is responsible for configuring keyless blockchain accounts which were introduced in
 /// [AIP-61](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-61.md).
 module aptos_framework::keyless_account {
-    use std::bn254_algebra;
     use std::config_buffer;
     use std::option::Option;
     use std::signer;
     use std::string::String;
-    use aptos_std::crypto_algebra;
     use aptos_std::ed25519;
     use aptos_framework::chain_status;
     use aptos_framework::system_addresses;
@@ -175,18 +173,6 @@ module aptos_framework::keyless_account {
             max_extra_field_bytes,
             max_jwt_header_b64_bytes,
         }
-    }
-
-    /// Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
-    fun validate_groth16_vk(vk: &Groth16VerificationKey) {
-        // Could be leveraged to speed up the VM deserialization of the VK by 2x, since it can assume the points are valid.
-        assert!(crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(&vk.alpha_g1).is_some(), E_INVALID_BN254_G1_SERIALIZATION);
-        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.beta_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
-        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.gamma_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
-        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.delta_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
-        for (i in 0..vk.gamma_abc_g1.length()) {
-            assert!(crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(vk.gamma_abc_g1.borrow(i)).is_some(), E_INVALID_BN254_G1_SERIALIZATION);
-        };
     }
 
     /// Sets the Groth16 verification key, only callable during genesis. To call during governance proposals, use

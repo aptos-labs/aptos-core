@@ -120,12 +120,14 @@ module aptos_framework::account {
         // the new public key that the account owner wants to rotate to
     }
 
+    #[deprecated]
     /// Deprecated struct - newest version is `RotationCapabilityOfferProofChallengeV2`
     struct RotationCapabilityOfferProofChallenge has drop {
         sequence_number: u64,
         recipient_address: address,
     }
 
+    #[deprecated]
     /// Deprecated struct - newest version is `SignerCapabilityOfferProofChallengeV2`
     struct SignerCapabilityOfferProofChallenge has drop {
         sequence_number: u64,

@@ -1100,6 +1100,7 @@ module aptos_framework::multisig_account {
 
     ////////////////////////// To be called by VM only ///////////////////////////////
 
+    #[lint::skip(unused_function)]
     /// Called by the VM as part of transaction prologue, which is invoked during mempool transaction validation and as
     /// the first step of transaction execution.
     ///
@@ -1150,6 +1151,7 @@ module aptos_framework::multisig_account {
         }
     }
 
+    #[lint::skip(unused_function)]
     /// Post-execution cleanup for a successful multisig transaction execution.
     /// This function is private so no other code can call this beside the VM itself as part of MultisigTransaction.
     fun successful_transaction_execution_cleanup(
@@ -1170,6 +1172,7 @@ module aptos_framework::multisig_account {
         );
     }
 
+    #[lint::skip(unused_function)]
     /// Post-execution cleanup for a failed multisig transaction execution.
     /// This function is private so no other code can call this beside the VM itself as part of MultisigTransaction.
     fun failed_transaction_execution_cleanup(

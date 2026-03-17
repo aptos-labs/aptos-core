@@ -139,6 +139,7 @@ module aptos_framework::coin {
         value: Aggregator
     }
 
+    #[lint::skip(unused_constant)]
     /// Maximum possible aggregatable coin value.
     const MAX_U64: u128 = 18446744073709551615;
 
@@ -173,6 +174,7 @@ module aptos_framework::coin {
     }
 
     #[event]
+    #[deprecated]
     /// Module event emitted when some amount of a coin is deposited into an account.
     struct CoinDeposit has drop, store {
         coin_type: String,
@@ -181,6 +183,7 @@ module aptos_framework::coin {
     }
 
     #[event]
+    #[deprecated]
     /// Module event emitted when some amount of a coin is withdrawn from an account.
     struct CoinWithdraw has drop, store {
         coin_type: String,
@@ -620,23 +623,6 @@ module aptos_framework::coin {
         _aptos_framework: &signer, _allowed: bool
     ) {
         abort error::invalid_state(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
-    }
-
-    inline fun calculate_amount_to_withdraw<CoinType>(
-        account_addr: address, amount: u64
-    ): (u64, u64) {
-        let coin_balance = coin_balance<CoinType>(account_addr);
-        if (coin_balance >= amount) {
-            (amount, 0)
-        } else {
-            let metadata = paired_metadata<CoinType>();
-            if (metadata.is_some()
-                && primary_fungible_store::primary_store_exists(
-                    account_addr, metadata.destroy_some()
-                ))
-                (coin_balance, amount - coin_balance)
-            else abort error::invalid_argument(EINSUFFICIENT_BALANCE)
-        }
     }
 
     fun maybe_convert_to_fungible_store<CoinType>(
