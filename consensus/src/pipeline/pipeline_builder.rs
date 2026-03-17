@@ -567,6 +567,7 @@ impl PipelineBuilder {
                     parent.observer_publish_fut.clone(),
                     decryption_fut.clone(),
                     order_proof_fut.clone(),
+                    rand_check_fut.clone(),
                     block.clone(),
                     self.consensus_publisher.clone(),
                     self.enable_v2_observer_messages,
@@ -980,6 +981,7 @@ impl PipelineBuilder {
         parent_observer_publish_fut: TaskFuture<()>,
         decryption_fut: TaskFuture<DecryptionResult>,
         order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
+        rand_check: TaskFuture<RandResult>,
         block: Arc<Block>,
         publisher: Option<Arc<ConsensusPublisher>>,
         enable_v2_observer_messages: bool,
@@ -988,6 +990,7 @@ impl PipelineBuilder {
         parent_observer_publish_fut.await?;
         let DecryptionResult { decrypted_txns, .. } = decryption_fut.await?;
         let (ordered_blocks, order_proof) = order_proof_fut.await?;
+        rand_check.await?;
 
         tracker.start_working();
 

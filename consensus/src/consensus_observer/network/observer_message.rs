@@ -382,8 +382,9 @@ impl PipelinedBlockV2Owned {
         }
         if let Some(key) = self.secret_shared_key {
             block.set_decryption_key(key);
+            // Note: Decryption key must be Some if decrypted transactions are available.
+            block.set_decrypted_txns(self.decrypted_txns);
         }
-        block.set_decrypted_txns(self.decrypted_txns);
         Arc::new(block)
     }
 }
