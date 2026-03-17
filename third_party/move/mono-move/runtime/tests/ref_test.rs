@@ -399,7 +399,13 @@ fn ref_nested_vectors() {
         data_size: 96,
         extended_frame_size: 120,
         zero_locals: true,
-        pointer_slots: vec![FO(outer), FO(inner_ptr), FO(ref_base), FO(outer_ref), FO(inner_ref)],
+        pointer_slots: vec![
+            FO(outer),
+            FO(inner_ptr),
+            FO(ref_base),
+            FO(outer_ref),
+            FO(inner_ref),
+        ],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
         elem_size: 8,

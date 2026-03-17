@@ -328,7 +328,8 @@ pub enum MicroOp {
     //======================================================================
     // Vector operations
     //======================================================================
-    // Heap-allocated: [header | length | capacity | elements...].
+    // Heap-allocated: [header | length | elements...].
+    // Capacity is derived from the header's size field.
     // A null pointer represents an empty vector (no allocation).
     // `elem_size` is baked into each instruction (statically known).
     //

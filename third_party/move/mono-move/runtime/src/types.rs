@@ -4,9 +4,8 @@
 //! Core types and constants for the interpreter runtime.
 
 use crate::FrameOffset;
-use mono_move_micro_ops::MicroOp;
-
 pub use mono_move_micro_ops::DescriptorId;
+use mono_move_micro_ops::MicroOp;
 
 // ---------------------------------------------------------------------------
 // Object descriptors (for GC tracing)
@@ -146,10 +145,10 @@ pub(crate) const META_SAVED_FUNC_ID_OFFSET: usize = 16;
 
 /// Offset of the `length` field within a vector object (after the header).
 pub const VEC_LENGTH_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
-/// Offset of the `capacity` field within a vector object.
-pub(crate) const VEC_CAPACITY_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
-/// Offset where vector element data begins.
-pub const VEC_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 16; // 24
+/// Offset where vector element data begins (after header + length).
+/// Capacity is not stored; it is derived from the header's `size_in_bytes`
+/// field: `capacity = (size_in_bytes - VEC_DATA_OFFSET) / elem_size`.
+pub const VEC_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
 
 /// Marker written into the `descriptor_id` field of a forwarded object during GC.
 pub(crate) const FORWARDED_MARKER: u32 = u32::MAX;

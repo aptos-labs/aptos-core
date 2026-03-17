@@ -6,8 +6,7 @@
 //! pointer slot validity, invalid jump targets, etc.
 
 use crate::{
-    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, ObjectDescriptor,
-    FRAME_METADATA_SIZE,
+    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, ObjectDescriptor, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 

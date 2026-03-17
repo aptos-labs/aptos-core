@@ -22,7 +22,9 @@ mod micro_op {
         let values = shuffled_range(n, 42);
         let (functions, descriptors) = micro_op_merge_sort();
         let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
-        let vec_ptr = ctx.alloc_u64_vec(mono_move_runtime::DescriptorId(0), &values).unwrap();
+        let vec_ptr = ctx
+            .alloc_u64_vec(mono_move_runtime::DescriptorId(0), &values)
+            .unwrap();
         ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
         ctx.run().unwrap();
 

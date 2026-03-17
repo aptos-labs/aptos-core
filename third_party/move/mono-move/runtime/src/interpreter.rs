@@ -6,11 +6,12 @@
 
 use crate::{
     heap::Heap,
-    memory::{read_ptr, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
+    memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
     types::{
-        DescriptorId, Function, ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
-        FRAME_METADATA_SIZE, META_SAVED_FP_OFFSET, META_SAVED_FUNC_ID_OFFSET, META_SAVED_PC_OFFSET,
-        SENTINEL_FUNC_ID, VEC_CAPACITY_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        DescriptorId, Function, ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE,
+        DEFAULT_STACK_SIZE, FRAME_METADATA_SIZE, HEADER_SIZE_OFFSET, META_SAVED_FP_OFFSET,
+        META_SAVED_FUNC_ID_OFFSET, META_SAVED_PC_OFFSET, SENTINEL_FUNC_ID, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
     },
 };
 use anyhow::{bail, Result};
@@ -355,6 +356,9 @@ impl InterpreterContext<'_> {
                 },
 
                 MicroOp::ShrU64Imm { dst, src, imm } => {
+                    if imm > 63 {
+                        bail!("ShrU64Imm: shift amount {} exceeds 63", imm);
+                    }
                     let v = read_u64(fp, src);
                     write_u64(fp, dst, v >> imm);
                 },
@@ -427,7 +431,8 @@ impl InterpreterContext<'_> {
                     }
 
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
-                    let cap = read_u64(vec_ptr, VEC_CAPACITY_OFFSET);
+                    let size = read_u32(vec_ptr, HEADER_SIZE_OFFSET) as usize;
+                    let cap = ((size - VEC_DATA_OFFSET) / elem_size as usize) as u64;
 
                     if len >= cap {
                         vec_ptr = self.grow_vec_ref(fp, vec_ref.into(), elem_size, len + 1)?;
@@ -476,10 +481,7 @@ impl InterpreterContext<'_> {
                     let vec_ptr = read_ptr(ref_base, ref_off);
                     let idx_val = read_u64(fp, idx);
                     if vec_ptr.is_null() {
-                        bail!(
-                            "VecLoadElem index out of bounds: idx={} len=0",
-                            idx_val,
-                        );
+                        bail!("VecLoadElem index out of bounds: idx={} len=0", idx_val,);
                     }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
                     if idx_val >= len {
@@ -507,10 +509,7 @@ impl InterpreterContext<'_> {
                     let vec_ptr = read_ptr(ref_base, ref_off);
                     let idx_val = read_u64(fp, idx);
                     if vec_ptr.is_null() {
-                        bail!(
-                            "VecStoreElem index out of bounds: idx={} len=0",
-                            idx_val,
-                        );
+                        bail!("VecStoreElem index out of bounds: idx={} len=0", idx_val,);
                     }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
                     if idx_val >= len {

@@ -14,7 +14,7 @@ use crate::{
         DescriptorId, ObjectDescriptor, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FORWARDED_MARKER,
         FRAME_METADATA_SIZE, HEADER_DESCRIPTOR_OFFSET, HEADER_SIZE_OFFSET, META_SAVED_FP_OFFSET,
         META_SAVED_FUNC_ID_OFFSET, OBJECT_HEADER_SIZE, SENTINEL_FUNC_ID, STRUCT_DATA_OFFSET,
-        VEC_CAPACITY_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use anyhow::{bail, Result};
@@ -103,7 +103,6 @@ impl InterpreterContext<'_> {
             write_u32(ptr, HEADER_DESCRIPTOR_OFFSET, descriptor_id.as_u32());
             write_u32(ptr, HEADER_SIZE_OFFSET, aligned_size as u32);
             write_u64(ptr, VEC_LENGTH_OFFSET, 0);
-            write_u64(ptr, VEC_CAPACITY_OFFSET, capacity);
         }
         Ok(ptr)
     }
@@ -154,7 +153,8 @@ impl InterpreterContext<'_> {
             let old_ptr = read_ptr(base, off);
 
             let old_len = read_u64(old_ptr, VEC_LENGTH_OFFSET);
-            let old_cap = read_u64(old_ptr, VEC_CAPACITY_OFFSET);
+            let old_size = read_u32(old_ptr, HEADER_SIZE_OFFSET) as usize;
+            let old_cap = ((old_size - VEC_DATA_OFFSET) / elem_size as usize) as u64;
             let descriptor_id = DescriptorId(read_u32(old_ptr, HEADER_DESCRIPTOR_OFFSET) as u16);
 
             let mut new_cap = if old_cap == 0 { 4 } else { old_cap * 2 };
