@@ -156,7 +156,7 @@ jobs:
           # get the last 10 commits if GIT_SHA is not specified
           fetch-depth: ${{ inputs.GIT_SHA != null && 0 || 10 }}
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         if: ${{ !inputs.SKIP_JOB }}
 
       - name: Install python deps
