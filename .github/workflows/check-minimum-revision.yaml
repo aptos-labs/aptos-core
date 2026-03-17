@@ -20,7 +20,7 @@ jobs:
   check-minimum-revision:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ env.GIT_SHA }}
           fetch-depth: 1000

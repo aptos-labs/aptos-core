@@ -11,7 +11,7 @@ jobs:
   check-protos:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf
         uses: bufbuild/buf-setup-action@v1.50.0
@@ -62,7 +62,7 @@ jobs:
       )
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf

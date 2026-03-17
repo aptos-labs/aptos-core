@@ -21,7 +21,7 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.branch }}
 
