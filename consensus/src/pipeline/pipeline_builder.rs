@@ -561,7 +561,7 @@ impl PipelineBuilder {
             ),
             None,
         );
-        let observer_publish_fut = if !observer_enabled {
+        let observer_publish_fut = if self.consensus_publisher.is_some() {
             spawn_shared_fut(
                 Self::observer_publish(
                     parent.observer_publish_fut.clone(),
