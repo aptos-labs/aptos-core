@@ -15,9 +15,17 @@ pub struct MemoryRegion {
     layout: Layout,
 }
 
+const ALIGNMENT: usize = 8;
+
 impl MemoryRegion {
+    /// Allocates a zeroed, 8-byte-aligned memory region of the given size.
+    ///
+    /// OOM is handled by aborting via `handle_alloc_error`.
     pub fn new(size: usize) -> Self {
-        let layout = Layout::from_size_align(size, 8).expect("invalid memory layout");
+        debug_assert!(size > 0);
+        let layout = Layout::from_size_align(size, ALIGNMENT).expect("invalid memory layout");
+        // SAFETY: layout is valid (power-of-two alignment) and `alloc_zeroed` handles
+        // zero-size layouts per the GlobalAlloc contract. Null is checked below.
         let ptr = unsafe { alloc::alloc_zeroed(layout) };
         if ptr.is_null() {
             alloc::handle_alloc_error(layout);
@@ -55,6 +63,7 @@ impl Drop for MemoryRegion {
 /// `base.add(byte_offset)` must be valid, aligned, and point to an initialized `u64`.
 #[inline(always)]
 pub unsafe fn read_u64(base: *const u8, byte_offset: impl Into<usize>) -> u64 {
+    // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *const u64).read() }
 }
 
@@ -62,6 +71,7 @@ pub unsafe fn read_u64(base: *const u8, byte_offset: impl Into<usize>) -> u64 {
 /// `base.add(byte_offset)` must be valid, aligned, and writable for a `u64`.
 #[inline(always)]
 pub unsafe fn write_u64(base: *mut u8, byte_offset: impl Into<usize>, val: u64) {
+    // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *mut u64).write(val) }
 }
 
@@ -69,6 +79,7 @@ pub unsafe fn write_u64(base: *mut u8, byte_offset: impl Into<usize>, val: u64) 
 /// `base.add(byte_offset)` must be valid, aligned, and point to an initialized pointer.
 #[inline(always)]
 pub unsafe fn read_ptr(base: *const u8, byte_offset: impl Into<usize>) -> *mut u8 {
+    // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *const *mut u8).read() }
 }
 
@@ -76,6 +87,7 @@ pub unsafe fn read_ptr(base: *const u8, byte_offset: impl Into<usize>) -> *mut u
 /// `base.add(byte_offset)` must be valid, aligned, and writable for a pointer.
 #[inline(always)]
 pub unsafe fn write_ptr(base: *mut u8, byte_offset: impl Into<usize>, ptr: *const u8) {
+    // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *mut *const u8).write(ptr) }
 }
 
@@ -83,6 +95,7 @@ pub unsafe fn write_ptr(base: *mut u8, byte_offset: impl Into<usize>, ptr: *cons
 /// `base.add(byte_offset)` must be valid, aligned, and point to an initialized `u32`.
 #[inline(always)]
 pub unsafe fn read_u32(base: *const u8, byte_offset: impl Into<usize>) -> u32 {
+    // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *const u32).read() }
 }
 
@@ -90,6 +103,7 @@ pub unsafe fn read_u32(base: *const u8, byte_offset: impl Into<usize>) -> u32 {
 /// `base.add(byte_offset)` must be valid, aligned, and writable for a `u32`.
 #[inline(always)]
 pub unsafe fn write_u32(base: *mut u8, byte_offset: impl Into<usize>, val: u32) {
+    // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { (base.add(byte_offset.into()) as *mut u32).write(val) }
 }
 
@@ -99,5 +113,6 @@ pub unsafe fn write_u32(base: *mut u8, byte_offset: impl Into<usize>, val: u32) 
 /// The resulting pointer must be within the vector's allocated data region.
 #[inline(always)]
 pub unsafe fn vec_elem_ptr(vec_ptr: *const u8, idx: u64, elem_size: u32) -> *const u8 {
+    // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { vec_ptr.add(VEC_DATA_OFFSET + idx as usize * elem_size as usize) }
 }

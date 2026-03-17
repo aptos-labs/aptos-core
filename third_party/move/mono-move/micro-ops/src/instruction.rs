@@ -145,6 +145,28 @@ impl From<CodeOffset> for usize {
     }
 }
 
+/// Typed index into the program's object descriptor table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DescriptorId(pub u16);
+
+impl DescriptorId {
+    #[inline(always)]
+    pub fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+
+    #[inline(always)]
+    pub fn as_u32(self) -> u32 {
+        self.0 as u32
+    }
+}
+
+impl std::fmt::Display for DescriptorId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug)]
 pub enum MicroOp {
     //======================================================================
@@ -325,7 +347,7 @@ pub enum MicroOp {
     /// MAY TRIGGER GC.
     VecNew {
         dst: FrameOffset,
-        descriptor_id: u16,
+        descriptor_id: DescriptorId,
         elem_size: u32,
         initial_capacity: u64,
     },
@@ -465,7 +487,7 @@ pub enum MicroOp {
     /// preferable.
     HeapNew {
         dst: FrameOffset,
-        descriptor_id: u16,
+        descriptor_id: DescriptorId,
     },
 
     /// Copy 8 bytes from a heap object at `heap_ptr + offset` into `dst`.

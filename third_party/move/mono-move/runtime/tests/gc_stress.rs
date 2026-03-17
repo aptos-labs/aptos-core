@@ -22,8 +22,9 @@
 //! element-by-element against a pure-Rust simulation using the same seed.
 
 use mono_move_runtime::{
-    read_ptr, read_u64, CodeOffset as CO, FrameOffset as FO, Function, InterpreterContext, MicroOp,
-    ObjectDescriptor, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function,
+    InterpreterContext, MicroOp, ObjectDescriptor, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET,
+    VEC_LENGTH_OFFSET,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -99,11 +100,11 @@ fn make_gc_stress_program(
     #[rustfmt::skip]
     let make_entry_code = vec![
         // PC 0: vec = VecNew(descriptor=0, elem_size=8)
-        VecNew { dst: FO(callee_vec), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(callee_vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         // PC 1: VecPushBack(vec, val)
         VecPushBack { heap_ptr: FO(callee_vec), elem: FO(callee_val), elem_size: 8 },
         // PC 2: entry = HeapNew(descriptor=1)
-        HeapNew { dst: FO(callee_entry), descriptor_id: 1 },
+        HeapNew { dst: FO(callee_entry), descriptor_id: DescriptorId(1) },
         // PC 3: entry.key = val
         MicroOp::struct_store8(FO(callee_entry), 0, FO(callee_val)),
         // PC 4: entry.values = vec
@@ -135,7 +136,7 @@ fn make_gc_stress_program(
     let code = vec![
         // ---- Setup ----
         // PC 0: outer_vec = VecNew(descriptor=2, elem_size=8)
-        VecNew { dst: FO(outer_vec), descriptor_id: 2, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(outer_vec), descriptor_id: DescriptorId(2), elem_size: 8, initial_capacity: 4 },
         // PC 1: i = 0
         StoreImm8 { dst: FO(i), imm: 0 },
         // PC 2: const_hundred = 100

@@ -266,16 +266,16 @@ pub fn native_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
 #[cfg(feature = "micro-op")]
 mod micro_op {
     use mono_move_runtime::{
-        CodeOffset as CO, FrameOffset as FO, Function, MicroOp as Op, MicroOp::*, ObjectDescriptor,
-        FRAME_METADATA_SIZE,
+        CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp as Op, MicroOp::*,
+        ObjectDescriptor, FRAME_METADATA_SIZE,
     };
 
     const NULL: u64 = u64::MAX;
     const NODE_SIZE: u32 = 32;
     /// Descriptor index for trivial (no-pointer) vector elements.
-    const DESC_TRIVIAL: u16 = 0;
+    const DESC_TRIVIAL: DescriptorId = DescriptorId(0);
     /// Descriptor index for the BstMap heap struct.
-    const DESC_BST_MAP: u16 = 1;
+    const DESC_BST_MAP: DescriptorId = DescriptorId(1);
 
     /// BstMap struct field offsets (within the struct payload).
     const BST_NODES: u32 = 0;

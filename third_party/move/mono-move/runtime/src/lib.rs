@@ -15,7 +15,7 @@ pub use memory::{
 };
 pub use mono_move_micro_ops::{CodeOffset, FrameOffset, MicroOp};
 pub use types::{
-    Function, ObjectDescriptor, StepResult, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
-    OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    DescriptorId, Function, ObjectDescriptor, StepResult, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 pub use verifier::{verify_program, VerificationError};

@@ -5,8 +5,8 @@
 //! HeapBorrow).
 
 use mono_move_runtime::{
-    read_ptr, read_u64, FrameOffset as FO, Function, InterpreterContext, MicroOp, ObjectDescriptor,
-    FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET,
+    read_ptr, read_u64, DescriptorId, FrameOffset as FO, Function, InterpreterContext, MicroOp,
+    ObjectDescriptor, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ fn ref_basic() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(tmp), imm: 10 },
         VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
@@ -81,7 +81,7 @@ fn ref_survives_gc() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: 0, elem_size: 8, initial_capacity: 3 },
+        VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 3 },
         StoreImm8 { dst: FO(tmp), imm: 100 },
         VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 200 },
@@ -164,7 +164,7 @@ fn ref_cross_frame() {
 
     #[rustfmt::skip]
     let main_code = vec![
-        VecNew { dst: FO(m_vec), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(m_vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(m_tmp), imm: 10 },
         VecPushBack { heap_ptr: FO(m_vec), elem: FO(m_tmp), elem_size: 8 },
         StoreImm8 { dst: FO(m_tmp), imm: 20 },
@@ -227,7 +227,7 @@ fn ref_multiple_borrows() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(tmp), imm: 10 },
         VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
@@ -297,7 +297,7 @@ fn ref_borrow_local() {
     let code = vec![
         StoreImm8 { dst: FO(local_val), imm: 42 },
         SlotBorrow { dst: FO(r#ref), local: FO(local_val) },
-        VecNew { dst: FO(vec), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 99 },
@@ -348,16 +348,16 @@ fn ref_nested_vectors() {
     #[rustfmt::skip]
     let code = vec![
         // -- Build inner0 = [100, 200] --
-        VecNew { dst: FO(inner_ptr), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(inner_ptr), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(tmp), imm: 100 },
         VecPushBack { heap_ptr: FO(inner_ptr), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 200 },
         VecPushBack { heap_ptr: FO(inner_ptr), elem: FO(tmp), elem_size: 8 },
         // -- Build outer --
-        VecNew { dst: FO(outer), descriptor_id: 1, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(outer), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
         VecPushBack { heap_ptr: FO(outer), elem: FO(inner_ptr), elem_size: 8 },
         // -- Build inner1 = [300, 400, 500] --
-        VecNew { dst: FO(inner_ptr), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(inner_ptr), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(tmp), imm: 300 },
         VecPushBack { heap_ptr: FO(inner_ptr), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 400 },
@@ -440,7 +440,7 @@ fn ref_survives_double_gc() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: 0, elem_size: 8, initial_capacity: 3 },
+        VecNew { dst: FO(vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 3 },
         StoreImm8 { dst: FO(tmp), imm: 10 },
         VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
@@ -497,7 +497,7 @@ fn ref_struct_field_borrow() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: 0 },
+        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 42 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 100 },
@@ -550,7 +550,7 @@ fn ref_struct_field_survives_gc() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: 0 },
+        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 7 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 13 },

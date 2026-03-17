@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use mono_move_runtime::{
-    CodeOffset as CO, FrameOffset as FO, Function, InterpreterContext, MicroOp, ObjectDescriptor,
+    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, InterpreterContext, MicroOp,
+    ObjectDescriptor,
 };
 
 /// Data segment (32 bytes):
@@ -20,7 +21,7 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(slot_vec), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(slot_vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(slot_i), imm: 0 },
         JumpGreaterEqualU64Imm { target: CO(8), src: FO(slot_i), imm: n },
         VecPushBack { heap_ptr: FO(slot_vec), elem: FO(slot_i), elem_size: 8 },

@@ -8,7 +8,7 @@ use crate::{
     heap::Heap,
     memory::{read_ptr, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
     types::{
-        Function, ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
+        DescriptorId, Function, ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
         FRAME_METADATA_SIZE, META_SAVED_FP_OFFSET, META_SAVED_FUNC_ID_OFFSET, META_SAVED_PC_OFFSET,
         SENTINEL_FUNC_ID, VEC_CAPACITY_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
@@ -22,16 +22,16 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 // ---------------------------------------------------------------------------
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
-///
-/// `frame_ptr` (fp) is an absolute pointer into the linear stack memory, so
-/// operand accesses are a single addition (`fp + offset`). It is recomputed
-/// only on `CallFunc` and `Return`.
 pub struct InterpreterContext<'a> {
+    /// Externally-provided function table (will be replaced by execution context).
     pub(crate) functions: &'a [Function],
+    /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
 
     pub(crate) pc: usize,
     pub(crate) func_id: usize,
+    /// Absolute pointer into the linear stack memory. Operand accesses are a
+    /// single addition (`fp + offset`). Recomputed only on `CallFunc` and `Return`.
     pub(crate) frame_ptr: *mut u8,
 
     pub(crate) stack: MemoryRegion,
@@ -170,7 +170,7 @@ impl<'a> InterpreterContext<'a> {
     /// Allocate a vector of `u64` values on the heap and return its address
     /// as a `u64` suitable for embedding in args. Useful for passing pre-built
     /// data into a program without generating initialization micro-ops.
-    pub fn alloc_u64_vec(&mut self, descriptor_id: u16, values: &[u64]) -> Result<u64> {
+    pub fn alloc_u64_vec(&mut self, descriptor_id: DescriptorId, values: &[u64]) -> Result<u64> {
         let n = values.len() as u64;
         let ptr = self.alloc_vec(descriptor_id, 8, n)?;
         unsafe {
@@ -313,26 +313,38 @@ impl InterpreterContext<'_> {
 
                 MicroOp::SubU64Imm { dst, src, imm } => {
                     let v = read_u64(fp, src);
-                    let result = v.checked_sub(imm).expect("arithmetic underflow");
+                    let result = match v.checked_sub(imm) {
+                        Some(v) => v,
+                        None => bail!("arithmetic underflow"),
+                    };
                     write_u64(fp, dst, result);
                 },
 
                 MicroOp::AddU64 { dst, lhs, rhs } => {
                     let v1 = read_u64(fp, lhs);
                     let v2 = read_u64(fp, rhs);
-                    let result = v1.checked_add(v2).expect("arithmetic overflow");
+                    let result = match v1.checked_add(v2) {
+                        Some(v) => v,
+                        None => bail!("arithmetic overflow"),
+                    };
                     write_u64(fp, dst, result);
                 },
 
                 MicroOp::AddU64Imm { dst, src, imm } => {
                     let v = read_u64(fp, src);
-                    let result = v.checked_add(imm).expect("arithmetic overflow");
+                    let result = match v.checked_add(imm) {
+                        Some(v) => v,
+                        None => bail!("arithmetic overflow"),
+                    };
                     write_u64(fp, dst, result);
                 },
 
                 MicroOp::RSubU64Imm { dst, src, imm } => {
                     let v = read_u64(fp, src);
-                    let result = imm.checked_sub(v).expect("arithmetic underflow");
+                    let result = match imm.checked_sub(v) {
+                        Some(v) => v,
+                        None => bail!("arithmetic underflow"),
+                    };
                     write_u64(fp, dst, result);
                 },
 
@@ -350,7 +362,9 @@ impl InterpreterContext<'_> {
                 MicroOp::ModU64 { dst, lhs, rhs } => {
                     let lhs_val = read_u64(fp, lhs);
                     let rhs_val = read_u64(fp, rhs);
-                    assert!(rhs_val != 0, "ModU64: division by zero");
+                    if rhs_val == 0 {
+                        bail!("ModU64: division by zero");
+                    }
                     write_u64(fp, dst, lhs_val % rhs_val);
                 },
 

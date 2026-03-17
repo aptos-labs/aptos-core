@@ -4,8 +4,9 @@
 //! Tests for Move enum support (heap-allocated tagged unions).
 
 use mono_move_runtime::{
-    read_ptr, read_u64, CodeOffset as CO, FrameOffset as FO, Function, InterpreterContext, MicroOp,
-    ObjectDescriptor, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function,
+    InterpreterContext, MicroOp, ObjectDescriptor, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -22,7 +23,7 @@ fn enum_basic() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(shape), descriptor_id: 0 },
+        HeapNew { dst: FO(shape), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(shape), 1),
         StoreImm8 { dst: FO(tmp), imm: 3 },
         MicroOp::enum_store8(FO(shape), 0, FO(tmp)),
@@ -76,7 +77,7 @@ fn enum_survives_gc() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(shape), descriptor_id: 0 },
+        HeapNew { dst: FO(shape), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(shape), 0),
         StoreImm8 { dst: FO(tmp), imm: 42 },
         MicroOp::enum_store8(FO(shape), 0, FO(tmp)),
@@ -125,14 +126,14 @@ fn enum_gc_traces_refs() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: 1, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(tmp), imm: 10 },
         VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
         VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 30 },
         VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
-        HeapNew { dst: FO(val), descriptor_id: 0 },
+        HeapNew { dst: FO(val), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(val), 1),
         MicroOp::enum_store8(FO(val), 0, FO(vec)),
         ForceGC,
@@ -192,7 +193,7 @@ fn enum_pattern_match() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(op), descriptor_id: 0 },
+        HeapNew { dst: FO(op), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(op), 0),
         StoreImm8 { dst: FO(tmp), imm: 10 },
         MicroOp::enum_store8(FO(op), 0, FO(tmp)),
@@ -240,7 +241,7 @@ fn enum_variant_switch() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(e), descriptor_id: 0 },
+        HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 111 },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
@@ -286,7 +287,7 @@ fn enum_borrow_field() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(e), descriptor_id: 0 },
+        HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(result), imm: 10 },
         MicroOp::enum_store8(FO(e), 0, FO(result)),
@@ -333,10 +334,10 @@ fn enum_gc_variant_switching() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: 1, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(tmp), imm: 100 },
         VecPushBack { heap_ptr: FO(vec), elem: FO(tmp), elem_size: 8 },
-        HeapNew { dst: FO(ctr), descriptor_id: 0 },
+        HeapNew { dst: FO(ctr), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(ctr), 1),
         MicroOp::enum_store8(FO(ctr), 0, FO(vec)),
         ForceGC,
@@ -392,11 +393,11 @@ fn enum_in_struct() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(payload), descriptor_id: 1 },
+        HeapNew { dst: FO(payload), descriptor_id: DescriptorId(1) },
         MicroOp::enum_set_tag(FO(payload), 1),
         StoreImm8 { dst: FO(tmp), imm: 42 },
         MicroOp::enum_store8(FO(payload), 0, FO(tmp)),
-        HeapNew { dst: FO(wrapper), descriptor_id: 0 },
+        HeapNew { dst: FO(wrapper), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 7 },
         MicroOp::struct_store8(FO(wrapper), 0, FO(tmp)),
         MicroOp::struct_store8(FO(wrapper), 8, FO(payload)),
@@ -453,13 +454,13 @@ fn enum_in_vector() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: 1, elem_size: 8, initial_capacity: 4 },
-        HeapNew { dst: FO(e), descriptor_id: 0 },
+        VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 10 },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
         VecPushBack { heap_ptr: FO(vec), elem: FO(e), elem_size: 8 },
-        HeapNew { dst: FO(e), descriptor_id: 0 },
+        HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 1),
         StoreImm8 { dst: FO(tmp), imm: 30 },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),

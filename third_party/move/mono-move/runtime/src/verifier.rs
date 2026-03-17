@@ -5,7 +5,10 @@
 //! that would otherwise cause undefined behavior at runtime: frame bounds,
 //! pointer slot validity, invalid jump targets, etc.
 
-use crate::{CodeOffset, FrameOffset, Function, MicroOp, ObjectDescriptor, FRAME_METADATA_SIZE};
+use crate::{
+    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, ObjectDescriptor,
+    FRAME_METADATA_SIZE,
+};
 use std::fmt;
 
 // ---------------------------------------------------------------------------
@@ -292,9 +295,9 @@ impl FunctionVerifier<'_> {
             MicroOp::HeapNew { dst, descriptor_id } => {
                 self.check_frame_access_8(pc, dst);
                 self.check_descriptor(pc, descriptor_id);
-                if (descriptor_id as usize) < self.descriptors.len()
+                if descriptor_id.as_usize() < self.descriptors.len()
                     && !matches!(
-                        self.descriptors[descriptor_id as usize],
+                        self.descriptors[descriptor_id.as_usize()],
                         ObjectDescriptor::Struct { .. } | ObjectDescriptor::Enum { .. }
                     )
                 {
@@ -384,8 +387,8 @@ impl FunctionVerifier<'_> {
         self.check_frame_access(Some(pc), offset, 8);
     }
 
-    fn check_descriptor(&mut self, pc: usize, descriptor_id: u16) {
-        if (descriptor_id as usize) >= self.descriptors.len() {
+    fn check_descriptor(&mut self, pc: usize, descriptor_id: DescriptorId) {
+        if descriptor_id.as_usize() >= self.descriptors.len() {
             self.err(
                 Some(pc),
                 format!("descriptor_id {} out of bounds", descriptor_id),

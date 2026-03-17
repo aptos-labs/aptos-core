@@ -6,6 +6,8 @@
 use crate::FrameOffset;
 use mono_move_micro_ops::MicroOp;
 
+pub use mono_move_micro_ops::DescriptorId;
+
 // ---------------------------------------------------------------------------
 // Object descriptors (for GC tracing)
 // ---------------------------------------------------------------------------

@@ -4,7 +4,8 @@
 //! Tests for the static verifier (`verify_program`).
 
 use mono_move_runtime::{
-    verify_program, CodeOffset as CO, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
+    verify_program, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp,
+    ObjectDescriptor,
 };
 
 fn trivial_descriptors() -> Vec<ObjectDescriptor> {
@@ -64,7 +65,7 @@ fn valid_with_vec_and_pointer_slots() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(0), descriptor_id: 0, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(0), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(8), imm: 42 },
         VecPushBack { heap_ptr: FO(0), elem: FO(8), elem_size: 8 },
         Return,
@@ -306,7 +307,7 @@ fn invalid_descriptor_id() {
         code: vec![
             VecNew {
                 dst: FO(0),
-                descriptor_id: 99,
+                descriptor_id: DescriptorId(99),
                 elem_size: 8,
                 initial_capacity: 4,
             },
@@ -358,7 +359,7 @@ fn zero_elem_size_vec_new() {
         code: vec![
             VecNew {
                 dst: FO(0),
-                descriptor_id: 0,
+                descriptor_id: DescriptorId(0),
                 elem_size: 0,
                 initial_capacity: 4,
             },

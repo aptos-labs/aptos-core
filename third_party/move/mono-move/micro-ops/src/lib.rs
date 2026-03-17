@@ -4,6 +4,6 @@
 mod instruction;
 
 pub use instruction::{
-    CodeOffset, FrameOffset, MicroOp, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
-    OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
+    CodeOffset, DescriptorId, FrameOffset, MicroOp, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
 };

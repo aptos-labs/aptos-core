@@ -4,8 +4,8 @@
 //! Tests for Move struct support (both inline and heap-allocated).
 
 use mono_move_runtime::{
-    read_ptr, read_u64, FrameOffset as FO, Function, InterpreterContext, MicroOp, ObjectDescriptor,
-    STRUCT_DATA_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, DescriptorId, FrameOffset as FO, Function, InterpreterContext, MicroOp,
+    ObjectDescriptor, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn struct_heap_basic() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: 0 },
+        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 42 },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 100 },
@@ -140,7 +140,7 @@ fn struct_heap_survives_gc() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: 0 },
+        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 7 },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 13 },
@@ -190,10 +190,10 @@ fn struct_with_vector_field() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(ctr), descriptor_id: 0 },
+        HeapNew { dst: FO(ctr), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 999 },
         MicroOp::struct_store8(FO(ctr), 0, FO(tmp)),
-        VecNew { dst: FO(items), descriptor_id: 1, elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(items), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
         StoreImm8 { dst: FO(tmp), imm: 10 },
         VecPushBack { heap_ptr: FO(items), elem: FO(tmp), elem_size: 8 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
@@ -255,7 +255,7 @@ fn struct_borrow_field() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: 0 },
+        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 5 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 10 },
@@ -305,7 +305,7 @@ fn struct_borrow_survives_gc() {
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: 0 },
+        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 100 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 200 },

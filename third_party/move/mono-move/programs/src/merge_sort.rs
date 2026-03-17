@@ -62,7 +62,7 @@ pub fn native_merge_sort(v: &mut [u64]) {
 #[cfg(feature = "micro-op")]
 mod micro_op {
     use mono_move_runtime::{
-        CodeOffset as CO, FrameOffset as FO, Function, MicroOp::*, ObjectDescriptor,
+        CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp::*, ObjectDescriptor,
         FRAME_METADATA_SIZE,
     };
 
@@ -209,7 +209,7 @@ mod micro_op {
                 // i = lo; j = mid; tmp = new vec
                 Move8 { dst: FO(i), src: FO(lo) },                              // 0
                 Move8 { dst: FO(j), src: FO(mid) },                             // 1
-                VecNew { dst: FO(tmp), descriptor_id: 0, elem_size: 8,
+                VecNew { dst: FO(tmp), descriptor_id: DescriptorId(0), elem_size: 8,
                          initial_capacity: 4 },                                  // 2
 
                 // MERGE_LOOP (3): both halves have elements?
