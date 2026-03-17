@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use anyhow::anyhow;
 use crate::{
     fiat_shamir,
     sigma_protocol::{
@@ -218,20 +219,28 @@ pub trait CurveGroupTrait:
         let minus_one = -<Self::Group as PrimeGroup>::ScalarField::ONE;
         let minus_challenge = -challenge;
 
-        let msm_terms = msm_terms_for_prover_response
-            .into_iter()
-            .zip(prover_first_message.clone().into_iter()) // TODO: not sure the cloning is ideal here
-            .zip(public_statement.clone().into_iter())
-            .map(|((term, A), P)| {
-                let mut bases = term.bases().to_vec();
-                bases.push(A);
-                bases.push(P);
-                let mut scalars = term.scalars().to_vec();
-                scalars.push(minus_one);
-                scalars.push(minus_challenge);
-                MsmInput::new(bases, scalars)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut it_msm = msm_terms_for_prover_response.into_iter();
+        let mut it_commitment = prover_first_message.clone().into_iter(); // not sure the cloning is efficient here
+        let mut it_statement = public_statement.clone().into_iter();
+
+        let msm_terms = std::iter::from_fn(|| {
+            match (it_msm.next(), it_commitment.next(), it_statement.next()) {
+                (Some(term), Some(A), Some(P)) => {
+                    let mut bases = term.bases().to_vec();
+                    bases.push(A);
+                    bases.push(P);
+                    let mut scalars = term.scalars().to_vec();
+                    scalars.push(minus_one);
+                    scalars.push(minus_challenge);
+                    Some(MsmInput::new(bases, scalars))
+                }
+                (None, None, None) => None,
+                _ => Some(Err(anyhow!(
+                    "length mismatch: msm_terms, prover_first_message, and public_statement must have the same arity"
+                ))),
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
         Ok(msm_terms)
     }
