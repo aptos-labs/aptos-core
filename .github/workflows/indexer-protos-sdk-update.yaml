@@ -49,6 +49,7 @@ jobs:
           fi
 
   update-sdk:
+    needs: [check-protos]
     runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       contents: read
@@ -56,8 +57,8 @@ jobs:
     if: | # Only run on each PR once an appropriate event occurs and there are actual changes
       (
         github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update')
-      || needs.check-protos.outputs.changes == 'true'
+        contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update') ||
+        needs.check-protos.outputs.changes == 'true'
       )
     steps:
       - name: Checkout code
