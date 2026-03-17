@@ -151,7 +151,7 @@ jobs:
         if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
         uses: peter-evans/repository-dispatch@v3.0.0
         with:
-          TOKEN: '${{ steps.secrets.outputs.token }}'
+          token: '${{ steps.secrets.outputs.token }}'
           repository: 'aptos-labs/aptos-indexer-processors'
           event-type: 'test-txn-json-change-detected'
           client-payload: '{"commit_hash": "${{ github.sha }}"}'
