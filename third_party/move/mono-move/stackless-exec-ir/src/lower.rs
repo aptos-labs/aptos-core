@@ -335,14 +335,14 @@ impl<'a> LoweringState<'a> {
     fn try_fuse_compare_branch(
         &mut self,
         op: &BinaryOp,
-        _dst: &Reg,
+        dst: &Reg,
         lhs: Reg,
         rhs: Reg,
         next: Option<&Instr>,
     ) -> Option<bool> {
         let next = next?;
         match (op, next) {
-            (BinaryOp::Lt, Instr::BrTrue(Label(l), _)) => {
+            (BinaryOp::Lt, Instr::BrTrue(Label(l), cond)) if cond == dst => {
                 let l_slot = self.slot(lhs);
                 let r_slot = self.slot(rhs);
                 let idx = self.ops.len();
@@ -362,14 +362,14 @@ impl<'a> LoweringState<'a> {
     fn try_fuse_compare_branch_imm(
         &mut self,
         op: &BinaryOp,
-        _dst: &Reg,
+        dst: &Reg,
         src: Reg,
         imm: &ImmValue,
         next: Option<&Instr>,
     ) -> Option<bool> {
         let next = next?;
         match (op, next) {
-            (BinaryOp::Le, Instr::BrFalse(Label(l), _)) => {
+            (BinaryOp::Le, Instr::BrFalse(Label(l), cond)) if cond == dst => {
                 // le src, #c + br_false L => jump if src >= c+1
                 let s = self.slot(src);
                 let v = imm_to_u64(imm);
@@ -382,7 +382,7 @@ impl<'a> LoweringState<'a> {
                 });
                 Some(true)
             },
-            (BinaryOp::Lt, Instr::BrFalse(Label(l), _)) => {
+            (BinaryOp::Lt, Instr::BrFalse(Label(l), cond)) if cond == dst => {
                 // lt src, #c + br_false L => jump if src >= c
                 let s = self.slot(src);
                 let v = imm_to_u64(imm);
