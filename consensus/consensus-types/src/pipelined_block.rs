@@ -79,6 +79,24 @@ pub struct DecryptionResult {
     pub block_gas_limit: Option<u64>,
     pub decryption_key: Option<Option<BlockTxnDecryptionKey>>,
 }
+
+impl DecryptionResult {
+    pub fn passthrough(
+        regular_txns: Vec<SignedTransaction>,
+        max_txns_from_block_to_execute: Option<u64>,
+        block_gas_limit: Option<u64>,
+        decryption_key: Option<Option<BlockTxnDecryptionKey>>,
+    ) -> Self {
+        Self {
+            decrypted_txns: Vec::new(),
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key,
+        }
+    }
+}
+
 pub type PrepareResult = (
     Arc<Vec<SignatureVerifiedTransaction>>,
     Option<u64>,
