@@ -525,6 +525,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             &Self::DST,
             rng,
         )
+        .expect("sigma prove")
         .0; // We're throwing away the normalised statement here; I don't think storing it in the proof would ultimately decrease verification time
 
         // Step 3b
@@ -707,6 +708,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 hiding_randomness: Scalar(rho_h),
                 values: Scalar::vec_from_inner_slice(&h_evals),
             })
+            .expect("KZG apply")
             .0;
         // Step 7b
         let D = D_proj.into_affine();
@@ -1184,13 +1186,13 @@ pub mod two_term_msm {
         type CodomainNormalized = CodomainShape<C::Affine>;
         type Domain = Witness<C::ScalarField>;
 
-        fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+        fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
             // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower!
             // `msm_terms()` is still useful for verification though: there the code will use it to produce an MSM
             //  of size 2+2 (the latter two are for the first prover message A and the statement P)
-            CodomainShape(
+            Ok(CodomainShape(
                 self.base_1 * input.poly_randomness.0 + self.base_2 * input.hiding_kzg_randomness.0,
-            )
+            ))
         }
 
         fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -1210,7 +1212,7 @@ pub mod two_term_msm {
         fn msm_terms(
             &self,
             input: &Self::Domain,
-        ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+        ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
             let mut scalars = Vec::with_capacity(2);
             scalars.push(input.poly_randomness.0);
             scalars.push(input.hiding_kzg_randomness.0);
@@ -1219,7 +1221,7 @@ pub mod two_term_msm {
             bases.push(self.base_1);
             bases.push(self.base_2);
 
-            CodomainShape(MsmInput { bases, scalars })
+            Ok(CodomainShape(MsmInput { bases, scalars }))
         }
 
         fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {

@@ -48,14 +48,14 @@ pub trait Trait:
         statement: Self::Codomain, // TODO: should allow to either submit H::Codomain or H::CodomainNormalized
         cntxt: &Ct,                // needed for SoK purposes
         rng: &mut R,
-    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized) {
+    ) -> Result<(Proof<Self::Scalar, Self>, Self::CodomainNormalized)> {
         let store_prover_commitment = true; // TODO: should change this into a parameter when code is ready
 
         // Step 1: Sample randomness. Here the `witness` is only used to make sure that `r` has the right dimensions
         let r = witness.rand(rng);
 
         // Step 2: Compute commitment A = Ψ(r)
-        let A_proj = self.apply(&r);
+        let A_proj = self.apply(&r)?;
         let A = self.normalize(A_proj);
         let normalized_statement = self.normalize(statement); // TODO: combine these two normalisations
 
@@ -72,13 +72,13 @@ pub trait Trait:
             FirstProofItem::Challenge(c)
         };
 
-        (
+        Ok((
             Proof {
                 first_proof_item,
                 z,
             },
             normalized_statement,
-        )
+        ))
     }
 
     /// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
@@ -213,7 +213,7 @@ pub trait CurveGroupTrait:
             MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
         >,
     > {
-        let msm_terms_for_prover_response = self.msm_terms(&prover_response);
+        let msm_terms_for_prover_response = self.msm_terms(&prover_response)?;
 
         let minus_one = -<Self::Group as PrimeGroup>::ScalarField::ONE;
         let minus_challenge = -challenge;

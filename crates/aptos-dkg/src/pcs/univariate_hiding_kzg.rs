@@ -10,7 +10,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::ensure;
+use anyhow::{ensure, Result};
 #[allow(unused_imports)] // This is used but due to some bug it is not noticed by the compiler
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
@@ -223,7 +223,7 @@ pub fn commit_with_randomness_and_offset<E: Pairing>(
         values: Scalar::vec_from_inner_slice(&values[offset..]),
     };
 
-    commitment_hom.apply(&input)
+    commitment_hom.apply(&input).expect("KZG commit")
 }
 
 impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
@@ -411,9 +411,9 @@ impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type CodomainNormalized = CodomainShape<E::G1Affine>;
     type Domain = Witness<E::ScalarField>;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
         // CommitmentHomomorphism::<'_, E>::normalize_output(self.apply_msm(self.msm_terms(input)))
-        self.apply_msm(self.msm_terms(input))
+        Ok(self.apply_msm(self.msm_terms(input)?))
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -433,8 +433,8 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
-        assert!(
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
+        ensure!(
             self.msm_basis.len() >= input.values.len(),
             "Not enough Lagrange basis elements for univariate hiding KZG: required {}, got {}",
             input.values.len(),
@@ -449,7 +449,7 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
         bases.push(self.xi_1);
         bases.extend(&self.msm_basis[..input.values.len()]);
 
-        CodomainShape(MsmInput { bases, scalars })
+        Ok(CodomainShape(MsmInput { bases, scalars }))
     }
 
     fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use anyhow::Result;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
@@ -38,7 +39,7 @@ pub trait Trait: CanonicalSerialize {
     type Codomain;
     type CodomainNormalized;
 
-    fn apply(&self, element: &Self::Domain) -> Self::Codomain;
+    fn apply(&self, element: &Self::Domain) -> Result<Self::Codomain>;
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized;
 }
 
@@ -103,7 +104,7 @@ where
     type CodomainNormalized = H::CodomainNormalized;
     type Domain = LargerDomain;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
         let projected = (self.projection)(input);
         self.hom.apply(&projected)
     }

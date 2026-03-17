@@ -9,6 +9,7 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
     Scalar,
 };
+use anyhow::Result;
 use aptos_crypto::arkworks::{self, msm::MsmInput, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::CurveGroup;
@@ -94,7 +95,7 @@ impl<C: CurveGroup> homomorphism::Trait for Homomorphism<'_, C> {
     type CodomainNormalized = CodomainShape<C::Affine>;
     type Domain = Witness<C::ScalarField>;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
         // Get the batch multiplication tables
         let G_table = &*self.pp.G_table;
         let H_table = &*self.pp.H_table;
@@ -160,10 +161,10 @@ impl<C: CurveGroup> homomorphism::Trait for Homomorphism<'_, C> {
             randomness_result.push(R_row);
         }
 
-        CodomainShape {
+        Ok(CodomainShape {
             chunks: chunks_result,
             randomness: randomness_result,
-        }
+        })
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -261,7 +262,7 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+    ) -> anyhow::Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
         let Cs = input
             .plaintext_chunks
@@ -288,10 +289,10 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
             })
             .collect();
 
-        CodomainShape {
+        Ok(CodomainShape {
             chunks: Cs,
             randomness: Rs,
-        }
+        })
     }
 
     fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
@@ -477,7 +478,7 @@ mod tests {
         let CodomainShape::<C> {
             chunks: Cs,
             randomness: Rs,
-        } = hom.apply(&witness);
+        } = hom.apply(&witness).expect("apply");
 
         // 8. Build a baby-step giant-step table for computing discrete logs
         let table = dlog::table::BabyStepTable::new(pp.G, (1u64 << (radix_exponent / 2)) as u32);
