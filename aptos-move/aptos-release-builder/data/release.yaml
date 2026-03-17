@@ -1,15 +1,14 @@
 ---
 remote_endpoint: https://testnet.movementnetwork.xyz/
-# replace with below for actual release, compat test needs concrete URL above:
-# remote_endpoint: ~
 name: "v0.1"
 proposals:
-  - name: proposal_1_upgrade_framework
+  - name: enable_default_account_resource
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework, version v0.1"
-      description: "This is for upgrading the framework to move2"
+      title: "Enable default account resource"
+      description: "This is for enabling the default account resource"
     execution_mode: RootSigner
     update_sequence:
-      - Gas:
-          old: movement-migration/gas-schedule/gas-v38.json
-          new: movement-migration/gas-schedule/gas-v39.json
+      - FeatureFlag:
+          enabled:
+            - default_account_resource
+          disabled: []
