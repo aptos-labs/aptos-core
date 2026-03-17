@@ -647,6 +647,7 @@ module aptos_token_objects::property_map {
         read_u8(&object, &string::utf8(b"bool"));
     }
 
+    #[test_only]
     fun assert_end_to_end_input(object: Object<ObjectCore>) acquires PropertyMap {
         assert!(read_bool(&object, &string::utf8(b"bool")), 0);
         assert!(read_u8(&object, &string::utf8(b"u8")) == 0x12, 1);

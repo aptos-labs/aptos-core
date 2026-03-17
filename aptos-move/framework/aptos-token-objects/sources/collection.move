@@ -57,6 +57,7 @@ module aptos_token_objects::collection {
     const MAX_URI_LENGTH: u64 = 512;
     const MAX_DESCRIPTION_LENGTH: u64 = 2048;
 
+    #[test_only]
     const MAX_U64: u64 = 18446744073709551615;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -289,6 +290,7 @@ module aptos_token_objects::collection {
         constructor_ref
     }
 
+    #[test_only]
     /// Creates an untracked collection, or a collection that supports an arbitrary amount of
     /// tokens. This is useful for mass airdrops that fully leverage Aptos parallelization.
     /// TODO: Hide this until we bring back meaningful way to enforce burns

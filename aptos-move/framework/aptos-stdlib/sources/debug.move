@@ -133,7 +133,9 @@ module aptos_std::debug {
         }
     }
 
+    #[test_only]
     const MSG_1 : vector<u8> = b"abcdef";
+    #[test_only]
     const MSG_2 : vector<u8> = b"123456";
 
     #[test]

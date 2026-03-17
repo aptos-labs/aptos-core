@@ -28,6 +28,7 @@ module aptos_token::token_transfers {
         token_id: TokenId,
     }
 
+    #[deprecated]
     #[event]
     struct TokenOffer has drop, store {
         to_address: address,
