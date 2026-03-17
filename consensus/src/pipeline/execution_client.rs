@@ -618,7 +618,7 @@ impl TExecutionClient for ExecutionProxyClient {
         for block in &blocks {
             block.set_insertion_time();
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                tx.order_proof_tx
+                tx.ordered_blocks_and_proof_fut
                     .take()
                     .map(|tx| tx.send((blocks.clone(), ordered_proof.clone())));
             }
