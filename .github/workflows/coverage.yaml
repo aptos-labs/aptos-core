@@ -98,7 +98,7 @@ jobs:
         with:
           name: lcov_smoke
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # pin@v5.5.2
         with:
           files: lcov_unit.info,lcov_smoke.info
           fail_ci_if_error: true
