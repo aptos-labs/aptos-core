@@ -301,7 +301,7 @@ impl ResolvingGraph {
             })?;
         }
 
-        self.unify_addresses_in_package(&package, &mut resolution_table, is_root_package)?;
+        self.unify_addresses_in_package(&package, &mut resolution_table, is_root_package, writer)?;
 
         let source_digest =
             ResolvingPackage::get_package_digest_for_config(&package_path, &self.build_options)?;
@@ -318,11 +318,12 @@ impl ResolvingGraph {
         Ok(())
     }
 
-    fn unify_addresses_in_package(
+    fn unify_addresses_in_package<W: Write>(
         &mut self,
         package: &SourceManifest,
         resolution_table: &mut ResolvingTable,
         is_root_package: bool,
+        writer: &mut W,
     ) -> Result<()> {
         let package_name = &package.package.name;
         for (name, addr_opt) in package.addresses.clone().unwrap_or_default().into_iter() {
@@ -353,6 +354,18 @@ impl ResolvingGraph {
         }
 
         if self.build_options.dev_mode && is_root_package {
+            let mut addr_to_name_mapping: BTreeMap<AccountAddress, Vec<NamedAddress>> =
+                BTreeMap::new();
+            for (name, addr) in resolution_table
+                .iter()
+                .filter(|(_name, addr)| addr.value.borrow().is_some())
+            {
+                addr_to_name_mapping
+                    .entry(addr.value.borrow().unwrap())
+                    .or_default()
+                    .push(*name);
+            }
+
             for (name, addr) in package
                 .dev_address_assignments
                 .clone()
@@ -378,6 +391,26 @@ impl ResolvingGraph {
                             package_name
                         );
                     },
+                }
+
+                if let Some(conflicts) = addr_to_name_mapping.insert(addr, vec![name]) {
+                    let conflict_names = conflicts
+                        .into_iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    writeln!(
+                        writer,
+                        "{} Dev address assignment '{name} = 0x{addr}' in package \
+                         '{pkg}' has the same address as: {conflicts}. If these addresses \
+                         are different in a non-dev build, the package may behave differently \
+                         than in dev mode / testing.",
+                        "WARNING".bold().yellow(),
+                        name = name,
+                        addr = addr.short_str_lossless(),
+                        pkg = package_name,
+                        conflicts = conflict_names,
+                    )?;
                 }
             }
         }
