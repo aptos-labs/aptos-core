@@ -9,7 +9,7 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
     Scalar,
 };
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use aptos_crypto::arkworks::{self, msm::MsmInput, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::CurveGroup;
@@ -221,15 +221,21 @@ fn chunks_msm_terms<C: CurveGroup>(
     ek: C::Affine,
     chunks: &[Scalar<C::ScalarField>],
     correlated_randomness: &[Scalar<C::ScalarField>],
-) -> Vec<MsmInput<C::Affine, C::ScalarField>> {
-    chunks
+) -> Result<Vec<MsmInput<C::Affine, C::ScalarField>>> {
+    ensure!(
+        chunks.len() == correlated_randomness.len(),
+        "chunks length {} does not match correlated_randomness length {}",
+        chunks.len(),
+        correlated_randomness.len()
+    );
+    Ok(chunks
         .iter()
         .zip(correlated_randomness.iter())
         .map(|(&z_ij, &r_j)| MsmInput {
             bases: vec![pp.G, ek],
             scalars: vec![z_ij.0, r_j.0],
         })
-        .collect()
+        .collect())
 }
 
 // Given a vector of chunked scalar [[z_j]] and vector of randomness [[r_j]], returns a vector of
@@ -239,7 +245,13 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
     ek: C::Affine,
     chunks_vec: &[Vec<Scalar<C::ScalarField>>],
     correlated_randomness_vec: &[Vec<Scalar<C::ScalarField>>],
-) -> Vec<Vec<MsmInput<C::Affine, C::ScalarField>>> {
+) -> Result<Vec<Vec<MsmInput<C::Affine, C::ScalarField>>>> {
+    ensure!(
+        chunks_vec.len() == correlated_randomness_vec.len(),
+        "chunks_vec length {} does not match correlated_randomness_vec length {}",
+        chunks_vec.len(),
+        correlated_randomness_vec.len()
+    );
     chunks_vec
         .iter()
         .zip(correlated_randomness_vec.iter())
@@ -262,17 +274,26 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> anyhow::Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
+        ensure!(
+            input.plaintext_chunks.len() <= self.eks.len(),
+            "plaintext_chunks length {} exceeds encryption keys length {}",
+            input.plaintext_chunks.len(),
+            self.eks.len()
+        );
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
+        // For each player i, z_i has length = that player's weight; use only the first z_i.len()
+        // rows of plaintext_randomness (row j is used for that player's j-th share in apply()).
         let Cs = input
             .plaintext_chunks
             .iter()
             .enumerate()
             .map(|(i, z_i)| {
-                // here `i` is the player's id
-                chunks_vec_msm_terms::<C>(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
+                // here `i` is the player's id; bounds check above ensures self.eks[i] is valid
+                let randomness_slice = &input.plaintext_randomness[0..z_i.len()];
+                chunks_vec_msm_terms::<C>(self.pp, self.eks[i], z_i, randomness_slice)
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         // R_j = r_j * H_1
         let Rs = input

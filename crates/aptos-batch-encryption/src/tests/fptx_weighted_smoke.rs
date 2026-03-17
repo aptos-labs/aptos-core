@@ -94,7 +94,7 @@ fn weighted_smoke_with_pvss() {
     let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
     let pp = <T as TranscriptCore>::PublicParameters::new_with_commitment_base(
         tc.get_total_weight(),
-        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
         tc.get_total_num_players(),
         G2Affine::generator(),
         &mut rng_aptos,

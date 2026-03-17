@@ -102,14 +102,20 @@ fn test_pvss_all_weighted() {
     }
 
     // Restarting the loop here because now it'll grab **arkworks** weighted `ThresholdConfig`s over BN254 instead.
-    // Public parameters (incl. dlog table) are built once per config and shared across all four chunky variants.
+    // Public parameters (incl. dlog table) are built once for all configs and shared across the loop.
     let wcs = test_utils::get_weighted_configs_for_testing();
+    let n_max = wcs
+        .iter()
+        .map(|wc| wc.get_total_weight())
+        .max()
+        .expect("no configs");
+    let pp = chunky::PublicParameters::<Bn254>::with_max_num_shares(n_max.try_into().unwrap());
+    let mut rng = thread_rng();
     for wc in wcs {
         println!("\nTesting {wc} PVSS");
-        let mut rng = thread_rng();
 
         let (d_unsigned_v1, d_unsigned_v2, d_signed_v1, d_signed_v2) =
-            test_utils::setup_dealing_chunky_all_four(&wc, None, &mut rng);
+            test_utils::setup_dealing_chunky_all_four_with_pp(&wc, &pp, &mut rng);
 
         let t = Instant::now();
         run_weighted_pvss_deal_verify_reconstruct::<
@@ -375,7 +381,7 @@ fn run_weighted_pvss_deal_verify_reconstruct<E, T, R>(
         &sc.get_player(0),
         rng,
     );
-    trx.verify(sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux, rng)
+    trx.verify(sc, &d.pp, &d.spks, &d.eks, &NoAux, rng)
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization

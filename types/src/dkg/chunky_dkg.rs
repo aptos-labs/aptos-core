@@ -281,7 +281,7 @@ impl ChunkyDKG {
         let mut rng_aptos = StdRng::seed_from_u64(seed);
         let public_parameters = PublicParameters::new_with_commitment_base(
             total_weight as usize,
-            aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+            aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
             threshold_config.get_total_num_players(),
             G2Affine::generator(),
             &mut rng_aptos,
