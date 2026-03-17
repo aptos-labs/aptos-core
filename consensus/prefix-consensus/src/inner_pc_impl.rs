@@ -11,6 +11,7 @@
 //! including author mismatch checks and signature verification.
 
 use crate::{
+    counters::SPC_ROUND_DURATION,
     inner_pc_trait::{Author, InnerPCAlgorithm},
     network_messages::PrefixConsensusMsg,
     protocol::PrefixConsensusProtocol,
@@ -21,6 +22,7 @@ use anyhow::Result;
 use aptos_types::{validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier};
 use async_trait::async_trait;
 use std::sync::Arc;
+use std::time::Instant;
 use aptos_logger::prelude::*;
 
 /// Tracks which round the cascade logic should advance to next.
@@ -45,6 +47,8 @@ pub struct ThreeRoundPC {
     protocol: PrefixConsensusProtocol,
     verifier: Arc<ValidatorVerifier>,
     round: RoundState,
+    /// Start time of the current round, for per-round latency metrics.
+    round_start_time: Option<Instant>,
 }
 
 impl ThreeRoundPC {
@@ -56,12 +60,18 @@ impl ThreeRoundPC {
         &mut self,
         signer: &ValidatorSigner,
     ) -> Result<(Vec<PrefixConsensusMsg>, Option<PrefixConsensusOutput>)> {
+        self.round_start_time = Some(Instant::now());
         let (vote2, qc2) = self.protocol.start_round2(signer).await?;
         self.round = RoundState::Round2;
 
         let mut msgs = vec![PrefixConsensusMsg::from(vote2)];
 
         if qc2.is_some() {
+            if let Some(start) = self.round_start_time.take() {
+                SPC_ROUND_DURATION
+                    .with_label_values(&["round2"])
+                    .observe(start.elapsed().as_secs_f64());
+            }
             let (more_msgs, output) = self.cascade_from_round3(signer).await?;
             msgs.extend(more_msgs);
             return Ok((msgs, output));
@@ -77,8 +87,14 @@ impl ThreeRoundPC {
         &mut self,
         signer: &ValidatorSigner,
     ) -> Result<(Vec<PrefixConsensusMsg>, Option<PrefixConsensusOutput>)> {
+        self.round_start_time = Some(Instant::now());
         let (vote3, output) = self.protocol.start_round3(signer).await?;
         self.round = if output.is_some() {
+            if let Some(start) = self.round_start_time.take() {
+                SPC_ROUND_DURATION
+                    .with_label_values(&["round3"])
+                    .observe(start.elapsed().as_secs_f64());
+            }
             RoundState::Complete
         } else {
             RoundState::Round3
@@ -98,6 +114,7 @@ impl InnerPCAlgorithm for ThreeRoundPC {
             protocol,
             verifier,
             round: RoundState::Round1,
+            round_start_time: None,
         }
     }
 
@@ -105,12 +122,18 @@ impl InnerPCAlgorithm for ThreeRoundPC {
         &mut self,
         signer: &ValidatorSigner,
     ) -> Result<(Vec<Self::Message>, Option<PrefixConsensusOutput>)> {
+        self.round_start_time = Some(Instant::now());
         let (vote1, qc1) = self.protocol.start_round1(signer).await?;
 
         let mut msgs = vec![PrefixConsensusMsg::from(vote1)];
 
         if qc1.is_some() {
-            // Early QC1 — cascade to Round 2 (and potentially Round 3)
+            // Early QC1 — record Round 1 and cascade to Round 2
+            if let Some(start) = self.round_start_time.take() {
+                SPC_ROUND_DURATION
+                    .with_label_values(&["round1"])
+                    .observe(start.elapsed().as_secs_f64());
+            }
             let (more_msgs, output) = self.cascade_from_round2(signer).await?;
             msgs.extend(more_msgs);
             return Ok((msgs, output));
@@ -138,7 +161,12 @@ impl InnerPCAlgorithm for ThreeRoundPC {
                 // Process vote
                 match self.protocol.process_vote1(*vote).await {
                     Ok(Some(_qc1)) => {
-                        // QC1 formed — cascade to Round 2
+                        // QC1 formed — record Round 1 and cascade to Round 2
+                        if let Some(start) = self.round_start_time.take() {
+                            SPC_ROUND_DURATION
+                                .with_label_values(&["round1"])
+                                .observe(start.elapsed().as_secs_f64());
+                        }
                         self.cascade_from_round2(signer).await
                     },
                     Ok(None) => Ok((vec![], None)),
@@ -157,7 +185,12 @@ impl InnerPCAlgorithm for ThreeRoundPC {
                 }
                 match self.protocol.process_vote2(*vote).await {
                     Ok(Some(_qc2)) => {
-                        // QC2 formed — cascade to Round 3
+                        // QC2 formed — record Round 2 and cascade to Round 3
+                        if let Some(start) = self.round_start_time.take() {
+                            SPC_ROUND_DURATION
+                                .with_label_values(&["round2"])
+                                .observe(start.elapsed().as_secs_f64());
+                        }
                         self.cascade_from_round3(signer).await
                     },
                     Ok(None) => Ok((vec![], None)),
@@ -176,6 +209,12 @@ impl InnerPCAlgorithm for ThreeRoundPC {
                 }
                 match self.protocol.process_vote3(*vote).await {
                     Ok(Some(output)) => {
+                        // QC3 formed — record Round 3
+                        if let Some(start) = self.round_start_time.take() {
+                            SPC_ROUND_DURATION
+                                .with_label_values(&["round3"])
+                                .observe(start.elapsed().as_secs_f64());
+                        }
                         self.round = RoundState::Complete;
                         Ok((vec![], Some(output)))
                     },

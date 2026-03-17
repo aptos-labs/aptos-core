@@ -58,6 +58,37 @@ Finalization sub-stages should sum to `finalization`:
 finalization ≈ fin_extract_proof + fin_ranking_update + fin_cleanup
 ```
 
+## Metric: `pc_spc_round_duration_s`
+
+Prometheus histogram with a `round` label. Measures latency (in seconds) for each round of the inner PC protocol within SPC.
+
+Defined in: `consensus/prefix-consensus/src/counters.rs`
+Instrumented in: `consensus/prefix-consensus/src/inner_pc_impl.rs`
+
+### PromQL
+
+Average latency per round (across all validators):
+```promql
+avg(rate(pc_spc_round_duration_s_sum[1m]) / rate(pc_spc_round_duration_s_count[1m])) by (round)
+```
+
+### Rounds
+
+| Round | Description | Measured span |
+|-------|-------------|---------------|
+| `round1` | Vote1 broadcast → QC1 formation | `start()` / `start_round1()` to quorum in `process_vote1()` |
+| `round2` | Vote2 broadcast → QC2 formation | `cascade_from_round2()` / `start_round2()` to quorum in `process_vote2()` |
+| `round3` | Vote3 broadcast → QC3 formation | `cascade_from_round3()` / `start_round3()` to quorum in `process_vote3()` |
+
+### Verification Property
+
+All rounds should sum to approximately `spc_to_vlow` (from `pc_slot_duration_s`):
+```
+spc_to_vlow ≈ round1 + round2 + round3 + inter-round overhead
+```
+
+Each round is dominated by network RTT (waiting for >2/3 stake of votes to arrive).
+
 ## Notes
 
 - `proposal_wait` excludes `payload_pull` time (measured from after broadcast)

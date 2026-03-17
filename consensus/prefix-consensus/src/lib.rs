@@ -39,6 +39,7 @@
 pub mod block_builder;
 pub mod certificates;
 mod certify;
+pub mod counters;
 pub mod inner_pc_impl;
 pub mod inner_pc_trait;
 pub mod manager;

@@ -3730,6 +3730,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-network",
  "aptos-time-service",
  "aptos-types",
