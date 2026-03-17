@@ -145,7 +145,8 @@ consensus/prefix-consensus/src/
 ├── strong_protocol.rs    - Strong PC state machine (918 lines)
 ├── strong_manager.rs     - Strong PC orchestrator, generic over InnerPCAlgorithm, SPCOutput with commit proof (~1310 lines)
 ├── inner_pc_trait.rs     - InnerPCAlgorithm trait (~90 lines)
-├── inner_pc_impl.rs      - ThreeRoundPC implementation (~400 lines)
+├── counters.rs           - Prometheus metrics (pc_spc_round_duration_s histogram) for per-round latency
+├── inner_pc_impl.rs      - ThreeRoundPC implementation + per-round timing instrumentation (~400 lines)
 ├── slot_types.rs         - SlotProposal, ProposalData, compute_entry_hash, EntryFetchRequest/Response, SlotConsensusMsg (~480 lines) — Phases 1, 12, 13
 ├── slot_ranking.rs       - MultiSlotRankingManager, SPC-aware cross-slot demotion (~320 lines) — Phases 2, 12
 ├── slot_state.rs         - ProposalBuffer, SlotPhase, SlotState, entry_data_map (~645 lines) — Phases 3, 13
@@ -191,6 +192,13 @@ testsuite/smoke-test/src/consensus/
 
 Stages: `payload_pull`, `proposal_wait`, `spc_to_vlow`, `vlow_entry_resolution`, `vlow_commit_wave`, `vlow_to_vhigh`, `vhigh_entry_resolution`, `vhigh_commit_wave`, `finalization`, `total`
 Finalization sub-stages: `fin_extract_proof`, `fin_ranking_update`, `fin_cleanup`
+
+**Metric**: `pc_spc_round_duration_s` (histogram with `round` label)
+**File**: `consensus/prefix-consensus/src/counters.rs`
+**Instrumented in**: `consensus/prefix-consensus/src/inner_pc_impl.rs`
+
+Rounds: `round1` (Vote1→QC1), `round2` (Vote2→QC2), `round3` (Vote3→QC3)
+Verification: `round1 + round2 + round3 ≈ spc_to_vlow` (from `pc_slot_duration_s`)
 
 ---
 
