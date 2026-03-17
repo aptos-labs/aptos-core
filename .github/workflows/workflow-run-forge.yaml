@@ -154,7 +154,7 @@ jobs:
         with:
           ref: ${{ inputs.GIT_SHA }}
           # get the last 10 commits if GIT_SHA is not specified
-          fetch-depth: inputs.GIT_SHA != null && 0 || 10
+          fetch-depth: ${{ inputs.GIT_SHA != null && 0 || 10 }}
 
       - uses: actions/setup-python@v4
         if: ${{ !inputs.SKIP_JOB }}
