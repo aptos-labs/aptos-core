@@ -15,7 +15,7 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
       - uses: pnpm/action-setup@v4
