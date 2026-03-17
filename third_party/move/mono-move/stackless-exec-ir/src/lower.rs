@@ -5,7 +5,7 @@
 
 use crate::{
     ir::{BinaryOp, FunctionIR, ImmValue, Instr, Label, Reg},
-    lowering_context::{slot_info_for_reg, LoweringContext, SlotInfo},
+    lowering_context::{LoweringContext, SlotInfo},
 };
 use anyhow::{bail, Result};
 use mono_move_micro_ops::instruction::{CodeOffset, FrameOffset, MicroOp};
@@ -36,6 +36,10 @@ struct LoweringState<'a> {
     branch_fixups: Vec<usize>,
     call_site_cursor: usize,
     reg_types: &'a [Type],
+    /// Per-position slot info for Arg registers, updated lazily.
+    active_arg_slots: Vec<SlotInfo>,
+    /// Per-position types for Arg registers, updated lazily.
+    active_arg_types: Vec<Type>,
 }
 
 impl<'a> LoweringState<'a> {
@@ -55,6 +59,17 @@ impl<'a> LoweringState<'a> {
             .map(|m| m + 1)
             .unwrap_or(0);
 
+        // Initialize active_arg_slots/types from first callsite's arg_write_slots
+        let num_arg_regs = ctx.num_arg_regs as usize;
+        let mut active_arg_slots = vec![SlotInfo { offset: 0, size: 0 }; num_arg_regs];
+        let mut active_arg_types = vec![Type::U64; num_arg_regs];
+        if !ctx.call_sites.is_empty() {
+            let first = &ctx.call_sites[0];
+            let n = num_arg_regs.min(first.arg_write_slots.len());
+            active_arg_slots[..n].copy_from_slice(&first.arg_write_slots[..n]);
+            active_arg_types[..n].clone_from_slice(&first.param_types[..n]);
+        }
+
         LoweringState {
             ctx,
             ops: Vec::new(),
@@ -62,11 +77,33 @@ impl<'a> LoweringState<'a> {
             branch_fixups: Vec::new(),
             call_site_cursor: 0,
             reg_types: &func_ir.reg_types,
+            active_arg_slots,
+            active_arg_types,
         }
     }
 
     fn slot(&self, reg: Reg) -> SlotInfo {
-        slot_info_for_reg(self.ctx, reg)
+        match reg {
+            Reg::Home(i) => self.ctx.home_slots[i as usize],
+            Reg::Arg(j) => self.active_arg_slots[j as usize],
+        }
+    }
+
+    /// Resolve slot info for a destination register. For Arg registers, updates
+    /// `active_arg_slots` and `active_arg_types` from the upcoming callsite
+    /// before returning.
+    fn def_slot(&mut self, reg: Reg) -> SlotInfo {
+        match reg {
+            Reg::Home(i) => self.ctx.home_slots[i as usize],
+            Reg::Arg(j) => {
+                let cs = &self.ctx.call_sites[self.call_site_cursor];
+                let slot = cs.arg_write_slots[j as usize];
+                let ty = cs.param_types[j as usize].clone();
+                self.active_arg_slots[j as usize] = slot;
+                self.active_arg_types[j as usize] = ty;
+                slot
+            },
+        }
     }
 
     fn emit(&mut self, op: MicroOp) {
@@ -94,7 +131,7 @@ impl<'a> LoweringState<'a> {
     fn reg_type(&self, reg: Reg) -> &Type {
         match reg {
             Reg::Home(i) => &self.reg_types[i as usize],
-            Reg::Arg(_) => &Type::U64, // Arg types inferred from call signatures; use u64 as fallback
+            Reg::Arg(j) => &self.active_arg_types[j as usize],
         }
     }
 
@@ -131,70 +168,70 @@ impl<'a> LoweringState<'a> {
 
             // --- Loads ---
             Instr::LdU64(dst, v) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: *v,
                 });
             },
             Instr::LdTrue(dst) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: 1,
                 });
             },
             Instr::LdFalse(dst) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: 0,
                 });
             },
             Instr::LdU8(dst, v) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: *v as u64,
                 });
             },
             Instr::LdU16(dst, v) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: *v as u64,
                 });
             },
             Instr::LdU32(dst, v) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: *v as u64,
                 });
             },
             Instr::LdI8(dst, v) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: *v as u64,
                 });
             },
             Instr::LdI16(dst, v) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: *v as u64,
                 });
             },
             Instr::LdI32(dst, v) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: *v as u64,
                 });
             },
             Instr::LdI64(dst, v) => {
-                let d = self.slot(*dst);
+                let d = self.def_slot(*dst);
                 self.emit(MicroOp::StoreImm8 {
                     dst: FrameOffset(d.offset),
                     imm: *v as u64,
@@ -203,8 +240,8 @@ impl<'a> LoweringState<'a> {
 
             // --- Copy/Move ---
             Instr::Copy(dst, src) | Instr::Move(dst, src) => {
-                let d = self.slot(*dst);
                 let s = self.slot(*src);
+                let d = self.def_slot(*dst);
                 self.emit_move(d, s);
             },
 
@@ -216,9 +253,9 @@ impl<'a> LoweringState<'a> {
                     if let Some(fused) = self.try_fuse_compare_branch(op, dst, *lhs, *rhs, next) {
                         return Ok(fused);
                     }
-                    let d = self.slot(*dst);
                     let l = self.slot(*lhs);
                     let r = self.slot(*rhs);
+                    let d = self.def_slot(*dst);
                     match op {
                         BinaryOp::Add => self.emit(MicroOp::AddU64 {
                             dst: FrameOffset(d.offset),
@@ -241,8 +278,8 @@ impl<'a> LoweringState<'a> {
                     {
                         return Ok(fused);
                     }
-                    let d = self.slot(*dst);
                     let s = self.slot(*src);
+                    let d = self.def_slot(*dst);
                     let v = imm_to_u64(imm);
                     match op {
                         BinaryOp::Sub => self.emit(MicroOp::SubU64Imm {
@@ -310,7 +347,7 @@ impl<'a> LoweringState<'a> {
         let call_site = &self.ctx.call_sites[self.call_site_cursor];
 
         // Copy arguments into callee's parameter slots.
-        // [TODO] This is also a spot to insert a bulk move micro-op insertion.
+        // active_arg_slots already set for this call's args by prior def_slot calls.
         for (k, arg_reg) in args.iter().enumerate() {
             let src = self.slot(*arg_reg);
             let dst = call_site.arg_write_slots[k];
@@ -322,10 +359,35 @@ impl<'a> LoweringState<'a> {
         });
         self.call_site_cursor += 1;
 
-        // Move return values to destination registers.
+        // Update active_arg_slots for ret Arg positions before doing ret copies.
+        // For each ret that targets an Arg(j), resolve its physical slot:
+        //  - If there's a next callsite with a param at position j, use that
+        //    callsite's arg_write_slots[j] so the later arg copy is elided.
+        //  - Otherwise fall back to ret_read_slots[k] (no-copy).
         let prev = self.call_site_cursor - 1;
+        let prev_cs = &self.ctx.call_sites[prev];
         for (k, ret_reg) in rets.iter().enumerate() {
-            let src = self.ctx.call_sites[prev].ret_read_slots[k];
+            if let Reg::Arg(j) = ret_reg {
+                let j = *j as usize;
+                let mut resolved = false;
+                if self.call_site_cursor < self.ctx.call_sites.len() {
+                    let next_cs = &self.ctx.call_sites[self.call_site_cursor];
+                    if j < next_cs.arg_write_slots.len() {
+                        self.active_arg_slots[j] = next_cs.arg_write_slots[j];
+                        self.active_arg_types[j] = next_cs.param_types[j].clone();
+                        resolved = true;
+                    }
+                }
+                if !resolved && k < prev_cs.ret_read_slots.len() {
+                    self.active_arg_slots[j] = prev_cs.ret_read_slots[k];
+                    self.active_arg_types[j] = prev_cs.ret_types[k].clone();
+                }
+            }
+        }
+
+        // Move return values to destination registers.
+        for (k, ret_reg) in rets.iter().enumerate() {
+            let src = prev_cs.ret_read_slots[k];
             let dst = self.slot(*ret_reg);
             self.emit_move(dst, src);
         }

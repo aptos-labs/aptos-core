@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 
-use crate::ir::{FunctionIR, Instr, Reg};
+use crate::ir::{FunctionIR, Instr};
 use mono_move_micro_ops::instruction::FRAME_METADATA_SIZE;
 use move_binary_format::{
     access::ModuleAccess,
@@ -58,6 +58,27 @@ fn sig_token_size(tok: &SignatureToken) -> Option<usize> {
     }
 }
 
+fn sig_token_to_type(tok: &SignatureToken) -> Option<Type> {
+    match tok {
+        SignatureToken::Bool => Some(Type::Bool),
+        SignatureToken::U8 => Some(Type::U8),
+        SignatureToken::I8 => Some(Type::I8),
+        SignatureToken::U16 => Some(Type::U16),
+        SignatureToken::I16 => Some(Type::I16),
+        SignatureToken::U32 => Some(Type::U32),
+        SignatureToken::I32 => Some(Type::I32),
+        SignatureToken::U64 => Some(Type::U64),
+        SignatureToken::I64 => Some(Type::I64),
+        SignatureToken::U128 => Some(Type::U128),
+        SignatureToken::I128 => Some(Type::I128),
+        SignatureToken::U256 => Some(Type::U256),
+        SignatureToken::I256 => Some(Type::I256),
+        SignatureToken::Address => Some(Type::Address),
+        SignatureToken::Signer => Some(Type::Signer),
+        _ => None,
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct SlotInfo {
     pub offset: u32,
@@ -68,6 +89,8 @@ pub struct CallSiteInfo {
     pub callee_func_id: u32,
     pub arg_write_slots: Vec<SlotInfo>,
     pub ret_read_slots: Vec<SlotInfo>,
+    pub param_types: Vec<Type>,
+    pub ret_types: Vec<Type>,
 }
 
 pub struct LoweringContext {
@@ -75,10 +98,8 @@ pub struct LoweringContext {
     pub frame_data_size: u32,
     pub call_sites: Vec<CallSiteInfo>,
     pub return_slots: Vec<SlotInfo>,
-    /// Physical layout for Arg registers (a0, a1, ...).
-    /// Computed from the callee_base; Arg(j) is at arg_slots[j].
-    /// Sized by num_arg_regs from the FunctionIR.
-    pub arg_slots: Vec<SlotInfo>,
+    /// Number of arg registers used (a0..a(num_arg_regs-1)).
+    pub num_arg_regs: u16,
 }
 
 /// Try to build a LoweringContext for a monomorphic function.
@@ -149,6 +170,7 @@ fn try_build_context_inner(
         // Param layout
         let param_sig = &module.signature_at(callee_handle.parameters).0;
         let mut arg_write_slots = Vec::with_capacity(param_sig.len());
+        let mut param_types = Vec::with_capacity(param_sig.len());
         let mut arg_offset = callee_base;
         for tok in param_sig {
             let size = sig_token_size(tok)? as u32;
@@ -156,12 +178,14 @@ fn try_build_context_inner(
                 offset: arg_offset,
                 size,
             });
+            param_types.push(sig_token_to_type(tok)?);
             arg_offset += size;
         }
 
         // Return layout
         let callee_ret_sig = &module.signature_at(callee_handle.return_).0;
         let mut ret_read_slots = Vec::with_capacity(callee_ret_sig.len());
+        let mut ret_types = Vec::with_capacity(callee_ret_sig.len());
         let mut callee_ret_offset = callee_base;
         for tok in callee_ret_sig {
             let size = sig_token_size(tok)? as u32;
@@ -169,6 +193,7 @@ fn try_build_context_inner(
                 offset: callee_ret_offset,
                 size,
             });
+            ret_types.push(sig_token_to_type(tok)?);
             callee_ret_offset += size;
         }
 
@@ -176,25 +201,9 @@ fn try_build_context_inner(
             callee_func_id,
             arg_write_slots,
             ret_read_slots,
+            param_types,
+            ret_types,
         });
-    }
-
-    // 4. Build arg_slots from the widest call site
-    let num_arg_regs = func_ir.num_arg_regs as usize;
-    let mut arg_slots = Vec::with_capacity(num_arg_regs);
-    if num_arg_regs > 0 {
-        // Find the call site with the most args to define the physical layout
-        let widest = match call_sites.iter().max_by_key(|cs| cs.arg_write_slots.len()) {
-            Some(cs) => cs,
-            None => {
-                return Some(Err(anyhow::anyhow!(
-                    "num_arg_regs > 0 but no call sites found"
-                )));
-            },
-        };
-        for j in 0..num_arg_regs {
-            arg_slots.push(widest.arg_write_slots[j]);
-        }
     }
 
     Some(Ok(LoweringContext {
@@ -202,7 +211,7 @@ fn try_build_context_inner(
         frame_data_size,
         call_sites,
         return_slots,
-        arg_slots,
+        num_arg_regs: func_ir.num_arg_regs,
     }))
 }
 
@@ -221,12 +230,4 @@ pub fn build_func_id_map(module: &CompiledModule) -> Vec<Option<u32>> {
         }
     }
     map
-}
-
-/// Resolve slot info for a register.
-pub fn slot_info_for_reg(ctx: &LoweringContext, reg: Reg) -> SlotInfo {
-    match reg {
-        Reg::Home(i) => ctx.home_slots[i as usize],
-        Reg::Arg(j) => ctx.arg_slots[j as usize],
-    }
 }
