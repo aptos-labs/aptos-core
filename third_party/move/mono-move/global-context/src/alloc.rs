@@ -66,12 +66,12 @@ impl<T: ?Sized> GlobalArenaPtr<T> {
 
 // SAFETY:
 //
-// Global pointer only exposes immutable access to pointee type. It is `Send`
-// because we are only moving a read-only handle to a pointee type which is
-// also `Send` across threads. It also requires pointee to be `Sync` because
-// the pointer can be copied, so multiple threads can obtain a reference to
-// same pointee (and that requires`Sync`).
-unsafe impl<T: ?Sized + Send + Sync> Send for GlobalArenaPtr<T> {}
+// Global pointer acts as a shared reference when send to other threads. It is
+// allocated in the arena, which is guaranteed to be alive throughout the
+// lifetime of multiple threads executing. Hence, there is no need to require
+// T to be `Send`. However, T has to be `Sync` because global pointer does
+// expose a shared reference to T.
+unsafe impl<T: ?Sized + Sync> Send for GlobalArenaPtr<T> {}
 
 // SAFETY:
 //
@@ -190,8 +190,12 @@ impl GlobalArenaPool {
     ///
     /// # Safety
     ///
-    /// The caller **must** ensure there are no live pointers pointing to the
-    /// data allocated in the arena that is about to be cleared.
+    /// 1. The caller **must** ensure there are no live pointers pointing to
+    ///    the data allocated in the arena that is about to be cleared.
+    /// 2. During iteration, arenas are not locked at the same time. The caller
+    ///    **must** ensure that the access is exclusive and there are no race
+    ///    conditions.
+    // TODO: Consider using &mut to enforce exclusive access at compile-time.
     pub unsafe fn reset_unchecked(&self) {
         for arena in self.arenas.iter() {
             arena.lock().reset();
