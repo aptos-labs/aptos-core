@@ -265,7 +265,7 @@ jobs:
         # Post a Slack comment if the run has not been cancelled and the envs are set
         if: ${{ !inputs.SKIP_JOB && env.POST_TO_SLACK == 'true' && failure() }}
         id: slack
-        uses: slackapi/slack-github-action@936158bbe252e9a6062e793ea4609642c966e302 # pin@v1.21.0
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
         with:
           # For posting a rich message using Block Kit
           payload: |
