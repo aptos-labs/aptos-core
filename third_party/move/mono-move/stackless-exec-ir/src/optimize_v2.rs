@@ -148,6 +148,7 @@ fn renumber_registers(func: &mut FunctionIR) {
         rename_instr(instr, &rename_map);
     }
 
+    // Bool placeholder — overwritten for every used register by the loop below.
     let mut new_reg_types = vec![move_vm_types::loaded_data::runtime_types::Type::Bool; next_reg as usize];
     for (&old, &new) in &rename_map {
         if let (Reg::Home(old_i), Reg::Home(new_i)) = (old, new)

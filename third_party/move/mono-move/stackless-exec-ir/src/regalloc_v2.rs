@@ -6,6 +6,7 @@
 //! Consumes `BlockAnalysis` from `analysis_v2` and maps SSA temp VIDs to
 //! physical Home/Arg registers using liveness-driven type-keyed reuse.
 
+use anyhow::{bail, Context, Result};
 use crate::analysis_v2::analyze_block;
 use crate::instr_utils_v2::{get_defs_uses, rename_instr, split_into_blocks};
 use crate::ir::{Instr, Reg};
@@ -22,7 +23,7 @@ pub(crate) fn allocate_registers(
     num_pinned: u16,
     local_types: &[Type],
     vid_types: &[Type],
-) -> (Vec<Instr>, u16, u16, Vec<Type>) {
+) -> Result<(Vec<Instr>, u16, u16, Vec<Type>)> {
     let blocks = split_into_blocks(instrs);
     let mut result = Vec::with_capacity(instrs.len());
     let mut global_next_reg = num_pinned;
@@ -44,7 +45,7 @@ pub(crate) fn allocate_registers(
             vid_types,
             &mut phys_reg_types,
             &analysis,
-        );
+        )?;
         free_pool = returned_pool;
         if block_max > global_next_reg {
             global_next_reg = block_max;
@@ -61,20 +62,20 @@ pub(crate) fn allocate_registers(
             phys_reg_types
                 .get(&Reg::Home(i))
                 .cloned()
-                .unwrap_or(Type::Bool),
+                .context("missing type for physical register")?,
         );
     }
 
-    (result, global_next_reg, global_num_arg_regs, reg_types)
+    Ok((result, global_next_reg, global_num_arg_regs, reg_types))
 }
 
-fn vid_type(vid: Reg, num_pinned: u16, vid_types: &[Type]) -> Type {
+fn vid_type(vid: Reg, num_pinned: u16, vid_types: &[Type]) -> Result<Type> {
     match vid {
         Reg::Home(i) if i >= num_pinned => vid_types
             .get((i - num_pinned) as usize)
             .cloned()
-            .unwrap_or(Type::Bool),
-        _ => Type::Bool,
+            .context("VID type not found during SSA allocation"),
+        _ => bail!("vid_type called on non-temp register {:?}", vid),
     }
 }
 
@@ -86,9 +87,9 @@ fn allocate_block(
     vid_types: &[Type],
     phys_reg_types: &mut BTreeMap<Reg, Type>,
     analysis: &crate::analysis_v2::BlockAnalysis,
-) -> (Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Reg>>) {
+) -> Result<(Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Reg>>)> {
     if instrs.is_empty() {
-        return (Vec::new(), start_reg, 0, carry_pool);
+        return Ok((Vec::new(), start_reg, 0, carry_pool));
     }
 
     let is_temp_vid = |r: &Reg| -> bool { r.is_temp(num_pinned) };
@@ -139,7 +140,7 @@ fn allocate_block(
                 } else if let Some(&local_r) = analysis.coalesce_to_local.get(d) {
                     vid_to_phys.insert(*d, local_r);
                 } else {
-                    let ty = vid_type(*d, num_pinned, vid_types);
+                    let ty = vid_type(*d, num_pinned, vid_types)?;
                     let phys = if let Some(regs) = free_pool.get_mut(&ty) {
                         regs.pop()
                     } else {
@@ -179,5 +180,5 @@ fn allocate_block(
         }
     }
 
-    (output, next_reg, analysis.max_arg_width, free_pool)
+    Ok((output, next_reg, analysis.max_arg_width, free_pool))
 }
