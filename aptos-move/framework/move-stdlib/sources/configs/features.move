@@ -198,6 +198,7 @@ module std::features {
     /// Lifetime: ephemeral
     const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
 
+    #[lint::skip(unused_constant)]
     /// Whether struct constructors are enabled
     ///
     /// Lifetime: transient
@@ -227,6 +228,7 @@ module std::features {
         is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
 
+    #[lint::skip(unused_constant)]
     /// Charge invariant violation error.
     /// Lifetime: transient
     const CHARGE_INVARIANT_VIOLATION: u64 = 20;
@@ -251,6 +253,7 @@ module std::features {
         is_enabled(FEE_PAYER_ENABLED)
     }
 
+    #[lint::skip(unused_constant)]
     /// Whether enable MOVE functions to call create_auid method to create AUIDs.
     /// Lifetime: transient
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
@@ -301,6 +304,7 @@ module std::features {
         is_enabled(MODULE_EVENT)
     }
 
+    #[lint::skip(unused_constant)]
     /// Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
     /// Lifetime: transient
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
@@ -323,10 +327,13 @@ module std::features {
         abort error::invalid_argument(EINVALID_FEATURE)
     }
 
+    #[lint::skip(unused_constant)]
     const SAFER_RESOURCE_GROUPS: u64 = 31;
 
+    #[lint::skip(unused_constant)]
     const SAFER_METADATA: u64 = 32;
 
+    #[lint::skip(unused_constant)]
     const SINGLE_SENDER_AUTHENTICATOR: u64 = 33;
 
     /// Whether the automatic creation of accounts is enabled for sponsored transactions.
@@ -341,6 +348,7 @@ module std::features {
         is_enabled(SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
     }
 
+    #[lint::skip(unused_constant)]
     const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
 
     public fun get_concurrent_token_v2_feature(): u64 {
@@ -361,6 +369,7 @@ module std::features {
         abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
+    #[lint::skip(unused_constant)]
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
 
     /// Whether allow changing beneficiaries for operators.
@@ -375,8 +384,10 @@ module std::features {
         is_enabled(OPERATOR_BENEFICIARY_CHANGE)
     }
 
+    #[lint::skip(unused_constant)]
     const VM_BINARY_FORMAT_V7: u64 = 40;
 
+    #[lint::skip(unused_constant)]
     const RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET: u64 = 41;
 
     /// Whether the operator commission rate change in delegation pool is enabled.
@@ -561,6 +572,7 @@ module std::features {
         is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
     }
 
+    #[lint::skip(unused_constant)]
     const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
 
     #[deprecated]
@@ -573,6 +585,7 @@ module std::features {
         true
     }
 
+    #[lint::skip(unused_constant)]
     const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
 
     public fun aggregator_v2_is_at_least_api_enabled(): bool {
@@ -614,6 +627,7 @@ module std::features {
         is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
     }
 
+    #[lint::skip(unused_constant)]
     /// Lifetime: transient
     const OPERATIONS_DEFAULT_TO_FA_APT_STORE: u64 = 65;
 
@@ -724,6 +738,7 @@ module std::features {
         is_enabled(ACCOUNT_ABSTRACTION)
     }
 
+    #[lint::skip(unused_constant)]
     /// Whether bytecode version v8 is enabled.
     /// Lifetime: transient
     ///
@@ -762,6 +777,7 @@ module std::features {
     /// We do not expect use from Move, so for now only for documentation purposes here
     const ENABLE_FUNCTION_VALUES: u64 = 89;
 
+    #[lint::skip(unused_constant)]
     /// Whether new accounts default to the Fungible Asset store.
     /// Lifetime: transient
     const NEW_ACCOUNTS_DEFAULT_TO_FA_STORE: u64 = 90;
@@ -838,6 +854,7 @@ module std::features {
         is_enabled(DISTRIBUTE_TRANSACTION_FEE)
     }
 
+    #[lint::skip(unused_constant)]
     /// Whether the monotonically increasing counter native function is enabled.
     const MONOTONICALLY_INCREASING_COUNTER: u64 = 98;
 
@@ -913,6 +930,7 @@ module std::features {
         abort(error::invalid_state(EAPI_DISABLED))
     }
 
+    #[lint::skip(unused_function)]
     /// Update feature flags directly. Only used in genesis/tests.
     fun change_feature_flags_internal(
         framework: &signer, enable: vector<u64>, disable: vector<u64>
