@@ -36,6 +36,7 @@ pub fn make_prod_gas_meter<T: BlockSynchronizationKillSwitch>(
     vm_gas_params: VMGasParameters,
     storage_gas_params: StorageGasParameters,
     is_approved_gov_script: bool,
+    is_high_execution_limit: bool,
     meter_balance: Gas,
     block_synchronization_kill_switch: &T,
 ) -> ProdGasMeter<'_, T> {
@@ -44,6 +45,7 @@ pub fn make_prod_gas_meter<T: BlockSynchronizationKillSwitch>(
         vm_gas_params,
         storage_gas_params,
         is_approved_gov_script,
+        is_high_execution_limit,
         meter_balance,
         block_synchronization_kill_switch,
     )
@@ -54,6 +56,7 @@ pub fn make_prod_gas_meter_impl<T: BlockSynchronizationKillSwitch, M: MemoryAlge
     vm_gas_params: VMGasParameters,
     storage_gas_params: StorageGasParameters,
     is_approved_gov_script: bool,
+    is_high_execution_limit: bool,
     meter_balance: Gas,
     block_synchronization_kill_switch: &T,
 ) -> MemoryTrackedGasMeterImpl<StandardGasMeter<StandardGasAlgebra<'_, T>>, M> {
@@ -62,6 +65,7 @@ pub fn make_prod_gas_meter_impl<T: BlockSynchronizationKillSwitch, M: MemoryAlge
         vm_gas_params,
         storage_gas_params,
         is_approved_gov_script,
+        is_high_execution_limit,
         meter_balance,
         block_synchronization_kill_switch,
     )))

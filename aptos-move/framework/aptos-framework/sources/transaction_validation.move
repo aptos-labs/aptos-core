@@ -13,6 +13,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
+    use aptos_framework::high_execution_limit;
     use aptos_framework::nonce_validation;
 
     friend aptos_framework::genesis;
@@ -68,6 +69,8 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT: u64 = 1011;
     const PROLOGUE_ENONCE_ALREADY_USED: u64 = 1012;
     const PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
+    /// No more high-execution-limit transactionsare available in this epoch.
+    const PROLOGUE_EHIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED: u64 = 1014;
 
     /// Permission management
     ///
@@ -129,6 +132,7 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
         is_simulation: bool,
+        high_execution_limit_fee: Option<u64>,
     ) {
         let sender_address = signer::address_of(sender);
         let gas_payer_address = signer::address_of(gas_payer);
@@ -182,6 +186,14 @@ module aptos_framework::transaction_validation {
 
         // Check if the gas payer has enough balance to pay for the transaction
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
+        if (high_execution_limit_fee.is_some()) {
+            assert!(
+                high_execution_limit::is_high_execution_limit_available(),
+                error::resource_exhausted(PROLOGUE_EHIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED)
+            );
+            max_transaction_fee += high_execution_limit_fee.destroy_some();
+        };
+
         if (!skip_gas_payment(
             is_simulation,
             gas_payer_address
@@ -272,6 +284,7 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
             false,
+            option::none(),
         )
     }
 
@@ -299,6 +312,7 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
             is_simulation,
+            option::none(),
         )
     }
 
@@ -325,6 +339,7 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
             false,
+            option::none(),
         );
         multi_agent_common_prologue(
             secondary_signer_addresses,
@@ -358,6 +373,7 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
             is_simulation,
+            option::none(),
         );
         multi_agent_common_prologue(
             secondary_signer_addresses,
@@ -451,6 +467,7 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
             false,
+            option::none(),
         );
         multi_agent_common_prologue(
             secondary_signer_addresses,
@@ -490,6 +507,7 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
             is_simulation,
+            option::none(),
         );
         multi_agent_common_prologue(
             secondary_signer_addresses,
@@ -649,7 +667,6 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
             is_simulation,
-
         )
     }
 
@@ -724,18 +741,19 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        prologue_common(
-            &sender,
-            &sender,
-            replay_protector,
+        unified_prologue_v3(
+            sender,
             txn_sender_public_key,
+            replay_protector,
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
             txn_gas_price,
             txn_max_gas_units,
             txn_expiration_time,
             chain_id,
             is_simulation,
+            option::none(),
         );
-        multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes, is_simulation);
     }
 
         /// If there is no fee_payer, fee_payer = sender
@@ -753,6 +771,93 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
+        unified_prologue_fee_payer_v3(
+            sender,
+            fee_payer,
+            txn_sender_public_key,
+            fee_payer_public_key_hash,
+            replay_protector,
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+            txn_gas_price,
+            txn_max_gas_units,
+            txn_expiration_time,
+            chain_id,
+            is_simulation,
+            option::none(),
+        );
+    }
+
+    fun unified_epilogue_v2(
+        account: signer,
+        gas_payer: signer,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64,
+        is_simulation: bool,
+        is_orderless_txn: bool,
+    ) {
+        unified_epilogue_v3(
+            account,
+            gas_payer,
+            storage_fee_refunded,
+            txn_gas_price,
+            txn_max_gas_units,
+            gas_units_remaining,
+            is_simulation,
+            is_orderless_txn,
+            option::none(),
+        )
+    }
+
+    ///////////////////////////////////////////////////////////
+    /// V3 functions: extend V2 with high-execution-limit tier support
+    ///////////////////////////////////////////////////////////
+
+    fun unified_prologue_v3(
+        sender: signer,
+        txn_sender_public_key: Option<vector<u8>>,
+        replay_protector: ReplayProtector,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        is_simulation: bool,
+        high_execution_limit_fee: Option<u64>,
+    ) {
+        prologue_common(
+            &sender,
+            &sender,
+            replay_protector,
+            txn_sender_public_key,
+            txn_gas_price,
+            txn_max_gas_units,
+            txn_expiration_time,
+            chain_id,
+            is_simulation,
+            high_execution_limit_fee,
+        );
+        multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes, is_simulation);
+    }
+
+    fun unified_prologue_fee_payer_v3(
+        sender: signer,
+        fee_payer: signer,
+        txn_sender_public_key: Option<vector<u8>>,
+        fee_payer_public_key_hash: Option<vector<u8>>,
+        replay_protector: ReplayProtector,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        is_simulation: bool,
+        high_execution_limit_fee: Option<u64>,
+    ) {
         prologue_common(
             &sender,
             &fee_payer,
@@ -763,6 +868,7 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
             is_simulation,
+            high_execution_limit_fee,
         );
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes, is_simulation);
         if (!skip_auth_key_check(is_simulation, &fee_payer_public_key_hash)) {
@@ -781,7 +887,7 @@ module aptos_framework::transaction_validation {
         }
     }
 
-    fun unified_epilogue_v2(
+    fun unified_epilogue_v3(
         account: signer,
         gas_payer: signer,
         storage_fee_refunded: u64,
@@ -790,6 +896,7 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64,
         is_simulation: bool,
         is_orderless_txn: bool,
+        high_execution_limit_fee: Option<u64>,
     ) {
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
@@ -799,6 +906,10 @@ module aptos_framework::transaction_validation {
             error::out_of_range(EOUT_OF_GAS)
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
+        if (high_execution_limit_fee.is_some()) {
+            high_execution_limit::record_used_high_execution_limit();
+            transaction_fee_amount += high_execution_limit_fee.destroy_some();
+        };
 
         let gas_payer_address = signer::address_of(&gas_payer);
         // it's important to maintain the error code consistent with vm

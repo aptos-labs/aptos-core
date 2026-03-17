@@ -47,6 +47,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
+<b>use</b> <a href="high_execution_limit.md#0x1_high_execution_limit">0x1::high_execution_limit</a>;
 <b>use</b> <a href="nonce_validation.md#0x1_nonce_validation">0x1::nonce_validation</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
@@ -335,7 +336,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     // put reserved framework reserved accounts under aptos governance
     <b>let</b> framework_reserved_addresses = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
     <b>while</b> (!framework_reserved_addresses.is_empty()) {
-        <b>let</b> <b>address</b> = framework_reserved_addresses.pop_back&lt;<b>address</b>&gt;();
+        <b>let</b> <b>address</b> = framework_reserved_addresses.pop_back();
         <b>let</b> (_, framework_signer_cap) = <a href="account.md#0x1_account_create_framework_reserved_account">account::create_framework_reserved_account</a>(<b>address</b>);
         <a href="aptos_governance.md#0x1_aptos_governance_store_signer_cap">aptos_governance::store_signer_cap</a>(&aptos_framework_account, <b>address</b>, framework_signer_cap);
     };
@@ -367,6 +368,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
     <a href="nonce_validation.md#0x1_nonce_validation_initialize">nonce_validation::initialize</a>(&aptos_framework_account);
+    <a href="high_execution_limit.md#0x1_high_execution_limit_initialize">high_execution_limit::initialize</a>(&aptos_framework_account, 10);
 }
 </code></pre>
 

@@ -37,6 +37,7 @@ mod gas_profiling;
 mod generate_upgrade_script;
 mod generic_cmp;
 mod governance_updates;
+mod high_execution_limit;
 mod infinite_loop;
 mod init_module;
 mod init_module_closure_store;

@@ -1,12 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::AptosVM;
 use aptos_crypto::HashValue;
 use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
+use aptos_gas_schedule::{gas_feature_versions::RELEASE_V1_44, VMGasParameters};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    on_chain_config::{TimedFeatureFlag, TimedFeatures},
+    on_chain_config::TimedFeatureFlag,
     transaction::{
         authenticator::AuthenticationProof,
         user_transaction_context::{TransactionIndexKind, UserTransactionContext},
@@ -39,22 +41,41 @@ pub struct TransactionMetadata {
     pub multisig_payload: Option<Multisig>,
     /// The transaction index context for the monotonically increasing counter.
     pub transaction_index_kind: TransactionIndexKind,
+    /// The flat fee (in octas) to charge for the high-execution-limit tier,
+    /// or [`None`] if this is not a high-execution-limit transaction.
+    pub high_execution_limit_fee_octas: Option<u64>,
 }
 
 impl TransactionMetadata {
-    pub fn new(
+    pub(crate) fn new(
+        vm: &AptosVM,
+        vm_gas_params: &VMGasParameters,
         txn: &SignedTransaction,
         auxiliary_info: &AuxiliaryInfo,
-        timed_features: &TimedFeatures,
     ) -> Self {
         // Use full transaction size (including authenticator) when the feature is enabled,
         // otherwise use the raw transaction size for backwards compatibility.
-        let transaction_size =
-            if timed_features.is_enabled(TimedFeatureFlag::UseFullTransactionSizeForGasCheck) {
-                txn.txn_bytes_len()
-            } else {
-                txn.raw_txn_bytes_len()
-            };
+        let transaction_size = if vm
+            .timed_features()
+            .is_enabled(TimedFeatureFlag::UseFullTransactionSizeForGasCheck)
+        {
+            txn.txn_bytes_len()
+        } else {
+            txn.raw_txn_bytes_len()
+        };
+
+        // If high-limit transaction feature is enabled, and transaction requests
+        // a higher limit, set it based on the gas parameters value.
+        let high_execution_limit_fee_octas = if vm.gas_feature_version() >= RELEASE_V1_44
+            && vm.features().is_high_execution_limit_transactions_enabled()
+            && (vm.features().is_account_abstraction_enabled()
+                || vm.features().is_derivable_account_abstraction_enabled())
+            && txn.extra_config().high_execution_limit_request()
+        {
+            Some(u64::from(vm_gas_params.txn.high_execution_limit_fee))
+        } else {
+            None
+        };
 
         Self {
             sender: txn.sender(),
@@ -120,7 +141,10 @@ impl TransactionMetadata {
                         TransactionExtraConfig::V1 {
                             multisig_address: Some(multisig_address),
                             ..
-                        },
+                        } | TransactionExtraConfig::V2 {
+                            multisig_address: Some(multisig_address),
+                            ..
+                        }
                 }) => Some(Multisig {
                     multisig_address: *multisig_address,
                     transaction_payload: match executable {
@@ -151,6 +175,7 @@ impl TransactionMetadata {
                 TransactionPayload::ModuleBundle(_) | TransactionPayload::EntryFunction(_) => None,
             },
             transaction_index_kind: auxiliary_info.transaction_index_kind(),
+            high_execution_limit_fee_octas,
         }
     }
 

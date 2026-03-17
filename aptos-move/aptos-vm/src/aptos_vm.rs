@@ -347,7 +347,7 @@ impl AptosVM {
     }
 
     #[inline(always)]
-    fn features(&self) -> &Features {
+    pub(crate) fn features(&self) -> &Features {
         self.move_vm.env.features()
     }
 
@@ -2009,6 +2009,20 @@ impl AptosVM {
             ));
         }
 
+        if transaction
+            .payload()
+            .extra_config()
+            .high_execution_limit_request()
+            && !self
+                .features()
+                .is_high_execution_limit_transactions_enabled()
+        {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("High-execution limit transactions are not yet supported".to_string()),
+            ));
+        }
+
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
         // end up skipping validation.
@@ -2255,9 +2269,10 @@ impl AptosVM {
     where
         C: AptosCodeStorage + BlockSynchronizationKillSwitch,
         G: AptosGasMeter,
-        F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
+        F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, bool, Gas, &'a C) -> G,
     {
-        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info, self.timed_features());
+        let vm_params = self.gas_params(log_context)?.vm.clone();
+        let txn_metadata = TransactionMetadata::new(self, &vm_params, txn, auxiliary_info);
 
         let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
 
@@ -2276,6 +2291,7 @@ impl AptosVM {
             vm_params,
             self.storage_gas_params(log_context)?.clone(),
             is_approved_gov_script,
+            txn_metadata.high_execution_limit_fee_octas.is_some(),
             initial_balance,
             code_storage,
         );
@@ -2340,6 +2356,7 @@ impl AptosVM {
              vm_gas_params,
              storage_gas_params,
              is_approved_gov_script,
+             is_high_execution_limit,
              meter_balance,
              _maybe_block_synchronization_kill_switch| {
                 modify_gas_meter(make_prod_gas_meter_impl::<_, M>(
@@ -2347,6 +2364,7 @@ impl AptosVM {
                     vm_gas_params,
                     storage_gas_params,
                     is_approved_gov_script,
+                    is_high_execution_limit,
                     meter_balance,
                     &NoopBlockSynchronizationKillSwitch {},
                 ))
@@ -2369,7 +2387,23 @@ impl AptosVM {
             code_storage,
             txn,
             log_context,
-            make_prod_gas_meter,
+            |gas_feature_version,
+             vm_gas_params,
+             storage_gas_params,
+             is_approved_gov_script,
+             is_high_execution_limit,
+             meter_balance,
+             kill_switch| {
+                make_prod_gas_meter(
+                    gas_feature_version,
+                    vm_gas_params,
+                    storage_gas_params,
+                    is_approved_gov_script,
+                    is_high_execution_limit,
+                    meter_balance,
+                    kill_switch,
+                )
+            },
             auxiliary_info,
         ) {
             Ok((vm_status, vm_output, _gas_meter)) => (vm_status, vm_output),
@@ -2779,6 +2813,7 @@ impl AptosVM {
                     vm_gas_params,
                     storage_gas_params,
                     /* is_approved_gov_script */ false,
+                    /* is_high_execution_limit */ false,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
                 )
@@ -2825,6 +2860,7 @@ impl AptosVM {
                     vm_gas_params,
                     storage_gas_params,
                     /* is_approved_gov_script */ false,
+                    /* is_high_execution_limit */ false,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
                 );
@@ -3461,8 +3497,16 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
+
+        let vm_params = match self.gas_params(&log_context) {
+            Ok(vm_params) => vm_params.vm.clone(),
+            Err(err) => {
+                return VMValidatorResult::new(Some(err.status_code()), 0);
+            },
+        };
+
         let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
-        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info, self.timed_features());
+        let txn_data = TransactionMetadata::new(self, &vm_params, &txn, &auxiliary_info);
 
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
@@ -3473,12 +3517,6 @@ impl VMValidator for AptosVM {
             Some(txn_data.as_user_transaction_context()),
         );
 
-        let vm_params = match self.gas_params(&log_context) {
-            Ok(vm_params) => vm_params.vm.clone(),
-            Err(err) => {
-                return VMValidatorResult::new(Some(err.status_code()), 0);
-            },
-        };
         let storage_gas_params = match self.storage_gas_params(&log_context) {
             Ok(storage_params) => storage_params.clone(),
             Err(err) => {
@@ -3499,6 +3537,7 @@ impl VMValidator for AptosVM {
             vm_params,
             storage_gas_params,
             is_approved_gov_script,
+            txn_data.high_execution_limit_fee_octas.is_some(),
             initial_balance,
             &NoopBlockSynchronizationKillSwitch {},
         );

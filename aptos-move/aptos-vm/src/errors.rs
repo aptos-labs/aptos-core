@@ -40,6 +40,8 @@ pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
 pub const ENONCE_ALREADY_USED: u64 = 1012;
 // Transaction expiration time is too far in the future.
 pub const ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
+// Execution high limit is not available for this transaction.
+pub const EHIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED: u64 = 1014;
 
 // Specified account is not a multisig account.
 const EACCOUNT_NOT_MULTISIG: u64 = 2002;
@@ -59,6 +61,7 @@ const LIMIT_EXCEEDED: u8 = 0x2;
 const INVALID_STATE: u8 = 0x3;
 const PERMISSION_DENIED: u8 = 0x5;
 const NOT_FOUND: u8 = 0x6;
+const RESOURCE_EXHAUSTED: u8 = 0x9;
 
 fn error_split(code: u64) -> (u8, u64) {
     let reason = code & 0xFFFF;
@@ -153,6 +156,9 @@ pub fn convert_prologue_error(
                     StatusCode::TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE
                 },
                 (INVALID_ARGUMENT, ENONCE_ALREADY_USED) => StatusCode::NONCE_ALREADY_USED,
+                (RESOURCE_EXHAUSTED, EHIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED) => {
+                    StatusCode::HIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED
+                },
                 (category, reason) => {
                     let mut err_msg = format!(
                         "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",

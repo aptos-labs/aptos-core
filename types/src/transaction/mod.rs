@@ -892,6 +892,15 @@ pub enum TransactionExtraConfig {
         // Some(nonce) for orderless transactions
         replay_protection_nonce: Option<u64>,
     },
+    V2 {
+        multisig_address: Option<AccountAddress>,
+        // None for regular transactions
+        // Some(nonce) for orderless transactions
+        replay_protection_nonce: Option<u64>,
+        /// When true, the transaction requests the high-execution-limit tier
+        /// and pays a flat premium on top of normal gas.
+        high_execution_limit_request: bool,
+    },
 }
 
 impl TransactionPayload {
@@ -1042,6 +1051,16 @@ impl TransactionPayload {
                         replay_protection_nonce: replay_protection_nonce
                             .or_else(|| Some(replay_nonce_f())),
                     },
+                    TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce,
+                        high_execution_limit_request,
+                    } => TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce: replay_protection_nonce
+                            .or_else(|| Some(replay_nonce_f())),
+                        high_execution_limit_request,
+                    },
                 }
             }
             TransactionPayload::Payload(TransactionPayloadInner::V1 {
@@ -1069,6 +1088,21 @@ impl TransactionPayload {
                 TransactionExtraConfig::V1 {
                     multisig_address,
                     replay_protection_nonce: Some(replay_protection_nonce),
+                }
+            },
+            TransactionExtraConfig::V2 {
+                multisig_address,
+                replay_protection_nonce: old_replay_protection_nonce,
+                high_execution_limit_request,
+            } => {
+                assert!(
+                    old_replay_protection_nonce.is_none(),
+                    "trying to set replay protection nonce twice."
+                );
+                TransactionExtraConfig::V2 {
+                    multisig_address,
+                    replay_protection_nonce: Some(replay_protection_nonce),
+                    high_execution_limit_request,
                 }
             },
         };
@@ -1107,6 +1141,10 @@ impl TransactionExtraConfig {
             Self::V1 {
                 replay_protection_nonce,
                 ..
+            }
+            | Self::V2 {
+                replay_protection_nonce,
+                ..
             } => *replay_protection_nonce,
         }
     }
@@ -1118,9 +1156,21 @@ impl TransactionExtraConfig {
     pub fn multisig_address(&self) -> Option<AccountAddress> {
         match self {
             Self::V1 {
-                multisig_address,
-                replay_protection_nonce: _,
+                multisig_address, ..
+            }
+            | Self::V2 {
+                multisig_address, ..
             } => *multisig_address,
+        }
+    }
+
+    pub fn high_execution_limit_request(&self) -> bool {
+        match self {
+            Self::V1 { .. } => false,
+            Self::V2 {
+                high_execution_limit_request,
+                ..
+            } => *high_execution_limit_request,
         }
     }
 }

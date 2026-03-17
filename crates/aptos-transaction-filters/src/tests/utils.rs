@@ -383,13 +383,11 @@ pub fn get_module_name(txn: &SignedTransaction) -> String {
 pub fn get_multisig_address(txn: &SignedTransaction) -> AccountAddress {
     match txn.payload() {
         TransactionPayload::Multisig(multisig) => multisig.multisig_address,
-        TransactionPayload::Payload(TransactionPayloadInner::V1 {
-            extra_config:
-                TransactionExtraConfig::V1 {
-                    multisig_address, ..
-                },
-            ..
-        }) => multisig_address.expect("Expected multisig address!"),
+        TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
+            extra_config
+                .multisig_address()
+                .expect("Expected multisig address!")
+        },
         payload => panic!("Unexpected transaction payload: {:?}", payload),
     }
 }

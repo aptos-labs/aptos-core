@@ -171,6 +171,8 @@ pub enum FeatureFlag {
     PUBLIC_STRUCT_ENUM_ARGS = 109,
     /// Whether multisig script payloads are enabled
     MULTISIG_SCRIPT = 110,
+    /// Enables the high-execution-limit transaction tier for a flat premium.
+    HIGH_EXECUTION_LIMIT_TRANSACTIONS = 111,
 }
 
 impl FeatureFlag {
@@ -281,6 +283,7 @@ impl FeatureFlag {
             Self::SLH_DSA_SHA2_128S_SIGNATURE,
             Self::PUBLIC_STRUCT_ENUM_ARGS,
             Self::MULTISIG_SCRIPT,
+            Self::HIGH_EXECUTION_LIMIT_TRANSACTIONS,
         ]
     }
 }
@@ -488,6 +491,10 @@ impl Features {
 
     pub fn is_multisig_script_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::MULTISIG_SCRIPT)
+    }
+
+    pub fn is_high_execution_limit_transactions_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::HIGH_EXECUTION_LIMIT_TRANSACTIONS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

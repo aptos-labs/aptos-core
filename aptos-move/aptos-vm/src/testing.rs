@@ -81,15 +81,16 @@ impl AptosVM {
         use aptos_types::transaction::AuxiliaryInfo;
         use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 
-        let txn_data =
-            TransactionMetadata::new(txn, &AuxiliaryInfo::default(), self.timed_features());
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-
         let vm_gas_params = self
             .gas_params_for_test()
             .expect("should be able to get gas params")
             .vm
             .clone();
+
+        let txn_data =
+            TransactionMetadata::new(self, &vm_gas_params, txn, &AuxiliaryInfo::default());
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
         let storage_gas_params = self
             .storage_gas_params(&log_context)
             .expect("should be able to get storage gas params")
@@ -99,6 +100,7 @@ impl AptosVM {
             self.gas_feature_version(),
             vm_gas_params,
             storage_gas_params,
+            false,
             false,
             gas_meter_balance.into(),
             &NoopBlockSynchronizationKillSwitch {},

@@ -527,11 +527,18 @@ impl Arbitrary for TransactionExtraConfig {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
-        (any::<Option<AccountAddress>>(), any::<Option<u64>>())
+        (
+            any::<Option<AccountAddress>>(),
+            any::<Option<u64>>(),
+            any::<bool>(),
+        )
             .prop_map(
-                |(multisig_address, replay_protection_nonce)| TransactionExtraConfig::V1 {
-                    multisig_address,
-                    replay_protection_nonce,
+                |(multisig_address, replay_protection_nonce, high_execution_limit_request)| {
+                    TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce,
+                        high_execution_limit_request,
+                    }
                 },
             )
             .boxed()

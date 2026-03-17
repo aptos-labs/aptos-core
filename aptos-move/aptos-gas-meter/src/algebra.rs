@@ -65,6 +65,7 @@ where
         vm_gas_params: VMGasParameters,
         storage_gas_params: StorageGasParameters,
         is_approved_gov_script: bool,
+        is_high_execution_limit: bool,
         balance: impl Into<Gas>,
         block_synchronization_kill_switch: &'a T,
     ) -> Self {
@@ -77,6 +78,14 @@ where
                 vm_gas_params.txn.max_execution_gas_gov,
                 vm_gas_params.txn.max_io_gas_gov,
                 vm_gas_params.txn.max_storage_fee_gov,
+            )
+        } else if is_high_execution_limit
+            && gas_feature_version >= gas_feature_versions::RELEASE_V1_44
+        {
+            (
+                vm_gas_params.txn.max_execution_gas_high,
+                vm_gas_params.txn.max_io_gas_high,
+                vm_gas_params.txn.max_storage_fee_high,
             )
         } else {
             (

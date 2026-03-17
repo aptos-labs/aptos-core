@@ -1447,6 +1447,15 @@ TransactionExtraConfig:
                 TYPENAME: AccountAddress
           - replay_protection_nonce:
               OPTION: U64
+    1:
+      V2:
+        STRUCT:
+          - multisig_address:
+              OPTION:
+                TYPENAME: AccountAddress
+          - replay_protection_nonce:
+              OPTION: U64
+          - high_execution_limit_request: BOOL
 TransactionPayload:
   ENUM:
     0:

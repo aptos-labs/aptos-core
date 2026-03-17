@@ -663,14 +663,14 @@ pub enum StatusCode {
     EMPTY_PAYLOAD_PROVIDED = 43,
     TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE = 44,
     INVALID_NUMBER_OF_AUTHENTICATION_PROOFS = 45,
+    // All epoch slots for high-execution-limit transactions have been consumed.
+    HIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED = 46,
 
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_11 = 46,
     RESERVED_VALIDATION_ERROR_12 = 47,
     RESERVED_VALIDATION_ERROR_13 = 48,
     RESERVED_VALIDATION_ERROR_14 = 49,
     RESERVED_VALIDATION_ERROR_15 = 50,
-
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.
