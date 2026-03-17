@@ -26,7 +26,7 @@ jobs:
           ref: ${{ github.event.inputs.branch }}
 
       - name: Determine next version and update aptos-node/Cargo.toml
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         id: determine-version
         with:
           script: |
