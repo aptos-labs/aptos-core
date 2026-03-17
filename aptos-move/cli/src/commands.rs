@@ -973,6 +973,7 @@ impl IncludedArtifacts {
             skip_attribute_checks,
             check_test_code,
             experiments,
+            modular_compilation: move_options.modular_compilation,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             ..BuildOptions::default()
         };

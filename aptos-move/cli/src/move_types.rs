@@ -157,6 +157,12 @@ pub struct MovePackageOptions {
     /// Fail the compilation if there are any warnings.
     #[clap(long)]
     pub fail_on_warning: bool,
+
+    /// Enable per-package incremental modular compilation (compiler v2 only).
+    /// Each package is compiled independently; unchanged packages are served
+    /// from cache without recompilation.
+    #[clap(long)]
+    pub modular_compilation: bool,
 }
 
 impl Default for MovePackageOptions {
@@ -182,6 +188,7 @@ impl MovePackageOptions {
             optimize: None,
             fail_on_warning: false,
             experiments: vec![],
+            modular_compilation: false,
         }
     }
 

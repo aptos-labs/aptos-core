@@ -4,5 +4,6 @@
 
 pub mod build_plan;
 pub mod compiled_package;
+pub mod interface_hash;
 pub mod model_builder;
 pub mod package_layout;

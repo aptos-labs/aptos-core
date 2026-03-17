@@ -97,6 +97,11 @@ pub struct BuildConfig {
     #[clap(long = "skip-fetch-latest-git-deps", global = true)]
     pub skip_fetch_latest_git_deps: bool,
 
+    /// Enable per-package incremental modular compilation (compiler v2 only).
+    /// When false, falls back to the legacy monolithic compilation path.
+    #[clap(long = "modular-compilation", global = true, default_value = "false")]
+    pub modular_compilation: bool,
+
     #[clap(flatten)]
     pub compiler_config: CompilerConfig,
 }

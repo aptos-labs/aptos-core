@@ -1,0 +1,9 @@
+[package]
+name = "Middle"
+version = "0.0.0"
+
+[addresses]
+middle = "0xb"
+
+[dependencies]
+Leaf = { local = "../../deps_only/Leaf" }

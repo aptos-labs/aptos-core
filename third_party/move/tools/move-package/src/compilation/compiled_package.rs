@@ -67,6 +67,11 @@ pub struct CompiledPackageInfo {
     pub source_digest: Option<PackageDigest>,
     /// The build flags that were used when compiling this package.
     pub build_flags: BuildConfig,
+    /// Hash of this package's public/friend API surface.
+    /// `None` for packages compiled via the legacy monolithic path.
+    /// Used by dependents to decide whether they need to recompile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface_hash: Option<PackageDigest>,
 }
 
 /// Represents a compiled package in memory.
@@ -101,6 +106,11 @@ pub struct OnDiskPackage {
     /// Dependency names for this package.
     pub dependencies: Vec<PackageName>,
     pub bytecode_deps: Vec<PackageName>,
+    /// Maps each direct dependency's `PackageName` to its `interface_hash` at the time
+    /// this package was compiled. Used for incremental cache invalidation.
+    /// Absent in packages compiled via the legacy monolithic path.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub dep_interface_hashes: BTreeMap<PackageName, PackageDigest>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -530,6 +540,69 @@ impl CompiledPackage {
                 == resolved_package.resolution_table
     }
 
+    /// Returns `true` iff the on-disk artifacts for this package are up-to-date
+    /// and can be loaded without recompilation (used by the incremental build path).
+    ///
+    /// Checks:
+    /// 1. `force_recompilation` flag is not set.
+    /// 2. Source file digest is unchanged.
+    /// 3. Build flags are unchanged.
+    /// 4. Named address instantiation is unchanged.
+    /// 5. The `interface_hash` of every direct dependency matches what was
+    ///    recorded when this package was last compiled.
+    pub(crate) fn is_package_cache_valid(
+        on_disk: &OnDiskCompiledPackage,
+        resolved_pkg: &ResolvedPackage,
+        build_opts: &BuildConfig,
+        current_dep_hashes: &BTreeMap<PackageName, PackageDigest>,
+    ) -> bool {
+        // Always recompile if forced
+        if build_opts.force_recompilation {
+            return false;
+        }
+        // Source files changed?
+        if on_disk.has_source_changed_since_last_compile(resolved_pkg) {
+            return false;
+        }
+        // Build flags changed?
+        if on_disk.are_build_flags_different(build_opts) {
+            return false;
+        }
+        // Named address instantiation changed?
+        if on_disk
+            .package
+            .compiled_package_info
+            .address_alias_instantiation
+            != resolved_pkg.resolution_table
+        {
+            return false;
+        }
+        // If no interface_hash stored this was compiled with the old monolithic path — treat as miss
+        if on_disk
+            .package
+            .compiled_package_info
+            .interface_hash
+            .is_none()
+        {
+            return false;
+        }
+        // Interface of any direct dependency changed?
+        for (dep_name, stored_hash) in &on_disk.package.dep_interface_hashes {
+            match current_dep_hashes.get(dep_name) {
+                None => return false,                        // Dependency removed
+                Some(h) if h != stored_hash => return false, // Interface changed
+                _ => {},
+            }
+        }
+        // A new direct dependency was added
+        for dep_name in current_dep_hashes.keys() {
+            if !on_disk.package.dep_interface_hashes.contains_key(dep_name) {
+                return false;
+            }
+        }
+        true
+    }
+
     pub(crate) fn build_all<W: Write>(
         w: &mut W,
         project_root: &Path,
@@ -761,6 +834,7 @@ impl CompiledPackage {
                 address_alias_instantiation: resolved_package.resolution_table,
                 source_digest: Some(resolved_package.source_digest),
                 build_flags: resolution_graph.build_options.clone(),
+                interface_hash: None, // set only by the modular compilation path
             },
             compiled_docs,
             compiled_abis,
@@ -834,6 +908,17 @@ impl CompiledPackage {
         under_path: PathBuf,
         bytecode_version: u32,
     ) -> Result<OnDiskCompiledPackage> {
+        self.save_to_disk_with_dep_hashes(under_path, bytecode_version, BTreeMap::new())
+    }
+
+    /// Like `save_to_disk` but also persists the `dep_interface_hashes` map for
+    /// incremental cache invalidation (used by the modular build path).
+    pub(crate) fn save_to_disk_with_dep_hashes(
+        &self,
+        under_path: PathBuf,
+        bytecode_version: u32,
+        dep_interface_hashes: BTreeMap<PackageName, PackageDigest>,
+    ) -> Result<OnDiskCompiledPackage> {
         self.check_filepaths_ok()?;
         assert!(under_path.ends_with(CompiledPackageLayout::Root.path()));
         let root_package = self.compiled_package_info.package_name;
@@ -855,6 +940,7 @@ impl CompiledPackage {
                     .collect::<BTreeSet<_>>()
                     .into_iter()
                     .collect(),
+                dep_interface_hashes,
             },
         };
 

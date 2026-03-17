@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_types::vm::module_metadata::{
-    KnownAttribute, RandomnessAnnotation, ResourceGroupScope, RuntimeModuleMetadataV1,
+    get_metadata_from_compiled_code, KnownAttribute, RandomnessAnnotation, ResourceGroupScope,
+    RuntimeModuleMetadataV1,
 };
 use legacy_move_compiler::shared::known_attributes;
 use move_binary_format::file_format::Visibility;
@@ -476,6 +477,36 @@ impl ExtendedChecker<'_> {
     }
 
     fn get_resource_group(&mut self, struct_: &StructEnv) -> Option<ResourceGroupScope> {
+        // Fast path: attributes are populated for source-compiled modules.
+        // For dependency modules loaded from pre-compiled bytecode (modular compilation),
+        // GlobalEnv struct attributes are empty; fall back to reading the compiled module
+        // metadata directly.
+        let has_resource_group_attr = struct_.get_attributes().iter().any(|attr| {
+            if let Attribute::Apply(_, name, _) = attr {
+                self.name_string(*name).as_ref() == RESOURCE_GROUP
+            } else {
+                false
+            }
+        });
+        if !has_resource_group_attr {
+            // Check compiled-module metadata (present for bytecode-loaded deps).
+            let scope = struct_
+                .module_env
+                .get_compiled_module()
+                .and_then(get_metadata_from_compiled_code)
+                .and_then(|meta| {
+                    let struct_name = self
+                        .env
+                        .symbol_pool()
+                        .string(struct_.get_name())
+                        .to_string();
+                    meta.struct_attributes
+                        .get(&struct_name)
+                        .and_then(|attrs| attrs.iter().find_map(|a| a.get_resource_group()))
+                });
+            return scope;
+        }
+
         let container = struct_.get_attributes().iter().find(|attr| {
             if let Attribute::Apply(_, name, _) = attr {
                 self.name_string(*name).as_ref() == RESOURCE_GROUP

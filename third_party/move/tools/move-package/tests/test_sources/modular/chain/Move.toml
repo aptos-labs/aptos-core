@@ -1,0 +1,9 @@
+[package]
+name = "Root"
+version = "0.0.0"
+
+[addresses]
+root = "0xc"
+
+[dependencies]
+Middle = { local = "./deps_only/Middle" }

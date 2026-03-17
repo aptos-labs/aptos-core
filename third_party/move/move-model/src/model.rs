@@ -3493,6 +3493,14 @@ impl<'env> ModuleEnv<'env> {
         self.data.source_map.as_ref()
     }
 
+    /// Gets the underlying compiled module (bytecode), if one is attached.
+    /// This is present for modules that were loaded from pre-compiled bytecode
+    /// (i.e. dependency packages in modular/incremental compilation), as well
+    /// as for source-compiled modules after `attach_compiled_module` is called.
+    pub fn get_compiled_module(&'env self) -> Option<&'env CompiledModule> {
+        self.data.compiled_module.as_ref()
+    }
+
     /// Gets a `NamedConstantEnv` in this module by name
     pub fn find_named_constant(&'env self, name: Symbol) -> Option<NamedConstantEnv<'env>> {
         let id = NamedConstantId(name);

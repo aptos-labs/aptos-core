@@ -116,6 +116,11 @@ pub struct BuildOptions {
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
     pub experiments: Vec<String>,
+    /// Enable per-package incremental modular compilation (compiler v2 only).
+    /// Each package is compiled independently; unchanged packages are served
+    /// from cache without recompilation.
+    #[clap(long)]
+    pub modular_compilation: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -144,6 +149,9 @@ impl Default for BuildOptions {
             with_test_mode: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
+            modular_compilation: std::env::var("MOVE_MODULAR_COMPILATION")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false),
         }
     }
 }
@@ -274,6 +282,7 @@ fn make_model_build_config(
         force_recompilation: false,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
+        modular_compilation: false,
         compiler_config: CompilerConfig {
             bytecode_version,
             compiler_version,
@@ -333,6 +342,7 @@ impl BuiltPackage {
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
+            modular_compilation: options.modular_compilation,
             compiler_config: CompilerConfig {
                 bytecode_version,
                 compiler_version,
