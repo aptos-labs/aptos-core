@@ -90,6 +90,9 @@ module aptos_experimental::confidential_asset {
     /// "Dispatchable" fungible asset types whose withdraw, deposit, balance or supply functions can be customized are not supported, for now.
     const E_UNSAFE_DISPATCHABLE_FA: u64 = 16;
 
+    /// Allow listing is not enabled yet.
+    const E_ALLOW_LISTING_IS_DISABLED: u64 = 17;
+
     /// An internal error occurred: there is either a bug or a misconfiguration in the contract.
     const E_INTERNAL_ERROR: u64 = 999;
 
@@ -220,24 +223,15 @@ module aptos_experimental::confidential_asset {
         );
 
         let deployer_address = signer::address_of(deployer);
-        let is_mainnet = chain_id::get() == MAINNET_CHAIN_ID;
-
         move_to(
             deployer,
             GlobalConfig::V1 {
-                allow_list_enabled: is_mainnet,
+                allow_list_enabled: chain_id::get() == MAINNET_CHAIN_ID,
                 global_auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 },
                 // DO NOT CHANGE: using long syntax until framework change is released to mainnet
                 extend_ref: object::create_object(deployer_address).generate_extend_ref()
             }
         );
-
-        // On mainnet, allow APT by default
-        if (is_mainnet) {
-            let apt_metadata = object::address_to_object<fungible_asset::Metadata>(@aptos_fungible_asset);
-            let config_signer = get_asset_config_signer(apt_metadata);
-            move_to(&config_signer, AssetConfig::V1 { allowed: true, auditor: AuditorEK::V1 { ek: std::option::none(), epoch: 0 } });
-        };
     }
 
     /// Initializes the module for devnet/tests. Asserts non-mainnet, non-testnet chain.
@@ -671,11 +665,19 @@ module aptos_experimental::confidential_asset {
     /// Enables or disables the allow list for confidential transfers.
     public fun set_allow_listing(aptos_framework: &signer, enabled: bool) acquires GlobalConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
-
         borrow_global_mut<GlobalConfig>(@aptos_experimental).allow_list_enabled = enabled;
     }
 
-    /// Enables or disables confidential transfers for a specific asset type.
+    /// Enables or disables confidentiality for the APT token.
+    public fun set_confidentiality_for_apt(aptos_framework: &signer, allowed: bool) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        let asset_type = object::address_to_object<fungible_asset::Metadata>(@aptos_fungible_asset);
+        set_confidentiality_for_asset_type(aptos_framework, asset_type, allowed)
+    }
+
+    /// When allow listing is on, this enables or disables confidential transfers for a specific asset type. In contrast,
+    /// if allow listing is disabled, this aborts. Note that, in this case, `is_confidentiality_enabled_for_asset_type`
+    /// will correctly return `false` for any asset type.
     public fun set_confidentiality_for_asset_type(
         aptos_framework: &signer,
         asset_type: Object<fungible_asset::Metadata>,
@@ -683,8 +685,10 @@ module aptos_experimental::confidential_asset {
     ) acquires AssetConfig, GlobalConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let asset_config = borrow_global_mut<AssetConfig>(get_asset_config_address_or_create(asset_type));
-        asset_config.allowed = allowed;
+        // When allow listing is disabled, updates to `AssetConfig::V1::allowed` are not meaningful, so we forbid them.
+        assert!(is_allow_listing_required(), error::invalid_state(E_ALLOW_LISTING_IS_DISABLED));
+
+        borrow_global_mut<AssetConfig>(get_asset_config_address_or_create(asset_type)).allowed = allowed;
     }
 
     /// Sets or removes the auditor for a specific asset type. Epoch increments only on install/change.
@@ -751,7 +755,6 @@ module aptos_experimental::confidential_asset {
         };
 
         let asset_config_address = get_asset_config_address(asset_type);
-
         if (!exists<AssetConfig>(asset_config_address)) {
             return false
         };
