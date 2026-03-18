@@ -5,6 +5,7 @@ module aptos_experimental::confidential_range_proofs {
     use std::error;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
     use aptos_std::ristretto255_bulletproofs::{Self as bulletproofs, RangeProof};
+    use aptos_experimental::confidential_balance;
 
     #[test_only]
     use aptos_std::ristretto255::Scalar;
@@ -22,7 +23,6 @@ module aptos_experimental::confidential_range_proofs {
     //
 
     const BULLETPROOFS_DST: vector<u8> = b"AptosConfidentialAsset/BulletproofRangeProof";
-    const BULLETPROOFS_NUM_BITS: u64 = 16;
 
     //
     // Range proof verification helpers
@@ -41,7 +41,7 @@ module aptos_experimental::confidential_range_proofs {
                 &ristretto255::basepoint(),
                 &ristretto255::hash_to_point_base(),
                 zkrp,
-                BULLETPROOFS_NUM_BITS,
+                confidential_balance::get_chunk_size_bits(),
                 BULLETPROOFS_DST
             ),
             error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
@@ -58,12 +58,6 @@ module aptos_experimental::confidential_range_proofs {
         BULLETPROOFS_DST
     }
 
-    #[view]
-    /// Returns the maximum number of bits of the normalized chunk for the range proofs.
-    public fun get_bulletproofs_num_bits(): u64 {
-        BULLETPROOFS_NUM_BITS
-    }
-
     //
     // Test-only range proof proving helpers
     //
@@ -76,7 +70,7 @@ module aptos_experimental::confidential_range_proofs {
             bulletproofs::prove_batch_range_pedersen(
                 amount_chunks,
                 randomness,
-                BULLETPROOFS_NUM_BITS,
+                confidential_balance::get_chunk_size_bits(),
                 BULLETPROOFS_DST
             );
         proof
