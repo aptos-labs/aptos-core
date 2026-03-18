@@ -386,8 +386,9 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
     active_matched_order: ActiveMatchedOrder,
     is_bid: bool
 ): OrderMatch&lt;M&gt; {
-    <b>let</b> (order_id, matched_size, remaining_size, order_book_type) =
-        active_matched_order.destroy_active_matched_order();
+    <b>let</b> (
+        order_id, matched_size, remaining_size, order_book_type
+    ) = active_matched_order.destroy_active_matched_order();
     <b>assert</b>!(order_book_type == bulk_order_type(), <a href="bulk_order_book.md#0x7_bulk_order_book_ENOT_BULK_ORDER">ENOT_BULK_ORDER</a>);
     <b>let</b> order_address = self.order_id_to_address.get(&order_id).destroy_some();
     <b>let</b> order = self.orders.remove(&order_address);
@@ -644,7 +645,9 @@ effectively allowing them to "reuse" matched liquidity.
     <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &order);
     <a href="bulk_order_utils.md#0x7_bulk_order_utils_reinsert_order_into_bulk_order">bulk_order_utils::reinsert_order_into_bulk_order</a>(&<b>mut</b> order, &reinsert_order);
     <a href="bulk_order_book.md#0x7_bulk_order_book_activate_first_price_levels">activate_first_price_levels</a>(
-        price_time_idx, &order, reinsert_order.get_order_id_from_match_details()
+        price_time_idx,
+        &order,
+        reinsert_order.get_order_id_from_match_details()
     );
     self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order);
 }
@@ -977,9 +980,7 @@ The first price levels of both bid and ask sides will be activated in the active
                 // Put the <b>old</b> order back
                 self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, old_order);
                 <b>return</b> new_bulk_order_place_response_rejection(
-                    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-                    new_sequence_number,
-                    existing_sequence_number
+                    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, new_sequence_number, existing_sequence_number
                 )
             };
             <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);

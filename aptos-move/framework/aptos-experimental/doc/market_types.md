@@ -2115,7 +2115,8 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b>
+    + drop&gt;(
     settle_trade_f: |
         &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;,
         MarketClearinghouseOrderInfo&lt;M&gt;,
@@ -2136,20 +2137,16 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
         &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
         &M
     | <a href="market_types.md#0x7_market_types_ValidationResult">ValidationResult</a> <b>has</b> drop + <b>copy</b>,
-    place_maker_order_f: |MarketClearinghouseOrderInfo&lt;M&gt;, u64| <a href="market_types.md#0x7_market_types_PlaceMakerOrderResult">PlaceMakerOrderResult</a>&lt;R&gt; <b>has</b> drop
-    + <b>copy</b>,
+    place_maker_order_f: |
+        MarketClearinghouseOrderInfo&lt;M&gt;,
+        u64
+    | <a href="market_types.md#0x7_market_types_PlaceMakerOrderResult">PlaceMakerOrderResult</a>&lt;R&gt; <b>has</b> drop + <b>copy</b>,
     cleanup_order_f: |
         MarketClearinghouseOrderInfo&lt;M&gt;,
         u64,
         bool
     | <b>has</b> drop + <b>copy</b>,
-    cleanup_bulk_order_at_price_f: |
-        <b>address</b>,
-        OrderId,
-        bool,
-        u64,
-        u64
-    | <b>has</b> drop + <b>copy</b>,
+    cleanup_bulk_order_at_price_f: |<b>address</b>, OrderId, bool, u64, u64| <b>has</b> drop + <b>copy</b>,
     place_bulk_order_f: |
         <b>address</b>,
         OrderId,
@@ -2549,7 +2546,9 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
     settled_price: u64,
     settled_size: u64
 ): <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a>&lt;R&gt; {
-    (self.settle_trade_f) (market, taker, maker, fill_id, settled_price, settled_size)
+    (self.settle_trade_f) (
+        market, taker, maker, fill_id, settled_price, settled_size
+    )
 }
 </code></pre>
 
@@ -2610,7 +2609,12 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
     order_metadata: &M
 ): <a href="market_types.md#0x7_market_types_ValidationResult">ValidationResult</a> {
     (self.validate_bulk_order_placement_f) (
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, bids_prices, bids_sizes, asks_prices, asks_sizes, order_metadata
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        bids_prices,
+        bids_sizes,
+        asks_prices,
+        asks_sizes,
+        order_metadata
     )
 }
 </code></pre>
@@ -2802,8 +2806,7 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_metadata_bytes">get_order_metadata_bytes</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
-    self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M, R&gt;,
-    order_metadata: &M
+    self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M, R&gt;, order_metadata: &M
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     (self.get_order_metadata_bytes) (order_metadata)
 }
@@ -3147,7 +3150,9 @@ enum <a href="market_types.md#0x7_market_types_BulkOrderRejectionEvent">BulkOrde
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_is_allowed_self_trade">is_allowed_self_trade</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_is_allowed_self_trade">is_allowed_self_trade</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
+): bool {
     self.config.allow_self_trade
 }
 </code></pre>
@@ -3311,10 +3316,7 @@ around ownership of the order.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_order_metadata_by_client_id">set_order_metadata_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;,
-    user: <b>address</b>,
-    client_order_id: String,
-    metadata: M
+    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: String, metadata: M
 ) {
     <b>let</b> order_id = self.<a href="order_book.md#0x7_order_book">order_book</a>.get_order_id_by_client_id(user, client_order_id);
     <b>assert</b>!(order_id.is_some(), <a href="market_types.md#0x7_market_types_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);

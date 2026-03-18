@@ -135,7 +135,8 @@ Constructs a new BCSStream instance from the provided byte array.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_has_remaining">has_remaining</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): bool
+<pre><code>#[lint::skip(#[needless_mutable_reference])]
+<b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_has_remaining">has_remaining</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): bool
 </code></pre>
 
 
@@ -178,7 +179,7 @@ In the BCS format, lengths of vectors are represented using ULEB128 encoding.
         <b>let</b> byte = stream.data[stream.cur];
         stream.cur += 1;
 
-        <b>let</b> val = ((byte & 0x7f) <b>as</b> u64);
+        <b>let</b> val = (byte & 0x7f) <b>as</b> u64;
         <b>if</b> (((val &lt;&lt; shift) &gt;&gt; shift) != val) {
             <b>abort</b> <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="bcs_stream.md#0x1_bcs_stream_EMALFORMED_DATA">EMALFORMED_DATA</a>)
         };
@@ -589,7 +590,7 @@ The <code>elem_deserializer</code> lambda expression is used sequentially to des
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_deserialize_vector">deserialize_vector</a>&lt;E&gt;(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">BCSStream</a>, elem_deserializer: |&<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">BCSStream</a>| E): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt; {
     <b>let</b> len = <a href="bcs_stream.md#0x1_bcs_stream_deserialize_uleb128">deserialize_uleb128</a>(stream);
-    <b>let</b> v = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    <b>let</b> v = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
 
     for (i in 0..len) {
         v.push_back(elem_deserializer(stream));

@@ -151,16 +151,16 @@ Invoked in block prologues to update the block decryption key.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="decryption.md#0x1_decryption_on_new_block">on_new_block</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="decryption.md#0x1_decryption_on_new_block">on_new_block</a>(
     vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     epoch: u64,
     round: u64,
     decryption_key_for_new_block: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-) <b>acquires</b> <a href="decryption.md#0x1_decryption_PerBlockDecryptionKey">PerBlockDecryptionKey</a> {
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
     <b>if</b> (<b>exists</b>&lt;<a href="decryption.md#0x1_decryption_PerBlockDecryptionKey">PerBlockDecryptionKey</a>&gt;(@aptos_framework)) {
         <b>let</b> decryption_key =
-            <b>borrow_global_mut</b>&lt;<a href="decryption.md#0x1_decryption_PerBlockDecryptionKey">PerBlockDecryptionKey</a>&gt;(@aptos_framework);
+            &<b>mut</b> <a href="decryption.md#0x1_decryption_PerBlockDecryptionKey">PerBlockDecryptionKey</a>[@aptos_framework];
         decryption_key.epoch = epoch;
         decryption_key.round = round;
         decryption_key.decryption_key = decryption_key_for_new_block;
@@ -188,7 +188,7 @@ Buffer the encryption key for the next epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="decryption.md#0x1_decryption_set_for_next_epoch">set_for_next_epoch</a>(epoch: u64, encryption_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+<pre><code><b>friend</b> <b>fun</b> <a href="decryption.md#0x1_decryption_set_for_next_epoch">set_for_next_epoch</a>(epoch: u64, encryption_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="decryption.md#0x1_decryption_PerEpochEncryptionKey">PerEpochEncryptionKey</a> {
         epoch,
         encryption_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(encryption_key)
@@ -216,12 +216,12 @@ Apply buffered PerEpochEncryptionKey on epoch transition.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="decryption.md#0x1_decryption_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="decryption.md#0x1_decryption_PerEpochEncryptionKey">PerEpochEncryptionKey</a> {
+<pre><code><b>friend</b> <b>fun</b> <a href="decryption.md#0x1_decryption_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="decryption.md#0x1_decryption_PerEpochEncryptionKey">PerEpochEncryptionKey</a>&gt;()) {
         <b>let</b> new_key = <a href="config_buffer.md#0x1_config_buffer_extract_v2">config_buffer::extract_v2</a>&lt;<a href="decryption.md#0x1_decryption_PerEpochEncryptionKey">PerEpochEncryptionKey</a>&gt;();
         <b>if</b> (<b>exists</b>&lt;<a href="decryption.md#0x1_decryption_PerEpochEncryptionKey">PerEpochEncryptionKey</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="decryption.md#0x1_decryption_PerEpochEncryptionKey">PerEpochEncryptionKey</a>&gt;(@aptos_framework) = new_key;
+            <a href="decryption.md#0x1_decryption_PerEpochEncryptionKey">PerEpochEncryptionKey</a>[@aptos_framework] = new_key;
         } <b>else</b> {
             <b>move_to</b>(framework, new_key);
         }

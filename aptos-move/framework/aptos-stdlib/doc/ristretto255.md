@@ -352,56 +352,6 @@ The hash of the basepoint of the Ristretto255 group using SHA3_512
 
 
 
-<a id="0x1_ristretto255_L_MINUS_ONE"></a>
-
-<code><a href="ristretto255.md#0x1_ristretto255_ORDER_ELL">ORDER_ELL</a></code> - 1: i.e., the "largest", reduced scalar in the field
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_L_MINUS_ONE">L_MINUS_ONE</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [236, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16];
-</code></pre>
-
-
-
-<a id="0x1_ristretto255_MAX_POINT_NUM_BYTES"></a>
-
-The maximum size in bytes of a canonically-encoded Ristretto255 point is 32 bytes.
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_MAX_POINT_NUM_BYTES">MAX_POINT_NUM_BYTES</a>: u64 = 32;
-</code></pre>
-
-
-
-<a id="0x1_ristretto255_MAX_SCALAR_NUM_BITS"></a>
-
-The maximum size in bits of a canonically-encoded Scalar is 256 bits.
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_MAX_SCALAR_NUM_BITS">MAX_SCALAR_NUM_BITS</a>: u64 = 256;
-</code></pre>
-
-
-
-<a id="0x1_ristretto255_MAX_SCALAR_NUM_BYTES"></a>
-
-The maximum size in bytes of a canonically-encoded Scalar is 32 bytes.
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_MAX_SCALAR_NUM_BYTES">MAX_SCALAR_NUM_BYTES</a>: u64 = 32;
-</code></pre>
-
-
-
-<a id="0x1_ristretto255_ORDER_ELL"></a>
-
-The order of the Ristretto255 group and its scalar field, in little-endian.
-
-
-<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_ORDER_ELL">ORDER_ELL</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [237, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16];
-</code></pre>
-
-
-
 <a id="0x1_ristretto255_point_identity_compressed"></a>
 
 ## Function `point_identity_compressed`
@@ -1312,7 +1262,7 @@ Creates a Scalar from an u32.
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_u32">new_scalar_from_u32</a>(four_bytes: u32): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
     <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-        data: <a href="ristretto255.md#0x1_ristretto255_scalar_from_u64_internal">scalar_from_u64_internal</a>((four_bytes <b>as</b> u64))
+        data: <a href="ristretto255.md#0x1_ristretto255_scalar_from_u64_internal">scalar_from_u64_internal</a>(four_bytes <b>as</b> u64)
     }
 }
 </code></pre>

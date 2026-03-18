@@ -134,6 +134,8 @@ Invalid signature type.
 
 <a id="0x1_solana_derivable_account_BASE_58_ALPHABET"></a>
 
+a 58-character alphabet consisting of numbers (1-9) and almost all (A-Z, a-z) letters,
+excluding 0, O, I, and l to avoid confusion between similar-looking characters.
 
 
 <pre><code><b>const</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_BASE_58_ALPHABET">BASE_58_ALPHABET</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [49, 50, 51, 52, 53, 54, 55, 56, 57, 65, 66, 67, 68, 69, 70, 71, 72, 74, 75, 76, 77, 78, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122];
@@ -157,15 +159,6 @@ Invalid public key length.
 
 
 <pre><code><b>const</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_EINVALID_PUBLIC_KEY_LENGTH">EINVALID_PUBLIC_KEY_LENGTH</a>: u64 = 6;
-</code></pre>
-
-
-
-<a id="0x1_solana_derivable_account_HEX_ALPHABET"></a>
-
-
-
-<pre><code><b>const</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_HEX_ALPHABET">HEX_ALPHABET</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 97, 98, 99, 100, 101, 102];
 </code></pre>
 
 
@@ -262,13 +255,13 @@ Returns a tuple of the signature type and the signature.
         <b>assert</b>!(found, <a href="solana_derivable_account.md#0x1_solana_derivable_account_EINVALID_BASE_58_PUBLIC_KEY">EINVALID_BASE_58_PUBLIC_KEY</a>);
 
         <b>let</b> j = 0;
-        <b>let</b> carry = (char_index <b>as</b> u16);
+        <b>let</b> carry = char_index <b>as</b> u16;
 
         // For each existing byte, multiply by 58 and add carry
         <b>while</b> (j &lt; bytes.length()) {
-            <b>let</b> current = (bytes[j] <b>as</b> u16);
+            <b>let</b> current = bytes[j] <b>as</b> u16;
             <b>let</b> new_carry = current * base + carry;
-            bytes[j] = ((new_carry & 0xff) <b>as</b> u8);
+            bytes[j] = (new_carry & 0xff) <b>as</b> u8;
             carry = new_carry &gt;&gt; 8;
             j += 1;
         };

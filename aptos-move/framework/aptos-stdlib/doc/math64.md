@@ -207,7 +207,7 @@ Returns a * b / c going through u128 to prevent intermediate overflow
 <pre><code><b>public</b> inline <b>fun</b> <a href="math64.md#0x1_math64_mul_div">mul_div</a>(a: u64, b: u64, c: u64): u64 {
     // Inline functions cannot take constants, <b>as</b> then every <b>module</b> using it needs the constant
     <b>assert</b>!(c != 0, std::error::invalid_argument(4));
-    (((a <b>as</b> u128) * (b <b>as</b> u128) / (c <b>as</b> u128)) <b>as</b> u64)
+    ((a <b>as</b> u128) * (b <b>as</b> u128) / (c <b>as</b> u128)) <b>as</b> u64
 }
 </code></pre>
 

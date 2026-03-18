@@ -119,15 +119,6 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 ## Constants
 
 
-<a id="0x7_pre_cancellation_tracker_DUPLICATE_ORDER_PLACEMENT"></a>
-
-
-
-<pre><code><b>const</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_DUPLICATE_ORDER_PLACEMENT">DUPLICATE_ORDER_PLACEMENT</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x7_pre_cancellation_tracker_MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL"></a>
 
 
@@ -152,9 +143,8 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 <summary>Implementation</summary>
 
 
-<pre><code><b>friend</b> <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_pre_cancellation_tracker">new_pre_cancellation_tracker</a>(
-    expiration_time_secs: u64
-): <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> {
+<pre><code><b>friend</b> <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_pre_cancellation_tracker">new_pre_cancellation_tracker</a>(expiration_time_secs: u64)
+    : <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> {
     PreCancellationTracker::V1 {
         pre_cancellation_window_secs: expiration_time_secs,
         expiration_with_order_ids: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>(),
@@ -278,9 +268,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 <summary>Implementation</summary>
 
 
-<pre><code><b>friend</b> <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_garbage_collect">garbage_collect</a>(
-    tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a>
-) {
+<pre><code><b>friend</b> <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_garbage_collect">garbage_collect</a>(tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a>) {
     <b>let</b> i = 0;
     <b>let</b> current_time = aptos_std::timestamp::now_seconds();
     <b>while</b> (i &lt; <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL">MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL</a>

@@ -681,10 +681,7 @@ subsequent transactions.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_to">deposit_to</a>(
-    sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    token: Object&lt;Metadata&gt;,
-    <b>to</b>: <b>address</b>,
-    amount: u64
+    sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token: Object&lt;Metadata&gt;, <b>to</b>: <b>address</b>, amount: u64
 ) {
     <a href="confidential_asset.md#0x7_confidential_asset_deposit_to_internal">deposit_to_internal</a>(sender, token, <b>to</b>, amount)
 }
@@ -771,9 +768,7 @@ The same as <code>deposit</code>, but converts coins to missing FA first.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(
-    sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64
-) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64) {
     <b>let</b> token = <a href="confidential_asset.md#0x7_confidential_asset_ensure_sufficient_fa">ensure_sufficient_fa</a>&lt;CoinType&gt;(sender, amount).extract();
 
     <a href="confidential_asset.md#0x7_confidential_asset_deposit_to_internal">deposit_to_internal</a>(
@@ -820,8 +815,9 @@ The sender provides their new normalized confidential balance, encrypted with fr
     <b>let</b> new_balance =
         <a href="confidential_balance.md#0x7_confidential_balance_new_actual_balance_from_bytes">confidential_balance::new_actual_balance_from_bytes</a>(new_balance).extract();
     <b>let</b> proof =
-        <a href="confidential_proof.md#0x7_confidential_proof_deserialize_withdrawal_proof">confidential_proof::deserialize_withdrawal_proof</a>(sigma_proof, zkrp_new_balance)
-            .extract();
+        <a href="confidential_proof.md#0x7_confidential_proof_deserialize_withdrawal_proof">confidential_proof::deserialize_withdrawal_proof</a>(
+            sigma_proof, zkrp_new_balance
+        ).extract();
 
     <a href="confidential_asset.md#0x7_confidential_asset_withdraw_to_internal">withdraw_to_internal</a>(sender, token, <b>to</b>, amount, new_balance, proof);
 
@@ -973,7 +969,9 @@ to preserve privacy.
     <b>let</b> new_balance =
         <a href="confidential_balance.md#0x7_confidential_balance_new_actual_balance_from_bytes">confidential_balance::new_actual_balance_from_bytes</a>(new_balance).extract();
     <b>let</b> proof =
-        <a href="confidential_proof.md#0x7_confidential_proof_deserialize_rotation_proof">confidential_proof::deserialize_rotation_proof</a>(sigma_proof, zkrp_new_balance).extract();
+        <a href="confidential_proof.md#0x7_confidential_proof_deserialize_rotation_proof">confidential_proof::deserialize_rotation_proof</a>(
+            sigma_proof, zkrp_new_balance
+        ).extract();
 
     <a href="confidential_asset.md#0x7_confidential_asset_rotate_encryption_key_internal">rotate_encryption_key_internal</a>(sender, token, new_ek, new_balance, proof);
 }
@@ -1041,9 +1039,7 @@ Freezes the confidential account for the specified token, disabling all incoming
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_freeze_token">freeze_token</a>(
-    sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token: Object&lt;Metadata&gt;
-) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_freeze_token">freeze_token</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token: Object&lt;Metadata&gt;) {
     <a href="confidential_asset.md#0x7_confidential_asset_freeze_token_internal">freeze_token_internal</a>(sender, token);
 }
 </code></pre>
@@ -1502,8 +1498,7 @@ Returns the pending balance of the user for the specified token.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>let</b> ca_store =
-        &<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(owner, token)];
+    <b>let</b> ca_store = &<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(owner, token)];
 
     ca_store.pending_balance
 }
@@ -1538,8 +1533,7 @@ Returns the actual balance of the user for the specified token.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>let</b> ca_store =
-        &<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(owner, token)];
+    <b>let</b> ca_store = &<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(owner, token)];
 
     ca_store.actual_balance
 }
@@ -1599,9 +1593,7 @@ Checks if the user's actual balance is normalized for the specified token.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_is_normalized">is_normalized</a>(
-    user: <b>address</b>, token: Object&lt;Metadata&gt;
-): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_is_normalized">is_normalized</a>(user: <b>address</b>, token: Object&lt;Metadata&gt;): bool {
     <b>assert</b>!(
         <a href="confidential_asset.md#0x7_confidential_asset_has_confidential_asset_store">has_confidential_asset_store</a>(user, token),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>)
@@ -1664,9 +1656,8 @@ If the auditing feature is disabled for the token, the encryption key is set to 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_auditor">get_auditor</a>(
-    token: Object&lt;Metadata&gt;
-): Option&lt;twisted_elgamal::CompressedPubkey&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_auditor">get_auditor</a>(token: Object&lt;Metadata&gt;)
+    : Option&lt;twisted_elgamal::CompressedPubkey&gt; {
     <b>let</b> fa_config_address = <a href="confidential_asset.md#0x7_confidential_asset_get_fa_config_address">get_fa_config_address</a>(token);
 
     <b>if</b> (!<a href="confidential_asset.md#0x7_confidential_asset_is_allow_list_enabled">is_allow_list_enabled</a>() && !<b>exists</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAConfig">FAConfig</a>&gt;(fa_config_address)) {
@@ -1808,10 +1799,7 @@ Implementation of the <code>deposit_to</code> entry function.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_deposit_to_internal">deposit_to_internal</a>(
-    sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    token: Object&lt;Metadata&gt;,
-    <b>to</b>: <b>address</b>,
-    amount: u64
+    sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token: Object&lt;Metadata&gt;, <b>to</b>: <b>address</b>, amount: u64
 ) {
     <b>assert</b>!(<a href="confidential_asset.md#0x7_confidential_asset_is_token_allowed">is_token_allowed</a>(token), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x7_confidential_asset_ETOKEN_DISABLED">ETOKEN_DISABLED</a>));
     <b>assert</b>!(!<a href="confidential_asset.md#0x7_confidential_asset_is_frozen">is_frozen</a>(<b>to</b>, token), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_EALREADY_FROZEN">EALREADY_FROZEN</a>));
@@ -1826,11 +1814,13 @@ Implementation of the <code>deposit_to</code> entry function.
         );
 
     <a href="../../aptos-framework/doc/dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">dispatchable_fungible_asset::transfer</a>(
-        sender, sender_fa_store, ca_fa_store, amount
+        sender,
+        sender_fa_store,
+        ca_fa_store,
+        amount
     );
 
-    <b>let</b> ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(<b>to</b>, token)];
+    <b>let</b> ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(<b>to</b>, token)];
     <b>let</b> pending_balance =
         <a href="confidential_balance.md#0x7_confidential_balance_decompress_balance">confidential_balance::decompress_balance</a>(&ca_store.pending_balance);
 
@@ -1885,8 +1875,7 @@ Withdrawals are always allowed, regardless of the token allow status.
 
     <b>let</b> sender_ek = <a href="confidential_asset.md#0x7_confidential_asset_encryption_key">encryption_key</a>(from, token);
 
-    <b>let</b> ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(from, token)];
+    <b>let</b> ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(from, token)];
     <b>let</b> current_balance =
         <a href="confidential_balance.md#0x7_confidential_balance_decompress_balance">confidential_balance::decompress_balance</a>(&ca_store.actual_balance);
 
@@ -1958,8 +1947,7 @@ Implementation of the <code>confidential_transfer</code> entry function.
     <b>let</b> sender_ek = <a href="confidential_asset.md#0x7_confidential_asset_encryption_key">encryption_key</a>(from, token);
     <b>let</b> recipient_ek = <a href="confidential_asset.md#0x7_confidential_asset_encryption_key">encryption_key</a>(<b>to</b>, token);
 
-    <b>let</b> sender_ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(from, token)];
+    <b>let</b> sender_ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(from, token)];
 
     <b>let</b> sender_current_actual_balance =
         <a href="confidential_balance.md#0x7_confidential_balance_decompress_balance">confidential_balance::decompress_balance</a>(&sender_ca_store.actual_balance);
@@ -1984,8 +1972,7 @@ Implementation of the <code>confidential_transfer</code> entry function.
     // Cannot create multiple mutable references <b>to</b> the same type, so we need <b>to</b> drop it
     <b>let</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a> { .. } = sender_ca_store;
 
-    <b>let</b> recipient_ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(<b>to</b>, token)];
+    <b>let</b> recipient_ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(<b>to</b>, token)];
 
     <b>assert</b>!(
         recipient_ca_store.pending_counter &lt; <a href="confidential_asset.md#0x7_confidential_asset_MAX_TRANSFERS_BEFORE_ROLLOVER">MAX_TRANSFERS_BEFORE_ROLLOVER</a>,
@@ -2039,8 +2026,7 @@ Implementation of the <code>rotate_encryption_key</code> entry function.
     <b>let</b> user = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>let</b> current_ek = <a href="confidential_asset.md#0x7_confidential_asset_encryption_key">encryption_key</a>(user, token);
 
-    <b>let</b> ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
+    <b>let</b> ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
 
     <b>let</b> pending_balance =
         <a href="confidential_balance.md#0x7_confidential_balance_decompress_balance">confidential_balance::decompress_balance</a>(&ca_store.pending_balance);
@@ -2099,8 +2085,7 @@ Implementation of the <code>normalize</code> entry function.
     <b>let</b> user = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>let</b> sender_ek = <a href="confidential_asset.md#0x7_confidential_asset_encryption_key">encryption_key</a>(user, token);
 
-    <b>let</b> ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
+    <b>let</b> ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
 
     <b>assert</b>!(!ca_store.normalized, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_EALREADY_NORMALIZED">EALREADY_NORMALIZED</a>));
 
@@ -2149,8 +2134,7 @@ Implementation of the <code>rollover_pending_balance</code> entry function.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>let</b> ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
+    <b>let</b> ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
 
     <b>assert</b>!(ca_store.normalized, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_ENORMALIZATION_REQUIRED">ENORMALIZATION_REQUIRED</a>));
 
@@ -2198,8 +2182,7 @@ Implementation of the <code>freeze_token</code> entry function.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>let</b> ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
+    <b>let</b> ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
 
     <b>assert</b>!(!ca_store.frozen, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_EALREADY_FROZEN">EALREADY_FROZEN</a>));
 
@@ -2237,8 +2220,7 @@ Implementation of the <code>unfreeze_token</code> entry function.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>let</b> ca_store =
-        &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
+    <b>let</b> ca_store = &<b>mut</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>[<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)];
 
     <b>assert</b>!(ca_store.frozen, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_ENOT_FROZEN">ENOT_FROZEN</a>));
 
@@ -2305,7 +2287,9 @@ Returns an object for handling all the FA primary stores, and returns a signer f
 
 
 <pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_fa_store_signer">get_fa_store_signer</a>(): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(&<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>[@aptos_experimental].extend_ref)
+    <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(
+        &<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>[@aptos_experimental].extend_ref
+    )
 }
 </code></pre>
 
@@ -2539,9 +2523,11 @@ Otherwise, returns <code><b>true</b></code>.
     auditor_amounts: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">confidential_balance::ConfidentialBalance</a>&gt;,
     proof: &TransferProof
 ): bool {
-    <b>if</b> (!auditor_amounts.all(|auditor_amount| {
-        <a href="confidential_balance.md#0x7_confidential_balance_balance_c_equals">confidential_balance::balance_c_equals</a>(transfer_amount, auditor_amount)
-    })) {
+    <b>if</b> (!auditor_amounts.all(
+        |auditor_amount| {
+            <a href="confidential_balance.md#0x7_confidential_balance_balance_c_equals">confidential_balance::balance_c_equals</a>(transfer_amount, auditor_amount)
+        }
+    )) {
         <b>return</b> <b>false</b>
     };
 
@@ -2598,11 +2584,13 @@ Returns <code>Some(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib
 
     <b>let</b> auditors_count = auditor_eks_bytes.length() / 32;
 
-    <b>let</b> auditor_eks = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, auditors_count).map(|i| {
-        twisted_elgamal::new_pubkey_from_bytes(
-            auditor_eks_bytes.slice(i * 32, (i + 1) * 32)
-        )
-    });
+    <b>let</b> auditor_eks = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, auditors_count).map(
+        |i| {
+            twisted_elgamal::new_pubkey_from_bytes(
+                auditor_eks_bytes.slice(i * 32, (i + 1) * 32)
+            )
+        }
+    );
 
     <b>if</b> (auditor_eks.<a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a>(|ek| ek.is_none())) {
         <b>return</b> std::option::none()
@@ -2642,11 +2630,13 @@ Returns <code>Some(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib
 
     <b>let</b> auditors_count = auditor_amounts_bytes.length() / 256;
 
-    <b>let</b> auditor_amounts = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, auditors_count).map(|i| {
-        <a href="confidential_balance.md#0x7_confidential_balance_new_pending_balance_from_bytes">confidential_balance::new_pending_balance_from_bytes</a>(
-            auditor_amounts_bytes.slice(i * 256, (i + 1) * 256)
-        )
-    });
+    <b>let</b> auditor_amounts = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, auditors_count).map(
+        |i| {
+            <a href="confidential_balance.md#0x7_confidential_balance_new_pending_balance_from_bytes">confidential_balance::new_pending_balance_from_bytes</a>(
+                auditor_amounts_bytes.slice(i * 256, (i + 1) * 256)
+            )
+        }
+    );
 
     <b>if</b> (auditor_amounts.<a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a>(|ek| ek.is_none())) {
         <b>return</b> std::option::none()
@@ -2679,7 +2669,8 @@ Returns <code>Some(Object&lt;Metadata&gt;)</code> if user has a suffucient amoun
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_ensure_sufficient_fa">ensure_sufficient_fa</a>&lt;CoinType&gt;(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64): Option&lt;Object&lt;Metadata&gt;&gt; {
+<pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_ensure_sufficient_fa">ensure_sufficient_fa</a>&lt;CoinType&gt;(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64)
+    : Option&lt;Object&lt;Metadata&gt;&gt; {
     <b>let</b> user = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>let</b> fa = <a href="../../aptos-framework/doc/coin.md#0x1_coin_paired_metadata">coin::paired_metadata</a>&lt;CoinType&gt;();
 

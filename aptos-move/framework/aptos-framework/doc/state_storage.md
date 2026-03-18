@@ -103,7 +103,8 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<pre><code><b>struct</b> <a href="state_storage.md#0x1_state_storage_GasParameter">GasParameter</a> <b>has</b> store, key
+<pre><code>#[deprecated]
+<b>struct</b> <a href="state_storage.md#0x1_state_storage_GasParameter">GasParameter</a> <b>has</b> store, key
 </code></pre>
 
 
@@ -153,7 +154,7 @@ usage after the last txn of the previous epoch is committed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>friend</b> <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>assert</b>!(
         !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
@@ -188,12 +189,12 @@ usage after the last txn of the previous epoch is committed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_new_block">on_new_block</a>(epoch: u64) <b>acquires</b> <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> {
+<pre><code><b>friend</b> <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_new_block">on_new_block</a>(epoch: u64) {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
     );
-    <b>let</b> usage = <b>borrow_global_mut</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+    <b>let</b> usage = &<b>mut</b> <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>[@aptos_framework];
     <b>if</b> (epoch != usage.epoch) {
         usage.epoch = epoch;
         usage.usage = <a href="state_storage.md#0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning">get_state_storage_usage_only_at_epoch_beginning</a>();
@@ -220,12 +221,12 @@ usage after the last txn of the previous epoch is committed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_current_items_and_bytes">current_items_and_bytes</a>(): (u64, u64) <b>acquires</b> <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> {
+<pre><code><b>friend</b> <b>fun</b> <a href="state_storage.md#0x1_state_storage_current_items_and_bytes">current_items_and_bytes</a>(): (u64, u64) {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
     );
-    <b>let</b> usage = <b>borrow_global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+    <b>let</b> usage = &<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>[@aptos_framework];
     (usage.usage.items, usage.usage.bytes)
 }
 </code></pre>
@@ -266,7 +267,8 @@ guarantees a fresh state view then.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>()
+<pre><code>#[deprecated]
+<b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>()
 </code></pre>
 
 
@@ -275,7 +277,7 @@ guarantees a fresh state view then.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>() {
+<pre><code><b>friend</b> <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>() {
     <b>abort</b> 0
 }
 </code></pre>
@@ -442,7 +444,8 @@ aborts if StateStorageUsage already exists.
 ### Function `on_reconfig`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>()
+<pre><code>#[deprecated]
+<b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>()
 </code></pre>
 
 

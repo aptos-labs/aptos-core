@@ -32,9 +32,9 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_id_generation.md#0x7_order_id_generation_next_order_id">next_order_id</a>(): OrderId {
     // reverse bits <b>to</b> make order ids random, so indices on top of them are shuffled.
-    new_order_id_type(<a href="order_id_generation.md#0x7_order_id_generation_reverse_bits">reverse_bits</a>(
-        <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>()
-    ))
+    new_order_id_type(
+        <a href="order_id_generation.md#0x7_order_id_generation_reverse_bits">reverse_bits</a>(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>())
+    )
 }
 </code></pre>
 

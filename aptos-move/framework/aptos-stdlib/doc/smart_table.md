@@ -327,7 +327,7 @@ dynamically assgined by the contract code.
 ): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt; {
     <b>assert</b>!(split_load_threshold &lt;= 100, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EINVALID_LOAD_THRESHOLD_PERCENT">EINVALID_LOAD_THRESHOLD_PERCENT</a>));
     <b>let</b> buckets = <a href="table_with_length.md#0x1_table_with_length_new">table_with_length::new</a>();
-    buckets.<a href="smart_table.md#0x1_smart_table_add">add</a>(0, <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>());
+    buckets.<a href="smart_table.md#0x1_smart_table_add">add</a>(0, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
     <b>let</b> <a href="table.md#0x1_table">table</a> = <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a> {
         buckets,
         num_buckets: 1,
@@ -427,7 +427,7 @@ Clear a table completely when T has <code>drop</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_clear">clear</a>&lt;K: drop, V: drop&gt;(self: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;) {
-    *self.buckets.<a href="smart_table.md#0x1_smart_table_borrow_mut">borrow_mut</a>(0) = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    *self.buckets.<a href="smart_table.md#0x1_smart_table_borrow_mut">borrow_mut</a>(0) = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     for (i in 1..self.num_buckets) {
         self.buckets.<a href="smart_table.md#0x1_smart_table_remove">remove</a>(i);
     };
@@ -467,10 +467,7 @@ Note: This method may occasionally cost much more gas when triggering bucket spl
     <b>let</b> bucket = self.buckets.<a href="smart_table.md#0x1_smart_table_borrow_mut">borrow_mut</a>(index);
     // We set a per-bucket limit here <b>with</b> a upper bound (10000) that nobody should normally reach.
     <b>assert</b>!(bucket.<a href="smart_table.md#0x1_smart_table_length">length</a>() &lt;= 10000, <a href="../../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="smart_table.md#0x1_smart_table_EEXCEED_MAX_BUCKET_SIZE">EEXCEED_MAX_BUCKET_SIZE</a>));
-    <b>assert</b>!(bucket.all(| entry | {
-        <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = entry;
-        &e.key != &key
-    }), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EALREADY_EXIST">EALREADY_EXIST</a>));
+    <b>assert</b>!(bucket.all(| entry | &entry.key != &key), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EALREADY_EXIST">EALREADY_EXIST</a>));
     <b>let</b> e = <a href="smart_table.md#0x1_smart_table_Entry">Entry</a> { <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>, key, value };
     <b>if</b> (self.target_bucket_size == 0) {
         <b>let</b> estimated_entry_size = max(size_of_val(&e), 1);

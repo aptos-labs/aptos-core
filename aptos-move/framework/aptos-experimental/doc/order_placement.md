@@ -176,15 +176,6 @@ TimeBased(time): The order is triggered when the current time is greater than or
 ## Constants
 
 
-<a id="0x7_order_placement_U64_MAX"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_U64_MAX">U64_MAX</a>: u64 = 18446744073709551615;
-</code></pre>
-
-
-
 <a id="0x7_order_placement_ECLEARINGHOUSE_SETTLEMENT_VIOLATION"></a>
 
 
@@ -221,6 +212,15 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 
+<a id="0x7_order_placement_U64_MAX"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_U64_MAX">U64_MAX</a>: u64 = 18446744073709551615;
+</code></pre>
+
+
+
 <a id="0x7_order_placement_destroy_order_match_result"></a>
 
 ## Function `destroy_order_match_result`
@@ -238,7 +238,14 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_destroy_order_match_result">destroy_order_match_result</a>&lt;R: store + <b>copy</b> + drop&gt;(
     self: <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R&gt;
-): (OrderId, u64, Option&lt;OrderCancellationReason&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, u32) {
+): (
+    OrderId,
+    u64,
+    Option&lt;OrderCancellationReason&gt;,
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;,
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    u32
+) {
     <b>let</b> OrderMatchResult::V1 {
         order_id,
         remaining_size,
@@ -513,7 +520,9 @@ Includes fills and cancels
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_get_order_id">get_order_id</a>&lt;R: store + <b>copy</b> + drop&gt;(self: <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R&gt;): OrderId {
+<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_get_order_id">get_order_id</a>&lt;R: store + <b>copy</b> + drop&gt;(
+    self: <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R&gt;
+): OrderId {
     self.order_id
 }
 </code></pre>
@@ -632,9 +641,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     <a href="order_placement.md#0x7_order_placement_place_order_with_order_id">place_order_with_order_id</a>(
         market,
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user),
-        <b>if</b> (is_bid) {
-            <a href="order_placement.md#0x7_order_placement_U64_MAX">U64_MAX</a>
-        } <b>else</b> { 1 },
+        <b>if</b> (is_bid) { <a href="order_placement.md#0x7_order_placement_U64_MAX">U64_MAX</a> }
+        <b>else</b> { 1 },
         orig_size,
         orig_size,
         is_bid,
@@ -878,7 +886,10 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
     // Emit <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> <b>with</b> the cancelled price level
     <b>let</b> (
-        modified_order_request, _order_id, _unique_priority_idx, _creation_time_micros
+        modified_order_request,
+        _order_id,
+        _unique_priority_idx,
+        _creation_time_micros
     ) = modified_order.destroy_bulk_order();
     <b>let</b> (
         _account,
@@ -898,9 +909,13 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         cancelled_ask_sizes
     ) =
         <b>if</b> (is_bid) {
-            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[price], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[cancelled_size], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[])
+            (
+                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[price], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[cancelled_size], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]
+            )
         } <b>else</b> {
-            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[price], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[cancelled_size])
+            (
+                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[price], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[cancelled_size]
+            )
         };
 
     market.emit_event_for_bulk_order_modified(

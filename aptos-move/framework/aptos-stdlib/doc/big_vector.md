@@ -364,7 +364,7 @@ This operation will cost more gas when it adds new bucket.
 <pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_push_back">push_back</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a>&lt;T&gt;, val: T) {
     <b>let</b> num_buckets = self.buckets.<a href="big_vector.md#0x1_big_vector_length">length</a>();
     <b>if</b> (self.end_index == num_buckets * self.bucket_size) {
-        self.buckets.add(num_buckets, <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>());
+        self.buckets.add(num_buckets, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
         self.buckets.<a href="big_vector.md#0x1_big_vector_borrow_mut">borrow_mut</a>(num_buckets).<a href="big_vector.md#0x1_big_vector_push_back">push_back</a>(val);
     } <b>else</b> {
         self.buckets.<a href="big_vector.md#0x1_big_vector_borrow_mut">borrow_mut</a>(num_buckets - 1).<a href="big_vector.md#0x1_big_vector_push_back">push_back</a>(val);
@@ -641,14 +641,12 @@ Disclaimer: This function is costly. Use it at your own discretion.
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_index_of">index_of</a>&lt;T&gt;(self: &<a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a>&lt;T&gt;, val: &T): (bool, u64) {
     <b>let</b> num_buckets = self.buckets.<a href="big_vector.md#0x1_big_vector_length">length</a>();
-    <b>let</b> bucket_index = 0;
-    <b>while</b> (bucket_index &lt; num_buckets) {
+    for (bucket_index in 0..num_buckets) {
         <b>let</b> cur = self.buckets.<a href="big_vector.md#0x1_big_vector_borrow">borrow</a>(bucket_index);
         <b>let</b> (found, i) = cur.<a href="big_vector.md#0x1_big_vector_index_of">index_of</a>(val);
         <b>if</b> (found) {
             <b>return</b> (<b>true</b>, bucket_index * self.bucket_size + i)
         };
-        bucket_index += 1;
     };
     (<b>false</b>, 0)
 }

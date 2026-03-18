@@ -5158,7 +5158,6 @@ Deposit the token balance into the recipients account and emit an event.
 
 <pre><code><b>fun</b> <a href="token.md#0x3_token_assert_non_standard_reserved_property">assert_non_standard_reserved_property</a>(keys: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;) {
     keys.for_each_ref(|key| {
-        <b>let</b> key: &String = key;
         <b>let</b> length = key.length();
         <b>if</b> (length &gt;= 6) {
             <b>let</b> prefix = key.sub_string(0, 6);

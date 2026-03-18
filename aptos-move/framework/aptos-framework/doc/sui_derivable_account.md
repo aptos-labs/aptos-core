@@ -601,8 +601,8 @@ to a tuple of (signing_scheme, signature, public_key)
     <b>assert</b>!(bytes.length() == 97, <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNATURE_LENGTH">EINVALID_SIGNATURE_LENGTH</a>);
 
     <b>let</b> signing_scheme = bytes[0];
-    <b>let</b> abstract_signature_signature = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    <b>let</b> abstract_signature_public_key = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
+    <b>let</b> abstract_signature_signature = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;[];
+    <b>let</b> abstract_signature_public_key = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;[];
 
     // Extract signature (64 bytes)
     <b>let</b> i = 1;
@@ -651,8 +651,7 @@ Derives the account address from the public key and returns it is a hex string w
 
     // Convert the <b>address</b> bytes <b>to</b> a hex <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a> <b>with</b> "0x" prefix
     <b>let</b> sui_account_address_hex = b"0x";
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; sui_account_address.length()) {
+    for (i in 0..(sui_account_address.length())) {
         <b>let</b> byte = sui_account_address[i];
         // Convert each byte <b>to</b> two hex characters
         <b>let</b> hex_chars = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
@@ -660,7 +659,6 @@ Derives the account address from the public key and returns it is a hex string w
             <b>if</b> ((byte & 0xf) &lt; 10) ((byte & 0xf) + 0x30) <b>else</b> ((byte & 0xf) - 10 + 0x61)
         ];
         sui_account_address_hex.append(hex_chars);
-        i += 1;
     };
 
     // Return the <a href="account.md#0x1_account">account</a> <b>address</b> <b>as</b> hex <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a>

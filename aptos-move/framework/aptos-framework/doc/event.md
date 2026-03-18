@@ -155,7 +155,7 @@ Use EventHandleGenerator to generate a unique event handle for <code>sig</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="event.md#0x1_event_new_event_handle">new_event_handle</a>&lt;T: drop + store&gt;(<a href="guid.md#0x1_guid">guid</a>: GUID): <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="event.md#0x1_event_new_event_handle">new_event_handle</a>&lt;T: drop + store&gt;(<a href="guid.md#0x1_guid">guid</a>: GUID): <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; {
     <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; {
         counter: 0,
         <a href="guid.md#0x1_guid">guid</a>,

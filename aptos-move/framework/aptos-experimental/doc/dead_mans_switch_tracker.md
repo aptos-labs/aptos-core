@@ -591,8 +591,10 @@ if (!is_valid) {
     <b>let</b> removed = tracker.state.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
     <b>let</b> was_registered = removed.is_some();
     <b>if</b> (was_registered) {
-        <b>let</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAliveState">KeepAliveState</a> { session_start_time_secs: _, expiration_time_secs: _ } =
-            removed.destroy_some();
+        <b>let</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_KeepAliveState">KeepAliveState</a> {
+            session_start_time_secs: _,
+            expiration_time_secs: _
+        } = removed.destroy_some();
     } <b>else</b> {
         removed.destroy_none();
     };

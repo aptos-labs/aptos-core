@@ -231,19 +231,10 @@ There is a code bug that breaks internal invariant
 
 <a id="0x7_price_time_index_SLIPPAGE_PCT_PRECISION"></a>
 
-
-
-<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_SLIPPAGE_PCT_PRECISION">SLIPPAGE_PCT_PRECISION</a>: u64 = 100;
-</code></pre>
-
-
-
-<a id="0x7_price_time_index_U64_MAX"></a>
-
 ========= Active OrderBook ===========
 
 
-<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_U64_MAX">U64_MAX</a>: u64 = 18446744073709551615;
+<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_SLIPPAGE_PCT_PRECISION">SLIPPAGE_PCT_PRECISION</a>: u64 = 100;
 </code></pre>
 
 
@@ -541,9 +532,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
             cur_value.size
         } <b>else</b> {
             <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-                orders,
-                &cur_key,
-                |order_data| {
+                orders, &cur_key, |order_data| {
                     order_data.size -= remaining_size;
                 }
             );
@@ -674,10 +663,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_result">get_single_match_result</a>(
-    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
-    price: u64,
-    size: u64,
-    is_bid: bool
+    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, price: u64, size: u64, is_bid: bool
 ): ActiveMatchedOrder {
     <b>if</b> (is_bid) {
         self.<a href="price_time_index.md#0x7_price_time_index_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(price, size)
@@ -720,18 +706,14 @@ Increase the size of the order in the orderbook without altering its position in
             tie_breaker: unique_priority_idx.into_decreasing_idx_type()
         };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.buys,
-            &key,
-            |order_data| {
+            &<b>mut</b> self.buys, &key, |order_data| {
                 order_data.size += size_delta;
             }
         );
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.sells,
-            &key,
-            |order_data| {
+            &<b>mut</b> self.sells, &key, |order_data| {
                 order_data.size += size_delta;
             }
         );
@@ -772,18 +754,14 @@ Decrease the size of the order in the order book without altering its position i
             tie_breaker: unique_priority_idx.into_decreasing_idx_type()
         };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.buys,
-            &key,
-            |order_data| {
+            &<b>mut</b> self.buys, &key, |order_data| {
                 order_data.size -= size_delta;
             }
         );
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.sells,
-            &key,
-            |order_data| {
+            &<b>mut</b> self.sells, &key, |order_data| {
                 order_data.size -= size_delta;
             }
         );

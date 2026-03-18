@@ -213,7 +213,7 @@ Returns self + y. The result cannot be greater than MAX_U128.
     <b>let</b> y_raw = y.<a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>();
     <b>let</b> result = (x_raw <b>as</b> u256) + (y_raw <b>as</b> u256);
     <b>assert</b>!(result &lt;= <a href="fixed_point64.md#0x1_fixed_point64_MAX_U128">MAX_U128</a>, <a href="fixed_point64.md#0x1_fixed_point64_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>);
-    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">create_from_raw_value</a>((result <b>as</b> u128))
+    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">create_from_raw_value</a>(result <b>as</b> u128)
 }
 </code></pre>
 
@@ -249,7 +249,7 @@ overflows.
     <b>let</b> product = unscaled_product &gt;&gt; 64;
     // Check whether the value is too large.
     <b>assert</b>!(product &lt;= <a href="fixed_point64.md#0x1_fixed_point64_MAX_U128">MAX_U128</a>, <a href="fixed_point64.md#0x1_fixed_point64_EMULTIPLICATION">EMULTIPLICATION</a>);
-    (product <b>as</b> u128)
+    product <b>as</b> u128
 }
 </code></pre>
 
@@ -286,7 +286,7 @@ is zero or if the quotient overflows.
     <b>assert</b>!(quotient &lt;= <a href="fixed_point64.md#0x1_fixed_point64_MAX_U128">MAX_U128</a>, <a href="fixed_point64.md#0x1_fixed_point64_EDIVISION">EDIVISION</a>);
     // the value may be too large, which will cause the cast <b>to</b> fail
     // <b>with</b> an arithmetic <a href="../../move-stdlib/doc/error.md#0x1_error">error</a>.
-    (quotient <b>as</b> u128)
+    quotient <b>as</b> u128
 }
 </code></pre>
 

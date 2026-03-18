@@ -954,7 +954,7 @@ this proposal.
     expiration_secs: u64,
     early_resolution_vote_threshold: Option&lt;u128&gt;,
     metadata: SimpleMap&lt;String, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
-): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): u64 {
     <a href="voting.md#0x1_voting_create_proposal_v2">create_proposal_v2</a>(
         proposer,
         voting_forum_address,
@@ -1011,7 +1011,7 @@ resolve this proposal.
     early_resolution_vote_threshold: Option&lt;u128&gt;,
     metadata: SimpleMap&lt;String, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     is_multi_step_proposal: bool,
-): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): u64 {
     <b>if</b> (early_resolution_vote_threshold.is_some()) {
         <b>assert</b>!(
             min_vote_threshold &lt;= *early_resolution_vote_threshold.borrow(),
@@ -1102,7 +1102,7 @@ This guarantees that voting eligibility and voting power are controlled by the r
     proposal_id: u64,
     num_votes: u64,
     should_pass: bool,
-) <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+) {
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>let</b> proposal = voting_forum.proposals.borrow_mut(proposal_id);
     // Voting might still be possible after the proposal <b>has</b> enough yes votes <b>to</b> be resolved early. This would only
@@ -1120,9 +1120,9 @@ This guarantees that voting eligibility and voting power are controlled by the r
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EMULTI_STEP_PROPOSAL_IN_EXECUTION">EMULTI_STEP_PROPOSAL_IN_EXECUTION</a>));
 
     <b>if</b> (should_pass) {
-        proposal.yes_votes += (num_votes <b>as</b> u128);
+        proposal.yes_votes += num_votes <b>as</b> u128;
     } <b>else</b> {
-        proposal.no_votes += (num_votes <b>as</b> u128);
+        proposal.no_votes += num_votes <b>as</b> u128;
     };
 
     // Record the resolvable time <b>to</b> ensure that resolution <b>has</b> <b>to</b> be done non-atomically.
@@ -1161,7 +1161,7 @@ Common checks on if a proposal is resolvable, regardless if the proposal is sing
 <pre><code><b>fun</b> <a href="voting.md#0x1_voting_is_proposal_resolvable">is_proposal_resolvable</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-) <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+) {
     <b>let</b> proposal_state = <a href="voting.md#0x1_voting_get_proposal_state">get_proposal_state</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     <b>assert</b>!(proposal_state == <a href="voting.md#0x1_voting_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_CANNOT_BE_RESOLVED">EPROPOSAL_CANNOT_BE_RESOLVED</a>));
 
@@ -1208,7 +1208,7 @@ there are more yes votes than no. If either of these conditions is not met, this
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_resolve">resolve</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): ProposalType <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): ProposalType {
     <a href="voting.md#0x1_voting_is_proposal_resolvable">is_proposal_resolvable</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
 
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
@@ -1273,7 +1273,7 @@ there are more yes votes than no. If either of these conditions is not met, this
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
     next_execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-) <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+) {
     <a href="voting.md#0x1_voting_is_proposal_resolvable">is_proposal_resolvable</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
 
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
@@ -1353,7 +1353,7 @@ Return the next unassigned proposal id
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_next_proposal_id">next_proposal_id</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, ): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_next_proposal_id">next_proposal_id</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, ): u64 {
     <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     voting_forum.next_proposal_id
 }
@@ -1382,7 +1382,7 @@ Return the next unassigned proposal id
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposer">get_proposer</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64
-): <b>address</b> <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): <b>address</b> {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.proposer
 }
@@ -1411,7 +1411,7 @@ Return the next unassigned proposal id
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_voting_closed">is_voting_closed</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64
-): bool <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): bool {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     <a href="voting.md#0x1_voting_can_be_resolved_early">can_be_resolved_early</a>(proposal) || <a href="voting.md#0x1_voting_is_voting_period_over">is_voting_period_over</a>(proposal)
 }
@@ -1471,7 +1471,7 @@ Return true if the proposal has reached early resolution threshold (if specified
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_metadata">get_proposal_metadata</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): SimpleMap&lt;String, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): SimpleMap&lt;String, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.metadata
 }
@@ -1501,7 +1501,7 @@ Return true if the proposal has reached early resolution threshold (if specified
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
     metadata_key: String,
-): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     *proposal.metadata.borrow(&metadata_key)
 }
@@ -1535,7 +1535,7 @@ Return the state of the proposal with given id.
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_state">get_proposal_state</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): u64 {
     <b>if</b> (<a href="voting.md#0x1_voting_is_voting_closed">is_voting_closed</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id)) {
         <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
         <b>let</b> yes_votes = proposal.yes_votes;
@@ -1576,7 +1576,7 @@ Return the proposal's creation time.
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_creation_secs">get_proposal_creation_secs</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): u64 {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.creation_time_secs
 }
@@ -1606,7 +1606,7 @@ Return the proposal's expiration time.
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_expiration_secs">get_proposal_expiration_secs</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): u64 {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.expiration_secs
 }
@@ -1636,7 +1636,7 @@ Return the proposal's execution hash.
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_execution_hash">get_execution_hash</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.execution_hash
 }
@@ -1666,7 +1666,7 @@ Return the proposal's minimum vote threshold
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_min_vote_threshold">get_min_vote_threshold</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): u128 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): u128 {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.min_vote_threshold
 }
@@ -1696,7 +1696,7 @@ Return the proposal's early resolution minimum vote threshold (optionally set)
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_early_resolution_vote_threshold">get_early_resolution_vote_threshold</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): Option&lt;u128&gt; <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): Option&lt;u128&gt; {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.early_resolution_vote_threshold
 }
@@ -1726,7 +1726,7 @@ Return the proposal's current vote count (yes_votes, no_votes)
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_votes">get_votes</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): (u128, u128) <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): (u128, u128) {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     (proposal.yes_votes, proposal.no_votes)
 }
@@ -1756,7 +1756,7 @@ Return true if the governance proposal has already been resolved.
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_resolved">is_resolved</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): bool <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): bool {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.is_resolved
 }
@@ -1785,7 +1785,7 @@ Return true if the governance proposal has already been resolved.
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_resolution_time_secs">get_resolution_time_secs</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): u64 {
     <b>let</b> proposal = <a href="voting.md#0x1_voting_get_proposal">get_proposal</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
     proposal.resolution_time_secs
 }
@@ -1815,7 +1815,7 @@ Return true if the multi-step governance proposal is in execution.
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_multi_step_proposal_in_execution">is_multi_step_proposal_in_execution</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): bool <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): bool {
     <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>let</b> proposal = voting_forum.proposals.borrow(proposal_id);
     <b>let</b> is_multi_step_in_execution_key = utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
@@ -2031,7 +2031,7 @@ Return true if the voting period of the given proposal has already ended.
     <b>let</b> proposal_id = voting_forum.next_proposal_id;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals,proposal_id);
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(early_resolution_vote_threshold) && min_vote_threshold &gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(early_resolution_vote_threshold);
+    <b>aborts_if</b> early_resolution_vote_threshold.is_some() && min_vote_threshold &gt; early_resolution_vote_threshold.borrow();
     <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
     <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
     <b>aborts_if</b> len(execution_hash) == 0;
@@ -2161,9 +2161,9 @@ Return true if the voting period of the given proposal has already ended.
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> post_proposal.is_resolved == <b>true</b>;
 <b>ensures</b> post_proposal.resolution_time_secs == <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
-<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(proposal.execution_content);
-<b>ensures</b> result == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(proposal.execution_content);
-<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(post_proposal.execution_content);
+<b>aborts_if</b> proposal.execution_content.is_none();
+<b>ensures</b> result == proposal.execution_content.borrow();
+<b>ensures</b> post_proposal.execution_content.is_none();
 </code></pre>
 
 
@@ -2304,8 +2304,8 @@ Return true if the voting period of the given proposal has already ended.
 
 
 <pre><code><b>fun</b> <a href="voting.md#0x1_voting_spec_can_be_resolved_early">spec_can_be_resolved_early</a>&lt;ProposalType: store&gt;(proposal: <a href="voting.md#0x1_voting_Proposal">Proposal</a>&lt;ProposalType&gt;): bool {
-   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold)) {
-       <b>let</b> early_resolution_threshold = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(proposal.early_resolution_vote_threshold);
+   <b>if</b> (proposal.early_resolution_vote_threshold.is_some()) {
+       <b>let</b> early_resolution_threshold = proposal.early_resolution_vote_threshold.borrow();
        <b>if</b> (proposal.yes_votes &gt;= early_resolution_threshold || proposal.no_votes &gt;= early_resolution_threshold) {
            <b>true</b>
        } <b>else</b>{

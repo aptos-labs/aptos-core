@@ -19,7 +19,8 @@
 
 
 
-<pre><code><b>struct</b> <a href="test_function_values.md#0x7_test_function_values_Funcs">Funcs</a>
+<pre><code>#[deprecated]
+<b>struct</b> <a href="test_function_values.md#0x7_test_function_values_Funcs">Funcs</a>
 </code></pre>
 
 
@@ -46,7 +47,8 @@
 
 
 
-<pre><code><b>fun</b> <a href="test_function_values.md#0x7_test_function_values_transfer_and_create_account">transfer_and_create_account</a>(some_f: |u64|u64): u64
+<pre><code>#[deprecated]
+<b>fun</b> <a href="test_function_values.md#0x7_test_function_values_transfer_and_create_account">transfer_and_create_account</a>(some_f: |u64|u64): u64
 </code></pre>
 
 
@@ -55,7 +57,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="test_function_values.md#0x7_test_function_values_transfer_and_create_account">transfer_and_create_account</a>(some_f: |u64|u64): u64 {
+<pre><code><b>fun</b> <a href="test_function_values.md#0x7_test_function_values_transfer_and_create_account">transfer_and_create_account</a>(some_f: |u64| u64): u64 {
     some_f(3)
 }
 </code></pre>

@@ -51,7 +51,7 @@ Entry function payload is missing.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_network_name">network_name</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_network_name">network_name</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> <a href="chain_id.md#0x1_chain_id">chain_id</a> = <a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>();
     <b>if</b> (<a href="chain_id.md#0x1_chain_id">chain_id</a> == 1) {
         b"mainnet"
@@ -87,7 +87,7 @@ Entry function payload is missing.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_entry_function_name">entry_function_name</a>(entry_function_payload: &EntryFunctionPayload): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_entry_function_name">entry_function_name</a>(entry_function_payload: &EntryFunctionPayload): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> entry_function_name = &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> addr_str = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(
         &<a href="transaction_context.md#0x1_transaction_context_account_address">transaction_context::account_address</a>(entry_function_payload)
@@ -125,7 +125,7 @@ Entry function payload is missing.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_construct_message">construct_message</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_construct_message">construct_message</a>(
     chain_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     account_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
@@ -174,7 +174,7 @@ Entry function payload is missing.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) inline <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_daa_authenticate">daa_authenticate</a>(
+<pre><code><b>friend</b> inline <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_daa_authenticate">daa_authenticate</a>(
     <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     aa_auth_data: AbstractionAuthData,
     auth_fn: |AbstractionAuthData, &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;|,

@@ -203,7 +203,7 @@ is zero or if the quotient overflows.
     <b>assert</b>!(quotient &lt;= <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_EDIVISION">EDIVISION</a>);
     // the value may be too large, which will cause the cast <b>to</b> fail
     // <b>with</b> an arithmetic <a href="error.md#0x1_error">error</a>.
-    (quotient <b>as</b> u64)
+    quotient <b>as</b> u64
 }
 </code></pre>
 

@@ -788,7 +788,7 @@ Return the number of coins <code>shares</code> are worth in <code>self</code> wi
         // Shares price = total_coins / total existing shares.
         // Shares worth = shares * shares price = shares * total_coins / total existing shares.
         // We rearrange the calc and do multiplication first <b>to</b> avoid rounding errors.
-        (self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(shares, total_coins <b>as</b> u128, self.total_shares) <b>as</b> u64)
+        self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(shares, total_coins <b>as</b> u128, self.total_shares) <b>as</b> u64
     }
 }
 </code></pre>
@@ -822,7 +822,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
     <b>if</b> (self.total_coins == 0 || total_shares == 0) {
         0
     } <b>else</b> {
-        (self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(shares, total_coins <b>as</b> u128, total_shares) <b>as</b> u64)
+        self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(shares, total_coins <b>as</b> u128, total_shares) <b>as</b> u64
     }
 }
 </code></pre>

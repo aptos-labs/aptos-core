@@ -120,9 +120,7 @@ Returns:
             response.destroy_bulk_order_place_response_rejection();
         // Emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
         market.emit_event_for_bulk_order_rejection(
-            rejected_account,
-            rejected_seq_num,
-            existing_seq_num
+            rejected_account, rejected_seq_num, existing_seq_num
         );
         // Return None since the order was rejected
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -137,8 +135,9 @@ Returns:
         cancelled_ask_sizes,
         previous_seq_num_option
     ) = response.destroy_bulk_order_place_response_success();
-    <b>let</b> (order_request, order_id, _unique_priority_idx, _creation_time_micros) =
-        bulk_order.destroy_bulk_order();
+    <b>let</b> (
+        order_request, order_id, _unique_priority_idx, _creation_time_micros
+    ) = bulk_order.destroy_bulk_order();
     <b>let</b> (
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         order_sequence_number,
@@ -255,8 +254,9 @@ Parameters:
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> cancelled_bulk_order = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>(user);
-    <b>let</b> (order_request, order_id, _unique_priority_idx, _creation_time_micros) =
-        cancelled_bulk_order.destroy_bulk_order();
+    <b>let</b> (
+        order_request, order_id, _unique_priority_idx, _creation_time_micros
+    ) = cancelled_bulk_order.destroy_bulk_order();
     <b>let</b> (
         _account,
         order_sequence_number,

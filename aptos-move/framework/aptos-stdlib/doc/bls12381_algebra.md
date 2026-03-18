@@ -89,7 +89,8 @@ The finite field $F_{q^12}$ used in BLS12-381 curves,
 which is an extension field of <code>Fq6</code> (defined in the module documentation), constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_Fq12">Fq12</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_Fq12">Fq12</a>
 </code></pre>
 
 
@@ -123,7 +124,8 @@ which is a concatenation of its coefficients serialized, with the least signific
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatFq12LscLsb">FormatFq12LscLsb</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatFq12LscLsb">FormatFq12LscLsb</a>
 </code></pre>
 
 
@@ -154,7 +156,8 @@ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 (so <code><a href="bls12381_algebra.md#0x1_bls12381_algebra_Fr">Fr</a></code> is the associated scalar field).
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_G1">G1</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_G1">G1</a>
 </code></pre>
 
 
@@ -204,7 +207,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatG1Uncompr">FormatG1Uncompr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatG1Uncompr">FormatG1Uncompr</a>
 </code></pre>
 
 
@@ -256,7 +260,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatG1Compr">FormatG1Compr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatG1Compr">FormatG1Compr</a>
 </code></pre>
 
 
@@ -287,7 +292,8 @@ It is a subgroup of <code>G2Full</code> (defined in the module documentation) wi
 (so <code><a href="bls12381_algebra.md#0x1_bls12381_algebra_Fr">Fr</a></code> is the scalar field).
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_G2">G2</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_G2">G2</a>
 </code></pre>
 
 
@@ -337,7 +343,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatG2Uncompr">FormatG2Uncompr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatG2Uncompr">FormatG2Uncompr</a>
 </code></pre>
 
 
@@ -389,7 +396,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatG2Compr">FormatG2Compr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatG2Compr">FormatG2Compr</a>
 </code></pre>
 
 
@@ -421,7 +429,8 @@ with a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5b
 The identity of <code><a href="bls12381_algebra.md#0x1_bls12381_algebra_Gt">Gt</a></code> is 1.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_Gt">Gt</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_Gt">Gt</a>
 </code></pre>
 
 
@@ -455,7 +464,8 @@ To deserialize, it uses <code><a href="bls12381_algebra.md#0x1_bls12381_algebra_
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatGt">FormatGt</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatGt">FormatGt</a>
 </code></pre>
 
 
@@ -484,7 +494,8 @@ The finite field $F_r$ that can be used as the scalar fields
 associated with the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_Fr">Fr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_Fr">Fr</a>
 </code></pre>
 
 
@@ -515,7 +526,8 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatFrLsb">FormatFrLsb</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatFrLsb">FormatFrLsb</a>
 </code></pre>
 
 
@@ -546,7 +558,8 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatFrMsb">FormatFrMsb</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_FormatFrMsb">FormatFrMsb</a>
 </code></pre>
 
 
@@ -576,7 +589,8 @@ The hash-to-curve suite <code>BLS12381G1_XMD:SHA-256_SSWU_RO_</code> that hashes
 Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_HashG1XmdSha256SswuRo">HashG1XmdSha256SswuRo</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_HashG1XmdSha256SswuRo">HashG1XmdSha256SswuRo</a>
 </code></pre>
 
 
@@ -606,7 +620,8 @@ The hash-to-curve suite <code>BLS12381G2_XMD:SHA-256_SSWU_RO_</code> that hashes
 Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
 
 
-<pre><code><b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_HashG2XmdSha256SswuRo">HashG2XmdSha256SswuRo</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bls12381_algebra.md#0x1_bls12381_algebra_HashG2XmdSha256SswuRo">HashG2XmdSha256SswuRo</a>
 </code></pre>
 
 

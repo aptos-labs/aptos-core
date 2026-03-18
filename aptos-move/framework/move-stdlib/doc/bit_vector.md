@@ -96,15 +96,6 @@ The maximum allowed bitvector size
 
 
 
-<a id="0x1_bit_vector_WORD_SIZE"></a>
-
-
-
-<pre><code><b>const</b> <a href="bit_vector.md#0x1_bit_vector_WORD_SIZE">WORD_SIZE</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x1_bit_vector_new"></a>
 
 ## Function `new`
@@ -124,7 +115,7 @@ The maximum allowed bitvector size
     <b>assert</b>!(length &gt; 0, <a href="bit_vector.md#0x1_bit_vector_ELENGTH">ELENGTH</a>);
     <b>assert</b>!(<a href="bit_vector.md#0x1_bit_vector_length">length</a> &lt; <a href="bit_vector.md#0x1_bit_vector_MAX_SIZE">MAX_SIZE</a>, <a href="bit_vector.md#0x1_bit_vector_ELENGTH">ELENGTH</a>);
     <b>let</b> counter = 0;
-    <b>let</b> bit_field = <a href="vector.md#0x1_vector_empty">vector::empty</a>();
+    <b>let</b> bit_field = <a href="vector.md#0x1_vector">vector</a>[];
     <b>while</b> ({<b>spec</b> {
         <b>invariant</b> counter &lt;= length;
         <b>invariant</b> len(bit_field) == counter;

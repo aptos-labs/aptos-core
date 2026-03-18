@@ -95,9 +95,7 @@ It it the caller's responsibility to ensure that the account is authorized to ca
         );
     };
     pre_cancel_order_for_tracker(
-        market.get_pre_cancellation_tracker_mut(),
-        user,
-        client_order_id
+        market.get_pre_cancellation_tracker_mut(), user, client_order_id
     );
 }
 </code></pre>

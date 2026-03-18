@@ -672,7 +672,7 @@ and an empty vector otherwise
 
 <pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_to_vec">to_vec</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
     match (self) {
-        Option::None =&gt; <a href="vector.md#0x1_vector_empty">vector::empty</a>(),
+        Option::None =&gt; <a href="vector.md#0x1_vector">vector</a>[],
         Option::Some { e } =&gt; <a href="vector.md#0x1_vector_singleton">vector::singleton</a>(e),
     }
 }
@@ -1360,7 +1360,7 @@ Utility function to destroy an option that is not droppable.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (<b>if</b> (self.<a href="option.md#0x1_option_is_some">is_some</a>()) <a href="vector.md#0x1_vector">vector</a>[self.<a href="option.md#0x1_option_borrow">borrow</a>()] <b>else</b> <a href="vector.md#0x1_vector_empty">vector::empty</a>());
+<b>ensures</b> result == (<b>if</b> (self.<a href="option.md#0x1_option_is_some">is_some</a>()) <a href="vector.md#0x1_vector">vector</a>[self.<a href="option.md#0x1_option_borrow">borrow</a>()] <b>else</b> <a href="vector.md#0x1_vector">vector</a>[]);
 </code></pre>
 
 

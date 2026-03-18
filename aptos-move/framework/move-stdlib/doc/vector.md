@@ -1134,10 +1134,8 @@ This errors out if the vectors are not of the same length.
     // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
     // due <b>to</b> how inline functions work.
     <b>assert</b>!(len == v2.<a href="vector.md#0x1_vector_length">length</a>(), 0x20002);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
+    for (i in 0..len) {
         f(self.<a href="vector.md#0x1_vector_borrow">borrow</a>(i), v2.<a href="vector.md#0x1_vector_borrow">borrow</a>(i));
-        i += 1
     }
 }
 </code></pre>
@@ -1676,13 +1674,11 @@ Return true if any element in the vector satisfies the predicate.
     p: |&Element|bool
 ): bool {
     <b>let</b> result = <b>false</b>;
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; self.<a href="vector.md#0x1_vector_length">length</a>()) {
+    for (i in 0..(self.<a href="vector.md#0x1_vector_length">length</a>())) {
         result = p(self.<a href="vector.md#0x1_vector_borrow">borrow</a>(i));
         <b>if</b> (result) {
             <b>break</b>
         };
-        i += 1
     };
     result
 }
@@ -1713,13 +1709,11 @@ Return true if all elements in the vector satisfy the predicate.
     p: |&Element|bool
 ): bool {
     <b>let</b> result = <b>true</b>;
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; self.<a href="vector.md#0x1_vector_length">length</a>()) {
+    for (i in 0..(self.<a href="vector.md#0x1_vector_length">length</a>())) {
         result = p(self.<a href="vector.md#0x1_vector_borrow">borrow</a>(i));
         <b>if</b> (!result) {
             <b>break</b>
         };
-        i += 1
     };
     result
 }

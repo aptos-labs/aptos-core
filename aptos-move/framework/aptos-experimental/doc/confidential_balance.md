@@ -173,11 +173,13 @@ Creates a new zero pending balance, where each chunk is set to zero Twisted ElGa
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_pending_balance_no_randomness">new_pending_balance_no_randomness</a>(): <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
     <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
-        chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>).map(|_| {
-            twisted_elgamal::ciphertext_from_points(
-                <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>(), <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>()
-            )
-        })
+        chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>).map(
+            |_| {
+                twisted_elgamal::ciphertext_from_points(
+                    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>(), <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>()
+                )
+            }
+        )
     }
 }
 </code></pre>
@@ -204,11 +206,13 @@ Creates a new zero actual balance, where each chunk is set to zero Twisted ElGam
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_actual_balance_no_randomness">new_actual_balance_no_randomness</a>(): <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
     <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
-        chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>).map(|_| {
-            twisted_elgamal::ciphertext_from_points(
-                <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>(), <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>()
-            )
-        })
+        chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>).map(
+            |_| {
+                twisted_elgamal::ciphertext_from_points(
+                    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>(), <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>()
+                )
+            }
+        )
     }
 }
 </code></pre>
@@ -233,14 +237,17 @@ Creates a new compressed zero pending balance, where each chunk is set to compre
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_compressed_pending_balance_no_randomness">new_compressed_pending_balance_no_randomness</a>(): <a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_compressed_pending_balance_no_randomness">new_compressed_pending_balance_no_randomness</a>()
+    : <a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a> {
     <a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a> {
-        chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>).map(|_| {
-            twisted_elgamal::ciphertext_from_compressed_points(
-                <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>(),
-                <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>()
-            )
-        })
+        chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>).map(
+            |_| {
+                twisted_elgamal::ciphertext_from_compressed_points(
+                    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>(),
+                    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>()
+                )
+            }
+        )
     }
 }
 </code></pre>
@@ -267,12 +274,14 @@ Creates a new compressed zero actual balance, where each chunk is set to compres
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_compressed_actual_balance_no_randomness">new_compressed_actual_balance_no_randomness</a>(): <a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a> {
     <a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a> {
-        chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>).map(|_| {
-            twisted_elgamal::ciphertext_from_compressed_points(
-                <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>(),
-                <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>()
-            )
-        })
+        chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>).map(
+            |_| {
+                twisted_elgamal::ciphertext_from_compressed_points(
+                    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>(),
+                    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>()
+                )
+            }
+        )
     }
 }
 </code></pre>
@@ -299,9 +308,11 @@ Creates a new pending balance from a 64-bit amount with no randomness, splitting
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_pending_balance_u64_no_randonmess">new_pending_balance_u64_no_randonmess</a>(amount: u64): <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
     <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
-        chunks: <a href="confidential_balance.md#0x7_confidential_balance_split_into_chunks_u64">split_into_chunks_u64</a>(amount).map(|chunk| {
-            twisted_elgamal::new_ciphertext_no_randomness(&chunk)
-        })
+        chunks: <a href="confidential_balance.md#0x7_confidential_balance_split_into_chunks_u64">split_into_chunks_u64</a>(amount).map(
+            |chunk| {
+                twisted_elgamal::new_ciphertext_no_randomness(&chunk)
+            }
+        )
     }
 }
 </code></pre>
@@ -327,14 +338,18 @@ Returns <code>Some(<a href="confidential_balance.md#0x7_confidential_balance_Con
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_pending_balance_from_bytes">new_pending_balance_from_bytes</a>(bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_pending_balance_from_bytes">new_pending_balance_from_bytes</a>(bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+    : Option&lt;<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>&gt; {
     <b>if</b> (bytes.length() != 64 * <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>) {
         <b>return</b> std::option::none()
     };
 
-    <b>let</b> chunks = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>).map(|i| {
-        twisted_elgamal::new_ciphertext_from_bytes(bytes.slice(i * 64, (i + 1) * 64))
-    });
+    <b>let</b> chunks = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>).map(
+        |i| {
+            twisted_elgamal::new_ciphertext_from_bytes(bytes.slice(i * 64, (i + 1) *
+            64))
+        }
+    );
 
     <b>if</b> (chunks.<a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a>(|chunk| chunk.is_none())) {
         <b>return</b> std::option::none()
@@ -369,14 +384,18 @@ Returns <code>Some(<a href="confidential_balance.md#0x7_confidential_balance_Con
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_actual_balance_from_bytes">new_actual_balance_from_bytes</a>(bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_new_actual_balance_from_bytes">new_actual_balance_from_bytes</a>(bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+    : Option&lt;<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>&gt; {
     <b>if</b> (bytes.length() != 64 * <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>) {
         <b>return</b> std::option::none()
     };
 
-    <b>let</b> chunks = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>).map(|i| {
-        twisted_elgamal::new_ciphertext_from_bytes(bytes.slice(i * 64, (i + 1) * 64))
-    });
+    <b>let</b> chunks = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>).map(
+        |i| {
+            twisted_elgamal::new_ciphertext_from_bytes(bytes.slice(i * 64, (i + 1) *
+            64))
+        }
+    );
 
     <b>if</b> (chunks.<a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a>(|chunk| chunk.is_none())) {
         <b>return</b> std::option::none()
@@ -410,11 +429,12 @@ Compresses a confidential balance into its <code><a href="confidential_balance.m
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_compress_balance">compress_balance</a>(balance: &<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>): <a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_compress_balance">compress_balance</a>(balance: &<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>)
+    : <a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a> {
     <a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a> {
-        chunks: balance.chunks.map_ref(|ciphertext| twisted_elgamal::compress_ciphertext(
-            ciphertext
-        ))
+        chunks: balance.chunks.map_ref(
+            |ciphertext| twisted_elgamal::compress_ciphertext(ciphertext)
+        )
     }
 }
 </code></pre>
@@ -439,12 +459,13 @@ Decompresses a compressed confidential balance into its <code><a href="confident
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_decompress_balance">decompress_balance</a>(balance: &<a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a>):
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_decompress_balance">decompress_balance</a>(
+    balance: &<a href="confidential_balance.md#0x7_confidential_balance_CompressedConfidentialBalance">CompressedConfidentialBalance</a>
+): <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
     <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
-    <a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a> {
-        chunks: balance.chunks.map_ref(|ciphertext| twisted_elgamal::decompress_ciphertext(
-            ciphertext
-        ))
+        chunks: balance.chunks.map_ref(
+            |ciphertext| twisted_elgamal::decompress_ciphertext(ciphertext)
+        )
     }
 }
 </code></pre>
@@ -472,9 +493,11 @@ Serializes a confidential balance into a byte array representation.
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_balance_to_bytes">balance_to_bytes</a>(balance: &<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;[];
 
-    balance.chunks.for_each_ref(|ciphertext| {
-        bytes.append(twisted_elgamal::ciphertext_to_bytes(ciphertext));
-    });
+    balance.chunks.for_each_ref(
+        |ciphertext| {
+            bytes.append(twisted_elgamal::ciphertext_to_bytes(ciphertext));
+        }
+    );
 
     bytes
 }
@@ -501,10 +524,12 @@ Extracts the <code>C</code> value component (<code>a * H + r * G</code>) of each
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_balance_to_points_c">balance_to_points_c</a>(balance: &<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
-    balance.chunks.map_ref(|chunk| {
-        <b>let</b> (c, _) = twisted_elgamal::ciphertext_as_points(chunk);
-        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(c)
-    })
+    balance.chunks.map_ref(
+        |chunk| {
+            <b>let</b> (c, _) = twisted_elgamal::ciphertext_as_points(chunk);
+            <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(c)
+        }
+    )
 }
 </code></pre>
 
@@ -529,10 +554,12 @@ Extracts the <code>D</code> randomness component (<code>r * Y</code>) of each ch
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_balance_to_points_d">balance_to_points_d</a>(balance: &<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
-    balance.chunks.map_ref(|chunk| {
-        <b>let</b> (_, d) = twisted_elgamal::ciphertext_as_points(chunk);
-        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(d)
-    })
+    balance.chunks.map_ref(
+        |chunk| {
+            <b>let</b> (_, d) = twisted_elgamal::ciphertext_as_points(chunk);
+            <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(d)
+        }
+    )
 }
 </code></pre>
 
@@ -565,11 +592,13 @@ The second balance must have fewer or equal chunks compared to the first.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="confidential_balance.md#0x7_confidential_balance_EINTERNAL_ERROR">EINTERNAL_ERROR</a>)
     );
 
-    lhs.chunks.enumerate_mut(|i, chunk| {
-        <b>if</b> (i &lt; rhs.chunks.length()) {
-            twisted_elgamal::ciphertext_add_assign(chunk, &rhs.chunks[i])
+    lhs.chunks.enumerate_mut(
+        |i, chunk| {
+            <b>if</b> (i &lt; rhs.chunks.length()) {
+                twisted_elgamal::ciphertext_add_assign(chunk, &rhs.chunks[i])
+            }
         }
-    })
+    )
 }
 </code></pre>
 
@@ -602,11 +631,13 @@ The second balance must have fewer or equal chunks compared to the first.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="confidential_balance.md#0x7_confidential_balance_EINTERNAL_ERROR">EINTERNAL_ERROR</a>)
     );
 
-    lhs.chunks.enumerate_mut(|i, chunk| {
-        <b>if</b> (i &lt; rhs.chunks.length()) {
-            twisted_elgamal::ciphertext_add_assign(chunk, &rhs.chunks[i])
+    lhs.chunks.enumerate_mut(
+        |i, chunk| {
+            <b>if</b> (i &lt; rhs.chunks.length()) {
+                twisted_elgamal::ciphertext_add_assign(chunk, &rhs.chunks[i])
+            }
         }
-    })
+    )
 }
 </code></pre>
 
@@ -641,7 +672,8 @@ Checks if two confidential balances are equivalent, including both value and ran
     <b>let</b> ok = <b>true</b>;
 
     lhs.chunks.zip_ref(
-        &rhs.chunks, |l, r| {
+        &rhs.chunks,
+        |l, r| {
             ok = ok && twisted_elgamal::ciphertext_equals(l, r);
         }
     );
@@ -715,14 +747,16 @@ Checks if a confidential balance is equivalent to zero, where all chunks are the
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_is_zero_balance">is_zero_balance</a>(balance: &<a href="confidential_balance.md#0x7_confidential_balance_ConfidentialBalance">ConfidentialBalance</a>): bool {
-    balance.chunks.all(|chunk| {
-        twisted_elgamal::ciphertext_equals(
-            chunk,
-            &twisted_elgamal::ciphertext_from_points(
-                <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>(), <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>()
+    balance.chunks.all(
+        |chunk| {
+            twisted_elgamal::ciphertext_equals(
+                chunk,
+                &twisted_elgamal::ciphertext_from_points(
+                    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>(), <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>()
+                )
             )
-        )
-    })
+        }
+    )
 }
 </code></pre>
 
@@ -747,11 +781,13 @@ Splits a 64-bit integer amount into four 16-bit chunks, represented as <code>Sca
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_split_into_chunks_u64">split_into_chunks_u64</a>(amount: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>).map(|i| {
-        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_u64">ristretto255::new_scalar_from_u64</a>(
-            amount &gt;&gt; (i * <a href="confidential_balance.md#0x7_confidential_balance_CHUNK_SIZE_BITS">CHUNK_SIZE_BITS</a> <b>as</b> u8) & 0xffff
-        )
-    })
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_PENDING_BALANCE_CHUNKS">PENDING_BALANCE_CHUNKS</a>).map(
+        |i| {
+            <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_u64">ristretto255::new_scalar_from_u64</a>(
+                amount &gt;&gt; (i * <a href="confidential_balance.md#0x7_confidential_balance_CHUNK_SIZE_BITS">CHUNK_SIZE_BITS</a> <b>as</b> u8) & 0xffff
+            )
+        }
+    )
 }
 </code></pre>
 
@@ -776,11 +812,13 @@ Splits a 128-bit integer amount into eight 16-bit chunks, represented as <code>S
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_balance.md#0x7_confidential_balance_split_into_chunks_u128">split_into_chunks_u128</a>(amount: u128): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>).map(|i| {
-        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_u128">ristretto255::new_scalar_from_u128</a>(
-            amount &gt;&gt; (i * <a href="confidential_balance.md#0x7_confidential_balance_CHUNK_SIZE_BITS">CHUNK_SIZE_BITS</a> <b>as</b> u8) & 0xffff
-        )
-    })
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, <a href="confidential_balance.md#0x7_confidential_balance_ACTUAL_BALANCE_CHUNKS">ACTUAL_BALANCE_CHUNKS</a>).map(
+        |i| {
+            <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_u128">ristretto255::new_scalar_from_u128</a>(
+                amount &gt;&gt; (i * <a href="confidential_balance.md#0x7_confidential_balance_CHUNK_SIZE_BITS">CHUNK_SIZE_BITS</a> <b>as</b> u8) & 0xffff
+            )
+        }
+    )
 }
 </code></pre>
 

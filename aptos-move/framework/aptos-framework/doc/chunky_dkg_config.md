@@ -192,12 +192,12 @@ Only used in reconfigurations to apply the pending <code><a href="chunky_dkg_con
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a> {
+<pre><code><b>friend</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;()) {
         <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract_v2">config_buffer::extract_v2</a>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;();
         <b>if</b> (<b>exists</b>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;(@aptos_framework) = new_config;
+            <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>[@aptos_framework] = new_config;
         } <b>else</b> {
             <b>move_to</b>(framework, new_config);
         }
@@ -228,9 +228,9 @@ The feature works if and only if <code><a href="consensus_config.md#0x1_consensu
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_enabled">enabled</a>(): bool <b>acquires</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_enabled">enabled</a>(): bool {
     <b>if</b> (<b>exists</b>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;(@aptos_framework)) {
-        <b>let</b> config = <b>borrow_global</b>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;(@aptos_framework);
+        <b>let</b> config = &<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>[@aptos_framework];
         <b>let</b> variant_type_name = *config.variant.type_name().bytes();
         variant_type_name != b"<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigOff">0x1::chunky_dkg_config::ConfigOff</a>"
     } <b>else</b> { <b>false</b> }
@@ -315,9 +315,9 @@ Get the currently effective chunky DKG configuration object.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_current">current</a>(): <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a> <b>acquires</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_current">current</a>(): <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a> {
     <b>if</b> (<b>exists</b>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;(@aptos_framework)) {
-        *<b>borrow_global</b>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;(@aptos_framework)
+        <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>[@aptos_framework]
     } <b>else</b> {
         <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_new_off">new_off</a>()
     }

@@ -708,8 +708,9 @@ API to ensure that the order is a taker order before calling this API, otherwise
 <pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, active_matched_order: ActiveMatchedOrder
 ): OrderMatch&lt;M&gt; {
-    <b>let</b> (order_id, matched_size, remaining_size, order_book_type) =
-        active_matched_order.destroy_active_matched_order();
+    <b>let</b> (
+        order_id, matched_size, remaining_size, order_book_type
+    ) = active_matched_order.destroy_active_matched_order();
     <b>assert</b>!(order_book_type == single_order_type(), <a href="single_order_book.md#0x7_single_order_book_ENOT_SINGLE_ORDER_BOOK">ENOT_SINGLE_ORDER_BOOK</a>);
 
     <b>let</b> order_with_state =

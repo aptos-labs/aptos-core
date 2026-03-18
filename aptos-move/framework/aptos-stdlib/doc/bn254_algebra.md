@@ -103,7 +103,8 @@ The finite field $F_r$ that can be used as the scalar fields
 associated with the groups $G_1$, $G_2$, $G_t$ in BN254-based pairing.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Fr">Fr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Fr">Fr</a>
 </code></pre>
 
 
@@ -134,7 +135,8 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFrLsb">FormatFrLsb</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFrLsb">FormatFrLsb</a>
 </code></pre>
 
 
@@ -165,7 +167,8 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFrMsb">FormatFrMsb</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFrMsb">FormatFrMsb</a>
 </code></pre>
 
 
@@ -193,7 +196,8 @@ NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 The finite field $F_q$ that can be used as the base field of $G_1$
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Fq">Fq</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Fq">Fq</a>
 </code></pre>
 
 
@@ -224,7 +228,8 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqLsb">FormatFqLsb</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqLsb">FormatFqLsb</a>
 </code></pre>
 
 
@@ -255,7 +260,8 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqMsb">FormatFqMsb</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqMsb">FormatFqMsb</a>
 </code></pre>
 
 
@@ -286,7 +292,8 @@ The field can downcast to <code><a href="bn254_algebra.md#0x1_bn254_algebra_Gt">
 with a prime order $r$ = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a>
 </code></pre>
 
 
@@ -320,7 +327,8 @@ which is a concatenation of its coefficients serialized, with the least signific
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq12LscLsb">FormatFq12LscLsb</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq12LscLsb">FormatFq12LscLsb</a>
 </code></pre>
 
 
@@ -351,7 +359,8 @@ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 (so <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fr">Fr</a></code> is the associated scalar field).
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a>
 </code></pre>
 
 
@@ -399,7 +408,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatG1Uncompr">FormatG1Uncompr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatG1Uncompr">FormatG1Uncompr</a>
 </code></pre>
 
 
@@ -447,7 +457,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatG1Compr">FormatG1Compr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatG1Compr">FormatG1Compr</a>
 </code></pre>
 
 
@@ -478,7 +489,8 @@ It is a subgroup of <code>G2Full</code> (defined in the module documentation) wi
 (so <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fr">Fr</a></code> is the scalar field).
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_G2">G2</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_G2">G2</a>
 </code></pre>
 
 
@@ -526,7 +538,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatG2Uncompr">FormatG2Uncompr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatG2Uncompr">FormatG2Uncompr</a>
 </code></pre>
 
 
@@ -574,7 +587,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">FormatG2Compr</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">FormatG2Compr</a>
 </code></pre>
 
 
@@ -606,7 +620,8 @@ with a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5b
 The identity of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a></code> is 1.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a>
 </code></pre>
 
 
@@ -640,7 +655,8 @@ To deserialize, it uses <code><a href="bn254_algebra.md#0x1_bn254_algebra_Format
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatGt">FormatGt</a>
+<pre><code>#[lint::skip(#[unused_struct])]
+<b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatGt">FormatGt</a>
 </code></pre>
 
 

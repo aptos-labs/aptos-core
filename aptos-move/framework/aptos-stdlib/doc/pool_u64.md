@@ -280,7 +280,7 @@ Create a new pool with custom <code>scaling_factor</code>.
         total_coins: 0,
         total_shares: 0,
         shares: <a href="simple_map.md#0x1_simple_map_create">simple_map::create</a>&lt;<b>address</b>, u64&gt;(),
-        shareholders: <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<b>address</b>&gt;(),
+        shareholders: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;[],
         scaling_factor,
     }
 }

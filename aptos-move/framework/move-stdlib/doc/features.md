@@ -164,7 +164,6 @@ return true.
 -  [Function `get_encrypted_transactions_feature`](#0x1_features_get_encrypted_transactions_feature)
 -  [Function `is_encrypted_transactions_enabled`](#0x1_features_is_encrypted_transactions_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
--  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
@@ -180,7 +179,6 @@ return true.
     -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
     -  [Function `abort_if_multisig_payload_mismatch_enabled`](#@Specification_1_abort_if_multisig_payload_mismatch_enabled)
     -  [Function `is_default_account_resource_enabled`](#@Specification_1_is_default_account_resource_enabled)
-    -  [Function `change_feature_flags_internal`](#@Specification_1_change_feature_flags_internal)
     -  [Function `change_feature_flags_for_next_epoch`](#@Specification_1_change_feature_flags_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
@@ -776,16 +774,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>: u64 = 57;
-</code></pre>
-
-
-
-<a id="0x1_features_MONOTONICALLY_INCREASING_COUNTER"></a>
-
-Whether the monotonically increasing counter native function is enabled.
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_MONOTONICALLY_INCREASING_COUNTER">MONOTONICALLY_INCREASING_COUNTER</a>: u64 = 98;
 </code></pre>
 
 
@@ -4309,7 +4297,7 @@ Deprecated feature
 
 Deprecated to prevent validator set changes during DKG.
 
-Genesis/tests should use <code><a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>()</code> for feature vec initialization.
+Genesis/tests should use <code>change_feature_flags_internal()</code> for feature vec initialization.
 
 Governance proposals should use <code><a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>()</code> to enable/disable features.
 
@@ -4327,46 +4315,6 @@ Governance proposals should use <code><a href="features.md#0x1_features_change_f
     _framework: &<a href="signer.md#0x1_signer">signer</a>, _enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, _disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;
 ) {
     <b>abort</b>(<a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="features.md#0x1_features_EAPI_DISABLED">EAPI_DISABLED</a>))
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_change_feature_flags_internal"></a>
-
-## Function `change_feature_flags_internal`
-
-Update feature flags directly. Only used in genesis/tests.
-
-
-<pre><code><b>fun</b> <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(
-    framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;
-) {
-    <b>assert</b>!(
-        <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std,
-        <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>)
-    );
-    <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-        <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
-    };
-    <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <a href="features.md#0x1_features_Features">Features</a>[@std].<a href="features.md#0x1_features">features</a>;
-    enable.for_each_ref(|feature| {
-        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
-    });
-    disable.for_each_ref(|feature| {
-        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
-    });
 }
 </code></pre>
 
@@ -4392,7 +4340,7 @@ Enable and disable features for the next epoch.
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(
     framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;
-) <b>acquires</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>, <a href="features.md#0x1_features_Features">Features</a> {
+) {
     <b>assert</b>!(
         <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std,
         <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>)
@@ -4441,7 +4389,7 @@ who have permission to set the flag that's checked in <code>extract()</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a>, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>) {
     <a href="features.md#0x1_features_ensure_framework_signer">ensure_framework_signer</a>(framework);
     <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
         <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
@@ -4799,24 +4747,6 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<a id="@Specification_1_change_feature_flags_internal"></a>
-
-### Function `change_feature_flags_internal`
-
-
-<pre><code><b>fun</b> <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> opaque;
-<b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
-<b>aborts_if</b> <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) != @std;
-</code></pre>
-
-
-
 <a id="@Specification_1_change_feature_flags_for_next_epoch"></a>
 
 ### Function `change_feature_flags_for_next_epoch`
@@ -4842,7 +4772,7 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_contains">spec_contains</a>(<a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64): bool {
    ((int2bv(
-       (((1 <b>as</b> u8) &lt;&lt; ((feature % (8 <b>as</b> u64)) <b>as</b> u64)) <b>as</b> u8)
+       ((1 <b>as</b> u8) &lt;&lt; ((feature % (8 <b>as</b> u64)) <b>as</b> u64)) <b>as</b> u8
    ) <b>as</b> u8) & <a href="features.md#0x1_features">features</a>[feature / 8] <b>as</b> u8) &gt; (0 <b>as</b> u8)
        && (feature / 8) &lt; len(<a href="features.md#0x1_features">features</a>)
 }

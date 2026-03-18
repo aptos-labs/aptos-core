@@ -378,7 +378,7 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid">generate_auid</a>(): <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> {
-    <b>return</b> <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> {
+    <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> {
         unique_address: <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>()
     }
 }
