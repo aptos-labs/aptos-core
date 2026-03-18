@@ -15,7 +15,7 @@ use aptos_batch_encryption::{
 use aptos_consensus_types::{
     block::Block,
     common::Author,
-    pipelined_block::{DecryptionResult, MaterializeResult, TaskError, TaskFuture, TaskResult},
+    pipelined_block::{DecryptionResult, MaterializeResult, TaskFuture, TaskResult},
 };
 use aptos_logger::{error, info, warn};
 use aptos_types::{
