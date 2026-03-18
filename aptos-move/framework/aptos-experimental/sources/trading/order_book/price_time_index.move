@@ -41,8 +41,6 @@ module aptos_experimental::price_time_index {
 
     // (price, unique_priority_idx) -> (volume, order_id)
 
-    const U64_MAX: u64 = 0xffffffffffffffff;
-
     const SLIPPAGE_PCT_PRECISION: u64 = 100; // 100 = 1%
 
     public fun get_slippage_pct_precision(): u64 {

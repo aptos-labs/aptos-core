@@ -23,8 +23,6 @@ module aptos_experimental::pre_cancellation_tracker {
     #[test_only]
     use aptos_framework::timestamp;
 
-    const DUPLICATE_ORDER_PLACEMENT: u64 = 1;
-
     const MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL: u64 = 10;
 
     enum PreCancellationTracker has store {
