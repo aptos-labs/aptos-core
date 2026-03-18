@@ -41,6 +41,7 @@ module aptos_token::token_coin_swap {
         min_price_per_token: u64,
     }
 
+    #[deprecated]
     /// The listing of all tokens for swapping stored at token owner's account
     struct TokenListings<phantom CoinType> has key {
         // key is the token id for swapping and value is the min price of target coin type.
@@ -57,6 +58,7 @@ module aptos_token::token_coin_swap {
         locked_until_secs: u64,
     }
 
+    #[deprecated]
     /// TokenStoreEscrow holds a map of token id to their tokenEscrow
     struct TokenStoreEscrow has key {
         token_escrows: Table<TokenId, TokenEscrow>,
@@ -113,11 +115,13 @@ module aptos_token::token_coin_swap {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
 
+    #[deprecated]
     /// Initalize the token listing for a token owner
     fun initialize_token_listing<CoinType>(_token_owner: &signer) {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
 
+    #[deprecated]
     /// Intialize the token escrow
     fun initialize_token_store_escrow(_token_owner: &signer) {
         abort error::invalid_argument(EDEPRECATED_MODULE)
@@ -133,6 +137,7 @@ module aptos_token::token_coin_swap {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
 
+    #[deprecated]
     /// Private function for withdraw tokens from an escrow stored in token owner address
     fun withdraw_token_from_escrow_internal(
         _token_owner_addr: address,

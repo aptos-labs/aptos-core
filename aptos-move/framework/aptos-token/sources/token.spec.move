@@ -182,7 +182,7 @@ spec aptos_token::token {
         let creator_address = signer::address_of(creator);
         let token_id = spec_create_token_id_raw(creator_address, collection, name, property_version);
         let creator_addr = token_id.token_data_id.creator;
-        let collections = borrow_global_mut<Collections>(creator_address);
+        let collections = Collections[creator_address];
         let token_data = table::spec_get(
             collections.token_data,
             token_id.token_data_id,
@@ -207,7 +207,7 @@ spec aptos_token::token {
         pragma aborts_if_is_partial;
         let token_id = spec_create_token_id_raw(creators_address, collection, name, property_version);
         let creator_addr = token_id.token_data_id.creator;
-        let collections = borrow_global_mut<Collections>(creator_addr);
+        let collections = Collections[creator_addr];
         let token_data = table::spec_get(
             collections.token_data,
             token_id.token_data_id,
@@ -786,7 +786,7 @@ spec aptos_token::token {
     }
 
     spec fun spec_balance_of(owner: address, id: TokenId): u64 {
-        let token_store = borrow_global<TokenStore>(owner);
+        let token_store = TokenStore[owner];
         if (!exists<TokenStore>(owner)) {
             0
         }

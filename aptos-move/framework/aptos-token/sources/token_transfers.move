@@ -29,6 +29,7 @@ module aptos_token::token_transfers {
     }
 
     #[event]
+    #[deprecated]
     struct TokenOffer has drop, store {
         to_address: address,
         token_id: TokenId,
@@ -100,7 +101,7 @@ module aptos_token::token_transfers {
         name: String,
         property_version: u64,
         amount: u64,
-    ) acquires PendingClaims {
+    ) {
         let token_id = token::create_token_id_raw(creator, collection, name, property_version);
         offer(&sender, receiver, token_id, amount);
     }
@@ -110,7 +111,7 @@ module aptos_token::token_transfers {
         receiver: address,
         token_id: TokenId,
         amount: u64,
-    ) acquires PendingClaims {
+    ) {
         let sender_addr = signer::address_of(sender);
         if (!exists<PendingClaims>(sender_addr)) {
             initialize_token_transfers(sender)
@@ -144,7 +145,7 @@ module aptos_token::token_transfers {
         collection: String,
         name: String,
         property_version: u64,
-    ) acquires PendingClaims {
+    ) {
         let token_id = token::create_token_id_raw(creator, collection, name, property_version);
         claim(&receiver, sender, token_id);
     }
@@ -153,7 +154,7 @@ module aptos_token::token_transfers {
         receiver: &signer,
         sender: address,
         token_id: TokenId,
-    ) acquires PendingClaims {
+    ) {
         assert!(exists<PendingClaims>(sender), ETOKEN_OFFER_NOT_EXIST);
         let pending_claims =
             &mut PendingClaims[sender].pending_claims;
@@ -180,7 +181,7 @@ module aptos_token::token_transfers {
         collection: String,
         name: String,
         property_version: u64,
-    ) acquires PendingClaims {
+    ) {
         let token_id = token::create_token_id_raw(creator, collection, name, property_version);
         cancel_offer(&sender, receiver, token_id);
     }
@@ -190,7 +191,7 @@ module aptos_token::token_transfers {
         sender: &signer,
         receiver: address,
         token_id: TokenId,
-    ) acquires PendingClaims {
+    ) {
         let sender_addr = signer::address_of(sender);
         let token_offer_id = create_token_offer_id(receiver, token_id);
         assert!(exists<PendingClaims>(sender_addr), ETOKEN_OFFER_NOT_EXIST);
@@ -211,7 +212,7 @@ module aptos_token::token_transfers {
     }
 
     #[test(creator = @0x1, owner = @0x2)]
-    public fun test_nft(creator: signer, owner: signer) acquires PendingClaims {
+    public fun test_nft(creator: signer, owner: signer) {
         let token_id = create_token(&creator, 1);
 
         let creator_addr = signer::address_of(&creator);
@@ -230,7 +231,7 @@ module aptos_token::token_transfers {
         creator: signer,
         owner0: signer,
         owner1: signer,
-    ) acquires PendingClaims {
+    ) {
         let token_id = create_token(&creator, 2);
 
         let creator_addr = signer::address_of(&creator);
