@@ -1,6 +1,5 @@
 module aptos_std::big_vector {
     use std::error;
-    use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};
     friend aptos_std::smart_vector;
 
@@ -97,7 +96,7 @@ module aptos_std::big_vector {
     public fun push_back<T: store>(self: &mut BigVector<T>, val: T) {
         let num_buckets = self.buckets.length();
         if (self.end_index == num_buckets * self.bucket_size) {
-            self.buckets.add(num_buckets, vector::empty());
+            self.buckets.add(num_buckets, vector[]);
             self.buckets.borrow_mut(num_buckets).push_back(val);
         } else {
             self.buckets.borrow_mut(num_buckets - 1).push_back(val);
@@ -254,14 +253,12 @@ module aptos_std::big_vector {
     /// Disclaimer: This function is costly. Use it at your own discretion.
     public fun index_of<T>(self: &BigVector<T>, val: &T): (bool, u64) {
         let num_buckets = self.buckets.length();
-        let bucket_index = 0;
-        while (bucket_index < num_buckets) {
+        for (bucket_index in 0..num_buckets) {
             let cur = self.buckets.borrow(bucket_index);
             let (found, i) = cur.index_of(val);
             if (found) {
                 return (true, bucket_index * self.bucket_size + i)
             };
-            bucket_index += 1;
         };
         (false, 0)
     }
@@ -375,16 +372,12 @@ module aptos_std::big_vector {
     #[test]
     fun big_vector_to_vector_test() {
         let v1 = empty(7);
-        let i = 0;
-        while (i < 100) {
+        for (i in 0..100) {
             v1.push_back(i);
-            i += 1;
         };
         let v2 = v1.to_vector();
-        let j = 0;
-        while (j < 100) {
+        for (j in 0..100) {
             assert!(v2[j] == j, 0);
-            j += 1;
         };
         v1.destroy();
     }
@@ -446,12 +439,10 @@ module aptos_std::big_vector {
     #[test]
     fun big_vector_index_of_test() {
         let v = empty(11);
-        let i = 0;
-        while (i < 100) {
+        for (i in 0..100) {
             v.push_back(i);
             let (found, idx) = v.index_of(&i);
             assert!(found && idx == i, 0);
-            i += 1;
         };
         v.destroy();
     }

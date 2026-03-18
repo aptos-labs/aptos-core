@@ -35,7 +35,7 @@ module aptos_std::simple_map {
     /// Create an empty SimpleMap.
     public fun new<Key: store, Value: store>(): SimpleMap<Key, Value> {
         SimpleMap {
-            data: vector::empty(),
+            data: vector[],
         }
     }
 
@@ -151,8 +151,8 @@ module aptos_std::simple_map {
     /// Primarily used to destroy a map
     public fun to_vec_pair<Key: store, Value: store>(
         self: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
-        let keys: vector<Key> = vector::empty();
-        let values: vector<Value> = vector::empty();
+        let keys: vector<Key> = vector[];
+        let values: vector<Value> = vector[];
         let SimpleMap { data } = self;
         data.for_each(|e| {
             let Element { key, value } = e;

@@ -52,7 +52,7 @@ module aptos_std::math128 {
     public inline fun mul_div(a: u128, b: u128, c: u128): u128 {
         // Inline functions cannot take constants, as then every module using it needs the constant
         assert!(c != 0, std::error::invalid_argument(4));
-        (((a as u256) * (b as u256) / (c as u256)) as u128)
+        ((a as u256) * (b as u256) / (c as u256)) as u128
     }
 
     /// Return x clamped to the interval [lower, upper].
@@ -179,7 +179,7 @@ module aptos_std::math128 {
         assert!(ceil_div(13, 3) == 5, 0);
 
         // No overflow
-        assert!(ceil_div((((1u256<<128) - 9) as u128), 11) == 30934760629176223951215873402888019223, 0);
+        assert!(ceil_div(((1u256<<128) - 9) as u128, 11) == 30934760629176223951215873402888019223, 0);
     }
 
     #[test]
@@ -288,7 +288,7 @@ module aptos_std::math128 {
         };
         idx = 1;
         while (idx <= 128) {
-            assert!(floor_log2((((1u256<<idx) - 1) as u128)) == idx - 1, 0);
+            assert!(floor_log2(((1u256<<idx) - 1) as u128) == idx - 1, 0);
             idx += 1;
         };
     }
@@ -303,7 +303,7 @@ module aptos_std::math128 {
         };
         idx = 10;
         while (idx <= 128) {
-            let res = log2((((1u256<<idx) - 1) as u128));
+            let res = log2(((1u256<<idx) - 1) as u128);
             // idx + log2 (1 - 1/2^idx) = idx + ln (1-1/2^idx)/ln2
             // Use 3rd order taylor to approximate expected result
             let expected = (idx as u128) << 32;
@@ -312,7 +312,7 @@ module aptos_std::math128 {
             let taylor3 = (taylor2 * taylor1) >> 32;
             let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3) << 32) / 2977044472;
             // verify it matches to 8 significant digits
-            assert_approx_the_same((res.get_raw_value() as u128), expected, 8);
+            assert_approx_the_same(res.get_raw_value() as u128, expected, 8);
             idx += 1;
         };
     }
@@ -327,7 +327,7 @@ module aptos_std::math128 {
         };
         idx = 10;
         while (idx <= 128) {
-            let res = log2_64((((1u256<<idx) - 1) as u128));
+            let res = log2_64(((1u256<<idx) - 1) as u128);
             // idx + log2 (1 - 1/2^idx) = idx + ln (1-1/2^idx)/ln2
             // Use 3rd order taylor to approximate expected result
             let expected = (idx as u256) << 64;
@@ -337,7 +337,7 @@ module aptos_std::math128 {
             let taylor4 = (taylor3 * taylor1) >> 64;
             let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3 + taylor4 / 4) << 64) / 12786308645202655660;
             // verify it matches to 8 significant digits
-            assert_approx_the_same(res.get_raw_value(), (expected as u128), 14);
+            assert_approx_the_same(res.get_raw_value(), expected as u128, 14);
             idx += 1;
         };
     }
@@ -356,7 +356,7 @@ module aptos_std::math128 {
         let result = sqrt(1<<126);
         assert!(result == 1<<63, 0);
 
-        let result = sqrt((((1u256 << 128) - 1) as u128));
+        let result = sqrt(((1u256 << 128) - 1) as u128);
         assert!(result == (1u128 << 64) - 1, 0);
 
         let result = sqrt((1u128 << 127));

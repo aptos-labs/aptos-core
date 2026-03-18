@@ -657,10 +657,8 @@ module aptos_std::smart_vector {
             i += 1;
         };
         v.reverse();
-        let k = 0;
-        while (k < 10) {
+        for (k in 0..10) {
             assert!(v.inline_vec[k] == 9 - k, 0);
-            k += 1;
         };
         while (i < 100) {
             v.push_back(i);
@@ -687,10 +685,8 @@ module aptos_std::smart_vector {
         let v = empty_with_config(1, 2);
         v.add_all(vector[1, 2, 3, 4, 5, 6]);
         assert!(v.length() == 6, 0);
-        let i = 0;
-        while (i < 6) {
+        for (i in 0..6) {
             assert!(*v.borrow(i) == i + 1, 0);
-            i += 1;
         };
         v.destroy();
     }
@@ -698,16 +694,12 @@ module aptos_std::smart_vector {
     #[test]
     fun smart_vector_to_vector_test() {
         let v1 = empty_with_config(7, 11);
-        let i = 0;
-        while (i < 100) {
+        for (i in 0..100) {
             v1.push_back(i);
-            i += 1;
         };
         let v2 = v1.to_vector();
-        let j = 0;
-        while (j < 100) {
+        for (j in 0..100) {
             assert!(v2[j] == j, 0);
-            j += 1;
         };
         v1.destroy();
     }
@@ -736,12 +728,10 @@ module aptos_std::smart_vector {
     #[test]
     fun smart_vector_index_of_test() {
         let v = empty();
-        let i = 0;
-        while (i < 100) {
+        for (i in 0..100) {
             v.push_back(i);
             let (found, idx) = v.index_of(&i);
             assert!(found && idx == i, 0);
-            i += 1;
         };
         v.destroy();
     }

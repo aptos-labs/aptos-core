@@ -9,7 +9,6 @@
 /// has been deprecated in favor of `big_ordered_map.move`.
 module aptos_std::smart_table {
     use std::error;
-    use std::vector;
     use aptos_std::aptos_hash::sip_hash_from_value;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use aptos_std::type_info::size_of_val;
@@ -75,7 +74,7 @@ module aptos_std::smart_table {
     ): SmartTable<K, V> {
         assert!(split_load_threshold <= 100, error::invalid_argument(EINVALID_LOAD_THRESHOLD_PERCENT));
         let buckets = table_with_length::new();
-        buckets.add(0, vector::empty());
+        buckets.add(0, vector[]);
         let table = SmartTable {
             buckets,
             num_buckets: 1,
@@ -115,7 +114,7 @@ module aptos_std::smart_table {
 
     /// Clear a table completely when T has `drop`.
     public fun clear<K: drop, V: drop>(self: &mut SmartTable<K, V>) {
-        *self.buckets.borrow_mut(0) = vector::empty();
+        *self.buckets.borrow_mut(0) = vector[];
         for (i in 1..self.num_buckets) {
             self.buckets.remove(i);
         };
@@ -135,10 +134,7 @@ module aptos_std::smart_table {
         let bucket = self.buckets.borrow_mut(index);
         // We set a per-bucket limit here with a upper bound (10000) that nobody should normally reach.
         assert!(bucket.length() <= 10000, error::permission_denied(EEXCEED_MAX_BUCKET_SIZE));
-        assert!(bucket.all(| entry | {
-            let e: &Entry<K, V> = entry;
-            &e.key != &key
-        }), error::invalid_argument(EALREADY_EXIST));
+        assert!(bucket.all(| entry | &entry.key != &key), error::invalid_argument(EALREADY_EXIST));
         let e = Entry { hash, key, value };
         if (self.target_bucket_size == 0) {
             let estimated_entry_size = max(size_of_val(&e), 1);
@@ -573,10 +569,8 @@ module aptos_std::smart_table {
     #[test]
     public fun smart_table_to_simple_map_test() {
         let table = new();
-        let i = 0;
-        while (i < 200) {
+        for (i in 0..200) {
             table.add(i, i);
-            i += 1;
         };
         let map = table.to_simple_map();
         assert!(map.length() == 200, 0);
@@ -592,10 +586,8 @@ module aptos_std::smart_table {
             i += 1;
         };
         table.clear();
-        let i = 0;
-        while (i < 200) {
+        for (i in 0..200) {
             table.add(i, i);
-            i += 1;
         };
         assert!(table.size == 200, 0);
         table.destroy();

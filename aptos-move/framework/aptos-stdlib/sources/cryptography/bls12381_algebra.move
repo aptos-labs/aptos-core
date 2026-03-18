@@ -58,10 +58,12 @@ module aptos_std::bls12381_algebra {
     // Marker types + serialization formats begin.
     //
 
+    #[lint::skip(unused_struct)]
     /// The finite field $F_{q^12}$ used in BLS12-381 curves,
     /// which is an extension field of `Fq6` (defined in the module documentation), constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
     struct Fq12 {}
 
+    #[lint::skip(unused_struct)]
     /// A serialization scheme for `Fq12` elements,
     /// where an element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 576,
     /// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
@@ -71,12 +73,14 @@ module aptos_std::bls12381_algebra {
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct FormatFq12LscLsb {}
 
+    #[lint::skip(unused_struct)]
     /// The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a subgroup of `G1Full` (defined in the module documentation) with a prime order $r$
     /// equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `Fr` is the associated scalar field).
     struct G1 {}
 
+    #[lint::skip(unused_struct)]
     /// A serialization scheme for `G1` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
@@ -102,6 +106,7 @@ module aptos_std::bls12381_algebra {
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct FormatG1Uncompr {}
 
+    #[lint::skip(unused_struct)]
     /// A serialization scheme for `G1` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
@@ -129,12 +134,14 @@ module aptos_std::bls12381_algebra {
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct FormatG1Compr {}
 
+    #[lint::skip(unused_struct)]
     /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a subgroup of `G2Full` (defined in the module documentation) with a prime order $r$ equal to
     /// 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `Fr` is the scalar field).
     struct G2 {}
 
+    #[lint::skip(unused_struct)]
     /// A serialization scheme for `G2` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
@@ -160,6 +167,7 @@ module aptos_std::bls12381_algebra {
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct FormatG2Uncompr {}
 
+    #[lint::skip(unused_struct)]
     /// A serialization scheme for `G2` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
@@ -187,6 +195,7 @@ module aptos_std::bls12381_algebra {
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct FormatG2Compr {}
 
+    #[lint::skip(unused_struct)]
     /// The group $G_t$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a multiplicative subgroup of `Fq12`,
     /// with a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
@@ -194,6 +203,7 @@ module aptos_std::bls12381_algebra {
     /// The identity of `Gt` is 1.
     struct Gt {}
 
+    #[lint::skip(unused_struct)]
     /// A serialization scheme for `Gt` elements.
     ///
     /// To serialize, it treats a `Gt` element `p` as an `Fq12` element and serialize it using `FormatFq12LscLsb`.
@@ -203,16 +213,19 @@ module aptos_std::bls12381_algebra {
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct FormatGt {}
 
+    #[lint::skip(unused_struct)]
     /// The finite field $F_r$ that can be used as the scalar fields
     /// associated with the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
     struct Fr {}
 
+    #[lint::skip(unused_struct)]
     /// A serialization format for `Fr` elements,
     /// where an element is represented by a byte array `b[]` of size 32 with the least significant byte (LSB) coming first.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
     struct FormatFrLsb {}
 
+    #[lint::skip(unused_struct)]
     /// A serialization scheme for `Fr` elements,
     /// where an element is represented by a byte array `b[]` of size 32 with the most significant byte (MSB) coming first.
     ///
@@ -224,11 +237,13 @@ module aptos_std::bls12381_algebra {
     // Hash-to-structure suites begin.
     //
 
+    #[lint::skip(unused_struct)]
     /// The hash-to-curve suite `BLS12381G1_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G1` elements.
     ///
     /// Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
     struct HashG1XmdSha256SswuRo {}
 
+    #[lint::skip(unused_struct)]
     /// The hash-to-curve suite `BLS12381G2_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G2` elements.
     ///
     /// Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
@@ -412,24 +427,20 @@ module aptos_std::bls12381_algebra {
         assert!(G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1, FormatG1Compr>( &point_7g_calc), 1);
 
         // Multi-scalar multiplication.
-        let num_entries = 1;
-        while (num_entries < 10) {
+        for (num_entries in 1..10) {
             let scalars = rand_vector<Fr>(num_entries);
             let elements = rand_vector<G1>(num_entries);
 
             let expected = zero<G1>();
-            let i = 0;
-            while (i < num_entries) {
+            for (i in 0..num_entries) {
                 let element = elements.borrow(i);
                 let scalar = scalars.borrow(i);
                 expected = add(&expected, &scalar_mul(element, scalar));
-                i += 1;
             };
 
             let actual = multi_scalar_mul(&elements, &scalars);
             assert!(eq(&expected, &actual), 1);
 
-            num_entries += 1;
         };
 
         // Doubling.
@@ -549,24 +560,20 @@ module aptos_std::bls12381_algebra {
         assert!(G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&point_7g_calc), 1);
 
         // Multi-scalar multiplication.
-        let num_entries = 1;
-        while (num_entries < 10) {
+        for (num_entries in 1..10) {
             let scalars = rand_vector<Fr>(num_entries);
             let elements = rand_vector<G2>(num_entries);
 
             let expected = zero<G2>();
-            let i = 0;
-            while (i < num_entries) {
+            for (i in 0..num_entries) {
                 let element = elements.borrow(i);
                 let scalar = scalars.borrow(i);
                 expected = add(&expected, &scalar_mul(element, scalar));
-                i += 1;
             };
 
             let actual = multi_scalar_mul(&elements, &scalars);
             assert!(eq(&expected, &actual), 1);
 
-            num_entries += 1;
         };
 
         // Doubling.

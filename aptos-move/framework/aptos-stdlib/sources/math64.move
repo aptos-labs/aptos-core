@@ -50,7 +50,7 @@ module aptos_std::math64 {
     public inline fun mul_div(a: u64, b: u64, c: u64): u64 {
         // Inline functions cannot take constants, as then every module using it needs the constant
         assert!(c != 0, std::error::invalid_argument(4));
-        (((a as u128) * (b as u128) / (c as u128)) as u64)
+        ((a as u128) * (b as u128) / (c as u128)) as u64
     }
 
     /// Return x clamped to the interval [lower, upper].
@@ -153,7 +153,7 @@ module aptos_std::math64 {
         assert!(ceil_div(13, 3) == 5, 0);
 
         // No overflow
-        assert!(ceil_div((((1u128<<64) - 9) as u64), 11) == 1676976733973595601, 0);
+        assert!(ceil_div(((1u128<<64) - 9) as u64, 11) == 1676976733973595601, 0);
     }
 
     #[test]
@@ -268,7 +268,7 @@ module aptos_std::math64 {
         };
         idx = 1;
         while (idx <= 64) {
-            assert!(floor_log2((((1u128<<idx) - 1) as u64)) == idx - 1, 0);
+            assert!(floor_log2(((1u128<<idx) - 1) as u64) == idx - 1, 0);
             idx += 1;
         };
     }
@@ -283,7 +283,7 @@ module aptos_std::math64 {
         };
         idx = 10;
         while (idx <= 64) {
-            let res = log2((((1u128<<idx) - 1) as u64));
+            let res = log2(((1u128<<idx) - 1) as u64);
             // idx + log2 (1 - 1/2^idx) = idx + ln (1-1/2^idx)/ln2
             // Use 3rd order taylor to approximate expected result
             let expected = (idx as u128) << 32;
@@ -292,7 +292,7 @@ module aptos_std::math64 {
             let taylor3 = (taylor2 * taylor1) >> 32;
             let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3) << 32) / 2977044472;
             // verify it matches to 8 significant digits
-            assert_approx_the_same((res.get_raw_value() as u128), expected, 8);
+            assert_approx_the_same(res.get_raw_value() as u128, expected, 8);
             idx += 1;
         };
     }
@@ -311,7 +311,7 @@ module aptos_std::math64 {
         let result = sqrt(1<<62);
         assert!(result == 1<<31, 0);
 
-        let result = sqrt((((1u128 << 64) - 1) as u64));
+        let result = sqrt(((1u128 << 64) - 1) as u64);
         assert!(result == (1u64 << 32) - 1, 0);
 
         let result = sqrt((1u64 << 63));
@@ -330,7 +330,7 @@ module aptos_std::math64 {
             x = y;
             y = tmp;
         };
-        let mult = (pow(10, precission) as u128);
+        let mult = pow(10, precission) as u128;
         assert!((x - y) * mult < x, 0);
     }
 }

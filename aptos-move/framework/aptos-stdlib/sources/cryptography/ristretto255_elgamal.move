@@ -11,7 +11,6 @@
 module aptos_std::ristretto255_elgamal {
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
     use std::option::Option;
-    use std::vector;
 
     //
     // Structs
@@ -117,7 +116,7 @@ module aptos_std::ristretto255_elgamal {
     public fun ciphertext_to_bytes(ct: &Ciphertext): vector<u8> {
         let bytes_left = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.left));
         let bytes_right = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.right));
-        let bytes = vector::empty<u8>();
+        let bytes = vector<u8>[];
         bytes.append<u8>(bytes_left);
         bytes.append<u8>(bytes_right);
         bytes

@@ -45,20 +45,13 @@ module aptos_std::ristretto255 {
     // Constants
     //
 
+    #[test_only]
     /// The order of the Ristretto255 group and its scalar field, in little-endian.
     const ORDER_ELL: vector<u8> = x"edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
 
+    #[test_only]
     /// `ORDER_ELL` - 1: i.e., the "largest", reduced scalar in the field
     const L_MINUS_ONE: vector<u8> = x"ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
-
-    /// The maximum size in bytes of a canonically-encoded Scalar is 32 bytes.
-    const MAX_SCALAR_NUM_BYTES: u64 = 32u64;
-
-    /// The maximum size in bits of a canonically-encoded Scalar is 256 bits.
-    const MAX_SCALAR_NUM_BITS: u64 = 256u64;
-
-    /// The maximum size in bytes of a canonically-encoded Ristretto255 point is 32 bytes.
-    const MAX_POINT_NUM_BYTES: u64 = 32u64;
 
     /// The basepoint (generator) of the Ristretto255 group
     const BASE_POINT: vector<u8> = x"e2f2ae0a6abc4e71a884a961c500515f58e30b6aa582dd8db6a65945e08d2d76";
@@ -369,7 +362,7 @@ module aptos_std::ristretto255 {
     /// Creates a Scalar from an u32.
     public fun new_scalar_from_u32(four_bytes: u32): Scalar {
         Scalar {
-            data: scalar_from_u64_internal((four_bytes as u64))
+            data: scalar_from_u64_internal(four_bytes as u64)
         }
     }
 
@@ -1290,10 +1283,8 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_num_points_within_limit() {
         let limit = 10000;
-        let i = 0;
-        while (i < limit) {
+        for (i in 0..limit) {
             point_identity();
-            i += 1;
         }
     }
 
@@ -1301,10 +1292,8 @@ module aptos_std::ristretto255 {
     #[expected_failure(abort_code=0x090004, location=Self)]
     fun test_num_points_limit_exceeded() {
         let limit = 10001;
-        let i = 0;
-        while (i < limit) {
+        for (i in 0..limit) {
             point_identity();
-            i += 1;
         }
     }
 }

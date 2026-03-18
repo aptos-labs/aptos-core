@@ -109,7 +109,7 @@ module aptos_std::string_utils {
         native_format_list(&b"a = {} b = {} c = {}", &l);
     }
 
-    /// #[test_only]
+    #[lint::skip(unused_struct)]
     struct FakeCons<T, N> has copy, drop, store {
         car: T,
         cdr: N,
