@@ -33,7 +33,7 @@ on:
         type: string
       NUMBER_OF_EXECUTION_THREADS:
         required: false
-        default: "32"
+        default: "30"
         type: string
   # This allows the workflow to be triggered manually from the Github UI or CLI
   # NOTE: because the "number" type is not supported, we default to 720 minute timeout
@@ -63,7 +63,7 @@ on:
         description: The name of the runner to use for the test. (which decides machine specs)
       NUMBER_OF_EXECUTION_THREADS:
         required: false
-        default: "32"
+        default: "30"
         type: string
         description: Number of execution threads to use for the tests.
       FLOW:
