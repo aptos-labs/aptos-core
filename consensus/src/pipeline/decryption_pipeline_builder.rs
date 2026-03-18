@@ -51,18 +51,28 @@ impl PipelineBuilder {
         observer_decrypted_txns: Option<Vec<SignedTransaction>>,
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
-        let (mut input_txns, max_txns_from_block_to_execute, block_gas_limit) =
+        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) =
             materialize_fut.await?;
         tracker.start_working();
 
-        // TODO(ibalajiarun): if decryption is disabled, convert encrypted txns to failed decryption.
+        // Single partition point: split encrypted from regular transactions once
+        // so all downstream paths receive pre-partitioned vecs.
+        let (encrypted_txns, regular_txns): (Vec<_>, Vec<_>) = input_txns
+            .into_iter()
+            .partition(|txn| txn.is_encrypted_txn());
+
         if !is_decryption_enabled {
-            return Ok(DecryptionResult::passthrough(
-                input_txns,
+            let failed_txns = mark_txns_failed_decryption(
+                encrypted_txns,
+                DecryptionFailureReason::ConfigUnavailable,
+            );
+            return Ok(DecryptionResult {
+                decrypted_txns: failed_txns,
+                regular_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
-                None,
-            ));
+                decryption_key: None,
+            });
         }
 
         let Some(secret_share_config) = maybe_secret_share_config else {
@@ -74,11 +84,6 @@ impl PipelineBuilder {
             // dependency: has_rand_txns_fut -> prepare -> decrypt (waiting for
             // secret_shared_key_rx) -> ordering (blocked on has_rand_txns_fut).
             if !observer_enabled {
-                // Partition so we only mark encrypted txns as failed; non-encrypted
-                // txns pass through as regular_txns unchanged.
-                let (encrypted_txns, regular_txns): (Vec<_>, Vec<_>) = input_txns
-                    .into_iter()
-                    .partition(|txn| txn.is_encrypted_txn());
                 let failed_txns = mark_txns_failed_decryption(
                     encrypted_txns,
                     DecryptionFailureReason::ConfigUnavailable,
@@ -93,7 +98,8 @@ impl PipelineBuilder {
             }
 
             return decrypt_observer_path(
-                input_txns,
+                encrypted_txns,
+                regular_txns,
                 secret_shared_key_rx,
                 observer_decrypted_txns,
                 max_txns_from_block_to_execute,
@@ -103,7 +109,8 @@ impl PipelineBuilder {
         };
 
         decrypt_validator_path(
-            input_txns,
+            encrypted_txns,
+            regular_txns,
             &block,
             author,
             &secret_share_config,
@@ -119,7 +126,8 @@ impl PipelineBuilder {
 /// Observer path: wait for the decryption key from the ordering path, then use
 /// pre-decrypted transactions provided by the validator.
 async fn decrypt_observer_path(
-    input_txns: Vec<SignedTransaction>,
+    _encrypted_txns: Vec<SignedTransaction>,
+    regular_txns: Vec<SignedTransaction>,
     secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
     observer_decrypted_txns: Option<Vec<SignedTransaction>>,
     max_txns_from_block_to_execute: Option<u64>,
@@ -135,12 +143,13 @@ async fn decrypt_observer_path(
                 "observer decrypted txns should not be available if decryption key is not available"
             ))));
         }
-        return Ok(DecryptionResult::passthrough(
-            input_txns,
+        return Ok(DecryptionResult {
+            decrypted_txns: Vec::new(),
+            regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
-            Some(None),
-        ));
+            decryption_key: Some(None),
+        });
     }
 
     if observer_decrypted_txns.is_none() {
@@ -148,11 +157,6 @@ async fn decrypt_observer_path(
             "observer decrypted txns should be available"
         ))));
     }
-
-    // Partition out encrypted txns, discard them, use pre-decrypted txns from validator.
-    let (_, regular_txns): (Vec<_>, Vec<_>) = input_txns
-        .into_iter()
-        .partition(|txn| txn.is_encrypted_txn());
 
     let dec_key = maybe_key
         .map(|key| BlockTxnDecryptionKey::from_secret_shared_key(&key))
@@ -171,7 +175,8 @@ async fn decrypt_observer_path(
 /// Validator path: derive key share, prepare ciphertexts, await the shared
 /// decryption key, and decrypt all encrypted transactions.
 async fn decrypt_validator_path(
-    input_txns: Vec<SignedTransaction>,
+    encrypted_txns: Vec<SignedTransaction>,
+    regular_txns: Vec<SignedTransaction>,
     block: &Block,
     author: Author,
     secret_share_config: &SecretShareConfig,
@@ -180,10 +185,6 @@ async fn decrypt_validator_path(
     max_txns_from_block_to_execute: Option<u64>,
     block_gas_limit: Option<u64>,
 ) -> TaskResult<DecryptionResult> {
-    let (encrypted_txns, regular_txns): (Vec<_>, Vec<_>) = input_txns
-        .into_iter()
-        .partition(|txn| txn.is_encrypted_txn());
-
     // Short-circuit if no encrypted transactions: skip all crypto operations
     if encrypted_txns.is_empty() {
         let _ = derived_self_key_share_tx.send(None);
