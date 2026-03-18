@@ -287,6 +287,7 @@ impl<
     pub fn new(
         max_poly_degree: usize,
         eval_domain_size: usize,
+        // TODO can we avoid requiring a clone here? Very expensive...
         tau_powers: Vec<Vec<T>>,
     ) -> Option<Self> {
         let toeplitz_domain = ToeplitzDomain::new(max_poly_degree)?;
