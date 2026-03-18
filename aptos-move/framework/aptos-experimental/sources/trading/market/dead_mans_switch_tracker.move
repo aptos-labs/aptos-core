@@ -238,8 +238,10 @@ module aptos_experimental::dead_mans_switch_tracker {
         let removed = tracker.state.remove_or_none(&account);
         let was_registered = removed.is_some();
         if (was_registered) {
-            let KeepAliveState { session_start_time_secs: _, expiration_time_secs: _ } =
-                removed.destroy_some();
+            let KeepAliveState {
+                session_start_time_secs: _,
+                expiration_time_secs: _
+            } = removed.destroy_some();
         } else {
             removed.destroy_none();
         };
@@ -350,8 +352,10 @@ module aptos_experimental::dead_mans_switch_tracker {
         let DeadMansSwitchTracker { min_keep_alive_time_secs: _, state } = tracker;
         state.destroy(
             |v| {
-                let KeepAliveState { session_start_time_secs: _, expiration_time_secs: _ } =
-                    v;
+                let KeepAliveState {
+                    session_start_time_secs: _,
+                    expiration_time_secs: _
+                } = v;
             }
         );
     }
@@ -365,9 +369,7 @@ module aptos_experimental::dead_mans_switch_tracker {
 
     #[test_only]
     public fun update_keep_alive_state_for_test(
-        tracker: &mut DeadMansSwitchTracker,
-        account: address,
-        timeout_seconds: u64
+        tracker: &mut DeadMansSwitchTracker, account: address, timeout_seconds: u64
     ) {
         keep_alive(tracker, @0x0, @0x0, account, timeout_seconds)
     }

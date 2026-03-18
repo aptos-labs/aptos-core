@@ -88,7 +88,9 @@ module aptos_experimental::confidential_asset_tests {
                 &confidential_asset::actual_balance(from, token)
             );
 
-        let (proof, new_balance, sender_amount, recipient_amount, _) =
+        let (
+            proof, new_balance, sender_amount, recipient_amount, _
+        ) =
             confidential_proof::prove_transfer(
                 sender_dk,
                 &sender_ek,
@@ -134,7 +136,9 @@ module aptos_experimental::confidential_asset_tests {
                 &confidential_asset::actual_balance(from, token)
             );
 
-        let (proof, new_balance, sender_amount, recipient_amount, auditor_amounts) =
+        let (
+            proof, new_balance, sender_amount, recipient_amount, auditor_amounts
+        ) =
             confidential_proof::prove_transfer(
                 sender_dk,
                 &sender_ek,
@@ -501,9 +505,7 @@ module aptos_experimental::confidential_asset_tests {
         let (auditor2_dk, auditor2_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::set_auditor(
-            &aptos_fx,
-            token,
-            twisted_elgamal::pubkey_to_bytes(&auditor1_ek)
+            &aptos_fx, token, twisted_elgamal::pubkey_to_bytes(&auditor1_ek)
         );
 
         confidential_asset::register(
@@ -586,9 +588,7 @@ module aptos_experimental::confidential_asset_tests {
         let (_, auditor2_ek) = generate_twisted_elgamal_keypair();
 
         confidential_asset::set_auditor(
-            &aptos_fx,
-            token,
-            twisted_elgamal::pubkey_to_bytes(&auditor1_ek)
+            &aptos_fx, token, twisted_elgamal::pubkey_to_bytes(&auditor1_ek)
         );
 
         confidential_asset::register(
@@ -670,7 +670,10 @@ module aptos_experimental::confidential_asset_tests {
         assert!(confidential_asset::encryption_key(alice_addr, token) == new_alice_ek, 1);
         assert!(
             confidential_asset::verify_actual_balance(
-                alice_addr, token, &new_alice_dk, 150
+                alice_addr,
+                token,
+                &new_alice_dk,
+                150
             ),
             1
         );
@@ -757,10 +760,7 @@ module aptos_experimental::confidential_asset_tests {
     ]
     #[expected_failure(abort_code = 0x01000D, location = confidential_asset)]
     fun fail_register_if_token_disallowed(
-        confidential_asset: signer,
-        aptos_fx: signer,
-        fa: signer,
-        alice: signer
+        confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer
     ) {
         let token =
             set_up_for_confidential_asset_test(
@@ -791,10 +791,7 @@ module aptos_experimental::confidential_asset_tests {
         )
     ]
     fun success_register_if_token_allowed(
-        confidential_asset: signer,
-        aptos_fx: signer,
-        fa: signer,
-        alice: signer
+        confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer
     ) {
         let token =
             set_up_for_confidential_asset_test(
@@ -817,13 +814,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            alice = @0xa1
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, alice = @0xa1)]
     fun fail_deposit_with_coins_if_insufficient_amount(
         confidential_asset: signer, aptos_fx: signer, alice: signer
     ) {
@@ -863,13 +854,7 @@ module aptos_experimental::confidential_asset_tests {
         confidential_asset::deposit(&alice, token, 100);
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            alice = @0xa1
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, alice = @0xa1)]
     fun success_deposit_with_coins(
         confidential_asset: signer, aptos_fx: signer, alice: signer
     ) {

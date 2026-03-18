@@ -210,7 +210,9 @@ module aptos_experimental::bulk_order_book_tests {
             _creation_time_micros,
             _metadata
         ) = matched_order.destroy_bulk_order_match_details();
-        (account, price, 0, matched_size, remaining_size, is_bid)
+        (
+            account, price, 0, matched_size, remaining_size, is_bid
+        )
     }
 
     // ===== HELPER FUNCTIONS TO REDUCE DUPLICATION =====
@@ -317,8 +319,9 @@ module aptos_experimental::bulk_order_book_tests {
         expected_is_bid: bool
     ) {
         let (matched_order_result, matched_size) = match_result.destroy_order_match();
-        let (_, account, _, price, _, is_bid, _, _, _) =
-            matched_order_result.destroy_bulk_order_match_details();
+        let (
+            _, account, _, price, _, is_bid, _, _, _
+        ) = matched_order_result.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
         assert!(price == expected_price);
@@ -376,10 +379,7 @@ module aptos_experimental::bulk_order_book_tests {
 
     /// Helper to create an ExpectedMatch struct
     fun create_expected_match(
-        account: address,
-        price: u64,
-        matched_size: u64,
-        is_bid: bool
+        account: address, price: u64, matched_size: u64, is_bid: bool
     ): ExpectedMatch {
         ExpectedMatch { account, price, matched_size, is_bid }
     }
@@ -960,7 +960,9 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_BID_ORDER_INVALID)]
+    #[expected_failure(
+        abort_code = aptos_experimental::bulk_order_utils::E_BID_ORDER_INVALID
+    )]
     fun test_duplicate_bid_prices() {
         // Test placing an order with duplicate bid prices (not strictly descending) - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_1]; // Duplicate prices
@@ -981,7 +983,9 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_ASK_ORDER_INVALID)]
+    #[expected_failure(
+        abort_code = aptos_experimental::bulk_order_utils::E_ASK_ORDER_INVALID
+    )]
     fun test_duplicate_ask_prices() {
         // Test placing an order with duplicate ask prices (not strictly ascending) - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -1158,7 +1162,6 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     // ===== MULTI-ACCOUNT TESTS =====
-
     #[test]
     fun test_two_accounts_same_price_level() {
         // Test two accounts placing orders at the same price level

@@ -25,16 +25,13 @@ module aptos_experimental::market_mixed_order_tests {
     };
 
     const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
-
-    #[
-        test(
-            admin = @0x1,
-            market_signer = @0x123,
-            bulk_maker = @0x456,
-            single_maker = @0x789,
-            taker = @0xabc
-        )
-    ]
+    #[test(
+        admin = @0x1,
+        market_signer = @0x123,
+        bulk_maker = @0x456,
+        single_maker = @0x789,
+        taker = @0xabc
+    )]
     public fun test_bulk_and_single_orders_coexist(
         admin: &signer,
         market_signer: &signer,
@@ -101,15 +98,13 @@ module aptos_experimental::market_mixed_order_tests {
         market.destroy_market()
     }
 
-    #[
-        test(
-            admin = @0x1,
-            market_signer = @0x123,
-            bulk_maker = @0x456,
-            single_maker = @0x789,
-            taker = @0xabc
-        )
-    ]
+    #[test(
+        admin = @0x1,
+        market_signer = @0x123,
+        bulk_maker = @0x456,
+        single_maker = @0x789,
+        taker = @0xabc
+    )]
     public fun test_taker_matches_single_order_with_bulk_present(
         admin: &signer,
         market_signer: &signer,
@@ -206,15 +201,13 @@ module aptos_experimental::market_mixed_order_tests {
         market.destroy_market()
     }
 
-    #[
-        test(
-            admin = @0x1,
-            market_signer = @0x123,
-            bulk_maker = @0x456,
-            single_maker = @0x789,
-            taker = @0xabc
-        )
-    ]
+    #[test(
+        admin = @0x1,
+        market_signer = @0x123,
+        bulk_maker = @0x456,
+        single_maker = @0x789,
+        taker = @0xabc
+    )]
     public fun test_taker_matches_bulk_order_with_single_present(
         admin: &signer,
         market_signer: &signer,
@@ -311,15 +304,13 @@ module aptos_experimental::market_mixed_order_tests {
         market.destroy_market()
     }
 
-    #[
-        test(
-            admin = @0x1,
-            market_signer = @0x123,
-            bulk_maker = @0x456,
-            single_maker = @0x789,
-            taker = @0xabc
-        )
-    ]
+    #[test(
+        admin = @0x1,
+        market_signer = @0x123,
+        bulk_maker = @0x456,
+        single_maker = @0x789,
+        taker = @0xabc
+    )]
     public fun test_bulk_order_cancellation_with_single_order_remaining(
         admin: &signer,
         market_signer: &signer,

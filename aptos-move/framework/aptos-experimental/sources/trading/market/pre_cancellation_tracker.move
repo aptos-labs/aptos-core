@@ -20,6 +20,7 @@ module aptos_experimental::pre_cancellation_tracker {
 
     #[test_only]
     use std::signer;
+
     #[test_only]
     use aptos_framework::timestamp;
 
@@ -40,9 +41,8 @@ module aptos_experimental::pre_cancellation_tracker {
         account_order_id: AccountClientOrderId
     }
 
-    friend fun new_pre_cancellation_tracker(
-        expiration_time_secs: u64
-    ): PreCancellationTracker {
+    friend fun new_pre_cancellation_tracker(expiration_time_secs: u64)
+        : PreCancellationTracker {
         PreCancellationTracker::V1 {
             pre_cancellation_window_secs: expiration_time_secs,
             expiration_with_order_ids: order_book_utils::new_default_big_ordered_map(),
@@ -106,9 +106,7 @@ module aptos_experimental::pre_cancellation_tracker {
         return false
     }
 
-    friend fun garbage_collect(
-        tracker: &mut PreCancellationTracker
-    ) {
+    friend fun garbage_collect(tracker: &mut PreCancellationTracker) {
         let i = 0;
         let current_time = aptos_std::timestamp::now_seconds();
         while (i < MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL

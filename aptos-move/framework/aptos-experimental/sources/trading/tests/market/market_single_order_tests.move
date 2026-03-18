@@ -49,15 +49,11 @@ module aptos_experimental::market_single_order_tests {
     };
 
     const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
-
     #[test(
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_gtc_taker_fully_filled(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         let market = setup_market(admin, market_signer);
         test_gtc_taker_fully_filled_internal(&mut market, maker, taker, false);
@@ -68,10 +64,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_gtc_taker_partially_filled(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_gtc_taker_partially_filled_helper(admin, market_signer, maker, taker, false);
     }
@@ -80,10 +73,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
     )]
     public fun test_post_only_success(
-        admin: &signer,
-        market_signer: &signer,
-        maker1: &signer,
-        maker2: &signer
+        admin: &signer, market_signer: &signer, maker1: &signer, maker2: &signer
     ) {
         test_post_only_success_helper(admin, market_signer, maker1, maker2, false);
     }
@@ -92,10 +82,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_post_only_failure(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_post_only_failure_helper(admin, market_signer, maker, taker, false);
     }
@@ -104,10 +91,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_ioc_full_match(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_full_match(admin, market_signer, maker, taker, false, false);
     }
@@ -116,10 +100,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_market_order_full_match(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_full_match(
             admin,
@@ -135,10 +116,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_ioc_partial_match(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_partial_match(
             admin,
@@ -154,10 +132,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_market_order_partial_match(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_partial_match(
             admin,
@@ -173,10 +148,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_ioc_no_match(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_no_match(
             admin,
@@ -243,10 +215,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_taker_order_partial_fill(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         let market = setup_market(admin, market_signer);
         let event_store = event_utils::new_event_store();
@@ -309,10 +278,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_taker_order_multiple_fills(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         let market = setup_market(admin, market_signer);
         let event_store = event_utils::new_event_store();
@@ -390,13 +356,14 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_taker_partial_cancelled_maker_reinserted(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_taker_partial_cancelled_maker_reinserted_helper(
-            admin, market_signer, maker, taker, false
+            admin,
+            market_signer,
+            maker,
+            taker,
+            false
         );
     }
 
@@ -406,10 +373,7 @@ module aptos_experimental::market_single_order_tests {
     /// Test that when clearinghouse signals stop matching without a taker cancellation reason,
     /// the order returns ClearinghouseStoppedMatching as the cancellation reason.
     public fun test_clearinghouse_stopped_matching_reason(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_clearinghouse_stopped_matching_reason_helper(
             admin, market_signer, maker, taker
@@ -420,23 +384,18 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
     )]
     public fun test_self_matching_not_allowed(
-        admin: &signer,
-        market_signer: &signer,
-        maker1: &signer,
-        maker2: &signer
+        admin: &signer, market_signer: &signer, maker1: &signer, maker2: &signer
     ) {
         test_self_matching_not_allowed_helper(admin, market_signer, maker1, maker2, false);
     }
 
-    #[
-        test(
-            aptos_framework = @0x1,
-            admin = @0x1,
-            market_signer = @0x123,
-            maker1 = @0x456,
-            maker2 = @0x789
-        )
-    ]
+    #[test(
+        aptos_framework = @0x1,
+        admin = @0x1,
+        market_signer = @0x123,
+        maker1 = @0x456,
+        maker2 = @0x789
+    )]
     public fun test_self_matching_allowed(
         aptos_framework: &signer,
         admin: &signer,
@@ -458,10 +417,7 @@ module aptos_experimental::market_single_order_tests {
         admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
     )]
     public fun test_self_matching_not_allowed_no_match(
-        admin: &signer,
-        market_signer: &signer,
-        maker1: &signer,
-        maker2: &signer
+        admin: &signer, market_signer: &signer, maker1: &signer, maker2: &signer
     ) {
         let market = setup_market(admin, market_signer);
         let maker1_addr = signer::address_of(maker1);
@@ -638,9 +594,7 @@ module aptos_experimental::market_single_order_tests {
 
     #[test(admin = @0x1, market_signer = @0x123, maker = @0x456)]
     public fun test_place_maker_order_cancelled(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer
     ) {
         let market = setup_market(admin, market_signer);
         let event_store = event_utils::new_event_store();
@@ -665,9 +619,7 @@ module aptos_experimental::market_single_order_tests {
 
     #[test(admin = @0x1, market_signer = @0x123, maker = @0x456)]
     public fun test_place_maker_order_with_trigger_condition(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer
     ) {
         let market = setup_market(admin, market_signer);
         let event_store = event_utils::new_event_store();

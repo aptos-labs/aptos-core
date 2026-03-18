@@ -403,8 +403,8 @@ module aptos_experimental::sigma_protos {
     }
 
     /// Deserializes and returns a `TransferSubproof` given its byte representation.
-    public fun deserialize_transfer_subproof(proof_bytes: vector<u8>):
-        Option<TransferSubproof> {
+    public fun deserialize_transfer_subproof(proof_bytes: vector<u8>)
+        : Option<TransferSubproof> {
         if (proof_bytes.length() != 384) {
             return std::option::none<TransferSubproof>()
         };
@@ -538,27 +538,19 @@ module aptos_experimental::sigma_protos {
         );
         bytes.append(
             ristretto255::point_to_bytes(
-                &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())
+                &ristretto255::point_compress(
+                    &pedersen::randomness_base_for_bulletproof()
+                )
             )
         );
         bytes.append(ristretto255::point_to_bytes(&y));
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(c1))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(c2))
-        );
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
         bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
         bytes.append(ristretto255::scalar_to_bytes(amount));
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x1))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x2))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x3))
-        );
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
@@ -597,7 +589,9 @@ module aptos_experimental::sigma_protos {
         );
         bytes.append(
             ristretto255::point_to_bytes(
-                &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())
+                &ristretto255::point_compress(
+                    &pedersen::randomness_base_for_bulletproof()
+                )
             )
         );
         bytes.append(ristretto255::point_to_bytes(&y));
@@ -612,36 +606,18 @@ module aptos_experimental::sigma_protos {
             ristretto255::point_to_bytes(&ristretto255::point_compress(big_d))
         );
         bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(c1))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(c2))
-        );
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
         bytes.append(
             ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c))
         );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x1))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x2))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x3))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x4))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x5))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x6))
-        );
-        bytes.append(
-            ristretto255::point_to_bytes(&ristretto255::point_compress(x7))
-        );
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x4)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x5)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x6)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x7)));
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
@@ -649,7 +625,6 @@ module aptos_experimental::sigma_protos {
     //
     // Test-only serialization & proving functions
     //
-
     #[test_only]
     /// Proves the $\Sigma$-protocol used for veiled-to-unveiled coin transfers.
     /// See top-level comments for a detailed description of the $\Sigma$-protocol
@@ -706,7 +681,14 @@ module aptos_experimental::sigma_protos {
         let alpha3 = ristretto255::scalar_mul(&rho, sender_sk);
         ristretto255::scalar_add_assign(&mut alpha3, &x3);
 
-        WithdrawalSubproof { x1: big_x1, x2: big_x2, x3: big_x3, alpha1, alpha2, alpha3 }
+        WithdrawalSubproof {
+            x1: big_x1,
+            x2: big_x2,
+            x3: big_x3,
+            alpha1,
+            alpha2,
+            alpha3
+        }
     }
 
     #[test_only]
@@ -891,7 +873,6 @@ module aptos_experimental::sigma_protos {
     //
     // Sigma proof verification tests
     //
-
     #[test_only]
     fun verify_transfer_subproof_test(maul_proof: bool) {
         // Pick a keypair for the sender, and one for the recipient
@@ -1031,7 +1012,6 @@ module aptos_experimental::sigma_protos {
     //
     // Sigma proof deserialization tests
     //
-
     #[test]
     fun serialize_transfer_subproof_test() {
         let (sender_sk, sender_pk) = generate_elgamal_keypair();

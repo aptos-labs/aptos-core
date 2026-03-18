@@ -4,9 +4,9 @@ module aptos_experimental::order_id_generation {
 
     public fun next_order_id(): OrderId {
         // reverse bits to make order ids random, so indices on top of them are shuffled.
-        new_order_id_type(reverse_bits(
-            transaction_context::monotonically_increasing_counter()
-        ))
+        new_order_id_type(
+            reverse_bits(transaction_context::monotonically_increasing_counter())
+        )
     }
 
     /// Reverse the bits in a u128 value using divide and conquer approach
@@ -51,7 +51,6 @@ module aptos_experimental::order_id_generation {
     }
 
     // ============================= Tests ====================================
-
     #[test]
     fun test_reverse_bits_order_id_type() {
         // Test basic bit reversal functionality
@@ -117,5 +116,4 @@ module aptos_experimental::order_id_generation {
         let recovered_alt = reverse_bits(reversed_alt);
         assert!(order_id_alt == recovered_alt);
     }
-
 }

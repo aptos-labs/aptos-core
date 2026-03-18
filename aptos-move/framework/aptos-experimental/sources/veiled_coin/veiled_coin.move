@@ -114,6 +114,7 @@ module aptos_experimental::veiled_coin {
     use aptos_std::ristretto255_bulletproofs::RangeProof;
     use aptos_std::ristretto255_elgamal as elgamal;
     use aptos_std::ristretto255_pedersen as pedersen;
+
     #[test_only]
     use aptos_std::ristretto255::Scalar;
 
@@ -252,8 +253,9 @@ module aptos_experimental::veiled_coin {
 
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // transfer `Coin<T>`'s into its `CoinStore<T>` before minting a `VeiledCoin<T>`.
-        let (_resource, signer_cap) =
-            account::create_resource_account(deployer, vector[]);
+        let (_resource, signer_cap) = account::create_resource_account(
+            deployer, vector[]
+        );
 
         move_to(deployer, VeiledCoinMinter { signer_cap })
     }
@@ -287,9 +289,7 @@ module aptos_experimental::veiled_coin {
     /// This function can be used by the `owner` to initialize his veiled balance to a *public* value.
     ///
     /// **WARNING:** The initialized balance is *leaked*, since its initialized `amount` is public here.
-    public entry fun veil<CoinType>(
-        owner: &signer, amount: u32
-    ) {
+    public entry fun veil<CoinType>(owner: &signer, amount: u32) {
         veil_to<CoinType>(owner, signer::address_of(owner), amount)
     }
 
@@ -405,7 +405,8 @@ module aptos_experimental::veiled_coin {
 
         let comm_amount = pedersen::new_commitment_from_bytes(comm_amount);
         assert!(
-            comm_amount.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED)
+            comm_amount.is_some(),
+            error::invalid_argument(EDESERIALIZATION_FAILED)
         );
 
         let transfer_subproof =
@@ -468,9 +469,7 @@ module aptos_experimental::veiled_coin {
     }
 
     /// Returns the ElGamal encryption of the veiled balance of `owner` for the provided `CoinType`.
-    public fun veiled_balance<CoinType>(
-        owner: address
-    ): elgamal::CompressedCiphertext {
+    public fun veiled_balance<CoinType>(owner: address): elgamal::CompressedCiphertext {
         assert!(
             has_veiled_coin_store<CoinType>(owner),
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED)
@@ -480,9 +479,7 @@ module aptos_experimental::veiled_coin {
     }
 
     /// Given an address `addr`, returns the ElGamal encryption public key associated with that address
-    public fun encryption_public_key<CoinType>(
-        addr: address
-    ): elgamal::CompressedPubkey {
+    public fun encryption_public_key<CoinType>(addr: address): elgamal::CompressedPubkey {
         assert!(
             has_veiled_coin_store<CoinType>(addr),
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED)
@@ -764,9 +761,7 @@ module aptos_experimental::veiled_coin {
     /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.
     ///
     /// **WARNING:** Fundamentally, there is no way to hide the value of the coin being minted here.
-    fun veiled_mint_from_coin<CoinType>(
-        c: Coin<CoinType>
-    ): VeiledCoin<CoinType> {
+    fun veiled_mint_from_coin<CoinType>(c: Coin<CoinType>): VeiledCoin<CoinType> {
         // If there is no `coin::CoinStore<CoinType>` in the resource account, create one.
         let rsrc_acc_signer = get_resource_account_signer();
         let rsrc_acc_addr = signer::address_of(&rsrc_acc_signer);
@@ -799,15 +794,11 @@ module aptos_experimental::veiled_coin {
     //
     // Test-only functions
     //
-
     #[test_only]
     /// Returns true if the balance at address `owner` equals `value`.
     /// Requires the ElGamal encryption randomness `r` and public key `pk` as auxiliary inputs.
     public fun verify_opened_balance<CoinType>(
-        owner: address,
-        value: u32,
-        r: &Scalar,
-        pk: &elgamal::CompressedPubkey
+        owner: address, value: u32, r: &Scalar, pk: &elgamal::CompressedPubkey
     ): bool {
         // compute the expected encrypted balance
         let value = ristretto255::new_scalar_from_u32(value);

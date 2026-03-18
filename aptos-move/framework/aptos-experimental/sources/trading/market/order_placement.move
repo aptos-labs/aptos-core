@@ -107,7 +107,14 @@ module aptos_experimental::order_placement {
 
     public fun destroy_order_match_result<R: store + copy + drop>(
         self: OrderMatchResult<R>
-    ): (OrderId, u64, Option<OrderCancellationReason>, vector<R>, vector<u64>, u32) {
+    ): (
+        OrderId,
+        u64,
+        Option<OrderCancellationReason>,
+        vector<R>,
+        vector<u64>,
+        u32
+    ) {
         let OrderMatchResult::V1 {
             order_id,
             remaining_size,
@@ -182,7 +189,9 @@ module aptos_experimental::order_placement {
             == market_types::order_cancellation_reason_clearinghouse_stopped_matching()
     }
 
-    public fun get_order_id<R: store + copy + drop>(self: OrderMatchResult<R>): OrderId {
+    public fun get_order_id<R: store + copy + drop>(
+        self: OrderMatchResult<R>
+    ): OrderId {
         self.order_id
     }
 
@@ -261,9 +270,8 @@ module aptos_experimental::order_placement {
         place_order_with_order_id(
             market,
             signer::address_of(user),
-            if (is_bid) {
-                U64_MAX
-            } else { 1 },
+            if (is_bid) { U64_MAX }
+            else { 1 },
             orig_size,
             orig_size,
             is_bid,
@@ -467,7 +475,10 @@ module aptos_experimental::order_placement {
 
         // Emit event with the cancelled price level
         let (
-            modified_order_request, _order_id, _unique_priority_idx, _creation_time_micros
+            modified_order_request,
+            _order_id,
+            _unique_priority_idx,
+            _creation_time_micros
         ) = modified_order.destroy_bulk_order();
         let (
             _account,
@@ -487,9 +498,13 @@ module aptos_experimental::order_placement {
             cancelled_ask_sizes
         ) =
             if (is_bid) {
-                (vector[price], vector[cancelled_size], vector[], vector[])
+                (
+                    vector[price], vector[cancelled_size], vector[], vector[]
+                )
             } else {
-                (vector[], vector[], vector[price], vector[cancelled_size])
+                (
+                    vector[], vector[], vector[price], vector[cancelled_size]
+                )
             };
 
         market.emit_event_for_bulk_order_modified(

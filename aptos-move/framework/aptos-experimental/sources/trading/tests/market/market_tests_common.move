@@ -77,30 +77,26 @@ module aptos_experimental::market_tests_common {
     ): OrderId {
         if (is_bulk) {
             // Use bulk order placement for single order
-            let bid_prices =
-                if (is_bid) {
-                    vector[price]
-                } else {
-                    vector<u64>[]
-                };
-            let bid_sizes =
-                if (is_bid) {
-                    vector[size]
-                } else {
-                    vector<u64>[]
-                };
-            let ask_prices =
-                if (!is_bid) {
-                    vector[price]
-                } else {
-                    vector<u64>[]
-                };
-            let ask_sizes =
-                if (!is_bid) {
-                    vector[size]
-                } else {
-                    vector<u64>[]
-                };
+            let bid_prices = if (is_bid) {
+                vector[price]
+            } else {
+                vector<u64>[]
+            };
+            let bid_sizes = if (is_bid) {
+                vector[size]
+            } else {
+                vector<u64>[]
+            };
+            let ask_prices = if (!is_bid) {
+                vector[price]
+            } else {
+                vector<u64>[]
+            };
+            let ask_sizes = if (!is_bid) {
+                vector[size]
+            } else {
+                vector<u64>[]
+            };
             let order_id_opt =
                 place_bulk_order(
                     market,
@@ -227,7 +223,6 @@ module aptos_experimental::market_tests_common {
     }
 
     // Additional common test helper functions to eliminate duplication
-
     public fun test_gtc_taker_fully_filled_internal(
         market: &mut Market<clearinghouse_test::TestOrderMetadata>,
         maker: &signer,
@@ -735,10 +730,7 @@ module aptos_experimental::market_tests_common {
     /// Test that when clearinghouse signals stop matching (without a taker cancellation reason),
     /// the order returns ClearinghouseStoppedMatching as the cancellation reason.
     public fun test_clearinghouse_stopped_matching_reason_helper(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         let market = setup_market(admin, market_signer);
         let maker_addr = signer::address_of(maker);

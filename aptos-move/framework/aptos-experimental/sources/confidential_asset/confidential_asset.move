@@ -172,7 +172,6 @@ module aptos_experimental::confidential_asset {
     //
     // Events
     //
-
     #[event]
     /// Emitted when tokens are brought into the protocol.
     struct Deposited has drop, store {
@@ -200,7 +199,6 @@ module aptos_experimental::confidential_asset {
     //
     // Module initialization, done only once when this module is first published on the blockchain
     //
-
     fun init_module(deployer: &signer) {
         assert!(
             bulletproofs::get_max_range_bits()
@@ -244,10 +242,7 @@ module aptos_experimental::confidential_asset {
     /// However, tokens within the protocol become obfuscated through confidential transfers, ensuring privacy in
     /// subsequent transactions.
     public entry fun deposit_to(
-        sender: &signer,
-        token: Object<Metadata>,
-        to: address,
-        amount: u64
+        sender: &signer, token: Object<Metadata>, to: address, amount: u64
     ) {
         deposit_to_internal(sender, token, to, amount)
     }
@@ -274,9 +269,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// The same as `deposit`, but converts coins to missing FA first.
-    public entry fun deposit_coins<CoinType>(
-        sender: &signer, amount: u64
-    ) {
+    public entry fun deposit_coins<CoinType>(sender: &signer, amount: u64) {
         let token = ensure_sufficient_fa<CoinType>(sender, amount).extract();
 
         deposit_to_internal(
@@ -303,8 +296,9 @@ module aptos_experimental::confidential_asset {
         let new_balance =
             confidential_balance::new_actual_balance_from_bytes(new_balance).extract();
         let proof =
-            confidential_proof::deserialize_withdrawal_proof(sigma_proof, zkrp_new_balance)
-                .extract();
+            confidential_proof::deserialize_withdrawal_proof(
+                sigma_proof, zkrp_new_balance
+            ).extract();
 
         withdraw_to_internal(sender, token, to, amount, new_balance, proof);
 
@@ -396,7 +390,9 @@ module aptos_experimental::confidential_asset {
         let new_balance =
             confidential_balance::new_actual_balance_from_bytes(new_balance).extract();
         let proof =
-            confidential_proof::deserialize_rotation_proof(sigma_proof, zkrp_new_balance).extract();
+            confidential_proof::deserialize_rotation_proof(
+                sigma_proof, zkrp_new_balance
+            ).extract();
 
         rotate_encryption_key_internal(sender, token, new_ek, new_balance, proof);
     }
@@ -424,9 +420,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Freezes the confidential account for the specified token, disabling all incoming transactions.
-    public entry fun freeze_token(
-        sender: &signer, token: Object<Metadata>
-    ) {
+    public entry fun freeze_token(sender: &signer, token: Object<Metadata>) {
         freeze_token_internal(sender, token);
     }
 
@@ -560,7 +554,6 @@ module aptos_experimental::confidential_asset {
     //
     // Public view functions
     //
-
     #[view]
     /// Checks if the user has a confidential asset store for the specified token.
     public fun has_confidential_asset_store(
@@ -613,8 +606,7 @@ module aptos_experimental::confidential_asset {
             error::not_found(ECA_STORE_NOT_PUBLISHED)
         );
 
-        let ca_store =
-            &ConfidentialAssetStore[get_user_address(owner, token)];
+        let ca_store = &ConfidentialAssetStore[get_user_address(owner, token)];
 
         ca_store.pending_balance
     }
@@ -629,8 +621,7 @@ module aptos_experimental::confidential_asset {
             error::not_found(ECA_STORE_NOT_PUBLISHED)
         );
 
-        let ca_store =
-            &ConfidentialAssetStore[get_user_address(owner, token)];
+        let ca_store = &ConfidentialAssetStore[get_user_address(owner, token)];
 
         ca_store.actual_balance
     }
@@ -650,9 +641,7 @@ module aptos_experimental::confidential_asset {
 
     #[view]
     /// Checks if the user's actual balance is normalized for the specified token.
-    public fun is_normalized(
-        user: address, token: Object<Metadata>
-    ): bool {
+    public fun is_normalized(user: address, token: Object<Metadata>): bool {
         assert!(
             has_confidential_asset_store(user, token),
             error::not_found(ECA_STORE_NOT_PUBLISHED)
@@ -675,9 +664,8 @@ module aptos_experimental::confidential_asset {
     #[view]
     /// Returns the asset-specific auditor's encryption key.
     /// If the auditing feature is disabled for the token, the encryption key is set to `None`.
-    public fun get_auditor(
-        token: Object<Metadata>
-    ): Option<twisted_elgamal::CompressedPubkey> {
+    public fun get_auditor(token: Object<Metadata>)
+        : Option<twisted_elgamal::CompressedPubkey> {
         let fa_config_address = get_fa_config_address(token);
 
         if (!is_allow_list_enabled() && !exists<FAConfig>(fa_config_address)) {
@@ -744,10 +732,7 @@ module aptos_experimental::confidential_asset {
 
     /// Implementation of the `deposit_to` entry function.
     public fun deposit_to_internal(
-        sender: &signer,
-        token: Object<Metadata>,
-        to: address,
-        amount: u64
+        sender: &signer, token: Object<Metadata>, to: address, amount: u64
     ) {
         assert!(is_token_allowed(token), error::invalid_argument(ETOKEN_DISABLED));
         assert!(!is_frozen(to, token), error::invalid_state(EALREADY_FROZEN));
@@ -762,11 +747,13 @@ module aptos_experimental::confidential_asset {
             );
 
         dispatchable_fungible_asset::transfer(
-            sender, sender_fa_store, ca_fa_store, amount
+            sender,
+            sender_fa_store,
+            ca_fa_store,
+            amount
         );
 
-        let ca_store =
-            &mut ConfidentialAssetStore[get_user_address(to, token)];
+        let ca_store = &mut ConfidentialAssetStore[get_user_address(to, token)];
         let pending_balance =
             confidential_balance::decompress_balance(&ca_store.pending_balance);
 
@@ -801,8 +788,7 @@ module aptos_experimental::confidential_asset {
 
         let sender_ek = encryption_key(from, token);
 
-        let ca_store =
-            &mut ConfidentialAssetStore[get_user_address(from, token)];
+        let ca_store = &mut ConfidentialAssetStore[get_user_address(from, token)];
         let current_balance =
             confidential_balance::decompress_balance(&ca_store.actual_balance);
 
@@ -854,8 +840,7 @@ module aptos_experimental::confidential_asset {
         let sender_ek = encryption_key(from, token);
         let recipient_ek = encryption_key(to, token);
 
-        let sender_ca_store =
-            &mut ConfidentialAssetStore[get_user_address(from, token)];
+        let sender_ca_store = &mut ConfidentialAssetStore[get_user_address(from, token)];
 
         let sender_current_actual_balance =
             confidential_balance::decompress_balance(&sender_ca_store.actual_balance);
@@ -880,8 +865,7 @@ module aptos_experimental::confidential_asset {
         // Cannot create multiple mutable references to the same type, so we need to drop it
         let ConfidentialAssetStore { .. } = sender_ca_store;
 
-        let recipient_ca_store =
-            &mut ConfidentialAssetStore[get_user_address(to, token)];
+        let recipient_ca_store = &mut ConfidentialAssetStore[get_user_address(to, token)];
 
         assert!(
             recipient_ca_store.pending_counter < MAX_TRANSFERS_BEFORE_ROLLOVER,
@@ -915,8 +899,7 @@ module aptos_experimental::confidential_asset {
         let user = signer::address_of(sender);
         let current_ek = encryption_key(user, token);
 
-        let ca_store =
-            &mut ConfidentialAssetStore[get_user_address(user, token)];
+        let ca_store = &mut ConfidentialAssetStore[get_user_address(user, token)];
 
         let pending_balance =
             confidential_balance::decompress_balance(&ca_store.pending_balance);
@@ -955,8 +938,7 @@ module aptos_experimental::confidential_asset {
         let user = signer::address_of(sender);
         let sender_ek = encryption_key(user, token);
 
-        let ca_store =
-            &mut ConfidentialAssetStore[get_user_address(user, token)];
+        let ca_store = &mut ConfidentialAssetStore[get_user_address(user, token)];
 
         assert!(!ca_store.normalized, error::invalid_state(EALREADY_NORMALIZED));
 
@@ -985,8 +967,7 @@ module aptos_experimental::confidential_asset {
             error::not_found(ECA_STORE_NOT_PUBLISHED)
         );
 
-        let ca_store =
-            &mut ConfidentialAssetStore[get_user_address(user, token)];
+        let ca_store = &mut ConfidentialAssetStore[get_user_address(user, token)];
 
         assert!(ca_store.normalized, error::invalid_state(ENORMALIZATION_REQUIRED));
 
@@ -1014,8 +995,7 @@ module aptos_experimental::confidential_asset {
             error::not_found(ECA_STORE_NOT_PUBLISHED)
         );
 
-        let ca_store =
-            &mut ConfidentialAssetStore[get_user_address(user, token)];
+        let ca_store = &mut ConfidentialAssetStore[get_user_address(user, token)];
 
         assert!(!ca_store.frozen, error::invalid_state(EALREADY_FROZEN));
 
@@ -1033,8 +1013,7 @@ module aptos_experimental::confidential_asset {
             error::not_found(ECA_STORE_NOT_PUBLISHED)
         );
 
-        let ca_store =
-            &mut ConfidentialAssetStore[get_user_address(user, token)];
+        let ca_store = &mut ConfidentialAssetStore[get_user_address(user, token)];
 
         assert!(ca_store.frozen, error::invalid_state(ENOT_FROZEN));
 
@@ -1065,7 +1044,9 @@ module aptos_experimental::confidential_asset {
 
     /// Returns an object for handling all the FA primary stores, and returns a signer for it.
     fun get_fa_store_signer(): signer {
-        object::generate_signer_for_extending(&FAController[@aptos_experimental].extend_ref)
+        object::generate_signer_for_extending(
+            &FAController[@aptos_experimental].extend_ref
+        )
     }
 
     /// Returns the address that handles all the FA primary stores.
@@ -1139,9 +1120,11 @@ module aptos_experimental::confidential_asset {
         auditor_amounts: &vector<confidential_balance::ConfidentialBalance>,
         proof: &TransferProof
     ): bool {
-        if (!auditor_amounts.all(|auditor_amount| {
-            confidential_balance::balance_c_equals(transfer_amount, auditor_amount)
-        })) {
+        if (!auditor_amounts.all(
+            |auditor_amount| {
+                confidential_balance::balance_c_equals(transfer_amount, auditor_amount)
+            }
+        )) {
             return false
         };
 
@@ -1178,11 +1161,13 @@ module aptos_experimental::confidential_asset {
 
         let auditors_count = auditor_eks_bytes.length() / 32;
 
-        let auditor_eks = vector::range(0, auditors_count).map(|i| {
-            twisted_elgamal::new_pubkey_from_bytes(
-                auditor_eks_bytes.slice(i * 32, (i + 1) * 32)
-            )
-        });
+        let auditor_eks = vector::range(0, auditors_count).map(
+            |i| {
+                twisted_elgamal::new_pubkey_from_bytes(
+                    auditor_eks_bytes.slice(i * 32, (i + 1) * 32)
+                )
+            }
+        );
 
         if (auditor_eks.any(|ek| ek.is_none())) {
             return std::option::none()
@@ -1202,11 +1187,13 @@ module aptos_experimental::confidential_asset {
 
         let auditors_count = auditor_amounts_bytes.length() / 256;
 
-        let auditor_amounts = vector::range(0, auditors_count).map(|i| {
-            confidential_balance::new_pending_balance_from_bytes(
-                auditor_amounts_bytes.slice(i * 256, (i + 1) * 256)
-            )
-        });
+        let auditor_amounts = vector::range(0, auditors_count).map(
+            |i| {
+                confidential_balance::new_pending_balance_from_bytes(
+                    auditor_amounts_bytes.slice(i * 256, (i + 1) * 256)
+                )
+            }
+        );
 
         if (auditor_amounts.any(|ek| ek.is_none())) {
             return std::option::none()
@@ -1219,7 +1206,8 @@ module aptos_experimental::confidential_asset {
 
     /// Converts coins to missing FA.
     /// Returns `Some(Object<Metadata>)` if user has a suffucient amount of FA to proceed, otherwise `None`.
-    fun ensure_sufficient_fa<CoinType>(sender: &signer, amount: u64): Option<Object<Metadata>> {
+    fun ensure_sufficient_fa<CoinType>(sender: &signer, amount: u64)
+        : Option<Object<Metadata>> {
         let user = signer::address_of(sender);
         let fa = coin::paired_metadata<CoinType>();
 
@@ -1271,13 +1259,9 @@ module aptos_experimental::confidential_asset {
 
     #[test_only]
     public fun verify_pending_balance(
-        user: address,
-        token: Object<Metadata>,
-        user_dk: &Scalar,
-        amount: u64
+        user: address, token: Object<Metadata>, user_dk: &Scalar, amount: u64
     ): bool {
-        let ca_store =
-            &ConfidentialAssetStore[get_user_address(user, token)];
+        let ca_store = &ConfidentialAssetStore[get_user_address(user, token)];
         let pending_balance =
             confidential_balance::decompress_balance(&ca_store.pending_balance);
 
@@ -1286,13 +1270,9 @@ module aptos_experimental::confidential_asset {
 
     #[test_only]
     public fun verify_actual_balance(
-        user: address,
-        token: Object<Metadata>,
-        user_dk: &Scalar,
-        amount: u128
+        user: address, token: Object<Metadata>, user_dk: &Scalar, amount: u128
     ): bool {
-        let ca_store =
-            &ConfidentialAssetStore[get_user_address(user, token)];
+        let ca_store = &ConfidentialAssetStore[get_user_address(user, token)];
         let actual_balance =
             confidential_balance::decompress_balance(&ca_store.actual_balance);
 
@@ -1305,9 +1285,11 @@ module aptos_experimental::confidential_asset {
     ): vector<u8> {
         let auditor_eks_bytes = vector[];
 
-        auditor_eks.for_each_ref(|auditor| {
-            auditor_eks_bytes.append(twisted_elgamal::pubkey_to_bytes(auditor));
-        });
+        auditor_eks.for_each_ref(
+            |auditor| {
+                auditor_eks_bytes.append(twisted_elgamal::pubkey_to_bytes(auditor));
+            }
+        );
 
         auditor_eks_bytes
     }
@@ -1318,9 +1300,13 @@ module aptos_experimental::confidential_asset {
     ): vector<u8> {
         let auditor_amounts_bytes = vector[];
 
-        auditor_amounts.for_each_ref(|balance| {
-            auditor_amounts_bytes.append(confidential_balance::balance_to_bytes(balance));
-        });
+        auditor_amounts.for_each_ref(
+            |balance| {
+                auditor_amounts_bytes.append(
+                    confidential_balance::balance_to_bytes(balance)
+                );
+            }
+        );
 
         auditor_amounts_bytes
     }

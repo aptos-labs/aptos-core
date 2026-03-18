@@ -2,6 +2,7 @@
 module aptos_experimental::event_utils {
     use std::option::Option;
     use aptos_framework::event;
+
     struct EventStore has drop {
         last_index: u64
     }

@@ -31,15 +31,11 @@ module aptos_experimental::market_bulk_order_tests {
     };
 
     const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
-
     #[test(
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_gtc_taker_fully_filled_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         let market = setup_market(admin, market_signer);
         test_gtc_taker_fully_filled_internal(&mut market, maker, taker, true);
@@ -50,10 +46,7 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_bulk_orders_multiple_levels(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         let market = setup_market(admin, market_signer);
         let maker_addr = signer::address_of(maker);
@@ -126,10 +119,7 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_gtc_taker_partially_filled_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_gtc_taker_partially_filled_helper(admin, market_signer, maker, taker, true);
     }
@@ -138,10 +128,7 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
     )]
     public fun test_post_only_success_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker1: &signer,
-        maker2: &signer
+        admin: &signer, market_signer: &signer, maker1: &signer, maker2: &signer
     ) {
         test_post_only_success_helper(admin, market_signer, maker1, maker2, true);
     }
@@ -150,23 +137,18 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_post_only_failure_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_post_only_failure_helper(admin, market_signer, maker, taker, true);
     }
 
-    #[
-        test(
-            aptos_framework = @0x1,
-            admin = @0x1,
-            market_signer = @0x123,
-            maker1 = @0x456,
-            maker2 = @0x789
-        )
-    ]
+    #[test(
+        aptos_framework = @0x1,
+        admin = @0x1,
+        market_signer = @0x123,
+        maker1 = @0x456,
+        maker2 = @0x789
+    )]
     public fun test_self_matching_allowed(
         aptos_framework: &signer,
         admin: &signer,
@@ -188,10 +170,7 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_ioc_full_match_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_full_match(admin, market_signer, maker, taker, false, true);
     }
@@ -200,10 +179,7 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_market_order_full_match_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_full_match(
             admin,
@@ -219,10 +195,7 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_ioc_partial_match_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_partial_match(
             admin,
@@ -238,10 +211,7 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_market_order_partial_match_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_partial_match(
             admin,
@@ -257,10 +227,7 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_ioc_no_match_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_order_no_match(
             admin,
@@ -276,21 +243,20 @@ module aptos_experimental::market_bulk_order_tests {
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
     public fun test_taker_partial_cancelled_maker_reinserted_bulk(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer, taker: &signer
     ) {
         test_taker_partial_cancelled_maker_reinserted_helper(
-            admin, market_signer, maker, taker, true
+            admin,
+            market_signer,
+            maker,
+            taker,
+            true
         );
     }
 
     #[test(admin = @0x1, market_signer = @0x123, maker = @0x456)]
     public fun test_bulk_order_cancellation_event_fields(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer
     ) {
         use aptos_experimental::market_types::BulkOrderModifiedEvent;
         use aptos_experimental::market_bulk_order::cancel_bulk_order;
@@ -361,9 +327,7 @@ module aptos_experimental::market_bulk_order_tests {
 
     #[test(admin = @0x1, market_signer = @0x123, maker = @0x456)]
     public fun test_place_bulk_order_callback(
-        admin: &signer,
-        market_signer: &signer,
-        maker: &signer
+        admin: &signer, market_signer: &signer, maker: &signer
     ) {
         use aptos_experimental::market_bulk_order;
 

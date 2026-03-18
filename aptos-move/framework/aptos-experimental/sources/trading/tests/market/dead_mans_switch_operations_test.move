@@ -74,9 +74,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Update keep-alive state for trader with 5 minute timeout
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Place several orders (bids at 100-101, asks at 200-201 to avoid matching)
@@ -133,9 +131,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Update keep-alive state for trader
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Place orders after keep-alive update
@@ -148,9 +144,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Renew keep-alive
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Try to cleanup - should not cancel anything
@@ -172,11 +166,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
     }
 
     #[test]
-    #[
-        expected_failure(
-            abort_code = 0, location = aptos_experimental::dead_mans_switch_operations
-        )
-    ]
+    #[expected_failure(
+        abort_code = 0, location = aptos_experimental::dead_mans_switch_operations
+    )]
     fun test_cleanup_fails_when_dms_not_enabled() {
         // Setup market WITHOUT dead man's switch
         let admin = account::create_signer_for_test(@0x1);
@@ -214,9 +206,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Update keep-alive state for trader
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Place a bulk order
@@ -271,9 +261,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Update keep-alive state for trader
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Place a bulk order
@@ -300,9 +288,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Renew keep-alive
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Try to cleanup - should not cancel
@@ -332,9 +318,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Step 1: Update keep-alive state for trader
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Step 2: Place orders in the first session
@@ -355,9 +339,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Step 4: Start a new session with keep-alive update
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Step 5: Place new orders in the second session
@@ -412,9 +394,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Maker updates keep-alive state and places a bid order
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            signer::address_of(&maker),
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, signer::address_of(&maker), KEEP_ALIVE_TIMEOUT_SECS
         );
 
         timestamp::fast_forward_seconds(10);
@@ -486,9 +466,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Taker updates keep-alive state
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            signer::address_of(&taker),
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, signer::address_of(&taker), KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Fast forward past the taker's keep-alive timeout
@@ -541,9 +519,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Maker updates keep-alive state and places order
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            signer::address_of(&maker),
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, signer::address_of(&maker), KEEP_ALIVE_TIMEOUT_SECS
         );
 
         timestamp::fast_forward_seconds(10);
@@ -552,9 +528,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Taker updates keep-alive state
         timestamp::fast_forward_seconds(10);
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            signer::address_of(&taker),
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, signer::address_of(&taker), KEEP_ALIVE_TIMEOUT_SECS
         );
 
         // Taker places matching order shortly after (within timeout)
@@ -591,11 +565,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
     }
 
     #[test]
-    #[
-        expected_failure(
-            abort_code = 0, location = aptos_experimental::dead_mans_switch_operations
-        )
-    ]
+    #[expected_failure(
+        abort_code = 0, location = aptos_experimental::dead_mans_switch_operations
+    )]
     fun test_keep_alive_fails_when_dms_not_enabled() {
         // Setup market WITHOUT dead man's switch
         let admin = account::create_signer_for_test(@0x1);
@@ -614,9 +586,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Try to update keep-alive - should abort with E_DEAD_MANS_SWITCH_NOT_ENABLED
         dead_mans_switch_operations::keep_alive(
-            &mut market,
-            trader_addr,
-            KEEP_ALIVE_TIMEOUT_SECS
+            &mut market, trader_addr, KEEP_ALIVE_TIMEOUT_SECS
         );
 
         market.destroy_market();

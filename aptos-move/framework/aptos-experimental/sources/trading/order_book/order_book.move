@@ -4,6 +4,7 @@ module aptos_experimental::order_book {
     friend aptos_experimental::market_types;
     friend aptos_experimental::market_bulk_order;
     friend aptos_experimental::dead_mans_switch_operations;
+
     #[test_only]
     friend aptos_experimental::order_book_client_order_id;
 
@@ -40,7 +41,6 @@ module aptos_experimental::order_book {
     }
 
     // ============================= APIs relevant to single order only ====================================
-
     friend fun client_order_id_exists<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address, client_order_id: String
     ): bool {
@@ -136,16 +136,11 @@ module aptos_experimental::order_book {
     }
 
     // ============================= APIs relevant to both single and bulk order ====================================
-
-    friend fun best_bid_price<M: store + copy + drop>(
-        self: &OrderBook<M>
-    ): Option<u64> {
+    friend fun best_bid_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
         self.price_time_idx.best_bid_price()
     }
 
-    friend fun best_ask_price<M: store + copy + drop>(
-        self: &OrderBook<M>
-    ): Option<u64> {
+    friend fun best_ask_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
         self.price_time_idx.best_ask_price()
     }
 
@@ -169,10 +164,7 @@ module aptos_experimental::order_book {
     }
 
     public fun get_single_match_for_taker<M: store + copy + drop>(
-        self: &mut OrderBook<M>,
-        price: u64,
-        size: u64,
-        is_bid: bool
+        self: &mut OrderBook<M>, price: u64, size: u64, is_bid: bool
     ): OrderMatch<M> {
         let result = self.price_time_idx.get_single_match_result(price, size, is_bid);
         if (result.is_active_matched_book_type_single_order()) {
@@ -201,7 +193,6 @@ module aptos_experimental::order_book {
     }
 
     // ============================= APIs relevant to bulk order only ====================================
-
     friend fun get_bulk_order_remaining_size<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address, is_bid: bool
     ): u64 {
@@ -227,10 +218,7 @@ module aptos_experimental::order_book {
     }
 
     friend fun cancel_bulk_order_at_price<M: store + copy + drop>(
-        self: &mut OrderBook<M>,
-        order_creator: address,
-        price: u64,
-        is_bid: bool
+        self: &mut OrderBook<M>, order_creator: address, price: u64, is_bid: bool
     ): (u64, BulkOrder<M>) {
         self.bulk_order_book.cancel_bulk_order_at_price(
             &mut self.price_time_idx,

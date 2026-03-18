@@ -166,11 +166,7 @@ module aptos_experimental::dead_mans_switch_tracker_test {
     }
 
     #[test(aptos_framework = @0x1, user = @0x123)]
-    #[
-        expected_failure(
-            abort_code = 0, location = aptos_experimental::dead_mans_switch_tracker
-        )
-    ]
+    #[expected_failure(abort_code = 0, location = aptos_experimental::dead_mans_switch_tracker)]
     public fun test_timeout_too_short_fails(
         aptos_framework: &signer, user: &signer
     ) {

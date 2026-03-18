@@ -7,12 +7,7 @@ module aptos_experimental::price_time_index {
     use std::option::{Self, Option};
     use aptos_std::math64::mul_div;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_trading::order_book_types::{
-        OrderId,
-        IncreasingIdx,
-        OrderType,
-        DecreasingIdx
-    };
+    use aptos_trading::order_book_types::{OrderId, IncreasingIdx, OrderType, DecreasingIdx};
     use aptos_trading::order_match_types::{ActiveMatchedOrder, new_active_matched_order};
     use aptos_experimental::order_book_utils;
 
@@ -31,6 +26,7 @@ module aptos_experimental::price_time_index {
     friend aptos_experimental::single_order_book;
     friend aptos_experimental::order_book;
     friend aptos_experimental::bulk_order_book;
+
     #[test_only]
     friend aptos_experimental::bulk_order_book_tests;
 
@@ -42,7 +38,6 @@ module aptos_experimental::price_time_index {
     // (price, unique_priority_idx) -> (volume, order_id)
 
     const SLIPPAGE_PCT_PRECISION: u64 = 100; // 100 = 1%
-
     public fun get_slippage_pct_precision(): u64 {
         SLIPPAGE_PCT_PRECISION
     }
@@ -190,9 +185,7 @@ module aptos_experimental::price_time_index {
                 cur_value.size
             } else {
                 modify_order_data(
-                    orders,
-                    &cur_key,
-                    |order_data| {
+                    orders, &cur_key, |order_data| {
                         order_data.size -= remaining_size;
                     }
                 );
@@ -243,10 +236,7 @@ module aptos_experimental::price_time_index {
     }
 
     friend fun get_single_match_result(
-        self: &mut PriceTimeIndex,
-        price: u64,
-        size: u64,
-        is_bid: bool
+        self: &mut PriceTimeIndex, price: u64, size: u64, is_bid: bool
     ): ActiveMatchedOrder {
         if (is_bid) {
             self.get_single_match_for_buy_order(price, size)
@@ -269,18 +259,14 @@ module aptos_experimental::price_time_index {
                 tie_breaker: unique_priority_idx.into_decreasing_idx_type()
             };
             modify_order_data(
-                &mut self.buys,
-                &key,
-                |order_data| {
+                &mut self.buys, &key, |order_data| {
                     order_data.size += size_delta;
                 }
             );
         } else {
             let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
             modify_order_data(
-                &mut self.sells,
-                &key,
-                |order_data| {
+                &mut self.sells, &key, |order_data| {
                     order_data.size += size_delta;
                 }
             );
@@ -301,18 +287,14 @@ module aptos_experimental::price_time_index {
                 tie_breaker: unique_priority_idx.into_decreasing_idx_type()
             };
             modify_order_data(
-                &mut self.buys,
-                &key,
-                |order_data| {
+                &mut self.buys, &key, |order_data| {
                     order_data.size -= size_delta;
                 }
             );
         } else {
             let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
             modify_order_data(
-                &mut self.sells,
-                &key,
-                |order_data| {
+                &mut self.sells, &key, |order_data| {
                     order_data.size -= size_delta;
                 }
             );

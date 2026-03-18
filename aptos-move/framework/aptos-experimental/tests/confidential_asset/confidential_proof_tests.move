@@ -64,7 +64,11 @@ module aptos_experimental::confidential_proof_tests {
 
         let (proof, new_balance) =
             confidential_proof::prove_withdrawal(
-                &dk, &ek, amount, new_amount, &current_balance
+                &dk,
+                &ek,
+                amount,
+                new_amount,
+                &current_balance
             );
 
         WithdrawParameters { ek, amount, current_balance, new_balance, proof }
@@ -83,16 +87,16 @@ module aptos_experimental::confidential_proof_tests {
         let current_balance_r = confidential_balance::generate_balance_randomness();
         let current_balance =
             confidential_balance::new_actual_balance_from_u128(
-                current_amount,
-                &current_balance_r,
-                &sender_ek
+                current_amount, &current_balance_r, &sender_ek
             );
 
         let (_, auditor_ek) = generate_twisted_elgamal_keypair();
 
         let auditor_eks = vector[auditor_ek];
 
-        let (proof, new_balance, sender_amount, recipient_amount, auditor_amounts) =
+        let (
+            proof, new_balance, sender_amount, recipient_amount, auditor_amounts
+        ) =
             confidential_proof::prove_transfer(
                 &sender_dk,
                 &sender_ek,

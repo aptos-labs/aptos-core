@@ -20,7 +20,9 @@ module aptos_experimental::bulk_order_types_tests {
     const TOTAL_SIZE_PER_SIDE: u64 = SIZE_1 + SIZE_2;
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_BID_ORDER_INVALID)]
+    #[expected_failure(
+        abort_code = aptos_experimental::bulk_order_utils::E_BID_ORDER_INVALID
+    )]
     fun test_invalid_bid_prices_not_descending() {
         // Test placing an order with bid prices not in descending order - should return rejection
         // Bid prices in ascending order (invalid - should be descending)
@@ -42,7 +44,9 @@ module aptos_experimental::bulk_order_types_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_utils::E_ASK_ORDER_INVALID)]
+    #[expected_failure(
+        abort_code = aptos_experimental::bulk_order_utils::E_ASK_ORDER_INVALID
+    )]
     fun test_invalid_ask_prices_not_ascending() {
         // Test placing an order with ask prices not in ascending order - should return rejection
         // Ask prices in descending order (invalid - should be ascending)

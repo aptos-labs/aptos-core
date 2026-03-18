@@ -8,8 +8,10 @@ module aptos_experimental::bulk_order_utils {
 
     friend aptos_experimental::bulk_order_book;
     friend aptos_experimental::market_bulk_order;
+
     #[test_only]
     friend aptos_experimental::bulk_order_book_tests;
+
     #[test_only]
     friend aptos_experimental::bulk_order_types_tests;
 
@@ -100,7 +102,9 @@ module aptos_experimental::bulk_order_utils {
         order_req: BulkOrderRequest<M>,
         best_bid_price: Option<u64>,
         best_ask_price: Option<u64>
-    ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
+    ): (
+        BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>
+    ) {
         let creation_time_micros = timestamp::now_microseconds();
         let bid_price_crossing_idx =
             discard_price_crossing_levels(

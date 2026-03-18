@@ -59,68 +59,83 @@ module aptos_experimental::confidential_balance {
     /// Creates a new zero pending balance, where each chunk is set to zero Twisted ElGamal ciphertext.
     public fun new_pending_balance_no_randomness(): ConfidentialBalance {
         ConfidentialBalance {
-            chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(|_| {
-                twisted_elgamal::ciphertext_from_points(
-                    ristretto255::point_identity(), ristretto255::point_identity()
-                )
-            })
+            chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(
+                |_| {
+                    twisted_elgamal::ciphertext_from_points(
+                        ristretto255::point_identity(), ristretto255::point_identity()
+                    )
+                }
+            )
         }
     }
 
     /// Creates a new zero actual balance, where each chunk is set to zero Twisted ElGamal ciphertext.
     public fun new_actual_balance_no_randomness(): ConfidentialBalance {
         ConfidentialBalance {
-            chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|_| {
-                twisted_elgamal::ciphertext_from_points(
-                    ristretto255::point_identity(), ristretto255::point_identity()
-                )
-            })
+            chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(
+                |_| {
+                    twisted_elgamal::ciphertext_from_points(
+                        ristretto255::point_identity(), ristretto255::point_identity()
+                    )
+                }
+            )
         }
     }
 
     /// Creates a new compressed zero pending balance, where each chunk is set to compressed zero Twisted ElGamal ciphertext.
-    public fun new_compressed_pending_balance_no_randomness(): CompressedConfidentialBalance {
+    public fun new_compressed_pending_balance_no_randomness()
+        : CompressedConfidentialBalance {
         CompressedConfidentialBalance {
-            chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(|_| {
-                twisted_elgamal::ciphertext_from_compressed_points(
-                    ristretto255::point_identity_compressed(),
-                    ristretto255::point_identity_compressed()
-                )
-            })
+            chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(
+                |_| {
+                    twisted_elgamal::ciphertext_from_compressed_points(
+                        ristretto255::point_identity_compressed(),
+                        ristretto255::point_identity_compressed()
+                    )
+                }
+            )
         }
     }
 
     /// Creates a new compressed zero actual balance, where each chunk is set to compressed zero Twisted ElGamal ciphertext.
     public fun new_compressed_actual_balance_no_randomness(): CompressedConfidentialBalance {
         CompressedConfidentialBalance {
-            chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|_| {
-                twisted_elgamal::ciphertext_from_compressed_points(
-                    ristretto255::point_identity_compressed(),
-                    ristretto255::point_identity_compressed()
-                )
-            })
+            chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(
+                |_| {
+                    twisted_elgamal::ciphertext_from_compressed_points(
+                        ristretto255::point_identity_compressed(),
+                        ristretto255::point_identity_compressed()
+                    )
+                }
+            )
         }
     }
 
     /// Creates a new pending balance from a 64-bit amount with no randomness, splitting the amount into four 16-bit chunks.
     public fun new_pending_balance_u64_no_randonmess(amount: u64): ConfidentialBalance {
         ConfidentialBalance {
-            chunks: split_into_chunks_u64(amount).map(|chunk| {
-                twisted_elgamal::new_ciphertext_no_randomness(&chunk)
-            })
+            chunks: split_into_chunks_u64(amount).map(
+                |chunk| {
+                    twisted_elgamal::new_ciphertext_no_randomness(&chunk)
+                }
+            )
         }
     }
 
     /// Creates a new pending balance from a serialized byte array representation.
     /// Returns `Some(ConfidentialBalance)` if deserialization succeeds, otherwise `None`.
-    public fun new_pending_balance_from_bytes(bytes: vector<u8>): Option<ConfidentialBalance> {
+    public fun new_pending_balance_from_bytes(bytes: vector<u8>)
+        : Option<ConfidentialBalance> {
         if (bytes.length() != 64 * PENDING_BALANCE_CHUNKS) {
             return std::option::none()
         };
 
-        let chunks = vector::range(0, PENDING_BALANCE_CHUNKS).map(|i| {
-            twisted_elgamal::new_ciphertext_from_bytes(bytes.slice(i * 64, (i + 1) * 64))
-        });
+        let chunks = vector::range(0, PENDING_BALANCE_CHUNKS).map(
+            |i| {
+                twisted_elgamal::new_ciphertext_from_bytes(bytes.slice(i * 64, (i + 1) *
+                64))
+            }
+        );
 
         if (chunks.any(|chunk| chunk.is_none())) {
             return std::option::none()
@@ -135,14 +150,18 @@ module aptos_experimental::confidential_balance {
 
     /// Creates a new actual balance from a serialized byte array representation.
     /// Returns `Some(ConfidentialBalance)` if deserialization succeeds, otherwise `None`.
-    public fun new_actual_balance_from_bytes(bytes: vector<u8>): Option<ConfidentialBalance> {
+    public fun new_actual_balance_from_bytes(bytes: vector<u8>)
+        : Option<ConfidentialBalance> {
         if (bytes.length() != 64 * ACTUAL_BALANCE_CHUNKS) {
             return std::option::none()
         };
 
-        let chunks = vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|i| {
-            twisted_elgamal::new_ciphertext_from_bytes(bytes.slice(i * 64, (i + 1) * 64))
-        });
+        let chunks = vector::range(0, ACTUAL_BALANCE_CHUNKS).map(
+            |i| {
+                twisted_elgamal::new_ciphertext_from_bytes(bytes.slice(i * 64, (i + 1) *
+                64))
+            }
+        );
 
         if (chunks.any(|chunk| chunk.is_none())) {
             return std::option::none()
@@ -156,21 +175,23 @@ module aptos_experimental::confidential_balance {
     }
 
     /// Compresses a confidential balance into its `CompressedConfidentialBalance` representation.
-    public fun compress_balance(balance: &ConfidentialBalance): CompressedConfidentialBalance {
+    public fun compress_balance(balance: &ConfidentialBalance)
+        : CompressedConfidentialBalance {
         CompressedConfidentialBalance {
-            chunks: balance.chunks.map_ref(|ciphertext| twisted_elgamal::compress_ciphertext(
-                ciphertext
-            ))
+            chunks: balance.chunks.map_ref(
+                |ciphertext| twisted_elgamal::compress_ciphertext(ciphertext)
+            )
         }
     }
 
     /// Decompresses a compressed confidential balance into its `ConfidentialBalance` representation.
-    public fun decompress_balance(balance: &CompressedConfidentialBalance):
+    public fun decompress_balance(
+        balance: &CompressedConfidentialBalance
+    ): ConfidentialBalance {
         ConfidentialBalance {
-        ConfidentialBalance {
-            chunks: balance.chunks.map_ref(|ciphertext| twisted_elgamal::decompress_ciphertext(
-                ciphertext
-            ))
+            chunks: balance.chunks.map_ref(
+                |ciphertext| twisted_elgamal::decompress_ciphertext(ciphertext)
+            )
         }
     }
 
@@ -178,27 +199,33 @@ module aptos_experimental::confidential_balance {
     public fun balance_to_bytes(balance: &ConfidentialBalance): vector<u8> {
         let bytes = vector<u8>[];
 
-        balance.chunks.for_each_ref(|ciphertext| {
-            bytes.append(twisted_elgamal::ciphertext_to_bytes(ciphertext));
-        });
+        balance.chunks.for_each_ref(
+            |ciphertext| {
+                bytes.append(twisted_elgamal::ciphertext_to_bytes(ciphertext));
+            }
+        );
 
         bytes
     }
 
     /// Extracts the `C` value component (`a * H + r * G`) of each chunk in a confidential balance as a vector of `RistrettoPoint`s.
     public fun balance_to_points_c(balance: &ConfidentialBalance): vector<RistrettoPoint> {
-        balance.chunks.map_ref(|chunk| {
-            let (c, _) = twisted_elgamal::ciphertext_as_points(chunk);
-            ristretto255::point_clone(c)
-        })
+        balance.chunks.map_ref(
+            |chunk| {
+                let (c, _) = twisted_elgamal::ciphertext_as_points(chunk);
+                ristretto255::point_clone(c)
+            }
+        )
     }
 
     /// Extracts the `D` randomness component (`r * Y`) of each chunk in a confidential balance as a vector of `RistrettoPoint`s.
     public fun balance_to_points_d(balance: &ConfidentialBalance): vector<RistrettoPoint> {
-        balance.chunks.map_ref(|chunk| {
-            let (_, d) = twisted_elgamal::ciphertext_as_points(chunk);
-            ristretto255::point_clone(d)
-        })
+        balance.chunks.map_ref(
+            |chunk| {
+                let (_, d) = twisted_elgamal::ciphertext_as_points(chunk);
+                ristretto255::point_clone(d)
+            }
+        )
     }
 
     /// Adds two confidential balances homomorphically, mutating the first balance in place.
@@ -211,11 +238,13 @@ module aptos_experimental::confidential_balance {
             error::internal(EINTERNAL_ERROR)
         );
 
-        lhs.chunks.enumerate_mut(|i, chunk| {
-            if (i < rhs.chunks.length()) {
-                twisted_elgamal::ciphertext_add_assign(chunk, &rhs.chunks[i])
+        lhs.chunks.enumerate_mut(
+            |i, chunk| {
+                if (i < rhs.chunks.length()) {
+                    twisted_elgamal::ciphertext_add_assign(chunk, &rhs.chunks[i])
+                }
             }
-        })
+        )
     }
 
     /// Subtracts one confidential balance from another homomorphically, mutating the first balance in place.
@@ -228,11 +257,13 @@ module aptos_experimental::confidential_balance {
             error::internal(EINTERNAL_ERROR)
         );
 
-        lhs.chunks.enumerate_mut(|i, chunk| {
-            if (i < rhs.chunks.length()) {
-                twisted_elgamal::ciphertext_add_assign(chunk, &rhs.chunks[i])
+        lhs.chunks.enumerate_mut(
+            |i, chunk| {
+                if (i < rhs.chunks.length()) {
+                    twisted_elgamal::ciphertext_add_assign(chunk, &rhs.chunks[i])
+                }
             }
-        })
+        )
     }
 
     /// Checks if two confidential balances are equivalent, including both value and randomness components.
@@ -247,7 +278,8 @@ module aptos_experimental::confidential_balance {
         let ok = true;
 
         lhs.chunks.zip_ref(
-            &rhs.chunks, |l, r| {
+            &rhs.chunks,
+            |l, r| {
                 ok = ok && twisted_elgamal::ciphertext_equals(l, r);
             }
         );
@@ -281,38 +313,43 @@ module aptos_experimental::confidential_balance {
 
     /// Checks if a confidential balance is equivalent to zero, where all chunks are the identity element.
     public fun is_zero_balance(balance: &ConfidentialBalance): bool {
-        balance.chunks.all(|chunk| {
-            twisted_elgamal::ciphertext_equals(
-                chunk,
-                &twisted_elgamal::ciphertext_from_points(
-                    ristretto255::point_identity(), ristretto255::point_identity()
+        balance.chunks.all(
+            |chunk| {
+                twisted_elgamal::ciphertext_equals(
+                    chunk,
+                    &twisted_elgamal::ciphertext_from_points(
+                        ristretto255::point_identity(), ristretto255::point_identity()
+                    )
                 )
-            )
-        })
+            }
+        )
     }
 
     /// Splits a 64-bit integer amount into four 16-bit chunks, represented as `Scalar` values.
     public fun split_into_chunks_u64(amount: u64): vector<Scalar> {
-        vector::range(0, PENDING_BALANCE_CHUNKS).map(|i| {
-            ristretto255::new_scalar_from_u64(
-                amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff
-            )
-        })
+        vector::range(0, PENDING_BALANCE_CHUNKS).map(
+            |i| {
+                ristretto255::new_scalar_from_u64(
+                    amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff
+                )
+            }
+        )
     }
 
     /// Splits a 128-bit integer amount into eight 16-bit chunks, represented as `Scalar` values.
     public fun split_into_chunks_u128(amount: u128): vector<Scalar> {
-        vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|i| {
-            ristretto255::new_scalar_from_u128(
-                amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff
-            )
-        })
+        vector::range(0, ACTUAL_BALANCE_CHUNKS).map(
+            |i| {
+                ristretto255::new_scalar_from_u128(
+                    amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff
+                )
+            }
+        )
     }
 
     //
     // View functions
     //
-
     #[view]
     /// Returns the number of chunks in a pending balance.
     public fun get_pending_balance_chunks(): u64 {
@@ -334,7 +371,6 @@ module aptos_experimental::confidential_balance {
     //
     // Test-only
     //
-
     #[test_only]
     /// A helper struct for generating randomness for confidential balances in test environments.
     /// Each `r` element represents a random scalar used for Twisted ElGamal encryption.
@@ -348,7 +384,9 @@ module aptos_experimental::confidential_balance {
     /// This is useful for creating randomness for actual balances during testing.
     public fun generate_balance_randomness(): ConfidentialBalanceRandomness {
         ConfidentialBalanceRandomness {
-            r: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|_| ristretto255::random_scalar())
+            r: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(
+                |_| ristretto255::random_scalar()
+            )
         }
     }
 
@@ -371,11 +409,13 @@ module aptos_experimental::confidential_balance {
         let amount_chunks = split_into_chunks_u128(amount);
 
         ConfidentialBalance {
-            chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|i| {
-                twisted_elgamal::new_ciphertext_with_basepoint(
-                    &amount_chunks[i], &randomness.r[i], ek
-                )
-            })
+            chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(
+                |i| {
+                    twisted_elgamal::new_ciphertext_with_basepoint(
+                        &amount_chunks[i], &randomness.r[i], ek
+                    )
+                }
+            )
         }
     }
 
@@ -390,11 +430,13 @@ module aptos_experimental::confidential_balance {
         let amount_chunks = split_into_chunks_u64(amount);
 
         ConfidentialBalance {
-            chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(|i| {
-                twisted_elgamal::new_ciphertext_with_basepoint(
-                    &amount_chunks[i], &randomness.r[i], ek
-                )
-            })
+            chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(
+                |i| {
+                    twisted_elgamal::new_ciphertext_with_basepoint(
+                        &amount_chunks[i], &randomness.r[i], ek
+                    )
+                }
+            )
         }
     }
 

@@ -184,9 +184,8 @@ module aptos_experimental::market_test_utils {
             if (taker_price.is_some()) {
                 taker_price.destroy_some()
             } else {
-                if (is_bid) {
-                    U64_MAX
-                } else { 1 }
+                if (is_bid) { U64_MAX }
+                else { 1 }
             };
         // Taker order is opened
         order_place_event.verify_order_event(

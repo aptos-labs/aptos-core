@@ -2,16 +2,22 @@
 module aptos_experimental::clearinghouse_test {
     #[test_only]
     friend aptos_experimental::market_single_order_tests;
+
     #[test_only]
     friend aptos_experimental::pre_cancellation_tests;
+
     #[test_only]
     friend aptos_experimental::market_tests_common;
+
     #[test_only]
     friend aptos_experimental::market_test_utils;
+
     #[test_only]
     friend aptos_experimental::market_bulk_order_tests;
+
     #[test_only]
     friend aptos_experimental::market_mixed_order_tests;
+
     #[test_only]
     friend aptos_experimental::dead_mans_switch_operations_test;
 
@@ -97,9 +103,7 @@ module aptos_experimental::clearinghouse_test {
         );
     }
 
-    friend fun validate_order_placement(
-        order_id: OrderId
-    ): ValidationResult {
+    friend fun validate_order_placement(order_id: OrderId): ValidationResult {
         let open_orders = &mut GlobalState[@0x1].open_orders;
         assert!(
             !open_orders.contains(order_id),
@@ -109,9 +113,7 @@ module aptos_experimental::clearinghouse_test {
         return new_validation_result(option::none())
     }
 
-    friend fun validate_bulk_order_placement(
-        account: address
-    ): ValidationResult {
+    friend fun validate_bulk_order_placement(account: address): ValidationResult {
         let bulk_open_bids = &mut GlobalState[@0x1].bulk_open_bids;
         if (!bulk_open_bids.contains(account)) {
             bulk_open_bids.add(account, true);
@@ -131,9 +133,7 @@ module aptos_experimental::clearinghouse_test {
         user_positions.borrow(user).size
     }
 
-    fun update_position(
-        position: &mut Position, size: u64, is_bid: bool
-    ) {
+    fun update_position(position: &mut Position, size: u64, is_bid: bool) {
         if (position.is_long != is_bid) {
             if (size > position.size) {
                 position.size = size - position.size;
@@ -147,21 +147,14 @@ module aptos_experimental::clearinghouse_test {
     }
 
     friend fun settle_trade(
-        taker: address,
-        maker: address,
-        size: u64,
-        is_taker_long: bool
+        taker: address, maker: address, size: u64, is_taker_long: bool
     ): SettleTradeResult<u64> {
         let user_positions = &mut GlobalState[@0x1].user_positions;
         let taker_position =
-            user_positions.borrow_mut_with_default(
-                taker, Position { size: 0, is_long: true }
-            );
+            user_positions.borrow_mut_with_default(taker, Position { size: 0, is_long: true });
         update_position(taker_position, size, is_taker_long);
         let maker_position =
-            user_positions.borrow_mut_with_default(
-                maker, Position { size: 0, is_long: true }
-            );
+            user_positions.borrow_mut_with_default(maker, Position { size: 0, is_long: true });
         update_position(maker_position, size, !is_taker_long);
         new_settle_trade_result(
             size,
@@ -171,11 +164,8 @@ module aptos_experimental::clearinghouse_test {
         )
     }
 
-    friend fun place_maker_order(
-        order_id: OrderId
-    ): PlaceMakerOrderResult<u64> {
-        let maker_order_calls =
-            &mut GlobalState[@0x1].maker_order_calls;
+    friend fun place_maker_order(order_id: OrderId): PlaceMakerOrderResult<u64> {
+        let maker_order_calls = &mut GlobalState[@0x1].maker_order_calls;
         assert!(
             !maker_order_calls.contains(order_id),
             error::invalid_argument(E_DUPLICATE_ORDER)
@@ -231,8 +221,7 @@ module aptos_experimental::clearinghouse_test {
         cancelled_ask_prices: &vector<u64>,
         cancelled_ask_sizes: &vector<u64>
     ) {
-        let place_bulk_order_calls =
-            &mut GlobalState[@0x1].place_bulk_order_calls;
+        let place_bulk_order_calls = &mut GlobalState[@0x1].place_bulk_order_calls;
         let callback_data = PlaceBulkOrderCallbackData {
             order_id,
             bid_prices: *bid_prices,
@@ -251,8 +240,7 @@ module aptos_experimental::clearinghouse_test {
     }
 
     friend fun place_bulk_order_callback_called(account: address): bool {
-        let place_bulk_order_calls =
-            &GlobalState[@0x1].place_bulk_order_calls;
+        let place_bulk_order_calls = &GlobalState[@0x1].place_bulk_order_calls;
         place_bulk_order_calls.contains(account)
     }
 
@@ -269,8 +257,7 @@ module aptos_experimental::clearinghouse_test {
         vector<u64>,
         vector<u64>
     ) {
-        let place_bulk_order_calls =
-            &GlobalState[@0x1].place_bulk_order_calls;
+        let place_bulk_order_calls = &GlobalState[@0x1].place_bulk_order_calls;
         let callback_data = place_bulk_order_calls.borrow(account);
         (
             callback_data.order_id,
@@ -286,10 +273,7 @@ module aptos_experimental::clearinghouse_test {
     }
 
     friend fun settle_trade_with_taker_cancelled(
-        _taker: address,
-        _maker: address,
-        size: u64,
-        _is_taker_long: bool
+        _taker: address, _maker: address, size: u64, _is_taker_long: bool
     ): SettleTradeResult<u64> {
         new_settle_trade_result(
             size / 2,
@@ -303,10 +287,7 @@ module aptos_experimental::clearinghouse_test {
     /// This tests the scenario where the clearinghouse signals to stop matching without cancelling
     /// the taker order explicitly. The trade is fully settled but then matching is stopped.
     friend fun settle_trade_with_stop_matching(
-        _taker: address,
-        _maker: address,
-        size: u64,
-        _is_taker_long: bool
+        _taker: address, _maker: address, size: u64, _is_taker_long: bool
     ): SettleTradeResult<u64> {
         new_settle_trade_result(
             size, // Fully settle this trade

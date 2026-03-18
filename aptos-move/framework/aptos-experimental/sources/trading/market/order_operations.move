@@ -54,9 +54,7 @@ module aptos_experimental::order_operations {
             );
         };
         pre_cancel_order_for_tracker(
-            market.get_pre_cancellation_tracker_mut(),
-            user,
-            client_order_id
+            market.get_pre_cancellation_tracker_mut(), user, client_order_id
         );
     }
 

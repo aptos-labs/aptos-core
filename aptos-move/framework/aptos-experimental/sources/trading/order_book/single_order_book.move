@@ -55,18 +55,23 @@ module aptos_experimental::single_order_book {
         price_move_up_condition,
         price_move_down_condition
     };
+
     #[test_only]
     use aptos_framework::timestamp;
+
     #[test_only]
     use aptos_framework::account;
+
     #[test_only]
     use aptos_trading::single_order_types::{
         create_simple_test_order_request,
         create_test_order_request,
         create_test_order_request_with_client_id
     };
+
     #[test_only]
     use aptos_experimental::price_time_index::new_price_time_idx;
+
     #[test_only]
     use aptos_trading::order_book_types::{TestMetadata, new_test_metadata};
 
@@ -312,8 +317,9 @@ module aptos_experimental::single_order_book {
     friend fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, active_matched_order: ActiveMatchedOrder
     ): OrderMatch<M> {
-        let (order_id, matched_size, remaining_size, order_book_type) =
-            active_matched_order.destroy_active_matched_order();
+        let (
+            order_id, matched_size, remaining_size, order_book_type
+        ) = active_matched_order.destroy_active_matched_order();
         assert!(order_book_type == single_order_type(), ENOT_SINGLE_ORDER_BOOK);
 
         let order_with_state =
@@ -533,7 +539,6 @@ module aptos_experimental::single_order_book {
     }
 
     // ============================= test_only APIs ====================================
-
     #[test_only]
     friend fun destroy_single_order_book<M: store + copy + drop>(
         self: SingleOrderBook<M>
@@ -613,9 +618,7 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     friend fun trigger_pending_orders<M: store + copy + drop>(
-        self: &mut SingleOrderBook<M>,
-        price_time_idx: &mut PriceTimeIndex,
-        oracle_price: u64
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, oracle_price: u64
     ): vector<OrderMatch<M>> {
         let ready_orders = self.take_ready_price_based_orders(oracle_price, 1000);
         let all_matches = vector[];
@@ -662,7 +665,6 @@ module aptos_experimental::single_order_book {
     }
 
     // ============================= Test Helper Functions ====================================
-
     #[test_only]
     public fun verify_order_state<M: store + copy + drop>(
         order_book: &SingleOrderBook<M>,
@@ -739,7 +741,6 @@ module aptos_experimental::single_order_book {
     }
 
     // ============================= Tests ====================================
-
     #[test]
     fun test_good_til_cancelled_order() {
         let (order_book, price_time_idx) = set_up_test();
@@ -1229,7 +1230,9 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    fun test_price_move_condition_time_priority_helper(is_move_up: bool) {
+    fun test_price_move_condition_time_priority_helper(
+        is_move_up: bool
+    ) {
         let (order_book, price_time_idx) = set_up_test();
 
         let trigger_price = if (is_move_up) 110 else 90;
@@ -1730,7 +1733,12 @@ module aptos_experimental::single_order_book {
         // Place an active order
         let order_req =
             create_simple_test_order_request(
-                @0xAA, new_order_id_type(1), 100, 1000, false, 1
+                @0xAA,
+                new_order_id_type(1),
+                100,
+                1000,
+                false,
+                1
             );
         order_book.place_maker_or_pending_order(&mut price_time_idx, order_req);
         // Verify order was placed with correct metadata

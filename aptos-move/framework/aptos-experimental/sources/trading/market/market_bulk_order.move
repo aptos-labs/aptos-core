@@ -70,9 +70,7 @@ module aptos_experimental::market_bulk_order {
                 response.destroy_bulk_order_place_response_rejection();
             // Emit rejection event
             market.emit_event_for_bulk_order_rejection(
-                rejected_account,
-                rejected_seq_num,
-                existing_seq_num
+                rejected_account, rejected_seq_num, existing_seq_num
             );
             // Return None since the order was rejected
             return option::none()
@@ -87,8 +85,9 @@ module aptos_experimental::market_bulk_order {
             cancelled_ask_sizes,
             previous_seq_num_option
         ) = response.destroy_bulk_order_place_response_success();
-        let (order_request, order_id, _unique_priority_idx, _creation_time_micros) =
-            bulk_order.destroy_bulk_order();
+        let (
+            order_request, order_id, _unique_priority_idx, _creation_time_micros
+        ) = bulk_order.destroy_bulk_order();
         let (
             account,
             order_sequence_number,
@@ -165,8 +164,9 @@ module aptos_experimental::market_bulk_order {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let cancelled_bulk_order = market.get_order_book_mut().cancel_bulk_order(user);
-        let (order_request, order_id, _unique_priority_idx, _creation_time_micros) =
-            cancelled_bulk_order.destroy_bulk_order();
+        let (
+            order_request, order_id, _unique_priority_idx, _creation_time_micros
+        ) = cancelled_bulk_order.destroy_bulk_order();
         let (
             _account,
             order_sequence_number,
