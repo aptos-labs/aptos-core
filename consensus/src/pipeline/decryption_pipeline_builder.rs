@@ -61,6 +61,7 @@ impl PipelineBuilder {
             .partition(|txn| txn.is_encrypted_txn());
 
         if !is_decryption_enabled {
+            let _ = derived_self_key_share_tx.send(None);
             let failed_txns = mark_txns_failed_decryption(
                 encrypted_txns,
                 DecryptionFailureReason::ConfigUnavailable,
