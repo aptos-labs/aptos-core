@@ -47,6 +47,12 @@ pub fn metadata() -> Result<Metadata> {
 
 /// Get the aptos node binary from the current working directory
 pub fn get_aptos_node_binary_from_worktree() -> Result<(String, PathBuf)> {
+    if let Ok(bin) = std::env::var("APTOS_NODE_BIN_PATH") {
+        let path = PathBuf::from(&bin);
+        anyhow::ensure!(path.exists(), "APTOS_NODE_BIN_PATH does not exist: {bin}");
+        return Ok(("prebuilt".to_string(), path));
+    }
+
     let metadata = metadata()?;
     let revision = get_worktree_revision(&metadata);
     let bin_path = cargo_build_aptos_node(&metadata.workspace_root, &metadata.target_directory)?;
