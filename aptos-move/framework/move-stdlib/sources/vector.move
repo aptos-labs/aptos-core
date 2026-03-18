@@ -435,10 +435,8 @@ module std::vector {
         // We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
         assert!(len == v2.length(), 0x20002);
-        let i = 0;
-        while (i < len) {
+        for (i in 0..len) {
             f(self.borrow(i), v2.borrow(i));
-            i += 1
         }
     }
 
@@ -663,13 +661,11 @@ module std::vector {
         p: |&Element|bool
     ): bool {
         let result = false;
-        let i = 0;
-        while (i < self.length()) {
+        for (i in 0..(self.length())) {
             result = p(self.borrow(i));
             if (result) {
                 break
             };
-            i += 1
         };
         result
     }
@@ -680,13 +676,11 @@ module std::vector {
         p: |&Element|bool
     ): bool {
         let result = true;
-        let i = 0;
-        while (i < self.length()) {
+        for (i in 0..(self.length())) {
             result = p(self.borrow(i));
             if (!result) {
                 break
             };
-            i += 1
         };
         result
     }

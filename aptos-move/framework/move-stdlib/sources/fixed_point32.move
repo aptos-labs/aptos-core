@@ -70,7 +70,7 @@ module std::fixed_point32 {
         assert!(quotient <= MAX_U64, EDIVISION);
         // the value may be too large, which will cause the cast to fail
         // with an arithmetic error.
-        (quotient as u64)
+        quotient as u64
     }
     spec divide_u64 {
         pragma opaque;

@@ -838,9 +838,6 @@ module std::features {
         is_enabled(DISTRIBUTE_TRANSACTION_FEE)
     }
 
-    /// Whether the monotonically increasing counter native function is enabled.
-    const MONOTONICALLY_INCREASING_COUNTER: u64 = 98;
-
     #[deprecated]
     public fun get_monotonically_increasing_counter_feature(): u64 {
         abort error::invalid_argument(EINVALID_FEATURE)
@@ -913,6 +910,7 @@ module std::features {
         abort(error::invalid_state(EAPI_DISABLED))
     }
 
+    #[test_only]
     /// Update feature flags directly. Only used in genesis/tests.
     fun change_feature_flags_internal(
         framework: &signer, enable: vector<u64>, disable: vector<u64>
@@ -936,7 +934,7 @@ module std::features {
     /// Enable and disable features for the next epoch.
     public fun change_feature_flags_for_next_epoch(
         framework: &signer, enable: vector<u64>, disable: vector<u64>
-    ) acquires PendingFeatures, Features {
+    ) {
         assert!(
             signer::address_of(framework) == @std,
             error::permission_denied(EFRAMEWORK_SIGNER_NEEDED)
@@ -965,7 +963,7 @@ module std::features {
     ///
     /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
     /// who have permission to set the flag that's checked in `extract()`.
-    public fun on_new_epoch(framework: &signer) acquires Features, PendingFeatures {
+    public fun on_new_epoch(framework: &signer) {
         ensure_framework_signer(framework);
         if (exists<PendingFeatures>(@std)) {
             let PendingFeatures { features } = move_from<PendingFeatures>(@std);

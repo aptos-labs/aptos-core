@@ -1,11 +1,11 @@
 module std::bit_vector {
-    use std::vector;
 
     /// The provided index is out of bounds
     const EINDEX: u64 = 0x20000;
     /// An invalid length of bitvector was given
     const ELENGTH: u64 = 0x20001;
 
+    #[test_only]
     const WORD_SIZE: u64 = 1;
     /// The maximum allowed bitvector size
     const MAX_SIZE: u64 = 1024;
@@ -23,7 +23,7 @@ module std::bit_vector {
         assert!(length > 0, ELENGTH);
         assert!(length < MAX_SIZE, ELENGTH);
         let counter = 0;
-        let bit_field = vector::empty();
+        let bit_field = vector[];
         while ({spec {
             invariant counter <= length;
             invariant len(bit_field) == counter;
