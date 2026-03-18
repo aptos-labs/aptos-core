@@ -569,6 +569,7 @@ impl PipelineBuilder {
                     order_proof_fut.clone(),
                     rand_check_fut.clone(),
                     block.clone(),
+                    observer_enabled,
                     self.consensus_publisher.clone(),
                     self.enable_v2_observer_messages,
                 ),
@@ -983,6 +984,7 @@ impl PipelineBuilder {
         order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
         rand_check: TaskFuture<RandResult>,
         block: Arc<Block>,
+        observer_enabled: bool,
         publisher: Option<Arc<ConsensusPublisher>>,
         enable_v2_observer_messages: bool,
     ) -> TaskResult<()> {
@@ -998,7 +1000,9 @@ impl PipelineBuilder {
             .iter()
             .find(|ordered_block| ordered_block.id() == block.id())
             .map(|block| {
-                block.set_decrypted_txns(decrypted_txns);
+                if !observer_enabled {
+                    block.set_decrypted_txns(decrypted_txns);
+                }
             })
             .is_none()
         {
