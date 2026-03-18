@@ -6,7 +6,7 @@ use crate::{
     errors::BatchEncryptionError,
     group::G2Affine,
     shared::{
-        digest::Digest,
+        digest::{Digest, DigestKey},
         key_derivation::{self, BIBEDecryptionKey},
     },
 };
