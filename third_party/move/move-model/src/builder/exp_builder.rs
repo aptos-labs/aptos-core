@@ -4043,7 +4043,7 @@ impl ExpTranslator<'_, '_, '_> {
 
     fn track_constant_usage(&mut self, loc: &Loc, const_sym: &QualifiedSymbol, user_id: UserId) {
         if let Some(const_entry) = self.parent.parent.const_table.get_mut(const_sym) {
-            const_entry.users.insert(user_id);
+            const_entry.users.insert(user_id.with_loc(loc.clone()));
         } else {
             self.parent.parent.env.diag(
                 Severity::Bug,

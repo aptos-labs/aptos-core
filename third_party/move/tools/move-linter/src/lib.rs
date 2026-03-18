@@ -6,8 +6,8 @@ mod stackless_bytecode_lints;
 mod utils;
 
 use move_compiler_v2::external_checks::{
-    ConstantChecker, ExpChecker, ExternalChecks, FunctionChecker, StacklessBytecodeChecker,
-    StructChecker,
+    ConstantChecker, ExpChecker, ExternalChecks, FunctionChecker, ModuleChecker,
+    StacklessBytecodeChecker, StructChecker,
 };
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -35,6 +35,10 @@ impl ExternalChecks for MoveLintChecks {
 
     fn get_function_checkers(&self) -> Vec<Box<dyn FunctionChecker>> {
         model_ast_lints::get_default_function_linter_pipeline(&self.config)
+    }
+
+    fn get_module_checkers(&self) -> Vec<Box<dyn ModuleChecker>> {
+        model_ast_lints::get_default_module_linter_pipeline(&self.config)
     }
 }
 

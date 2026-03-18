@@ -7,7 +7,7 @@
 use legacy_move_compiler::shared::known_attributes::LintAttribute;
 use move_model::{
     ast::ExpData,
-    model::{FunctionEnv, GlobalEnv, Loc, NamedConstantEnv, StructEnv},
+    model::{FunctionEnv, GlobalEnv, Loc, ModuleEnv, NamedConstantEnv, StructEnv},
 };
 use move_stackless_bytecode::function_target::FunctionTarget;
 use std::{collections::BTreeSet, fmt, sync::Arc};
@@ -31,6 +31,11 @@ pub trait ExternalChecks {
 
     /// Get all the function checkers.
     fn get_function_checkers(&self) -> Vec<Box<dyn FunctionChecker>>;
+
+    /// Get all the module checkers.
+    fn get_module_checkers(&self) -> Vec<Box<dyn ModuleChecker>> {
+        vec![]
+    }
 }
 
 impl fmt::Debug for dyn ExternalChecks {
@@ -65,10 +70,16 @@ impl fmt::Debug for dyn ExternalChecks {
             .map(|c| c.get_name())
             .collect::<Vec<_>>()
             .join(", ");
+        let module_checkers = self
+            .get_module_checkers()
+            .into_iter()
+            .map(|c| c.get_name())
+            .collect::<Vec<_>>()
+            .join(", ");
         write!(
             f,
-            "dyn ExternalChecks {{ exp_checkers: [{}], stackless_bytecode_checkers: [{}], constant_checkers: [{}], struct_checkers: [{}], function_checkers: [{}] }}",
-            exp_checkers, stackless_bytecode_checkers, constant_checkers, struct_checkers, function_checkers
+            "dyn ExternalChecks {{ exp_checkers: [{}], stackless_bytecode_checkers: [{}], constant_checkers: [{}], struct_checkers: [{}], function_checkers: [{}], module_checkers: [{}] }}",
+            exp_checkers, stackless_bytecode_checkers, constant_checkers, struct_checkers, function_checkers, module_checkers
         )
     }
 }
@@ -136,6 +147,20 @@ pub trait FunctionChecker {
     }
 }
 
+/// Implement this trait for checks on individual modules (e.g., use declarations).
+pub trait ModuleChecker {
+    /// Name of this checker.
+    fn get_name(&self) -> String;
+
+    /// Examine `module_env` and potentially emit reports via `self.report()`.
+    fn check_module(&self, module_env: &ModuleEnv);
+
+    /// Report the `msg` highlighting the `loc`.
+    fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
+        report(env, loc, msg, self.get_name().as_str());
+    }
+}
+
 /// Implement this trait for checks that are performed on the stackless bytecode.
 pub trait StacklessBytecodeChecker {
     /// Name of the stackless bytecode checker.
@@ -167,6 +192,9 @@ pub fn known_checker_names(external_checkers: &Vec<Arc<dyn ExternalChecks>>) -> 
             names.insert(checker.get_name());
         }
         for checker in checkers.get_function_checkers() {
+            names.insert(checker.get_name());
+        }
+        for checker in checkers.get_module_checkers() {
             names.insert(checker.get_name());
         }
     }

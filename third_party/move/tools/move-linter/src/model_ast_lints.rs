@@ -9,6 +9,7 @@ mod assert_const;
 mod blocks_in_conditions;
 mod collapsible_if;
 mod cyclomatic_complexity;
+mod deprecated_usage;
 mod empty_if;
 mod equal_operands_in_bin_op;
 mod known_to_abort;
@@ -31,7 +32,7 @@ mod unused_struct;
 mod while_true;
 
 use move_compiler_v2::external_checks::{
-    ConstantChecker, ExpChecker, FunctionChecker, StructChecker,
+    ConstantChecker, ExpChecker, FunctionChecker, ModuleChecker, StructChecker,
 };
 use std::collections::BTreeMap;
 
@@ -64,6 +65,7 @@ pub fn get_default_exp_linter_pipeline(
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),
+        Box::<deprecated_usage::DeprecatedUsageExpChecker>::default(),
     ];
     let checks_category = config.get("checks").map_or("default", |s| s.as_str());
     if checks_category == "strict" || checks_category == "experimental" {
@@ -81,7 +83,10 @@ pub fn get_default_exp_linter_pipeline(
 pub fn get_default_constant_linter_pipeline(
     _config: &BTreeMap<String, String>,
 ) -> Vec<Box<dyn ConstantChecker>> {
-    vec![Box::<unused_constant::UnusedConstant>::default()]
+    vec![
+        Box::<unused_constant::UnusedConstant>::default(),
+        Box::<deprecated_usage::DeprecatedUsageConstantChecker>::default(),
+    ]
 }
 
 /// Returns a default pipeline of struct linters.
@@ -89,7 +94,10 @@ pub fn get_default_constant_linter_pipeline(
 pub fn get_default_struct_linter_pipeline(
     _config: &BTreeMap<String, String>,
 ) -> Vec<Box<dyn StructChecker>> {
-    vec![Box::<unused_struct::UnusedStruct>::default()]
+    vec![
+        Box::<unused_struct::UnusedStruct>::default(),
+        Box::<deprecated_usage::DeprecatedUsageStructChecker>::default(),
+    ]
 }
 
 /// Returns a default pipeline of function linters.
@@ -97,5 +105,16 @@ pub fn get_default_struct_linter_pipeline(
 pub fn get_default_function_linter_pipeline(
     _config: &BTreeMap<String, String>,
 ) -> Vec<Box<dyn FunctionChecker>> {
-    vec![Box::<unused_function::UnusedFunction>::default()]
+    vec![
+        Box::<unused_function::UnusedFunction>::default(),
+        Box::<deprecated_usage::DeprecatedUsageFuncChecker>::default(),
+    ]
+}
+
+/// Returns a default pipeline of module linters.
+/// The `_config` parameter follows the same convention as in [`get_default_exp_linter_pipeline`].
+pub fn get_default_module_linter_pipeline(
+    _config: &BTreeMap<String, String>,
+) -> Vec<Box<dyn ModuleChecker>> {
+    vec![Box::<deprecated_usage::DeprecatedUsageModuleChecker>::default()]
 }

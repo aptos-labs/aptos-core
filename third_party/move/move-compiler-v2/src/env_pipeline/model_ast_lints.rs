@@ -5,7 +5,8 @@
 
 use crate::{
     external_checks::{
-        known_checker_names, ConstantChecker, ExternalChecks, FunctionChecker, StructChecker,
+        known_checker_names, ConstantChecker, ExternalChecks, FunctionChecker, ModuleChecker,
+        StructChecker,
     },
     lint_common::lint_skips_from_attributes,
     Options,
@@ -38,10 +39,15 @@ pub fn checker(env: &mut GlobalEnv) {
         .iter()
         .flat_map(|c| c.get_function_checkers())
         .collect::<Vec<_>>();
+    let module_checkers = external_checks
+        .iter()
+        .flat_map(|c| c.get_module_checkers())
+        .collect::<Vec<_>>();
     for module in env.get_modules() {
         if module.is_primary_target() {
             let module_lint_skips =
                 lint_skips_from_attributes(env, module.get_attributes(), &known_checker_names);
+            check_module(&module, &module_checkers, &module_lint_skips);
             for const_env in module.get_named_constants() {
                 check_constant(
                     &const_env,
@@ -75,6 +81,19 @@ pub fn checker(env: &mut GlobalEnv) {
                     &known_checker_names,
                 );
             }
+        }
+    }
+}
+
+/// Run module-level lint checks on a module.
+fn check_module(
+    module_env: &move_model::model::ModuleEnv,
+    checkers: &[Box<dyn ModuleChecker>],
+    module_lint_skips: &BTreeSet<String>,
+) {
+    for checker in checkers {
+        if !module_lint_skips.contains(&checker.get_name()) {
+            checker.check_module(module_env);
         }
     }
 }

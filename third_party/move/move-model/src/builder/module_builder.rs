@@ -1260,7 +1260,7 @@ impl ModuleBuilder<'_, '_> {
             // Type check the constant.
             let const_id = self.module_id.qualified(NamedConstantId::new(qsym.symbol));
             let mut et = ExpTranslator::new(self);
-            et.set_constant_use_context(UserId::Constant(const_id));
+            et.set_constant_use_context(UserId::Constant(const_id, loc.clone()));
             et.set_translate_move_fun();
             let exp = et.translate_exp(&def.value, &ty).into_exp();
             et.finalize_types(true);
@@ -1466,9 +1466,9 @@ impl ModuleBuilder<'_, '_> {
             et.set_spec_block_map(spec_block_map);
             et.set_result_type(result_type.clone());
             et.set_fun_name(full_name.clone());
-            et.set_constant_use_context(UserId::Function(fun_qid));
             et.set_translate_move_fun();
             let loc = et.to_loc(&body.loc);
+            et.set_constant_use_context(UserId::Function(fun_qid, loc.clone()));
             for (pos, TypeParameter(name, kind, loc)) in type_params.iter().enumerate() {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }

@@ -488,11 +488,30 @@ impl QualifiedInstId<StructId> {
 }
 
 /// Represents different types of users for a struct or constant.
+/// The `Loc` tracks the source location where the usage occurs.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UserId {
-    Function(QualifiedId<FunId>),
-    Struct(QualifiedId<StructId>),
-    Constant(QualifiedId<NamedConstantId>),
+    Function(QualifiedId<FunId>, Loc),
+    Struct(QualifiedId<StructId>, Loc),
+    Constant(QualifiedId<NamedConstantId>, Loc),
+}
+
+impl UserId {
+    /// Returns the source location of this usage.
+    pub fn loc(&self) -> &Loc {
+        match self {
+            UserId::Function(_, loc) | UserId::Struct(_, loc) | UserId::Constant(_, loc) => loc,
+        }
+    }
+
+    /// Returns a copy with the location replaced.
+    pub fn with_loc(self, loc: Loc) -> Self {
+        match self {
+            UserId::Function(id, _) => UserId::Function(id, loc),
+            UserId::Struct(id, _) => UserId::Struct(id, loc),
+            UserId::Constant(id, _) => UserId::Constant(id, loc),
+        }
+    }
 }
 
 // =================================================================================================
