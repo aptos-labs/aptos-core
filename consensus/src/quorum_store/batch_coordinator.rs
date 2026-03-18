@@ -104,7 +104,12 @@ impl BatchCoordinator {
                 let signed_batch_infos = batch_store.persist(persist_requests);
                 if !signed_batch_infos.is_empty() {
                     if approx_created_ts_usecs > 0 {
-                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED, &first_batch_info);
+                        observe_batch(
+                            approx_created_ts_usecs,
+                            peer_id,
+                            BatchStage::SIGNED,
+                            &first_batch_info,
+                        );
                     }
                     network_sender
                         .send_signed_batch_info_msg_v2(signed_batch_infos, vec![peer_id])
@@ -118,7 +123,12 @@ impl BatchCoordinator {
                         .expect("must not be empty")
                         .is_v2());
                     if approx_created_ts_usecs > 0 {
-                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED, &first_batch_info);
+                        observe_batch(
+                            approx_created_ts_usecs,
+                            peer_id,
+                            BatchStage::SIGNED,
+                            &first_batch_info,
+                        );
                     }
                     let signed_batch_infos = signed_batch_infos
                         .into_iter()

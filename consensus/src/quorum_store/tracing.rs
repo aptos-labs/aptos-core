@@ -41,12 +41,7 @@ pub fn observe_batch(
     }
 }
 
-pub fn observe_batch_vote_pct(
-    timestamp: u64,
-    author: Author,
-    pct: u8,
-    batch_info: &BatchInfoExt,
-) {
+pub fn observe_batch_vote_pct(timestamp: u64, author: Author, pct: u8, batch_info: &BatchInfoExt) {
     if let Some(t) = duration_since_epoch().checked_sub(Duration::from_micros(timestamp)) {
         let pct = (pct / 10) * 10;
         counters::BATCH_VOTE_PROGRESS
