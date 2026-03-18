@@ -137,34 +137,17 @@ async fn decrypt_observer_path(
         .await
         .map_err(|_| anyhow!("secret_shared_key_rx dropped in observer path"))?;
 
-    if maybe_key.is_none() {
-        if observer_decrypted_txns.is_some() {
-            return Err(TaskError::InternalError(Arc::new(anyhow!(
-                "observer decrypted txns should not be available if decryption key is not available"
-            ))));
-        }
-        return Ok(DecryptionResult {
-            decrypted_txns: Vec::new(),
-            regular_txns,
-            max_txns_from_block_to_execute,
-            block_gas_limit,
-            decryption_key: Some(None),
-        });
-    }
-
-    if observer_decrypted_txns.is_none() {
-        return Err(TaskError::InternalError(Arc::new(anyhow!(
-            "observer decrypted txns should be available"
-        ))));
-    }
-
+    // When the key is None the validator may still send failed-decryption txns
+    // (e.g. DecryptionKeyUnavailable) via V2. Accept them if present; only
+    // return an empty result when neither key nor txns are available.
     let dec_key = maybe_key
         .map(|key| BlockTxnDecryptionKey::from_secret_shared_key(&key))
         .transpose()?;
 
+    let decrypted_txns = observer_decrypted_txns.unwrap_or_default();
+
     Ok(DecryptionResult {
-        decrypted_txns: observer_decrypted_txns
-            .expect("observer decrypted txns should be available"),
+        decrypted_txns,
         regular_txns,
         max_txns_from_block_to_execute,
         block_gas_limit,
