@@ -128,6 +128,14 @@ module aptos_experimental::confidential_asset {
         }
     }
 
+    /// When developers fetch the effective auditor config, we wrap it in this struct to indicate whether they've fetched the global or the asset-specific auditor config
+    enum EffectiveAuditorConfig has store, drop, copy {
+        V1 {
+            is_global: bool,
+            config: AuditorConfig,
+        }
+    }
+
     /// Global configuration for the confidential asset protocol, installed during `init_module`.
     enum GlobalConfig has key {
         V1 {
@@ -423,7 +431,7 @@ module aptos_experimental::confidential_asset {
         // Read values before mutable borrow to avoid conflicting borrows of ConfidentialStore
         let ek = get_encryption_key(sender_addr, asset_type);
         let old_balance = get_available_balance(sender_addr, asset_type);
-        let auditor_ek = get_effective_auditor(asset_type);
+        let auditor_ek = get_effective_auditor_config(asset_type).config.ek;
 
         let compressed_new_balance = assert_valid_withdrawal_proof(
             sender, asset_type,
@@ -508,7 +516,7 @@ module aptos_experimental::confidential_asset {
 
         let from = signer::address_of(sender);
         assert!(from != to, error::invalid_argument(E_SELF_TRANSFER));
-        let ek_effective_auditor = get_effective_auditor(asset_type);
+        let ek_effective_auditor = get_effective_auditor_config(asset_type).config.ek;
         let ek_sender = get_encryption_key(from, asset_type);
         let ek_recip = get_encryption_key(to, asset_type);
         let old_balance = get_available_balance(from, asset_type);
@@ -827,69 +835,45 @@ module aptos_experimental::confidential_asset {
     }
 
     #[view]
-    /// This ignores the global auditor, if any, and only returns the asset-specific auditor EK. Also, it returns the EK
-    /// even if the asset_type is no longer allow-listed.
-    public fun get_auditor_for_asset_type(
+    /// Note: Dapp developers should **not** need to call this function, which is why (for now) it is marked private.
+    ///
+    /// This ignores the global auditor, if any, and only returns the asset-specific auditor config. Furthermore, it returns
+    /// the auditor config even if the asset_type is no longer allow-listed.
+    fun get_auditor_config_for_asset_type(
         asset_type: Object<fungible_asset::Metadata>
-    ): Option<CompressedRistretto> acquires AssetConfig, GlobalConfig {
+    ): AuditorConfig acquires AssetConfig, GlobalConfig {
         let asset_config_address = get_asset_config_address(asset_type);
 
-        if (!exists<AssetConfig>(asset_config_address)) {
-            return std::option::none();
-        };
-
-        borrow_global<AssetConfig>(asset_config_address).auditor.ek
+        borrow_global<AssetConfig>(asset_config_address).auditor
     }
 
     #[view]
-    public fun get_global_auditor(): Option<CompressedRistretto> acquires GlobalConfig {
-        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor.ek
+    /// Note: Dapp developers should **not** need to call this function, which is why (for now) it is marked private.
+    ///
+    /// This ignores asset-specific auditors, if any, and only returns the global auditor config. Furthermore, it returns
+    /// the auditor config even if the asset_type is no longer allow-listed.
+    fun get_global_auditor_config(): AuditorConfig acquires GlobalConfig {
+        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor
     }
 
     #[view]
     /// Returns the effective auditor: asset-specific if set, else global.
-    public fun get_effective_auditor(
+    /// Used by dapp developers to fetch the right auditor EK to create withdraw, normalize or transfer transactions.
+    public fun get_effective_auditor_config(
         asset_type: Object<fungible_asset::Metadata>
-    ): Option<CompressedRistretto> acquires AssetConfig, GlobalConfig {
+    ): EffectiveAuditorConfig acquires AssetConfig, GlobalConfig {
         let config_addr = get_asset_config_address(asset_type); // first, check asset-specific auditor
         if (exists<AssetConfig>(config_addr)) {
-            let asset_auditor = borrow_global<AssetConfig>(config_addr).auditor.ek;
-            if (asset_auditor.is_some()) {
-                return asset_auditor
+            return EffectiveAuditorConfig::V1 {
+                is_global: false,
+                config: borrow_global<AssetConfig>(config_addr).auditor
             };
         };
 
-        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor.ek // otherwise, fall back to global auditor
-    }
-
-    #[view]
-    public fun get_global_auditor_epoch(): u64 acquires GlobalConfig {
-        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor.epoch
-    }
-
-    #[view]
-    public fun get_auditor_epoch_for_asset_type(
-        asset_type: Object<fungible_asset::Metadata>
-    ): u64 acquires AssetConfig, GlobalConfig {
-        let asset_config_address = get_asset_config_address(asset_type);
-        if (!exists<AssetConfig>(asset_config_address)) {
-            return 0 // this indicates an auditor EK was never installed
-        };
-        borrow_global<AssetConfig>(asset_config_address).auditor.epoch
-    }
-
-    #[view]
-    public fun get_effective_auditor_epoch(
-        asset_type: Object<fungible_asset::Metadata>
-    ): u64 acquires AssetConfig, GlobalConfig {
-        let config_addr = get_asset_config_address(asset_type);
-        if (exists<AssetConfig>(config_addr)) {
-            let ac = borrow_global<AssetConfig>(config_addr);
-            if (ac.auditor.ek.is_some()) {
-                return ac.auditor.epoch
-            };
-        };
-        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor.epoch
+        EffectiveAuditorConfig::V1 {      // otherwise, fall back to global auditor
+            is_global: true,
+            config: borrow_global<GlobalConfig>( @aptos_experimental).global_auditor
+        }
     }
 
     #[view]
@@ -1231,7 +1215,7 @@ module aptos_experimental::confidential_asset {
         acquires ConfidentialStore, AssetConfig, GlobalConfig
     {
         let ek = get_encryption_key(sender_addr, asset_type);
-        let compressed_ek_aud = get_effective_auditor(asset_type);
+        let compressed_ek_aud = get_effective_auditor_config(asset_type).config.ek;
         let sender = aptos_framework::account::create_signer_for_test(sender_addr);
 
         let new_balance_randomness = generate_available_randomness();
@@ -1292,7 +1276,7 @@ module aptos_experimental::confidential_asset {
         let ek_sender = get_encryption_key(sender_addr, asset_type);
         let ek_recipient = get_encryption_key(recipient_addr, asset_type);
         let compressed_old_balance = get_available_balance(sender_addr, asset_type);
-        let compressed_ek_eff_aud = get_effective_auditor(asset_type);
+        let compressed_ek_eff_aud = get_effective_auditor_config(asset_type).config.ek;
         let sender = aptos_framework::account::create_signer_for_test(sender_addr);
         let has_effective_auditor = compressed_ek_eff_aud.is_some();
         let num_volun_auditors = compressed_ek_volun_auds.length();
