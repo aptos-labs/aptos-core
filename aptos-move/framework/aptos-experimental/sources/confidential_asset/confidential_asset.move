@@ -101,6 +101,10 @@ module aptos_experimental::confidential_asset {
 
     // === Constants (2 out of 13) ===
 
+
+    /// Any natural number that fits in this # of bits will be less than the Ristretto255 order $p$ and thus fit in its scalar field $\mathbb{Z}_p$ without "wrapping around."
+    const MAX_NUM_BITS_IN_SCALAR_FIELD : u64 = 252;
+
     /// The maximum number of transactions can be aggregated on the pending balance before rollover is required.
     /// i.e., `ConfidentialStore::transfers_received` will never exceed this value.
     const MAX_TRANSFERS_BEFORE_ROLLOVER: u64 = 65536;
@@ -216,11 +220,29 @@ module aptos_experimental::confidential_asset {
         // the publishing account as deployer. It does, so the assert is redundant (it can never fail).
         assert!(signer::address_of(deployer) == @aptos_experimental, error::internal(E_INTERNAL_ERROR));
         assert!(math64::pow(2, get_chunk_size_bits()) == get_chunk_upper_bound(), error::internal(E_INTERNAL_ERROR));
-
         assert!(
-            bulletproofs::get_max_range_bits() >= confidential_range_proofs::get_bulletproofs_num_bits(),
+            bulletproofs::get_max_range_bits() >= confidential_balance::get_chunk_size_bits(),
             error::internal(E_RANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE)
         );
+
+        // Available must have more chunks than pending (rollover safety)
+        let num_avail_chunks = confidential_balance::get_num_available_chunks();
+        let num_pend_chunks = confidential_balance::get_num_pending_chunks();
+        assert!(num_avail_chunks >= num_pend_chunks);
+
+        // Available balance chunking must be done so that any balance is representable as a Scalar, w/o wrap-around
+        let avail_balance_upper_bound = get_chunk_size_bits() * num_avail_chunks;
+        // FA balances use u128 amounts
+        assert!(avail_balance_upper_bound == 128);
+        // no modular wraparound on available balances
+        assert!(avail_balance_upper_bound <= MAX_NUM_BITS_IN_SCALAR_FIELD);
+
+        // Pending balance chunking must be done so that any balance is representable as a Scalar, w/o wrap-around
+        let pend_balance_upper_bound = get_chunk_size_bits() * num_pend_chunks;
+        // FA deposit/withdraw use u64 amounts
+        assert!(pend_balance_upper_bound == 64);
+        // no modular wraparound on pending balances nor transferred amounts
+        assert!(pend_balance_upper_bound <= MAX_NUM_BITS_IN_SCALAR_FIELD);
 
         let deployer_address = signer::address_of(deployer);
         move_to(
