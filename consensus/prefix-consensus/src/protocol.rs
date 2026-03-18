@@ -15,7 +15,7 @@ use crate::{
         PendingVotes1, PendingVotes2, PendingVotes3, PrefixConsensusInput,
         PrefixConsensusOutput, PrefixVector, Vote1, Vote2, Vote3, QC1, QC2, QC3,
     },
-    verification::{verify_qc1, verify_qc2, verify_qc3, verify_vote1, verify_vote2, verify_vote3},
+    verification::{verify_vote1, verify_vote2, verify_vote3},
 };
 use anyhow::{bail, Result};
 use aptos_logger::{debug, error, info};
@@ -202,8 +202,7 @@ impl PrefixConsensusProtocol {
             let consumed_pending = std::mem::replace(&mut *pending, PendingVotes1::new());
             let qc1 = consumed_pending.into_qc1();
 
-            // Verify QC1
-            verify_qc1(&qc1, &self.validator_verifier)?;
+            // No need to verify QC1 — we verified each vote individually on arrival.
 
             // Store QC1
             *self.qc1.write().await = Some(qc1.clone());
@@ -313,8 +312,7 @@ impl PrefixConsensusProtocol {
             let consumed_pending = std::mem::replace(&mut *pending, PendingVotes2::new());
             let qc2 = consumed_pending.into_qc2();
 
-            // Verify QC2
-            verify_qc2(&qc2, &self.validator_verifier)?;
+            // No need to verify QC2 — we verified each vote individually on arrival.
 
             // Store QC2
             *self.qc2.write().await = Some(qc2.clone());
@@ -424,8 +422,7 @@ impl PrefixConsensusProtocol {
             let consumed_pending = std::mem::replace(&mut *pending, PendingVotes3::new());
             let qc3 = consumed_pending.into_qc3();
 
-            // Verify QC3
-            verify_qc3(&qc3, &self.validator_verifier)?;
+            // No need to verify QC3 — we verified each vote individually on arrival.
 
             // Store QC3
             *self.qc3.write().await = Some(qc3.clone());
