@@ -51,7 +51,7 @@ impl<T: ?Sized> GlobalArenaPtr<T> {
     /// been reset or dropped while this reference was created. In other words,
     /// the returned reference **must not** outlive the actual lifetime of the
     /// allocation.
-    pub unsafe fn as_ref_unchecked<'a>(&self) -> &'a T {
+    pub unsafe fn as_ref_unchecked<'pool>(&self) -> &'pool T {
         // SAFETY:
         //
         // Caller must ensure safety preconditions.
@@ -110,8 +110,8 @@ impl<T: ?Sized> Hash for GlobalArenaPtr<T> {
 /// from the pool can be acquired by the running thread to obtain an exclusive
 /// access.
 pub struct GlobalArenaPool {
+    // Note: use cache-padded to avoid false sharing.
     arenas: Box<[CachePadded<Mutex<Bump>>]>,
-    num_arenas: usize,
 }
 
 impl GlobalArenaPool {
@@ -131,18 +131,16 @@ impl GlobalArenaPool {
     /// # Panics
     ///
     /// - If number of arenas is zero, or larger than 128.
-    /// - If number of arenas is not a power of two.
     pub fn with_capacity_and_num_arenas(arena_capacity: usize, num_arenas: usize) -> Self {
         // Number of arenas is ~ number of working threads. Upper bound by 128
         // is good enough to accommodate most of the CPUs.
         assert!(num_arenas > 0);
         assert!(num_arenas <= 128);
-        assert!(num_arenas.is_power_of_two());
 
         let arenas = (0..num_arenas)
             .map(|_| CachePadded::new(Mutex::new(Bump::with_capacity(arena_capacity))))
             .collect();
-        Self { arenas, num_arenas }
+        Self { arenas }
     }
 
     /// Locks the arena at a specific index and returns its guard. Returns
@@ -152,7 +150,7 @@ impl GlobalArenaPool {
     ///
     /// Panics if the index is out of bounds.
     pub fn try_lock_arena(&self, idx: usize) -> Option<GlobalArenaShard<'_>> {
-        assert!(idx < self.num_arenas);
+        assert!(idx < self.num_arenas());
         Some(GlobalArenaShard {
             guard: self.arenas[idx].try_lock()?,
         })
@@ -165,7 +163,7 @@ impl GlobalArenaPool {
     ///
     /// Panics if the index is out of bounds.
     pub fn lock_arena(&self, idx: usize) -> GlobalArenaShard<'_> {
-        assert!(idx < self.num_arenas);
+        assert!(idx < self.num_arenas());
         GlobalArenaShard {
             guard: self.arenas[idx].lock(),
         }
@@ -173,7 +171,7 @@ impl GlobalArenaPool {
 
     /// Returns the number of arenas in the pool.
     pub fn num_arenas(&self) -> usize {
-        self.num_arenas
+        self.arenas.len()
     }
 
     /// Returns the number of allocated bytes for a specific arena in the pool.
@@ -182,7 +180,7 @@ impl GlobalArenaPool {
     ///
     /// Panics if the index is out of bounds.
     pub fn allocated_bytes(&self, idx: usize) -> usize {
-        assert!(idx < self.num_arenas);
+        assert!(idx < self.num_arenas());
         self.arenas[idx].lock().allocated_bytes()
     }
 
@@ -210,22 +208,34 @@ impl Default for GlobalArenaPool {
 }
 
 /// A bump allocator borrowed from [`GlobalArenaPool`].
-pub struct GlobalArenaShard<'a> {
-    guard: MutexGuard<'a, Bump>,
+pub struct GlobalArenaShard<'pool> {
+    guard: MutexGuard<'pool, Bump>,
 }
 
-impl<'a> GlobalArenaShard<'a> {
-    /// Allocates a value in the arena, returning a stable pointer to it.
+impl<'pool> GlobalArenaShard<'pool> {
+    /// Allocates a value in the arena, returning a raw pointer to it.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if reserving space for the value fails.
     pub fn alloc<T>(&self, value: T) -> GlobalArenaPtr<T> {
         GlobalArenaPtr(NonNull::from(self.guard.alloc(value)))
     }
 
-    /// Allocates a string in the arena, returning a stable pointer to it.
+    /// Allocates a string in the arena, returning a raw pointer to it.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if reserving space for the string fails.
     pub fn alloc_str(&self, s: &str) -> GlobalArenaPtr<str> {
         GlobalArenaPtr(NonNull::from(self.guard.alloc_str(s)))
     }
 
-    /// Allocates a slice by copying from the source, returning a stable pointer.
+    /// Allocates a slice by copying from the source, returning a raw pointer.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if reserving space for the slice fails.
     pub fn alloc_slice_copy<T: Copy>(&self, src: &[T]) -> GlobalArenaPtr<[T]> {
         GlobalArenaPtr(NonNull::from(self.guard.alloc_slice_copy(src)))
     }
