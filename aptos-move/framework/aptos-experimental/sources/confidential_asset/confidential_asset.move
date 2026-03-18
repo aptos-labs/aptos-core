@@ -111,7 +111,7 @@ module aptos_experimental::confidential_asset {
     // === Structs (4 out of 14) ===
 
     /// Bundles an auditor's encryption key with its epoch counter (both always modified together).
-    enum AuditorEK has store, drop, copy {
+    enum AuditorConfig has store, drop, copy {
         V1 {
             ek: Option<CompressedRistretto>,
 
@@ -129,7 +129,7 @@ module aptos_experimental::confidential_asset {
             allow_list_enabled: bool,
 
             /// The global auditor. Asset-specific auditors take precedence.
-            global_auditor: AuditorEK,
+            global_auditor: AuditorConfig,
 
             /// Used to derive a signer that owns all the FAs' primary stores and `AssetConfig` objects.
             extend_ref: ExtendRef
@@ -145,7 +145,7 @@ module aptos_experimental::confidential_asset {
             allowed: bool,
 
             /// The asset-specific auditor. Takes precedence over the global auditor.
-            auditor: AuditorEK,
+            auditor: AuditorConfig,
         }
     }
 
@@ -226,9 +226,9 @@ module aptos_experimental::confidential_asset {
             deployer,
             GlobalConfig::V1 {
                 allow_list_enabled: is_mainnet,
-                global_auditor: AuditorEK::V1 { ek: std::option::none(), epoch: 0 },
+                global_auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 },
                 // DO NOT CHANGE: using long syntax until framework change is released to mainnet
-                extend_ref: object::generate_extend_ref(&object::create_object(deployer_address))
+                extend_ref: object::create_object(deployer_address).generate_extend_ref()
             }
         );
 
@@ -706,7 +706,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Shared logic for setting/removing an auditor EK. Validates non-identity, increments epoch on install/change.
-    fun update_auditor(auditor: &mut AuditorEK, new_ek_bytes: Option<vector<u8>>) {
+    fun update_auditor(auditor: &mut AuditorConfig, new_ek_bytes: Option<vector<u8>>) {
         let new_ek = new_ek_bytes.map(|ek| new_compressed_point_from_bytes(ek).extract());
 
         if (new_ek.is_some()) {
@@ -887,7 +887,7 @@ module aptos_experimental::confidential_asset {
 
     fun get_asset_config_address(asset_type: Object<fungible_asset::Metadata>): address acquires GlobalConfig {
         let config_ext = &borrow_global<GlobalConfig>(@aptos_experimental).extend_ref;
-        let config_ext_address = object::address_from_extend_ref(config_ext);
+        let config_ext_address = config_ext.address_from_extend_ref();
         object::create_object_address(&config_ext_address, construct_asset_config_seed(asset_type))
     }
 
@@ -901,7 +901,7 @@ module aptos_experimental::confidential_asset {
                 &asset_config_signer,
                 // We disallow the asset type from being made confidential since this function is
                 // called in a lot of different contexts.
-                AssetConfig::V1 { allowed: false, auditor: AuditorEK::V1 { ek: std::option::none(), epoch: 0 } }
+                AssetConfig::V1 { allowed: false, auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 } }
             );
         };
 
@@ -943,12 +943,12 @@ module aptos_experimental::confidential_asset {
 
     fun get_asset_config_signer(asset_type: Object<fungible_asset::Metadata>): signer acquires GlobalConfig {
         let config_ext = &borrow_global<GlobalConfig>(@aptos_experimental).extend_ref;
-        let config_ext_signer = object::generate_signer_for_extending(config_ext);
+        let config_ext_signer = config_ext.generate_signer_for_extending();
 
         let config_ctor =
             &object::create_named_object(&config_ext_signer, construct_asset_config_seed(asset_type));
 
-        object::generate_signer(config_ctor)
+        config_ctor.generate_signer()
     }
 
     /// Unique seed per (user, asset-type) for the ConfidentialStore object address.
@@ -957,7 +957,7 @@ module aptos_experimental::confidential_asset {
             &string_utils::format2(
                 &b"confidential_asset::{}::asset_type::{}::ConfidentialStore",
                 @aptos_experimental,
-                object::object_address(&asset_type)
+                asset_type.object_address()
             )
         )
     }
@@ -968,7 +968,7 @@ module aptos_experimental::confidential_asset {
             &string_utils::format2(
                 &b"confidential_asset::{}::asset_type::{}::AssetConfig",
                 @aptos_experimental,
-                object::object_address(&asset_type)
+                asset_type.object_address()
             )
         )
     }
