@@ -15,11 +15,13 @@ use crate::{
         PendingVotes1, PendingVotes2, PendingVotes3, PrefixConsensusInput,
         PrefixConsensusOutput, PrefixVector, Vote1, Vote2, Vote3, QC1, QC2, QC3,
     },
-    verification::{verify_vote1, verify_vote2, verify_vote3},
+    verification::{verify_vote1_cached, verify_vote2_cached, verify_vote3_cached},
 };
 use anyhow::{bail, Result};
+use aptos_crypto::HashValue;
 use aptos_logger::{debug, error, info};
 use aptos_types::validator_signer::ValidatorSigner;
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -87,6 +89,11 @@ pub struct PrefixConsensusProtocol {
 
     /// Validator verifier for signature checking
     validator_verifier: Arc<aptos_types::validator_verifier::ValidatorVerifier>,
+
+    /// Cache of verified vote SignData hashes to skip redundant BLS verification.
+    /// Votes embedded in later-round QCs (e.g., Vote1s inside QC1 inside Vote2)
+    /// are checked against this cache before performing expensive BLS verification.
+    verified_votes: Arc<RwLock<HashSet<HashValue>>>,
 }
 
 impl PrefixConsensusProtocol {
@@ -108,6 +115,7 @@ impl PrefixConsensusProtocol {
             qc3: Arc::new(RwLock::new(None)),
             output: Arc::new(RwLock::new(None)),
             validator_verifier,
+            verified_votes: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 
@@ -168,8 +176,8 @@ impl PrefixConsensusProtocol {
 
     /// Process an incoming Vote1
     pub async fn process_vote1(&self, vote: Vote1) -> Result<Option<QC1>> {
-        // Verify vote
-        verify_vote1(&vote, &self.validator_verifier)?;
+        // Verify vote (with cache to skip redundant BLS for embedded votes)
+        verify_vote1_cached(&vote, &self.validator_verifier, &mut *self.verified_votes.write().await)?;
 
         debug!(
             author = %vote.author,
@@ -279,8 +287,8 @@ impl PrefixConsensusProtocol {
 
     /// Process an incoming Vote2
     pub async fn process_vote2(&self, vote: Vote2) -> Result<Option<QC2>> {
-        // Verify vote
-        verify_vote2(&vote, &self.validator_verifier)?;
+        // Verify vote (with cache to skip redundant BLS for embedded votes)
+        verify_vote2_cached(&vote, &self.validator_verifier, &mut *self.verified_votes.write().await)?;
 
         debug!(
             author = %vote.author,
@@ -389,8 +397,8 @@ impl PrefixConsensusProtocol {
 
     /// Process an incoming Vote3
     pub async fn process_vote3(&self, vote: Vote3) -> Result<Option<PrefixConsensusOutput>> {
-        // Verify vote
-        verify_vote3(&vote, &self.validator_verifier)?;
+        // Verify vote (with cache to skip redundant BLS for embedded votes)
+        verify_vote3_cached(&vote, &self.validator_verifier, &mut *self.verified_votes.write().await)?;
 
         debug!(
             author = %vote.author,

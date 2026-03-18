@@ -8,9 +8,12 @@
 
 use crate::{
     signing::{verify_vote1_signature, verify_vote2_signature, verify_vote3_signature},
-    types::{PartyId, Vote1, Vote2, Vote3, QC1, QC2, QC3},
+    types::{
+        PartyId, Vote1, Vote1SignData, Vote2, Vote2SignData, Vote3, Vote3SignData, QC1, QC2, QC3,
+    },
 };
 use anyhow::{bail, Result};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use std::collections::HashSet;
 
@@ -132,6 +135,121 @@ pub fn verify_qc3(qc3: &QC3, verifier: &ValidatorVerifier) -> Result<()> {
         verify_vote3(vote, verifier)?;
     }
 
+    Ok(())
+}
+
+// ============================================================================
+// Cached Vote/QC Verification
+// ============================================================================
+// These variants check a HashSet of previously verified vote SignData hashes
+// before performing BLS verification. This avoids re-verifying votes that
+// appear embedded in later-round QCs (e.g., Vote1s inside QC1 inside Vote2).
+
+/// Verify a Vote1 message with cache. Skips BLS if already verified.
+pub fn verify_vote1_cached(
+    vote: &Vote1,
+    verifier: &ValidatorVerifier,
+    cache: &mut HashSet<HashValue>,
+) -> Result<()> {
+    let sign_data = Vote1SignData {
+        author: vote.author,
+        input_vector: vote.input_vector.clone(),
+        epoch: vote.epoch,
+        slot: vote.slot,
+        view: vote.view,
+    };
+    let hash = CryptoHash::hash(&sign_data);
+    if cache.contains(&hash) {
+        return Ok(());
+    }
+    verify_vote1_signature(vote, &vote.author, verifier)?;
+    cache.insert(hash);
+    Ok(())
+}
+
+/// Verify a Vote2 message with cache. Skips BLS if already verified.
+/// Also uses cache for embedded QC1 votes.
+pub fn verify_vote2_cached(
+    vote: &Vote2,
+    verifier: &ValidatorVerifier,
+    cache: &mut HashSet<HashValue>,
+) -> Result<()> {
+    verify_qc1_cached(&vote.qc1, verifier, cache)?;
+
+    let sign_data = Vote2SignData {
+        author: vote.author,
+        certified_prefix: vote.certified_prefix.clone(),
+        qc1: vote.qc1.clone(),
+        epoch: vote.epoch,
+        slot: vote.slot,
+        view: vote.view,
+    };
+    let hash = CryptoHash::hash(&sign_data);
+    if cache.contains(&hash) {
+        return Ok(());
+    }
+    verify_vote2_signature(vote, &vote.author, verifier)?;
+    cache.insert(hash);
+    Ok(())
+}
+
+/// Verify a Vote3 message with cache. Skips BLS if already verified.
+/// Also uses cache for embedded QC2 votes.
+pub fn verify_vote3_cached(
+    vote: &Vote3,
+    verifier: &ValidatorVerifier,
+    cache: &mut HashSet<HashValue>,
+) -> Result<()> {
+    verify_qc2_cached(&vote.qc2, verifier, cache)?;
+
+    let sign_data = Vote3SignData {
+        author: vote.author,
+        mcp_prefix: vote.mcp_prefix.clone(),
+        qc2: vote.qc2.clone(),
+        epoch: vote.epoch,
+        slot: vote.slot,
+        view: vote.view,
+    };
+    let hash = CryptoHash::hash(&sign_data);
+    if cache.contains(&hash) {
+        return Ok(());
+    }
+    verify_vote3_signature(vote, &vote.author, verifier)?;
+    cache.insert(hash);
+    Ok(())
+}
+
+/// Verify a QC1 with cache for individual vote verification.
+fn verify_qc1_cached(
+    qc1: &QC1,
+    verifier: &ValidatorVerifier,
+    cache: &mut HashSet<HashValue>,
+) -> Result<()> {
+    let authors: Vec<PartyId> = qc1.votes.iter().map(|v| v.author).collect();
+    verify_no_duplicate_authors(&authors)?;
+    verifier
+        .check_voting_power(authors.iter(), true)
+        .map_err(|e| anyhow::anyhow!("QC1 insufficient voting power: {}", e))?;
+    for vote in &qc1.votes {
+        verify_vote1_cached(vote, verifier, cache)?;
+    }
+    Ok(())
+}
+
+/// Verify a QC2 with cache for individual vote verification.
+fn verify_qc2_cached(
+    qc2: &QC2,
+    verifier: &ValidatorVerifier,
+    cache: &mut HashSet<HashValue>,
+) -> Result<()> {
+    let authors: Vec<PartyId> = qc2.votes.iter().map(|v| v.author).collect();
+    verify_no_duplicate_authors(&authors)?;
+    verifier
+        .check_voting_power(authors.iter(), true)
+        .map_err(|e| anyhow::anyhow!("QC2 insufficient voting power: {}", e))?;
+    for vote in &qc2.votes {
+        verify_vote2_cached(vote, verifier, cache)?;
+    }
     Ok(())
 }
 

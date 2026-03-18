@@ -15,7 +15,6 @@ use crate::{
     inner_pc_trait::{Author, InnerPCAlgorithm},
     network_messages::PrefixConsensusMsg,
     protocol::PrefixConsensusProtocol,
-    signing::{verify_vote1_signature, verify_vote2_signature, verify_vote3_signature},
     types::{PrefixConsensusInput, PrefixConsensusOutput},
 };
 use anyhow::Result;
@@ -45,7 +44,6 @@ enum RoundState {
 /// `start()` and `process_message()`.
 pub struct ThreeRoundPC {
     protocol: PrefixConsensusProtocol,
-    verifier: Arc<ValidatorVerifier>,
     round: RoundState,
     /// Start time of the current round, for per-round latency metrics.
     round_start_time: Option<Instant>,
@@ -109,10 +107,9 @@ impl InnerPCAlgorithm for ThreeRoundPC {
     type Message = PrefixConsensusMsg;
 
     fn new_for_view(input: PrefixConsensusInput, verifier: Arc<ValidatorVerifier>) -> Self {
-        let protocol = PrefixConsensusProtocol::new(input, verifier.clone());
+        let protocol = PrefixConsensusProtocol::new(input, verifier);
         Self {
             protocol,
-            verifier,
             round: RoundState::Round1,
             round_start_time: None,
         }
@@ -154,11 +151,7 @@ impl InnerPCAlgorithm for ThreeRoundPC {
                 if vote.author != author {
                     return Ok((vec![], None));
                 }
-                // Signature verification
-                if verify_vote1_signature(&vote, &author, &self.verifier).is_err() {
-                    return Ok((vec![], None));
-                }
-                // Process vote
+                // BLS verification happens inside protocol.process_vote1 (with cache)
                 match self.protocol.process_vote1(*vote).await {
                     Ok(Some(_qc1)) => {
                         // QC1 formed — record Round 1 and cascade to Round 2
@@ -180,9 +173,7 @@ impl InnerPCAlgorithm for ThreeRoundPC {
                 if vote.author != author {
                     return Ok((vec![], None));
                 }
-                if verify_vote2_signature(&vote, &author, &self.verifier).is_err() {
-                    return Ok((vec![], None));
-                }
+                // BLS verification happens inside protocol.process_vote2 (with cache)
                 match self.protocol.process_vote2(*vote).await {
                     Ok(Some(_qc2)) => {
                         // QC2 formed — record Round 2 and cascade to Round 3
@@ -204,9 +195,7 @@ impl InnerPCAlgorithm for ThreeRoundPC {
                 if vote.author != author {
                     return Ok((vec![], None));
                 }
-                if verify_vote3_signature(&vote, &author, &self.verifier).is_err() {
-                    return Ok((vec![], None));
-                }
+                // BLS verification happens inside protocol.process_vote3 (with cache)
                 match self.protocol.process_vote3(*vote).await {
                     Ok(Some(output)) => {
                         // QC3 formed — record Round 3
