@@ -623,7 +623,7 @@ module aptos_experimental::confidential_asset {
         assert!(ca_store.transfers_received > 0, error::invalid_state(E_NOTHING_TO_ROLLOVER));
 
         add_assign_available_excluding_auditor(&mut ca_store.available_balance, &ca_store.pending_balance);
-        // A components remain stale — will be refreshed on normalize/withdraw/transfer
+        // Note: R_aud components [must] remain stale, but will be refreshed on the next normalize/withdraw/transfer
 
         ca_store.normalized = false;
         ca_store.transfers_received = 0;
