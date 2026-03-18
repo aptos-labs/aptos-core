@@ -118,8 +118,8 @@ module aptos_experimental::confidential_asset {
         V1 {
             ek: Option<CompressedRistretto>,
 
-            /// Tracks how many times the auditor EK has been installed or changed (not removed).
-            /// Starts at 0 and increments each time a new EK is set (None → Some(ek) or Some(old_ek) → Some(new_ek)).
+            /// Tracks how many times the auditor EK has been installed or changed (not removed). Starts at 0, indicating
+            /// no auditor was ever installed. Increments each time a new EK is set (None → Some(ek) or Some(old) → Some(new)).
             epoch: u64,
         }
     }
@@ -717,12 +717,13 @@ module aptos_experimental::confidential_asset {
             assert!(!new_ek.borrow().is_identity(), error::invalid_argument(E_AUDITOR_EK_IS_IDENTITY));
         };
 
-        // Increment epoch only when installing or changing the EK (not when removing)
+        // Increment epoch only when installing or changing the EK (not when removing): i.e., when None --> Some(ek), or
+        // when Some(old) --> Some(new), with new != old
         let should_increment = if (new_ek.is_some()) {
             if (auditor.ek.is_some()) {
-                !new_ek.borrow().compressed_point_equals(auditor.ek.borrow())
+                !new_ek.borrow().compressed_point_equals(auditor.ek.borrow())   // i.e., new != old
             } else {
-                true // None → Some: installing
+                true // None --> Some(ek): installing
             }
         } else {
             false // removing or no-op
@@ -826,16 +827,15 @@ module aptos_experimental::confidential_asset {
     public fun get_effective_auditor(
         asset_type: Object<fungible_asset::Metadata>
     ): Option<CompressedRistretto> acquires AssetConfig, GlobalConfig {
-        // 1. Check asset-specific auditor
-        let config_addr = get_asset_config_address(asset_type);
+        let config_addr = get_asset_config_address(asset_type); // first, check asset-specific auditor
         if (exists<AssetConfig>(config_addr)) {
             let asset_auditor = borrow_global<AssetConfig>(config_addr).auditor.ek;
             if (asset_auditor.is_some()) {
                 return asset_auditor
             };
         };
-        // 2. Fall back to global auditor
-        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor.ek
+
+        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor.ek // otherwise, fall back to global auditor
     }
 
     #[view]
@@ -849,7 +849,7 @@ module aptos_experimental::confidential_asset {
     ): u64 acquires AssetConfig, GlobalConfig {
         let asset_config_address = get_asset_config_address(asset_type);
         if (!exists<AssetConfig>(asset_config_address)) {
-            return 0
+            return 0 // this indicates an auditor EK was never installed
         };
         borrow_global<AssetConfig>(asset_config_address).auditor.epoch
     }
@@ -902,8 +902,7 @@ module aptos_experimental::confidential_asset {
 
             move_to(
                 &asset_config_signer,
-                // We disallow the asset type from being made confidential since this function is
-                // called in a lot of different contexts.
+                // We disallow the asset type from being made confidential since this function is called in a lot of different contexts.
                 AssetConfig::V1 { allowed: false, auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 } }
             );
         };
