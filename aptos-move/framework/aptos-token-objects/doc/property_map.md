@@ -409,7 +409,7 @@ Burns the entire property map
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_burn">burn</a>(ref: <a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_burn">burn</a>(ref: <a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>) {
     <b>move_from</b>&lt;<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>&gt;(ref.self);
 }
 </code></pre>
@@ -675,7 +675,7 @@ Validates property value type against its expected type
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_contains_key">contains_key</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): bool <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_contains_key">contains_key</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): bool {
     <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address());
     <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address()];
     <a href="property_map.md#0x4_property_map">property_map</a>.inner.<a href="property_map.md#0x4_property_map_contains_key">contains_key</a>(key)
@@ -701,7 +701,7 @@ Validates property value type against its expected type
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_length">length</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;): u64 <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_length">length</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;): u64 {
     <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address());
     <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address()];
     <a href="property_map.md#0x4_property_map">property_map</a>.inner.<a href="property_map.md#0x4_property_map_length">length</a>()
@@ -730,7 +730,7 @@ The preferred method is to use <code>read_&lt;type&gt;</code> where the type is 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read">read</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): (String, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read">read</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): (String, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
     <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address());
     <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>.object_address()];
     <b>let</b> property_value = <a href="property_map.md#0x4_property_map">property_map</a>.inner.borrow(key);
@@ -815,7 +815,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_bool">read_bool</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): bool <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_bool">read_bool</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): bool {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, bool&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_bool">from_bcs::to_bool</a>(value)
 }
@@ -840,7 +840,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u8">read_u8</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u8 <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u8">read_u8</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u8 {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, u8&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u8">from_bcs::to_u8</a>(value)
 }
@@ -865,7 +865,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u16">read_u16</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u16 <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u16">read_u16</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u16 {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, u16&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u16">from_bcs::to_u16</a>(value)
 }
@@ -890,7 +890,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u32">read_u32</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u32 <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u32">read_u32</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u32 {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, u32&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u32">from_bcs::to_u32</a>(value)
 }
@@ -915,7 +915,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u64">read_u64</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u64 <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u64">read_u64</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u64 {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, u64&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u64">from_bcs::to_u64</a>(value)
 }
@@ -940,7 +940,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u128">read_u128</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u128 <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u128">read_u128</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u128 {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, u128&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u128">from_bcs::to_u128</a>(value)
 }
@@ -965,7 +965,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u256">read_u256</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u256 <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_u256">read_u256</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): u256 {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, u256&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u256">from_bcs::to_u256</a>(value)
 }
@@ -990,7 +990,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_address">read_address</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): <b>address</b> <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_address">read_address</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): <b>address</b> {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, <b>address</b>&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(value)
 }
@@ -1015,7 +1015,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_bytes">read_bytes</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_bytes">read_bytes</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_bytes">from_bcs::to_bytes</a>(value)
 }
@@ -1040,7 +1040,7 @@ Read a type and verify that the type is correct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_string">read_string</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): String <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_read_string">read_string</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: &Object&lt;T&gt;, key: &String): String {
     <b>let</b> value = <a href="property_map.md#0x4_property_map_read_typed">read_typed</a>&lt;T, String&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, key);
     <a href="../../aptos-framework/../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_string">from_bcs::to_string</a>(value)
 }
@@ -1066,7 +1066,7 @@ Add a property, already bcs encoded as a <code><a href="../../aptos-framework/..
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_add">add</a>(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: String, type: String, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_add">add</a>(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: String, type: String, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
     <b>let</b> new_type = <a href="property_map.md#0x4_property_map_to_internal_type">to_internal_type</a>(type);
     <a href="property_map.md#0x4_property_map_validate_type">validate_type</a>(new_type, value);
     <a href="property_map.md#0x4_property_map_add_internal">add_internal</a>(ref, key, new_type, value);
@@ -1093,7 +1093,7 @@ Add a property that isn't already encoded as a <code><a href="../../aptos-framew
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_add_typed">add_typed</a>&lt;T: drop&gt;(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: String, value: T) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_add_typed">add_typed</a>&lt;T: drop&gt;(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: String, value: T) {
     <b>let</b> type = <a href="property_map.md#0x4_property_map_type_info_to_internal_type">type_info_to_internal_type</a>&lt;T&gt;();
     <a href="property_map.md#0x4_property_map_add_internal">add_internal</a>(ref, key, type, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&value));
 }
@@ -1145,7 +1145,7 @@ Updates a property in place already bcs encoded
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <b>update</b>(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: &String, type: String, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <b>update</b>(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: &String, type: String, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
     <b>let</b> new_type = <a href="property_map.md#0x4_property_map_to_internal_type">to_internal_type</a>(type);
     <a href="property_map.md#0x4_property_map_validate_type">validate_type</a>(new_type, value);
     <a href="property_map.md#0x4_property_map_update_internal">update_internal</a>(ref, key, new_type, value);
@@ -1172,7 +1172,7 @@ Updates a property in place that is not already bcs encoded
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_update_typed">update_typed</a>&lt;T: drop&gt;(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: &String, value: T) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_update_typed">update_typed</a>&lt;T: drop&gt;(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: &String, value: T) {
     <b>let</b> type = <a href="property_map.md#0x4_property_map_type_info_to_internal_type">type_info_to_internal_type</a>&lt;T&gt;();
     <a href="property_map.md#0x4_property_map_update_internal">update_internal</a>(ref, key, type, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&value));
 }
@@ -1225,7 +1225,7 @@ Removes a property from the map, ensuring that it does in fact exist
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_remove">remove</a>(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: &String) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_remove">remove</a>(ref: &<a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>, key: &String) {
     <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(ref.self);
     <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = &<b>mut</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>[ref.self];
     <a href="property_map.md#0x4_property_map">property_map</a>.inner.<a href="property_map.md#0x4_property_map_remove">remove</a>(key);
@@ -1251,7 +1251,7 @@ Removes a property from the map, ensuring that it does in fact exist
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="property_map.md#0x4_property_map_assert_end_to_end_input">assert_end_to_end_input</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: Object&lt;ObjectCore&gt;) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+<pre><code><b>fun</b> <a href="property_map.md#0x4_property_map_assert_end_to_end_input">assert_end_to_end_input</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: Object&lt;ObjectCore&gt;) {
     <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_bool">read_bool</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"bool")), 0);
     <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u8">read_u8</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u8")) == 0x12, 1);
     <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u16">read_u16</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u16")) == 0x1234, 2);

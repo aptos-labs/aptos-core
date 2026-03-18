@@ -42,7 +42,7 @@ module aptos_token_objects::royalty {
     }
 
     /// Set the royalty if it does not exist, replace it otherwise.
-    public fun update(mutator_ref: &MutatorRef, royalty: Royalty) acquires Royalty {
+    public fun update(mutator_ref: &MutatorRef, royalty: Royalty) {
         let addr = mutator_ref.inner.address_from_extend_ref();
         if (exists<Royalty>(addr)) {
             move_from<Royalty>(addr);
@@ -68,13 +68,13 @@ module aptos_token_objects::royalty {
         exists<Royalty>(addr)
     }
 
-    friend fun delete(addr: address) acquires Royalty {
+    friend fun delete(addr: address) {
         assert!(exists<Royalty>(addr), error::not_found(EROYALTY_DOES_NOT_EXIST));
         move_from<Royalty>(addr);
     }
 
     // Accessors
-    public fun get<T: key>(maybe_royalty: Object<T>): Option<Royalty> acquires Royalty {
+    public fun get<T: key>(maybe_royalty: Object<T>): Option<Royalty> {
         let obj_addr = maybe_royalty.object_address();
         if (exists<Royalty>(obj_addr)) {
             option::some(Royalty[obj_addr])
@@ -96,14 +96,14 @@ module aptos_token_objects::royalty {
     }
 
     #[test(creator = @0x123)]
-    fun test_none(creator: &signer) acquires Royalty {
+    fun test_none(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
         assert!(option::none() == get(object), 0);
     }
 
     #[test(creator = @0x123)]
-    fun test_init_and_update(creator: &signer) acquires Royalty {
+    fun test_init_and_update(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
         let init_royalty = create(1, 2, @0x123);
@@ -123,7 +123,7 @@ module aptos_token_objects::royalty {
     }
 
     #[test(creator = @0x123)]
-    fun test_update_only(creator: &signer) acquires Royalty {
+    fun test_update_only(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
         assert!(option::none() == get(object), 0);
@@ -136,7 +136,7 @@ module aptos_token_objects::royalty {
 
     #[test]
     #[expected_failure(abort_code = 0x60001, location = Self)]
-    fun test_does_not_exist() acquires Royalty {
+    fun test_does_not_exist() {
         delete(@0x1);
     }
 
