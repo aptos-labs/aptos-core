@@ -37,7 +37,6 @@ impl EncryptionKey {
         }
     }
 
-    #[cfg(test)]
     pub fn use_digest_key(&mut self, digest_key: &DigestKey) {
         self.tau_g2 = digest_key.tau_g2;
     }
