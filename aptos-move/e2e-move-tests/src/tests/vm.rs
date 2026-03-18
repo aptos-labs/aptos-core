@@ -10,8 +10,7 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{
         encrypted_payload::{DecryptionFailureReason, EncryptedPayload},
-        ExecutionStatus, TransactionExtraConfig,
-        TransactionPayload,
+        ExecutionStatus, TransactionExtraConfig, TransactionPayload,
     },
     write_set::WriteOp,
 };
