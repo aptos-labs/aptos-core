@@ -58,12 +58,12 @@ module 0xcafe::clamped_token {
         );
     }
 
-    public fun derived_balance<T: key>(store: Object<T>): u64 acquires BalanceStore {
-        borrow_global<BalanceStore>(@0xcafe).balance_ref.balance_with_ref(store)
+    public fun derived_balance<T: key>(store: Object<T>): u64 {
+        BalanceStore[@0xcafe].balance_ref.balance_with_ref(store)
     }
 
-    public fun derived_supply<T: key>(metadata: Object<T>): Option<u128> acquires BalanceStore {
-        option::some(borrow_global<BalanceStore>(@0xcafe).supply_ref.supply_with_ref(metadata).extract())
+    public fun derived_supply<T: key>(metadata: Object<T>): Option<u128> {
+        option::some(BalanceStore[@0xcafe].supply_ref.supply_with_ref(metadata).extract())
     }
 
     public fun withdraw<T: key>(

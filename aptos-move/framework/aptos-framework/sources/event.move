@@ -42,7 +42,7 @@ module aptos_framework::event {
 
     #[deprecated]
     /// Use EventHandleGenerator to generate a unique event handle for `sig`
-    public(friend) fun new_event_handle<T: drop + store>(guid: GUID): EventHandle<T> {
+    friend fun new_event_handle<T: drop + store>(guid: GUID): EventHandle<T> {
         EventHandle<T> {
             counter: 0,
             guid,

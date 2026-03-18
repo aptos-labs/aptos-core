@@ -10,7 +10,7 @@ module aptos_framework::util {
     /// owned.
     ///
     /// Function would abort if T has signer in it.
-    public(friend) native fun from_bytes<T>(bytes: vector<u8>): T;
+    friend native fun from_bytes<T>(bytes: vector<u8>): T;
 
     public fun address_from_bytes(bytes: vector<u8>): address {
         from_bytes(bytes)

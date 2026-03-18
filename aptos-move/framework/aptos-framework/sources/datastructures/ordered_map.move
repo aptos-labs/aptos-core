@@ -75,7 +75,7 @@ module aptos_framework::ordered_map {
     /// Create a new empty OrderedMap, using default (SortedVectorMap) implementation.
     public fun new<K, V>(): OrderedMap<K, V> {
         OrderedMap::SortedVectorMap {
-            entries: vector::empty(),
+            entries: vector[],
         }
     }
 
@@ -206,7 +206,7 @@ module aptos_framework::ordered_map {
     /// Changes the key, while keeping the same value attached to it
     /// Aborts with EKEY_NOT_FOUND if `old_key` doesn't exist.
     /// Aborts with ENEW_KEY_NOT_IN_ORDER if `new_key` doesn't keep the order `old_key` was in.
-    public(friend) fun replace_key_inplace<K: drop, V>(self: &mut OrderedMap<K, V>, old_key: &K, new_key: K) {
+    friend fun replace_key_inplace<K: drop, V>(self: &mut OrderedMap<K, V>, old_key: &K, new_key: K) {
         let len = self.entries.length();
         let index = binary_search(old_key, &self.entries, 0, len);
         assert!(index < len, error::invalid_argument(EKEY_NOT_FOUND));
@@ -262,7 +262,7 @@ module aptos_framework::ordered_map {
         let OrderedMap::SortedVectorMap {
             entries: other_entries,
         } = other;
-        let overwritten = vector::empty();
+        let overwritten = vector[];
 
         if (other_entries.is_empty()) {
             other_entries.destroy_empty();
@@ -281,7 +281,7 @@ module aptos_framework::ordered_map {
         };
 
         // In O(n), traversing from the back, build reverse sorted result, and then reverse it back
-        let reverse_result = vector::empty();
+        let reverse_result = vector[];
         let cur_i = self.entries.length() - 1;
         let other_i = other_entries.length() - 1;
 
@@ -606,8 +606,8 @@ module aptos_framework::ordered_map {
     /// Transform the map into two vectors with the keys and values respectively
     /// Primarily used to destroy a map
     public fun to_vec_pair<K, V>(self: OrderedMap<K, V>): (vector<K>, vector<V>) {
-        let keys: vector<K> = vector::empty();
-        let values: vector<V> = vector::empty();
+        let keys: vector<K> = vector[];
+        let values: vector<V> = vector[];
         let OrderedMap::SortedVectorMap { entries } = self;
         entries.for_each(|e| {
             let Entry { key, value } = e;
@@ -722,10 +722,8 @@ module aptos_framework::ordered_map {
     #[test_only]
     public fun validate_ordered<K, V>(self: &OrderedMap<K, V>) {
         let len = self.entries.length();
-        let i = 1;
-        while (i < len) {
+        for (i in 1..len) {
             assert!(cmp::compare(&self.entries.borrow(i).key, &self.entries.borrow(i - 1).key).is_gt(), 1);
-            i += 1;
         };
     }
 
@@ -750,7 +748,7 @@ module aptos_framework::ordered_map {
     }
 
     #[test_only]
-    public(friend) fun validate_map<K: drop + copy + store, V: store>(self: &OrderedMap<K, V>) {
+    friend fun validate_map<K: drop + copy + store, V: store>(self: &OrderedMap<K, V>) {
         self.validate_ordered();
         self.validate_iteration();
     }

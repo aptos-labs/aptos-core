@@ -24,7 +24,6 @@ module aptos_framework::sui_derivable_account {
     use std::bcs_stream::{ Self, deserialize_u8 };
     use std::bcs;
     use std::string_utils;
-    use std::vector;
     use aptos_std::aptos_hash;
 
     /// Entry function payload is missing.
@@ -138,8 +137,8 @@ module aptos_framework::sui_derivable_account {
         assert!(bytes.length() == 97, EINVALID_SIGNATURE_LENGTH);
 
         let signing_scheme = bytes[0];
-        let abstract_signature_signature = vector::empty<u8>();
-        let abstract_signature_public_key = vector::empty<u8>();
+        let abstract_signature_signature = vector<u8>[];
+        let abstract_signature_public_key = vector<u8>[];
 
         // Extract signature (64 bytes)
         let i = 1;
@@ -173,8 +172,7 @@ module aptos_framework::sui_derivable_account {
 
         // Convert the address bytes to a hex string with "0x" prefix
         let sui_account_address_hex = b"0x";
-        let i = 0;
-        while (i < sui_account_address.length()) {
+        for (i in 0..(sui_account_address.length())) {
             let byte = sui_account_address[i];
             // Convert each byte to two hex characters
             let hex_chars = vector[
@@ -182,7 +180,6 @@ module aptos_framework::sui_derivable_account {
                 if ((byte & 0xf) < 10) ((byte & 0xf) + 0x30) else ((byte & 0xf) - 10 + 0x61)
             ];
             sui_account_address_hex.append(hex_chars);
-            i += 1;
         };
 
         // Return the account address as hex string

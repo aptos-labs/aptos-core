@@ -212,7 +212,7 @@ spec aptos_framework::account {
         /// [high-level-req-10]
         let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        aborts_if vector::length(new_auth_key) != 32;
+        aborts_if new_auth_key.length() != 32;
         modifies global<Account>(addr);
         ensures account_resource.authentication_key == new_auth_key;
     }
@@ -222,7 +222,7 @@ spec aptos_framework::account {
         /// [high-level-req-10]
         let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        aborts_if vector::length(new_auth_key) != 32;
+        aborts_if new_auth_key.length() != 32;
         modifies global<Account>(addr);
         ensures account_resource.authentication_key == new_auth_key;
     }
@@ -442,7 +442,7 @@ spec aptos_framework::account {
         /// [high-level-req-7.1]
         modifies global<Account>(source_address);
         let post offer_for = global<Account>(source_address).rotation_capability_offer.for;
-        ensures option::borrow(offer_for) == recipient_address;
+        ensures offer_for.borrow() == recipient_address;
     }
 
     /// The Account existed under the signer.
@@ -495,7 +495,7 @@ spec aptos_framework::account {
         /// [high-level-req-7.2]
         modifies global<Account>(source_address);
         let post offer_for = global<Account>(source_address).signer_capability_offer.for;
-        ensures option::borrow(offer_for) == recipient_address;
+        ensures offer_for.borrow() == recipient_address;
     }
 
     spec is_signer_capability_offered(account_addr: address): bool {
@@ -505,7 +505,7 @@ spec aptos_framework::account {
     spec get_signer_capability_offer_for(account_addr: address): address {
         aborts_if !exists<Account>(account_addr);
         let account_resource = global<Account>(account_addr);
-        aborts_if option::is_none(account_resource.signer_capability_offer.for);
+        aborts_if account_resource.signer_capability_offer.for.is_none();
     }
 
     spec is_rotation_capability_offered(account_addr: address): bool {
@@ -515,7 +515,7 @@ spec aptos_framework::account {
     spec get_rotation_capability_offer_for(account_addr: address): address {
         aborts_if !exists<Account>(account_addr);
         let account_resource = global<Account>(account_addr);
-        aborts_if option::is_none(account_resource.rotation_capability_offer.for);
+        aborts_if account_resource.rotation_capability_offer.for.is_none();
     }
 
     /// The Account existed under the signer.
@@ -535,7 +535,7 @@ spec aptos_framework::account {
         /// [high-level-req-7.4]
         aborts_if !exists<Account>(signer::address_of(account));
         let account_resource = global<Account>(signer::address_of(account));
-        aborts_if !option::is_some(account_resource.signer_capability_offer.for);
+        aborts_if !account_resource.signer_capability_offer.for.is_some();
     }
 
     spec revoke_rotation_capability(account: &signer, to_be_revoked_address: address) {
@@ -547,7 +547,7 @@ spec aptos_framework::account {
         modifies global<Account>(addr);
         ensures exists<Account>(to_be_revoked_address);
         let post offer_for = global<Account>(addr).rotation_capability_offer.for;
-        ensures !option::is_some(offer_for);
+        ensures !offer_for.is_some();
     }
 
     spec revoke_any_rotation_capability(account: &signer) {
@@ -556,9 +556,9 @@ spec aptos_framework::account {
         aborts_if !exists<Account>(addr);
         let account_resource = global<Account>(addr);
         /// [high-level-req-7.3]
-        aborts_if !option::is_some(account_resource.rotation_capability_offer.for);
+        aborts_if !account_resource.rotation_capability_offer.for.is_some();
         let post offer_for = global<Account>(addr).rotation_capability_offer.for;
-        ensures !option::is_some(offer_for);
+        ensures !offer_for.is_some();
     }
 
     /// The Account existed under the signer.
@@ -607,7 +607,7 @@ spec aptos_framework::account {
 
         ensures signer::address_of(result_1) == resource_addr;
         let post offer_for = global<Account>(resource_addr).signer_capability_offer.for;
-        ensures option::borrow(offer_for) == resource_addr;
+        ensures offer_for.borrow() == resource_addr;
         ensures result_2 == SignerCapability { account: resource_addr };
     }
 

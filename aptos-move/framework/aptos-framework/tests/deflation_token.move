@@ -37,11 +37,11 @@ module 0xcafe::deflation_token {
         store: Object<T>,
         amount: u64,
         transfer_ref: &TransferRef,
-    ): FungibleAsset acquires BurnStore {
+    ): FungibleAsset {
         // For every withdraw, we burn 10% from the store.
         let burn_amount = amount / 10;
         if (burn_amount > 0) {
-            borrow_global<BurnStore>(@0xcafe).burn_ref.burn_from(store, burn_amount);
+            BurnStore[@0xcafe].burn_ref.burn_from(store, burn_amount);
         };
 
         transfer_ref.withdraw_with_ref(store, amount)

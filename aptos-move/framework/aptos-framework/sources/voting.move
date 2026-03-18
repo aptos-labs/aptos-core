@@ -25,8 +25,6 @@ module aptos_framework::voting {
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{String, utf8};
-    #[test_only]
-    use std::vector;
 
     use aptos_std::from_bcs::to_u64;
     use aptos_std::simple_map::{Self, SimpleMap};
@@ -254,7 +252,7 @@ module aptos_framework::voting {
         expiration_secs: u64,
         early_resolution_vote_threshold: Option<u128>,
         metadata: SimpleMap<String, vector<u8>>,
-    ): u64 acquires VotingForum {
+    ): u64 {
         create_proposal_v2(
             proposer,
             voting_forum_address,
@@ -291,7 +289,7 @@ module aptos_framework::voting {
         early_resolution_vote_threshold: Option<u128>,
         metadata: SimpleMap<String, vector<u8>>,
         is_multi_step_proposal: bool,
-    ): u64 acquires VotingForum {
+    ): u64 {
         if (early_resolution_vote_threshold.is_some()) {
             assert!(
                 min_vote_threshold <= *early_resolution_vote_threshold.borrow(),
@@ -362,7 +360,7 @@ module aptos_framework::voting {
         proposal_id: u64,
         num_votes: u64,
         should_pass: bool,
-    ) acquires VotingForum {
+    ) {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = voting_forum.proposals.borrow_mut(proposal_id);
         // Voting might still be possible after the proposal has enough yes votes to be resolved early. This would only
@@ -380,9 +378,9 @@ module aptos_framework::voting {
             error::invalid_state(EMULTI_STEP_PROPOSAL_IN_EXECUTION));
 
         if (should_pass) {
-            proposal.yes_votes += (num_votes as u128);
+            proposal.yes_votes += num_votes as u128;
         } else {
-            proposal.no_votes += (num_votes as u128);
+            proposal.no_votes += num_votes as u128;
         };
 
         // Record the resolvable time to ensure that resolution has to be done non-atomically.
@@ -401,7 +399,7 @@ module aptos_framework::voting {
     fun is_proposal_resolvable<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ) acquires VotingForum {
+    ) {
         let proposal_state = get_proposal_state<ProposalType>(voting_forum_address, proposal_id);
         assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_state(EPROPOSAL_CANNOT_BE_RESOLVED));
 
@@ -428,7 +426,7 @@ module aptos_framework::voting {
     public fun resolve<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): ProposalType acquires VotingForum {
+    ): ProposalType {
         is_proposal_resolvable<ProposalType>(voting_forum_address, proposal_id);
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
@@ -473,7 +471,7 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
         next_execution_hash: vector<u8>,
-    ) acquires VotingForum {
+    ) {
         is_proposal_resolvable<ProposalType>(voting_forum_address, proposal_id);
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
@@ -533,7 +531,7 @@ module aptos_framework::voting {
 
     #[view]
     /// Return the next unassigned proposal id
-    public fun next_proposal_id<ProposalType: store>(voting_forum_address: address, ): u64 acquires VotingForum {
+    public fun next_proposal_id<ProposalType: store>(voting_forum_address: address, ): u64 {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         voting_forum.next_proposal_id
     }
@@ -542,7 +540,7 @@ module aptos_framework::voting {
     public fun get_proposer<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64
-    ): address acquires VotingForum {
+    ): address {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.proposer
     }
@@ -551,7 +549,7 @@ module aptos_framework::voting {
     public fun is_voting_closed<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64
-    ): bool acquires VotingForum {
+    ): bool {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         can_be_resolved_early(proposal) || is_voting_period_over(proposal)
     }
@@ -571,7 +569,7 @@ module aptos_framework::voting {
     public fun get_proposal_metadata<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): SimpleMap<String, vector<u8>> acquires VotingForum {
+    ): SimpleMap<String, vector<u8>> {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.metadata
     }
@@ -581,7 +579,7 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
         metadata_key: String,
-    ): vector<u8> acquires VotingForum {
+    ): vector<u8> {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         *proposal.metadata.borrow(&metadata_key)
     }
@@ -595,7 +593,7 @@ module aptos_framework::voting {
     public fun get_proposal_state<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): u64 acquires VotingForum {
+    ): u64 {
         if (is_voting_closed<ProposalType>(voting_forum_address, proposal_id)) {
             let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
             let yes_votes = proposal.yes_votes;
@@ -616,7 +614,7 @@ module aptos_framework::voting {
     public fun get_proposal_creation_secs<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): u64 acquires VotingForum {
+    ): u64 {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.creation_time_secs
     }
@@ -626,7 +624,7 @@ module aptos_framework::voting {
     public fun get_proposal_expiration_secs<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): u64 acquires VotingForum {
+    ): u64 {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.expiration_secs
     }
@@ -636,7 +634,7 @@ module aptos_framework::voting {
     public fun get_execution_hash<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): vector<u8> acquires VotingForum {
+    ): vector<u8> {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.execution_hash
     }
@@ -646,7 +644,7 @@ module aptos_framework::voting {
     public fun get_min_vote_threshold<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): u128 acquires VotingForum {
+    ): u128 {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.min_vote_threshold
     }
@@ -656,7 +654,7 @@ module aptos_framework::voting {
     public fun get_early_resolution_vote_threshold<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): Option<u128> acquires VotingForum {
+    ): Option<u128> {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.early_resolution_vote_threshold
     }
@@ -666,7 +664,7 @@ module aptos_framework::voting {
     public fun get_votes<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): (u128, u128) acquires VotingForum {
+    ): (u128, u128) {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         (proposal.yes_votes, proposal.no_votes)
     }
@@ -676,7 +674,7 @@ module aptos_framework::voting {
     public fun is_resolved<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): bool acquires VotingForum {
+    ): bool {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.is_resolved
     }
@@ -685,7 +683,7 @@ module aptos_framework::voting {
     public fun get_resolution_time_secs<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): u64 acquires VotingForum {
+    ): u64 {
         let proposal = get_proposal<ProposalType>(voting_forum_address, proposal_id);
         proposal.resolution_time_secs
     }
@@ -695,7 +693,7 @@ module aptos_framework::voting {
     public fun is_multi_step_proposal_in_execution<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): bool acquires VotingForum {
+    ): bool {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = voting_forum.proposals.borrow(proposal_id);
         let is_multi_step_in_execution_key = utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
@@ -730,14 +728,14 @@ module aptos_framework::voting {
         governance: &signer,
         early_resolution_threshold: Option<u128>,
         use_generic_create_proposal_function: bool,
-    ): u64 acquires VotingForum {
+    ): u64 {
         // Register voting forum and create a proposal.
         register<TestProposal>(governance);
         let governance_address = signer::address_of(governance);
         let proposal = TestProposal {};
 
         // This works because our Move unit test extensions mock out the execution hash to be [1].
-        let execution_hash = vector::empty<u8>();
+        let execution_hash = vector<u8>[];
         execution_hash.push_back(1);
         let metadata = simple_map::create<String, vector<u8>>();
 
@@ -773,14 +771,14 @@ module aptos_framework::voting {
         proposal_id: u64,
         is_multi_step: bool,
         finish_multi_step_execution: bool
-    ) acquires VotingForum {
+    ) {
         if (is_multi_step) {
-            let execution_hash = vector::empty<u8>();
+            let execution_hash = vector<u8>[];
             execution_hash.push_back(1);
             resolve_proposal_v2<TestProposal>(voting_forum_address, proposal_id, execution_hash);
 
             if (finish_multi_step_execution) {
-                resolve_proposal_v2<TestProposal>(voting_forum_address, proposal_id, vector::empty<u8>());
+                resolve_proposal_v2<TestProposal>(voting_forum_address, proposal_id, vector<u8>[]);
             };
         } else {
             let proposal = resolve<TestProposal>(voting_forum_address, proposal_id);
@@ -792,7 +790,7 @@ module aptos_framework::voting {
     public fun create_test_proposal(
         governance: &signer,
         early_resolution_threshold: Option<u128>,
-    ): u64 acquires VotingForum {
+    ): u64 {
         create_test_proposal_generic(governance, early_resolution_threshold, false)
     }
 
@@ -800,7 +798,7 @@ module aptos_framework::voting {
     public fun create_proposal_with_empty_execution_hash_should_fail_generic(
         governance: &signer,
         is_multi_step: bool
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         let governance_address = signer::address_of(governance);
         account::create_account_for_test(governance_address);
@@ -836,7 +834,7 @@ module aptos_framework::voting {
 
     #[test(governance = @0x123)]
     #[expected_failure(abort_code = 0x10004, location = Self)]
-    public fun create_proposal_with_empty_execution_hash_should_fail(governance: &signer) acquires VotingForum {
+    public fun create_proposal_with_empty_execution_hash_should_fail(governance: &signer) {
         create_proposal_with_empty_execution_hash_should_fail_generic(governance, false);
     }
 
@@ -844,7 +842,7 @@ module aptos_framework::voting {
     #[expected_failure(abort_code = 0x10004, location = Self)]
     public fun create_proposal_with_empty_execution_hash_should_fail_multi_step(
         governance: &signer
-    ) acquires VotingForum {
+    ) {
         create_proposal_with_empty_execution_hash_should_fail_generic(governance, true);
     }
 
@@ -854,7 +852,7 @@ module aptos_framework::voting {
         governance: &signer,
         use_create_multi_step: bool,
         use_resolve_multi_step: bool
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
@@ -877,7 +875,7 @@ module aptos_framework::voting {
         // It's testing when we have a single-step proposal that was created by the single-step `create_proposal()`,
         // we should be able to successfully resolve it using the generic `resolve_proposal_v2` function.
         if (!use_create_multi_step && use_resolve_multi_step) {
-            resolve_proposal_v2<TestProposal>(governance_address, proposal_id, vector::empty<u8>());
+            resolve_proposal_v2<TestProposal>(governance_address, proposal_id, vector<u8>[]);
         } else {
             resolve_proposal_for_test<TestProposal>(governance_address, proposal_id, use_resolve_multi_step, true);
         };
@@ -886,12 +884,12 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    public entry fun test_voting_passed(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+    public entry fun test_voting_passed(aptos_framework: &signer, governance: &signer) {
         test_voting_passed_generic(aptos_framework, governance, false, false);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    public entry fun test_voting_passed_multi_step(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+    public entry fun test_voting_passed_multi_step(aptos_framework: &signer, governance: &signer) {
         test_voting_passed_generic(aptos_framework, governance, true, true);
     }
 
@@ -900,7 +898,7 @@ module aptos_framework::voting {
     public entry fun test_voting_passed_multi_step_cannot_use_single_step_resolve_function(
         aptos_framework: &signer,
         governance: &signer
-    ) acquires VotingForum {
+    ) {
         test_voting_passed_generic(aptos_framework, governance, true, false);
     }
 
@@ -908,7 +906,7 @@ module aptos_framework::voting {
     public entry fun test_voting_passed_single_step_can_use_generic_function(
         aptos_framework: &signer,
         governance: &signer
-    ) acquires VotingForum {
+    ) {
         test_voting_passed_generic(aptos_framework, governance, false, true);
     }
 
@@ -917,7 +915,7 @@ module aptos_framework::voting {
         aptos_framework: &signer,
         governance: &signer,
         is_multi_step: bool
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
@@ -941,7 +939,7 @@ module aptos_framework::voting {
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x30003, location = Self)]
-    public entry fun test_cannot_resolve_twice(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+    public entry fun test_cannot_resolve_twice(aptos_framework: &signer, governance: &signer) {
         test_cannot_resolve_twice_generic(aptos_framework, governance, false);
     }
 
@@ -950,7 +948,7 @@ module aptos_framework::voting {
     public entry fun test_cannot_resolve_twice_multi_step(
         aptos_framework: &signer,
         governance: &signer
-    ) acquires VotingForum {
+    ) {
         test_cannot_resolve_twice_generic(aptos_framework, governance, true);
     }
 
@@ -959,7 +957,7 @@ module aptos_framework::voting {
         aptos_framework: &signer,
         governance: &signer,
         is_multi_step: bool
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
@@ -1007,7 +1005,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    public entry fun test_voting_passed_early(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+    public entry fun test_voting_passed_early(aptos_framework: &signer, governance: &signer) {
         test_voting_passed_early_generic(aptos_framework, governance, false);
     }
 
@@ -1015,7 +1013,7 @@ module aptos_framework::voting {
     public entry fun test_voting_passed_early_multi_step(
         aptos_framework: &signer,
         governance: &signer
-    ) acquires VotingForum {
+    ) {
         test_voting_passed_early_generic(aptos_framework, governance, true);
     }
 
@@ -1024,7 +1022,7 @@ module aptos_framework::voting {
         aptos_framework: &signer,
         governance: &signer,
         is_multi_step: bool
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
         let governance_address = signer::address_of(governance);
@@ -1044,7 +1042,7 @@ module aptos_framework::voting {
     public entry fun test_voting_passed_early_in_same_tx_should_fail(
         aptos_framework: &signer,
         governance: &signer
-    ) acquires VotingForum {
+    ) {
         test_voting_passed_early_in_same_tx_should_fail_generic(aptos_framework, governance, false);
     }
 
@@ -1053,7 +1051,7 @@ module aptos_framework::voting {
     public entry fun test_voting_passed_early_in_same_tx_should_fail_multi_step(
         aptos_framework: &signer,
         governance: &signer
-    ) acquires VotingForum {
+    ) {
         test_voting_passed_early_in_same_tx_should_fail_generic(aptos_framework, governance, true);
     }
 
@@ -1062,7 +1060,7 @@ module aptos_framework::voting {
         aptos_framework: &signer,
         governance: &signer,
         is_multi_step: bool
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
@@ -1085,13 +1083,13 @@ module aptos_framework::voting {
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x30002, location = Self)]
-    public entry fun test_voting_failed(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+    public entry fun test_voting_failed(aptos_framework: &signer, governance: &signer) {
         test_voting_failed_generic(aptos_framework, governance, false);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x30002, location = Self)]
-    public entry fun test_voting_failed_multi_step(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+    public entry fun test_voting_failed_multi_step(aptos_framework: &signer, governance: &signer) {
         test_voting_failed_generic(aptos_framework, governance, true);
     }
 
@@ -1100,7 +1098,7 @@ module aptos_framework::voting {
     public entry fun test_cannot_vote_after_voting_period_is_over(
         aptos_framework: signer,
         governance: signer
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         let governance_address = signer::address_of(&governance);
@@ -1118,7 +1116,7 @@ module aptos_framework::voting {
     public entry fun test_cannot_vote_after_multi_step_proposal_starts_executing(
         aptos_framework: signer,
         governance: signer
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
@@ -1145,7 +1143,7 @@ module aptos_framework::voting {
         aptos_framework: &signer,
         governance: &signer,
         is_multi_step: bool
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
@@ -1168,7 +1166,7 @@ module aptos_framework::voting {
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x30002, location = Self)]
-    public entry fun test_voting_failed_early(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+    public entry fun test_voting_failed_early(aptos_framework: &signer, governance: &signer) {
         test_voting_failed_early_generic(aptos_framework, governance, true);
     }
 
@@ -1177,7 +1175,7 @@ module aptos_framework::voting {
     public entry fun test_voting_failed_early_multi_step(
         aptos_framework: &signer,
         governance: &signer
-    ) acquires VotingForum {
+    ) {
         test_voting_failed_early_generic(aptos_framework, governance, false);
     }
 
@@ -1186,7 +1184,7 @@ module aptos_framework::voting {
         aptos_framework: &signer,
         governance: &signer,
         is_multi_step: bool,
-    ) acquires VotingForum {
+    ) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
         account::create_account_for_test(signer::address_of(governance));
@@ -1199,7 +1197,7 @@ module aptos_framework::voting {
     public entry fun test_cannot_set_min_threshold_higher_than_early_resolution(
         aptos_framework: &signer,
         governance: &signer,
-    ) acquires VotingForum {
+    ) {
         test_cannot_set_min_threshold_higher_than_early_resolution_generic(aptos_framework, governance, false);
     }
 
@@ -1208,12 +1206,12 @@ module aptos_framework::voting {
     public entry fun test_cannot_set_min_threshold_higher_than_early_resolution_multi_step(
         aptos_framework: &signer,
         governance: &signer,
-    ) acquires VotingForum {
+    ) {
         test_cannot_set_min_threshold_higher_than_early_resolution_generic(aptos_framework, governance, true);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    public entry fun test_replace_execution_hash(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+    public entry fun test_replace_execution_hash(aptos_framework: &signer, governance: &signer) {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
 

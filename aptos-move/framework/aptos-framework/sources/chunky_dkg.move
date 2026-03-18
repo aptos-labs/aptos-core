@@ -57,13 +57,13 @@ module aptos_framework::chunky_dkg {
     }
 
     /// Mark on-chain Chunky DKG state as in-progress. Notify validators to start Chunky DKG.
-    public(friend) fun start(
+    friend fun start(
         dealer_epoch: u64,
         chunky_dkg_config: ChunkyDKGConfig,
         dealer_validator_set: vector<ValidatorConsensusInfo>,
         target_validator_set: vector<ValidatorConsensusInfo>
-    ) acquires ChunkyDKGState {
-        let chunky_dkg_state = borrow_global_mut<ChunkyDKGState>(@aptos_framework);
+    ) {
+        let chunky_dkg_state = &mut ChunkyDKGState[@aptos_framework];
         let new_session_metadata = ChunkyDKGSessionMetadata {
             dealer_epoch,
             chunky_dkg_config,
@@ -87,8 +87,8 @@ module aptos_framework::chunky_dkg {
     /// Put a transcript into the currently incomplete Chunky DKG session, then mark it completed.
     ///
     /// Abort if Chunky DKG is not in progress.
-    public(friend) fun finish(aggregated_subtranscript: vector<u8>) acquires ChunkyDKGState {
-        let chunky_dkg_state = borrow_global_mut<ChunkyDKGState>(@aptos_framework);
+    friend fun finish(aggregated_subtranscript: vector<u8>) {
+        let chunky_dkg_state = &mut ChunkyDKGState[@aptos_framework];
         assert!(
             chunky_dkg_state.in_progress.is_some(),
             error::invalid_state(ECHUNKY_DKG_NOT_IN_PROGRESS)
@@ -100,18 +100,18 @@ module aptos_framework::chunky_dkg {
     }
 
     /// Delete the currently incomplete session, if it exists.
-    public fun try_clear_incomplete_session(fx: &signer) acquires ChunkyDKGState {
+    public fun try_clear_incomplete_session(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         if (exists<ChunkyDKGState>(@aptos_framework)) {
-            let chunky_dkg_state = borrow_global_mut<ChunkyDKGState>(@aptos_framework);
+            let chunky_dkg_state = &mut ChunkyDKGState[@aptos_framework];
             chunky_dkg_state.in_progress = option::none();
         }
     }
 
     /// Return the incomplete Chunky DKG session state, if it exists.
-    public fun incomplete_session(): Option<ChunkyDKGSessionState> acquires ChunkyDKGState {
+    public fun incomplete_session(): Option<ChunkyDKGSessionState> {
         if (exists<ChunkyDKGState>(@aptos_framework)) {
-            borrow_global<ChunkyDKGState>(@aptos_framework).in_progress
+            ChunkyDKGState[@aptos_framework].in_progress
         } else {
             option::none()
         }

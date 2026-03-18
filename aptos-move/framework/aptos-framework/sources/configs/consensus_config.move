@@ -19,7 +19,7 @@ module aptos_framework::consensus_config {
     const EINVALID_CONFIG: u64 = 1;
 
     /// Publishes the ConsensusConfig config.
-    public(friend) fun initialize(aptos_framework: &signer, config: vector<u8>) {
+    friend fun initialize(aptos_framework: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(config.length() > 0, error::invalid_argument(EINVALID_CONFIG));
         move_to(aptos_framework, ConsensusConfig { config });
@@ -30,12 +30,12 @@ module aptos_framework::consensus_config {
     /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
     ///
     /// TODO: update all the tests that reference this function, then disable this function.
-    public fun set(account: &signer, config: vector<u8>) acquires ConsensusConfig {
+    public fun set(account: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(account);
         chain_status::assert_genesis();
         assert!(config.length() > 0, error::invalid_argument(EINVALID_CONFIG));
 
-        let config_ref = &mut borrow_global_mut<ConsensusConfig>(@aptos_framework).config;
+        let config_ref = &mut ConsensusConfig[@aptos_framework].config;
         *config_ref = config;
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
@@ -55,20 +55,20 @@ module aptos_framework::consensus_config {
     }
 
     /// Only used in reconfigurations to apply the pending `ConsensusConfig`, if there is any.
-    public(friend) fun on_new_epoch(framework: &signer) acquires ConsensusConfig {
+    friend fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ConsensusConfig>()) {
             let new_config = config_buffer::extract_v2<ConsensusConfig>();
             if (exists<ConsensusConfig>(@aptos_framework)) {
-                *borrow_global_mut<ConsensusConfig>(@aptos_framework) = new_config;
+                ConsensusConfig[@aptos_framework] = new_config;
             } else {
                 move_to(framework, new_config);
             };
         }
     }
 
-    public fun validator_txn_enabled(): bool acquires ConsensusConfig {
-        let config_bytes = borrow_global<ConsensusConfig>(@aptos_framework).config;
+    public fun validator_txn_enabled(): bool {
+        let config_bytes = ConsensusConfig[@aptos_framework].config;
         validator_txn_enabled_internal(config_bytes)
     }
 

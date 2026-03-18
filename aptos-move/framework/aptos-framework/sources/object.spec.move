@@ -510,9 +510,9 @@ spec aptos_framework::object {
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !is_burnt(object);
-        let tomb_stone = borrow_global<TombStone>(object_address);
+        let tomb_stone = TombStone[object_address];
         let original_owner_address = signer::address_of(original_owner);
-        let object_current_owner = borrow_global<ObjectCore>(object_address).owner;
+        let object_current_owner = ObjectCore[object_address].owner;
         aborts_if object_current_owner != original_owner_address && tomb_stone.original_owner != original_owner_address;
     }
 

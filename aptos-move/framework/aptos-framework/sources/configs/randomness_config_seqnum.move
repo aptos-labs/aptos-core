@@ -35,12 +35,12 @@ module aptos_framework::randomness_config_seqnum {
     }
 
     /// Only used in reconfigurations to apply the pending `RandomnessConfig`, if there is any.
-    public(friend) fun on_new_epoch(framework: &signer) acquires RandomnessConfigSeqNum {
+    friend fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfigSeqNum>()) {
             let new_config = config_buffer::extract_v2<RandomnessConfigSeqNum>();
             if (exists<RandomnessConfigSeqNum>(@aptos_framework)) {
-                *borrow_global_mut<RandomnessConfigSeqNum>(@aptos_framework) = new_config;
+                RandomnessConfigSeqNum[@aptos_framework] = new_config;
             } else {
                 move_to(framework, new_config);
             }

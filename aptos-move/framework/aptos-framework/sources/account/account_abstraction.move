@@ -79,7 +79,7 @@ module aptos_framework::account_abstraction {
 
     #[view]
     /// Return the current dispatchable authenticator move function info. `None` means this authentication scheme is disabled.
-    public fun dispatchable_authenticator(addr: address): Option<vector<FunctionInfo>> acquires DispatchableAuthenticator {
+    public fun dispatchable_authenticator(addr: address): Option<vector<FunctionInfo>> {
         let resource_addr = resource_addr(addr);
         if (exists<DispatchableAuthenticator>(resource_addr)) {
             option::some(
@@ -124,7 +124,7 @@ module aptos_framework::account_abstraction {
         module_address: address,
         module_name: String,
         function_name: String,
-    ) acquires DispatchableAuthenticator {
+    ) {
         assert!(features::is_account_abstraction_enabled(), error::invalid_state(EACCOUNT_ABSTRACTION_NOT_ENABLED));
         assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
@@ -142,7 +142,7 @@ module aptos_framework::account_abstraction {
         module_address: address,
         module_name: String,
         function_name: String,
-    ) acquires DispatchableAuthenticator {
+    ) {
         assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
             account,
@@ -156,7 +156,7 @@ module aptos_framework::account_abstraction {
     /// Note: it is a private entry function that can only be called directly from transaction.
     entry fun remove_authenticator(
         account: &signer,
-    ) acquires DispatchableAuthenticator {
+    ) {
         assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(account);
         let resource_addr = resource_addr(addr);
@@ -182,7 +182,7 @@ module aptos_framework::account_abstraction {
         module_address: address,
         module_name: String,
         function_name: String,
-    ) acquires DerivableDispatchableAuthenticator {
+    ) {
         assert!(features::is_derivable_account_abstraction_enabled(), error::invalid_state(EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED));
         system_addresses::assert_aptos_framework(aptos_framework);
 
@@ -208,7 +208,7 @@ module aptos_framework::account_abstraction {
         account: &signer,
         auth_function: FunctionInfo,
         is_add: bool,
-    ) acquires DispatchableAuthenticator {
+    ) {
         let addr = signer::address_of(account);
         let resource_addr = resource_addr(addr);
         let dispatcher_auth_function_info = function_info::new_function_info_from_address(
@@ -227,7 +227,7 @@ module aptos_framework::account_abstraction {
                     DispatchableAuthenticator::V1 { auth_functions: ordered_map::new() }
                 );
             };
-            let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
+            let current_map = &mut DispatchableAuthenticator[resource_addr].auth_functions;
             assert!(
                 !current_map.contains(&auth_function),
                 error::already_exists(EFUNCTION_INFO_EXISTENCE)
@@ -242,7 +242,7 @@ module aptos_framework::account_abstraction {
             );
         } else {
             assert!(exists<DispatchableAuthenticator>(resource_addr), error::not_found(EFUNCTION_INFO_EXISTENCE));
-            let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
+            let current_map = &mut DispatchableAuthenticator[resource_addr].auth_functions;
             assert!(
                 current_map.contains(&auth_function),
                 error::not_found(EFUNCTION_INFO_EXISTENCE)
@@ -275,7 +275,7 @@ module aptos_framework::account_abstraction {
         account: signer,
         func_info: FunctionInfo,
         signing_data: AbstractionAuthData,
-    ): signer acquires DispatchableAuthenticator, DerivableDispatchableAuthenticator {
+    ): signer {
         let master_signer_addr = signer::address_of(&account);
 
         if (signing_data.is_derivable()) {
@@ -311,7 +311,7 @@ module aptos_framework::account_abstraction {
     #[test(bob = @0xb0b)]
     entry fun test_dispatchable_authenticator(
         bob: &signer,
-    ) acquires DispatchableAuthenticator {
+    ) {
         let bob_addr = signer::address_of(bob);
         create_account_for_test(bob_addr);
         assert!(!using_dispatchable_authenticator(bob_addr));
@@ -330,7 +330,7 @@ module aptos_framework::account_abstraction {
     #[expected_failure(abort_code = 0x30005, location = Self)]
     entry fun test_authenticate_function_returning_invalid_signer(
         bob: signer,
-    ) acquires DispatchableAuthenticator, DerivableDispatchableAuthenticator {
+    ) {
         let bob_addr = signer::address_of(&bob);
         create_account_for_test(bob_addr);
         assert!(!using_dispatchable_authenticator(bob_addr), 0);

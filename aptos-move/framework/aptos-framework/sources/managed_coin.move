@@ -37,7 +37,7 @@ module aptos_framework::managed_coin {
     public entry fun burn<CoinType>(
         account: &signer,
         amount: u64,
-    ) acquires Capabilities {
+    ) {
         let account_addr = signer::address_of(account);
 
         assert!(
@@ -80,7 +80,7 @@ module aptos_framework::managed_coin {
         account: &signer,
         dst_addr: address,
         amount: u64,
-    ) acquires Capabilities {
+    ) {
         let account_addr = signer::address_of(account);
 
         assert!(
@@ -100,7 +100,7 @@ module aptos_framework::managed_coin {
     }
 
     /// Destroys capabilities from the account, so that the user no longer has access to mint or burn.
-    public entry fun destroy_caps<CoinType>(account: &signer) acquires Capabilities {
+    public entry fun destroy_caps<CoinType>(account: &signer) {
         let (burn_cap, freeze_cap, mint_cap) = remove_caps<CoinType>(account);
         destroy_burn_cap(burn_cap);
         destroy_freeze_cap(freeze_cap);
@@ -110,7 +110,7 @@ module aptos_framework::managed_coin {
     /// Removes capabilities from the account to be stored or destroyed elsewhere
     public fun remove_caps<CoinType>(
         account: &signer
-    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires Capabilities {
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         let account_addr = signer::address_of(account);
         assert!(
             exists<Capabilities<CoinType>>(account_addr),
@@ -141,7 +141,7 @@ module aptos_framework::managed_coin {
         source: signer,
         destination: signer,
         mod_account: signer
-    ) acquires Capabilities {
+    ) {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
         aptos_framework::account::create_account_for_test(source_addr);
@@ -194,7 +194,7 @@ module aptos_framework::managed_coin {
         source: signer,
         destination: signer,
         mod_account: signer
-    ) acquires Capabilities {
+    ) {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
         aptos_framework::account::create_account_for_test(source_addr);
@@ -226,7 +226,7 @@ module aptos_framework::managed_coin {
         source: signer,
         destination: signer,
         mod_account: signer,
-    ) acquires Capabilities {
+    ) {
         let source_addr = signer::address_of(&source);
 
         aptos_framework::account::create_account_for_test(source_addr);
@@ -251,7 +251,7 @@ module aptos_framework::managed_coin {
         source: signer,
         destination: signer,
         mod_account: signer,
-    ) acquires Capabilities {
+    ) {
         let source_addr = signer::address_of(&source);
 
         aptos_framework::account::create_account_for_test(source_addr);

@@ -56,14 +56,14 @@ module 0xcafe::ten_x_token {
         );
     }
 
-    public fun derived_balance<T: key>(store: Object<T>): u64 acquires BalanceStore {
+    public fun derived_balance<T: key>(store: Object<T>): u64 {
         // Derived value is always 10x!
-        borrow_global<BalanceStore>(@0xcafe).balance_ref.balance_with_ref(store) * 10
+        BalanceStore[@0xcafe].balance_ref.balance_with_ref(store) * 10
     }
 
-    public fun derived_supply<T: key>(metadata: Object<T>): Option<u128> acquires BalanceStore {
+    public fun derived_supply<T: key>(metadata: Object<T>): Option<u128> {
         // Derived supply is 10x.
-        option::some(borrow_global<BalanceStore>(@0xcafe).supply_ref.supply_with_ref(metadata).extract() * 10)
+        option::some(BalanceStore[@0xcafe].supply_ref.supply_with_ref(metadata).extract() * 10)
     }
 
     public fun withdraw<T: key>(

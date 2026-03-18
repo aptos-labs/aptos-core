@@ -43,16 +43,16 @@ module aptos_framework::decryption {
     }
 
     /// Invoked in block prologues to update the block decryption key.
-    public(friend) fun on_new_block(
+    friend fun on_new_block(
         vm: &signer,
         epoch: u64,
         round: u64,
         decryption_key_for_new_block: Option<vector<u8>>
-    ) acquires PerBlockDecryptionKey {
+    ) {
         system_addresses::assert_vm(vm);
         if (exists<PerBlockDecryptionKey>(@aptos_framework)) {
             let decryption_key =
-                borrow_global_mut<PerBlockDecryptionKey>(@aptos_framework);
+                &mut PerBlockDecryptionKey[@aptos_framework];
             decryption_key.epoch = epoch;
             decryption_key.round = round;
             decryption_key.decryption_key = decryption_key_for_new_block;
@@ -60,7 +60,7 @@ module aptos_framework::decryption {
     }
 
     /// Buffer the encryption key for the next epoch.
-    public(friend) fun set_for_next_epoch(epoch: u64, encryption_key: vector<u8>) {
+    friend fun set_for_next_epoch(epoch: u64, encryption_key: vector<u8>) {
         config_buffer::upsert(PerEpochEncryptionKey {
             epoch,
             encryption_key: option::some(encryption_key)
@@ -68,12 +68,12 @@ module aptos_framework::decryption {
     }
 
     /// Apply buffered PerEpochEncryptionKey on epoch transition.
-    public(friend) fun on_new_epoch(framework: &signer) acquires PerEpochEncryptionKey {
+    friend fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<PerEpochEncryptionKey>()) {
             let new_key = config_buffer::extract_v2<PerEpochEncryptionKey>();
             if (exists<PerEpochEncryptionKey>(@aptos_framework)) {
-                *borrow_global_mut<PerEpochEncryptionKey>(@aptos_framework) = new_key;
+                PerEpochEncryptionKey[@aptos_framework] = new_key;
             } else {
                 move_to(framework, new_key);
             }

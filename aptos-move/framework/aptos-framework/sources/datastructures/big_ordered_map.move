@@ -536,7 +536,7 @@ module aptos_framework::big_ordered_map {
     public fun internal_find_with_path<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): IteratorPtrWithPath<K> {
         let leaf_path = self.find_leaf_path(key);
         if (leaf_path.is_empty()) {
-            return IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector::empty() };
+            return IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector[] };
         };
 
         let leaf = leaf_path[leaf_path.length() - 1];
@@ -545,14 +545,14 @@ module aptos_framework::big_ordered_map {
 
         let child_lower_bound = node.children.internal_lower_bound(key);
         if (child_lower_bound.iter_is_end(&node.children)) {
-            IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector::empty() }
+            IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector[] }
         } else {
             let iter_key = *child_lower_bound.iter_borrow_key(&node.children);
 
             if (&iter_key == key) {
                 IteratorPtrWithPath { iterator: new_iter(leaf, child_lower_bound, iter_key), path: leaf_path }
             } else {
-                IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector::empty() }
+                IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector[] }
             }
         }
     }
@@ -1194,7 +1194,7 @@ module aptos_framework::big_ordered_map {
     /// Returns the path from root to that leaf (including the leaf itself)
     /// Returns empty path if `key` is larger than any key currently stored in the map.
     fun find_leaf_path<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): vector<u64> {
-        let vec = vector::empty();
+        let vec = vector[];
 
         let current = ROOT_INDEX;
         loop {
@@ -1207,7 +1207,7 @@ module aptos_framework::big_ordered_map {
             let children = &node.children;
             let child_iter = children.internal_lower_bound(key);
             if (child_iter.iter_is_end(children)) {
-                return vector::empty();
+                return vector[];
             } else {
                 current = child_iter.iter_borrow(children).node_index.stored_to_index();
             };
@@ -1665,7 +1665,7 @@ module aptos_framework::big_ordered_map {
     // ============================= Tests ====================================
 
     #[test_only]
-    public(friend) fun print_map<K: store, V: store>(self: &BigOrderedMap<K, V>) {
+    friend fun print_map<K: store, V: store>(self: &BigOrderedMap<K, V>) {
         // uncomment to debug:
         // aptos_std::debug::print(&std::string::utf8(b"print map"));
         // aptos_std::debug::print(self);
@@ -1688,7 +1688,7 @@ module aptos_framework::big_ordered_map {
     }
 
     #[test_only]
-    public(friend) fun destroy_and_validate<K: drop + copy + store, V: drop + store>(self: BigOrderedMap<K, V>) {
+    friend fun destroy_and_validate<K: drop + copy + store, V: drop + store>(self: BigOrderedMap<K, V>) {
         let it = self.internal_new_begin_iter();
         while (!it.iter_is_end(&self)) {
             self.remove(it.iter_borrow_key());
@@ -1765,7 +1765,7 @@ module aptos_framework::big_ordered_map {
     }
 
     #[test_only]
-    public(friend) fun validate_map<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
+    friend fun validate_map<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
         self.validate_subtree(ROOT_INDEX, option::none(), option::none());
         self.validate_iteration();
     }

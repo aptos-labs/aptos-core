@@ -7,12 +7,12 @@ module aptos_framework::governance_proposal {
     struct GovernanceProposal has store, drop {}
 
     /// Create and return a GovernanceProposal resource. Can only be called by AptosGovernance
-    public(friend) fun create_proposal(): GovernanceProposal {
+    friend fun create_proposal(): GovernanceProposal {
         GovernanceProposal {}
     }
 
     /// Useful for AptosGovernance to create an empty proposal as proof.
-    public(friend) fun create_empty_proposal(): GovernanceProposal {
+    friend fun create_empty_proposal(): GovernanceProposal {
         create_proposal()
     }
 

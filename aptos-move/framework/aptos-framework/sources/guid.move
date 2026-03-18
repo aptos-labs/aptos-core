@@ -20,7 +20,7 @@ module aptos_framework::guid {
     const EGUID_GENERATOR_NOT_PUBLISHED: u64 = 0;
 
     /// Create and return a new GUID from a trusted module.
-    public(friend) fun create(addr: address, creation_num_ref: &mut u64): GUID {
+    friend fun create(addr: address, creation_num_ref: &mut u64): GUID {
         let creation_num = *creation_num_ref;
         *creation_num_ref = creation_num + 1;
         GUID {

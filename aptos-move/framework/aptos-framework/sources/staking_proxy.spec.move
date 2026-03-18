@@ -146,7 +146,7 @@ spec aptos_framework::staking_proxy {
             s: owner
         };
         let owner_address = signer::address_of(owner);
-        let ownership_cap = borrow_global<stake::OwnerCapability>(owner_address);
+        let ownership_cap = stake::OwnerCapability[owner_address];
         let pool_address = ownership_cap.pool_address;
         aborts_if stake::stake_pool_exists(owner_address) && !(exists<stake::OwnerCapability>(owner_address) && stake::stake_pool_exists(pool_address));
         ensures stake::stake_pool_exists(owner_address) ==> global<stake::StakePool>(pool_address).operator_address == new_operator;

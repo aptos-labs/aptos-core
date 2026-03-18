@@ -236,10 +236,8 @@ module aptos_framework::transaction_context {
         };
         i = 0;
         while (i < count - 1) {
-            let j: u64 = i + 1;
-            while (j < count) {
+            for (j in (i + 1)..count) {
                 assert!(auids[i] != auids[j], 0);
-                j += 1;
             };
             i += 1;
         };

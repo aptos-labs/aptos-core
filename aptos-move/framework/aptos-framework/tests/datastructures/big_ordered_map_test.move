@@ -254,13 +254,11 @@ module aptos_framework::big_ordered_map_test {
         let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 0, 10];
         map.add_all(data, data);
 
-        let i = 0;
-        while (i < data.length()) {
+        for (i in 0..(data.length())) {
             let element = data.borrow(i);
             let it = map.internal_find(element);
             assert!(!it.iter_is_end(&map), i);
             assert!(it.iter_borrow_key() == element, i);
-            i += 1;
         };
 
         assert!(map.internal_find(&4).iter_is_end(&map), 0);
@@ -277,13 +275,11 @@ module aptos_framework::big_ordered_map_test {
         let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 12, 10];
         map.add_all(data, data);
 
-        let i = 0;
-        while (i < data.length()) {
+        for (i in 0..(data.length())) {
             let element = data[i];
             let it = map.internal_lower_bound(&element);
             assert!(!it.iter_is_end(&map), i);
             assert!(it.iter_borrow_key() == &element, i);
-            i += 1;
         };
 
         assert!(map.internal_lower_bound(&0).iter_borrow_key() == &1, 0);
@@ -669,7 +665,6 @@ module aptos_framework::big_ordered_map_test {
 
     #[test_only]
     fun test_large_data_set_helper(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool) {
-        use std::vector;
 
         let map = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots);
         if (reuse_slots) {
@@ -705,7 +700,7 @@ module aptos_framework::big_ordered_map_test {
             assert!(it_next == it_after, i);
         };
 
-        let removed = vector::empty();
+        let removed = vector[];
         for (i in 0..len) {
             let element = shuffled_data.borrow(i);
             if (!removed.contains(element)) {

@@ -35,12 +35,12 @@ module aptos_framework::randomness_api_v0_config {
     }
 
     /// Only used in reconfigurations to apply the pending `RequiredGasDeposit`, if there is any.
-    public fun on_new_epoch(framework: &signer) acquires RequiredGasDeposit, AllowCustomMaxGasFlag {
+    public fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RequiredGasDeposit>()) {
             let new_config = config_buffer::extract_v2<RequiredGasDeposit>();
             if (exists<RequiredGasDeposit>(@aptos_framework)) {
-                *borrow_global_mut<RequiredGasDeposit>(@aptos_framework) = new_config;
+                RequiredGasDeposit[@aptos_framework] = new_config;
             } else {
                 move_to(framework, new_config);
             }
@@ -48,7 +48,7 @@ module aptos_framework::randomness_api_v0_config {
         if (config_buffer::does_exist<AllowCustomMaxGasFlag>()) {
             let new_config = config_buffer::extract_v2<AllowCustomMaxGasFlag>();
             if (exists<AllowCustomMaxGasFlag>(@aptos_framework)) {
-                *borrow_global_mut<AllowCustomMaxGasFlag>(@aptos_framework) = new_config;
+                AllowCustomMaxGasFlag[@aptos_framework] = new_config;
             } else {
                 move_to(framework, new_config);
             }

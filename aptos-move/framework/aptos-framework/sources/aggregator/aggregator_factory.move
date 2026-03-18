@@ -29,7 +29,7 @@ module aptos_framework::aggregator_factory {
     }
 
     /// Creates a new factory for aggregators. Can only be called during genesis.
-    public(friend) fun initialize_aggregator_factory(aptos_framework: &signer) {
+    friend fun initialize_aggregator_factory(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         let aggregator_factory = AggregatorFactory {
             phantom_table: table::new()
@@ -38,20 +38,20 @@ module aptos_framework::aggregator_factory {
     }
 
     /// Creates a new aggregator instance which overflows on exceeding a `limit`.
-    public(friend) fun create_aggregator_internal(): Aggregator acquires AggregatorFactory {
+    friend fun create_aggregator_internal(): Aggregator {
         assert!(
             exists<AggregatorFactory>(@aptos_framework),
             error::not_found(EAGGREGATOR_FACTORY_NOT_FOUND)
         );
 
-        let aggregator_factory = borrow_global_mut<AggregatorFactory>(@aptos_framework);
+        let aggregator_factory = &mut AggregatorFactory[@aptos_framework];
         new_aggregator(aggregator_factory, MAX_U128)
     }
 
     #[deprecated]
     /// This is currently a function closed for public. This can be updated in the future by on-chain governance
     /// to allow any signer to call.
-    public fun create_aggregator(account: &signer, limit: u128): Aggregator acquires AggregatorFactory {
+    public fun create_aggregator(account: &signer, limit: u128): Aggregator {
         // deprecated. Currently used only in aptos-move/e2e-move-tests/src/tests/aggregator.data/pack/sources/aggregator_test.move
 
         // Only Aptos Framework (0x1) account can call this for now.
@@ -67,7 +67,7 @@ module aptos_framework::aggregator_factory {
     native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
 
     #[test_only]
-    public fun create_aggregator_for_test(): Aggregator acquires AggregatorFactory {
+    public fun create_aggregator_for_test(): Aggregator {
         create_aggregator_internal()
     }
 

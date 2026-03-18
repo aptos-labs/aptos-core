@@ -74,7 +74,7 @@ module aptos_framework::nonce_validation {
         nonce: u64,
     }
 
-    public(friend) fun initialize(aptos_framework: &signer) {
+    friend fun initialize(aptos_framework: &signer) {
         initialize_nonce_table(aptos_framework);
     }
 
@@ -108,7 +108,7 @@ module aptos_framework::nonce_validation {
     }
 
     // This method is used to prefill the nonce_table with empty buckets one by one.
-    public entry fun add_nonce_buckets(count: u64) acquires NonceHistory {
+    public entry fun add_nonce_buckets(count: u64) {
         assert!(exists<NonceHistory>(@aptos_framework), error::invalid_state(E_NONCE_HISTORY_DOES_NOT_EXIST));
         let nonce_history = &mut NonceHistory[@aptos_framework];
         for (i in 0..count) {
@@ -126,11 +126,11 @@ module aptos_framework::nonce_validation {
 
     // Returns true if the input (address, nonce) pair doesn't exist in the nonce history, and inserted into nonce history successfully.
     // Returns false if the input (address, nonce) pair already exists in the nonce history.
-    public(friend) fun check_and_insert_nonce(
+    friend fun check_and_insert_nonce(
         sender_address: address,
         nonce: u64,
         txn_expiration_time: u64,
-    ): bool acquires NonceHistory {
+    ): bool {
         assert!(exists<NonceHistory>(@aptos_framework), error::invalid_state(E_NONCE_HISTORY_DOES_NOT_EXIST));
         // Check if the transaction expiration time is too far in the future.
         assert!(txn_expiration_time <= timestamp::now_seconds() + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS, error::invalid_argument(ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE));
@@ -209,7 +209,7 @@ module aptos_framework::nonce_validation {
     fun check_if_nonce_exists_in_history(
         sender_address: address,
         nonce: u64,
-    ): bool acquires NonceHistory {
+    ): bool {
         assert!(exists<NonceHistory>(@aptos_framework), error::invalid_state(E_NONCE_HISTORY_DOES_NOT_EXIST));
         let nonce_key = NonceKey {
             sender_address,
@@ -232,7 +232,7 @@ module aptos_framework::nonce_validation {
     }
 
     #[test(fx = @aptos_framework)]
-    public entry fun nonce_history_test(fx: signer) acquires NonceHistory {
+    public entry fun nonce_history_test(fx: signer) {
         initialize_nonce_table(&fx);
         timestamp::set_time_has_started_for_testing(&fx);
         let begin_time = timestamp::now_seconds();
