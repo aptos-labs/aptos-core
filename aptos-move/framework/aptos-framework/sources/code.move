@@ -150,6 +150,7 @@ module aptos_framework::code {
         from.policy <= to.policy
     }
 
+    #[lint::skip(unused_function)]
     /// Initialize package metadata for Genesis.
     fun initialize(aptos_framework: &signer, package_owner: &signer, metadata: PackageMetadata) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -188,7 +189,6 @@ module aptos_framework::code {
         let index = len;
         let upgrade_number = 0;
         package_immutable.enumerate_ref(|i, old| {
-            let old: &PackageMetadata = old;
             if (old.name == pack.name) {
                 upgrade_number = old.upgrade_number + 1;
                 check_upgradability(old, &pack, &module_names);
@@ -278,7 +278,6 @@ module aptos_framework::code {
     fun check_coexistence(old_pack: &PackageMetadata, new_modules: &vector<String>) {
         // The modules introduced by each package must not overlap with `names`.
         old_pack.modules.for_each_ref(|old_mod| {
-            let old_mod: &ModuleMetadata = old_mod;
             for (j in 0..(new_modules.length())) {
                 let name = &new_modules[j];
                 assert!(&old_mod.name != name, error::already_exists(EMODULE_NAME_CLASH));
@@ -292,8 +291,7 @@ module aptos_framework::code {
     fun check_dependencies(publish_address: address, pack: &PackageMetadata): vector<AllowedDep> {
         let allowed_module_deps = vector[];
         let deps = &pack.deps;
-        deps.for_each_ref(|dep| {
-            let dep: &PackageDep = dep;
+        deps.for_each_ref(|dep: &PackageDep| {
             assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
             if (is_policy_exempted_address(dep.account)) {
                 // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
@@ -302,8 +300,7 @@ module aptos_framework::code {
                 allowed_module_deps.push_back(AllowedDep { account, module_name });
             } else {
                 let registry = &PackageRegistry[dep.account];
-                let found = registry.packages.any(|dep_pack| {
-                    let dep_pack: &PackageMetadata = dep_pack;
+                let found = registry.packages.any(|dep_pack: &PackageMetadata| {
                     if (dep_pack.name == dep.package_name) {
                         // Check policy
                         assert!(
@@ -348,7 +345,6 @@ module aptos_framework::code {
     fun get_module_names(pack: &PackageMetadata): vector<String> {
         let module_names = vector[];
         pack.modules.for_each_ref(|pack_module| {
-            let pack_module: &ModuleMetadata = pack_module;
             module_names.push_back(pack_module.name);
         });
         module_names

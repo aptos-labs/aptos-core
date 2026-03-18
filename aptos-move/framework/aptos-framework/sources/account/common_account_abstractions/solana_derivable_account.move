@@ -39,10 +39,9 @@ module aptos_framework::solana_derivable_account {
     /// Invalid public key length.
     const EINVALID_PUBLIC_KEY_LENGTH: u64 = 6;
 
-    // a 58-character alphabet consisting of numbers (1-9) and almost all (A-Z, a-z) letters,
-    // excluding 0, O, I, and l to avoid confusion between similar-looking characters.
+    /// a 58-character alphabet consisting of numbers (1-9) and almost all (A-Z, a-z) letters,
+    /// excluding 0, O, I, and l to avoid confusion between similar-looking characters.
     const BASE_58_ALPHABET: vector<u8> = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    const HEX_ALPHABET: vector<u8> = b"0123456789abcdef";
     const PUBLIC_KEY_NUM_BYTES: u64 = 32;
 
     enum SIWSAbstractSignature has drop {

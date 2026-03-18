@@ -177,6 +177,7 @@ module aptos_framework::keyless_account {
         }
     }
 
+    #[lint::skip(unused_function)]
     /// Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
     fun validate_groth16_vk(vk: &Groth16VerificationKey) {
         // Could be leveraged to speed up the VM deserialization of the VK by 2x, since it can assume the points are valid.

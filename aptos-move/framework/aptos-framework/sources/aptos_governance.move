@@ -207,6 +207,7 @@ module aptos_framework::aptos_governance {
         signer_caps.add(signer_address, signer_cap);
     }
 
+    #[lint::skip(unused_function)]
     /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
     /// for the aptos_framework (0x1) account.
     /// This function is private because it's called directly from the vm.

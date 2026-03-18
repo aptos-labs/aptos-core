@@ -139,9 +139,6 @@ module aptos_framework::coin {
         value: Aggregator
     }
 
-    /// Maximum possible aggregatable coin value.
-    const MAX_U64: u128 = 18446744073709551615;
-
     /// A holder of a specific coin types and associated event handles.
     /// These are kept in a single resource to ensure locality of data.
     struct CoinStore<phantom CoinType> has key {
@@ -173,6 +170,7 @@ module aptos_framework::coin {
     }
 
     #[event]
+    #[deprecated]
     /// Module event emitted when some amount of a coin is deposited into an account.
     struct CoinDeposit has drop, store {
         coin_type: String,
@@ -181,6 +179,7 @@ module aptos_framework::coin {
     }
 
     #[event]
+    #[deprecated]
     /// Module event emitted when some amount of a coin is withdrawn from an account.
     struct CoinWithdraw has drop, store {
         coin_type: String,
@@ -472,7 +471,7 @@ module aptos_framework::coin {
     ) {
         let MintRefReceipt { metadata } = receipt;
         assert!(
-            mint_ref.mint_ref_metadata() == metadata,
+            &mint_ref.mint_ref_metadata() == &metadata,
             error::invalid_argument(EMINT_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = metadata.object_address();
@@ -518,7 +517,7 @@ module aptos_framework::coin {
     ) {
         let TransferRefReceipt { metadata } = receipt;
         assert!(
-            transfer_ref.transfer_ref_metadata() == metadata,
+            &transfer_ref.transfer_ref_metadata() == &metadata,
             error::invalid_argument(ETRANSFER_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = metadata.object_address();
@@ -586,7 +585,7 @@ module aptos_framework::coin {
     ) {
         let BurnRefReceipt { metadata } = receipt;
         assert!(
-            burn_ref.burn_ref_metadata() == metadata,
+            &burn_ref.burn_ref_metadata() == &metadata,
             error::invalid_argument(EBURN_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = metadata.object_address();
@@ -620,23 +619,6 @@ module aptos_framework::coin {
         _aptos_framework: &signer, _allowed: bool
     ) {
         abort error::invalid_state(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
-    }
-
-    inline fun calculate_amount_to_withdraw<CoinType>(
-        account_addr: address, amount: u64
-    ): (u64, u64) {
-        let coin_balance = coin_balance<CoinType>(account_addr);
-        if (coin_balance >= amount) {
-            (amount, 0)
-        } else {
-            let metadata = paired_metadata<CoinType>();
-            if (metadata.is_some()
-                && primary_fungible_store::primary_store_exists(
-                    account_addr, metadata.destroy_some()
-                ))
-                (coin_balance, amount - coin_balance)
-            else abort error::invalid_argument(EINSUFFICIENT_BALANCE)
-        }
     }
 
     fun maybe_convert_to_fungible_store<CoinType>(
@@ -1142,7 +1124,7 @@ module aptos_framework::coin {
     /// Create a new `Coin<CoinType>` with a value of `0`.
     public fun zero<CoinType>(): Coin<CoinType> {
         spec {
-            update supply<CoinType> = supply<CoinType> + 0;
+            update supply<CoinType> = supply<CoinType>;
         };
         Coin<CoinType> { value: 0 }
     }

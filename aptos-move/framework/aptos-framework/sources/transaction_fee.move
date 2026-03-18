@@ -109,7 +109,8 @@ module aptos_framework::transaction_fee {
         move_to(aptos_framework, AptosCoinMintCapability { mint_cap })
     }
 
-    // Called by the VM after epilogue.
+    #[lint::skip(unused_function)]
+    /// Called by the VM after epilogue.
     fun emit_fee_statement(fee_statement: FeeStatement) {
         event::emit(fee_statement)
     }

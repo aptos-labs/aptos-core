@@ -83,6 +83,7 @@ module aptos_framework::reconfiguration {
         );
     }
 
+    #[lint::skip(unused_function)]
     /// Private function to temporarily halt reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun disable_reconfiguration(aptos_framework: &signer) {
@@ -91,6 +92,7 @@ module aptos_framework::reconfiguration {
         move_to(aptos_framework, DisableReconfiguration {})
     }
 
+    #[lint::skip(unused_function)]
     /// Private function to resume reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun enable_reconfiguration(aptos_framework: &signer) {
@@ -163,6 +165,7 @@ module aptos_framework::reconfiguration {
         Configuration[@aptos_framework].epoch
     }
 
+    #[lint::skip(unused_function)]
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() {

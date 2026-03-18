@@ -100,6 +100,7 @@ module aptos_framework::reconfiguration_with_dkg {
         }
     }
 
+    #[lint::skip(unused_function)]
     /// Complete the current DKG session with the given result.
     /// Aborts if no DKG session is in progress.
     /// If Chunky DKG is enabled, finish(account) is invoked only once both DKG and Chunky DKG
@@ -113,6 +114,7 @@ module aptos_framework::reconfiguration_with_dkg {
         }
     }
 
+    #[lint::skip(unused_function)]
     /// Complete the current Chunky DKG session with the given result.
     /// No-op if Chunky DKG is not enabled.
     /// Buffers the derived encryption key for the next epoch.

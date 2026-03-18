@@ -80,10 +80,12 @@ module aptos_framework::state_storage {
     // ======================== deprecated ============================
     friend aptos_framework::reconfiguration;
 
+    #[deprecated]
     struct GasParameter has key, store {
         usage: Usage,
     }
 
+    #[deprecated]
     friend fun on_reconfig() {
         abort 0
     }

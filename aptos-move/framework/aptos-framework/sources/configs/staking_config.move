@@ -37,8 +37,6 @@ module aptos_framework::staking_config {
 
     /// Limit the maximum value of `rewards_rate` in order to avoid any arithmetic overflow.
     const MAX_REWARDS_RATE: u64 = 1000000;
-    /// Denominator of number in basis points. 1 bps(basis points) = 0.01%.
-    const BPS_DENOMINATOR: u64 = 10000;
     /// 1 year => 365 * 24 * 60 * 60
     const ONE_YEAR_IN_SECS: u64 = 31536000;
 

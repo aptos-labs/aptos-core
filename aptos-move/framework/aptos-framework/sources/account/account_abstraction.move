@@ -41,8 +41,6 @@ module aptos_framework::account_abstraction {
     /// source is defined in Scheme enum in types/src/transaction/authenticator.rs
     const DERIVABLE_ABSTRACTION_DERIVED_SCHEME: u8 = 5;
 
-    const MAX_U64: u128 = 18446744073709551615;
-
     #[event]
     struct UpdateDispatchableAuthenticator has store, drop {
         account: address,
@@ -271,6 +269,7 @@ module aptos_framework::account_abstraction {
         &DerivableDispatchableAuthenticator[@aptos_framework].auth_functions
    }
 
+    #[lint::skip(unused_function)]
     fun authenticate(
         account: signer,
         func_info: FunctionInfo,

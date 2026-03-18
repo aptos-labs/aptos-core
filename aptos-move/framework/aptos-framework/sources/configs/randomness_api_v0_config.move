@@ -14,6 +14,7 @@ module aptos_framework::randomness_api_v0_config {
         value: bool,
     }
 
+    #[deprecated]
     /// Only used in genesis.
     fun initialize(framework: &signer, required_amount: RequiredGasDeposit, allow_custom_max_gas_flag: AllowCustomMaxGasFlag) {
         system_addresses::assert_aptos_framework(framework);

@@ -590,7 +590,6 @@ module aptos_framework::ordered_map {
     /// Return all keys in the map. This requires keys to be copyable.
     public fun keys<K: copy, V>(self: &OrderedMap<K, V>): vector<K> {
         self.entries.map_ref(|e| {
-            let e: &Entry<K, V> = e;
             e.key
         })
     }
@@ -598,7 +597,6 @@ module aptos_framework::ordered_map {
     /// Return all values in the map. This requires values to be copyable.
     public fun values<K, V: copy>(self: &OrderedMap<K, V>): vector<V> {
         self.entries.map_ref(|e| {
-            let e: &Entry<K, V> = e;
             e.value
         })
     }

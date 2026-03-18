@@ -59,9 +59,11 @@ module aptos_framework::object {
     /// nesting, but any checks such as transfer will only be evaluated this deep.
     const MAXIMUM_OBJECT_NESTING: u8 = 8;
 
+    #[deprecated]
     /// generate_unique_address uses this for domain separation within its native implementation
     const DERIVE_AUID_ADDRESS_SCHEME: u8 = 0xFB;
 
+    #[deprecated]
     /// Scheme identifier used to generate an object's address `obj_addr` as derived from another object.
     /// The object's address is generated as:
     /// ```

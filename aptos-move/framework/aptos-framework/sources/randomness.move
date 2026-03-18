@@ -25,9 +25,6 @@ module aptos_framework::randomness {
     /// `#[randomness]` annotation. Otherwise, malicious users can bias randomness result.
     const E_API_USE_IS_BIASIBLE: u64 = 1;
 
-    const MAX_U256: u256 =
-        115792089237316195423570985008687907853269984665640564039457584007913129639935;
-
     /// 32-byte randomness seed unique to every block.
     /// This resource is updated in every block prologue.
     struct PerBlockRandomness has drop, key {
@@ -281,7 +278,7 @@ module aptos_framework::randomness {
         let i = 0;
         while ({
             spec {
-                invariant sample >= 0 && sample < max_excl - min_incl;
+                invariant sample < max_excl - min_incl;
             };
             i < 256
         }) {
@@ -291,7 +288,7 @@ module aptos_framework::randomness {
 
         let sample = safe_add_mod(sample, r0 % range, range);
         spec {
-            assert sample >= 0 && sample < max_excl - min_incl;
+            assert sample < max_excl - min_incl;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -330,7 +327,7 @@ module aptos_framework::randomness {
         let tail = n - 1;
         while ({
             spec {
-                invariant tail >= 0 && tail < len(values);
+                invariant tail < len(values);
             };
             tail > 0
         }) {

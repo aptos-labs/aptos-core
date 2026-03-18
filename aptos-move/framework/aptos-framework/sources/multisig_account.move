@@ -1057,11 +1057,9 @@ module aptos_framework::multisig_account {
 
         let sequence_number = last_resolved_sequence_number(multisig_account) + 1;
         let owner_addr = address_of(owner);
-        if (features::multisig_v2_enhancement_feature_enabled()) {
-            // Implicitly vote for rejection if the owner has not voted for rejection yet.
-            if (!has_voted_for_rejection(multisig_account, sequence_number, owner_addr)) {
-                reject_transaction(owner, multisig_account, sequence_number);
-            }
+        // Implicitly vote for rejection if the owner has not voted for rejection yet.
+        if (features::multisig_v2_enhancement_feature_enabled() && !has_voted_for_rejection(multisig_account, sequence_number, owner_addr)) {
+            reject_transaction(owner, multisig_account, sequence_number);
         };
 
         let multisig_account_resource = &mut MultisigAccount[multisig_account];
@@ -1097,6 +1095,7 @@ module aptos_framework::multisig_account {
 
     ////////////////////////// To be called by VM only ///////////////////////////////
 
+    #[lint::skip(unused_function)]
     /// Called by the VM as part of transaction prologue, which is invoked during mempool transaction validation and as
     /// the first step of transaction execution.
     ///
@@ -1147,6 +1146,7 @@ module aptos_framework::multisig_account {
         }
     }
 
+    #[lint::skip(unused_function)]
     /// Post-execution cleanup for a successful multisig transaction execution.
     /// This function is private so no other code can call this beside the VM itself as part of MultisigTransaction.
     fun successful_transaction_execution_cleanup(
@@ -1155,7 +1155,7 @@ module aptos_framework::multisig_account {
         transaction_payload: vector<u8>,
     ) {
         let num_approvals = transaction_execution_cleanup_common(executor, multisig_account);
-        let multisig_account_resource = &mut MultisigAccount[multisig_account];
+        let multisig_account_resource = &MultisigAccount[multisig_account];
         emit(
             TransactionExecutionSucceeded {
                 multisig_account,
@@ -1167,6 +1167,7 @@ module aptos_framework::multisig_account {
         );
     }
 
+    #[lint::skip(unused_function)]
     /// Post-execution cleanup for a failed multisig transaction execution.
     /// This function is private so no other code can call this beside the VM itself as part of MultisigTransaction.
     fun failed_transaction_execution_cleanup(
@@ -1176,7 +1177,7 @@ module aptos_framework::multisig_account {
         execution_error: ExecutionError,
     ) {
         let num_approvals = transaction_execution_cleanup_common(executor, multisig_account);
-        let multisig_account_resource = &mut MultisigAccount[multisig_account];
+        let multisig_account_resource = &MultisigAccount[multisig_account];
         emit(
             TransactionExecutionFailed {
                 multisig_account,

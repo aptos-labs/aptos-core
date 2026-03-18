@@ -440,9 +440,8 @@ module aptos_framework::jwks {
     /// Helper function that removes an OIDC provider from the `SupportedOIDCProviders`.
     /// Returns the old config URL of the provider, if any, as an `Option`.
     fun remove_oidc_provider_internal(provider_set: &mut SupportedOIDCProviders, name: vector<u8>): Option<vector<u8>> {
-        let (name_exists, idx) = provider_set.providers.find(|obj| {
-            let provider: &OIDCProvider = obj;
-            provider.name == name
+        let (name_exists, idx) = provider_set.providers.find(|provider| {
+            &provider.name == &name
         });
 
         if (name_exists) {
@@ -606,9 +605,8 @@ module aptos_framework::jwks {
     /// Remove the entry of an issuer from a `AllProvidersJWKs` and return the entry, if exists.
     /// Maintains the sorted-by-issuer invariant in `AllProvidersJWKs`.
     fun remove_issuer(jwks: &mut AllProvidersJWKs, issuer: vector<u8>): Option<ProviderJWKs> {
-        let (found, index) = jwks.entries.find(|obj| {
-            let provider_jwk_set: &ProviderJWKs = obj;
-            provider_jwk_set.issuer == issuer
+        let (found, index) = jwks.entries.find(|provider_jwk_set| {
+            &provider_jwk_set.issuer == &issuer
         });
 
         let ret = if (found) {

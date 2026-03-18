@@ -383,6 +383,7 @@ module aptos_framework::permissioned_signer {
         }
     }
 
+    #[lint::skip(unused_function)]
     /// merge the two stored permission
     fun merge(lhs: &mut StoredPermission, rhs: StoredPermission) {
         match (rhs) {

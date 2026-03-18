@@ -99,10 +99,9 @@ module aptos_framework::stake {
     /// https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.rs#L20
     const MAX_VALIDATOR_SET_SIZE: u64 = 65536;
 
+    #[lint::skip(unused_constant)]
     /// Limit the maximum value of `rewards_rate` in order to avoid any arithmetic overflow.
     const MAX_REWARDS_RATE: u64 = 1000000;
-
-    const MAX_U64: u128 = 18446744073709551615;
 
     /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
     /// Having this be separate from the signer for the account that the validator resources are hosted at allows
@@ -232,6 +231,7 @@ module aptos_framework::stake {
     struct StakeManagementPermission has copy, drop, store {}
 
     #[event]
+    #[deprecated]
     struct RegisterValidatorCandidate has drop, store {
         pool_address: address
     }
@@ -955,7 +955,7 @@ module aptos_framework::stake {
         assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
 
-        let stake_pool = &mut StakePool[pool_address];
+        let stake_pool = &StakePool[pool_address];
         assert!(
             signer::address_of(operator) == stake_pool.operator_address,
             error::unauthenticated(ENOT_OPERATOR)
@@ -993,7 +993,7 @@ module aptos_framework::stake {
         check_stake_permission(operator);
         assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
-        let stake_pool = &mut StakePool[pool_address];
+        let stake_pool = &StakePool[pool_address];
         assert!(
             signer::address_of(operator) == stake_pool.operator_address,
             error::unauthenticated(ENOT_OPERATOR)
@@ -1215,7 +1215,7 @@ module aptos_framework::stake {
         );
 
         assert_stake_pool_exists(pool_address);
-        let stake_pool = &mut StakePool[pool_address];
+        let stake_pool = &StakePool[pool_address];
         // Account has to be the operator.
         assert!(
             signer::address_of(operator) == stake_pool.operator_address,
@@ -1342,14 +1342,12 @@ module aptos_framework::stake {
 
         // Process pending stake and distribute transaction fees and rewards for each currently active validator.
         validator_set.active_validators.for_each_ref(|validator| {
-            let validator: &ValidatorInfo = validator;
             update_stake_pool(validator_perf, validator.addr, &config);
         });
 
         // Process pending stake and distribute transaction fees and rewards for each currently pending_inactive validator
         // (requested to leave but not removed yet).
         validator_set.pending_inactive.for_each_ref(|validator| {
-            let validator: &ValidatorInfo = validator;
             update_stake_pool(validator_perf, validator.addr, &config);
         });
 
@@ -1359,7 +1357,6 @@ module aptos_framework::stake {
         // a mismatch with the DKG validator set (which excludes expired pending_inactive) and
         // an out-of-bounds panic in the epoch manager.
         validator_set.pending_active.for_each_ref(|validator| {
-            let validator: &ValidatorInfo = validator;
             let stake_pool = &mut StakePool[validator.addr];
             if (stake_pool.locked_until_secs > 0
                 && get_reconfig_start_time_secs() >= stake_pool.locked_until_secs) {
@@ -1460,7 +1457,7 @@ module aptos_framework::stake {
                 invariant spec_validators_are_initialized(validator_set.active_validators);
                 invariant len(validator_set.pending_active) == 0;
                 invariant len(validator_set.pending_inactive) == 0;
-                invariant 0 <= validator_index && validator_index <= vlen;
+                invariant validator_index <= vlen;
                 invariant vlen == len(validator_set.active_validators);
                 invariant forall i in 0..validator_index:
                     global<ValidatorConfig>(validator_set.active_validators[i].addr).validator_index
@@ -1772,13 +1769,6 @@ module aptos_framework::stake {
         validator_consensus_infos
     }
 
-    fun addresses_from_validator_infos(infos: &vector<ValidatorInfo>): vector<address> {
-        infos.map_ref(|obj| {
-            let info: &ValidatorInfo = obj;
-            info.addr
-        })
-    }
-
     /// Calculate the stake amount of a stake pool for the next epoch.
     /// Update individual validator's stake pool if `commit == true`.
     ///
@@ -1805,7 +1795,7 @@ module aptos_framework::stake {
                     &TransactionFeeConfig[@aptos_framework];
                 *max_fee_octa_allowed_per_epoch_per_pool
             } else {
-                MAX_U64 as u64
+                MAX_U64
             };
 
         if (exists<PendingTransactionFee>(@aptos_framework)) {

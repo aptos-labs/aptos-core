@@ -220,6 +220,7 @@ module aptos_framework::vesting {
     }
 
     #[event]
+    #[deprecated]
     struct UnlockRewards has drop, store {
         admin: address,
         vesting_contract_address: address,
@@ -727,7 +728,7 @@ module aptos_framework::vesting {
     public entry fun distribute(contract_address: address) {
         assert_active_vesting_contract(contract_address);
 
-        let vesting_contract = &mut VestingContract[contract_address];
+        let vesting_contract = &VestingContract[contract_address];
         let coins = withdraw_stake(vesting_contract, contract_address);
         let total_distribution_amount = coin::value(&coins);
         if (total_distribution_amount == 0) {
@@ -809,7 +810,7 @@ module aptos_framework::vesting {
             error::invalid_state(EVESTING_CONTRACT_STILL_ACTIVE)
         );
 
-        let vesting_contract = &mut VestingContract[contract_address];
+        let vesting_contract = &VestingContract[contract_address];
         verify_admin(admin, vesting_contract);
         let coins = withdraw_stake(vesting_contract, contract_address);
         let amount = coin::value(&coins);
@@ -905,7 +906,7 @@ module aptos_framework::vesting {
         admin: &signer,
         contract_address: address,
     ) {
-        let vesting_contract = &mut VestingContract[contract_address];
+        let vesting_contract = &VestingContract[contract_address];
         verify_admin(admin, vesting_contract);
         let contract_signer = &get_vesting_account_signer_internal(vesting_contract);
         staking_contract::reset_lockup(contract_signer, vesting_contract.staking.operator);

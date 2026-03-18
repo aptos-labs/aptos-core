@@ -1164,8 +1164,7 @@ module aptos_framework::fungible_asset {
         icon_uri: Option<String>,
         project_uri: Option<String>
     ) {
-        let metadata_address = self.metadata.object_address();
-        let mutable_metadata = &mut Metadata[metadata_address];
+        let mutable_metadata = borrow_fungible_metadata_mut(&self.metadata);
 
         if (name.is_some()) {
             let name = name.extract();
@@ -1375,7 +1374,7 @@ module aptos_framework::fungible_asset {
             );
             supply.current -= amount as u128;
         } else {
-            assert!(false, error::not_found(ESUPPLY_NOT_FOUND));
+            abort error::not_found(ESUPPLY_NOT_FOUND);
         }
     }
 
