@@ -270,24 +270,17 @@ async fn decrypt_validator_path(
         );
     }
 
-    // Overlap eval_proofs (CPU-heavy, O(n^2 log n)) with secret key reception (network wait).
-    // spawn_blocking prevents starving the async runtime during proof computation.
-    let digest_key = secret_share_config.digest_key_arc();
-    let proofs_handle = tokio::task::spawn_blocking(move || {
-        monitor!(
-            "decryption_eval_proofs",
-            FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key)
-        )
-    });
-
-    // Wait for eval_proofs first, then overlap prepare_ct with key reception.
+    // eval_proofs is CPU-heavy (O(n^2 log n)); spawn_blocking prevents starving the async runtime.
     // Pipeline: eval_proofs ──→ prepare_ct ──┐
     //           secret_shared_key_rx ─────────┴──→ decrypt
+    let digest_key = secret_share_config.digest_key_arc();
     let proofs = monitor!(
-        "decryption_wait_eval_proofs",
-        proofs_handle
-            .await
-            .map_err(|e| anyhow!("proof computation panicked: {e}"))?
+        "decryption_eval_proofs",
+        tokio::task::spawn_blocking(move || {
+            FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key)
+        })
+        .await
+        .map_err(|e| anyhow!("proof computation panicked: {e}"))?
     );
 
     // prepare_ct is expensive (parallel pairings) and doesn't need the decryption key,
