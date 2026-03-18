@@ -51,8 +51,7 @@ impl PipelineBuilder {
         observer_decrypted_txns: Option<Vec<SignedTransaction>>,
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
-        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) =
-            materialize_fut.await?;
+        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = materialize_fut.await?;
         tracker.start_working();
 
         // Single partition point: split encrypted from regular transactions once
@@ -198,9 +197,7 @@ async fn decrypt_validator_path(
     }
 
     let max_encrypted_txns = secret_share_config.digest_key().max_batch_size();
-    let (encrypted_txns, batch_limit_exceeded_txns) = if encrypted_txns.len()
-        > max_encrypted_txns
-    {
+    let (encrypted_txns, batch_limit_exceeded_txns) = if encrypted_txns.len() > max_encrypted_txns {
         warn!(
             "Block {} has {} encrypted txns exceeding batch limit {}; marking excess as BatchLimitReached",
             block.round(),
@@ -236,14 +233,16 @@ async fn decrypt_validator_path(
     // TODO(ibalajiarun): Fix this wrapping
     let num_rounds = secret_share_config.digest_key().num_rounds() as u64;
     let encryption_round = block.round() % num_rounds;
-    let (digest, proofs_promise) = monitor!(
-        "decryption_digest",
-        FPTXWeighted::digest(
-            secret_share_config.digest_key(),
-            &txn_ciphertexts,
-            encryption_round,
-        )?
-    );
+    let digest_key = secret_share_config.digest_key_arc();
+    let (txn_ciphertexts, digest, proofs_promise) = tokio::task::spawn_blocking(move || {
+        monitor!(
+            "decryption_digest",
+            FPTXWeighted::digest(&digest_key, &txn_ciphertexts, encryption_round)
+                .map(|(digest, proofs_promise)| (txn_ciphertexts, digest, proofs_promise))
+        )
+    })
+    .await
+    .map_err(|e| anyhow!("digest computation panicked: {e}"))??;
 
     let metadata = SecretShareMetadata::new(
         block.epoch(),
