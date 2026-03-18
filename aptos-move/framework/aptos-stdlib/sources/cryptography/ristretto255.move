@@ -49,9 +49,11 @@ module aptos_std::ristretto255 {
     //
 
     /// The order of the Ristretto255 group and its scalar field, in little-endian.
+    /// This requires 253 bits to represent.
     const ORDER_ELL: vector<u8> = x"edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
 
     /// `ORDER_ELL` - 1: i.e., the "largest", reduced scalar in the field
+    /// This also requires 253 bits to represent.
     const L_MINUS_ONE: vector<u8> = x"ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
 
     /// The maximum size in bytes of a canonically-encoded Scalar is 32 bytes.

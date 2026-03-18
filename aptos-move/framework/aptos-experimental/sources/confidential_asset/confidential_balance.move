@@ -1,12 +1,17 @@
 /// Balance types for the confidential asset protocol.
 ///
+/// A balances $a$ is chunked into vectors of $b$-bit chunks $[a_0, a_1, \ldots, a_{n-1}]$ such that $a = \sum_{i = 0}^{n-1} a_i B^i$
+/// where $B = 2^b$.
+/// Then, each chunk $i$ is encrypted as a tuple $(P_i = a_i G + r_i H, R_i = r_i \mathsf{ek})$ under an encryption key $\mathsf{ek}$.
+///
+/// The pending balance has $n$ chunks while the available balance has $\ell$ such chunks.
+/// For Aptos, we need $b n = 64$ and $b \ell = 128$.
+///
 /// `CompressedBalance<T>` and `Balance<T>` are parameterized by phantom markers `Pending` and `Available`.
-/// P_i = a_i*G + r_i*H, R_i = r_i*EK. R_aud is empty for Pending balances.
 module aptos_experimental::confidential_balance {
     use std::error;
     use std::vector;
-    use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto,
-        new_scalar_from_u128, scalar_one, point_identity, point_identity_compressed};
+    use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto, new_scalar_from_u128, scalar_one, point_identity, point_identity_compressed};
     use aptos_experimental::sigma_protocol_utils::deserialize_compressed_points;
 
     friend aptos_experimental::confidential_amount;
