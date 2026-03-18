@@ -86,7 +86,6 @@ fn weighted_smoke_with_pvss() {
         })
         .collect();
 
-    // Do all aggregations in projective form, then normalize to affine
     let subtranscript =
         <T as HasAggregatableSubtranscript>::Subtranscript::aggregate(&tc, subtrx_paths).unwrap();
 
