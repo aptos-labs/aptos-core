@@ -489,7 +489,7 @@ module aptos_experimental::confidential_asset {
         let ek_recip = get_encryption_key(to, asset_type);
         let old_balance = get_available_balance(from, asset_type);
 
-        // Note: Sender's amount is not used; only included for indexing to reliably pick it up for dapps that need it
+        // Note: Sender's amount in `TransferProof::compressed_amount::compressed_R_sender` is not used here; only included so it can be indexed for dapps that need it
         let (compressed_new_balance,recipient_amount) =
             assert_valid_transfer_proof(
                 sender, to, asset_type,
