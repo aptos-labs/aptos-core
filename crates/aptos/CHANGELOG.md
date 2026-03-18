@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- Updated default formatter version to 1.5.1.
 
 ## [9.0.0]
 - Add linter rules `unused_function`, `unused_struct`, and `unused_constant` to detect unused items.
