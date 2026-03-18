@@ -1257,10 +1257,10 @@ while preserving the order ID for potential reuse.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulk_order_types.md#0x5_bulk_order_types_set_empty">set_empty</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<b>mut</b> <a href="bulk_order_types.md#0x5_bulk_order_types_BulkOrder">BulkOrder</a>&lt;M&gt;) {
-    self.order_request.bid_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    self.order_request.ask_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    self.order_request.bid_prices = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    self.order_request.ask_prices = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    self.order_request.bid_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    self.order_request.ask_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    self.order_request.bid_prices = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    self.order_request.ask_prices = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
 }
 </code></pre>
 

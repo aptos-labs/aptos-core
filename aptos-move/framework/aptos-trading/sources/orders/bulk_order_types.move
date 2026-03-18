@@ -30,7 +30,6 @@
 module aptos_trading::bulk_order_types {
     use std::option;
     use std::option::Option;
-    use std::vector;
     use aptos_trading::order_book_types::{OrderId, IncreasingIdx};
     use aptos_trading::order_match_types::{
         OrderMatch,
@@ -437,10 +436,10 @@ module aptos_trading::bulk_order_types {
     /// # Arguments:
     /// - `self`: Mutable reference to the bulk order
     public fun set_empty<M: store + copy + drop>(self: &mut BulkOrder<M>) {
-        self.order_request.bid_sizes = vector::empty();
-        self.order_request.ask_sizes = vector::empty();
-        self.order_request.bid_prices = vector::empty();
-        self.order_request.ask_prices = vector::empty();
+        self.order_request.bid_sizes = vector[];
+        self.order_request.ask_sizes = vector[];
+        self.order_request.bid_prices = vector[];
+        self.order_request.ask_prices = vector[];
     }
 
     public fun destroy_bulk_order<M: store + copy + drop>(
