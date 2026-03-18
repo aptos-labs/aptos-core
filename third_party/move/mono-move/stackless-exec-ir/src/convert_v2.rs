@@ -7,7 +7,7 @@
 //!         (pure SSA within each basic block). Locals (params + declared locals)
 //!         are mutable across blocks and keep their original register indices.
 //!
-//! Pass 2: Map value IDs to physical registers using liveness-driven reuse
+//! Pass 2: Map value IDs to named registers using liveness-driven reuse
 //!         with StLoc look-ahead and CopyLoc/MoveLoc coalescing.
 
 use anyhow::{bail, Context, Result};
