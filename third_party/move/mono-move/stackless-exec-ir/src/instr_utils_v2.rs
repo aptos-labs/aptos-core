@@ -422,8 +422,10 @@ pub(crate) fn apply_subst_to_sources(instr: &mut Instr, subst: &BTreeMap<Reg, Re
         },
         Instr::TestVariant(_, _, src) | Instr::TestVariantGeneric(_, _, src) => s(src, subst),
 
-        // References
-        Instr::ImmBorrowLoc(_, src) | Instr::MutBorrowLoc(_, src) => s(src, subst),
+        // References — BorrowLoc sources are storage-location uses (identity of the
+        // slot matters), NOT value uses. Substituting them would change which frame
+        // slot the reference points to, which is unsound.
+        Instr::ImmBorrowLoc(_, _) | Instr::MutBorrowLoc(_, _) => {},
         Instr::ImmBorrowField(_, _, src)
         | Instr::MutBorrowField(_, _, src)
         | Instr::ImmBorrowFieldGeneric(_, _, src)

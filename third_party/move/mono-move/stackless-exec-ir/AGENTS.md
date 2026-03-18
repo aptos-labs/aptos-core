@@ -2,7 +2,7 @@
 
 This crate defines a polymorphic stackless execution IR and performs conversion from Move bytecode to the stackless execution IR.
 There are currently two pipelines, v1 and v2: v1 is there only for comparison purposes and is intended to be removed.
-The stackless execution IR is intended to be converted into monomorphic micro-ops.
+The stackless execution IR is then lowered into monomorphic micro-ops, when all types used in the function are fully concrete and thus type size and layout information is available.
 
 ## Goals of converting from Move bytecode to stackless-exec-ir
 

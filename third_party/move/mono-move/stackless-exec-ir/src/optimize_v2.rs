@@ -31,8 +31,60 @@ pub fn optimize_module_v2(module_ir: &mut ModuleIR) {
 ///
 /// Pre: allocated instruction stream (physical registers).
 /// Post: Copy/Move sources propagated to downstream uses; no instructions removed.
+///
+/// # Correctness
+///
+/// ## Move verifier guarantees we rely on
+/// - **StLoc(L) forbidden while L is borrowed** (immutably or mutably)
+/// - **MoveLoc(L) forbidden while L is borrowed**
+/// - **CopyLoc(L) forbidden while L is mutably borrowed**
+///
+/// ## Two kinds of register use
+/// 1. **Value use** — reads the register's current value (e.g., `Add(dst, r, #5)`)
+/// 2. **Storage-location use** — takes a reference to the register's slot
+///    (only `ImmBorrowLoc` and `MutBorrowLoc`)
+///
+/// Copy propagation is sound for value uses (value equality suffices) but
+/// unsound for storage-location uses (identity of the slot matters).
+/// `apply_subst_to_sources` skips BorrowLoc sources to enforce this.
+///
+/// ## The MutBorrowLoc hidden-write problem
+/// `WriteRef` through a mutable reference modifies the borrowed register's
+/// storage, but `get_defs_uses` reports NO defs for `WriteRef` — only uses.
+/// So the standard def-based subst invalidation misses it:
+/// ```text
+/// Copy(local, param)           // subst = {local -> param}
+/// MutBorrowLoc(ref, local)     // mutable borrow of local
+/// WriteRef(ref, 99)            // local is now 99, but NO defs reported
+/// use(local)                   // subst says use(param) -- WRONG
+/// ```
+/// Fix: kill subst entries for the borrowed register when `MutBorrowLoc` is
+/// encountered.
+///
+/// `ImmBorrowLoc` does NOT need this kill — the verifier guarantees the
+/// borrowed register cannot be modified while immutably borrowed.
+///
+/// ## Why cross-block mutable borrows are safe
+///
+/// Copy propagation is block-local — subst is reset at every block boundary.
+/// Three cases:
+///
+/// 1. **Borrow in same block as copy**: MutBorrowLoc kill fires in-block,
+///    preventing stale substitutions after the borrow point. Covers all
+///    downstream writes through the ref, including function calls.
+/// 2. **Borrow in different block**: That block starts with empty subst. No
+///    propagation of the borrowed register occurs. Cross-block DCE safety
+///    protects the copy in the original block from removal.
+/// 3. **Ref escapes via function call**: The MutBorrowLoc kill is
+///    conservative — fires at borrow creation, before any actual write.
+///    Handles invisible writes through calls in same or other blocks.
+///
+/// No block-crossing problem can arise because: (a) subst maps are
+/// block-local, and (b) the verifier forbids explicit redefinition
+/// (StLoc/MoveLoc) of a register while it's borrowed, so any modification
+/// must go through the ref — which is handled by the MutBorrowLoc kill in
+/// the block where the borrow is created.
 fn copy_propagation(func: &mut FunctionIR) {
-    let num_pinned = func.num_params + func.num_locals;
     let blocks = split_into_blocks(&func.instrs);
 
     for (start, end) in blocks {
@@ -41,6 +93,14 @@ fn copy_propagation(func: &mut FunctionIR) {
         for i in start..end {
             apply_subst_to_sources(&mut func.instrs[i], &subst);
 
+            // MutBorrowLoc kill: the borrowed register may be silently written
+            // through the resulting reference (WriteRef), which is not tracked
+            // as a def. Kill any substitution involving the borrowed register.
+            if let Instr::MutBorrowLoc(_, src) = &func.instrs[i] {
+                subst.remove(src);
+                subst.retain(|_, v| v != src);
+            }
+
             let (defs, _) = get_defs_uses(&func.instrs[i]);
             for d in &defs {
                 subst.remove(d);
@@ -48,9 +108,7 @@ fn copy_propagation(func: &mut FunctionIR) {
             }
 
             match &func.instrs[i] {
-                Instr::Copy(dst, src) | Instr::Move(dst, src)
-                    if matches!(dst, Reg::Home(i) if *i >= num_pinned) || dst.is_arg() =>
-                {
+                Instr::Copy(dst, src) | Instr::Move(dst, src) => {
                     subst.insert(*dst, *src);
                 },
                 _ => {},
@@ -69,10 +127,32 @@ fn eliminate_identity_moves(func: &mut FunctionIR) {
 /// Pass 5: Backward dead-code elimination within each basic block.
 ///
 /// Pre: after copy propagation and identity move elimination.
-/// Post: dead Copy/Move to non-pinned registers removed.
+/// Post: dead Copy/Move to unused registers removed.
+///
+/// Registers that appear in more than one basic block are excluded from
+/// removal — their liveness cannot be determined by block-local analysis.
 fn dead_instruction_elimination(func: &mut FunctionIR) {
-    let num_pinned = func.num_params + func.num_locals;
     let blocks = split_into_blocks(&func.instrs);
+
+    // Pre-scan: identify registers that appear in more than one block.
+    let mut reg_block: BTreeMap<Reg, usize> = BTreeMap::new();
+    let mut cross_block_regs: BTreeSet<Reg> = BTreeSet::new();
+    for (block_id, &(start, end)) in blocks.iter().enumerate() {
+        for i in start..end {
+            let (dsts, srcs) = get_defs_uses(&func.instrs[i]);
+            for r in dsts.into_iter().chain(srcs) {
+                match reg_block.get(&r) {
+                    Some(&prev) if prev != block_id => {
+                        cross_block_regs.insert(r);
+                    },
+                    None => {
+                        reg_block.insert(r, block_id);
+                    },
+                    _ => {},
+                }
+            }
+        }
+    }
 
     let mut dead_indices: BTreeSet<usize> = BTreeSet::new();
 
@@ -84,7 +164,7 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
 
             let is_removable = match &func.instrs[i] {
                 Instr::Copy(dst, _) | Instr::Move(dst, _)
-                    if matches!(dst, Reg::Home(i) if *i >= num_pinned) || dst.is_arg() =>
+                    if !cross_block_regs.contains(dst) =>
                 {
                     !live.contains(dst)
                 },
@@ -115,13 +195,14 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
     }
 }
 
-/// Pass 6: Compact Home register indices while preserving pinned registers.
+/// Pass 6: Compact Home register indices while preserving param ABI indices.
 ///
 /// Pre: after DCE (some registers may be unused).
-/// Post: Home registers renumbered contiguously starting at num_pinned;
-///       reg_types and num_regs updated.
+/// Post: Params keep indices 0..num_params-1 (ABI-visible). Surviving locals
+///       and temps are compacted contiguously starting at num_params.
+///       `num_locals`, `num_regs`, and `reg_types` are updated.
 fn renumber_registers(func: &mut FunctionIR) {
-    let num_pinned = func.num_params + func.num_locals;
+    let num_params = func.num_params;
 
     let mut used_home_regs: BTreeSet<u16> = BTreeSet::new();
     for instr in &func.instrs {
@@ -134,12 +215,18 @@ fn renumber_registers(func: &mut FunctionIR) {
     }
 
     let mut rename_map: BTreeMap<Reg, Reg> = BTreeMap::new();
-    let mut next_reg = num_pinned;
+    let mut next_reg = num_params;
+    let mut num_surviving_locals: u16 = 0;
+    let old_num_pinned = num_params + func.num_locals;
     for &i in &used_home_regs {
-        if i < num_pinned {
+        if i < num_params {
+            // Params keep their ABI indices.
             rename_map.insert(Reg::Home(i), Reg::Home(i));
         } else {
             rename_map.insert(Reg::Home(i), Reg::Home(next_reg));
+            if i < old_num_pinned {
+                num_surviving_locals += 1;
+            }
             next_reg += 1;
         }
     }
@@ -159,5 +246,6 @@ fn renumber_registers(func: &mut FunctionIR) {
     }
     func.reg_types = new_reg_types;
 
+    func.num_locals = num_surviving_locals;
     func.num_regs = next_reg;
 }

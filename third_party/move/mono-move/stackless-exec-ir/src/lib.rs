@@ -25,13 +25,14 @@ use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 /// Pipeline version selector.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PipelineVersion {
+    /// This is deprecated and will be removed.
     V1,
     V2,
 }
 
 /// Configuration for the conversion + optimization pipeline.
 pub struct PipelineConfig {
-    /// Whether to run the bytecode verifier before conversion.
+    /// Whether to run the bytecode verifier before conversion to stackless-exec-ir.
     /// Set to `false` when the module comes from a trusted source (e.g., the
     /// Move compiler, which verifies internally).
     pub verify_bytecode: bool,
@@ -43,12 +44,16 @@ impl Default for PipelineConfig {
     fn default() -> Self {
         Self {
             verify_bytecode: true,
-            version: PipelineVersion::V1,
+            version: PipelineVersion::V2,
         }
     }
 }
 
 /// Run the full conversion + optimization pipeline on a compiled module.
+///
+/// `struct_name_table` maps `StructHandleIndex` ordinals to globally unique
+/// `StructNameIndex` values, used to convert bytecode-level struct references
+/// into runtime `Type` representations.
 pub fn run_pipeline(
     module: CompiledModule,
     config: &PipelineConfig,
