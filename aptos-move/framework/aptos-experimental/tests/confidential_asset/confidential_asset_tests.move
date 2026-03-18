@@ -250,15 +250,7 @@ module aptos_experimental::confidential_asset_tests {
         };
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_register_test(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -294,15 +286,7 @@ module aptos_experimental::confidential_asset_tests {
         assert!(confidential_asset::get_encryption_key(alice_addr, token) == alice_ek, 1);
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_rollover_test(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -350,15 +334,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_deposit_test(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -400,15 +376,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_withdraw_test(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -454,15 +422,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_withdraw_with_auditor(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -503,15 +463,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_transfer_test(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -565,15 +517,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_transfer_no_eff_1_volun(
         confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer, bob: signer,
     ) {
@@ -582,15 +526,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_transfer_no_eff_2_volun(
         confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer, bob: signer,
     ) {
@@ -599,15 +535,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_transfer_no_eff_3_volun(
         confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer, bob: signer,
     ) {
@@ -616,15 +544,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_transfer_eff_0_volun(
         confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer, bob: signer,
     ) {
@@ -633,15 +553,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_transfer_eff_1_volun(
         confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer, bob: signer,
     ) {
@@ -650,15 +562,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_transfer_eff_2_volun(
         confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer, bob: signer,
     ) {
@@ -667,15 +571,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_transfer_eff_3_volun(
         confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer, bob: signer,
     ) {
@@ -684,15 +580,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     #[expected_failure(abort_code = 65542, location = aptos_experimental::sigma_protocol_transfer)]
     fun fail_audit_transfer_if_wrong_auditor_count(
         confidential_asset: signer,
@@ -753,15 +641,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1,
-            bob = @0xb0
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
     fun success_rotate(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -813,14 +693,7 @@ module aptos_experimental::confidential_asset_tests {
         );
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1)]
     #[expected_failure(abort_code = 65545, location = confidential_asset)]
     fun fail_register_if_token_disallowed(
         confidential_asset: signer,
@@ -846,14 +719,7 @@ module aptos_experimental::confidential_asset_tests {
         register(&alice, &alice_dk, alice_ek, token);
     }
 
-    #[
-        test(
-            confidential_asset = @aptos_experimental,
-            aptos_fx = @aptos_framework,
-            fa = @0xfa,
-            alice = @0xa1
-        )
-    ]
+    #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1)]
     fun success_register_if_token_allowed(
         confidential_asset: signer,
         aptos_fx: signer,
