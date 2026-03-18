@@ -12,7 +12,7 @@ pub mod fptx_weighted_smoke;
 
 
 
-fn run_smoke<Scheme: BatchThresholdEncryption>(
+pub fn run_smoke<Scheme: BatchThresholdEncryption>(
     tc: <Scheme as BatchThresholdEncryption>::ThresholdConfig,
     ek: <Scheme as BatchThresholdEncryption>::EncryptionKey,
     dk: <Scheme as BatchThresholdEncryption>::DigestKey,
