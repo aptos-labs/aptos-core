@@ -11,12 +11,70 @@ The rest of this document is for MoveFlow developers.
 
 Generate a local plugin directory and start Claude with it:
 
+**Quick Install (Pre-built Binaries):**
+
+For the easiest installation, use our one-line installer.
+
+Unix/Linux/macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/binary_release/install_binary.sh | bash -s -- move-flow
+```
+
+Windows (PowerShell):
+
+```powershell
+iwr https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/binary_release/install_binary.ps1 -OutFile install.ps1; .\install.ps1 -BinaryName move-flow
+```
+
+Using cargo-binstall (if published to crates.io):
+
+```bash
+cargo binstall aptos-move-flow
+```
+
+**Build from Source:**
+
 ```bash
 ./scripts/gen-local-for-claude.sh            # builds move-flow, generates plugin at ./gen/claude
 claude --plugin-dir ./gen/claude
 ```
 
 Options: `--debug` (debug build), `--log <file>` (enable MCP server logging).
+
+This puts `move-flow` on your `$PATH`. You can also set `$MOVE_FLOW` to point
+to a custom binary location; the generated `.mcp.json` will respect it.
+
+For more installation options and release information, see [RELEASE.md](RELEASE.md).
+
+### Generate a Plugin
+
+```bash
+move-flow plugin <plugin_dir>
+```
+
+This renders templates and writes them to `<plugin_dir>`:
+
+```
+<plugin_dir>/
+  agents/         # Agent personality / instruction files
+  skills/         # Skill definitions (e.g. move/)
+  hooks/          # Event hooks (shell scripts + hooks.json)
+  .mcp.json       # MCP server discovery config
+```
+
+Use `--platform <target>` to select the AI platform (default: `claude`).
+
+### Run with Claude Code
+
+For now, one can just specify at claude startup time. This is useful for development of flow
+where the plugin tree is not installed in a fixed location:
+
+```bash
+claude --plugin-dir <plugin_dir>
+```
+
+For more permanent configurations, consult Claude docs.
 
 ### Debugging
 

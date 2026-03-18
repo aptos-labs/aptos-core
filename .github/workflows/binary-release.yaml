@@ -44,6 +44,42 @@ on:
         required: false
         default: false
         description: "Skip checks - If checked, the release will skip version checks"
+  workflow_call:
+    inputs:
+      binary_name:
+        type: string
+        required: true
+        description: "The name of the binary to build"
+      crate_name:
+        type: string
+        required: true
+        description: "The crate name to build with -p flag"
+      build_profile:
+        type: string
+        required: true
+        description: "Build profile to use (tool or performance)"
+      release_version:
+        type: string
+        required: true
+        description: "The release version"
+      source_git_ref_override:
+        type: string
+        required: false
+        description: "Git ref to build from"
+      release_title:
+        type: string
+        required: false
+        description: "Custom release title"
+      dry_run:
+        type: boolean
+        required: false
+        default: true
+        description: "Dry run mode"
+      skip_checks:
+        type: boolean
+        required: false
+        default: false
+        description: "Skip version checks"
 
 jobs:
   build-linux-x86:
