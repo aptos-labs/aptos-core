@@ -698,8 +698,9 @@ module aptos_experimental::confidential_asset {
         auditor_ek: Option<vector<u8>>
     ) acquires AssetConfig, GlobalConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
-        let asset_config = borrow_global_mut<AssetConfig>(get_asset_config_address_or_create(asset_type));
-        update_auditor(&mut asset_config.auditor, auditor_ek);
+
+        let config_addr = get_asset_config_address_or_create(asset_type);
+        update_auditor(&mut borrow_global_mut<AssetConfig>(config_addr).auditor, auditor_ek)
     }
 
     /// Sets or removes the global auditor (fallback when no asset-specific auditor). Epoch increments only on install/change.
@@ -729,10 +730,7 @@ module aptos_experimental::confidential_asset {
             false // removing or no-op
         };
 
-        if (should_increment) {
-            auditor.epoch += 1;
-        };
-
+        auditor.epoch += if (should_increment) { 1 } else { 0 };
         auditor.ek = new_ek;
     }
 
