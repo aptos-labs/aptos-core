@@ -752,6 +752,7 @@ module aptos_experimental::confidential_asset_tests {
             alice = @0xa1
         )
     ]
+    #[expected_failure]
     fun fail_deposit_with_coins_if_insufficient_amount(
         confidential_asset: signer, aptos_fx: signer, alice: signer
     ) {
@@ -786,6 +787,7 @@ module aptos_experimental::confidential_asset_tests {
         let (alice_dk, alice_ek) = generate_twisted_elgamal_keypair();
 
         register(&alice, &alice_dk, alice_ek, token);
-        confidential_asset::deposit(&alice, token, 100);
+        // Alice only has 100 coins but tries to deposit 200 — should abort.
+        confidential_asset::deposit(&alice, token, 200);
     }
 }
