@@ -525,6 +525,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             &Self::DST,
             rng,
         )
+        .expect("sigma prove")
         .0; // We're throwing away the normalised statement here; I don't think storing it in the proof would ultimately decrease verification time
 
         // Step 3b
@@ -707,6 +708,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 hiding_randomness: Scalar(rho_h),
                 values: Scalar::vec_from_inner_slice(&h_evals),
             })
+            .expect("KZG apply")
             .0;
         // Step 7b
         let D = D_proj.into_affine();
@@ -849,12 +851,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             verifier_precomputed,
         } = vk;
 
-        assert!(
+        ensure!(
             ell as usize <= verifier_precomputed.powers_of_two.len(),
             "ell (got {}) must be ≤ max_ell (which is {})",
             ell,
             verifier_precomputed.powers_of_two.len()
-        ); // Easy to work around this if it fails...
+        );
 
         let Proof {
             hat_C,
@@ -974,9 +976,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let LHS = {
             // First compute V_SS^*(gamma), where V_SS^*(X) is the polynomial (X^{max_n + 1} - 1) / (X - 1)
+            let denom = (gamma - E::ScalarField::ONE).inverse().ok_or_else(|| {
+                anyhow!("gamma must not be 1 (division by zero in V_SS^* evaluation)")
+            })?;
             let V_eval_gamma = {
                 let gamma_pow = gamma.pow([num_omegas as u64]);
-                (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap()
+                (gamma_pow - E::ScalarField::ONE) * denom
             };
 
             *a_h * V_eval_gamma
@@ -1181,13 +1186,13 @@ pub mod two_term_msm {
         type CodomainNormalized = CodomainShape<C::Affine>;
         type Domain = Witness<C::ScalarField>;
 
-        fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+        fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
             // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower!
             // `msm_terms()` is still useful for verification though: there the code will use it to produce an MSM
             //  of size 2+2 (the latter two are for the first prover message A and the statement P)
-            CodomainShape(
+            Ok(CodomainShape(
                 self.base_1 * input.poly_randomness.0 + self.base_2 * input.hiding_kzg_randomness.0,
-            )
+            ))
         }
 
         fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -1207,7 +1212,7 @@ pub mod two_term_msm {
         fn msm_terms(
             &self,
             input: &Self::Domain,
-        ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+        ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
             let mut scalars = Vec::with_capacity(2);
             scalars.push(input.poly_randomness.0);
             scalars.push(input.hiding_kzg_randomness.0);
@@ -1216,11 +1221,12 @@ pub mod two_term_msm {
             bases.push(self.base_1);
             bases.push(self.base_2);
 
-            CodomainShape(MsmInput { bases, scalars })
+            Ok(CodomainShape(MsmInput { bases, scalars }))
         }
 
-        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-            C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
+        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+            C::msm(input.bases(), input.scalars())
+                .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
         }
 
         fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

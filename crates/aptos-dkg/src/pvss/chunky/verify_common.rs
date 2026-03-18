@@ -70,6 +70,13 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
             eks.len()
         );
     }
+    if spks.len() != sc.get_total_num_players() {
+        bail!(
+            "Expected {} signing public keys, but got {}",
+            sc.get_total_num_players(),
+            spks.len()
+        );
+    }
     if subtrs.Cs.len() != sc.get_total_num_players() {
         bail!(
             "Expected {} arrays of chunked ciphertexts, but got {}",
@@ -140,6 +147,14 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
     }
 
     // The previous checks should imply that Cs_flat.len() = sc.get_total_weight()
+
+    if dealer.id >= spks.len() {
+        bail!(
+            "Dealer id {} is out of bounds for {} signing public keys",
+            dealer.id,
+            spks.len()
+        );
+    }
 
     Ok(SokContext::new(
         spks[dealer.id].clone(),

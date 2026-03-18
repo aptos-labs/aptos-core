@@ -1,8 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{super::session::FlowSession, resolve_filter};
-use crate::{hooks::source_check, utilities::format_error_chain};
+use super::{
+    super::{common::format_error_chain, session::FlowSession},
+    resolve_filter,
+};
+use crate::hooks::source_check;
 use codespan_reporting::term::termcolor::NoColor;
 use move_prover::inference::InferenceOutput;
 use rmcp::{
@@ -39,7 +42,7 @@ impl FlowSession {
             params.package_path,
             params.filter
         );
-        let pkg = self.resolve_package(&params.package_path).await?;
+        let (pkg, _) = self.resolve_package(&params.package_path).await?;
         let filter = params.filter.clone();
 
         let result = tokio::task::spawn_blocking(move || {

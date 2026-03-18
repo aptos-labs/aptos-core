@@ -19,6 +19,7 @@ use crate::{
     },
     Scalar,
 };
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::arkworks::{
     msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
@@ -152,10 +153,10 @@ impl<E: Pairing> HomTrait for EvalPointCommitHom<E> {
     type CodomainNormalized = CodomainShape<E::G1Affine>;
     type Domain = ShplonkedSigmaWitness<E::ScalarField>;
 
-    fn apply(&self, w: &Self::Domain) -> Self::Codomain {
-        let input = self.msm_terms(w).0;
-        let out = Self::msm_eval(input);
-        CodomainShape(out)
+    fn apply(&self, w: &Self::Domain) -> Result<Self::Codomain> {
+        let input = self.msm_terms(w)?.0;
+        let out = Self::msm_eval(input)?;
+        Ok(CodomainShape(out))
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -175,27 +176,24 @@ impl<E: Pairing> fixed_base_msms::Trait for EvalPointCommitHom<E> {
     fn msm_terms(
         &self,
         witness: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
         // C_eval_hid = g_hid·τ_0 + ρ_eval·ξ_1
-        debug_assert_eq!(
-            self.weights.len(),
-            witness.hidden_evals.len(),
+        ensure!(
+            self.weights.len() == witness.hidden_evals.len(),
             "weights and evals must have the same length (one per polynomial)"
         );
-        debug_assert_eq!(
-            self.lagrange_at_x.len(),
-            witness.hidden_evals.len(),
+        ensure!(
+            self.lagrange_at_x.len() == witness.hidden_evals.len(),
             "lagrange_at_x and evals must have the same length"
         );
-        let g_hid = witness
+        let inners: Vec<E::ScalarField> = witness
             .hidden_evals
             .iter()
             .zip(self.weights.iter())
             .zip(self.lagrange_at_x.iter())
             .map(|((y_j_hid, &w_j), l_j)| {
-                debug_assert_eq!(
-                    l_j.len(),
-                    y_j_hid.len(),
+                ensure!(
+                    l_j.len() == y_j_hid.len(),
                     "lagrange_at_x[j].len() == evals[j].len()"
                 );
                 let inner: E::ScalarField = y_j_hid
@@ -203,17 +201,20 @@ impl<E: Pairing> fixed_base_msms::Trait for EvalPointCommitHom<E> {
                     .zip(l_j.iter())
                     .map(|(&y_ji, &l_ji)| l_ji * y_ji)
                     .fold(E::ScalarField::zero(), |a, b| a + b);
-                w_j * inner
+                Ok(w_j * inner)
             })
-            .fold(E::ScalarField::zero(), |a, b| a + b);
+            .collect::<Result<Vec<_>>>()?;
+        let g_hid = inners.iter().fold(E::ScalarField::zero(), |a, b| a + b);
         let bases = vec![self.tau_0, self.xi_1];
         let scalars = vec![g_hid, witness.C_evals_randomness];
-        CodomainShape(MsmInput::new(bases, scalars).expect("EvalPointCommitHom MSM"))
+        Ok(CodomainShape(
+            MsmInput::new(bases, scalars).expect("EvalPointCommitHom MSM"),
+        ))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), input.scalars()).expect("EvalPointCommitHom msm_eval")
-        // TODO: not sure we should be doing this because size-2 MSMs in arkworks might not be faster than elementwise multiplication
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        E::G1::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
@@ -242,11 +243,11 @@ impl<F: PrimeField> HomTrait for SumHom<F> {
     type CodomainNormalized = F;
     type Domain = ShplonkedSigmaWitness<F>;
 
-    fn apply(&self, w: &Self::Domain) -> Self::Codomain {
-        w.hidden_evals
+    fn apply(&self, w: &Self::Domain) -> Result<Self::Codomain> {
+        Ok(w.hidden_evals
             .iter()
             .flatten()
-            .fold(F::zero(), |acc, x| acc + x)
+            .fold(F::zero(), |acc, x| acc + x))
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -297,7 +298,7 @@ impl<F: PrimeField, H: HomTrait<Domain = Vec<Vec<F>>, Codomain = F, CodomainNorm
     type CodomainNormalized = F;
     type Domain = ShplonkedSigmaWitness<F>;
 
-    fn apply(&self, w: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, w: &Self::Domain) -> Result<Self::Codomain> {
         self.hom.apply(&w.hidden_evals)
     }
 
@@ -323,7 +324,7 @@ impl<F: PrimeField, H: HomTrait<Domain = Vec<Vec<F>>, Codomain = F, CodomainNorm
         response: &ShplonkedSigmaWitness<F>,
         _rng: &mut R,
     ) -> anyhow::Result<()> {
-        let phi_z = self.hom.apply(&response.hidden_evals);
+        let phi_z = self.hom.apply(&response.hidden_evals)?;
         let expected = *prover_commitment + challenge * public_statement;
         anyhow::ensure!(
             phi_z == expected,

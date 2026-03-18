@@ -14,6 +14,7 @@ use crate::{
     sigma_protocol::homomorphism::TrivialShape,
     Scalar,
 };
+use anyhow::Result;
 use aptos_crypto::{
     arkworks::{
         msm::MsmInput,

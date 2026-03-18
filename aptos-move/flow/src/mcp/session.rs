@@ -1,8 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{file_watcher::FileWatcher, package_data::PackageData, McpArgs};
-use crate::{utilities::format_error_chain, GlobalOpts};
+use super::{
+    common::format_error_chain, file_watcher::FileWatcher, package_data::PackageData, McpArgs,
+};
+use crate::GlobalOpts;
 use rmcp::{
     handler::server::router::tool::ToolRouter,
     model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo},
@@ -31,15 +33,23 @@ pub(crate) struct FlowSession {
 }
 
 impl FlowSession {
+    /// Combined router for all registered MCP tools.
+    ///
+    /// Add new tool routers here — this is the single source of truth used by
+    /// both `new()` and `tool_names()`.
+    fn all_tool_routers() -> ToolRouter<Self> {
+        Self::package_manifest_router()
+            + Self::package_query_router()
+            + Self::package_spec_infer_router()
+            + Self::package_status_router()
+            + Self::package_test_router()
+            + Self::package_verify_router()
+    }
+
     /// Returns the names of all registered MCP tools.
     /// Used by the plugin renderer to validate tool references in templates.
     pub(crate) fn tool_names() -> Vec<String> {
-        let router = Self::package_manifest_router()
-            + Self::package_status_router()
-            + Self::package_verify_router()
-            + Self::package_spec_infer_router()
-            + Self::package_test_router();
-        router
+        Self::all_tool_routers()
             .list_all()
             .into_iter()
             .map(|t| t.name.to_string())
@@ -48,10 +58,6 @@ impl FlowSession {
 
     pub(crate) fn args(&self) -> &McpArgs {
         &self.args
-    }
-
-    pub(crate) fn file_watcher(&self) -> &FileWatcher {
-        &self.file_watcher
     }
 
     pub(crate) fn temp_dir(&self) -> &Path {
@@ -79,11 +85,7 @@ impl FlowSession {
             args,
             package_cache,
             file_watcher,
-            tool_router: Self::package_manifest_router()
-                + Self::package_status_router()
-                + Self::package_verify_router()
-                + Self::package_spec_infer_router()
-                + Self::package_test_router(),
+            tool_router: Self::all_tool_routers(),
             temp_dir,
         }
     }
@@ -97,17 +99,19 @@ impl FlowSession {
             .into_owned()
     }
 
-    /// Resolve a package, returning cached `PackageData` or building it on cache miss.
+    /// Resolve a package, returning `(package_data, rebuilt)`.
     ///
-    /// Building is offloaded to `spawn_blocking` since compilation is a heavy
-    /// synchronous operation that must not block the async executor.
+    /// Returns cached `PackageData` (`rebuilt = false`) or builds it on cache
+    /// miss (`rebuilt = true`). Building is offloaded to `spawn_blocking` since
+    /// compilation is a heavy synchronous operation that must not block the
+    /// async executor.
     ///
     /// Cache entries are removed directly by the file-watcher callback,
     /// so a cache miss here means either first access or an invalidation.
     pub(crate) async fn resolve_package(
         &self,
         package_path: &str,
-    ) -> Result<Arc<Mutex<PackageData>>, rmcp::ErrorData> {
+    ) -> Result<(Arc<Mutex<PackageData>>, bool), rmcp::ErrorData> {
         let key = self.resolve_package_path(package_path);
         {
             let cache = self
@@ -116,7 +120,7 @@ impl FlowSession {
                 .expect("package_cache lock poisoned");
             if let Some(data) = cache.get(&key) {
                 log::info!("cache hit for `{}`", key);
-                return Ok(Arc::clone(data));
+                return Ok((Arc::clone(data), false));
             }
         }
 
@@ -162,7 +166,7 @@ impl FlowSession {
         let data = Arc::new(Mutex::new(data));
         if stale {
             log::info!("source changed during build of `{}`, skipping cache", key);
-            return Ok(data);
+            return Ok((data, true));
         }
 
         let mut cache = self
@@ -170,7 +174,7 @@ impl FlowSession {
             .lock()
             .expect("package_cache lock poisoned");
         cache.insert(key, Arc::clone(&data));
-        Ok(data)
+        Ok((data, true))
     }
 }
 

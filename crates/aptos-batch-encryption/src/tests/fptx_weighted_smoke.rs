@@ -1,5 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 use crate::{
     schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEDecryptionKeyShare},
     shared::digest::DigestKey,
@@ -94,7 +95,7 @@ fn weighted_smoke_with_pvss() {
     let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
     let pp = <T as TranscriptCore>::PublicParameters::new_with_commitment_base(
         tc.get_total_weight(),
-        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
         tc.get_total_num_players(),
         G2Affine::generator(),
         &mut rng_aptos,

@@ -3,20 +3,21 @@
 
 //! Reject literal patterns in unsupported positions.
 //!
-//! Literal patterns are currently supported only at the top level of
-//! match arms or inside top-level tuples, where match transforms handle
-//! them. They are NOT supported:
+//! Literal patterns are currently supported in match arms:
 //!
-//! 1. In let bindings or lambda parameters (refutable patterns in
-//!    irrefutable contexts).
-//! 2. Nested inside struct/enum variant patterns in match arms (not
-//!    yet handled by match transforms). TODO(#19024)
+//! 1. At the top level.
+//! 2. Inside top-level tuples.
+//! 3. Nested inside struct/enum variant patterns.
+//!
+//! They are NOT supported in let bindings or lambda parameters
+//! (refutable patterns in irrefutable contexts).
 //!
 //! This pass runs on the model AST before match coverage checks and
 //! match transforms.
 
 use move_model::{
     ast::{ExpData, Pattern},
+    metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH,
     model::GlobalEnv,
 };
 
@@ -41,7 +42,7 @@ fn check_exp(env: &GlobalEnv, exp: &move_model::ast::Exp) {
     exp.visit_pre_order(&mut |e| {
         match e {
             ExpData::Block(_, pat, _, _) | ExpData::Lambda(_, pat, _, _, _) => {
-                check_no_literal(env, pat);
+                check_no_literal(env, pat, "literals are not allowed here");
             },
             ExpData::Match(_, _, arms) => {
                 for arm in arms {
@@ -56,8 +57,9 @@ fn check_exp(env: &GlobalEnv, exp: &move_model::ast::Exp) {
 
 /// Check a single match arm pattern. Top-level literals and
 /// wildcards/vars are fine. For tuples, recurse into each element
-/// (still top-level context). For structs/enums, any nested literal
-/// is invalid.
+/// (still top-level context). For structs/enums, nested literals are
+/// allowed starting from `LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH`;
+/// on earlier versions any nested literal is invalid.
 fn check_match_arm_pattern(env: &GlobalEnv, pat: &Pattern) {
     match pat {
         Pattern::LiteralValue(..)
@@ -70,8 +72,20 @@ fn check_match_arm_pattern(env: &GlobalEnv, pat: &Pattern) {
             }
         },
         Pattern::Struct(_, _, _, pats) => {
-            for p in pats {
-                check_no_literal(env, p);
+            if env
+                .language_version()
+                .is_at_least(LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH)
+            {
+                for p in pats {
+                    check_match_arm_pattern(env, p);
+                }
+            } else {
+                for p in pats {
+                    check_no_literal(env, p, &format!(
+                        "literal patterns inside struct/enum variants require language version {} or later",
+                        LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH
+                    ));
+                }
             }
         },
     }
@@ -79,11 +93,11 @@ fn check_match_arm_pattern(env: &GlobalEnv, pat: &Pattern) {
 
 /// Report an error for every `Pattern::LiteralValue` reachable in
 /// `pat`.
-fn check_no_literal(env: &GlobalEnv, pat: &Pattern) {
+fn check_no_literal(env: &GlobalEnv, pat: &Pattern, msg: &str) {
     pat.visit_pre_post(&mut |is_post, p| {
         if !is_post {
             if let Pattern::LiteralValue(id, _) = p {
-                env.error(&env.get_node_loc(*id), "literals are not allowed here");
+                env.error(&env.get_node_loc(*id), msg);
             }
         }
     });

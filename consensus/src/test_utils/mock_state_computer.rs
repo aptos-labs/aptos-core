@@ -63,6 +63,12 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: u8,
         _: Arc<crate::network::NetworkSender>,
         _: Option<aptos_types::secret_sharing::SecretShareConfig>,
+        _: Option<
+            std::sync::Arc<
+                crate::consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
+            >,
+        >,
+        _: bool,
     ) {
     }
 

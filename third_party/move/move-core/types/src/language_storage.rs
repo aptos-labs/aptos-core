@@ -160,6 +160,32 @@ impl TypeTag {
         }
     }
 
+    /// Returns a short string for the top-level type without any type parameters.
+    /// Useful for error messages where the full canonical string would be unbounded in size.
+    pub fn to_short_string(&self) -> &'static str {
+        use TypeTag::*;
+        match self {
+            Bool => "bool",
+            U8 => "u8",
+            U16 => "u16",
+            U32 => "u32",
+            U64 => "u64",
+            U128 => "u128",
+            U256 => "u256",
+            I8 => "i8",
+            I16 => "i16",
+            I32 => "i32",
+            I64 => "i64",
+            I128 => "i128",
+            I256 => "i256",
+            Address => "address",
+            Signer => "signer",
+            Vector(_) => "vector",
+            Struct(_) => "struct",
+            Function(_) => "function",
+        }
+    }
+
     pub fn struct_tag(&self) -> Option<&StructTag> {
         use TypeTag::*;
         match self {

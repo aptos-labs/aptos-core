@@ -238,10 +238,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             &pp.pp_elgamal,
             &ek_g1_affines,
         );
-        let statement = hom.apply(&witness);
+        let statement = hom.apply(&witness).expect("hom.apply");
 
         // Step 6: produce the SoK; this is done before step 5b because it naturally normalises the statement
-        let (SoK, normalized_statement) = hom.prove(&witness, statement, &sok_cntxt, rng);
+        let (SoK, normalized_statement) = hom
+            .prove(&witness, statement, &sok_cntxt, rng)
+            .expect("hom.prove");
         let SoK = SoK.change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
         // Step 5b: compute the range proof
@@ -350,7 +352,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         // These are merged using powers_of_beta
         // On the other hand, each Vs_flat is a list of "single" MSM bases, and these are mixed with the same powers_of_beta
 
-        // Step 4: Verify the SoK (G1)
+        // Step 4: Verify the SoK (G_1)
         let ek_g1_affines: Vec<E::G1Affine> = eks.iter().map(|ek| ek.ek).collect();
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
             SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,

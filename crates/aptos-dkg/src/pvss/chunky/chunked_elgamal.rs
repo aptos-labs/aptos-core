@@ -9,6 +9,7 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
     Scalar,
 };
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::arkworks::{self, msm::MsmInput, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::CurveGroup;
@@ -94,7 +95,7 @@ impl<C: CurveGroup> homomorphism::Trait for Homomorphism<'_, C> {
     type CodomainNormalized = CodomainShape<C::Affine>;
     type Domain = Witness<C::ScalarField>;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
         // Get the batch multiplication tables
         let G_table = &*self.pp.G_table;
         let H_table = &*self.pp.H_table;
@@ -160,10 +161,10 @@ impl<C: CurveGroup> homomorphism::Trait for Homomorphism<'_, C> {
             randomness_result.push(R_row);
         }
 
-        CodomainShape {
+        Ok(CodomainShape {
             chunks: chunks_result,
             randomness: randomness_result,
-        }
+        })
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -177,9 +178,9 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         CodomainShape<U>;
 
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
+    fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
     where
-        F: FnMut(T) -> U,
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         let chunks = self
@@ -187,18 +188,28 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
             .into_iter()
             .map(|row| {
                 row.into_iter()
-                    .map(|inner_row| inner_row.into_iter().map(&mut f).collect::<Vec<_>>())
-                    .collect::<Vec<_>>()
+                    .map(|inner_row| {
+                        inner_row
+                            .into_iter()
+                            .map(&mut f)
+                            .collect::<Result<Vec<_>, _>>()
+                    })
+                    .collect::<Result<Vec<_>, _>>()
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         let randomness = self
             .randomness
             .into_iter()
-            .map(|inner_vec| inner_vec.into_iter().map(&mut f).collect::<Vec<_>>())
-            .collect();
+            .map(|inner_vec| {
+                inner_vec
+                    .into_iter()
+                    .map(&mut f)
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        CodomainShape { chunks, randomness }
+        Ok(CodomainShape { chunks, randomness })
     }
 }
 
@@ -220,15 +231,21 @@ fn chunks_msm_terms<C: CurveGroup>(
     ek: C::Affine,
     chunks: &[Scalar<C::ScalarField>],
     correlated_randomness: &[Scalar<C::ScalarField>],
-) -> Vec<MsmInput<C::Affine, C::ScalarField>> {
-    chunks
+) -> Result<Vec<MsmInput<C::Affine, C::ScalarField>>> {
+    ensure!(
+        chunks.len() == correlated_randomness.len(),
+        "chunks length {} does not match correlated_randomness length {}",
+        chunks.len(),
+        correlated_randomness.len()
+    );
+    Ok(chunks
         .iter()
         .zip(correlated_randomness.iter())
         .map(|(&z_ij, &r_j)| MsmInput {
             bases: vec![pp.G, ek],
             scalars: vec![z_ij.0, r_j.0],
         })
-        .collect()
+        .collect())
 }
 
 // Given a vector of chunked scalar [[z_j]] and vector of randomness [[r_j]], returns a vector of
@@ -238,7 +255,13 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
     ek: C::Affine,
     chunks_vec: &[Vec<Scalar<C::ScalarField>>],
     correlated_randomness_vec: &[Vec<Scalar<C::ScalarField>>],
-) -> Vec<Vec<MsmInput<C::Affine, C::ScalarField>>> {
+) -> Result<Vec<Vec<MsmInput<C::Affine, C::ScalarField>>>> {
+    ensure!(
+        chunks_vec.len() == correlated_randomness_vec.len(),
+        "chunks_vec length {} does not match correlated_randomness_vec length {}",
+        chunks_vec.len(),
+        correlated_randomness_vec.len()
+    );
     chunks_vec
         .iter()
         .zip(correlated_randomness_vec.iter())
@@ -261,17 +284,33 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
+        ensure!(
+            input.plaintext_chunks.len() <= self.eks.len(),
+            "plaintext_chunks length {} exceeds encryption keys length {}",
+            input.plaintext_chunks.len(),
+            self.eks.len()
+        );
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
+        // For each player i, z_i has length = that player's weight; use only the first z_i.len()
+        // rows of plaintext_randomness (row j is used for that player's j-th share in apply()).
         let Cs = input
             .plaintext_chunks
             .iter()
             .enumerate()
             .map(|(i, z_i)| {
-                // here `i` is the player's id
-                chunks_vec_msm_terms::<C>(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
+                // here `i` is the player's id; bounds check above ensures self.eks[i] is valid
+                ensure!(
+                    input.plaintext_randomness.len() >= z_i.len(),
+                    "plaintext_randomness has {} rows but need {} for player {}",
+                    input.plaintext_randomness.len(),
+                    z_i.len(),
+                    i
+                );
+                let randomness_slice = &input.plaintext_randomness[0..z_i.len()];
+                chunks_vec_msm_terms::<C>(self.pp, self.eks[i], z_i, randomness_slice)
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         // R_j = r_j * H_1
         let Rs = input
@@ -288,14 +327,15 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
             })
             .collect();
 
-        CodomainShape {
+        Ok(CodomainShape {
             chunks: Cs,
             randomness: Rs,
-        }
+        })
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        C::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
@@ -477,7 +517,7 @@ mod tests {
         let CodomainShape::<C> {
             chunks: Cs,
             randomness: Rs,
-        } = hom.apply(&witness);
+        } = hom.apply(&witness).expect("apply");
 
         // 8. Build a baby-step giant-step table for computing discrete logs
         let table = dlog::table::BabyStepTable::new(pp.G, (1u64 << (radix_exponent / 2)) as u32);

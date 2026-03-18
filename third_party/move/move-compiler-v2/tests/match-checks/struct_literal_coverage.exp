@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/struct_literal_coverage.move:6:16
+  │
+6 │         match (s) {
+  │                ^
+  │
+  = missing `S{..}`
+
+error: unreachable pattern
+   ┌─ tests/match-checks/struct_literal_coverage.move:15:13
+   │
+15 │             S { x: 42, y } => y + 1,
+   │             ^^^^^^^^^^^^^^

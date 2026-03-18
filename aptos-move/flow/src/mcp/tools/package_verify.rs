@@ -1,8 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{super::session::FlowSession, resolve_excludes, resolve_filter};
-use crate::utilities::format_error_chain;
+use super::{
+    super::{common::format_error_chain, session::FlowSession},
+    resolve_excludes, resolve_filter,
+};
 use codespan_reporting::term::termcolor::NoColor;
 use rmcp::{
     handler::server::wrapper::Parameters,
@@ -49,7 +51,7 @@ impl FlowSession {
             params.exclude,
             params.timeout
         );
-        let pkg = self.resolve_package(&params.package_path).await?;
+        let (pkg, _) = self.resolve_package(&params.package_path).await?;
         let filter = params.filter.clone();
         let exclude = params.exclude.clone();
         let vc_timeout = params.timeout.unwrap_or(DEFAULT_VC_TIMEOUT);

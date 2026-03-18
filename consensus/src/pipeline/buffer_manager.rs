@@ -398,14 +398,6 @@ impl BufferManager {
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: ordered_blocks.clone(),
         });
-        if let Some(consensus_publisher) = &self.consensus_publisher {
-            let message = ConsensusObserverMessage::new_ordered_block_message(
-                ordered_blocks.clone(),
-                ordered_proof.clone(),
-                self.consensus_observer_config.enable_v2_message_sending,
-            );
-            consensus_publisher.publish_message(message);
-        }
         self.execution_schedule_phase_tx
             .send(request)
             .await

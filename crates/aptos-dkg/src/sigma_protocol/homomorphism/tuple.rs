@@ -5,6 +5,7 @@ use crate::{
     sigma_protocol,
     sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
 };
+use anyhow::Result;
 use aptos_crypto::arkworks::msm::MsmInput;
 use ark_ec::CurveGroup;
 use ark_serialize::{
@@ -56,12 +57,12 @@ fn tuple_apply<H1, H2>(
     hom1: &H1,
     hom2: &H2,
     x: &H1::Domain,
-) -> TupleCodomainShape<H1::Codomain, H2::Codomain>
+) -> Result<TupleCodomainShape<H1::Codomain, H2::Codomain>>
 where
     H1: homomorphism::Trait,
     H2: homomorphism::Trait<Domain = H1::Domain>,
 {
-    TupleCodomainShape(hom1.apply(x), hom2.apply(x))
+    Ok(TupleCodomainShape(hom1.apply(x)?, hom2.apply(x)?))
 }
 
 fn tuple_normalize<H1, H2>(
@@ -93,7 +94,7 @@ where
     type CodomainNormalized = TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>;
     type Domain = H1::Domain;
 
-    fn apply(&self, x: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, x: &Self::Domain) -> Result<Self::Codomain> {
         tuple_apply(&self.hom1, &self.hom2, x)
     }
 
@@ -114,7 +115,7 @@ where
     type CodomainNormalized = TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>;
     type Domain = H1::Domain;
 
-    fn apply(&self, x: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, x: &Self::Domain) -> Result<Self::Codomain> {
         tuple_apply(&self.hom1, &self.hom2, x)
     }
 
@@ -199,12 +200,15 @@ where
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
+    fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
     where
-        F: FnMut(T) -> U,
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
-        TupleCodomainShape(self.0.map(&mut f), self.1.map(f))
+        Ok(TupleCodomainShape(
+            self.0.try_map(&mut f)?,
+            self.1.try_map(f)?,
+        ))
     }
 }
 
@@ -238,13 +242,13 @@ where
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
-        let terms1 = self.hom1.msm_terms(input);
-        let terms2 = self.hom2.msm_terms(input);
-        TupleCodomainShape(terms1, terms2)
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
+        let terms1 = self.hom1.msm_terms(input)?;
+        let terms2 = self.hom2.msm_terms(input)?;
+        Ok(TupleCodomainShape(terms1, terms2))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
         H1::msm_eval(input)
     }
 
