@@ -130,6 +130,9 @@ async fn fetch_jwks_with_relayer(issuer: &str) -> Result<(Vec<JWK>, Option<u128>
         .map_err(|e| anyhow!("fetch_jwks failed with relayer request: {:?}", e))?;
     let PollResult { jwk_structs, max_block_number, nonce, updated } = poll_result;
     debug!(issuer = issuer, max_block_number = max_block_number, nonce = ?nonce, updated = updated, "fetch_jwks_with_relayer");
+    if !updated {
+        return Err(anyhow!("No new data from relayer for issuer: {}", issuer));
+    }
     let jwks = jwk_structs
         .into_iter()
         .map(|jwk| {
