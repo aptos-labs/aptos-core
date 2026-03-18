@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-logger = { workspace = true }
 aptos-runtimes = { workspace = true }
 core_affinity = { workspace = true }
 libc = { workspace = true }

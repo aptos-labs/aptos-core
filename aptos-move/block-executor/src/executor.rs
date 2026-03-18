@@ -66,7 +66,6 @@ use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use num_cpus;
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
@@ -117,18 +116,18 @@ where
     A: AuxiliaryInfoTrait,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
-    /// be handled by sequential execution) and that concurrency_level <= num_cpus.
+    /// be handled by sequential execution) and that concurrency_level <= pool size.
     pub fn new(
         config: BlockExecutorConfig,
         executor_thread_pool: Arc<ThreadPool>,
         transaction_commit_hook: Option<L>,
     ) -> Self {
-        let num_cpus = num_cpus::get();
+        let pool_size = executor_thread_pool.current_num_threads();
         assert!(
-            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus,
-            "Parallel execution concurrency level {} should be between 1 and number of CPUs ({})",
+            config.local.concurrency_level > 0 && config.local.concurrency_level <= pool_size,
+            "Parallel execution concurrency level {} should be between 1 and pool size ({})",
             config.local.concurrency_level,
-            num_cpus,
+            pool_size,
         );
         Self {
             config,

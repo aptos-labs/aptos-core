@@ -55,13 +55,10 @@ use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
 
 static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
+    Arc::new(aptos_experimental_runtimes::exec_pool::build_pinned_exec_pool(
+        "par_exec",
+        num_cpus::get(),
+    ))
 });
 
 /// Output type wrapper used by block executor. VM output is stored first, then

@@ -16,11 +16,10 @@ use once_cell::sync::Lazy;
 use std::cmp::Ordering;
 
 static POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(AptosVM::get_num_proof_reading_threads())
-        .thread_name(|index| format!("smt_update_{}", index))
-        .build()
-        .unwrap()
+    aptos_experimental_runtimes::exec_pool::build_pinned_exec_pool(
+        "smt_update",
+        AptosVM::get_num_proof_reading_threads(),
+    )
 });
 
 type Result<T> = std::result::Result<T, UpdateError>;

@@ -1801,6 +1801,7 @@ dependencies = [
 name = "aptos-experimental-runtimes"
 version = "0.1.0"
 dependencies = [
+ "aptos-logger",
  "aptos-runtimes",
  "core_affinity",
  "libc",
@@ -4116,6 +4117,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-drop-helper",
+ "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-metrics-core",
  "aptos-types",
