@@ -102,6 +102,11 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
         ));
     }
 
+    files.push((
+        PathBuf::from("README.md"),
+        render::generate_readme(&files, global.platform.display_name()),
+    ));
+
     output::write_output(&args.output_dir, &files)?;
 
     println!(
@@ -257,6 +262,26 @@ mod tests {
                 .as_str()
                 .is_some_and(|s| !s.is_empty()),
             "plugin.json should have an author name"
+        );
+
+        // Verify README.md is generated at the output root
+        let readme_path = output_dir.path().join("README.md");
+        assert!(
+            readme_path.exists(),
+            "README.md should exist at output root"
+        );
+        let readme = std::fs::read_to_string(&readme_path).unwrap();
+        assert!(readme.contains("# MoveFlow"), "README should have title");
+        assert!(readme.contains("## Skills"), "README should list skills");
+        assert!(readme.contains("## Agents"), "README should list agents");
+        assert!(
+            readme.contains("## MCP Tools"),
+            "README should list MCP tools"
+        );
+        assert!(readme.contains("## Hooks"), "README should list hooks");
+        assert!(
+            readme.contains("move_package_status"),
+            "README should include MCP tool names"
         );
 
         // Verify .mcp.json is generated at the output root

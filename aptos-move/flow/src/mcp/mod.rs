@@ -5,6 +5,7 @@ pub(crate) mod common;
 pub(crate) mod file_watcher;
 mod package_data;
 pub(crate) mod session;
+pub(crate) mod supervisor;
 pub(crate) mod tools;
 
 use crate::GlobalOpts;
@@ -68,8 +69,7 @@ pub struct McpArgs {
     pub experiments: Vec<String>,
 }
 
-/// Start the MCP stdio server.
-pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
+fn setup() {
     move_compiler_v2::logging::setup_logging(None);
 
     // Register Aptos package hooks to recognize custom fields like upgrade_policy.
@@ -88,9 +88,23 @@ pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
         log::error!("panic: {}", info);
         default_hook(info);
     }));
+}
 
+/// Start the MCP stdio server.
+///
+/// When `restart` is true, skips the MCP `initialize` handshake because the
+/// client already completed it with the previous child process. After a crash
+/// the client is waiting for a response, not sending `initialize`, so a new
+/// handshake would deadlock.
+pub async fn run(args: &McpArgs, global: &GlobalOpts, restart: bool) -> Result<()> {
+    setup();
     let session = FlowSession::new(args.clone(), global.clone());
-    let service = session.serve(stdio()).await?;
-    service.waiting().await?;
+    if restart {
+        let service = rmcp::service::serve_directly(session, stdio(), None);
+        service.waiting().await?;
+    } else {
+        let service = session.serve(stdio()).await?;
+        service.waiting().await?;
+    }
     Ok(())
 }

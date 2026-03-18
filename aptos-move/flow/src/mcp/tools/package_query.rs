@@ -4,7 +4,7 @@
 //! Move package query tools.
 
 use super::super::{
-    common::{mcp_err, resolve_function, tool_error, try_call},
+    common::{mcp_err, resolve_function, tool_error},
     session::{into_call_tool_result, FlowSession},
 };
 use move_model::model::{FunId, GlobalEnv, QualifiedId};
@@ -19,27 +19,22 @@ use std::collections::{BTreeMap, BTreeSet};
 struct MovePackageQueryParams {
     /// Path to the Move package directory.
     package_path: String,
-    #[serde(flatten)]
+    /// The query to run.
     query: MovePackageQuery,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
-#[serde(tag = "query")]
+#[serde(rename_all = "snake_case")]
 enum MovePackageQuery {
     /// Returns a map from each module to the modules it depends on.
-    #[serde(rename = "dep_graph")]
     DepGraph,
     /// Returns a summary of each module's constants, structs, and functions.
-    #[serde(rename = "module_summary")]
     ModuleSummary,
     /// Returns a function-level call graph as a map from each function to the functions it calls.
-    #[serde(rename = "call_graph")]
     CallGraph,
     /// Returns direct and transitive calls/uses by a given function.
-    /// "called" = direct calls; "used" = direct calls + closure captures.
-    #[serde(rename = "function_usage")]
     FunctionUsage {
-        /// Function to query, in the form "module_name::function_name".
+        /// Function to query, as "module_name::function_name".
         function: String,
     },
 }
@@ -256,14 +251,8 @@ fn build_function_usage(env: &GlobalEnv, function: &str) -> Result<FunctionUsage
 
     let called = func.get_called_functions().cloned().unwrap_or_default();
     let used = func.get_used_functions().cloned().unwrap_or_default();
-    // These methods document that they panic if any function in the closure
-    // lacks call info. Guard against that to avoid crashing the server.
-    let called_transitive = try_call("failed to compute transitive called functions", || {
-        func.get_transitive_closure_of_called_functions()
-    })?;
-    let used_transitive = try_call("failed to compute transitive used functions", || {
-        func.get_transitive_closure_of_used_functions()
-    })?;
+    let called_transitive = func.get_transitive_closure_of_called_functions();
+    let used_transitive = func.get_transitive_closure_of_used_functions();
 
     Ok(FunctionUsage {
         called: qids_to_names(env, &called),

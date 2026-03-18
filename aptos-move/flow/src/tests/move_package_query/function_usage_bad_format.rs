@@ -16,8 +16,7 @@ async fn move_package_query_function_usage_bad_format() {
         "move_package_query",
         serde_json::json!({
             "package_path": dir,
-            "query": "function_usage",
-            "function": "no_colons"
+            "query": { "function_usage": { "function": "no_colons" } }
         }),
     )
     .await;

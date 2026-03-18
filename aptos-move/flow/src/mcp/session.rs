@@ -56,6 +56,21 @@ impl FlowSession {
             .collect()
     }
 
+    /// Returns (name, description) pairs for all registered MCP tools.
+    /// Used by the plugin renderer to generate the README.
+    pub(crate) fn tool_descriptions() -> Vec<(String, String)> {
+        Self::all_tool_routers()
+            .list_all()
+            .into_iter()
+            .map(|t| {
+                (
+                    t.name.to_string(),
+                    t.description.as_deref().unwrap_or("").to_string(),
+                )
+            })
+            .collect()
+    }
+
     pub(crate) fn args(&self) -> &McpArgs {
         &self.args
     }

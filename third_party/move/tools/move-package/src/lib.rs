@@ -25,7 +25,10 @@ use legacy_move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
 use move_compiler_v2::external_checks::ExternalChecks;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    account_address::AccountAddress,
+    diag_writer::{Buffer, DiagWriter},
+};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
     model,
@@ -36,7 +39,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 #[derive(Debug, Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default)]
@@ -127,9 +130,28 @@ pub struct CompilerConfig {
     #[clap(long, global = true)]
     pub experiments: Vec<String>,
 
-    /// Whether to print errors to stderr as they are reported.
-    #[clap(long, default_value = "true")]
-    pub print_errors: bool,
+    /// Controls where compiler diagnostics are written.
+    /// `Some(true)`: stderr (default for CLI). `Some(false)`: discard.
+    /// `None`: caller is responsible for capturing diagnostics.
+    #[clap(skip)]
+    pub print_errors: Option<bool>,
+}
+
+impl CompilerConfig {
+    /// Create a diagnostics writer based on [`Self::print_errors`].
+    /// `Some(true)`: stderr. `Some(false)`: discard. `None`: in-memory buffer.
+    /// The buffer handle is `Some` only for `None`, allowing the caller to
+    /// flush captured diagnostics.
+    pub fn error_writer(&self) -> (DiagWriter, Option<Arc<Mutex<Buffer>>>) {
+        match self.print_errors {
+            Some(true) => (DiagWriter::stderr(), None),
+            Some(false) => (DiagWriter::sink(), None),
+            None => {
+                let (w, b) = DiagWriter::new_buffer();
+                (w, Some(b))
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
