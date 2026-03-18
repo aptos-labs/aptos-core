@@ -149,6 +149,6 @@ module staking::commission_tests {
 
 
     inline fun usd_to_apt(amount_usd: u64): u64 {
-        (math128::mul_div((amount_usd as u128) * math128::pow(10, 8), math128::pow(10, 8), APT_PRICE) as u64)
+        math128::mul_div((amount_usd as u128) * math128::pow(10, 8), math128::pow(10, 8), APT_PRICE) as u64
     }
 }

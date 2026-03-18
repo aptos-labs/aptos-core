@@ -21,10 +21,9 @@ module upgrade_and_govern::parameters {
     }
 
     public fun get_parameters():
-    (u64, u64)
-    acquires GovernanceParameters {
+    (u64, u64) {
         let governance_parameters_ref =
-            borrow_global<GovernanceParameters>(@upgrade_and_govern);
+            &GovernanceParameters[@upgrade_and_govern];
         (governance_parameters_ref.parameter_1,
          governance_parameters_ref.parameter_2)
     }

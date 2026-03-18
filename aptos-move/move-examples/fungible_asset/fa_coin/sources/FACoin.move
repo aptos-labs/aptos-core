@@ -99,7 +99,7 @@ module FACoin::fa_coin {
         store: Object<T>,
         fa: FungibleAsset,
         transfer_ref: &TransferRef,
-    ) acquires State {
+    ) {
         assert_not_paused();
         fungible_asset::deposit_with_ref(transfer_ref, store, fa);
     }
@@ -110,14 +110,14 @@ module FACoin::fa_coin {
         store: Object<T>,
         amount: u64,
         transfer_ref: &TransferRef,
-    ): FungibleAsset acquires State {
+    ): FungibleAsset {
         assert_not_paused();
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
     // :!:>mint
     /// Mint as the owner of metadata object.
-    public entry fun mint(admin: &signer, to: address, amount: u64) acquires ManagedFungibleAsset {
+    public entry fun mint(admin: &signer, to: address, amount: u64) {
         let asset = get_metadata();
         let managed_fungible_asset = authorized_borrow_refs(admin, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
@@ -126,7 +126,7 @@ module FACoin::fa_coin {
     }// <:!:mint
 
     /// Transfer as the owner of metadata object ignoring `frozen` field.
-    public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset, State {
+    public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
@@ -136,7 +136,7 @@ module FACoin::fa_coin {
     }
 
     /// Burn fungible assets as the owner of metadata object.
-    public entry fun burn(admin: &signer, from: address, amount: u64) acquires ManagedFungibleAsset {
+    public entry fun burn(admin: &signer, from: address, amount: u64) {
         let asset = get_metadata();
         let burn_ref = &authorized_borrow_refs(admin, asset).burn_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
@@ -144,7 +144,7 @@ module FACoin::fa_coin {
     }
 
     /// Freeze an account so it cannot transfer or receive fungible assets.
-    public entry fun freeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
+    public entry fun freeze_account(admin: &signer, account: address) {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, asset);
@@ -152,7 +152,7 @@ module FACoin::fa_coin {
     }
 
     /// Unfreeze an account so it can transfer or receive fungible assets.
-    public entry fun unfreeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
+    public entry fun unfreeze_account(admin: &signer, account: address) {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, asset);
@@ -160,18 +160,18 @@ module FACoin::fa_coin {
     }
 
     /// Pause or unpause the transfer of FA coin. This checks that the caller is the pauser.
-    public entry fun set_pause(pauser: &signer, paused: bool) acquires State {
+    public entry fun set_pause(pauser: &signer, paused: bool) {
         let asset = get_metadata();
         assert!(object::is_owner(asset, signer::address_of(pauser)), error::permission_denied(ENOT_OWNER));
-        let state = borrow_global_mut<State>(object::create_object_address(&@FACoin, ASSET_SYMBOL));
+        let state = &mut State[object::create_object_address(&@FACoin, ASSET_SYMBOL)];
         if (state.paused == paused) { return };
         state.paused = paused;
     }
 
     /// Assert that the FA coin is not paused.
     /// OPTIONAL
-    fun assert_not_paused() acquires State {
-        let state = borrow_global<State>(object::create_object_address(&@FACoin, ASSET_SYMBOL));
+    fun assert_not_paused() {
+        let state = &State[object::create_object_address(&@FACoin, ASSET_SYMBOL)];
         assert!(!state.paused, EPAUSED);
     }
 
@@ -180,15 +180,15 @@ module FACoin::fa_coin {
     inline fun authorized_borrow_refs(
         owner: &signer,
         asset: Object<Metadata>,
-    ): &ManagedFungibleAsset acquires ManagedFungibleAsset {
+    ): &ManagedFungibleAsset {
         assert!(object::is_owner(asset, signer::address_of(owner)), error::permission_denied(ENOT_OWNER));
-        borrow_global<ManagedFungibleAsset>(object::object_address(&asset))
+        &ManagedFungibleAsset[object::object_address(&asset)]
     }
 
     #[test(creator = @FACoin)]
     fun test_basic_flow(
         creator: &signer,
-    ) acquires ManagedFungibleAsset, State {
+    ) {
         init_module(creator);
         let creator_address = signer::address_of(creator);
         let aaron_address = @0xface;
@@ -211,7 +211,7 @@ module FACoin::fa_coin {
     fun test_permission_denied(
         creator: &signer,
         aaron: &signer
-    ) acquires ManagedFungibleAsset {
+    ) {
         init_module(creator);
         let creator_address = signer::address_of(creator);
         mint(aaron, creator_address, 100);
@@ -221,7 +221,7 @@ module FACoin::fa_coin {
     #[expected_failure(abort_code = 2, location = Self)]
     fun test_paused(
         creator: &signer,
-    ) acquires ManagedFungibleAsset, State {
+    ) {
         init_module(creator);
         let creator_address = signer::address_of(creator);
         mint(creator, creator_address, 100);

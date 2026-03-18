@@ -27,28 +27,28 @@ module swap::package_manager {
     }
 
     /// Can be called by friended modules to obtain the resource account signer.
-    public(friend) fun get_signer(): signer acquires PermissionConfig {
-        let signer_cap = &borrow_global<PermissionConfig>(@swap).signer_cap;
+    friend fun get_signer(): signer {
+        let signer_cap = &PermissionConfig[@swap].signer_cap;
         account::create_signer_with_capability(signer_cap)
     }
 
     /// Can be called by friended modules to keep track of a system address.
-    public(friend) fun add_address(name: String, object: address) acquires PermissionConfig {
-        let addresses = &mut borrow_global_mut<PermissionConfig>(@swap).addresses;
-        smart_table::add(addresses, name, object);
+    friend fun add_address(name: String, object: address) {
+        let addresses = &mut PermissionConfig[@swap].addresses;
+        addresses.add(name, object);
     }
 
-    public fun address_exists(name: String): bool acquires PermissionConfig {
-        smart_table::contains(&safe_permission_config().addresses, name)
+    public fun address_exists(name: String): bool {
+        safe_permission_config().addresses.contains(name)
     }
 
-    public fun get_address(name: String): address acquires PermissionConfig {
-        let addresses = &borrow_global<PermissionConfig>(@swap).addresses;
-        *smart_table::borrow(addresses, name)
+    public fun get_address(name: String): address {
+        let addresses = &PermissionConfig[@swap].addresses;
+        *addresses.borrow(name)
     }
 
-    inline fun safe_permission_config(): &PermissionConfig acquires PermissionConfig {
-        borrow_global<PermissionConfig>(@swap)
+    inline fun safe_permission_config(): &PermissionConfig {
+        &PermissionConfig[@swap]
     }
 
     #[test_only]

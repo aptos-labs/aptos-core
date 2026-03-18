@@ -25,7 +25,7 @@ module confidential_asset_example::rotate_example {
         let bob_amount = 100;
 
         confidential_asset::register(bob, token, bob_current_ek_bytes);
-        confidential_asset::deposit(bob, token, (bob_amount as u64));
+        confidential_asset::deposit(bob, token, bob_amount as u64);
 
         // We need to rollover the pending balance and freeze the token to prevent any new deposits being come.
         confidential_asset::rollover_pending_balance_and_freeze(bob, token);

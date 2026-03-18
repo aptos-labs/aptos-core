@@ -21,7 +21,7 @@ module rewards_pool::test_helpers {
     }
 
     public fun clean_up(assets: vector<FungibleAsset>) {
-        vector::for_each(assets, |a| primary_fungible_store::deposit(@0x0, a));
+        assets.for_each(|a| primary_fungible_store::deposit(@0x0, a));
     }
 
     public fun create_fungible_asset_and_mint(creator: &signer, name: vector<u8>, amount: u64): FungibleAsset {

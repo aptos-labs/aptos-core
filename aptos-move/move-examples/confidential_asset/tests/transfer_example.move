@@ -48,7 +48,7 @@ module confidential_asset_example::transfer_example {
         confidential_asset::rollover_pending_balance(bob, token);
 
         print(&utf8(b"Bob's actual balance is 300"));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, (bob_current_amount as u128)));
+        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, bob_current_amount as u128));
 
         print(&utf8(b"Alice's pending balance is zero"));
         assert!(confidential_asset::verify_pending_balance(alice_addr, token, &alice_dk, alice_current_amount));

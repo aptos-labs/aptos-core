@@ -92,9 +92,9 @@ module marketplace::test_utils {
             string::utf8(b"description"),
             string::utf8(b"token_name"),
             string::utf8(b"uri"),
-            vector::empty(),
-            vector::empty(),
-            vector::empty(),
+            vector[],
+            vector[],
+            vector[],
         );
         (object::convert(collection_object), object::convert(aptos_token))
     }
@@ -131,9 +131,9 @@ module marketplace::test_utils {
             string::utf8(b"description"),
             string::utf8(b"token_name"),
             string::utf8(b"uri"),
-            vector::empty(),
-            vector::empty(),
-            vector::empty(),
+            vector[],
+            vector[],
+            vector[],
         );
         (object::convert(collection_object), object::convert(aptos_token))
     }
@@ -152,9 +152,9 @@ module marketplace::test_utils {
             string::utf8(b"description"),
             string::utf8(b"token_name_2"),
             string::utf8(b"uri"),
-            vector::empty(),
-            vector::empty(),
-            vector::empty(),
+            vector[],
+            vector[],
+            vector[],
         );
         object::convert(aptos_token)
     }
@@ -184,9 +184,9 @@ module marketplace::test_utils {
             100,
             1,
             vector[true, true, true, true, true],
-            vector::empty(),
-            vector::empty(),
-            vector::empty(),
+            vector[],
+            vector[],
+            vector[],
         );
 
         tokenv1::create_token_id_raw(
@@ -212,9 +212,9 @@ module marketplace::test_utils {
             100,
             1,
             vector[true, true, true, true, true],
-            vector::empty(),
-            vector::empty(),
-            vector::empty(),
+            vector[],
+            vector[],
+            vector[],
         );
 
         tokenv1::create_token_id_raw(
@@ -244,9 +244,9 @@ module marketplace::test_utils {
             royalty_denominator,
             royalty_numerator,
             vector[true, true, true, true, true],
-            vector::empty(),
-            vector::empty(),
-            vector::empty(),
+            vector[],
+            vector[],
+            vector[],
         );
 
         tokenv1::create_token_id_raw(

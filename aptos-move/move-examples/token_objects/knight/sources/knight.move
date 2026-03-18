@@ -73,8 +73,8 @@ module knight::knight {
 
     #[view]
     /// Returns the knight health point of the token
-    public fun health_point(token: Object<KnightToken>): u64 acquires HealthPoint {
-        let health = borrow_global<HealthPoint>(object::object_address(&token));
+    public fun health_point(token: Object<KnightToken>): u64 {
+        let health = &HealthPoint[object::object_address(&token)];
         health.value
     }
 
@@ -98,7 +98,7 @@ module knight::knight {
         // Creates the knight token, and get the constructor ref of the token. The constructor ref
         // is used to generate the refs of the token.
         let uri = base_uri;
-        string::append(&mut uri, string::utf8(CONDITION_HUNGRY));
+        uri.append(string::utf8(CONDITION_HUNGRY));
         let constructor_ref = token::create_named_token(
             creator,
             collection,
@@ -149,12 +149,12 @@ module knight::knight {
         move_to(&object_signer, knight_token);
     }
 
-    public entry fun feed_corn(from: &signer, to: Object<KnightToken>, amount: u64) acquires HealthPoint, KnightToken {
+    public entry fun feed_corn(from: &signer, to: Object<KnightToken>, amount: u64) {
         let corn_token = object::address_to_object<FoodToken>(food::corn_token_address());
         feed_food(from, corn_token, to, amount);
     }
 
-    public entry fun feed_meat(from: &signer, to: Object<KnightToken>, amount: u64) acquires HealthPoint, KnightToken {
+    public entry fun feed_meat(from: &signer, to: Object<KnightToken>, amount: u64) {
         let meat_token = object::address_to_object<FoodToken>(food::meat_token_address());
         feed_food(from, meat_token, to, amount);
     }
@@ -164,17 +164,17 @@ module knight::knight {
         food: Object<FoodToken>,
         to: Object<KnightToken>,
         amount: u64
-    ) acquires HealthPoint, KnightToken {
+    ) {
         food::burn_food(from, food, amount);
 
         let restoration_amount = food::restoration_value(food) * amount;
         let knight_token_address = object::object_address(&to);
-        let health_point = borrow_global_mut<HealthPoint>(knight_token_address);
+        let health_point = &mut HealthPoint[knight_token_address];
         let old_health_point = health_point.value;
         let new_health_point = old_health_point + restoration_amount;
         health_point.value = new_health_point;
 
-        let knight = borrow_global_mut<KnightToken>(knight_token_address);
+        let knight = &mut KnightToken[knight_token_address];
         // Gets `property_mutator_ref` to update the health point and condition in the property map.
         let property_mutator_ref = &knight.property_mutator_ref;
         // Updates the health point in the property map.
@@ -203,7 +203,7 @@ module knight::knight {
 
         // Updates the token URI based on the new condition.
         let uri = knight.base_uri;
-        string::append(&mut uri, string::utf8(new_condition));
+        uri.append(string::utf8(new_condition));
         token::set_uri(&knight.mutator_ref, uri);
     }
 
@@ -227,7 +227,7 @@ module knight::knight {
     }
 
     #[test(creator = @knight, user1 = @0x456)]
-    public fun test_knight(creator: &signer, user1: &signer) acquires HealthPoint, KnightToken {
+    public fun test_knight(creator: &signer, user1: &signer) {
         // This test assumes that the creator's address is equal to @knight.
         assert!(signer::address_of(creator) == @knight, 0);
 

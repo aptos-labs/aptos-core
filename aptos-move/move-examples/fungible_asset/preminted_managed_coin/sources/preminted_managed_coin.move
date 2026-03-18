@@ -57,7 +57,7 @@ module example_addr::preminted_managed_coin {
         let creator_address = signer::address_of(creator);
         let metadata = get_metadata();
 
-        assert!(option::destroy_some(fungible_asset::supply(metadata)) == (PRE_MINTED_TOTAL_SUPPLY as u128), 1);
+        assert!(fungible_asset::supply(metadata).destroy_some() == (PRE_MINTED_TOTAL_SUPPLY as u128), 1);
         managed_fungible_asset::mint_to_primary_stores(creator, metadata, vector[creator_address], vector[100]);
     }
 }

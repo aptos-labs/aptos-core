@@ -32,7 +32,7 @@ module confidential_asset_example::withdraw_example {
         let transfer_amount = 50;
 
         // Bob withdraws all available tokens
-        confidential_asset::deposit(bob, token, (bob_current_amount as u64));
+        confidential_asset::deposit(bob, token, bob_current_amount as u64);
         confidential_asset::rollover_pending_balance(bob, token);
 
         print(&utf8(b"Alice's FA balance before the withdrawal is zero:"));

@@ -184,12 +184,12 @@ module swap::router {
         if (!liquidity_pool::is_sorted(token_1, token_2)) {
             (reserves_1, reserves_2) = (reserves_2, reserves_1);
         };
-        let amount_1_desired = (amount_1_desired as u128);
-        let amount_2_desired = (amount_2_desired as u128);
-        let amount_1_min = (amount_1_min as u128);
-        let amount_2_min = (amount_2_min as u128);
-        let reserves_1 = (reserves_1 as u128);
-        let reserves_2 = (reserves_2 as u128);
+        let amount_1_desired = amount_1_desired as u128;
+        let amount_2_desired = amount_2_desired as u128;
+        let amount_1_min = amount_1_min as u128;
+        let amount_2_min = amount_2_min as u128;
+        let reserves_1 = reserves_1 as u128;
+        let reserves_2 = reserves_2 as u128;
         let lp_token_total_supply = liquidity_pool::lp_token_supply(pool);
         let (amount_1, amount_2) = (amount_1_desired, amount_2_desired);
         let liquidity = if (lp_token_total_supply == 0) {

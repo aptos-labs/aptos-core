@@ -21,7 +21,7 @@ module confidential_asset_example::normalize_example {
         let bob_amount = 500;
 
         confidential_asset::register(bob, token, bob_ek_bytes);
-        confidential_asset::deposit(bob, token, (bob_amount as u64));
+        confidential_asset::deposit(bob, token, bob_amount as u64);
 
         // The rollover function is the only function that requires the actual balance to be normalized
         // beforehand and leaves it unnormalized after execution, no matter what the pending balance was.
@@ -29,7 +29,7 @@ module confidential_asset_example::normalize_example {
 
         assert!(!confidential_asset::is_normalized(bob_addr, token));
 
-        confidential_asset::deposit(bob, token, (bob_amount as u64));
+        confidential_asset::deposit(bob, token, bob_amount as u64);
 
         // Before performing a second rollover, the actual balance must be normalized.
         // You will get an error if you try to rollover an unnormalized balance:

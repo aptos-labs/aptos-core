@@ -71,23 +71,23 @@ module drand::drand {
     /// (Technically, there is a small, computationally-indistinguishable bias in the number.)
     /// Note: This is a one-shot API that consumes the `randomness`.
     public fun random_number(randomness: Randomness, max: u64): u64 {
-        assert!(vector::length(&randomness.bytes) >= 8, error::invalid_argument(E_INCORRECT_RANDOMNESS));
+        assert!(randomness.bytes.length() >= 8, error::invalid_argument(E_INCORRECT_RANDOMNESS));
 
         let entropy = sha3_256(randomness.bytes);
 
         // We can convert the 256 uniform bits in `randomness` into a uniform 64-bit number `w \in [0, max)` by
         // taking the last 128 bits in `randomness` modulo `max`.
         let num : u256 = 0;
-        let max_256 = (max as u256);
+        let max_256 = max as u256;
 
         // Ugh, we have to manually deserialize this into a u128
-        while (!vector::is_empty(&entropy)) {
-            let byte = vector::pop_back(&mut entropy);
+        while (!entropy.is_empty()) {
+            let byte = entropy.pop_back();
             num = num << 8;
-            num = num + (byte as u256);
+            num += byte as u256;
         };
 
-        ((num % max_256) as u64)
+        (num % max_256) as u64
     }
 
     /// Returns the next round `i` that `drand` will sign after having signed the round corresponding to the

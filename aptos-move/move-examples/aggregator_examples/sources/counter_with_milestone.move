@@ -51,14 +51,14 @@ module aggregator_examples::counter_with_milestone {
         );
     }
 
-    public entry fun increment_milestone() acquires MilestoneCounter {
+    public entry fun increment_milestone() {
         assert!(exists<MilestoneCounter>(@aggregator_examples), error::invalid_argument(ERESOURCE_NOT_PRESENT));
-        let milestone_counter = borrow_global_mut<MilestoneCounter>(@aggregator_examples);
+        let milestone_counter = &mut MilestoneCounter[@aggregator_examples];
         assert!(aggregator_v2::try_add(&mut milestone_counter.count, 1), ECOUNTER_INCREMENT_FAIL);
 
         if (aggregator_v2::is_at_least(&milestone_counter.count, milestone_counter.next_milestone) && !aggregator_v2::is_at_least(&milestone_counter.count, milestone_counter.next_milestone + 1)) {
             event::emit(MilestoneReached { milestone: milestone_counter.next_milestone});
-            milestone_counter.next_milestone = milestone_counter.next_milestone + milestone_counter.milestone_every;
+            milestone_counter.next_milestone += milestone_counter.milestone_every;
         }
     }
 }

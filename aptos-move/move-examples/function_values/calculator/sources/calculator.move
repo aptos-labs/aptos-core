@@ -18,7 +18,7 @@ module account::calculator {
     }
 
     /// Process input in the current state.
-    fun process(s: &signer, input: Input) acquires State {
+    fun process(s: &signer, input: Input) {
         let addr = address_of(s);
         match ((move_from<State>(addr), input)) {
             (Empty, Number(x)) => move_to(s, State::Value(x)),
@@ -46,20 +46,20 @@ module account::calculator {
 
 
     /// Entry point functions
-    entry fun number(s: &signer, x: u64) acquires State {
+    entry fun number(s: &signer, x: u64) {
         process(s, Input::Number(x))
     }
 
-    entry fun add(s: &signer) acquires State {
+    entry fun add(s: &signer) {
         process(s, Input::Add)
     }
 
-    entry fun sub(s: &signer) acquires State {
+    entry fun sub(s: &signer) {
         process(s, Input::Sub)
     }
 
     #[view]
-    fun view(a: address): u64 acquires State {
+    fun view(a: address): u64 {
         match (&State[a]) {
             Value(x) => *x,
             _ => abort EINVALID_INPUT

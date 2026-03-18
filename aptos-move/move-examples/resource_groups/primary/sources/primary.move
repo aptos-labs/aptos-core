@@ -15,16 +15,16 @@ module resource_groups_primary::primary {
         move_to(account, Primary { value });
     }
 
-    public entry fun set_value(account: &signer, value: u64) acquires Primary {
-        let primary = borrow_global_mut<Primary>(signer::address_of(account));
+    public entry fun set_value(account: &signer, value: u64) {
+        let primary = &mut Primary[signer::address_of(account)];
         primary.value = value;
     }
 
-    public fun read(account: address): u64 acquires Primary {
-        borrow_global<Primary>(account).value
+    public fun read(account: address): u64 {
+        Primary[account].value
     }
 
-    public entry fun remove(account: &signer) acquires Primary {
+    public entry fun remove(account: &signer) {
         move_from<Primary>(signer::address_of(account));
     }
 
@@ -37,7 +37,7 @@ module resource_groups_primary::primary {
     }
 
     #[test(account = @0x3)]
-    fun test_multiple(account: &signer) acquires Primary {
+    fun test_multiple(account: &signer) {
         // Do it once to verify normal flow
         test_primary(account);
 
@@ -45,7 +45,7 @@ module resource_groups_primary::primary {
         test_primary(account);
     }
 
-    public fun test_primary(account: &signer) acquires Primary {
+    public fun test_primary(account: &signer) {
         let addr = signer::address_of(account);
         assert!(!exists_at(addr), 0);
         init(account, 5);

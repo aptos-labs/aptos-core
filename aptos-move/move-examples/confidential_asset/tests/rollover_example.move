@@ -44,7 +44,7 @@ module confidential_asset_example::rollover_example {
         print(&confidential_asset::actual_balance(bob_addr, token));
 
         assert!(confidential_asset::verify_pending_balance(bob_addr, token, &bob_dk, 0));
-        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, (bob_amount as u128)));
+        assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, bob_amount as u128));
     }
 
     #[test(

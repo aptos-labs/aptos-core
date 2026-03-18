@@ -135,12 +135,12 @@ module mint_nft::create_nft {
     /// In part 2 of this tutorial, we will introduce the concept of "resource account" - it is
     /// an account controlled by smart contracts to automatically sign for transactions. Resource account is also known
     /// as PDA or smart contract account in general blockchain terms.
-    public entry fun delayed_mint_event_ticket(module_owner: &signer, receiver: &signer) acquires ModuleData {
+    public entry fun delayed_mint_event_ticket(module_owner: &signer, receiver: &signer) {
         // Assert that the module owner signer is the owner of this module.
         assert!(signer::address_of(module_owner) == @mint_nft, error::permission_denied(ENOT_AUTHORIZED));
 
         // Mint token to the receiver.
-        let module_data = borrow_global_mut<ModuleData>(@mint_nft);
+        let module_data = &mut ModuleData[@mint_nft];
         let token_id = token::mint_token(module_owner, module_data.token_data_id, 1);
         token::direct_transfer(module_owner, receiver, token_id, 1);
 

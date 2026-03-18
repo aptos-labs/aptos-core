@@ -78,9 +78,9 @@ module raffle::raffle_test {
 
         // Assert the winner got all the money
         let i = 0;
-        let num_players = vector::length(&players);
+        let num_players = players.length();
         while (i < num_players) {
-            let player = *vector::borrow(&players, i);
+            let player = players[i];
 
             if (player == winner) {
                 assert!(coin::balance<AptosCoin>(player) == raffle::get_ticket_price() * num_players, 1);
@@ -88,7 +88,7 @@ module raffle::raffle_test {
                 assert!(coin::balance<AptosCoin>(player) == 0, 1);
             };
 
-            i = i + 1;
+            i += 1;
         };
 
         // Clean up

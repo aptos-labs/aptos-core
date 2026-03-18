@@ -30,8 +30,8 @@ module aptos_std::iterable_table {
     /// Destroy a table. The table must be empty to succeed.
     public fun destroy_empty<K: copy + store + drop, V: store>(table: IterableTable<K, V>) {
         assert!(empty(&table), 0);
-        assert!(option::is_none(&table.head), 0);
-        assert!(option::is_none(&table.tail), 0);
+        assert!(table.head.is_none(), 0);
+        assert!(table.tail.is_none(), 0);
         let IterableTable {inner, head: _, tail: _} = table;
         table_with_length::destroy_empty(inner);
     }
@@ -45,8 +45,8 @@ module aptos_std::iterable_table {
             next: option::none(),
         };
         table_with_length::add(&mut table.inner, key, wrapped_value);
-        if (option::is_some(&table.tail)) {
-            let k = option::borrow(&table.tail);
+        if (table.tail.is_some()) {
+            let k = table.tail.borrow();
             table_with_length::borrow_mut(&mut table.inner, *k).next = option::some(key);
         } else {
             table.head = option::some(key);
@@ -127,18 +127,18 @@ module aptos_std::iterable_table {
     /// Aborts if there is no entry for `key`.
     public fun remove_iter<K: copy + store + drop, V: store>(table: &mut IterableTable<K, V>, key: K): (V, Option<K>, Option<K>) {
         let val = table_with_length::remove(&mut table.inner, copy key);
-        if (option::contains(&table.tail, &key)) {
+        if (table.tail.contains(&key)) {
             table.tail = val.prev;
         };
-        if (option::contains(&table.head, &key)) {
+        if (table.head.contains(&key)) {
             table.head = val.next;
         };
-        if (option::is_some(&val.prev)) {
-            let key = option::borrow(&val.prev);
+        if (val.prev.is_some()) {
+            let key = val.prev.borrow();
             table_with_length::borrow_mut(&mut table.inner, *key).next = val.next;
         };
-        if (option::is_some(&val.next)) {
-            let key = option::borrow(&val.next);
+        if (val.next.is_some()) {
+            let key = val.next.borrow();
             table_with_length::borrow_mut(&mut table.inner, *key).prev = val.prev;
         };
         let IterableValue {val, prev, next} = val;
@@ -148,9 +148,9 @@ module aptos_std::iterable_table {
     /// Remove all items from v2 and append to v1.
     public fun append<K: copy + store + drop, V: store>(v1: &mut IterableTable<K, V>, v2: &mut IterableTable<K, V>) {
         let key = head_key(v2);
-        while (option::is_some(&key)) {
-            let (val, _, next) = remove_iter(v2, *option::borrow(&key));
-            add(v1, *option::borrow(&key), val);
+        while (key.is_some()) {
+            let (val, _, next) = remove_iter(v2, *key.borrow());
+            add(v1, *key.borrow(), val);
             key = next;
         };
     }
@@ -161,31 +161,31 @@ module aptos_std::iterable_table {
         let i = 0;
         while (i < 100) {
             add(&mut table, i, i);
-            i = i + 1;
+            i += 1;
         };
         assert!(length(&table) == 100, 0);
         i = 0;
         while (i < 100) {
             assert!(remove(&mut table, i) == i, 0);
-            i = i + 2;
+            i += 2;
         };
         assert!(!empty(&table), 0);
         let key = head_key(&table);
         i = 1;
-        while (option::is_some(&key)) {
-            let (val, _, next) = borrow_iter(&table, *option::borrow(&key));
+        while (key.is_some()) {
+            let (val, _, next) = borrow_iter(&table, *key.borrow());
             assert!(*val == i, 0);
             key = next;
-            i = i + 2;
+            i += 2;
         };
         assert!(i == 101, 0);
         let table2 = new();
         append(&mut table2, &mut table);
         destroy_empty(table);
         let key = tail_key(&table2);
-        while (option::is_some(&key)) {
-            let (val, prev, _) = remove_iter(&mut table2, *option::borrow(&key));
-            assert!(val == *option::borrow(&key), 0);
+        while (key.is_some()) {
+            let (val, prev, _) = remove_iter(&mut table2, *key.borrow());
+            assert!(val == *key.borrow(), 0);
             key = prev;
         };
         destroy_empty(table2);

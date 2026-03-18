@@ -113,7 +113,7 @@ module dao_platform::nft_dao_events {
     }
 
 
-    public(friend) fun emit_create_dao_event(
+    friend fun emit_create_dao_event(
         dao: &signer,
         dao_name: String,
         dao_resolve_threshold: u64,
@@ -135,7 +135,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_create_proposal_event(
+    friend fun emit_create_proposal_event(
         proposer: address,
         nft_dao: address,
         proposal_id: u64,
@@ -161,7 +161,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_voting_event(
+    friend fun emit_voting_event(
         voter: address,
         nft_dao: address,
         proposal_id: u64,
@@ -179,7 +179,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_resolve_event(proposal_id: u64, nft_dao: address, result: u8) {
+    friend fun emit_resolve_event(proposal_id: u64, nft_dao: address, result: u8) {
         event::emit(Resolve {
             nft_dao,
             proposal_id,
@@ -187,7 +187,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_admin_offer_event(
+    friend fun emit_admin_offer_event(
         admin: address,
         new_admin: address,
         nft_dao: address
@@ -199,7 +199,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_admin_claim_event(
+    friend fun emit_admin_claim_event(
         admin: address,
         new_admin: address,
         nft_dao: address
@@ -211,14 +211,14 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_admin_offer_cancel_event(admin: address, nft_dao: address) {
+    friend fun emit_admin_offer_cancel_event(admin: address, nft_dao: address) {
         event::emit(AdminOfferCancel {
             nft_dao,
             admin,
         });
     }
 
-    public(friend) fun emit_change_name_event(
+    friend fun emit_change_name_event(
         old_name: String,
         new_name: String,
         nft_dao: address
@@ -230,7 +230,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_change_threshold_event(
+    friend fun emit_change_threshold_event(
         old_threshold: u64,
         new_threshold: u64,
         nft_dao: address
@@ -242,7 +242,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_change_duration_event(
+    friend fun emit_change_duration_event(
         old_duration: u64,
         new_duration: u64,
         nft_dao: address
@@ -254,7 +254,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_change_voting_power_event(
+    friend fun emit_change_voting_power_event(
         old_power: u64,
         new_power: u64,
         nft_dao: address
@@ -266,7 +266,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_admin_veto_event(
+    friend fun emit_admin_veto_event(
         proposal_id: u64,
         admin: address,
         nft_dao: address,
@@ -280,7 +280,7 @@ module dao_platform::nft_dao_events {
         });
     }
 
-    public(friend) fun emit_admin_resolve_event(
+    friend fun emit_admin_resolve_event(
         proposal_id: u64,
         admin: address,
         nft_dao: address,

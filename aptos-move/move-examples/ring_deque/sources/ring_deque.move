@@ -30,10 +30,10 @@ module ring_deque::ring_deque {
     public fun new<T>(capacity: u64): RingDeque<T> {
         assert!(capacity > 0, E_CAPACITY_ZERO);
         let i = 0;
-        let data = vector::empty();
+        let data = vector[];
         while (i < capacity) {
-            vector::push_back(&mut data, option::none());
-            i = i + 1;
+            data.push_back(option::none());
+            i += 1;
         };
         RingDeque { data, capacity, front: 0, back: 0, length: 0 }
     }
@@ -50,26 +50,22 @@ module ring_deque::ring_deque {
 
     public fun borrow_front<T>(rd_ref: &RingDeque<T>): &T {
         assert!(rd_ref.length > 0, E_EMPTY);
-        option::borrow(vector::borrow(&rd_ref.data, rd_ref.front))
+        rd_ref.data[rd_ref.front].borrow()
     }
 
     public fun borrow_front_mut<T>(rd_ref_mut: &mut RingDeque<T>): &mut T {
         assert!(rd_ref_mut.length > 0, E_EMPTY);
-        option::borrow_mut(
-            vector::borrow_mut(&mut rd_ref_mut.data, rd_ref_mut.front)
-        )
+        rd_ref_mut.data[rd_ref_mut.front].borrow_mut()
     }
 
     public fun borrow_back<T>(rd_ref: &RingDeque<T>): &T {
         assert!(rd_ref.length > 0, E_EMPTY);
-        option::borrow(vector::borrow(&rd_ref.data, rd_ref.back))
+        rd_ref.data[rd_ref.back].borrow()
     }
 
     public fun borrow_back_mut<T>(rd_ref_mut: &mut RingDeque<T>): &mut T {
         assert!(rd_ref_mut.length > 0, E_EMPTY);
-        option::borrow_mut(
-            vector::borrow_mut(&mut rd_ref_mut.data, rd_ref_mut.back)
-        )
+        rd_ref_mut.data[rd_ref_mut.back].borrow_mut()
     }
 
     public fun push_front<T>(rd_ref_mut: &mut RingDeque<T>, value: T) {
@@ -82,11 +78,8 @@ module ring_deque::ring_deque {
                 rd_ref_mut.front - 1
             };
         };
-        option::fill(
-            vector::borrow_mut(&mut rd_ref_mut.data, rd_ref_mut.front),
-            value
-        );
-        rd_ref_mut.length = rd_ref_mut.length + 1;
+        rd_ref_mut.data[rd_ref_mut.front].fill(value);
+        rd_ref_mut.length += 1;
     }
 
     public fun push_back<T>(rd_ref_mut: &mut RingDeque<T>, value: T) {
@@ -99,18 +92,13 @@ module ring_deque::ring_deque {
                 rd_ref_mut.back + 1
             };
         };
-        option::fill(
-            vector::borrow_mut(&mut rd_ref_mut.data, rd_ref_mut.back),
-            value
-        );
-        rd_ref_mut.length = rd_ref_mut.length + 1;
+        rd_ref_mut.data[rd_ref_mut.back].fill(value);
+        rd_ref_mut.length += 1;
     }
 
     public fun pop_front<T>(rd_ref_mut: &mut RingDeque<T>): T {
         assert!(rd_ref_mut.length > 0, E_EMPTY);
-        let val = option::extract(
-            vector::borrow_mut(&mut rd_ref_mut.data, rd_ref_mut.front)
-        );
+        let val = rd_ref_mut.data[rd_ref_mut.front].extract();
         if (rd_ref_mut.length > 1) {
             let max_index = rd_ref_mut.capacity - 1;
             rd_ref_mut.front = if (rd_ref_mut.front == max_index) {
@@ -119,15 +107,13 @@ module ring_deque::ring_deque {
                 rd_ref_mut.front + 1
             };
         };
-        rd_ref_mut.length = rd_ref_mut.length - 1;
+        rd_ref_mut.length -= 1;
         val
     }
 
     public fun pop_back<T>(rd_ref_mut: &mut RingDeque<T>): T {
         assert!(rd_ref_mut.length > 0, E_EMPTY);
-        let val = option::extract(
-            vector::borrow_mut(&mut rd_ref_mut.data, rd_ref_mut.back)
-        );
+        let val = rd_ref_mut.data[rd_ref_mut.back].extract();
         if (rd_ref_mut.length > 1) {
             let max_index = rd_ref_mut.capacity - 1;
             rd_ref_mut.back = if (rd_ref_mut.back == 0) {
@@ -136,7 +122,7 @@ module ring_deque::ring_deque {
                 rd_ref_mut.back - 1
             };
         };
-        rd_ref_mut.length = rd_ref_mut.length - 1;
+        rd_ref_mut.length -= 1;
         val
     }
 

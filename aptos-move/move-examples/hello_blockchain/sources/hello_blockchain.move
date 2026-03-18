@@ -23,20 +23,19 @@ module hello_blockchain::message {
     const ENO_MESSAGE: u64 = 0;
 
     #[view]
-    public fun get_message(addr: address): string::String acquires MessageHolder {
+    public fun get_message(addr: address): string::String {
         assert!(exists<MessageHolder>(addr), error::not_found(ENO_MESSAGE));
-        borrow_global<MessageHolder>(addr).message
+        MessageHolder[addr].message
     }
 
-    public entry fun set_message(account: signer, message: string::String)
-    acquires MessageHolder {
+    public entry fun set_message(account: signer, message: string::String) {
         let account_addr = signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {
                 message,
             })
         } else {
-            let old_message_holder = borrow_global_mut<MessageHolder>(account_addr);
+            let old_message_holder = &mut MessageHolder[account_addr];
             let from_message = old_message_holder.message;
             event::emit(MessageChange {
                 account: account_addr,
@@ -48,7 +47,7 @@ module hello_blockchain::message {
     }
 
     #[test(account = @0x1)]
-    public entry fun sender_can_set_message(account: signer) acquires MessageHolder {
+    public entry fun sender_can_set_message(account: signer) {
         let msg: string::String = string::utf8(b"Running test for sender_can_set_message...");
         debug::print(&msg);
 

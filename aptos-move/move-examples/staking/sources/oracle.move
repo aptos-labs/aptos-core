@@ -30,7 +30,7 @@ module staking::oracle {
     }
 
     #[view]
-    public fun get_apt_price(): u128 acquires OracleConfig, TestPrice {
+    public fun get_apt_price(): u128 {
         if (exists<TestPrice>(@staking)) {
             return TestPrice[@staking].price;
         };
@@ -41,9 +41,9 @@ module staking::oracle {
         let expo = price::get_expo(&price);
         // Standardize precision or otherwise we'll get different magnitudes for different decimals
         math128::mul_div(
-            (raw_price as u128),
+            raw_price as u128,
             PRECISION,
-            math128::pow(10, (i64::get_magnitude_if_negative(&expo) as u128)),
+            math128::pow(10, i64::get_magnitude_if_negative(&expo) as u128),
         )
     }
 
@@ -60,7 +60,7 @@ module staking::oracle {
     }
 
     #[test_only]
-    public fun set_test_price(price: u128) acquires TestPrice {
+    public fun set_test_price(price: u128) {
         if (exists<TestPrice>(@staking)) {
             TestPrice[@staking].price = price;
         } else {

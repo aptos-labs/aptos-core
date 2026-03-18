@@ -140,19 +140,17 @@ module swap::liquidity_pool {
     }
 
     #[view]
-    public fun total_number_of_pools(): u64 acquires LiquidityPoolConfigs {
-        smart_vector::length(&safe_liquidity_pool_configs().all_pools)
+    public fun total_number_of_pools(): u64 {
+        safe_liquidity_pool_configs().all_pools.length()
     }
 
     #[view]
-    public fun all_pools(): vector<Object<LiquidityPool>> acquires LiquidityPoolConfigs {
+    public fun all_pools(): vector<Object<LiquidityPool>> {
         let all_pools = &safe_liquidity_pool_configs().all_pools;
         let results = vector[];
-        let len = smart_vector::length(all_pools);
-        let i = 0;
-        while (i < len) {
-            vector::push_back(&mut results, *smart_vector::borrow(all_pools, i));
-            i = i + 1;
+        let len = all_pools.length();
+        for (i in 0..len) {
+            results.push_back(*all_pools.borrow(i));
         };
         results
     }
@@ -190,11 +188,11 @@ module swap::liquidity_pool {
 
     #[view]
     public fun lp_token_supply<T: key>(pool: Object<T>): u128 {
-        option::destroy_some(fungible_asset::supply(pool))
+        fungible_asset::supply(pool).destroy_some()
     }
 
     #[view]
-    public fun pool_reserves<T: key>(pool: Object<T>): (u64, u64) acquires LiquidityPool {
+    public fun pool_reserves<T: key>(pool: Object<T>): (u64, u64) {
         let pool_data = liquidity_pool_data(&pool);
         (
             fungible_asset::balance(pool_data.token_store_1),
@@ -203,16 +201,16 @@ module swap::liquidity_pool {
     }
 
     #[view]
-    public fun supported_token_strings(pool: Object<LiquidityPool>): vector<String> acquires LiquidityPool {
-        vector::map(supported_inner_assets(pool), |a| coin_wrapper::get_original(a))
+    public fun supported_token_strings(pool: Object<LiquidityPool>): vector<String> {
+        supported_inner_assets(pool).map(|a| coin_wrapper::get_original(a))
     }
 
     #[view]
-    public fun supported_coins(pool: Object<LiquidityPool>): vector<String> acquires LiquidityPool {
+    public fun supported_coins(pool: Object<LiquidityPool>): vector<String> {
         let coins = vector[];
-        vector::for_each(supported_inner_assets(pool), |a| {
+        supported_inner_assets(pool).for_each(|a| {
             if (coin_wrapper::is_wrapper(a)) {
-                vector::push_back(&mut coins, coin_wrapper::get_coin_type(a))
+                coins.push_back(coin_wrapper::get_coin_type(a))
             };
         });
         coins
@@ -221,12 +219,12 @@ module swap::liquidity_pool {
     #[view]
     public fun supported_native_fungible_assets(
         pool: Object<LiquidityPool>,
-    ): vector<Object<Metadata>> acquires LiquidityPool {
-        vector::filter(supported_inner_assets(pool), |a| !coin_wrapper::is_wrapper(*a))
+    ): vector<Object<Metadata>> {
+        supported_inner_assets(pool).filter(|a| !coin_wrapper::is_wrapper(*a))
     }
 
     #[view]
-    public fun supported_inner_assets(pool: Object<LiquidityPool>): vector<Object<Metadata>> acquires LiquidityPool {
+    public fun supported_inner_assets(pool: Object<LiquidityPool>): vector<Object<Metadata>> {
         let pool_data = liquidity_pool_data(&pool);
         vector[
             fungible_asset::store_metadata(pool_data.token_store_1),
@@ -242,12 +240,12 @@ module swap::liquidity_pool {
     }
 
     #[view]
-    public fun is_stable(pool: Object<LiquidityPool>): bool acquires LiquidityPool {
+    public fun is_stable(pool: Object<LiquidityPool>): bool {
         liquidity_pool_data(&pool).is_stable
     }
 
     #[view]
-    public fun swap_fee_bps(pool: Object<LiquidityPool>): u64 acquires LiquidityPool {
+    public fun swap_fee_bps(pool: Object<LiquidityPool>): u64 {
         liquidity_pool_data(&pool).swap_fee_bps
     }
 
@@ -257,11 +255,11 @@ module swap::liquidity_pool {
     }
 
     #[view]
-    public fun claimable_fees(lp: address, pool: Object<LiquidityPool>): (u128, u128) acquires FeesAccounting {
+    public fun claimable_fees(lp: address, pool: Object<LiquidityPool>): (u128, u128) {
         let fees_accounting = safe_fees_accounting(&pool);
         (
-            *smart_table::borrow_with_default(&fees_accounting.claimable_1, lp, &0),
-            *smart_table::borrow_with_default(&fees_accounting.claimable_2, lp, &0),
+            *fees_accounting.claimable_1.borrow_with_default(lp, &0),
+            *fees_accounting.claimable_2.borrow_with_default(lp, &0),
         )
     }
 
@@ -270,7 +268,7 @@ module swap::liquidity_pool {
         token_1: Object<Metadata>,
         token_2: Object<Metadata>,
         is_stable: bool,
-    ): Object<LiquidityPool> acquires LiquidityPoolConfigs {
+    ): Object<LiquidityPool> {
         if (!is_sorted(token_1, token_2)) {
             return create(token_2, token_1, is_stable)
         };
@@ -302,7 +300,7 @@ module swap::liquidity_pool {
             claimable_2: smart_table::new(),
         });
         let pool = object::convert(lp_token);
-        smart_vector::push_back(&mut configs.all_pools, pool);
+        configs.all_pools.push_back(pool);
 
         event::emit(CreatePool { pool, token_1, token_2, is_stable });
         pool
@@ -316,17 +314,17 @@ module swap::liquidity_pool {
         pool: Object<LiquidityPool>,
         from: Object<Metadata>,
         amount_in: u64,
-    ): (u64, u64) acquires LiquidityPool {
+    ): (u64, u64) {
         let pool_data = liquidity_pool_data(&pool);
-        let reserve_1 = (fungible_asset::balance(pool_data.token_store_1) as u256);
-        let reserve_2 = (fungible_asset::balance(pool_data.token_store_2) as u256);
+        let reserve_1 = fungible_asset::balance(pool_data.token_store_1) as u256;
+        let reserve_2 = fungible_asset::balance(pool_data.token_store_2) as u256;
         let (reserve_in, reserve_out) = if (from == fungible_asset::store_metadata(pool_data.token_store_1)) {
             (reserve_1, reserve_2)
         } else {
             (reserve_2, reserve_1)
         };
         let fees_amount = math64::mul_div(amount_in, pool_data.swap_fee_bps, FEE_SCALE);
-        let amount_in = ((amount_in - fees_amount) as u256);
+        let amount_in = (amount_in - fees_amount) as u256;
         let amount_out = if (pool_data.is_stable) {
             let k = calculate_constant_k(pool_data);
             reserve_out - get_y(amount_in + reserve_in, k, reserve_out)
@@ -339,10 +337,10 @@ module swap::liquidity_pool {
     /// Swaps `from` for the other token in the pool.
     /// This is friend-only as the returned fungible assets might be of an internal wrapper type. If this is not the
     /// case, this function can be made public.
-    public(friend) fun swap(
+    friend fun swap(
         pool: Object<LiquidityPool>,
         from: FungibleAsset,
-    ): FungibleAsset acquires FeesAccounting, LiquidityPool, LiquidityPoolConfigs {
+    ): FungibleAsset {
         assert!(!safe_liquidity_pool_configs().is_paused, ESWAPS_ARE_PAUSED);
         // Calculate the amount of tokens to return to the user and the amount of fees to extract.
         let from_token = fungible_asset::metadata_from_asset(&from);
@@ -357,18 +355,18 @@ module swap::liquidity_pool {
         let store_1 = pool_data.token_store_1;
         let store_2 = pool_data.token_store_2;
         let swap_signer = &package_manager::get_signer();
-        let fees_amount = (fees_amount as u128);
+        let fees_amount = fees_amount as u128;
         let out = if (from_token == fungible_asset::store_metadata(pool_data.token_store_1)) {
             // User's swapping token 1 for token 2.
             fungible_asset::deposit(store_1, from);
             fungible_asset::deposit(pool_data.fees_store_1, fees);
-            fees_accounting.total_fees_1 = fees_accounting.total_fees_1 + fees_amount;
+            fees_accounting.total_fees_1 += fees_amount;
             fungible_asset::withdraw(swap_signer, store_2, amount_out)
         } else {
             // User's swapping token 2 for token 1.
             fungible_asset::deposit(store_2, from);
             fungible_asset::deposit(pool_data.fees_store_2, fees);
-            fees_accounting.total_fees_2 = fees_accounting.total_fees_2 + fees_amount;
+            fees_accounting.total_fees_2 += fees_amount;
             fungible_asset::withdraw(swap_signer, store_1, amount_out)
         };
 
@@ -389,7 +387,7 @@ module swap::liquidity_pool {
         fungible_asset_1: FungibleAsset,
         fungible_asset_2: FungibleAsset,
         is_stable: bool,
-    ) acquires FeesAccounting, LiquidityPool {
+    ) {
         let token_1 = fungible_asset::metadata_from_asset(&fungible_asset_1);
         let token_2 = fungible_asset::metadata_from_asset(&fungible_asset_2);
         if (!is_sorted(token_1, token_2)) {
@@ -408,18 +406,18 @@ module swap::liquidity_pool {
         // Before depositing the added liquidity, compute the amount of LP tokens the LP will receive.
         let reserve_1 = fungible_asset::balance(store_1);
         let reserve_2 = fungible_asset::balance(store_2);
-        let lp_token_supply = option::destroy_some(fungible_asset::supply(pool));
+        let lp_token_supply = fungible_asset::supply(pool).destroy_some();
         let mint_ref = &pool_data.lp_token_refs.mint_ref;
         let liquidity_token_amount = if (lp_token_supply == 0) {
-            let total_liquidity = (math128::sqrt((amount_1 as u128) * (amount_2 as u128)) as u64);
+            let total_liquidity = math128::sqrt((amount_1 as u128) * (amount_2 as u128)) as u64;
             // Permanently lock the first MINIMUM_LIQUIDITY tokens.
             fungible_asset::mint_to(mint_ref, pool, MINIMUM_LIQUIDITY);
             total_liquidity - MINIMUM_LIQUIDITY
         } else {
             // Only the smaller amount between the token 1 or token 2 is considered. Users should make sure to either
             // use the router module or calculate the optimal amounts to provide before calling this function.
-            let token_1_liquidity = math64::mul_div(amount_1, (lp_token_supply as u64), reserve_1);
-            let token_2_liquidity = math64::mul_div(amount_2, (lp_token_supply as u64), reserve_2);
+            let token_1_liquidity = math64::mul_div(amount_1, lp_token_supply as u64, reserve_1);
+            let token_2_liquidity = math64::mul_div(amount_2, lp_token_supply as u64, reserve_2);
             math64::min(token_1_liquidity, token_2_liquidity)
         };
         assert!(liquidity_token_amount > 0, EINSUFFICIENT_LIQUIDITY_MINTED);
@@ -445,7 +443,7 @@ module swap::liquidity_pool {
         lp_token: Object<LiquidityPool>,
         to: address,
         amount: u64,
-    ) acquires FeesAccounting, LiquidityPool {
+    ) {
         assert!(amount > 0, EZERO_AMOUNT);
         let from_address = signer::address_of(from);
         let from_store = ensure_lp_token_store(from_address, lp_token);
@@ -462,13 +460,13 @@ module swap::liquidity_pool {
     /// Burn the given amount of LP tokens and receive the underlying liquidity.
     /// This is friend-only as the returned fungible assets might be of an internal wrapper type. If this is not the
     /// case, this function can be made public.
-    public(friend) fun burn(
+    friend fun burn(
         lp: &signer,
         token_1: Object<Metadata>,
         token_2: Object<Metadata>,
         is_stable: bool,
         amount: u64,
-    ): (FungibleAsset, FungibleAsset) acquires FeesAccounting, LiquidityPool {
+    ): (FungibleAsset, FungibleAsset) {
         assert!(amount > 0, EZERO_AMOUNT);
         let lp_address = signer::address_of(lp);
         let pool = liquidity_pool(token_1, token_2, is_stable);
@@ -479,7 +477,7 @@ module swap::liquidity_pool {
         update_claimable_fees(lp_address, pool);
 
         // Burn the provided LP tokens.
-        let lp_token_supply = option::destroy_some(fungible_asset::supply(pool));
+        let lp_token_supply = fungible_asset::supply(pool).destroy_some();
         let pool_data = liquidity_pool_data(&pool);
         fungible_asset::burn_from(&pool_data.lp_token_refs.burn_ref, store, amount);
 
@@ -488,16 +486,16 @@ module swap::liquidity_pool {
         let store_2 = pool_data.token_store_2;
         let reserve_1 = fungible_asset::balance(store_1);
         let reserve_2 = fungible_asset::balance(store_2);
-        let amount_to_redeem_1 = (math128::mul_div(
-            (amount as u128),
-            (reserve_1 as u128),
+        let amount_to_redeem_1 = math128::mul_div(
+            amount as u128,
+            reserve_1 as u128,
             lp_token_supply
-        ) as u64);
-        let amount_to_redeem_2 = (math128::mul_div(
-            (amount as u128),
-            (reserve_2 as u128),
+        ) as u64;
+        let amount_to_redeem_2 = math128::mul_div(
+            amount as u128,
+            reserve_2 as u128,
             lp_token_supply
-        ) as u64);
+        ) as u64;
         assert!(amount_to_redeem_1 > 0 && amount_to_redeem_2 > 0, EINSUFFICIENT_LIQUIDITY_REDEEMED);
 
         // Withdraw and return the redeemed tokens.
@@ -512,65 +510,65 @@ module swap::liquidity_pool {
     }
 
     /// Calculate and update the latest amount of fees claimable by the given LP.
-    public entry fun update_claimable_fees(lp: address, pool: Object<LiquidityPool>) acquires FeesAccounting {
+    public entry fun update_claimable_fees(lp: address, pool: Object<LiquidityPool>) {
         let fees_accounting = unchecked_mut_fees_accounting(&pool);
         let current_total_fees_1 = fees_accounting.total_fees_1;
         let current_total_fees_2 = fees_accounting.total_fees_2;
-        let lp_balance = (primary_fungible_store::balance(lp, pool) as u128);
+        let lp_balance = primary_fungible_store::balance(lp, pool) as u128;
         let lp_token_total_supply = lp_token_supply(pool);
         // Calculate and update the amount of fees this LP token store is entitled to, taking into account the last
         // time they claimed.
         if (lp_balance > 0) {
-            let last_total_fees_1 = *smart_table::borrow(&fees_accounting.total_fees_at_last_claim_1, lp);
-            let last_total_fees_2 = *smart_table::borrow(&fees_accounting.total_fees_at_last_claim_2, lp);
+            let last_total_fees_1 = *fees_accounting.total_fees_at_last_claim_1.borrow(lp);
+            let last_total_fees_2 = *fees_accounting.total_fees_at_last_claim_2.borrow(lp);
             let delta_1 = current_total_fees_1 - last_total_fees_1;
             let delta_2 = current_total_fees_2 - last_total_fees_2;
             let claimable_1 = math128::mul_div(delta_1, lp_balance, lp_token_total_supply);
             let claimable_2 = math128::mul_div(delta_2, lp_balance, lp_token_total_supply);
             if (claimable_1 > 0) {
                 let old_claimable_1 = smart_table::borrow_mut_with_default(&mut fees_accounting.claimable_1, lp, 0);
-                *old_claimable_1 = *old_claimable_1 + claimable_1;
+                *old_claimable_1 += claimable_1;
             };
             if (claimable_2 > 0) {
                 let old_claimable_2 = smart_table::borrow_mut_with_default(&mut fees_accounting.claimable_2, lp, 0);
-                *old_claimable_2 = *old_claimable_2 + claimable_2;
+                *old_claimable_2 += claimable_2;
             };
         };
 
-        smart_table::upsert(&mut fees_accounting.total_fees_at_last_claim_1, lp, current_total_fees_1);
-        smart_table::upsert(&mut fees_accounting.total_fees_at_last_claim_2, lp, current_total_fees_2);
+        fees_accounting.total_fees_at_last_claim_1.upsert(lp, current_total_fees_1);
+        fees_accounting.total_fees_at_last_claim_2.upsert(lp, current_total_fees_2);
     }
 
     /// Claim the fees that the given LP is entitled to.
     /// This is friend-only as the returned fungible assets might be of an internal wrapper type. If this is not the
     /// case, this function can be made public.
-    public(friend) fun claim_fees(
+    friend fun claim_fees(
         lp: &signer,
         pool: Object<LiquidityPool>,
-    ): (FungibleAsset, FungibleAsset) acquires FeesAccounting, LiquidityPool {
+    ): (FungibleAsset, FungibleAsset) {
         let lp_address = signer::address_of(lp);
         update_claimable_fees(lp_address, pool);
 
         let pool_data = liquidity_pool_data(&pool);
         let fees_accounting = unchecked_mut_fees_accounting(&pool);
-        let claimable_1 = if (smart_table::contains(&fees_accounting.claimable_1, lp_address)) {
-            smart_table::remove(&mut fees_accounting.claimable_1, lp_address)
+        let claimable_1 = if (fees_accounting.claimable_1.contains(lp_address)) {
+            fees_accounting.claimable_1.remove(lp_address)
         } else {
             0
         };
-        let claimable_2 = if (smart_table::contains(&fees_accounting.claimable_2, lp_address)) {
-            smart_table::remove(&mut fees_accounting.claimable_2, lp_address)
+        let claimable_2 = if (fees_accounting.claimable_2.contains(lp_address)) {
+            fees_accounting.claimable_2.remove(lp_address)
         } else {
             0
         };
         let swap_signer = &package_manager::get_signer();
         let fees_1 = if (claimable_1 > 0) {
-            fungible_asset::withdraw(swap_signer, pool_data.fees_store_1, (claimable_1 as u64))
+            fungible_asset::withdraw(swap_signer, pool_data.fees_store_1, claimable_1 as u64)
         } else {
             fungible_asset::zero(fungible_asset::store_metadata(pool_data.fees_store_1))
         };
         let fees_2 = if (claimable_2 > 0) {
-            fungible_asset::withdraw(swap_signer, pool_data.fees_store_2, (claimable_2 as u64))
+            fungible_asset::withdraw(swap_signer, pool_data.fees_store_2, claimable_2 as u64)
         } else {
             fungible_asset::zero(fungible_asset::store_metadata(pool_data.fees_store_2))
         };
@@ -579,41 +577,41 @@ module swap::liquidity_pool {
 
     /////////////////////////////////////////////////// OPERATIONS /////////////////////////////////////////////////////
 
-    public entry fun set_pauser(pauser: &signer, new_pauser: address) acquires LiquidityPoolConfigs {
+    public entry fun set_pauser(pauser: &signer, new_pauser: address) {
         let pool_configs = pauser_only_mut_liquidity_pool_configs(pauser);
         pool_configs.pending_pauser = new_pauser;
     }
 
-    public entry fun accept_pauser(new_pauser: &signer) acquires LiquidityPoolConfigs {
+    public entry fun accept_pauser(new_pauser: &signer) {
         let pool_configs = unchecked_mut_liquidity_pool_configs();
         assert!(signer::address_of(new_pauser) == pool_configs.pending_pauser, ENOT_AUTHORIZED);
         pool_configs.pauser = pool_configs.pending_pauser;
         pool_configs.pending_pauser = @0x0;
     }
 
-    public entry fun set_pause(pauser: &signer, is_paused: bool) acquires LiquidityPoolConfigs {
+    public entry fun set_pause(pauser: &signer, is_paused: bool) {
         let pool_configs = pauser_only_mut_liquidity_pool_configs(pauser);
         pool_configs.is_paused = is_paused;
     }
 
-    public entry fun set_fee_manager(fee_manager: &signer, new_fee_manager: address) acquires LiquidityPoolConfigs {
+    public entry fun set_fee_manager(fee_manager: &signer, new_fee_manager: address) {
         let pool_configs = fee_manager_only_mut_liquidity_pool_configs(fee_manager);
         pool_configs.pending_fee_manager = new_fee_manager;
     }
 
-    public entry fun accept_fee_manager(new_fee_manager: &signer) acquires LiquidityPoolConfigs {
+    public entry fun accept_fee_manager(new_fee_manager: &signer) {
         let pool_configs = unchecked_mut_liquidity_pool_configs();
         assert!(signer::address_of(new_fee_manager) == pool_configs.pending_fee_manager, ENOT_AUTHORIZED);
         pool_configs.fee_manager = pool_configs.pending_fee_manager;
         pool_configs.pending_fee_manager = @0x0;
     }
 
-    public entry fun set_stable_fee(fee_manager: &signer, new_fee_bps: u64) acquires LiquidityPoolConfigs {
+    public entry fun set_stable_fee(fee_manager: &signer, new_fee_bps: u64) {
         let pool_configs = fee_manager_only_mut_liquidity_pool_configs(fee_manager);
         pool_configs.stable_fee_bps = new_fee_bps;
     }
 
-    public entry fun set_volatile_fee(fee_manager: &signer, new_fee_bps: u64) acquires LiquidityPoolConfigs {
+    public entry fun set_volatile_fee(fee_manager: &signer, new_fee_bps: u64) {
         let pool_configs = fee_manager_only_mut_liquidity_pool_configs(fee_manager);
         pool_configs.volatile_fee_bps = new_fee_bps;
     }
@@ -648,7 +646,7 @@ module swap::liquidity_pool {
         }
     }
 
-    fun ensure_lp_token_store<T: key>(lp: address, pool: Object<T>): Object<FungibleStore> acquires LiquidityPool {
+    fun ensure_lp_token_store<T: key>(lp: address, pool: Object<T>): Object<FungibleStore> {
         primary_fungible_store::ensure_primary_store_exists(lp, pool);
         let store = primary_fungible_store::primary_store(lp, pool);
         if (!fungible_asset::is_frozen(store)) {
@@ -661,9 +659,9 @@ module swap::liquidity_pool {
 
     inline fun get_pool_seeds(token_1: Object<Metadata>, token_2: Object<Metadata>, is_stable: bool): vector<u8> {
         let seeds = vector[];
-        vector::append(&mut seeds, bcs::to_bytes(&object::object_address(&token_1)));
-        vector::append(&mut seeds, bcs::to_bytes(&object::object_address(&token_2)));
-        vector::append(&mut seeds, bcs::to_bytes(&is_stable));
+        seeds.append(bcs::to_bytes(&object::object_address(&token_1)));
+        seeds.append(bcs::to_bytes(&object::object_address(&token_2)));
+        seeds.append(bcs::to_bytes(&is_stable));
         seeds
     }
 
@@ -674,15 +672,15 @@ module swap::liquidity_pool {
 
     inline fun lp_token_name(token_1: Object<Metadata>, token_2: Object<Metadata>): String {
         let token_symbol = string::utf8(b"LP-");
-        string::append(&mut token_symbol, fungible_asset::symbol(token_1));
-        string::append_utf8(&mut token_symbol, b"-");
-        string::append(&mut token_symbol, fungible_asset::symbol(token_2));
+        token_symbol.append(fungible_asset::symbol(token_1));
+        token_symbol.append_utf8(b"-");
+        token_symbol.append(fungible_asset::symbol(token_2));
         token_symbol
     }
 
     inline fun calculate_constant_k(pool: &LiquidityPool): u256 {
-        let r1 = (fungible_asset::balance(pool.token_store_1) as u256);
-        let r2 = (fungible_asset::balance(pool.token_store_2) as u256);
+        let r1 = fungible_asset::balance(pool.token_store_1) as u256;
+        let r2 = fungible_asset::balance(pool.token_store_2) as u256;
         if (pool.is_stable) {
             // k = x^3 * y + y^3 * x. This is a modified constant for stable pairs.
             r1 * r1 * r1 * r2 + r2 * r2 * r2 * r1
@@ -692,21 +690,21 @@ module swap::liquidity_pool {
         }
     }
 
-    inline fun safe_fees_accounting<T: key>(pool: &Object<T>): &FeesAccounting acquires FeesAccounting {
-        borrow_global<FeesAccounting>(object::object_address(pool))
+    inline fun safe_fees_accounting<T: key>(pool: &Object<T>): &FeesAccounting {
+        &FeesAccounting[object::object_address(pool)]
     }
 
-    inline fun liquidity_pool_data<T: key>(pool: &Object<T>): &LiquidityPool acquires LiquidityPool {
-        borrow_global<LiquidityPool>(object::object_address(pool))
+    inline fun liquidity_pool_data<T: key>(pool: &Object<T>): &LiquidityPool {
+        &LiquidityPool[object::object_address(pool)]
     }
 
-    inline fun safe_liquidity_pool_configs(): &LiquidityPoolConfigs acquires LiquidityPoolConfigs {
-        borrow_global<LiquidityPoolConfigs>(@swap)
+    inline fun safe_liquidity_pool_configs(): &LiquidityPoolConfigs {
+        &LiquidityPoolConfigs[@swap]
     }
 
     inline fun pauser_only_mut_liquidity_pool_configs(
         pauser: &signer,
-    ): &mut LiquidityPoolConfigs acquires LiquidityPoolConfigs {
+    ): &mut LiquidityPoolConfigs {
         let pool_configs = unchecked_mut_liquidity_pool_configs();
         assert!(signer::address_of(pauser) == pool_configs.pauser, ENOT_AUTHORIZED);
         pool_configs
@@ -714,22 +712,22 @@ module swap::liquidity_pool {
 
     inline fun fee_manager_only_mut_liquidity_pool_configs(
         fee_manager: &signer,
-    ): &mut LiquidityPoolConfigs acquires LiquidityPoolConfigs {
+    ): &mut LiquidityPoolConfigs {
         let pool_configs = unchecked_mut_liquidity_pool_configs();
         assert!(signer::address_of(fee_manager) == pool_configs.fee_manager, ENOT_AUTHORIZED);
         pool_configs
     }
 
-    inline fun unchecked_mut_liquidity_pool_data<T: key>(pool: &Object<T>): &mut LiquidityPool acquires LiquidityPool {
-        borrow_global_mut<LiquidityPool>(object::object_address(pool))
+    inline fun unchecked_mut_liquidity_pool_data<T: key>(pool: &Object<T>): &mut LiquidityPool {
+        &mut LiquidityPool[object::object_address(pool)]
     }
 
-    inline fun unchecked_mut_fees_accounting<T: key>(pool: &Object<T>): &mut FeesAccounting acquires FeesAccounting {
-        borrow_global_mut<FeesAccounting>(object::object_address(pool))
+    inline fun unchecked_mut_fees_accounting<T: key>(pool: &Object<T>): &mut FeesAccounting {
+        &mut FeesAccounting[object::object_address(pool)]
     }
 
-    inline fun unchecked_mut_liquidity_pool_configs(): &mut LiquidityPoolConfigs acquires LiquidityPoolConfigs {
-        borrow_global_mut<LiquidityPoolConfigs>(@swap)
+    inline fun unchecked_mut_liquidity_pool_configs(): &mut LiquidityPoolConfigs {
+        &mut LiquidityPoolConfigs[@swap]
     }
 
     inline fun f(x0: u256, y: u256): u256 {
@@ -741,16 +739,15 @@ module swap::liquidity_pool {
     }
 
     fun get_y(x0: u256, xy: u256, y: u256): u256 {
-        let i = 0;
-        while (i < 255) {
+        for (i in 0..255) {
             let y_prev = y;
             let k = f(x0, y);
             if (k < xy) {
                 let dy = (xy - k) / d(x0, y);
-                y = y + dy;
+                y += dy;
             } else {
                 let dy = (k - xy) / d(x0, y);
-                y = y - dy;
+                y -= dy;
             };
             if (y > y_prev) {
                 if (y - y_prev <= 1) {
@@ -761,7 +758,6 @@ module swap::liquidity_pool {
                     return y
                 }
             };
-            i = i + 1;
         };
         y
     }

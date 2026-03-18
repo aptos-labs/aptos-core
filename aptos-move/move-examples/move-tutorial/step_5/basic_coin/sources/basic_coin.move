@@ -28,7 +28,7 @@ module named_addr::basic_coin {
     }
 
     /// Mint `amount` tokens to `mint_addr`. Mint must be approved by the module owner.
-    public fun mint(module_owner: &signer, mint_addr: address, amount: u64) acquires Balance {
+    public fun mint(module_owner: &signer, mint_addr: address, amount: u64) {
         // Only the owner of the module can initialize this module
         assert!(signer::address_of(module_owner) == MODULE_OWNER, ENOT_MODULE_OWNER);
 
@@ -37,37 +37,37 @@ module named_addr::basic_coin {
     }
 
     /// Returns the balance of `owner`.
-    public fun balance_of(owner: address): u64 acquires Balance {
-        borrow_global<Balance>(owner).coin.value
+    public fun balance_of(owner: address): u64 {
+        Balance[owner].coin.value
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    public fun transfer(from: &signer, to: address, amount: u64) acquires Balance {
+    public fun transfer(from: &signer, to: address, amount: u64) {
         let check = withdraw(signer::address_of(from), amount);
         deposit(to, check);
     }
 
     /// Withdraw `amount` number of tokens from the balance under `addr`.
-    fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
+    fun withdraw(addr: address, amount: u64) : Coin {
         let balance = balance_of(addr);
         // balance must be greater than the withdraw amount
         assert!(balance >= amount, EINSUFFICIENT_BALANCE);
-        let balance_ref = &mut borrow_global_mut<Balance>(addr).coin.value;
+        let balance_ref = &mut Balance[addr].coin.value;
         *balance_ref = balance - amount;
         Coin { value: amount }
     }
 
     /// Deposit `amount` number of tokens to the balance under `addr`.
-    fun deposit(addr: address, check: Coin) acquires Balance{
+    fun deposit(addr: address, check: Coin){
         let balance = balance_of(addr);
-        let balance_ref = &mut borrow_global_mut<Balance>(addr).coin.value;
+        let balance_ref = &mut Balance[addr].coin.value;
         let Coin { value } = check;
         *balance_ref = balance + value;
     }
 
     #[test(account = @0x1)] // Creates a signer for the `account` argument with address `@0x1`
     #[expected_failure] // This test should abort
-    fun mint_non_owner(account: &signer) acquires Balance {
+    fun mint_non_owner(account: &signer) {
         // Make sure the address we've chosen doesn't match the module
         // owner address
         publish_balance(account);
@@ -76,7 +76,7 @@ module named_addr::basic_coin {
     }
 
     #[test(account = @named_addr)] // Creates a signer for the `account` argument with the value of the named address `named_addr`
-    fun mint_check_balance(account: &signer) acquires Balance {
+    fun mint_check_balance(account: &signer) {
         let addr = signer::address_of(account);
         publish_balance(account);
         mint(account, @named_addr, 42);
@@ -84,7 +84,7 @@ module named_addr::basic_coin {
     }
 
     #[test(account = @0x1)]
-    fun publish_balance_has_zero(account: &signer) acquires Balance {
+    fun publish_balance_has_zero(account: &signer) {
         let addr = signer::address_of(account);
         publish_balance(account);
         assert!(balance_of(addr) == 0, 0);
@@ -101,21 +101,21 @@ module named_addr::basic_coin {
 
     #[test]
     #[expected_failure]
-    fun withdraw_dne() acquires Balance {
+    fun withdraw_dne() {
         // Need to unpack the coin since `Coin` is a resource
         Coin { value: _ } = withdraw(@0x1, 0);
     }
 
     #[test(account = @0x1)]
     #[expected_failure] // This test should fail
-    fun withdraw_too_much(account: &signer) acquires Balance {
+    fun withdraw_too_much(account: &signer) {
         let addr = signer::address_of(account);
         publish_balance(account);
         Coin { value: _ } = withdraw(addr, 1);
     }
 
     #[test(account = @named_addr)]
-    fun can_withdraw_amount(account: &signer) acquires Balance {
+    fun can_withdraw_amount(account: &signer) {
         publish_balance(account);
         let amount = 1000;
         let addr = signer::address_of(account);

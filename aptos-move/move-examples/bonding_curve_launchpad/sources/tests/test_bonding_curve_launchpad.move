@@ -242,7 +242,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
         bonding_curve_creator: &signer
     ) {
         test_e2e_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, bonding_curve_creator);
-        let grad_apt: u64 = 6_000 * math64::pow(10, (8 as u64));
+        let grad_apt: u64 = 6_000 * math64::pow(10, 8 as u64);
         let name = string::utf8(b"SheepyCoin");
         let symbol = string::utf8(b"SHEEP");
         assert!(bonding_curve_launchpad::get_is_frozen(name, symbol) == true, EINCORRECT_FROZEN_STATUS);

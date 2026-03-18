@@ -18,9 +18,9 @@ module deploy_address::number {
     const ENOT_INITIALIZED: u64 = 0;
 
     #[view]
-    public fun get_number(addr: address): (u8, u16, u32, u64, u128, u256, vector<u256>) acquires NumberHolder {
+    public fun get_number(addr: address): (u8, u16, u32, u64, u128, u256, vector<u256>) {
         assert!(exists<NumberHolder>(addr), error::not_found(ENOT_INITIALIZED));
-        let holder = borrow_global<NumberHolder>(addr);
+        let holder = &NumberHolder[addr];
 
         (holder.u8, holder.u16, holder.u32, holder.u64,holder.u128, holder.u256, holder.vec_u256)
     }
@@ -33,8 +33,7 @@ module deploy_address::number {
         u64: u64,
         u128: u128,
         u256: u256,
-        vec_u256: vector<u256>)
-    acquires NumberHolder {
+        vec_u256: vector<u256>) {
         let account_addr = signer::address_of(&account);
         if (!exists<NumberHolder>(account_addr)) {
             move_to(&account, NumberHolder {
@@ -47,7 +46,7 @@ module deploy_address::number {
                 vec_u256,
             })
         } else {
-            let old_holder = borrow_global_mut<NumberHolder>(account_addr);
+            let old_holder = &mut NumberHolder[account_addr];
             old_holder.u8 = u8;
             old_holder.u16 = u16;
             old_holder.u32 = u32;

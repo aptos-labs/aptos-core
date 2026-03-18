@@ -96,14 +96,14 @@ module bonding_curve_launchpad::liquidity_pairs {
     ): (u64, u64, u128, u128) {
         if (swap_to_apt) {
             let divisor = fa_reserves + (amount_in as u128);
-            let apt_gained = (math128::mul_div(apt_reserves, (amount_in as u128), divisor) as u64);
+            let apt_gained = math128::mul_div(apt_reserves, amount_in as u128, divisor) as u64;
             let fa_updated_reserves = fa_reserves + (amount_in as u128);
             let apt_updated_reserves = apt_reserves - (apt_gained as u128);
             assert!(apt_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
             (amount_in, apt_gained, fa_updated_reserves, apt_updated_reserves)
         } else {
             let divisor = apt_reserves + (amount_in as u128);
-            let fa_gained = (math128::mul_div(fa_reserves, (amount_in as u128), divisor) as u64);
+            let fa_gained = math128::mul_div(fa_reserves, amount_in as u128, divisor) as u64;
             let fa_updated_reserves = fa_reserves - (fa_gained as u128);
             let apt_updated_reserves = apt_reserves + (amount_in as u128);
             assert!(fa_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
@@ -116,9 +116,9 @@ module bonding_curve_launchpad::liquidity_pairs {
     public fun get_is_frozen_metadata(
         name: String,
         symbol: String
-    ): bool acquires Pairs, LiquidityPair {
+    ): bool {
         assert_liquidity_pair_exists(name, symbol);
-        borrow_global<LiquidityPair>(get_pair_obj_address(name, symbol)).is_frozen
+        LiquidityPair[get_pair_obj_address(name, symbol)].is_frozen
     }
 
     // Retrieve the address of the given FA's name and symbol.
@@ -126,11 +126,11 @@ module bonding_curve_launchpad::liquidity_pairs {
     public fun get_pair_obj_address(
         name: String,
         symbol: String
-    ): address acquires Pairs {
-        let pairs = borrow_global<Pairs>(@bonding_curve_launchpad);
-        let fa_key_seed = *string::bytes(&name);
-        vector::append(&mut fa_key_seed, b"-");
-        vector::append(&mut fa_key_seed, *string::bytes(&symbol));
+    ): address {
+        let pairs = &Pairs[@bonding_curve_launchpad];
+        let fa_key_seed = *name.bytes();
+        fa_key_seed.append(b"-");
+        fa_key_seed.append(*symbol.bytes());
         object::create_object_address(
             &object::address_from_extend_ref(&pairs.signer_extender),
             fa_key_seed
@@ -149,7 +149,7 @@ module bonding_curve_launchpad::liquidity_pairs {
     //---------------------------Liquidity Pair---------------------------
     /// Creates a unique liquidity pair between a given FA and APT.
     /// Only callable from `bonding_curve_launchpad`.
-    public(friend) fun register_liquidity_pair(
+    friend fun register_liquidity_pair(
         name: String,
         symbol: String,
         transfer_ref: &TransferRef,
@@ -158,7 +158,7 @@ module bonding_curve_launchpad::liquidity_pairs {
         apt_amount_in: u64,
         fa_minted: FungibleAsset,
         fa_initial_liquidity: u128
-    ) acquires Pairs, LiquidityPair {
+    ) {
         // Only allow for creation of new APT-FA pairs.
         let does_already_exist = object::is_object(get_pair_obj_address(name, symbol));
         assert!(!does_already_exist, ELIQUIDITY_PAIR_EXISTS_ALREADY);
@@ -166,11 +166,11 @@ module bonding_curve_launchpad::liquidity_pairs {
         // generator signers from, for when APT or the FA needs to be transferred to and from the liquidity pair.
         // Reserves are kept on the liquidity pair object.
         // The object is identified by the unique combination of the FA's name and symbol.
-        let pairs = borrow_global<Pairs>(@bonding_curve_launchpad);
+        let pairs = &Pairs[@bonding_curve_launchpad];
         let pairs_signer = object::generate_signer_for_extending(&pairs.signer_extender);
-        let fa_key_seed = *string::bytes(&name);
-        vector::append(&mut fa_key_seed, b"-");
-        vector::append(&mut fa_key_seed, *string::bytes(&symbol));
+        let fa_key_seed = *name.bytes();
+        fa_key_seed.append(b"-");
+        fa_key_seed.append(*symbol.bytes());
         let liquidity_pair_object = object::create_named_object(&pairs_signer, fa_key_seed);
         let liquidity_pair_signer = object::generate_signer(&liquidity_pair_object);
         let liquidity_pair_extend_ref = object::generate_extend_ref(&liquidity_pair_object);
@@ -209,17 +209,17 @@ module bonding_curve_launchpad::liquidity_pairs {
     }
 
     /// Facilitate swapping between a given FA to APT.
-    public(friend) fun swap_fa_to_apt(
+    friend fun swap_fa_to_apt(
         name: String,
         symbol: String,
         transfer_ref: &TransferRef,
         swapper_account: &signer,
         fa_object_metadata: Object<Metadata>,
         amount_in: u64
-    ) acquires Pairs, LiquidityPair {
+    ) {
         // Verify the liquidity pair exists and is enabled for trading.
         assert_liquidity_pair_exists(name, symbol);
-        let liquidity_pair = borrow_global_mut<LiquidityPair>(get_pair_obj_address(name, symbol));
+        let liquidity_pair = &mut LiquidityPair[get_pair_obj_address(name, symbol)];
         assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
         // Determine the amount received of APT, when given swapper-supplied amount_in of FA.
         let (fa_given, apt_gained, fa_updated_reserves, apt_updated_reserves) = get_amount_out(
@@ -267,17 +267,17 @@ module bonding_curve_launchpad::liquidity_pairs {
     }
 
     /// Facilitate swapping between APT to a given FA.
-    public(friend) fun swap_apt_to_fa(
+    friend fun swap_apt_to_fa(
         name: String,
         symbol: String,
         transfer_ref: &TransferRef,
         swapper_account: &signer,
         fa_object_metadata: Object<Metadata>,
         amount_in: u64
-    ) acquires Pairs, LiquidityPair {
+    ) {
         // Verify the liquidity pair exists and is enabled for trading.
         assert_liquidity_pair_exists(name, symbol);
-        let liquidity_pair = borrow_global_mut<LiquidityPair>(get_pair_obj_address(name, symbol));
+        let liquidity_pair = &mut LiquidityPair[get_pair_obj_address(name, symbol)];
         assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
         // Determine the amount received of FA, when given swapper-supplied amount_in of APT.
         let (fa_gained, apt_given, fa_updated_reserves, apt_updated_reserves) = get_amount_out(
@@ -348,8 +348,8 @@ module bonding_curve_launchpad::liquidity_pairs {
             liquidity_pair.fa_store,
             fa_object_metadata,
             false,
-            ((apt_updated_reserves - (apt_updated_reserves / 10)) as u64),
-            ((fa_updated_reserves - (fa_updated_reserves / 10)) as u64),
+            (apt_updated_reserves - (apt_updated_reserves / 10)) as u64,
+            (fa_updated_reserves - (fa_updated_reserves / 10)) as u64,
             0,
             0
         );

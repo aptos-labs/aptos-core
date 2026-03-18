@@ -24,7 +24,7 @@ module test_account::cli_args {
         utf8_string: String,
         bool_vec: vector<bool>,
         address_vec_vec: vector<vector<address>>,
-    ) acquires Holder {
+    ) {
         let account_addr = signer::address_of(&account);
         if (exists<Holder>(account_addr)) {
             move_from<Holder>(account_addr);
@@ -56,8 +56,8 @@ module test_account::cli_args {
     /// `Holder`, as well as two `bool` flags denoting if `T1` & `T2`
     /// respectively match `Holder.type_info_1` & `Holder.type_info_2`,
     /// then return the `RevealResult`.
-    public fun reveal<T1, T2>(host: address): RevealResult acquires Holder {
-        let holder_ref = borrow_global<Holder>(host);
+    public fun reveal<T1, T2>(host: address): RevealResult {
+        let holder_ref = &Holder[host];
         RevealResult {
             u8_solo: holder_ref.u8_solo,
             bytes: holder_ref.bytes,

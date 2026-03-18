@@ -20,10 +20,9 @@ module upgrade_and_govern::parameters {
     }
 
     public fun get_parameters():
-    (u64, u64)
-    acquires GovernanceParameters {
+    (u64, u64) {
         let governance_parameters_ref =
-            borrow_global<GovernanceParameters>(@upgrade_and_govern);
+            &GovernanceParameters[@upgrade_and_govern];
         (governance_parameters_ref.parameter_1,
          governance_parameters_ref.parameter_2)
     }
@@ -37,11 +36,11 @@ module upgrade_and_govern::parameters {
         upgrade_and_govern: &signer,
         parameter_1: u64,
         parameter_2: u64
-    ) acquires GovernanceParameters {
+    ) {
         assert!(address_of(upgrade_and_govern) == @upgrade_and_govern,
                 E_INVALID_AUTHORITY);
         let governance_parameters_ref_mut =
-            borrow_global_mut<GovernanceParameters>(@upgrade_and_govern);
+            &mut GovernanceParameters[@upgrade_and_govern];
         governance_parameters_ref_mut.parameter_1 = parameter_1;
         governance_parameters_ref_mut.parameter_2 = parameter_2;
     }

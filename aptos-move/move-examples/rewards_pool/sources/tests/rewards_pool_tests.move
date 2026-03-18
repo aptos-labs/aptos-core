@@ -193,10 +193,10 @@ module rewards_pool::rewards_pool_tests {
         let (non_zero_reward_tokens, claimable_rewards) = rewards_pool::claimable_rewards(claimer_addr, pool, epoch);
         let claimable_map = simple_map::new_from(non_zero_reward_tokens, claimable_rewards);
         let rewards = rewards_pool::claim_rewards(claimer, pool, epoch);
-        vector::zip(rewards, expected_amounts, |reward, expected_amount| {
+        rewards.zip(expected_amounts, |reward, expected_amount| {
             let reward_metadata = fungible_asset::asset_metadata(&reward);
-            let claimable_amount = if (simple_map::contains_key(&claimable_map, &reward_metadata)) {
-                *simple_map::borrow(&claimable_map, &reward_metadata)
+            let claimable_amount = if (claimable_map.contains_key(&reward_metadata)) {
+                *claimable_map.borrow(&reward_metadata)
             } else {
                 0
             };

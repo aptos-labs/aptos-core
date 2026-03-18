@@ -87,7 +87,7 @@ module coin_listing {
         init_fixed_price_internal<CoinType>(seller, object, fee_schedule, start_time, price);
     }
 
-    public(friend) fun init_fixed_price_internal<CoinType>(
+    friend fun init_fixed_price_internal<CoinType>(
         seller: &signer,
         object: Object<ObjectCore>,
         fee_schedule: Object<FeeSchedule>,
@@ -143,7 +143,7 @@ module coin_listing {
         );
     }
 
-    public(friend) fun init_fixed_price_for_tokenv1_internal<CoinType>(
+    friend fun init_fixed_price_for_tokenv1_internal<CoinType>(
         seller: &signer,
         token_creator: address,
         token_collection: String,
@@ -193,7 +193,7 @@ module coin_listing {
         );
     }
 
-    public(friend) fun init_auction_internal<CoinType>(
+    friend fun init_auction_internal<CoinType>(
         seller: &signer,
         object: Object<ObjectCore>,
         fee_schedule: Object<FeeSchedule>,
@@ -265,7 +265,7 @@ module coin_listing {
         );
     }
 
-    public(friend) fun init_auction_for_tokenv1_internal<CoinType>(
+    friend fun init_auction_for_tokenv1_internal<CoinType>(
         seller: &signer,
         token_creator: address,
         token_collection: String,
@@ -321,7 +321,7 @@ module coin_listing {
     public entry fun purchase<CoinType>(
         purchaser: &signer,
         object: Object<Listing>,
-    ) acquires AuctionListing, FixedPriceListing {
+    ) {
         let listing_addr = listing::assert_started(&object);
 
         // Retrieve the purchase price if the auction has buy it now or this is a fixed listing.
@@ -338,14 +338,14 @@ module coin_listing {
             let now = timestamp::now_seconds();
             assert!(now < auction_end_time, error::invalid_state(EAUCTION_ENDED));
 
-            assert!(option::is_some(&buy_it_now_price), error::invalid_argument(ENO_BUY_IT_NOW));
-            if (option::is_some(&current_bid)) {
-                let Bid { bidder, coins } = option::destroy_some(current_bid);
+            assert!(buy_it_now_price.is_some(), error::invalid_argument(ENO_BUY_IT_NOW));
+            if (current_bid.is_some()) {
+                let Bid { bidder, coins } = current_bid.destroy_some();
                 aptos_account::deposit_coins(bidder, coins);
             } else {
-                option::destroy_none(current_bid);
+                current_bid.destroy_none();
             };
-            (option::destroy_some(buy_it_now_price), string::utf8(AUCTION_TYPE))
+            (buy_it_now_price.destroy_some(), string::utf8(AUCTION_TYPE))
         } else if (exists<FixedPriceListing<CoinType>>(listing_addr)) {
             let FixedPriceListing {
                 price,
@@ -365,7 +365,7 @@ module coin_listing {
     public entry fun end_fixed_price<CoinType>(
         seller: &signer,
         object: Object<Listing>,
-    ) acquires FixedPriceListing {
+    ) {
         let token_metadata = listing::token_metadata(object);
 
         let expected_seller_addr = signer::address_of(seller);
@@ -394,7 +394,7 @@ module coin_listing {
         bidder: &signer,
         object: Object<Listing>,
         bid_amount: u64,
-    ) acquires AuctionListing {
+    ) {
         let listing_addr = listing::assert_started(&object);
         assert!(exists<AuctionListing<CoinType>>(listing_addr), error::not_found(ENO_LISTING));
         let auction_listing = borrow_global_mut<AuctionListing<CoinType>>(listing_addr);
@@ -402,8 +402,8 @@ module coin_listing {
         let now = timestamp::now_seconds();
         assert!(now < auction_listing.auction_end_time, error::invalid_state(EAUCTION_ENDED));
 
-        let (previous_bidder, previous_bid, minimum_bid) = if (option::is_some(&auction_listing.current_bid)) {
-            let Bid { bidder, coins } = option::extract(&mut auction_listing.current_bid);
+        let (previous_bidder, previous_bid, minimum_bid) = if (auction_listing.current_bid.is_some()) {
+            let Bid { bidder, coins } = auction_listing.current_bid.extract();
             let current_bid = coin::value(&coins);
             aptos_account::deposit_coins(bidder, coins);
             (option::some(bidder), option::some(current_bid), current_bid + auction_listing.bid_increment)
@@ -417,7 +417,7 @@ module coin_listing {
             bidder: signer::address_of(bidder),
             coins,
         };
-        option::fill(&mut auction_listing.current_bid, bid);
+        auction_listing.current_bid.fill(bid);
 
         let fee_schedule = listing::fee_schedule(object);
         aptos_account::transfer_coins<CoinType>(
@@ -453,7 +453,7 @@ module coin_listing {
     public entry fun complete_auction<CoinType>(
         completer: &signer,
         object: Object<Listing>,
-    ) acquires AuctionListing {
+    ) {
         let listing_addr = listing::assert_started(&object);
         assert!(exists<AuctionListing<CoinType>>(listing_addr), error::not_found(ENO_LISTING));
 
@@ -471,11 +471,11 @@ module coin_listing {
 
         let seller = listing::seller(object);
 
-        let (purchaser, coins) = if (option::is_some(&current_bid)) {
-            let Bid { bidder, coins } = option::destroy_some(current_bid);
+        let (purchaser, coins) = if (current_bid.is_some()) {
+            let Bid { bidder, coins } = current_bid.destroy_some();
             (bidder, coins)
         } else {
-            option::destroy_none(current_bid);
+            current_bid.destroy_none();
             (seller, coin::zero<CoinType>())
         };
 
@@ -528,13 +528,13 @@ module coin_listing {
     #[view]
     public fun price<CoinType>(
         object: Object<Listing>,
-    ): Option<u64> acquires AuctionListing, FixedPriceListing {
+    ): Option<u64> {
         let listing_addr = object::object_address(&object);
         if (exists<FixedPriceListing<CoinType>>(listing_addr)) {
             let fixed_price = borrow_global<FixedPriceListing<CoinType>>(listing_addr);
             option::some(fixed_price.price)
         } else if (exists<AuctionListing<CoinType>>(listing_addr)) {
-            borrow_global<AuctionListing<CoinType>>(listing_addr).buy_it_now_price
+            AuctionListing<CoinType>[listing_addr].buy_it_now_price
         } else {
             // This should just be an abort but the compiler errors.
             assert!(false, error::not_found(ENO_LISTING));
@@ -549,19 +549,19 @@ module coin_listing {
     }
 
     #[view]
-    public fun starting_bid<CoinType>(object: Object<Listing>): u64 acquires AuctionListing {
+    public fun starting_bid<CoinType>(object: Object<Listing>): u64 {
         let auction = borrow_auction<CoinType>(object);
         auction.starting_bid
     }
 
     #[view]
-    public fun bid_increment<CoinType>(object: Object<Listing>): u64 acquires AuctionListing {
+    public fun bid_increment<CoinType>(object: Object<Listing>): u64 {
         let auction = borrow_auction<CoinType>(object);
         auction.bid_increment
     }
 
     #[view]
-    public fun auction_end_time<CoinType>(object: Object<Listing>): u64 acquires AuctionListing {
+    public fun auction_end_time<CoinType>(object: Object<Listing>): u64 {
         let auction = borrow_auction<CoinType>(object);
         auction.auction_end_time
     }
@@ -569,7 +569,7 @@ module coin_listing {
     #[view]
     public fun minimum_bid_time_before_end<CoinType>(
         object: Object<Listing>,
-    ): u64 acquires AuctionListing {
+    ): u64 {
         let auction = borrow_auction<CoinType>(object);
         auction.minimum_bid_time_before_end
     }
@@ -577,10 +577,10 @@ module coin_listing {
     #[view]
     public fun current_bidder<CoinType>(
         object: Object<Listing>,
-    ): Option<address> acquires AuctionListing {
+    ): Option<address> {
         let auction = borrow_auction<CoinType>(object);
-        if (option::is_some(&auction.current_bid)) {
-            option::some(option::borrow(&auction.current_bid).bidder)
+        if (auction.current_bid.is_some()) {
+            option::some(auction.current_bid.borrow().bidder)
         } else {
             option::none()
         }
@@ -589,10 +589,10 @@ module coin_listing {
     #[view]
     public fun current_amount<CoinType>(
         object: Object<Listing>,
-    ): Option<u64> acquires AuctionListing {
+    ): Option<u64> {
         let auction = borrow_auction<CoinType>(object);
-        if (option::is_some(&auction.current_bid)) {
-            let coins = &option::borrow(&auction.current_bid).coins;
+        if (auction.current_bid.is_some()) {
+            let coins = &auction.current_bid.borrow().coins;
             option::some(coin::value(coins))
         } else {
             option::none()
@@ -601,7 +601,7 @@ module coin_listing {
 
     inline fun borrow_auction<CoinType>(
         object: Object<Listing>,
-    ): &AuctionListing<CoinType> acquires AuctionListing {
+    ): &AuctionListing<CoinType> {
         let obj_addr = object::object_address(&object);
         assert!(exists<AuctionListing<CoinType>>(obj_addr), error::not_found(ENO_LISTING));
         borrow_global<AuctionListing<CoinType>>(obj_addr)
@@ -609,7 +609,7 @@ module coin_listing {
 
     inline fun borrow_fixed_price<CoinType>(
         object: Object<Listing>,
-    ): &FixedPriceListing<CoinType> acquires FixedPriceListing {
+    ): &FixedPriceListing<CoinType> {
         let obj_addr = object::object_address(&object);
         assert!(exists<FixedPriceListing<CoinType>>(obj_addr), error::not_found(ENO_LISTING));
         borrow_global<FixedPriceListing<CoinType>>(obj_addr)

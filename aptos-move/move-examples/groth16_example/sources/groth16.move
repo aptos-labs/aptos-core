@@ -104,7 +104,7 @@ module groth16_example::groth16 {
         let a_y = 4751084799539532208179359846086616641767957505361605807745261011239799367574u256;
         let a_bytes = bcs::to_bytes<u256>(&a_x);
         let a_y_bytes = bcs::to_bytes<u256>(&a_y);
-        vector::append(&mut a_bytes, a_y_bytes);
+        a_bytes.append(a_y_bytes);
         let a = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&a_bytes));
 
         let b_x1 = 4154738608741966676660560127107026081842675422117462672893103452342068780854u256;
@@ -115,23 +115,23 @@ module groth16_example::groth16 {
         let b_y1_bytes = bcs::to_bytes<u256>(&b_y1);
         let b_x2_bytes = bcs::to_bytes<u256>(&b_x2);
         let b_y2_bytes = bcs::to_bytes<u256>(&b_y2);
-        vector::append(&mut b_bytes, b_y1_bytes);
-        vector::append(&mut b_bytes, b_x2_bytes);
-        vector::append(&mut b_bytes, b_y2_bytes);
+        b_bytes.append(b_y1_bytes);
+        b_bytes.append(b_x2_bytes);
+        b_bytes.append(b_y2_bytes);
         let b = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&b_bytes));
 
         let c_x = 19416574444268205378069689424519026208317515867624593374135746889327790637883u256;
         let c_y = 9387724931669771435449663200581094189180308746057595118467671565223418773035u256;
         let c_bytes = bcs::to_bytes<u256>(&c_x);
         let c_y_bytes = bcs::to_bytes<u256>(&c_y);
-        vector::append(&mut c_bytes, c_y_bytes);
+        c_bytes.append(c_y_bytes);
         let c = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&c_bytes));
 
         let vk_alpha_x = 20491192805390485299153009773594534940189261866228447918068658471970481763042u256;
         let vk_alpha_y = 9383485363053290200918347156157836566562967994039712273449902621266178545958u256;
         let vk_alpha_bytes = bcs::to_bytes<u256>(&vk_alpha_x);
         let vk_alpha_y_bytes = bcs::to_bytes<u256>(&vk_alpha_y);
-        vector::append(&mut vk_alpha_bytes, vk_alpha_y_bytes);
+        vk_alpha_bytes.append(vk_alpha_y_bytes);
         let vk_alpha = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_alpha_bytes));
 
         let vk_beta_x1 = 6375614351688725206403948262868962793625744043794305715222011528459656738731u256;
@@ -142,9 +142,9 @@ module groth16_example::groth16 {
         let vk_beta_y1_bytes = bcs::to_bytes<u256>(&vk_beta_y1);
         let vk_beta_x2_bytes = bcs::to_bytes<u256>(&vk_beta_x2);
         let vk_beta_y2_bytes = bcs::to_bytes<u256>(&vk_beta_y2);
-        vector::append(&mut vk_beta_bytes, vk_beta_y1_bytes);
-        vector::append(&mut vk_beta_bytes, vk_beta_x2_bytes);
-        vector::append(&mut vk_beta_bytes, vk_beta_y2_bytes);
+        vk_beta_bytes.append(vk_beta_y1_bytes);
+        vk_beta_bytes.append(vk_beta_x2_bytes);
+        vk_beta_bytes.append(vk_beta_y2_bytes);
         let vk_beta = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&vk_beta_bytes));
 
         let vk_gamma_x1 = 10857046999023057135944570762232829481370756359578518086990519993285655852781u256;
@@ -155,9 +155,9 @@ module groth16_example::groth16 {
         let vk_gamma_y1_bytes = bcs::to_bytes<u256>(&vk_gamma_y1);
         let vk_gamma_x2_bytes = bcs::to_bytes<u256>(&vk_gamma_x2);
         let vk_gamma_y2_bytes = bcs::to_bytes<u256>(&vk_gamma_y2);
-        vector::append(&mut vk_gamma_bytes, vk_gamma_y1_bytes);
-        vector::append(&mut vk_gamma_bytes, vk_gamma_x2_bytes);
-        vector::append(&mut vk_gamma_bytes, vk_gamma_y2_bytes);
+        vk_gamma_bytes.append(vk_gamma_y1_bytes);
+        vk_gamma_bytes.append(vk_gamma_x2_bytes);
+        vk_gamma_bytes.append(vk_gamma_y2_bytes);
         let vk_gamma = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&vk_gamma_bytes));
 
         let vk_delta_x1 = 11733257046589851891850695012146277477007262722187040969185039828348964552798u256;
@@ -168,9 +168,9 @@ module groth16_example::groth16 {
         let vk_delta_y1_bytes = bcs::to_bytes<u256>(&vk_delta_y1);
         let vk_delta_x2_bytes = bcs::to_bytes<u256>(&vk_delta_x2);
         let vk_delta_y2_bytes = bcs::to_bytes<u256>(&vk_delta_y2);
-        vector::append(&mut vk_delta_bytes, vk_delta_y1_bytes);
-        vector::append(&mut vk_delta_bytes, vk_delta_x2_bytes);
-        vector::append(&mut vk_delta_bytes, vk_delta_y2_bytes);
+        vk_delta_bytes.append(vk_delta_y1_bytes);
+        vk_delta_bytes.append(vk_delta_x2_bytes);
+        vk_delta_bytes.append(vk_delta_y2_bytes);
         let vk_delta = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&vk_delta_bytes));
 
         let vk_gamma_abc_1_x = 9301933260370907965380929235907744187309044275532228633956723711236164592702u256;
@@ -194,47 +194,47 @@ module groth16_example::groth16 {
 
         let vk_gamma_abc_1_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_1_x);
         let vk_gamma_abc_1_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_1_y);
-        vector::append(&mut vk_gamma_abc_1_bytes, vk_gamma_abc_1_y_bytes);
+        vk_gamma_abc_1_bytes.append(vk_gamma_abc_1_y_bytes);
         let vk_gamma_abc_1 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_1_bytes));
 
         let vk_gamma_abc_2_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_2_x);
         let vk_gamma_abc_2_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_2_y);
-        vector::append(&mut vk_gamma_abc_2_bytes, vk_gamma_abc_2_y_bytes);
+        vk_gamma_abc_2_bytes.append(vk_gamma_abc_2_y_bytes);
         let vk_gamma_abc_2 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_2_bytes));
 
         let vk_gamma_abc_3_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_3_x);
         let vk_gamma_abc_3_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_3_y);
-        vector::append(&mut vk_gamma_abc_3_bytes, vk_gamma_abc_3_y_bytes);
+        vk_gamma_abc_3_bytes.append(vk_gamma_abc_3_y_bytes);
         let vk_gamma_abc_3 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_3_bytes));
 
         let vk_gamma_abc_4_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_4_x);
         let vk_gamma_abc_4_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_4_y);
-        vector::append(&mut vk_gamma_abc_4_bytes, vk_gamma_abc_4_y_bytes);
+        vk_gamma_abc_4_bytes.append(vk_gamma_abc_4_y_bytes);
         let vk_gamma_abc_4 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_4_bytes));
 
         let vk_gamma_abc_5_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_5_x);
         let vk_gamma_abc_5_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_5_y);
-        vector::append(&mut vk_gamma_abc_5_bytes, vk_gamma_abc_5_y_bytes);
+        vk_gamma_abc_5_bytes.append(vk_gamma_abc_5_y_bytes);
         let vk_gamma_abc_5 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_5_bytes));
 
         let vk_gamma_abc_6_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_6_x);
         let vk_gamma_abc_6_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_6_y);
-        vector::append(&mut vk_gamma_abc_6_bytes, vk_gamma_abc_6_y_bytes);
+        vk_gamma_abc_6_bytes.append(vk_gamma_abc_6_y_bytes);
         let vk_gamma_abc_6 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_6_bytes));
 
         let vk_gamma_abc_7_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_7_x);
         let vk_gamma_abc_7_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_7_y);
-        vector::append(&mut vk_gamma_abc_7_bytes, vk_gamma_abc_7_y_bytes);
+        vk_gamma_abc_7_bytes.append(vk_gamma_abc_7_y_bytes);
         let vk_gamma_abc_7 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_7_bytes));
 
         let vk_gamma_abc_8_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_8_x);
         let vk_gamma_abc_8_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_8_y);
-        vector::append(&mut vk_gamma_abc_8_bytes, vk_gamma_abc_8_y_bytes);
+        vk_gamma_abc_8_bytes.append(vk_gamma_abc_8_y_bytes);
         let vk_gamma_abc_8 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_8_bytes));
 
         let vk_gamma_abc_9_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_9_x);
         let vk_gamma_abc_9_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_9_y);
-        vector::append(&mut vk_gamma_abc_9_bytes, vk_gamma_abc_9_y_bytes);
+        vk_gamma_abc_9_bytes.append(vk_gamma_abc_9_y_bytes);
         let vk_gamma_abc_9 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_9_bytes));
 
         let vk_gamma_abc: vector<Element<bn254_algebra::G1>> = vector[

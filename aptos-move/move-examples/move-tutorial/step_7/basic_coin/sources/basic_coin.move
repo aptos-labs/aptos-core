@@ -25,13 +25,13 @@ module named_addr::basic_coin {
 
     /// Mint `amount` tokens to `mint_addr`. This method requires a witness with `CoinType` so that the
     /// module that owns `CoinType` can decide the minting policy.
-    public fun mint<CoinType: drop>(mint_addr: address, amount: u64, _witness: CoinType) acquires Balance {
+    public fun mint<CoinType: drop>(mint_addr: address, amount: u64, _witness: CoinType) {
         // Deposit `total_value` amount of tokens to mint_addr's balance
         deposit(mint_addr, Coin<CoinType> { value: amount });
     }
 
-    public fun balance_of<CoinType>(owner: address): u64 acquires Balance {
-        borrow_global<Balance<CoinType>>(owner).coin.value
+    public fun balance_of<CoinType>(owner: address): u64 {
+        Balance<CoinType>[owner].coin.value
     }
 
     spec balance_of {
@@ -40,12 +40,12 @@ module named_addr::basic_coin {
 
     /// Transfers `amount` of tokens from `from` to `to`. This method requires a witness with `CoinType` so that the
     /// module that owns `CoinType` can  decide the transferring policy.
-    public fun transfer<CoinType: drop>(from: &signer, to: address, amount: u64, _witness: CoinType) acquires Balance {
+    public fun transfer<CoinType: drop>(from: &signer, to: address, amount: u64, _witness: CoinType) {
         let check = withdraw<CoinType>(signer::address_of(from), amount);
         deposit<CoinType>(to, check);
     }
 
-    fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Balance {
+    fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> {
         let balance = balance_of<CoinType>(addr);
         assert!(balance >= amount, EINSUFFICIENT_BALANCE);
         let balance_ref = &mut borrow_global_mut<Balance<CoinType>>(addr).coin.value;
@@ -53,7 +53,7 @@ module named_addr::basic_coin {
         Coin<CoinType> { value: amount }
     }
 
-    fun deposit<CoinType>(addr: address, check: Coin<CoinType>) acquires Balance{
+    fun deposit<CoinType>(addr: address, check: Coin<CoinType>){
         let balance = balance_of<CoinType>(addr);
         let balance_ref = &mut borrow_global_mut<Balance<CoinType>>(addr).coin.value;
         let Coin { value } = check;

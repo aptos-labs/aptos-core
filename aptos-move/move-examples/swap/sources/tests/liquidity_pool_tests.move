@@ -23,12 +23,12 @@ module swap::liquidity_pool_tests {
         // Swap tokens
         let (amount_out_1, fees_2) = swap_and_verify(lp_1, pool, &mut tokens_2, 10000);
         let (amount_out_2, fees_1) = swap_and_verify(lp_1, pool, &mut tokens_1, 10000);
-        let expected_total_reserves_1 = ((200000 - amount_out_1 - fees_1 + 10000) as u128);
-        let expected_total_reserves_2 = ((300000 - amount_out_2 - fees_2 + 10000) as u128);
-        verify_reserves(pool, (expected_total_reserves_1 as u64), (expected_total_reserves_2 as u64));
+        let expected_total_reserves_1 = (200000 - amount_out_1 - fees_1 + 10000) as u128;
+        let expected_total_reserves_2 = (300000 - amount_out_2 - fees_2 + 10000) as u128;
+        verify_reserves(pool, expected_total_reserves_1 as u64, expected_total_reserves_2 as u64);
 
         // Remove half of the liquidity. Should receive the proportional amounts of tokens back.
-        let lp_tokens_to_withdraw = ((primary_fungible_store::balance(signer::address_of(lp_1), pool) / 2) as u128);
+        let lp_tokens_to_withdraw = (primary_fungible_store::balance(signer::address_of(lp_1), pool) / 2) as u128;
         let total_lp_supply = liquidity_pool::lp_token_supply(pool);
         let expected_liq_1 = expected_total_reserves_1 * lp_tokens_to_withdraw / total_lp_supply;
         let expected_liq_2 = expected_total_reserves_2 * lp_tokens_to_withdraw / total_lp_supply;
@@ -37,7 +37,7 @@ module swap::liquidity_pool_tests {
             fungible_asset::asset_metadata(&tokens_1),
             fungible_asset::asset_metadata(&tokens_2),
             is_stable,
-            (lp_tokens_to_withdraw as u64),
+            lp_tokens_to_withdraw as u64,
         );
         assert!(fungible_asset::amount(&liq_1) == (expected_liq_1 as u64), 0);
         assert!(fungible_asset::amount(&liq_2) == (expected_liq_2 as u64), 0);
@@ -113,13 +113,13 @@ module swap::liquidity_pool_tests {
     ): (u64, u64) {
         let (reserves_1, reserves_2) = liquidity_pool::pool_reserves(pool);
         let pool_assets = liquidity_pool::supported_inner_assets(pool);
-        if (fungible_asset::asset_metadata(tokens) != *vector::borrow(&pool_assets, 0)) {
+        if (fungible_asset::asset_metadata(tokens) != pool_assets[0]) {
             (reserves_1, reserves_2) = (reserves_2, reserves_1);
         };
         let out = liquidity_pool::swap(pool, fungible_asset::extract(tokens, amount_in));
 
         let fees_amount = liquidity_pool::swap_fee_bps(pool) * amount_in / 10000;
-        amount_in = amount_in - fees_amount;
+        amount_in -= fees_amount;
         let actual_amount = fungible_asset::amount(&out);
         if (!liquidity_pool::is_stable(pool)) {
             assert!(actual_amount == amount_in * reserves_2 / (reserves_1 + amount_in), 0);

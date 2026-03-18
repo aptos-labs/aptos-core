@@ -78,11 +78,11 @@ module token_lockup::token_lockup {
       from: &signer,
       token: Object<Token>,
       to: address,
-   ) acquires LockupConfig {
+   ) {
       // redundant error checking for clear error message
       assert!(object::is_owner(token, signer::address_of(from)), error::permission_denied(ENOT_TOKEN_OWNER));
       let now = timestamp::now_seconds();
-      let lockup_config = borrow_global_mut<LockupConfig>(object::object_address(&token));
+      let lockup_config = &mut LockupConfig[object::object_address(&token)];
 
       let time_since_transfer = now - lockup_config.last_transfer;
       let lockup_period_secs = LOCKUP_PERIOD_SECS;
@@ -99,7 +99,7 @@ module token_lockup::token_lockup {
    #[view]
    public fun view_last_transfer(
       token: Object<Token>,
-   ): u64 acquires LockupConfig {
-      borrow_global<LockupConfig>(object::object_address(&token)).last_transfer
+   ): u64 {
+      LockupConfig[object::object_address(&token)].last_transfer
    }
 }
