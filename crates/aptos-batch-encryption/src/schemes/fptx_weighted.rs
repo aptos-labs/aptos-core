@@ -221,7 +221,6 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type Id = Id;
     type MasterSecretKeyShare = WeightedBIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
-    type Round = u64;
     type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::weighted_config::WeightedConfigArkworks<Fr>;
     type VerificationKey = WeightedBIBEVerificationKey;
@@ -327,7 +326,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     fn digest(
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
-        round: Self::Round,
+        round: u64,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         FPTX::digest(digest_key, cts, round)
     }

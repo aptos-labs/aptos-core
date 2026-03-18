@@ -38,7 +38,6 @@ impl BatchThresholdEncryption for FPTX {
     type Id = Id;
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
-    type Round = u64;
     // This is essentially a placeholder, since there is no PVSS scheme right now that works
     // with the unweighted `SmairThresholdConfig`
     type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
@@ -104,7 +103,7 @@ impl BatchThresholdEncryption for FPTX {
     fn digest(
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
-        round: Self::Round,
+        round: u64,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: IdSet<UncomputedCoeffs> =
             IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>());

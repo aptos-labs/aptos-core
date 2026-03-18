@@ -2,67 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEDecryptionKeyShare},
-    shared::digest::DigestKey,
-    traits::BatchThresholdEncryption,
+    schemes::fptx_weighted::FPTXWeighted, shared::digest::DigestKey, tests::smoke::run_smoke, traits::BatchThresholdEncryption
 };
-use anyhow::Result;
 use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
 use aptos_dkg::pvss::traits::transcript::Aggregatable;
 use ark_ec::AffineRepr as _;
-use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
+use ark_std::rand::{thread_rng, Rng as _};
 
-fn weighted_smoke_with_setup<R: RngCore + CryptoRng>(
-    rng: &mut R,
-    tc: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
-    ek: <FPTXWeighted as BatchThresholdEncryption>::EncryptionKey,
-    dk: <FPTXWeighted as BatchThresholdEncryption>::DigestKey,
-    vks: Vec<<FPTXWeighted as BatchThresholdEncryption>::VerificationKey>,
-    msk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::MasterSecretKeyShare>,
-) {
-    let plaintext: String = String::from("hi");
-    let associated_data: String = String::from("hi");
-
-    let ct = FPTXWeighted::encrypt(&ek, rng, &plaintext, &associated_data).unwrap();
-    FPTXWeighted::verify_ct(&ct, &associated_data).unwrap();
-
-    let (d, pfs_promise) = FPTXWeighted::digest(&dk, std::slice::from_ref(&ct), 0).unwrap();
-    let pfs = FPTXWeighted::eval_proofs_compute_all(&pfs_promise, &dk);
-
-    let dk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
-        .into_iter()
-        .map(|msk_share| msk_share.derive_decryption_key_share(&d).unwrap())
-        .collect();
-
-    dk_shares
-        .iter()
-        .zip(&vks)
-        .map(|(dk_share, vk)| FPTXWeighted::verify_decryption_key_share(vk, &d, dk_share))
-        .collect::<Result<Vec<()>>>()
-        .unwrap();
-
-    let dk = FPTXWeighted::reconstruct_decryption_key(
-        &dk_shares
-            .choose_multiple(rng, tc.get_total_num_players()) // will be truncated
-            .cloned()
-            .collect::<Vec<WeightedBIBEDecryptionKeyShare>>(),
-        &tc,
-    )
-    .unwrap();
-
-    ek.verify_decryption_key(&d, &dk).unwrap();
-
-    let decrypted_plaintext: String =
-        FPTXWeighted::decrypt(&dk, &ct.prepare(&d, &pfs).unwrap()).unwrap();
-
-    assert_eq!(decrypted_plaintext, plaintext);
-
-    // Test individual decryption
-    let eval_proof = FPTXWeighted::eval_proof_for_ct(&pfs, &ct).unwrap();
-    let individual_decrypted_plaintext: String =
-        FPTXWeighted::decrypt_slow(&dk, &ct, &d, &eval_proof).unwrap();
-    assert_eq!(individual_decrypted_plaintext, plaintext);
-}
 
 #[test]
 fn weighted_smoke_with_setup_for_testing() {
@@ -72,11 +18,10 @@ fn weighted_smoke_with_setup_for_testing() {
     let (ek, dk, vks, msk_shares) =
         FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
-    weighted_smoke_with_setup(&mut rng, tc, ek, dk, vks, msk_shares);
+    run_smoke::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
 }
 
 type T = aptos_dkg::pvss::chunky::SignedWeightedTranscript<crate::group::Pairing>;
-// type C = WeightedConfigArkworks<Fr>;
 use crate::group::G2Affine;
 use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
@@ -160,5 +105,5 @@ fn weighted_smoke_with_pvss() {
         })
         .collect();
 
-    weighted_smoke_with_setup(&mut rng, tc, ek, dk, vks, msk_shares);
+    run_smoke::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
 }
