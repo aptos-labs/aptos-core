@@ -40,7 +40,7 @@ module aptos_experimental::confidential_asset {
     use aptos_experimental::sigma_protocol_utils::{points_clone, decompress_points};
 
 
-    // === Errors (2 out of 15) ===
+    // === Errors (1 out of 13) ===
 
     /// The range proof system does not support sufficient range.
     const E_RANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE: u64 = 1;
@@ -99,7 +99,7 @@ module aptos_experimental::confidential_asset {
     /// #[test_only] The confidential asset module initialization failed.
     const E_INIT_MODULE_FAILED_FOR_DEVNET: u64 = 1000;
 
-    // === Constants (3 out of 14) ===
+    // === Constants (2 out of 13) ===
 
     /// The maximum number of transactions can be aggregated on the pending balance before rollover is required.
     /// i.e., `ConfidentialStore::transfers_received` will never exceed this value.
@@ -111,7 +111,7 @@ module aptos_experimental::confidential_asset {
     /// The testnet chain ID.
     const TESTNET_CHAIN_ID: u8 = 2;
 
-    // === Structs (4 out of 14) ===
+    // === Structs (3 out of 13) ===
 
     /// Bundles an auditor's encryption key with its epoch counter (both always modified together).
     enum AuditorConfig has store, drop, copy {
@@ -170,7 +170,7 @@ module aptos_experimental::confidential_asset {
         }
     }
 
-    // === Events (5 out of 14) ===
+    // === Events (4 out of 13) ===
 
     #[event]
     enum Deposited has drop, store {
@@ -208,7 +208,7 @@ module aptos_experimental::confidential_asset {
         }
     }
 
-    // === Module initialization (6 out of 14) ===
+    // === Module initialization (5 out of 13) ===
 
     /// Called once when this module is first published on-chain.
     fun init_module(deployer: &signer) {
@@ -252,12 +252,14 @@ module aptos_experimental::confidential_asset {
         init_module(deployer)
     }
 
-    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
-    //                                                    //
-    // *** SECURITY-SENSITIVE functions (7 out of 14) *** //
-    //         (bugs here could lead to stolen funds)     //
-    //                                                    //
-    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+    // === Entry functions (6 out of 13) ===
+
+    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+    //                                      //
+    // *** SECURITY-SENSITIVE functions *** //
+    // (bugs here can lead to stolen funds) //
+    //                                      //
+    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
 
     /// Deserializes cryptographic data and forwards to `register`.
     public entry fun register_raw(
@@ -643,7 +645,7 @@ module aptos_experimental::confidential_asset {
     //                                             //
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ //
 
-    // === Public, non-security-sensitive functions (8 out of 14) ===
+    // === Public, non-security-sensitive functions (7 out of 13) ===
     //
     // Note: These functions can be useful for external contracts that want to integrate with the Confidential Asset
     // protocol.
@@ -657,10 +659,12 @@ module aptos_experimental::confidential_asset {
         borrow_confidential_store_mut(signer::address_of(owner), asset_type).pause_incoming = paused;
     }
 
-    // ==================================================================== //
-    //     SECURITY-SENSITIVE public governance functions (9 out of 14)     //
-    //               (bugs here could lead to loss of privacy)              //
-    // ==================================================================== //
+    // === Public, governance functions (8 out of 13) ===
+
+    // ======================================================= //
+    //     SECURITY-SENSITIVE public governance functions      //
+    //       (bugs here could lead to loss of privacy)         //
+    // ======================================================= //
 
     /// Enables or disables the allow list for confidential transfers.
     public fun set_allow_listing(aptos_framework: &signer, enabled: bool) acquires GlobalConfig {
@@ -738,7 +742,7 @@ module aptos_experimental::confidential_asset {
     //     End of SECURITY-SENSITIVE public governance functions      //
     // ============================================================== //
 
-    // === Public view functions (10 out of 14) ===
+    // === Public view functions (9 out of 13) ===
 
     #[view]
     public fun has_confidential_store(
@@ -884,7 +888,7 @@ module aptos_experimental::confidential_asset {
         MAX_TRANSFERS_BEFORE_ROLLOVER
     }
 
-    // === Private, internal functions (11 out of 14) ===
+    // === Private, internal functions (10 out of 13) ===
 
     fun get_asset_config_address(asset_type: Object<fungible_asset::Metadata>): address acquires GlobalConfig {
         let config_ext = &borrow_global<GlobalConfig>(@aptos_experimental).extend_ref;
@@ -973,7 +977,7 @@ module aptos_experimental::confidential_asset {
         )
     }
 
-    // === Test-only functions (12 out of 14) ===
+    // === Test-only functions (11 out of 13) ===
 
     #[test_only]
     public fun init_module_for_testing(deployer: &signer) {
@@ -1027,7 +1031,7 @@ module aptos_experimental::confidential_asset {
         })
     }
 
-    // === Proof enums and verification functions (13 out of 14) ===
+    // === Proof enums & verification functions (12 out of 13) ===
 
     /// Proof of knowledge of DK for registration: $\Sigma$-protocol proving $H = \mathsf{dk} \cdot \mathsf{ek}$.
     enum RegistrationProof has drop {
@@ -1174,13 +1178,13 @@ module aptos_experimental::confidential_asset {
         (compressed_new_ek, compressed_new_R)
     }
 
-    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ //
     //                                                                //
-    // *** End of SECURITY-SENSITIVE proof verification functions *** //
+    // ^^^ End of SECURITY-SENSITIVE proof verification functions ^^^ //
     //                                                                //
-    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ //
 
-    // === Test-only proof generation functions (14 out of 14) ===
+    // === Test-only proof generation functions (13 out of 13) ===
 
     #[test_only]
     public fun prove_registration(
