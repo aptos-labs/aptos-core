@@ -3,7 +3,6 @@ module aptos_experimental::market_tests_common {
     use std::option;
     use std::option::Option;
     use std::signer;
-    use std::vector;
     use aptos_framework::timestamp;
     use aptos_trading::order_book_types::{
         OrderId,
@@ -82,25 +81,25 @@ module aptos_experimental::market_tests_common {
                 if (is_bid) {
                     vector[price]
                 } else {
-                    vector::empty<u64>()
+                    vector<u64>[]
                 };
             let bid_sizes =
                 if (is_bid) {
                     vector[size]
                 } else {
-                    vector::empty<u64>()
+                    vector<u64>[]
                 };
             let ask_prices =
                 if (!is_bid) {
                     vector[price]
                 } else {
-                    vector::empty<u64>()
+                    vector<u64>[]
                 };
             let ask_sizes =
                 if (!is_bid) {
                     vector[size]
                 } else {
-                    vector::empty<u64>()
+                    vector<u64>[]
                 };
             let order_id_opt =
                 place_bulk_order(

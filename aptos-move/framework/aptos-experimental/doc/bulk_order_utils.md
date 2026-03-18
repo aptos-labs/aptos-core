@@ -177,7 +177,7 @@ This limit prevents gas DoS scenarios when cancelling bulk orders.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_request_with_sanitization">new_bulk_order_request_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_request_with_sanitization">new_bulk_order_request_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     sequence_number: u64,
     bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -264,7 +264,7 @@ A tuple containing:
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_with_sanitization">new_bulk_order_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_with_sanitization">new_bulk_order_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order_id: OrderId,
     unique_priority_idx: IncreasingIdx,
     order_req: BulkOrderRequest&lt;M&gt;,
@@ -294,7 +294,7 @@ A tuple containing:
                 );
             (cancelled_bid_prices, cancelled_bid_sizes)
         } <b>else</b> {
-            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;())
+            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;[])
         };
     <b>let</b> (cancelled_ask_prices, cancelled_ask_sizes) =
         <b>if</b> (ask_price_crossing_idx &gt; 0) {
@@ -308,7 +308,7 @@ A tuple containing:
                 );
             (cancelled_ask_prices, cancelled_ask_sizes)
         } <b>else</b> {
-            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u64&gt;())
+            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;[], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;[])
         };
     <b>let</b> bulk_order =
         <a href="_new_bulk_order">bulk_order_types::new_bulk_order</a>(
@@ -355,12 +355,10 @@ Validates that all sizes in the vector are greater than 0.
 
 
 <pre><code><b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_validate_not_zero_sizes">validate_not_zero_sizes</a>(sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): bool {
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; sizes.length()) {
+    for (i in 0..(sizes.length())) {
         <b>if</b> (sizes[i] == 0) {
             <b>return</b> <b>false</b>;
         };
-        i += 1;
     };
     <b>true</b>
 }
@@ -437,7 +435,7 @@ Validates that prices are in the correct order (descending for bids, ascending f
 
 
 <pre><code><b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_trim_start">trim_start</a>&lt;Element&gt;(v: &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_start: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Element&gt; {
-    <b>let</b> other = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    <b>let</b> other = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_move_range">vector::move_range</a>(v, 0, new_start, &<b>mut</b> other, 0);
     other
 }
@@ -514,7 +512,7 @@ the size; otherwise, it inserts the new price level at the front.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_reinsert_order_into_bulk_order">reinsert_order_into_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_reinsert_order_into_bulk_order">reinsert_order_into_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: &<b>mut</b> BulkOrder&lt;M&gt;, other: &OrderMatchDetails&lt;M&gt;
 ) {
     // Reinsert the order into the bulk order
@@ -581,7 +579,7 @@ A tuple containing the next active price and size as options.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_match_order_and_get_next_from_bulk_order">match_order_and_get_next_from_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_match_order_and_get_next_from_bulk_order">match_order_and_get_next_from_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: &<b>mut</b> BulkOrder&lt;M&gt;, is_bid: bool, matched_size: u64
 ): (Option&lt;u64&gt;, Option&lt;u64&gt;) {
     <b>let</b> (prices, sizes) =
@@ -640,13 +638,12 @@ The size that was cancelled at that price level, or 0 if the price wasn't found
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">cancel_at_price_level</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">cancel_at_price_level</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: &<b>mut</b> BulkOrder&lt;M&gt;, price: u64, is_bid: bool
 ): u64 {
     <b>let</b> (prices, sizes) =
         order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; prices.length()) {
+    for (i in 0..(prices.length())) {
         <b>if</b> (prices[i] == price) {
             // Found the price level, remove it
             <b>let</b> cancelled_size = sizes[i];
@@ -654,7 +651,6 @@ The size that was cancelled at that price level, or 0 if the price wasn't found
             sizes.remove(i);
             <b>return</b> cancelled_size
         };
-        i = i + 1;
     };
     0 // Price not found
 }

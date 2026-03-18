@@ -13,7 +13,6 @@
 module aptos_experimental::single_order_book {
     friend aptos_experimental::order_book;
 
-    use std::vector;
     use std::error;
     use std::option::{Self, Option};
     use std::string::String;
@@ -90,7 +89,7 @@ module aptos_experimental::single_order_book {
         }
     }
 
-    public(friend) fun new_single_order_book<M: store + copy + drop>(): SingleOrderBook<M> {
+    friend fun new_single_order_book<M: store + copy + drop>(): SingleOrderBook<M> {
         SingleOrderBook::V1 {
             orders: order_book_utils::new_default_big_ordered_map(),
             client_order_ids: order_book_utils::new_default_big_ordered_map(),
@@ -103,7 +102,7 @@ module aptos_experimental::single_order_book {
     /// If order doesn't exist, it aborts with EORDER_NOT_FOUND.
     ///
     /// `order_creator` is passed to only verify order cancellation is authorized correctly
-    public(friend) fun cancel_order<M: store + copy + drop>(
+    friend fun cancel_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_creator: address,
@@ -146,7 +145,7 @@ module aptos_experimental::single_order_book {
         return order
     }
 
-    public(friend) fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
+    friend fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_creator: address,
@@ -163,7 +162,7 @@ module aptos_experimental::single_order_book {
         )
     }
 
-    public(friend) fun try_cancel_order<M: store + copy + drop>(
+    friend fun try_cancel_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_creator: address,
@@ -183,7 +182,7 @@ module aptos_experimental::single_order_book {
         option::some(self.cancel_order(price_time_idx, order_creator, order_id))
     }
 
-    public(friend) fun client_order_id_exists<M: store + copy + drop>(
+    friend fun client_order_id_exists<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_creator: address, client_order_id: String
     ): bool {
         let account_client_order_id =
@@ -193,7 +192,7 @@ module aptos_experimental::single_order_book {
 
     /// Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
     /// else it is added to the active order book. The API aborts if it's not a maker order or if the order already exists
-    public(friend) fun place_maker_or_pending_order<M: store + copy + drop>(
+    friend fun place_maker_or_pending_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_req: SingleOrderRequest<M>
@@ -242,7 +241,7 @@ module aptos_experimental::single_order_book {
     /// Reinserts a maker order to the order book. This is used when the order is removed from the order book
     /// but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
     /// it is added to the order book, if it exists, its size is updated.
-    public(friend) fun reinsert_order<M: store + copy + drop>(
+    friend fun reinsert_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         reinsert_order: OrderMatchDetails<M>,
@@ -310,7 +309,7 @@ module aptos_experimental::single_order_book {
 
     /// Returns a single match for a taker order. It is responsibility of the caller to first call the `is_taker_order`
     /// API to ensure that the order is a taker order before calling this API, otherwise it will abort.
-    public(friend) fun get_single_match_for_taker<M: store + copy + drop>(
+    friend fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, active_matched_order: ActiveMatchedOrder
     ): OrderMatch<M> {
         let (order_id, matched_size, remaining_size, order_book_type) =
@@ -385,7 +384,7 @@ module aptos_experimental::single_order_book {
     /// cancellation of the order. Please use the `cancel_order` API to cancel the order.
     ///
     /// `order_creator` is passed to only verify order cancellation is authorized correctly
-    public(friend) fun decrease_order_size<M: store + copy + drop>(
+    friend fun decrease_order_size<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_creator: address,
@@ -425,7 +424,7 @@ module aptos_experimental::single_order_book {
         };
     }
 
-    public(friend) fun get_order_id_by_client_id<M: store + copy + drop>(
+    friend fun get_order_id_by_client_id<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_creator: address, client_order_id: String
     ): Option<OrderId> {
         let account_client_order_id =
@@ -433,13 +432,13 @@ module aptos_experimental::single_order_book {
         self.client_order_ids.get(&account_client_order_id)
     }
 
-    public(friend) fun get_order_metadata<M: store + copy + drop>(
+    friend fun get_order_metadata<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderId
     ): Option<M> {
         self.orders.get_and_map(&order_id, |order| order.get_metadata_from_state())
     }
 
-    public(friend) fun set_order_metadata<M: store + copy + drop>(
+    friend fun set_order_metadata<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, order_id: OrderId, metadata: M
     ) {
         let present =
@@ -452,7 +451,7 @@ module aptos_experimental::single_order_book {
         assert!(present, EORDER_NOT_FOUND);
     }
 
-    public(friend) fun is_active_order<M: store + copy + drop>(
+    friend fun is_active_order<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderId
     ): bool {
         self.orders.get_and_map(&order_id, |order| order.is_active_order()).destroy_with_default(
@@ -460,13 +459,13 @@ module aptos_experimental::single_order_book {
         )
     }
 
-    public(friend) fun get_order<M: store + copy + drop>(
+    friend fun get_order<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderId
     ): Option<OrderWithState<M>> {
         self.orders.get(&order_id)
     }
 
-    public(friend) fun get_remaining_size<M: store + copy + drop>(
+    friend fun get_remaining_size<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderId
     ): u64 {
         self.orders.get_and_map(
@@ -475,7 +474,7 @@ module aptos_experimental::single_order_book {
     }
 
     /// Removes and returns the orders that are ready to be executed based on the current price.
-    public(friend) fun take_ready_price_based_orders<M: store + copy + drop>(
+    friend fun take_ready_price_based_orders<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, current_price: u64, order_limit: u64
     ): vector<SingleOrder<M>> {
         let self_orders = &mut self.orders;
@@ -484,7 +483,7 @@ module aptos_experimental::single_order_book {
             self.pending_orders.take_ready_price_based_orders(
                 current_price, order_limit
             );
-        let orders = vector::empty();
+        let orders = vector[];
 
         order_ids.for_each(
             |order_id| {
@@ -506,13 +505,13 @@ module aptos_experimental::single_order_book {
     }
 
     /// Removes and returns the orders that are ready to be executed based on the time condition.
-    public(friend) fun take_ready_time_based_orders<M: store + copy + drop>(
+    friend fun take_ready_time_based_orders<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, order_limit: u64
     ): vector<SingleOrder<M>> {
         let self_orders = &mut self.orders;
         let self_client_order_ids = &mut self.client_order_ids;
         let order_ids = self.pending_orders.take_ready_time_based_orders(order_limit);
-        let orders = vector::empty();
+        let orders = vector[];
 
         order_ids.for_each(
             |order_id| {
@@ -536,7 +535,7 @@ module aptos_experimental::single_order_book {
     // ============================= test_only APIs ====================================
 
     #[test_only]
-    public(friend) fun destroy_single_order_book<M: store + copy + drop>(
+    friend fun destroy_single_order_book<M: store + copy + drop>(
         self: SingleOrderBook<M>
     ) {
         let SingleOrderBook::V1 { orders, client_order_ids, pending_orders } = self;
@@ -546,7 +545,7 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    public(friend) fun get_unique_priority_idx<M: store + copy + drop>(
+    friend fun get_unique_priority_idx<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderId
     ): Option<IncreasingIdx> {
         self.orders.get_and_map(
@@ -555,7 +554,7 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    public(friend) fun is_taker_order(
+    friend fun is_taker_order(
         price_time_idx: &PriceTimeIndex,
         price: u64,
         is_bid: bool,
@@ -568,12 +567,12 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    public(friend) fun place_order_and_get_matches<M: store + copy + drop>(
+    friend fun place_order_and_get_matches<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_req: SingleOrderRequest<M>
     ): vector<OrderMatch<M>> {
-        let match_results = vector::empty();
+        let match_results = vector[];
         let remaining_size = order_req.get_remaining_size();
         while (remaining_size > 0) {
             if (!is_taker_order(
@@ -599,7 +598,7 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    public(friend) fun update_order_and_get_matches<M: store + copy + drop>(
+    friend fun update_order_and_get_matches<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_req: SingleOrderRequest<M>
@@ -613,35 +612,31 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    public(friend) fun trigger_pending_orders<M: store + copy + drop>(
+    friend fun trigger_pending_orders<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         oracle_price: u64
     ): vector<OrderMatch<M>> {
         let ready_orders = self.take_ready_price_based_orders(oracle_price, 1000);
-        let all_matches = vector::empty();
-        let i = 0;
-        while (i < ready_orders.length()) {
+        let all_matches = vector[];
+        for (i in 0..(ready_orders.length())) {
             let order = ready_orders[i];
             let (order_request, _unique_priority_idx) = order.destroy_single_order();
             *order_request.get_trigger_condition_mut() = option::none();
             let match_results =
                 self.place_order_and_get_matches(price_time_idx, order_request);
             all_matches.append(match_results);
-            i += 1;
         };
         all_matches
     }
 
     #[test_only]
-    public(friend) fun total_matched_size<M: store + copy + drop>(
+    friend fun total_matched_size<M: store + copy + drop>(
         match_results: &vector<OrderMatch<M>>
     ): u64 {
         let total_matched_size = 0;
-        let i = 0;
-        while (i < match_results.length()) {
+        for (i in 0..(match_results.length())) {
             total_matched_size += match_results[i].get_matched_size();
-            i += 1;
         };
         total_matched_size
     }

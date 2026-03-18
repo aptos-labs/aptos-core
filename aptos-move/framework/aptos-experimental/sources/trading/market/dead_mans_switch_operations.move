@@ -41,8 +41,7 @@ module aptos_experimental::dead_mans_switch_operations {
         assert!(order_ids.length() <= MAX_ORDERS_CLEANED_PER_CALL, E_TOO_MANY_ORDERS);
 
         // Loop through each order ID
-        let i = 0;
-        while (i < order_ids.length()) {
+        for (i in 0..(order_ids.length())) {
             let order_id = order_ids[i];
 
             // Get the order from the order book
@@ -84,7 +83,6 @@ module aptos_experimental::dead_mans_switch_operations {
                     );
                 }
             };
-            i += 1;
         };
     }
 

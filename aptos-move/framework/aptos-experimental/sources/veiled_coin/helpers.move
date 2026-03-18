@@ -1,5 +1,4 @@
 module aptos_experimental::helpers {
-    use std::vector;
     use std::error;
 
     use aptos_std::ristretto255_elgamal as elgamal;
@@ -12,7 +11,7 @@ module aptos_experimental::helpers {
     /// exists because we did not like the interface of `std::vector::trim`.)
     public fun cut_vector<T>(vec: &mut vector<T>, cut_len: u64): vector<T> {
         let len = vec.length();
-        let res = vector::empty();
+        let res = vector[];
         assert!(len >= cut_len, error::out_of_range(EVECTOR_CUT_TOO_LARGE));
         while (cut_len > 0) {
             res.push_back(vec.pop_back());

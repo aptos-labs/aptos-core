@@ -21,8 +21,6 @@ module aptos_experimental::pre_cancellation_tracker {
     #[test_only]
     use std::signer;
     #[test_only]
-    use std::vector;
-    #[test_only]
     use aptos_framework::timestamp;
 
     const DUPLICATE_ORDER_PLACEMENT: u64 = 1;
@@ -44,7 +42,7 @@ module aptos_experimental::pre_cancellation_tracker {
         account_order_id: AccountClientOrderId
     }
 
-    public(friend) fun new_pre_cancellation_tracker(
+    friend fun new_pre_cancellation_tracker(
         expiration_time_secs: u64
     ): PreCancellationTracker {
         PreCancellationTracker::V1 {
@@ -54,7 +52,7 @@ module aptos_experimental::pre_cancellation_tracker {
         }
     }
 
-    public(friend) fun pre_cancel_order_for_tracker(
+    friend fun pre_cancel_order_for_tracker(
         tracker: &mut PreCancellationTracker, account: address, client_order_id: String
     ) {
         garbage_collect(tracker);
@@ -85,7 +83,7 @@ module aptos_experimental::pre_cancellation_tracker {
         tracker.expiration_with_order_ids.add(order_id_with_expiration, true);
     }
 
-    public(friend) fun is_pre_cancelled(
+    friend fun is_pre_cancelled(
         tracker: &mut PreCancellationTracker, account: address, client_order_id: String
     ): bool {
         garbage_collect(tracker);
@@ -110,7 +108,7 @@ module aptos_experimental::pre_cancellation_tracker {
         return false
     }
 
-    public(friend) fun garbage_collect(
+    friend fun garbage_collect(
         tracker: &mut PreCancellationTracker
     ) {
         let i = 0;
@@ -211,17 +209,15 @@ module aptos_experimental::pre_cancellation_tracker {
         let tracker = new_pre_cancellation_tracker(expiration_window);
         let addr = signer::address_of(account);
 
-        let ids = vector::empty<String>();
+        let ids = vector<String>[];
         ids.push_back(std::string::utf8(b"1"));
         ids.push_back(std::string::utf8(b"2"));
         ids.push_back(std::string::utf8(b"3"));
 
         // Pre-cancel multiple orders
-        let i = 0;
-        while (i < ids.length()) {
+        for (i in 0..(ids.length())) {
             let id = ids[i];
             pre_cancel_order_for_tracker(&mut tracker, signer::address_of(account), id);
-            i += 1;
         };
 
         // Wait to let them expire
@@ -245,8 +241,7 @@ module aptos_experimental::pre_cancellation_tracker {
         garbage_collect(&mut tracker);
 
         // All should now be considered not pre-cancelled
-        let j = 0;
-        while (j < ids.length()) {
+        for (j in 0..(ids.length())) {
             let id = ids[j];
             assert!(
                 !tracker.account_order_ids.contains(
@@ -255,7 +250,6 @@ module aptos_experimental::pre_cancellation_tracker {
             );
             let is_cancelled = is_pre_cancelled(&mut tracker, addr, id);
             assert!(!is_cancelled, 200 + j);
-            j += 1;
         };
         assert!(tracker.expiration_with_order_ids.is_empty());
         assert!(tracker.account_order_ids.is_empty());

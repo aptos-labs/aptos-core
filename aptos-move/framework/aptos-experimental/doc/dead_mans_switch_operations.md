@@ -107,8 +107,7 @@ Aborts:
     <b>assert</b>!(order_ids.length() &lt;= <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MAX_ORDERS_CLEANED_PER_CALL">MAX_ORDERS_CLEANED_PER_CALL</a>, <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_TOO_MANY_ORDERS">E_TOO_MANY_ORDERS</a>);
 
     // Loop through each order ID
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; order_ids.length()) {
+    for (i in 0..(order_ids.length())) {
         <b>let</b> order_id = order_ids[i];
 
         // Get the order from the order book
@@ -150,7 +149,6 @@ Aborts:
                 );
             }
         };
-        i += 1;
     };
 }
 </code></pre>

@@ -1,6 +1,5 @@
 #[test_only]
 module aptos_experimental::bulk_order_book_tests {
-    use std::vector;
     use aptos_framework::timestamp;
     use aptos_framework::account;
     use aptos_trading::order_match_types::OrderMatch;
@@ -102,7 +101,7 @@ module aptos_experimental::bulk_order_book_tests {
         taker_size: u64,
         is_bid: bool
     ): vector<OrderMatch<TestMetadata>> {
-        let match_results = vector::empty();
+        let match_results = vector[];
         // If the order is not a taker order, we return an empty match result
         let remaining_size = taker_size;
         while (remaining_size > 0) {
@@ -188,11 +187,9 @@ module aptos_experimental::bulk_order_book_tests {
         matches: vector<OrderMatch<TestMetadata>>, expected_total_size: u64
     ) {
         let total_matched = 0u64;
-        let i = 0;
-        while (i < matches.length()) {
+        for (i in 0..(matches.length())) {
             let (_, matched_size) = matches[i].destroy_order_match();
             total_matched += matched_size;
-            i += 1;
         };
         assert!(total_matched == expected_total_size);
     }
@@ -334,8 +331,7 @@ module aptos_experimental::bulk_order_book_tests {
         matches: vector<OrderMatch<TestMetadata>>, expected_sequence: vector<ExpectedMatch>
     ) {
         assert!(matches.length() == expected_sequence.length());
-        let i = 0;
-        while (i < matches.length()) {
+        for (i in 0..(matches.length())) {
             let expected = expected_sequence[i];
             verify_match_basic(
                 matches[i],
@@ -344,7 +340,6 @@ module aptos_experimental::bulk_order_book_tests {
                 expected.matched_size,
                 expected.is_bid
             );
-            i += 1;
         };
     }
 
@@ -354,8 +349,7 @@ module aptos_experimental::bulk_order_book_tests {
         price_time_index: &mut price_time_index::PriceTimeIndex,
         accounts_and_orders: vector<OrderData>
     ) {
-        let i = 0;
-        while (i < accounts_and_orders.length()) {
+        for (i in 0..(accounts_and_orders.length())) {
             let order_data = accounts_and_orders[i];
             place_simple_order(
                 order_book,
@@ -366,7 +360,6 @@ module aptos_experimental::bulk_order_book_tests {
                 order_data.ask_price,
                 order_data.ask_size
             );
-            i += 1;
         };
     }
 
@@ -944,8 +937,8 @@ module aptos_experimental::bulk_order_book_tests {
         // Test placing an order with empty bid vectors
         let (order_book, price_time_index) = setup_test();
 
-        let bid_prices = vector::empty<u64>(); // Empty bid prices
-        let bid_sizes = vector::empty<u64>(); // Empty bid sizes
+        let bid_prices = vector<u64>[]; // Empty bid prices
+        let bid_sizes = vector<u64>[]; // Empty bid sizes
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 

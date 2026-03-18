@@ -158,7 +158,7 @@ module aptos_experimental::market_bulk_order {
         );
     }
 
-    public(friend) fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(
+    friend fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: address,
         cancellation_reason: market_types::OrderCancellationReason,
@@ -176,8 +176,7 @@ module aptos_experimental::market_bulk_order {
             ask_sizes,
             _metadata
         ) = order_request.destroy_bulk_order_request();
-        let i = 0;
-        while (i < bid_sizes.length()) {
+        for (i in 0..(bid_sizes.length())) {
             callbacks.cleanup_bulk_order_at_price(
                 user,
                 order_id,
@@ -185,10 +184,8 @@ module aptos_experimental::market_bulk_order {
                 bid_prices[i],
                 bid_sizes[i]
             );
-            i += 1;
         };
-        let j = 0;
-        while (j < ask_sizes.length()) {
+        for (j in 0..(ask_sizes.length())) {
             callbacks.cleanup_bulk_order_at_price(
                 user,
                 order_id,
@@ -196,7 +193,6 @@ module aptos_experimental::market_bulk_order {
                 ask_prices[j],
                 ask_sizes[j]
             );
-            j += 1;
         };
         market.emit_event_for_bulk_order_cancelled(
             order_id,

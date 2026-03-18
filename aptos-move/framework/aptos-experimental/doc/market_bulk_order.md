@@ -248,7 +248,7 @@ Parameters:
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     market: &<b>mut</b> Market&lt;M&gt;,
     user: <b>address</b>,
     cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>,
@@ -266,8 +266,7 @@ Parameters:
         ask_sizes,
         _metadata
     ) = order_request.destroy_bulk_order_request();
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; bid_sizes.length()) {
+    for (i in 0..(bid_sizes.length())) {
         callbacks.cleanup_bulk_order_at_price(
             user,
             order_id,
@@ -275,10 +274,8 @@ Parameters:
             bid_prices[i],
             bid_sizes[i]
         );
-        i += 1;
     };
-    <b>let</b> j = 0;
-    <b>while</b> (j &lt; ask_sizes.length()) {
+    for (j in 0..(ask_sizes.length())) {
         callbacks.cleanup_bulk_order_at_price(
             user,
             order_id,
@@ -286,7 +283,6 @@ Parameters:
             ask_prices[j],
             ask_sizes[j]
         );
-        j += 1;
     };
     market.emit_event_for_bulk_order_cancelled(
         order_id,

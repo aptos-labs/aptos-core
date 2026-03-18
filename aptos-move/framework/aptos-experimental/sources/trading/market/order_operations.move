@@ -204,7 +204,7 @@ module aptos_experimental::order_operations {
     // - cancellation_reason: The reason for cancellation
     // - cancel_reason: String description of the cancellation
     // - callbacks: The market clearinghouse callbacks for cleanup operations
-    public(friend) fun cancel_single_order_helper<M: store + copy + drop, R: store + copy + drop>(
+    friend fun cancel_single_order_helper<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         order: SingleOrder<M>,
         emit_event: bool,

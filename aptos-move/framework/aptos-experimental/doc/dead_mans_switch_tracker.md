@@ -421,7 +421,7 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker">new_dead_mans_switch_tracker</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_new_dead_mans_switch_tracker">new_dead_mans_switch_tracker</a>(
     min_keep_alive_time_secs: u64
 ): <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
     <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a> {
@@ -450,7 +450,7 @@ let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">set_min_keep_alive_time_secs</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_set_min_keep_alive_time_secs">set_min_keep_alive_time_secs</a>(
     tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
     parent: <b>address</b>,
     market: <b>address</b>,
@@ -685,7 +685,7 @@ update_keep_alive_state(&mut tracker, trader_addr, 0);
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">keep_alive</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">keep_alive</a>(
     tracker: &<b>mut</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_DeadMansSwitchTracker">DeadMansSwitchTracker</a>,
     parent: <b>address</b>,
     market: <b>address</b>,

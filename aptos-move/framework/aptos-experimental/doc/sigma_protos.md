@@ -776,7 +776,7 @@ $\Sigma$-protocol.
     <b>let</b> c = pedersen::commitment_as_point(sender_new_balance_comm);
     <b>let</b> y = elgamal::pubkey_to_compressed_point(sender_pk);
 
-    <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
+    <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;[];
 
     bytes.append(<a href="sigma_protos.md#0x7_sigma_protos_FIAT_SHAMIR_SIGMA_DST">FIAT_SHAMIR_SIGMA_DST</a>);
     bytes.append(
@@ -855,7 +855,7 @@ Computes a Fiat-Shamir challenge <code>rho = H(G, H, Y, Y', C, D, c, c_1, c_2, \
     <b>let</b> (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
     <b>let</b> bar_c = pedersen::commitment_as_point(sender_new_balance_comm);
 
-    <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
+    <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;[];
 
     bytes.append(<a href="sigma_protos.md#0x7_sigma_protos_FIAT_SHAMIR_SIGMA_DST">FIAT_SHAMIR_SIGMA_DST</a>);
     bytes.append(

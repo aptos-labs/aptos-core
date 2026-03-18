@@ -456,8 +456,7 @@ module aptos_experimental::order_book_client_order_id {
         )];
 
         // Place all maker orders
-        let i = 0;
-        while (i < client_order_ids.length()) {
+        for (i in 0..(client_order_ids.length())) {
             let client_order_id = client_order_ids[i];
             let order_id = order_ids[i];
 
@@ -475,7 +474,6 @@ module aptos_experimental::order_book_client_order_id {
                     42 // metadata
                 );
             order_book.place_maker_order(order_req);
-            i += 1;
         };
 
         // Fully match the first order

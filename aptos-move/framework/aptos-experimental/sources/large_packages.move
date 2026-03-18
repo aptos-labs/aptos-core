@@ -67,7 +67,7 @@ module aptos_experimental::large_packages {
         metadata_chunk: vector<u8>,
         code_indices: vector<u16>,
         code_chunks: vector<vector<u8>>
-    ) acquires StagingArea {
+    ) {
         stage_code_chunk_internal(
             owner,
             metadata_chunk,
@@ -81,7 +81,7 @@ module aptos_experimental::large_packages {
         metadata_chunk: vector<u8>,
         code_indices: vector<u16>,
         code_chunks: vector<vector<u8>>
-    ) acquires StagingArea {
+    ) {
         let staging_area =
             stage_code_chunk_internal(
                 owner,
@@ -98,7 +98,7 @@ module aptos_experimental::large_packages {
         metadata_chunk: vector<u8>,
         code_indices: vector<u16>,
         code_chunks: vector<vector<u8>>
-    ) acquires StagingArea {
+    ) {
         let staging_area =
             stage_code_chunk_internal(
                 owner,
@@ -116,7 +116,7 @@ module aptos_experimental::large_packages {
         code_indices: vector<u16>,
         code_chunks: vector<vector<u8>>,
         code_object: Object<PackageRegistry>
-    ) acquires StagingArea {
+    ) {
         let staging_area =
             stage_code_chunk_internal(
                 owner,
@@ -152,16 +152,15 @@ module aptos_experimental::large_packages {
             );
         };
 
-        let staging_area = borrow_global_mut<StagingArea>(owner_address);
+        let staging_area = &mut StagingArea[owner_address];
 
         if (!metadata_chunk.is_empty()) {
             staging_area.metadata_serialized.append(metadata_chunk);
         };
 
-        let i = 0;
-        while (i < code_chunks.length()) {
+        for (i in 0..(code_chunks.length())) {
             let inner_code = code_chunks[i];
-            let idx = (code_indices[i] as u64);
+            let idx = code_indices[i] as u64;
 
             if (staging_area.code.contains(idx)) {
                 staging_area.code.borrow_mut(idx).append(inner_code);
@@ -171,7 +170,6 @@ module aptos_experimental::large_packages {
                     staging_area.last_module_idx = idx;
                 }
             };
-            i += 1;
         };
 
         staging_area
@@ -218,7 +216,7 @@ module aptos_experimental::large_packages {
         code
     }
 
-    public entry fun cleanup_staging_area(owner: &signer) acquires StagingArea {
+    public entry fun cleanup_staging_area(owner: &signer) {
         let StagingArea { metadata_serialized: _, code, last_module_idx: _ } =
             move_from<StagingArea>(signer::address_of(owner));
         code.destroy();

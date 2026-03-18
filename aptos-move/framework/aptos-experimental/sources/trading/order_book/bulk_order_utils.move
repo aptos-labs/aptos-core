@@ -35,7 +35,7 @@ module aptos_experimental::bulk_order_utils {
     /// - If bid_prices and bid_sizes have different lengths
     /// - If ask_prices and ask_sizes have different lengths
     /// - If bid_prices or ask_prices exceeds MAX_BULK_ORDER_DEPTH_PER_SIDE (30) levels
-    public(friend) fun new_bulk_order_request_with_sanitization<M: store + copy + drop>(
+    friend fun new_bulk_order_request_with_sanitization<M: store + copy + drop>(
         account: address,
         sequence_number: u64,
         bid_prices: vector<u64>,
@@ -94,7 +94,7 @@ module aptos_experimental::bulk_order_utils {
     /// - `vector<u64>`: Cancelled bid sizes corresponding to cancelled prices
     /// - `vector<u64>`: Cancelled ask prices (levels that crossed the spread)
     /// - `vector<u64>`: Cancelled ask sizes corresponding to cancelled prices
-    public(friend) fun new_bulk_order_with_sanitization<M: store + copy + drop>(
+    friend fun new_bulk_order_with_sanitization<M: store + copy + drop>(
         order_id: OrderId,
         unique_priority_idx: IncreasingIdx,
         order_req: BulkOrderRequest<M>,
@@ -124,7 +124,7 @@ module aptos_experimental::bulk_order_utils {
                     );
                 (cancelled_bid_prices, cancelled_bid_sizes)
             } else {
-                (vector::empty<u64>(), vector::empty<u64>())
+                (vector<u64>[], vector<u64>[])
             };
         let (cancelled_ask_prices, cancelled_ask_sizes) =
             if (ask_price_crossing_idx > 0) {
@@ -138,7 +138,7 @@ module aptos_experimental::bulk_order_utils {
                     );
                 (cancelled_ask_prices, cancelled_ask_sizes)
             } else {
-                (vector::empty<u64>(), vector::empty<u64>())
+                (vector<u64>[], vector<u64>[])
             };
         let bulk_order =
             bulk_order_types::new_bulk_order(
@@ -162,12 +162,10 @@ module aptos_experimental::bulk_order_utils {
     /// - `sizes`: Vector of sizes to validate
     ///
     fun validate_not_zero_sizes(sizes: &vector<u64>): bool {
-        let i = 0;
-        while (i < sizes.length()) {
+        for (i in 0..(sizes.length())) {
             if (sizes[i] == 0) {
                 return false;
             };
-            i += 1;
         };
         true
     }
@@ -201,7 +199,7 @@ module aptos_experimental::bulk_order_utils {
     }
 
     fun trim_start<Element>(v: &mut vector<Element>, new_start: u64): vector<Element> {
-        let other = vector::empty();
+        let other = vector[];
         vector::move_range(v, 0, new_start, &mut other, 0);
         other
     }
@@ -234,7 +232,7 @@ module aptos_experimental::bulk_order_utils {
     /// # Arguments:
     /// - `self`: Mutable reference to the bulk order
     /// - `other`: Reference to the order result to reinsert
-    public(friend) fun reinsert_order_into_bulk_order<M: store + copy + drop>(
+    friend fun reinsert_order_into_bulk_order<M: store + copy + drop>(
         order: &mut BulkOrder<M>, other: &OrderMatchDetails<M>
     ) {
         // Reinsert the order into the bulk order
@@ -269,7 +267,7 @@ module aptos_experimental::bulk_order_utils {
     ///
     /// # Aborts:
     /// - If the matched size exceeds the available size at the first level
-    public(friend) fun match_order_and_get_next_from_bulk_order<M: store + copy + drop>(
+    friend fun match_order_and_get_next_from_bulk_order<M: store + copy + drop>(
         order: &mut BulkOrder<M>, is_bid: bool, matched_size: u64
     ): (Option<u64>, Option<u64>) {
         let (prices, sizes) =
@@ -300,13 +298,12 @@ module aptos_experimental::bulk_order_utils {
     ///
     /// # Returns:
     /// The size that was cancelled at that price level, or 0 if the price wasn't found
-    public(friend) fun cancel_at_price_level<M: store + copy + drop>(
+    friend fun cancel_at_price_level<M: store + copy + drop>(
         order: &mut BulkOrder<M>, price: u64, is_bid: bool
     ): u64 {
         let (prices, sizes) =
             order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);
-        let i = 0;
-        while (i < prices.length()) {
+        for (i in 0..(prices.length())) {
             if (prices[i] == price) {
                 // Found the price level, remove it
                 let cancelled_size = sizes[i];
@@ -314,7 +311,6 @@ module aptos_experimental::bulk_order_utils {
                 sizes.remove(i);
                 return cancelled_size
             };
-            i = i + 1;
         };
         0 // Price not found
     }

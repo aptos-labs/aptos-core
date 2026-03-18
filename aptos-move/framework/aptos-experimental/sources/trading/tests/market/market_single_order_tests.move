@@ -321,10 +321,10 @@ module aptos_experimental::market_single_order_tests {
 
         // Place several maker order with small sizes.
         let i = 1;
-        let maker_order_ids = vector::empty<OrderId>();
-        let expected_fill_sizes = vector::empty<u64>();
-        let fill_prices = vector::empty<u64>();
-        let maker_orig_sizes = vector::empty<u64>();
+        let maker_order_ids = vector<OrderId>[];
+        let expected_fill_sizes = vector<u64>[];
+        let fill_prices = vector<u64>[];
+        let maker_orig_sizes = vector<u64>[];
         let maker_client_order_ids = vector::empty<Option<String>>();
         while (i < 6) {
             let maker_order_id =
