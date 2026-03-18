@@ -350,14 +350,14 @@ module aptos_experimental::confidential_asset {
         // Step 2: "Mint" corresponding confidential assets for the depositor, and add them to their pending balance.
         let ca_store = borrow_confidential_store_mut(addr, asset_type);
 
-        // Make sure the depositor has "room" in their pending balance for this deposit
-        assert!(
-            ca_store.transfers_received < MAX_TRANSFERS_BEFORE_ROLLOVER,
-            error::invalid_state(E_PENDING_BALANCE_MUST_BE_ROLLED_OVER)
-        );
-
         add_assign_pending(&mut ca_store.pending_balance, &new_pending_u64_no_randomness(amount));
         ca_store.transfers_received += 1;
+
+        // Make sure the depositor has "room" in their pending balance for this deposit
+        assert!(
+            ca_store.transfers_received <= MAX_TRANSFERS_BEFORE_ROLLOVER,
+            error::invalid_state(E_PENDING_BALANCE_MUST_BE_ROLLED_OVER)
+        );
 
         event::emit(Deposited::V1 { addr, amount, asset_type });
 
