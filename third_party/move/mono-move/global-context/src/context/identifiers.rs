@@ -31,7 +31,7 @@ impl<'guard> ArenaRef<'guard, str> {
         // SAFETY: The lifetime on this reference guarantees that the execution
         // guard is still alive, which guarantees that the arena allocation is
         // still valid and there were no deallocations.
-        unsafe { self.ptr.as_ref() }
+        unsafe { self.ptr.as_ref_unchecked() }
     }
 }
 

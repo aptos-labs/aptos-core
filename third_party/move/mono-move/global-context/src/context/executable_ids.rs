@@ -34,7 +34,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         // SAFETY: The lifetime on this reference guarantees that the execution
         // guard is still alive, which guarantees that the arena allocation is
         // still valid and there were no deallocations.
-        unsafe { &self.ptr.as_ref().address }
+        unsafe { &self.ptr.as_ref_unchecked().address }
     }
 
     /// Returns the name of this executable.
@@ -45,7 +45,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         // allocator APIs), the name allocation is  also valid for the same
         // lifetime.
         unsafe {
-            let id = self.ptr.as_ref();
+            let id = self.ptr.as_ref_unchecked();
             id.name.as_ref_unchecked()
         }
     }

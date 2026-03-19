@@ -21,6 +21,13 @@
 //!   there are no live pointers derived from the allocations that is about to
 //!   be reset and that it is called from single-threaded context (exclusive
 //!   access required).
+//!
+//! # Other pointer types
+//!
+//! - [`LeakedBoxPtr<T>`] — stable heap pointer from a leaked [`Box`]. Used
+//!   for executables in the cache whose address must remain fixed across
+//!   concurrent reads. Lifetime is managed manually: freed during the
+//!   maintenance phase via [`LeakedBoxPtr::free_unchecked`].
 
 use bumpalo::Bump;
 use crossbeam_utils::CachePadded;
@@ -245,5 +252,73 @@ impl<'pool> GlobalArenaShard<'pool> {
     /// Panics if reserving space for the slice fails.
     pub fn alloc_slice_copy<T: Copy>(&self, src: &[T]) -> GlobalArenaPtr<[T]> {
         GlobalArenaPtr(NonNull::from(self.guard.alloc_slice_copy(src)))
+    }
+}
+
+/// A stable pointer obtained by leaking a [`Box`].
+///
+/// Used for data that must remain at a fixed address (e.g., executables stored
+/// in the cache) but whose lifetime is managed manually. The pointer is valid
+/// until [`LeakedBoxPtr::free_unchecked`] is called.
+///
+/// # Safety model
+///
+/// The pointer is created by leaking a [`Box`], ensuring a stable heap address.
+/// Freeing is **unsafe** — the caller must guarantee that no other references to
+/// the data exist.
+#[repr(transparent)]
+pub struct LeakedBoxPtr<T>(NonNull<T>);
+
+impl<T> LeakedBoxPtr<T> {
+    /// Leaks the box and returns a stable pointer.
+    pub fn from_box(boxed: Box<T>) -> Self {
+        // SAFETY: Box::into_raw always returns a non-null pointer.
+        Self(unsafe { NonNull::new_unchecked(Box::into_raw(boxed)) })
+    }
+
+    /// Drops the pointee by reconstructing the [`Box`].
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that no other references to the data exist and
+    /// that this method is called at most once per pointer.
+    pub unsafe fn free_unchecked(self) {
+        // SAFETY: The caller guarantees exclusive access and single-free.
+        unsafe {
+            drop(Box::from_raw(self.0.as_ptr()));
+        }
+    }
+
+    /// Returns a shared reference to the pointee with an explicit lifetime.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the pointer has not been freed and that the
+    /// returned reference does not outlive the actual allocation.
+    pub unsafe fn as_ref_unchecked<'a>(&self) -> &'a T {
+        // SAFETY: The caller guarantees the pointer is still valid.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+// SAFETY:
+//
+// Leaked pointer acts as a shared reference when sent to other threads. The
+// allocation is guaranteed to be alive until explicitly freed during the
+// maintenance phase (single-threaded). T must be `Sync` because the pointer
+// exposes a shared reference to T.
+unsafe impl<T: Sync> Send for LeakedBoxPtr<T> {}
+
+// SAFETY:
+//
+// Leaked pointer only exposes immutable access to pointee type. Sharing it
+// gives concurrent read-only access, which is safe when pointee is `Sync`.
+unsafe impl<T: Sync> Sync for LeakedBoxPtr<T> {}
+
+impl<T> Copy for LeakedBoxPtr<T> {}
+
+impl<T> Clone for LeakedBoxPtr<T> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
