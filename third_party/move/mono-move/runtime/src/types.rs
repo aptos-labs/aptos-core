@@ -58,9 +58,9 @@ pub struct Function {
     pub code: Vec<MicroOp>,
     /// Size of the argument region at the start of the data segment.
     /// Arguments are placed by the caller before `CallFunc`; when
-    /// `zero_locals` is true, the runtime zeroes the local area
-    /// (`args_size..data_size`) at frame creation to ensure pointer
-    /// slots start as null.
+    /// `zero_frame` is true, the runtime zeroes everything beyond args
+    /// (`args_size..extended_frame_size`) at frame creation to ensure
+    /// pointer slots start as null.
     pub args_size: usize,
     /// Size of the data segment (arguments + locals). Frame metadata is stored
     /// immediately after this region at offset `data_size`.
@@ -70,27 +70,38 @@ pub struct Function {
     /// functions this equals `frame_size()`; for calling functions it
     /// additionally includes callee argument / return value slots.
     pub extended_frame_size: usize,
-    /// Whether the runtime must zero-initialize the local area
-    /// (`args_size..data_size`) when a new frame is created. This is
-    /// required when pointer slots exist in the local area so the GC
-    /// sees null instead of garbage. Functions with no pointer locals
+    /// Whether the runtime must zero-initialize the region beyond args
+    /// (`args_size..extended_frame_size`) when a new frame is created.
+    /// This is required when pointer slots exist so the GC sees null
+    /// instead of garbage. Functions with no pointer slots (beyond args)
     /// can set this to `false` to skip the memset.
-    pub zero_locals: bool,
+    pub zero_frame: bool,
     /// Frame byte-offsets that may hold heap pointers (GC roots).
     ///
-    /// The GC scans these slots in every live frame — no per-PC stack maps
-    /// are needed (see docs/gc_design.md). Invariants:
+    /// Offsets span `[0..extended_frame_size)` — they may reference the
+    /// data segment, AND the callee argument/return region beyond the
+    /// metadata. The GC scans these slots in every live frame — no
+    /// per-PC stack maps are needed (see docs/gc_design.md).
     ///
-    /// - **Zeroed at frame creation**: when `zero_locals` is true, the
-    ///   runtime zeroes the local area (offsets `args_size..data_size`)
-    ///   when a frame is created, so non-argument pointer slots start
-    ///   as null.
+    /// Invariants:
+    ///
+    /// - **Zeroed at frame creation**: when `zero_frame` is true, the
+    ///   runtime zeroes `args_size..extended_frame_size` when a frame
+    ///   is created, so all non-argument pointer slots (including the
+    ///   callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer slot may only be overwritten
     ///   with another valid heap pointer (or null). The re-compiler must
     ///   guarantee this.
     /// - **Fat pointers**: for a 16-byte `(base, offset)` fat pointer at
     ///   offset `X`, only `X` (the base) is listed here. The second word
     ///   (`X+8`, the offset) is a scalar.
+    ///
+    /// Callee arg region (`frame_size()..extended_frame_size`):
+    ///
+    /// This region overlaps with the callee's frame during GC
+    /// traversal — both frames may scan the same memory. The
+    /// forwarding markers in `gc_copy_object` handle double-scans
+    /// correctly.
     pub pointer_slots: Vec<FrameOffset>,
 }
 

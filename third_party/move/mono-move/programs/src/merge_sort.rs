@@ -106,7 +106,7 @@ mod micro_op {
                 args_size: 8,
                 data_size: data_size as usize,
                 extended_frame_size: (callee_hi + 8) as usize,
-                zero_locals: true,
+                zero_frame: true,
                 pointer_slots: vec![FO(vec), FO(vec_ref)],
             }
         };
@@ -171,7 +171,7 @@ mod micro_op {
                 args_size: 24,
                 data_size: data_size as usize,
                 extended_frame_size: (callee_3 + 8) as usize,
-                zero_locals: true,
+                zero_frame: true,
                 pointer_slots: vec![FO(vec)],
             }
         };
@@ -280,7 +280,7 @@ mod micro_op {
                 args_size: 32,
                 data_size: 120,
                 extended_frame_size: 144,
-                zero_locals: true,
+                zero_frame: true,
                 pointer_slots: vec![FO(vec), FO(tmp), FO(vec_ref), FO(tmp_ref)],
             }
         };

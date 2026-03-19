@@ -124,7 +124,7 @@ fn make_gc_stress_program(
         args_size: 8,
         data_size: 40,
         extended_frame_size: 64,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)],
     };
 
@@ -225,7 +225,7 @@ fn make_gc_stress_program(
         args_size: 0,
         data_size: 64,
         extended_frame_size: 128,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)],
     };
 

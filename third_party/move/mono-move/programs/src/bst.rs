@@ -344,7 +344,7 @@ mod micro_op {
             args_size: 0,
             data_size: 24,
             extended_frame_size: 24 + FRAME_METADATA_SIZE,
-            zero_locals: true,
+            zero_frame: true,
             pointer_slots: vec![FO(bst), FO(nodes), FO(free_list)],
         }
     }
@@ -353,58 +353,61 @@ mod micro_op {
     // Function 2 — get(bst_ref, key) → (tag, value)
     //
     // Frame layout:
-    //   [0]  bst_ref (ptr) / result: tag   [8] key / result: value
-    //   [16] nodes_ref (16B fat ptr)   [32] root   [40] idx
-    //   [48] node (32B: key[48] val[56] left[64] right[72])
+    //   [0]  bst (ptr) / result: tag   [8] key / result: value
+    //   [16] bst_ref (16B fat ptr)   [32] nodes_ref (16B fat ptr)
+    //   [48] root   [56] idx
+    //   [64] node (32B: key[64] val[72] left[80] right[88])
     // =================================================================
     fn make_get() -> Function {
         let bst = 0u32;
         let key = 8u32;
-        let nodes_ref = 16u32;
-        let root = 32u32;
-        let idx = 40u32;
-        let node_key = 48u32;
-        let node_val = 56u32;
-        let node_left = 64u32;
-        let node_right = 72u32;
+        let bst_ref = 16u32;
+        let nodes_ref = 32u32;
+        let root = 48u32;
+        let idx = 56u32;
+        let node_key = 64u32;
+        let node_val = 72u32;
+        let node_left = 80u32;
+        let node_right = 88u32;
         let tag = 0u32;
         let value = 8u32;
 
         #[rustfmt::skip]
         let code = vec![
             // -- Prologue: borrow struct fields --
-            Op::struct_borrow(FO(bst), BST_NODES, FO(nodes_ref)),             // 0
-            Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                    // 1
-            Move8 { dst: FO(idx), src: FO(root) },                                // 2: idx = root
-            // -- LOOP (3) --
-            JumpGreaterEqualU64Imm { target: CO(14), src: FO(idx), imm: NULL },   // 3: NULL? → NONE
+            SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
+            Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),             // 1
+            Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                        // 2
+            Move8 { dst: FO(idx), src: FO(root) },                                // 3: idx = root
+            // -- LOOP (4) --
+            JumpGreaterEqualU64Imm { target: CO(15), src: FO(idx), imm: NULL },   // 4: NULL? → NONE
             VecLoadElem { dst: FO(node_key), vec_ref: FO(nodes_ref),
-                          idx: FO(idx), elem_size: NODE_SIZE },                    // 4: node = nodes[idx]
-            JumpLessU64 { target: CO(10), lhs: FO(key), rhs: FO(node_key) },      // 5: key < node.key → LEFT
-            JumpLessU64 { target: CO(12), lhs: FO(node_key), rhs: FO(key) },      // 6: node.key < key → RIGHT
-            // EQUAL (7)
-            StoreImm8 { dst: FO(tag), imm: 1 },                                   // 7
-            Move8 { dst: FO(value), src: FO(node_val) },                           // 8
-            Return,                                                                // 9
-            // GO_LEFT (10)
-            Move8 { dst: FO(idx), src: FO(node_left) },                           // 10
-            Jump { target: CO(3) },                                                // 11
-            // GO_RIGHT (12)
-            Move8 { dst: FO(idx), src: FO(node_right) },                          // 12
-            Jump { target: CO(3) },                                                // 13
-            // NONE (14)
-            StoreImm8 { dst: FO(tag), imm: 0 },                                   // 14
-            StoreImm8 { dst: FO(value), imm: 0 },                                 // 15
-            Return,                                                                // 16
+                          idx: FO(idx), elem_size: NODE_SIZE },                    // 5: node = nodes[idx]
+            JumpLessU64 { target: CO(11), lhs: FO(key), rhs: FO(node_key) },      // 6: key < node.key → LEFT
+            JumpLessU64 { target: CO(13), lhs: FO(node_key), rhs: FO(key) },      // 7: node.key < key → RIGHT
+            // EQUAL (8)
+            StoreImm8 { dst: FO(tag), imm: 1 },                                   // 8
+            Move8 { dst: FO(value), src: FO(node_val) },                           // 9
+            Return,                                                                // 10
+            // GO_LEFT (11)
+            Move8 { dst: FO(idx), src: FO(node_left) },                           // 11
+            Jump { target: CO(4) },                                                // 12
+            // GO_RIGHT (13)
+            Move8 { dst: FO(idx), src: FO(node_right) },                          // 13
+            Jump { target: CO(4) },                                                // 14
+            // NONE (15)
+            StoreImm8 { dst: FO(tag), imm: 0 },                                   // 15
+            StoreImm8 { dst: FO(value), imm: 0 },                                 // 16
+            Return,                                                                // 17
         ];
 
         Function {
             code,
             args_size: 16,
-            data_size: 80,
-            extended_frame_size: 80 + FRAME_METADATA_SIZE,
-            zero_locals: false,
-            pointer_slots: vec![FO(bst), FO(nodes_ref)],
+            data_size: 96,
+            extended_frame_size: 96 + FRAME_METADATA_SIZE,
+            zero_frame: false,
+            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
         }
     }
 
@@ -415,91 +418,94 @@ mod micro_op {
     // right-null, equal) is self-contained with its own early return.
     //
     // Frame layout:
-    //   [0]  bst_ref (ptr)   [8] key   [16] value
-    //   [24] nodes_ref (16B fat ptr)   [40] root
-    //   [48] idx   [56] node (32B: key[56] val[64] left[72] right[80])
-    //   [88] metadata (24B)
-    //   [112] callee: bst_ref  [120] callee: key  [128] callee: value
+    //   [0]  bst (ptr)   [8] key   [16] value
+    //   [24] bst_ref (16B fat ptr)   [40] nodes_ref (16B fat ptr)
+    //   [56] root   [64] idx
+    //   [72] node (32B: key[72] val[80] left[88] right[96])
+    //   [104] metadata (24B)
+    //   [128] callee: bst  [136] callee: key  [144] callee: value
     // =================================================================
     fn make_insert(alloc_node_id: u32) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let bst = 0u32;
         let key = 8u32;
         let value = 16u32;
-        let nodes_ref = 24u32;
-        let root = 40u32;
-        let idx = 48u32;
-        let node = 56u32;
-        let node_key = 56u32;
-        let node_val = 64u32;
-        let node_left = 72u32;
-        let node_right = 80u32;
-        let data_size = 88u32;
-        let c0 = data_size + meta; // 112
-        let c1 = c0 + 8; // 120
-        let c2 = c1 + 8; // 128
+        let bst_ref = 24u32;
+        let nodes_ref = 40u32;
+        let root = 56u32;
+        let idx = 64u32;
+        let node = 72u32;
+        let node_key = 72u32;
+        let node_val = 80u32;
+        let node_left = 88u32;
+        let node_right = 96u32;
+        let data_size = 104u32;
+        let c0 = data_size + meta; // 128
+        let c1 = c0 + 8; // 136
+        let c2 = c1 + 8; // 144
 
         #[rustfmt::skip]
         let code = vec![
             // -- Prologue: borrow struct fields --
-            Op::struct_borrow(FO(bst), BST_NODES, FO(nodes_ref)),                  // 0
-            Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                         // 1
+            SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
+            Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
+            Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                         // 2
             // -- if root != NULL → LOOP_SETUP; else fall through to INSERT_ROOT --
-            JumpLessU64Imm { target: CO(9),
-                             src: FO(root), imm: NULL },                           // 2: → LOOP_SETUP
-            // -- INSERT_ROOT (3): bst.root = alloc_node(bst, key, value); return --
-            Move8 { dst: FO(c0), src: FO(bst) },                                  // 3
-            Move8 { dst: FO(c1), src: FO(key) },                                  // 4
-            Move8 { dst: FO(c2), src: FO(value) },                                // 5
-            CallFunc { func_id: alloc_node_id },                                   // 6
-            Op::struct_store8(FO(bst), BST_ROOT, FO(c0)),                          // 7
-            Return,                                                                // 8
-            // -- LOOP_SETUP (9) --
-            Move8 { dst: FO(idx), src: FO(root) },                                // 9
-            // -- LOOP (10): load node, 3-way compare --
+            JumpLessU64Imm { target: CO(10),
+                             src: FO(root), imm: NULL },                           // 3: → LOOP_SETUP
+            // -- INSERT_ROOT (4): bst.root = alloc_node(bst, key, value); return --
+            Move8 { dst: FO(c0), src: FO(bst) },                                  // 4
+            Move8 { dst: FO(c1), src: FO(key) },                                  // 5
+            Move8 { dst: FO(c2), src: FO(value) },                                // 6
+            CallFunc { func_id: alloc_node_id },                                   // 7
+            Op::struct_store8(FO(bst), BST_ROOT, FO(c0)),                          // 8
+            Return,                                                                // 9
+            // -- LOOP_SETUP (10) --
+            Move8 { dst: FO(idx), src: FO(root) },                                // 10
+            // -- LOOP (11): load node, 3-way compare --
             VecLoadElem { dst: FO(node), vec_ref: FO(nodes_ref),
-                          idx: FO(idx), elem_size: NODE_SIZE },                    // 10
+                          idx: FO(idx), elem_size: NODE_SIZE },                    // 11
             // -- key < node_key? (GO_LEFT falls through, skip if >=) --
-            JumpGreaterEqualU64 { target: CO(22),
-                                  lhs: FO(key), rhs: FO(node_key) },              // 11: key >= node_key → NOT_LESS
-            // GO_LEFT (12): key < node_key
-            JumpLessU64Imm { target: CO(20),
-                             src: FO(node_left), imm: NULL },                     // 12: left != NULL → CONTINUE_LEFT
-            // INSERT_LEFT (13): node.left = alloc_node(...); store node; return
-            Move8 { dst: FO(c0), src: FO(bst) },                                  // 13
-            Move8 { dst: FO(c1), src: FO(key) },                                  // 14
-            Move8 { dst: FO(c2), src: FO(value) },                                // 15
-            CallFunc { func_id: alloc_node_id },                                   // 16
-            Move8 { dst: FO(node_left), src: FO(c0) },                            // 17
+            JumpGreaterEqualU64 { target: CO(23),
+                                  lhs: FO(key), rhs: FO(node_key) },              // 12: key >= node_key → NOT_LESS
+            // GO_LEFT (13): key < node_key
+            JumpLessU64Imm { target: CO(21),
+                             src: FO(node_left), imm: NULL },                     // 13: left != NULL → CONTINUE_LEFT
+            // INSERT_LEFT (14): node.left = alloc_node(...); store node; return
+            Move8 { dst: FO(c0), src: FO(bst) },                                  // 14
+            Move8 { dst: FO(c1), src: FO(key) },                                  // 15
+            Move8 { dst: FO(c2), src: FO(value) },                                // 16
+            CallFunc { func_id: alloc_node_id },                                   // 17
+            Move8 { dst: FO(node_left), src: FO(c0) },                            // 18
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(idx),
-                           src: FO(node), elem_size: NODE_SIZE },                  // 18
-            Return,                                                                // 19
-            // CONTINUE_LEFT (20)
-            Move8 { dst: FO(idx), src: FO(node_left) },                           // 20
-            Jump { target: CO(10) },                                               // 21
-            // -- NOT_LESS (22): key > node_key? --
-            JumpGreaterEqualU64 { target: CO(33),
-                                  lhs: FO(node_key), rhs: FO(key) },              // 22: node_key >= key → EQUAL
-            // GO_RIGHT (23): key > node_key
-            JumpLessU64Imm { target: CO(31),
-                             src: FO(node_right), imm: NULL },                    // 23: right != NULL → CONTINUE_RIGHT
-            // INSERT_RIGHT (24): node.right = alloc_node(...); store node; return
-            Move8 { dst: FO(c0), src: FO(bst) },                                  // 24
-            Move8 { dst: FO(c1), src: FO(key) },                                  // 25
-            Move8 { dst: FO(c2), src: FO(value) },                                // 26
-            CallFunc { func_id: alloc_node_id },                                   // 27
-            Move8 { dst: FO(node_right), src: FO(c0) },                           // 28
+                           src: FO(node), elem_size: NODE_SIZE },                  // 19
+            Return,                                                                // 20
+            // CONTINUE_LEFT (21)
+            Move8 { dst: FO(idx), src: FO(node_left) },                           // 21
+            Jump { target: CO(11) },                                               // 22
+            // -- NOT_LESS (23): key > node_key? --
+            JumpGreaterEqualU64 { target: CO(34),
+                                  lhs: FO(node_key), rhs: FO(key) },              // 23: node_key >= key → EQUAL
+            // GO_RIGHT (24): key > node_key
+            JumpLessU64Imm { target: CO(32),
+                             src: FO(node_right), imm: NULL },                    // 24: right != NULL → CONTINUE_RIGHT
+            // INSERT_RIGHT (25): node.right = alloc_node(...); store node; return
+            Move8 { dst: FO(c0), src: FO(bst) },                                  // 25
+            Move8 { dst: FO(c1), src: FO(key) },                                  // 26
+            Move8 { dst: FO(c2), src: FO(value) },                                // 27
+            CallFunc { func_id: alloc_node_id },                                   // 28
+            Move8 { dst: FO(node_right), src: FO(c0) },                           // 29
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(idx),
-                           src: FO(node), elem_size: NODE_SIZE },                  // 29
-            Return,                                                                // 30
-            // CONTINUE_RIGHT (31)
-            Move8 { dst: FO(idx), src: FO(node_right) },                          // 31
-            Jump { target: CO(10) },                                               // 32
-            // -- EQUAL (33): node.value = value; store node; return --
-            Move8 { dst: FO(node_val), src: FO(value) },                           // 33
+                           src: FO(node), elem_size: NODE_SIZE },                  // 30
+            Return,                                                                // 31
+            // CONTINUE_RIGHT (32)
+            Move8 { dst: FO(idx), src: FO(node_right) },                          // 32
+            Jump { target: CO(11) },                                               // 33
+            // -- EQUAL (34): node.value = value; store node; return --
+            Move8 { dst: FO(node_val), src: FO(value) },                           // 34
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(idx),
-                           src: FO(node), elem_size: NODE_SIZE },                  // 34
-            Return,                                                                // 35
+                           src: FO(node), elem_size: NODE_SIZE },                  // 35
+            Return,                                                                // 36
         ];
 
         Function {
@@ -507,8 +513,8 @@ mod micro_op {
             args_size: 24,
             data_size: data_size as usize,
             extended_frame_size: (c2 + 8) as usize,
-            zero_locals: true,
-            pointer_slots: vec![FO(bst), FO(nodes_ref)],
+            zero_frame: true,
+            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
         }
     }
 
@@ -521,61 +527,64 @@ mod micro_op {
     // writes updated pointers back through the references.
     //
     // Frame layout:
-    //   [0]  bst_ref (ptr) / result: idx   [8] key   [16] value
-    //   [24] nodes_ref (16B fat ptr)   [40] free_list_ref (16B fat ptr)
-    //   [56] idx   [64] fl_len
-    //   [72] new_node (32B: key[72] val[80] left[88] right[96])
+    //   [0]  bst (ptr) / result: idx   [8] key   [16] value
+    //   [24] bst_ref (16B fat ptr)   [40] nodes_ref (16B fat ptr)
+    //   [56] free_list_ref (16B fat ptr)
+    //   [72] idx   [80] fl_len
+    //   [88] new_node (32B: key[88] val[96] left[104] right[112])
     // =================================================================
     fn make_alloc_node() -> Function {
         let bst = 0u32;
         let key = 8u32;
         let value = 16u32;
-        let nodes_ref = 24u32;
-        let free_list_ref = 40u32;
-        let idx = 56u32;
-        let fl_len = 64u32;
-        let new_node = 72u32;
-        let new_node_key = 72u32;
-        let new_node_val = 80u32;
-        let new_node_left = 88u32;
-        let new_node_right = 96u32;
+        let bst_ref = 24u32;
+        let nodes_ref = 40u32;
+        let free_list_ref = 56u32;
+        let idx = 72u32;
+        let fl_len = 80u32;
+        let new_node = 88u32;
+        let new_node_key = 88u32;
+        let new_node_val = 96u32;
+        let new_node_left = 104u32;
+        let new_node_right = 112u32;
         let result = 0u32;
 
         #[rustfmt::skip]
         let code = vec![
             // -- Prologue: borrow struct fields --
-            Op::struct_borrow(FO(bst), BST_NODES, FO(nodes_ref)),                  // 0
-            Op::struct_borrow(FO(bst), BST_FREE_LIST, FO(free_list_ref)),          // 1
+            SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
+            Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
+            Op::struct_borrow(FO(bst_ref), BST_FREE_LIST, FO(free_list_ref)),      // 2
             // Build new_node = { key, value, NULL, NULL }
-            Move8 { dst: FO(new_node_key), src: FO(key) },                        // 2
-            Move8 { dst: FO(new_node_val), src: FO(value) },                      // 3
-            StoreImm8 { dst: FO(new_node_left), imm: NULL },                      // 4
-            StoreImm8 { dst: FO(new_node_right), imm: NULL },                     // 5
+            Move8 { dst: FO(new_node_key), src: FO(key) },                        // 3
+            Move8 { dst: FO(new_node_val), src: FO(value) },                      // 4
+            StoreImm8 { dst: FO(new_node_left), imm: NULL },                      // 5
+            StoreImm8 { dst: FO(new_node_right), imm: NULL },                     // 6
             // Check free_list
-            VecLen { dst: FO(fl_len), vec_ref: FO(free_list_ref) },                // 6
-            JumpNotZeroU64 { target: CO(11), src: FO(fl_len) },                    // 7: → POP
+            VecLen { dst: FO(fl_len), vec_ref: FO(free_list_ref) },                // 7
+            JumpNotZeroU64 { target: CO(12), src: FO(fl_len) },                    // 8: → POP
             // PUSH path: idx = nodes.len(); nodes.push(new_node)
-            VecLen { dst: FO(idx), vec_ref: FO(nodes_ref) },                       // 8
+            VecLen { dst: FO(idx), vec_ref: FO(nodes_ref) },                       // 9
             VecPushBack { vec_ref: FO(nodes_ref), elem: FO(new_node),
-                          elem_size: NODE_SIZE, descriptor_id: DESC_TRIVIAL },     // 9
-            Jump { target: CO(13) },                                               // 10: → DONE
-            // POP path (11): idx = free_list.pop(); nodes[idx] = new_node
+                          elem_size: NODE_SIZE, descriptor_id: DESC_TRIVIAL },     // 10
+            Jump { target: CO(14) },                                               // 11: → DONE
+            // POP path (12): idx = free_list.pop(); nodes[idx] = new_node
             VecPopBack { dst: FO(idx), vec_ref: FO(free_list_ref),
-                         elem_size: 8 },                                           // 11
+                         elem_size: 8 },                                           // 12
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(idx),
-                           src: FO(new_node), elem_size: NODE_SIZE },              // 12
-            // DONE (13)
-            Move8 { dst: FO(result), src: FO(idx) },                               // 13
-            Return,                                                                // 14
+                           src: FO(new_node), elem_size: NODE_SIZE },              // 13
+            // DONE (14)
+            Move8 { dst: FO(result), src: FO(idx) },                               // 14
+            Return,                                                                // 15
         ];
 
         Function {
             code,
             args_size: 24,
-            data_size: 104,
-            extended_frame_size: 104 + FRAME_METADATA_SIZE,
-            zero_locals: true,
-            pointer_slots: vec![FO(bst), FO(nodes_ref), FO(free_list_ref)],
+            data_size: 120,
+            extended_frame_size: 120 + FRAME_METADATA_SIZE,
+            zero_frame: true,
+            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)],
         }
     }
 
@@ -586,79 +595,81 @@ mod micro_op {
     // fixes up the parent pointer (or root).
     //
     // Frame layout:
-    //   [0]  bst_ref (ptr)   [8] key
-    //   [16] nodes_ref (16B fat ptr)   [32] root
-    //   [40] parent   [48] idx
-    //   [56] node (32B: key[56] val[64] left[72] right[80])
-    //   [88] metadata (24B)
-    //   [112] callee: bst_ref / result  [120] callee: idx
+    //   [0]  bst (ptr)   [8] key
+    //   [16] bst_ref (16B fat ptr)   [32] nodes_ref (16B fat ptr)
+    //   [48] root   [56] parent   [64] idx
+    //   [72] node (32B: key[72] val[80] left[88] right[96])
+    //   [104] metadata (24B)
+    //   [128] callee: bst / result  [136] callee: idx
     // =================================================================
     fn make_remove(remove_node_id: u32) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let bst = 0u32;
         let key = 8u32;
-        let nodes_ref = 16u32;
-        let root = 32u32;
-        let parent = 40u32;
-        let idx = 48u32;
-        let node = 56u32;
-        let node_key = 56u32;
-        let node_left = 72u32;
-        let node_right = 80u32;
-        let data_size = 88u32;
-        let c0 = data_size + meta; // 112 — also holds replacement after CallFunc
-        let c1 = c0 + 8; // 120
+        let bst_ref = 16u32;
+        let nodes_ref = 32u32;
+        let root = 48u32;
+        let parent = 56u32;
+        let idx = 64u32;
+        let node = 72u32;
+        let node_key = 72u32;
+        let node_left = 88u32;
+        let node_right = 96u32;
+        let data_size = 104u32;
+        let c0 = data_size + meta; // 128 — also holds replacement after CallFunc
+        let c1 = c0 + 8; // 136
 
         #[rustfmt::skip]
         let code = vec![
             // -- Prologue --
-            Op::struct_borrow(FO(bst), BST_NODES, FO(nodes_ref)),                  // 0
-            Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                         // 1
-            StoreImm8 { dst: FO(parent), imm: NULL },                              // 2
-            Move8 { dst: FO(idx), src: FO(root) },                                // 3
-            // -- LOOP (4): while idx != NULL --
-            JumpGreaterEqualU64Imm { target: CO(26),
-                                     src: FO(idx), imm: NULL },                   // 4: → DONE
+            SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
+            Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
+            Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                         // 2
+            StoreImm8 { dst: FO(parent), imm: NULL },                              // 3
+            Move8 { dst: FO(idx), src: FO(root) },                                // 4
+            // -- LOOP (5): while idx != NULL --
+            JumpGreaterEqualU64Imm { target: CO(27),
+                                     src: FO(idx), imm: NULL },                   // 5: → DONE
             VecLoadElem { dst: FO(node), vec_ref: FO(nodes_ref),
-                          idx: FO(idx), elem_size: NODE_SIZE },                    // 5
+                          idx: FO(idx), elem_size: NODE_SIZE },                    // 6
             // -- key < node_key? --
-            JumpGreaterEqualU64 { target: CO(10),
-                                  lhs: FO(key), rhs: FO(node_key) },              // 6: key >= → NOT_LESS
+            JumpGreaterEqualU64 { target: CO(11),
+                                  lhs: FO(key), rhs: FO(node_key) },              // 7: key >= → NOT_LESS
             // GO_LEFT: key < node_key
-            Move8 { dst: FO(parent), src: FO(idx) },                              // 7
-            Move8 { dst: FO(idx), src: FO(node_left) },                           // 8
-            Jump { target: CO(4) },                                                // 9
-            // -- NOT_LESS (10): key > node_key? --
-            JumpGreaterEqualU64 { target: CO(14),
-                                  lhs: FO(node_key), rhs: FO(key) },              // 10: node_key >= key → EQUAL
+            Move8 { dst: FO(parent), src: FO(idx) },                              // 8
+            Move8 { dst: FO(idx), src: FO(node_left) },                           // 9
+            Jump { target: CO(5) },                                                // 10
+            // -- NOT_LESS (11): key > node_key? --
+            JumpGreaterEqualU64 { target: CO(15),
+                                  lhs: FO(node_key), rhs: FO(key) },              // 11: node_key >= key → EQUAL
             // GO_RIGHT: key > node_key
-            Move8 { dst: FO(parent), src: FO(idx) },                              // 11
-            Move8 { dst: FO(idx), src: FO(node_right) },                          // 12
-            Jump { target: CO(4) },                                                // 13
-            // -- EQUAL (14): remove_node(bst, idx) → c0 holds replacement --
-            Move8 { dst: FO(c0), src: FO(bst) },                                  // 14
-            Move8 { dst: FO(c1), src: FO(idx) },                                  // 15
-            CallFunc { func_id: remove_node_id },                                  // 16
+            Move8 { dst: FO(parent), src: FO(idx) },                              // 12
+            Move8 { dst: FO(idx), src: FO(node_right) },                          // 13
+            Jump { target: CO(5) },                                                // 14
+            // -- EQUAL (15): remove_node(bst, idx) → c0 holds replacement --
+            Move8 { dst: FO(c0), src: FO(bst) },                                  // 15
+            Move8 { dst: FO(c1), src: FO(idx) },                                  // 16
+            CallFunc { func_id: remove_node_id },                                  // 17
             // -- if parent != NULL → HAS_PARENT --
-            JumpLessU64Imm { target: CO(20),
-                             src: FO(parent), imm: NULL },                        // 17: → HAS_PARENT
+            JumpLessU64Imm { target: CO(21),
+                             src: FO(parent), imm: NULL },                        // 18: → HAS_PARENT
             // UPDATE_ROOT: parent == NULL, bst.root = replacement (c0)
-            Op::struct_store8(FO(bst), BST_ROOT, FO(c0)),                          // 18
-            Return,                                                                // 19
-            // -- HAS_PARENT (20) --
+            Op::struct_store8(FO(bst), BST_ROOT, FO(c0)),                          // 19
+            Return,                                                                // 20
+            // -- HAS_PARENT (21) --
             VecLoadElem { dst: FO(node), vec_ref: FO(nodes_ref),
-                          idx: FO(parent), elem_size: NODE_SIZE },                 // 20
-            JumpNotEqualU64 { target: CO(24),
-                              lhs: FO(node_left), rhs: FO(idx) },                 // 21: → UPDATE_RIGHT
+                          idx: FO(parent), elem_size: NODE_SIZE },                 // 21
+            JumpNotEqualU64 { target: CO(25),
+                              lhs: FO(node_left), rhs: FO(idx) },                 // 22: → UPDATE_RIGHT
             // UPDATE_LEFT: parent.left = replacement (c0)
-            Move8 { dst: FO(node_left), src: FO(c0) },                            // 22
-            Jump { target: CO(25) },                                               // 23: → STORE_PARENT
-            // UPDATE_RIGHT (24): parent.right = replacement (c0)
-            Move8 { dst: FO(node_right), src: FO(c0) },                           // 24
-            // -- STORE_PARENT (25): shared epilogue --
+            Move8 { dst: FO(node_left), src: FO(c0) },                            // 23
+            Jump { target: CO(26) },                                               // 24: → STORE_PARENT
+            // UPDATE_RIGHT (25): parent.right = replacement (c0)
+            Move8 { dst: FO(node_right), src: FO(c0) },                           // 25
+            // -- STORE_PARENT (26): shared epilogue --
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(parent),
-                           src: FO(node), elem_size: NODE_SIZE },                  // 25
-            Return,                                                                // 26
+                           src: FO(node), elem_size: NODE_SIZE },                  // 26
+            Return,                                                                // 27
         ];
 
         Function {
@@ -666,8 +677,8 @@ mod micro_op {
             args_size: 16,
             data_size: data_size as usize,
             extended_frame_size: (c1 + 8) as usize,
-            zero_locals: true,
-            pointer_slots: vec![FO(bst), FO(nodes_ref)],
+            zero_frame: true,
+            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
         }
     }
 
@@ -680,95 +691,98 @@ mod micro_op {
     // VecPushBack can write back through the reference.
     //
     // Frame layout:
-    //   [0]  bst_ref (ptr) / result   [8] idx
-    //   [16] nodes_ref (16B fat ptr)   [32] free_list_ref (16B fat ptr)
-    //   [48] left   [56] right
-    //   [64] parent   [72] cur   [80] cur_right
-    //   [88] scratch (32B: key[88] val[96] left[104] right[112])
+    //   [0]  bst (ptr) / result   [8] idx
+    //   [16] bst_ref (16B fat ptr)   [32] nodes_ref (16B fat ptr)
+    //   [48] free_list_ref (16B fat ptr)
+    //   [64] left   [72] right
+    //   [80] parent   [88] cur   [96] cur_right
+    //   [104] scratch (32B: key[104] val[112] left[120] right[128])
     // =================================================================
     fn make_remove_node() -> Function {
         let bst = 0u32;
         let idx = 8u32;
-        let nodes_ref = 16u32;
-        let free_list_ref = 32u32;
-        let left = 48u32;
-        let right = 56u32;
-        let parent = 64u32;
-        let cur = 72u32;
-        let cur_right = 80u32;
-        let scratch = 88u32;
-        let scratch_left = 104u32; // scratch + 16
-        let scratch_right = 112u32; // scratch + 24
+        let bst_ref = 16u32;
+        let nodes_ref = 32u32;
+        let free_list_ref = 48u32;
+        let left = 64u32;
+        let right = 72u32;
+        let parent = 80u32;
+        let cur = 88u32;
+        let cur_right = 96u32;
+        let scratch = 104u32;
+        let scratch_left = 120u32; // scratch + 16
+        let scratch_right = 128u32; // scratch + 24
         let result = 0u32;
 
         #[rustfmt::skip]
         let code = vec![
             // -- Prologue --
-            Op::struct_borrow(FO(bst), BST_NODES, FO(nodes_ref)),                  // 0
-            Op::struct_borrow(FO(bst), BST_FREE_LIST, FO(free_list_ref)),          // 1
+            SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
+            Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
+            Op::struct_borrow(FO(bst_ref), BST_FREE_LIST, FO(free_list_ref)),      // 2
             VecLoadElem { dst: FO(scratch), vec_ref: FO(nodes_ref),
-                          idx: FO(idx), elem_size: NODE_SIZE },                    // 2
-            Move8 { dst: FO(left), src: FO(scratch_left) },                        // 3
-            Move8 { dst: FO(right), src: FO(scratch_right) },                      // 4
+                          idx: FO(idx), elem_size: NODE_SIZE },                    // 3
+            Move8 { dst: FO(left), src: FO(scratch_left) },                        // 4
+            Move8 { dst: FO(right), src: FO(scratch_right) },                      // 5
             // -- if left == NULL: free idx, return right --
-            JumpLessU64Imm { target: CO(8),
-                             src: FO(left), imm: NULL },                           // 5: left != NULL → HAS_LEFT
-            Move8 { dst: FO(result), src: FO(right) },                            // 6
-            Jump { target: CO(32) },                                               // 7: → FREE_RETURN
-            // -- HAS_LEFT (8): if right == NULL: free idx, return left --
-            JumpLessU64Imm { target: CO(11),
-                             src: FO(right), imm: NULL },                          // 8: right != NULL → HAS_BOTH
-            Move8 { dst: FO(result), src: FO(left) },                             // 9
-            Jump { target: CO(32) },                                               // 10: → FREE_RETURN
-            // -- HAS_BOTH (11): load nodes[right], check right.left --
+            JumpLessU64Imm { target: CO(9),
+                             src: FO(left), imm: NULL },                           // 6: left != NULL → HAS_LEFT
+            Move8 { dst: FO(result), src: FO(right) },                            // 7
+            Jump { target: CO(33) },                                               // 8: → FREE_RETURN
+            // -- HAS_LEFT (9): if right == NULL: free idx, return left --
+            JumpLessU64Imm { target: CO(12),
+                             src: FO(right), imm: NULL },                          // 9: right != NULL → HAS_BOTH
+            Move8 { dst: FO(result), src: FO(left) },                             // 10
+            Jump { target: CO(33) },                                               // 11: → FREE_RETURN
+            // -- HAS_BOTH (12): load nodes[right], check right.left --
             VecLoadElem { dst: FO(scratch), vec_ref: FO(nodes_ref),
-                          idx: FO(right), elem_size: NODE_SIZE },                  // 11
-            JumpLessU64Imm { target: CO(17),
-                             src: FO(scratch_left), imm: NULL },                   // 12: right.left != NULL → DEEP
-            // SIMPLE_SUCCESSOR (13): right.left == NULL, right adopts left
-            Move8 { dst: FO(scratch_left), src: FO(left) },                       // 13
+                          idx: FO(right), elem_size: NODE_SIZE },                  // 12
+            JumpLessU64Imm { target: CO(18),
+                             src: FO(scratch_left), imm: NULL },                   // 13: right.left != NULL → DEEP
+            // SIMPLE_SUCCESSOR (14): right.left == NULL, right adopts left
+            Move8 { dst: FO(scratch_left), src: FO(left) },                       // 14
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(right),
-                           src: FO(scratch), elem_size: NODE_SIZE },               // 14
-            Move8 { dst: FO(result), src: FO(right) },                            // 15
-            Jump { target: CO(32) },                                               // 16: → FREE_RETURN
-            // -- DEEP_SUCCESSOR (17): walk left to find in-order successor --
-            Move8 { dst: FO(parent), src: FO(right) },                            // 17
-            Move8 { dst: FO(cur), src: FO(scratch_left) },                        // 18
-            // WALK_LOOP (19)
+                           src: FO(scratch), elem_size: NODE_SIZE },               // 15
+            Move8 { dst: FO(result), src: FO(right) },                            // 16
+            Jump { target: CO(33) },                                               // 17: → FREE_RETURN
+            // -- DEEP_SUCCESSOR (18): walk left to find in-order successor --
+            Move8 { dst: FO(parent), src: FO(right) },                            // 18
+            Move8 { dst: FO(cur), src: FO(scratch_left) },                        // 19
+            // WALK_LOOP (20)
             VecLoadElem { dst: FO(scratch), vec_ref: FO(nodes_ref),
-                          idx: FO(cur), elem_size: NODE_SIZE },                    // 19
-            JumpGreaterEqualU64Imm { target: CO(24),
-                                     src: FO(scratch_left), imm: NULL },           // 20: cur.left == NULL → WALK_DONE
-            Move8 { dst: FO(parent), src: FO(cur) },                              // 21
-            Move8 { dst: FO(cur), src: FO(scratch_left) },                        // 22
-            Jump { target: CO(19) },                                               // 23
-            // -- WALK_DONE (24): scratch = nodes[cur] --
+                          idx: FO(cur), elem_size: NODE_SIZE },                    // 20
+            JumpGreaterEqualU64Imm { target: CO(25),
+                                     src: FO(scratch_left), imm: NULL },           // 21: cur.left == NULL → WALK_DONE
+            Move8 { dst: FO(parent), src: FO(cur) },                              // 22
+            Move8 { dst: FO(cur), src: FO(scratch_left) },                        // 23
+            Jump { target: CO(20) },                                               // 24
+            // -- WALK_DONE (25): scratch = nodes[cur] --
             // Save cur.right, then set cur's children to left/right from removed node
-            Move8 { dst: FO(cur_right), src: FO(scratch_right) },                 // 24
-            Move8 { dst: FO(scratch_left), src: FO(left) },                       // 25: cur.left = left
-            Move8 { dst: FO(scratch_right), src: FO(right) },                     // 26: cur.right = right
+            Move8 { dst: FO(cur_right), src: FO(scratch_right) },                 // 25
+            Move8 { dst: FO(scratch_left), src: FO(left) },                       // 26: cur.left = left
+            Move8 { dst: FO(scratch_right), src: FO(right) },                     // 27: cur.right = right
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(cur),
-                           src: FO(scratch), elem_size: NODE_SIZE },               // 27
+                           src: FO(scratch), elem_size: NODE_SIZE },               // 28
             // Detach cur from parent: parent.left = cur_right
             VecLoadElem { dst: FO(scratch), vec_ref: FO(nodes_ref),
-                          idx: FO(parent), elem_size: NODE_SIZE },                 // 28
-            Move8 { dst: FO(scratch_left), src: FO(cur_right) },                  // 29
+                          idx: FO(parent), elem_size: NODE_SIZE },                 // 29
+            Move8 { dst: FO(scratch_left), src: FO(cur_right) },                  // 30
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(parent),
-                           src: FO(scratch), elem_size: NODE_SIZE },               // 30
-            Move8 { dst: FO(result), src: FO(cur) },                              // 31
-            // -- FREE_RETURN (32): free_list.push(idx); return --
+                           src: FO(scratch), elem_size: NODE_SIZE },               // 31
+            Move8 { dst: FO(result), src: FO(cur) },                              // 32
+            // -- FREE_RETURN (33): free_list.push(idx); return --
             VecPushBack { vec_ref: FO(free_list_ref), elem: FO(idx),
-                          elem_size: 8, descriptor_id: DESC_TRIVIAL },             // 32
-            Return,                                                                // 33
+                          elem_size: 8, descriptor_id: DESC_TRIVIAL },             // 33
+            Return,                                                                // 34
         ];
 
         Function {
             code,
             args_size: 16,
-            data_size: 120,
-            extended_frame_size: 120 + FRAME_METADATA_SIZE,
-            zero_locals: true,
-            pointer_slots: vec![FO(bst), FO(nodes_ref), FO(free_list_ref)],
+            data_size: 136,
+            extended_frame_size: 136 + FRAME_METADATA_SIZE,
+            zero_frame: true,
+            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)],
         }
     }
 
@@ -856,7 +870,7 @@ mod micro_op {
             args_size: 8,
             data_size: data_size as usize,
             extended_frame_size: (c2 + 8) as usize,
-            zero_locals: true,
+            zero_frame: true,
             pointer_slots: vec![FO(ops), FO(bst), FO(ops_ref)],
         }
     }

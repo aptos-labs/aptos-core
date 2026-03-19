@@ -445,21 +445,17 @@ pub enum MicroOp {
         elem_size: u32,
     },
 
-    /// Borrow a location within a heap object, producing a fat pointer
-    /// `(heap_ptr, offset)`. Writes 16 bytes at `[dst, dst+16)`:
-    ///   - base   = the object's heap pointer
-    ///   - offset = offset from the object's start
+    /// Borrow a location within a heap object, producing a fat pointer.
+    /// `obj_ref` is a 16-byte fat pointer `(base, ref_offset)` whose
+    /// target holds the heap object pointer. Writes 16 bytes at
+    /// `[dst, dst+16)`:
+    ///   - base   = the object's heap pointer (read through `obj_ref`)
+    ///   - offset = `offset` (byte offset from the object's start)
     ///
     /// Move semantics guarantee the offset is within bounds.
-    ///
-    /// TODO: Revisit whether `heap_ptr` should be a direct owned pointer
-    /// (as it is today) or a fat pointer reference, for consistency with
-    /// the vec instructions. Structs have fixed size so the pointer never
-    /// changes, but open enums switching to a larger variant could
-    /// potentially require reallocation. Too early to tell.
     HeapBorrow {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        obj_ref: FrameOffset,
         offset: u32,
     },
 
@@ -637,10 +633,10 @@ impl MicroOp {
         }
     }
 
-    pub fn struct_borrow(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
+    pub fn struct_borrow(obj_ref: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapBorrow {
             dst,
-            heap_ptr,
+            obj_ref,
             offset: STRUCT_DATA_OFFSET as u32 + field_offset,
         }
     }
@@ -707,10 +703,10 @@ impl MicroOp {
         }
     }
 
-    pub fn enum_borrow(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
+    pub fn enum_borrow(obj_ref: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapBorrow {
             dst,
-            heap_ptr,
+            obj_ref,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
         }
     }

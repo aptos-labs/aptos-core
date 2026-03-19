@@ -79,7 +79,7 @@ mod micro_op {
             args_size: 8,
             data_size: data_size as usize,
             extended_frame_size: (callee_n + 8) as usize,
-            zero_locals: false,
+            zero_frame: false,
             pointer_slots: vec![],
         };
 

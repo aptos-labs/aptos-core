@@ -275,8 +275,8 @@ impl FunctionVerifier<'_> {
                 self.check_frame_access(Some(pc), dst, 16);
             },
 
-            MicroOp::HeapBorrow { dst, heap_ptr, .. } => {
-                self.check_frame_access_8(pc, heap_ptr);
+            MicroOp::HeapBorrow { dst, obj_ref, .. } => {
+                self.check_frame_access(Some(pc), obj_ref, 16);
                 self.check_frame_access(Some(pc), dst, 16);
             },
 

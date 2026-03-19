@@ -130,13 +130,14 @@ impl<'a> InterpreterContext<'a> {
             write_u64(base, META_SAVED_FUNC_ID_OFFSET, SENTINEL_FUNC_ID);
         }
 
-        // Zero locals (beyond args) so pointer slots start as null.
-        if func.zero_locals {
+        // Zero everything beyond args (locals, metadata, callee arg/return
+        // region) so pointer slots start as null.
+        if func.zero_frame {
             unsafe {
                 std::ptr::write_bytes(
                     self.frame_ptr.add(func.args_size),
                     0,
-                    func.data_size - func.args_size,
+                    func.extended_frame_size - func.args_size,
                 );
             }
         }
@@ -219,12 +220,13 @@ impl InterpreterContext<'_> {
                     if new_fp.add(callee.extended_frame_size) > stack_end {
                         bail!("stack overflow");
                     }
-                    // Zero the callee's local area (beyond args) so that
-                    // pointer slots start as null. The argument region
-                    // (0..args_size) was already written by the caller.
-                    if callee.zero_locals {
-                        let local_size = callee.data_size - callee.args_size;
-                        std::ptr::write_bytes(new_fp.add(callee.args_size), 0, local_size);
+                    // Zero everything beyond args (locals, metadata, callee
+                    // arg/return region) so pointer slots start as null.
+                    // The argument region (0..args_size) was already written
+                    // by the caller.
+                    if callee.zero_frame {
+                        let zero_size = callee.extended_frame_size - callee.args_size;
+                        std::ptr::write_bytes(new_fp.add(callee.args_size), 0, zero_size);
                     }
                     let meta = fp.add(func.data_size);
                     write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
@@ -633,10 +635,12 @@ impl InterpreterContext<'_> {
 
                 MicroOp::HeapBorrow {
                     dst,
-                    heap_ptr,
+                    obj_ref,
                     offset,
                 } => {
-                    let obj_ptr = read_ptr(fp, heap_ptr);
+                    let ref_base = read_ptr(fp, obj_ref);
+                    let ref_off = read_u64(fp, obj_ref + 8) as usize;
+                    let obj_ptr = read_ptr(ref_base, ref_off);
                     write_ptr(fp, dst, obj_ptr);
                     write_u64(fp, dst + 8, offset as u64);
                 },

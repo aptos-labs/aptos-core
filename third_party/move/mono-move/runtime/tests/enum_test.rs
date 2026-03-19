@@ -42,7 +42,7 @@ fn enum_basic() {
         args_size: 0,
         data_size: 24,
         extended_frame_size: 48,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(shape)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
@@ -93,7 +93,7 @@ fn enum_survives_gc() {
         args_size: 0,
         data_size: 24,
         extended_frame_size: 48,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(shape)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
@@ -151,7 +151,7 @@ fn enum_gc_traces_refs() {
         args_size: 0,
         data_size: 48,
         extended_frame_size: 72,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(val), FO(vec), FO(vec_ref)],
     }];
     let descriptors = vec![
@@ -216,7 +216,7 @@ fn enum_pattern_match() {
         args_size: 0,
         data_size: 24,
         extended_frame_size: 48,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(op)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
@@ -262,7 +262,7 @@ fn enum_variant_switch() {
         args_size: 0,
         data_size: 24,
         extended_frame_size: 48,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(e)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
@@ -286,6 +286,7 @@ fn enum_borrow_field() {
     let result: u32 = 0;
     let e: u32 = 8;
     let r#ref: u32 = 16;
+    let e_ref: u32 = 32; // 16-byte fat pointer ref to e (for enum_borrow)
 
     #[rustfmt::skip]
     let code = vec![
@@ -295,7 +296,8 @@ fn enum_borrow_field() {
         MicroOp::enum_store8(FO(e), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 20 },
         MicroOp::enum_store8(FO(e), 8, FO(result)),
-        MicroOp::enum_borrow(FO(e), 8, FO(r#ref)),
+        SlotBorrow { dst: FO(e_ref), local: FO(e) },
+        MicroOp::enum_borrow(FO(e_ref), 8, FO(r#ref)),
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         StoreImm8 { dst: FO(result), imm: 99 },
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
@@ -306,10 +308,10 @@ fn enum_borrow_field() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 56,
-        zero_locals: true,
-        pointer_slots: vec![FO(e), FO(r#ref)],
+        data_size: 48,
+        extended_frame_size: 72,
+        zero_frame: true,
+        pointer_slots: vec![FO(e), FO(r#ref), FO(e_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -361,7 +363,7 @@ fn enum_gc_variant_switching() {
         args_size: 0,
         data_size: 48,
         extended_frame_size: 72,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(ctr), FO(vec), FO(vec_ref)],
     }];
     let descriptors = vec![
@@ -419,7 +421,7 @@ fn enum_in_struct() {
         args_size: 0,
         data_size: 32,
         extended_frame_size: 56,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(wrapper), FO(payload)],
     }];
     let descriptors = vec![
@@ -491,7 +493,7 @@ fn enum_in_vector() {
         args_size: 0,
         data_size: 48,
         extended_frame_size: 72,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(vec), FO(e), FO(vec_ref)],
     }];
     let descriptors = vec![

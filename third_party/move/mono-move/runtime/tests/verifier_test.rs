@@ -19,7 +19,7 @@ fn minimal_func() -> Function {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     }
 }
@@ -52,7 +52,7 @@ fn valid_with_arithmetic_and_jumps() {
         args_size: 0,
         data_size: 16,
         extended_frame_size: 40,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -77,7 +77,7 @@ fn valid_with_vec_and_pointer_slots() {
         args_size: 0,
         data_size: 32,
         extended_frame_size: 56,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(0)],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -96,7 +96,7 @@ fn frame_bounds_store_u64() {
         data_size: 8,
         extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
         args_size: 0,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -123,7 +123,7 @@ fn frame_bounds_mov() {
         data_size: 16,
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
         args_size: 0,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -148,7 +148,7 @@ fn frame_bounds_fat_ptr_write() {
         data_size: 16,
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
         args_size: 0,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -167,7 +167,7 @@ fn frame_bounds_callfunc_metadata() {
         data_size: 8,
         extended_frame_size: 16, // data_size 8 + 24 = 32 > 16
         args_size: 0,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func, callee], &trivial_descriptors());
@@ -188,7 +188,7 @@ fn pointer_slots_offset_out_of_bounds() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(100)], // offset 100 + 8 > extended_frame_size 32
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -205,7 +205,7 @@ fn pointer_slots_overlaps_metadata() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 40,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(8)], // offset 8 overlaps metadata [8, 32) since data_size = 8
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -222,7 +222,7 @@ fn args_size_exceeds_data_size() {
         data_size: 8,
         extended_frame_size: 32,
         args_size: 16, // > data_size 8
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -245,7 +245,7 @@ fn invalid_jump_target() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -268,7 +268,7 @@ fn invalid_conditional_jump_target() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -288,7 +288,7 @@ fn invalid_callfunc_func_id() {
         args_size: 0,
         data_size: 0,
         extended_frame_size: 32,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -317,7 +317,7 @@ fn invalid_descriptor_id() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(0)],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -344,7 +344,7 @@ fn zero_size_mov() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -369,7 +369,7 @@ fn zero_elem_size_vec_new() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(0)],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -388,7 +388,7 @@ fn empty_code() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -403,7 +403,7 @@ fn zero_frame_size() {
         args_size: 0,
         data_size: 0,
         extended_frame_size: 0,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
@@ -430,7 +430,7 @@ fn multiple_errors_collected() {
         args_size: 0,
         data_size: 8,
         extended_frame_size: 32,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());

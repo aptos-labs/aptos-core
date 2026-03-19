@@ -48,7 +48,7 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
         args_size: 0,
         data_size: 48,
         extended_frame_size: 72,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(slot_vec), FO(slot_vec_ref)],
     };
 

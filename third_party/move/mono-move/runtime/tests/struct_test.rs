@@ -33,7 +33,7 @@ fn struct_inline() {
         args_size: 0,
         data_size: 24,
         extended_frame_size: 48,
-        zero_locals: false,
+        zero_frame: false,
         pointer_slots: vec![],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
@@ -73,7 +73,7 @@ fn struct_inline_borrow() {
         args_size: 0,
         data_size: 40,
         extended_frame_size: 64,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(r#ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
@@ -113,7 +113,7 @@ fn struct_heap_basic() {
         args_size: 0,
         data_size: 24,
         extended_frame_size: 48,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(entry)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
@@ -157,7 +157,7 @@ fn struct_heap_survives_gc() {
         args_size: 0,
         data_size: 24,
         extended_frame_size: 48,
-        zero_locals: true,
+        zero_frame: true,
         pointer_slots: vec![FO(entry)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
@@ -188,6 +188,7 @@ fn struct_with_vector_field() {
     let items: u32 = 16;
     let tmp: u32 = 24;
     let vec_ref: u32 = 32; // 16-byte fat pointer referencing the vector
+    let ctr_ref: u32 = 48; // 16-byte fat pointer ref to ctr (for struct_borrow)
 
     #[rustfmt::skip]
     let code = vec![
@@ -204,7 +205,8 @@ fn struct_with_vector_field() {
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
         MicroOp::struct_store8(FO(ctr), 8, FO(items)),
         ForceGC,
-        MicroOp::struct_borrow(FO(ctr), 8, FO(vec_ref)),
+        SlotBorrow { dst: FO(ctr_ref), local: FO(ctr) },
+        MicroOp::struct_borrow(FO(ctr_ref), 8, FO(vec_ref)),
         MicroOp::struct_load8(FO(ctr), 0, FO(result)),
         VecLen { dst: FO(tmp), vec_ref: FO(vec_ref) },
         Return,
@@ -213,10 +215,10 @@ fn struct_with_vector_field() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
-        extended_frame_size: 72,
-        zero_locals: true,
-        pointer_slots: vec![FO(ctr), FO(items), FO(vec_ref)],
+        data_size: 64,
+        extended_frame_size: 88,
+        zero_frame: true,
+        pointer_slots: vec![FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Struct {
@@ -254,6 +256,7 @@ fn struct_borrow_field() {
     let result: u32 = 0;
     let entry: u32 = 8;
     let r#ref: u32 = 16;
+    let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
     #[rustfmt::skip]
     let code = vec![
@@ -262,7 +265,8 @@ fn struct_borrow_field() {
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 10 },
         MicroOp::struct_store8(FO(entry), 8, FO(result)),
-        MicroOp::struct_borrow(FO(entry), 8, FO(r#ref)),
+        SlotBorrow { dst: FO(entry_ref), local: FO(entry) },
+        MicroOp::struct_borrow(FO(entry_ref), 8, FO(r#ref)),
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         StoreImm8 { dst: FO(result), imm: 77 },
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
@@ -273,10 +277,10 @@ fn struct_borrow_field() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 56,
-        zero_locals: true,
-        pointer_slots: vec![FO(entry), FO(r#ref)],
+        data_size: 48,
+        extended_frame_size: 72,
+        zero_frame: true,
+        pointer_slots: vec![FO(entry), FO(r#ref), FO(entry_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -304,6 +308,7 @@ fn struct_borrow_survives_gc() {
     let entry: u32 = 8;
     let r#ref: u32 = 16;
     let ref_base: u32 = 16;
+    let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
     #[rustfmt::skip]
     let code = vec![
@@ -312,7 +317,8 @@ fn struct_borrow_survives_gc() {
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 200 },
         MicroOp::struct_store8(FO(entry), 8, FO(result)),
-        MicroOp::struct_borrow(FO(entry), 8, FO(r#ref)),
+        SlotBorrow { dst: FO(entry_ref), local: FO(entry) },
+        MicroOp::struct_borrow(FO(entry_ref), 8, FO(r#ref)),
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         Return,
@@ -321,10 +327,10 @@ fn struct_borrow_survives_gc() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 32,
-        extended_frame_size: 56,
-        zero_locals: true,
-        pointer_slots: vec![FO(entry), FO(ref_base)],
+        data_size: 48,
+        extended_frame_size: 72,
+        zero_frame: true,
+        pointer_slots: vec![FO(entry), FO(ref_base), FO(entry_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
