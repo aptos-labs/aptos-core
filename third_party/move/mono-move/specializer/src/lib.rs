@@ -21,7 +21,7 @@ use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 
 /// Configuration for the conversion + optimization pipeline.
 pub struct PipelineConfig {
-    /// Whether to run the bytecode verifier before conversion to stackless-exec-ir.
+    /// Whether to run the bytecode verifier before conversion.
     /// Set to `false` when the module comes from a trusted source (e.g., the
     /// Move compiler, which verifies internally).
     pub verify_bytecode: bool,
