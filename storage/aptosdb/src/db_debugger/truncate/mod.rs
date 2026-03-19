@@ -67,6 +67,7 @@ impl Cmd {
                     /*readonly=*/ false,
                     /*max_num_nodes_per_lru_cache_shard=*/ 0,
                     /*reset_hot_state=*/ true,
+                    /*persist_write_set_hotness=*/ false,
                 )?;
 
             let ledger_db = Arc::new(ledger_db);
