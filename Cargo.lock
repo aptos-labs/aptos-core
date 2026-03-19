@@ -12624,6 +12624,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-gas"
+version = "0.1.0"
+
+[[package]]
 name = "mono-move-global-context"
 version = "0.1.0"
 dependencies = [
@@ -12638,6 +12642,9 @@ dependencies = [
 [[package]]
 name = "mono-move-micro-ops"
 version = "0.1.0"
+dependencies = [
+ "mono-move-gas",
+]
 
 [[package]]
 name = "more-asserts"

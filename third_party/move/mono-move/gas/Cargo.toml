@@ -1,5 +1,5 @@
 [package]
-name = "mono-move-micro-ops"
+name = "mono-move-gas"
 version = "0.1.0"
 # Workspace inherited keys
 authors = { workspace = true }
@@ -9,6 +9,3 @@ license = { workspace = true }
 publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
-
-[dependencies]
-mono-move-gas = { path = "../gas" }
