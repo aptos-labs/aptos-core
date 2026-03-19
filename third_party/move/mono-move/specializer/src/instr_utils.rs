@@ -1,10 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Instruction utilities for the V2 pipeline.
+//! Instruction utilities for the pipeline.
 //!
-//! Self-contained copies of the helpers needed by convert_v2, regalloc_v2,
-//! and optimize_v2 so that the V2 pipeline has no dependency on optimize_v1.
+//! Helpers used by `convert`, `regalloc`, and `optimize`.
 
 use crate::ir::{BinaryOp, ImmValue, Instr, Reg};
 use std::collections::BTreeMap;

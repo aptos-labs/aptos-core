@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! V2 conversion pipeline: Intra-block SSA + greedy register allocation.
+//! Conversion pipeline: Intra-block SSA + greedy register allocation.
 //!
 //! Pass 1: Simulate the operand stack, assigning fresh sequential value IDs
 //!         (pure SSA within each basic block). Locals (params + declared locals)
@@ -12,7 +12,7 @@
 
 use anyhow::{bail, Context, Result};
 use crate::ir::{BinaryOp, FunctionIR, Instr, Label, ModuleIR, Reg, UnaryOp};
-use crate::instr_utils_v2::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
+use crate::instr_utils::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
 use crate::type_conversion::{convert_sig_token, convert_sig_tokens};
 use move_binary_format::{
     access::ModuleAccess,
@@ -28,7 +28,7 @@ use move_vm_types::loaded_data::{
 };
 use std::collections::BTreeMap;
 
-/// Convert an entire compiled module to stackless IR using the v2 pipeline.
+/// Convert an entire compiled module to stackless IR.
 ///
 /// The caller is responsible for running the bytecode verifier beforehand
 /// if the module comes from an untrusted source. The conversion relies on
@@ -56,7 +56,7 @@ use std::collections::BTreeMap;
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed registers
 ///   truly hold dead values, so type-keyed register recycling is sound.
-pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructNameIndex]) -> Result<ModuleIR> {
+pub fn convert_module(module: CompiledModule, struct_name_table: &[StructNameIndex]) -> Result<ModuleIR> {
     let functions = module
         .function_defs
         .iter()
@@ -89,7 +89,7 @@ pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructName
 
                 // Pass 2: Greedy Register Allocation
                 let (allocated_instrs, num_regs, num_arg_regs, reg_types) =
-                    crate::regalloc_v2::allocate_registers(
+                    crate::regalloc::allocate_registers(
                         &ssa_instrs,
                         num_pinned,
                         &local_types,

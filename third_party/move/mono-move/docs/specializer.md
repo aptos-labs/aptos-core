@@ -1,12 +1,12 @@
-# Stackless Execution IR V2 Design
+# Specializer Design
 
-This document describes the `specializer` v2 pipeline from Move bytecode
+This document describes the `specializer` pipeline from Move bytecode
 to the final polymorphic stackless execution IR. It reflects the current
 in-progress implementation in `specializer` and recommends the remaining
 changes needed to make the pipeline coherent, analyzable, and ready for the
 later micro-op lowering stage.
 
-The scope of this document is the v2 pipeline only. The v1-only conversion path
+The v1-only conversion path (in `stackless-exec-ir-v1`)
 is out of scope except where it provides prior art or highlights a design
 boundary.
 

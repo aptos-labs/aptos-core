@@ -1,14 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Greedy register allocation for the V2 pipeline.
+//! Greedy register allocation.
 //!
-//! Consumes `BlockAnalysis` from `analysis_v2` and maps SSA temp VIDs to
+//! Consumes `BlockAnalysis` from `analysis` and maps SSA temp VIDs to
 //! physical Home/Arg registers using liveness-driven type-keyed reuse.
 
 use anyhow::{bail, Context, Result};
-use crate::analysis_v2::analyze_block;
-use crate::instr_utils_v2::{get_defs_uses, rename_instr, split_into_blocks};
+use crate::analysis::analyze_block;
+use crate::instr_utils::{get_defs_uses, rename_instr, split_into_blocks};
 use crate::ir::{Instr, Reg};
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::BTreeMap;
@@ -86,7 +86,7 @@ fn allocate_block(
     carry_pool: BTreeMap<Type, Vec<Reg>>,
     vid_types: &[Type],
     phys_reg_types: &mut BTreeMap<Reg, Type>,
-    analysis: &crate::analysis_v2::BlockAnalysis,
+    analysis: &crate::analysis::BlockAnalysis,
 ) -> Result<(Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Reg>>)> {
     if instrs.is_empty() {
         return Ok((Vec::new(), start_reg, 0, carry_pool));
