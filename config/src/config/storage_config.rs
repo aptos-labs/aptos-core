@@ -251,6 +251,8 @@ pub struct HotStateConfig {
     /// Whether we compute root hashes for hot state in executor and commit the resulting JMT to
     /// db.
     pub compute_root_hash: bool,
+    /// Whether to persist hotness data alongside write sets in the ledger DB.
+    pub persist_hotness_in_write_set: bool,
 }
 
 impl Default for HotStateConfig {
@@ -260,6 +262,7 @@ impl Default for HotStateConfig {
             refresh_interval_versions: 100_000,
             delete_on_restart: true,
             compute_root_hash: true,
+            persist_hotness_in_write_set: false,
         }
     }
 }

@@ -19,9 +19,14 @@ use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::{transaction::Version, write_set::WriteSet};
+use aptos_types::{
+    state_store::state_key::StateKey,
+    transaction::Version,
+    write_set::{HotStateOp, ValueWriteSet, WriteSet, WriteSetV0},
+};
 use byteorder::{BigEndian, ReadBytesExt};
-use std::mem::size_of;
+use serde::{Deserialize, Serialize};
+use std::{collections::BTreeSet, mem::size_of};
 
 define_schema!(WriteSetSchema, Version, WriteSet, WRITE_SET_CF_NAME);
 
@@ -36,13 +41,61 @@ impl KeyCodec<WriteSetSchema> for Version {
     }
 }
 
+/// Storage-only serialization format for `WriteSet`. Separate from `ValueWriteSet` so that the
+/// `BCSCryptoHash` (which goes through `WriteSet::Serialize` → `ValueWriteSet`) is never affected
+/// by the addition of the hotness field.
+#[derive(Serialize, Deserialize)]
+enum PersistedWriteSet {
+    /// Legacy format: identical BCS layout to `ValueWriteSet::V0`.
+    V0(WriteSetV0),
+    /// Extended format that also persists the set of hot state keys.
+    V1 {
+        value: WriteSetV0,
+        hotness: BTreeSet<StateKey>,
+    },
+}
+
+/// Encode a `WriteSet` for storage. When `persist_hotness` is true and hotness is non-empty,
+/// produces the V1 format; otherwise produces the legacy V0 format (byte-identical to
+/// `bcs::to_bytes(write_set)`).
+pub fn encode_write_set(write_set: &WriteSet, persist_hotness: bool) -> Result<Vec<u8>> {
+    if persist_hotness && write_set.has_hotness() {
+        let persisted = PersistedWriteSet::V1 {
+            value: write_set.as_v0().clone(),
+            hotness: write_set.hotness_keys().cloned().collect(),
+        };
+        bcs::to_bytes(&persisted).map_err(Into::into)
+    } else {
+        // Delegates to WriteSet::Serialize → ValueWriteSet → V0 layout.
+        bcs::to_bytes(write_set).map_err(Into::into)
+    }
+}
+
+/// Decode a `WriteSet` from storage, handling both V0 (legacy) and V1 (with hotness) formats.
+pub fn decode_write_set(data: &[u8]) -> Result<WriteSet> {
+    let persisted: PersistedWriteSet = bcs::from_bytes(data)?;
+    match persisted {
+        PersistedWriteSet::V0(ws_v0) => Ok(WriteSet::new_from_value(ValueWriteSet::V0(ws_v0))),
+        PersistedWriteSet::V1 { value, hotness } => {
+            let mut ws = WriteSet::new_from_value(ValueWriteSet::V0(value));
+            ws.add_hotness(
+                hotness
+                    .into_iter()
+                    .map(|key| (key, HotStateOp::make_hot()))
+                    .collect(),
+            );
+            Ok(ws)
+        },
+    }
+}
+
 impl ValueCodec<WriteSetSchema> for WriteSet {
     fn encode_value(&self) -> Result<Vec<u8>> {
         bcs::to_bytes(self).map_err(Into::into)
     }
 
     fn decode_value(data: &[u8]) -> Result<Self> {
-        bcs::from_bytes(data).map_err(Into::into)
+        decode_write_set(data)
     }
 }
 

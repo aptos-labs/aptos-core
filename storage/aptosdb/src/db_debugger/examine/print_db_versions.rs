@@ -46,6 +46,7 @@ impl Cmd {
                 /*readonly=*/ true,
                 /*max_num_nodes_per_lru_cache_shard=*/ 0,
                 /*reset_hot_state=*/ false,
+                /*persist_write_set_hotness=*/ false,
             )?;
 
         println!(
