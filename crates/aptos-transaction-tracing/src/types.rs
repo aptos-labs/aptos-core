@@ -40,17 +40,25 @@ pub enum ExecutionStatus {
 }
 
 /// A single batch creation event (one per pull round that produced batches)
-/// with its timestamp, batch count, and back-pressure state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// with its timestamp, batch count, back-pressure state, and gas bucket breakdown.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchCreationRecord {
     /// Wall-clock timestamp (usecs) when batches were created in this pull round.
     pub timestamp_usecs: u64,
     /// Number of batch objects created in this pull round (one per gas bucket).
     pub num_batches: u64,
+    /// Number of txns pulled from mempool in this round.
+    pub pulled_txn_count: u64,
+    /// Max txns allowed in this pull round (dynamic back-pressure limit).
+    pub pull_max_txn: u64,
     /// Whether txn-count back-pressure was active at creation time.
     pub bp_txn: bool,
     /// Whether proof-count back-pressure was active at creation time.
     pub bp_proof: bool,
+    /// Gas bucket breakdown: (bucket_start, txn_count) for non-empty buckets.
+    /// Buckets are from `batch_buckets` config (e.g. [0, 150, 300, 500, ...]).
+    /// Shows the gas price distribution of txns that got pulled into batches.
+    pub gas_bucket_txn_counts: Vec<(u64, u64)>,
 }
 
 /// Context captured at each QS batch pull for diagnosing pull latency.
@@ -76,26 +84,11 @@ pub struct BatchPullInfo {
     pub bp_txn_count: bool,
     /// Whether proof-count back-pressure is active.
     pub bp_proof_count: bool,
-    /// Recent batch creation events (timestamps + BP state), capped at 200 entries.
-    /// Used to show what the batch generator was doing between MempoolInsert
-    /// and the first QsBatchPull, and how many batches had back-pressure active.
+    /// Recent batch creation events, capped at 500 entries (~37s at 75ms/round).
+    /// Each entry = one pull round that produced batches, with gas bucket breakdown,
+    /// BP state, and pull capacity info. Windowed to the gap between prev stage
+    /// and this pull to compute wait() diagnostics.
     pub recent_batches: Vec<BatchCreationRecord>,
-    /// Min gas price across all txns in batches created since batch generator start.
-    /// Compared with this txn's gas_unit_price to show if it was deprioritized.
-    pub prev_batches_min_gas: Option<u64>,
-    /// Max gas price across all txns in batches created since batch generator start.
-    pub prev_batches_max_gas: Option<u64>,
-    /// How many pull rounds returned zero txns (empty pulls) since last batch
-    /// creation. High count = batch generator was polling but mempool had
-    /// nothing (or back-pressure blocked pulls).
-    pub empty_pulls_since_last_batch: u64,
-    /// How many pull rounds had proof-count back-pressure active since last
-    /// batch creation. Proof BP blocks normal pulls entirely (only force-pull
-    /// at 250ms fires).
-    pub bp_proof_rounds_since_last_batch: u64,
-    /// How many pull rounds had txn-count back-pressure active since last
-    /// batch creation. Txn BP reduces the dynamic pull limit.
-    pub bp_txn_rounds_since_last_batch: u64,
 }
 
 /// Additional metadata for specific stages.

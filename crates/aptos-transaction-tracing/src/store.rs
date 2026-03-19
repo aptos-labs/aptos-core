@@ -278,14 +278,17 @@ fn is_block_finalization(stage: TransactionStage) -> bool {
 }
 
 /// Build a `wait(...)` summary for the gap between the previous stage and
-/// the first QsBatchPull of a new attempt. Shows gap duration, batch count,
-/// interval percentiles, back-pressure batch counts, and gas range.
+/// the first QsBatchPull of a new attempt.
+///
+/// Diagnoses why a txn waited: shows pull round count, interval percentiles,
+/// back-pressure breakdown, pull capacity utilization, and gas bucket distribution.
 fn build_wait_summary(
     info: &crate::types::BatchPullInfo,
     prev_stage_usecs: u64,
     pull_time_usecs: u64,
 ) -> String {
     use crate::types::BatchCreationRecord;
+    use std::collections::BTreeMap;
 
     // Filter batch records to the half-open window (prev_stage, pull_time).
     let gap_batches: Vec<&BatchCreationRecord> = info
@@ -302,7 +305,6 @@ fn build_wait_summary(
 
     if !gap_batches.is_empty() {
         let n = gap_batches.len();
-        // Each entry = one pull round that produced batches; num_batches = gas-bucket splits.
         let total_batch_objects: u64 = gap_batches.iter().map(|r| r.num_batches).sum();
         parts.push(format!("rounds={},batches={}", n, total_batch_objects));
 
@@ -326,10 +328,16 @@ fn build_wait_summary(
             ));
         }
 
-        // Count pull rounds with each type of back-pressure active at creation time.
-        // bp_txn: txn-count BP was active → pull limit was reduced for this round.
-        // bp_proof: proof-count BP was active → normal pulls were blocked entirely,
-        //           only the 250ms force-pull could fire.
+        // pulled_full: how many rounds pulled at max capacity (pull limit was the bottleneck).
+        let pulled_full = gap_batches
+            .iter()
+            .filter(|r| r.pulled_txn_count >= r.pull_max_txn)
+            .count();
+        if pulled_full > 0 {
+            parts.push(format!("pulled_full={}/{}", pulled_full, n));
+        }
+
+        // Back-pressure breakdown: how many rounds had each BP type active.
         let bp_txn_rounds = gap_batches.iter().filter(|r| r.bp_txn).count();
         let bp_proof_rounds = gap_batches.iter().filter(|r| r.bp_proof).count();
         match (bp_txn_rounds > 0, bp_proof_rounds > 0) {
@@ -345,35 +353,22 @@ fn build_wait_summary(
             },
             (false, false) => {},
         }
-    }
 
-    if let (Some(min_g), Some(max_g)) = (info.prev_batches_min_gas, info.prev_batches_max_gas) {
-        if min_g == max_g {
-            parts.push(format!("batch_gas={}", min_g));
-        } else {
-            parts.push(format!("batch_gas={}..{}", min_g, max_g));
+        // Aggregate gas bucket distribution across all rounds in the gap.
+        // Shows total txns per gas bucket: gas=[0:2700,150:1200,500:600]
+        let mut gas_totals: BTreeMap<u64, u64> = BTreeMap::new();
+        for r in &gap_batches {
+            for &(bucket, count) in &r.gas_bucket_txn_counts {
+                *gas_totals.entry(bucket).or_insert(0) += count;
+            }
         }
-    }
-    if info.empty_pulls_since_last_batch > 0 {
-        parts.push(format!(
-            "empty_pulls={}",
-            info.empty_pulls_since_last_batch
-        ));
-    }
-    // bp_*_rounds_since_last_batch count rounds only since the last
-    // batch creation (reset after each batch). For a long wait with many
-    // batches, these reflect only the final batch cycle, not the full gap.
-    if info.bp_proof_rounds_since_last_batch > 0 {
-        parts.push(format!(
-            "bp_proof_rounds={}",
-            info.bp_proof_rounds_since_last_batch
-        ));
-    }
-    if info.bp_txn_rounds_since_last_batch > 0 {
-        parts.push(format!(
-            "bp_txn_rounds={}",
-            info.bp_txn_rounds_since_last_batch
-        ));
+        if !gas_totals.is_empty() {
+            let bucket_strs: Vec<String> = gas_totals
+                .iter()
+                .map(|(bucket, count)| format!("{}:{}", bucket, count))
+                .collect();
+            parts.push(format!("gas=[{}]", bucket_strs.join(",")));
+        }
     }
 
     format!("wait({})", parts.join(","))
