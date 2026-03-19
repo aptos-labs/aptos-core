@@ -113,7 +113,7 @@ impl NumberOperationProcessor {
                 match item {
                     Either::Left(fid) => {
                         let func_env = env.get_function(*fid);
-                        if func_env.is_inline() {
+                        if func_env.is_not_prover_target() {
                             continue;
                         }
                         for (_, target) in targets.get_targets(&func_env) {
@@ -126,7 +126,7 @@ impl NumberOperationProcessor {
                     Either::Right(scc) => {
                         for fid in scc {
                             let func_env = env.get_function(*fid);
-                            if func_env.is_inline() {
+                            if func_env.is_not_prover_target() {
                                 continue;
                             }
                             for (_, target) in targets.get_targets(&func_env) {
@@ -1082,9 +1082,9 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                     GetField(msid, sid, _, offset) | BorrowField(msid, sid, _, offset) => {
                         let field_id = self
                             .func_target
-                            .func_env
-                            .module_env
-                            .get_struct(*sid)
+                            .global_env()
+                            .get_module(*msid)
+                            .into_struct(*sid)
                             .get_field_by_offset(*offset)
                             .get_id();
 
@@ -1152,8 +1152,11 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                     },
                     Function(msid, fsid, _) => {
                         let module_env = &self.func_target.global_env().get_module(*msid);
-                        // Vector functions are handled separately
-                        if !module_env.is_std_vector() && !module_env.is_table() {
+                        let callee_env = module_env.get_function(*fsid);
+                        if callee_env.is_struct_api() {
+                            // Struct API calls are already translated to native ops by
+                            // stackless_bytecode_generator; nothing to do here.
+                        } else if !module_env.is_std_vector() && !module_env.is_table() {
                             for (i, src) in srcs.iter().enumerate() {
                                 let cur_oper = global_state
                                     .get_temp_index_oper(cur_mid, cur_fid, *src, baseline_flag)

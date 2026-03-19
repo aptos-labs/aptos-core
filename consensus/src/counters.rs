@@ -1487,3 +1487,12 @@ pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| 
         "The number of last consecutive successes capped at window length",
     )
 });
+
+pub static DECRYPTION_PIPELINE_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_decryption_pipeline_txns_count",
+        "Count of transactions processed by the decryption pipeline by category.",
+        &["category"]
+    )
+    .unwrap()
+});

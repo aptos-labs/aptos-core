@@ -1,0 +1,74 @@
+module 0x42::pos_defs {
+    public struct NestedPair<T: copy + drop> has copy, drop {
+        _0: Pair,
+        _1: Wrapper<T>,
+    }
+    public struct Pair has copy, drop {
+        _0: u64,
+        _1: bool,
+    }
+    public struct Wrapper<T: copy + drop> has copy, drop {
+        _0: T,
+    }
+    public struct VecWrap<T: copy + drop> has copy, drop {
+        _0: vector<T>,
+    }
+}
+module 0x42::pos_consumer {
+    use 0x42::pos_defs;
+    fun borrow_nested_fields(n: &pos_defs::NestedPair<u64>): (u64, u64) {
+        let _v0 = *&(&n._0)._0;
+        let _v1 = *&(&n._1)._0;
+        (_v0, _v1)
+    }
+    fun borrow_pair_fields(p: &pos_defs::Pair): (u64, bool) {
+        let _v0 = *&p._0;
+        let _v1 = *&p._1;
+        (_v0, _v1)
+    }
+    fun borrow_vecwrap_field(v: &pos_defs::VecWrap<u64>): u64 {
+        *0x1::vector::borrow<u64>(&v._0, 0)
+    }
+    fun borrow_wrapper_field(w: &pos_defs::Wrapper<u64>): u64 {
+        *&w._0
+    }
+    fun make_pair(x: u64, b: bool): pos_defs::Pair {
+        pos_defs::Pair{_0: x, _1: b}
+    }
+    fun make_wrapper(v: u64): pos_defs::Wrapper<u64> {
+        pos_defs::Wrapper<u64>{_0: v}
+    }
+    fun mutate_pair_field(p: &mut pos_defs::Pair, new_x: u64) {
+        let _v0 = &mut p._0;
+        *_v0 = new_x;
+    }
+    fun mutate_wrapper_field(w: &mut pos_defs::Wrapper<u64>, new_v: u64) {
+        let _v0 = &mut w._0;
+        *_v0 = new_v;
+    }
+    fun round_trip(): u64 {
+        let (_v0,_v1) = unpack_pair(make_pair(10, true));
+        let _v2 = unpack_wrapper(make_wrapper(20));
+        _v0 + _v2
+    }
+    fun unpack_pair(p: pos_defs::Pair): (u64, bool) {
+        let pos_defs::Pair{_0: _v0, _1: _v1} = p;
+        (_v0, _v1)
+    }
+    fun unpack_wrapper(w: pos_defs::Wrapper<u64>): u64 {
+        let pos_defs::Wrapper<u64>{_0: _v0} = w;
+        _v0
+    }
+    fun unpack_nested(n: pos_defs::NestedPair<u64>): (u64, bool, u64) {
+        let pos_defs::NestedPair<u64>{_0: _v0, _1: _v1} = n;
+        let pos_defs::Pair{_0: _v2, _1: _v3} = _v0;
+        let pos_defs::Wrapper<u64>{_0: _v4} = _v1;
+        (_v2, _v3, _v4)
+    }
+    fun unpack_vecwrap(vw: pos_defs::VecWrap<u64>): vector<u64> {
+        let pos_defs::VecWrap<u64>{_0: _v0} = vw;
+        _v0
+    }
+}
+
+============ recompilation succeeded ========

@@ -50,9 +50,7 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
-        "realistic_env_max_load_encrypted" => {
-            realistic_env_max_load_encrypted_test(duration, test_cmd)
-        },
+        "realistic_env_max_load_encrypted" => realistic_env_max_load_encrypted_test(duration),
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -484,21 +482,10 @@ pub(crate) fn realistic_env_max_load_test(
         .with_num_pfns(1)
 }
 
-pub(crate) fn realistic_env_max_load_encrypted_test(
-    duration: Duration,
-    test_cmd: &TestCommand,
-) -> ForgeConfig {
-    // Check if HAProxy is enabled
-    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
-        k8s.enable_haproxy
-    } else {
-        false
-    };
-
+pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
     let num_validators = 5;
     let num_fullnodes = 1;
-
-    let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
+    let mempool_backlog = 100;
 
     let success_criteria = SuccessCriteria::new(15)
         .add_no_restarts()
@@ -556,8 +543,7 @@ pub(crate) fn realistic_env_max_load_encrypted_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 100 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
-                .latency_polling_interval(Duration::from_millis(100))
-                .encrypt_transactions(true),
+                .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)
 }

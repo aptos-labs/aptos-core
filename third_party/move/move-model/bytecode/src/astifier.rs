@@ -1054,13 +1054,19 @@ impl Generator {
     ) {
         use BytecodeOperation::*;
         match oper {
-            Function(mid, fid, inst) => self.gen_call_stm(
-                ctx,
-                Some(inst),
-                dests,
-                Operation::MoveFunction(*mid, *fid),
-                srcs,
-            ),
+            Function(mid, fid, inst) => {
+                debug_assert!(
+                    !ctx.env().get_function(mid.qualified(*fid)).is_struct_api(),
+                    "struct API wrapper should have been translated in stackless_bytecode_generator"
+                );
+                self.gen_call_stm(
+                    ctx,
+                    Some(inst),
+                    dests,
+                    Operation::MoveFunction(*mid, *fid),
+                    srcs,
+                )
+            },
             Closure(mid, fid, inst, closure_mask) => self.gen_call_stm(
                 ctx,
                 Some(inst),

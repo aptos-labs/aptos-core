@@ -415,7 +415,10 @@ impl<'env> BoogieTranslator<'env> {
             }
 
             for ref fun_env in module_env.get_functions() {
-                if fun_env.is_native_or_intrinsic() || fun_env.is_inline() || fun_env.is_test_only()
+                if fun_env.is_native_or_intrinsic()  // no Move body to translate
+                    || fun_env.is_test_only()         // not part of production verification
+                    || fun_env.is_not_prover_target()
+                // inline/struct-api: no independent target
                 {
                     continue;
                 }

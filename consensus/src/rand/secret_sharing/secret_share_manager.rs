@@ -161,7 +161,13 @@ impl SecretShareManager {
         let share = match result {
             Ok(Some(share)) => share,
             Ok(None) => {
-                error!(round = round, "Self-share derive returned None, skipping");
+                info!(
+                    round = round,
+                    "Self-share derive returned None (no encrypted txns), resolving round"
+                );
+                if let Some(item) = self.block_queue.item_mut(round) {
+                    item.resolve_round_without_key(round);
+                }
                 return;
             },
             Err(e) => {

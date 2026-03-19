@@ -221,7 +221,7 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 continue;
             }
             for ref fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_not_prover_target() {
                     continue;
                 }
                 for (variant, target) in targets.get_targets(fun) {
@@ -1204,7 +1204,7 @@ fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
     for module_env in env.get_modules() {
         if module_env.is_target() {
             for fun_env in module_env.get_functions() {
-                if !fun_env.is_inline() {
+                if !fun_env.is_not_prover_target() {
                     check_caller_callee_modifies_relation(env, targets, &fun_env);
                     check_opaque_modifies_completeness(env, targets, &fun_env);
                 }
@@ -1227,7 +1227,10 @@ fn check_caller_callee_modifies_relation(
         .expect(COMPILED_MODULE_AVAILABLE)
     {
         let callee_fun_env = env.get_function(*callee);
-        if callee_fun_env.is_native() || callee_fun_env.is_intrinsic() {
+        if callee_fun_env.is_native()
+            || callee_fun_env.is_intrinsic()
+            || callee_fun_env.is_struct_api()
+        {
             continue;
         }
         let callee_func_target = targets.get_target(&callee_fun_env, &FunctionVariant::Baseline);

@@ -191,7 +191,7 @@ impl EvalProofsPromise {
         }
     }
 
-    pub fn compute_all_vgzz_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs {
+    pub fn compute_all_vzgg_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs {
         EvalProofs {
             computed_proofs: self
                 .ids

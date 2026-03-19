@@ -106,6 +106,7 @@ impl AptosDB {
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
         reset_hot_state: bool,
+        persist_write_set_hotness: bool,
     ) -> Result<(
         LedgerDb,
         Option<StateMerkleDb>,
@@ -119,6 +120,7 @@ impl AptosDB {
             env,
             block_cache,
             readonly,
+            persist_write_set_hotness,
         )?;
         let hot_state_kv_db = if !readonly {
             Some(StateKvDb::new(

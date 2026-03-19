@@ -77,6 +77,7 @@ use aptos_types::{
     transaction::{
         authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
+        encrypted_payload::DecryptionFailureReason,
         signature_verified_transaction::SignatureVerifiedTransaction,
         AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
         MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
@@ -2128,6 +2129,24 @@ impl AptosVM {
             Ok(executable) => executable,
             Err(_) => return unwrap_or_discard!(Err(deprecated_module_bundle!())),
         };
+
+        // If the encrypted transaction exceeded the batch limit, return Retry
+        // so it is re-queued without charging gas or incrementing sequence number.
+        if txn.payload().decryption_failure_reason()
+            == Some(&DecryptionFailureReason::BatchLimitReached)
+        {
+            return (
+                VMStatus::Error {
+                    status_code: StatusCode::UNKNOWN_STATUS,
+                    sub_status: None,
+                    message: Some(
+                        "Encrypted transaction exceeded batch limit; retrying".to_string(),
+                    ),
+                },
+                VMOutput::empty_with_status(TransactionStatus::Retry),
+            );
+        }
+
         let multisig_address = txn.multisig_address();
         let result = if let Some(multisig_address) = multisig_address {
             self.execute_multisig_transaction(

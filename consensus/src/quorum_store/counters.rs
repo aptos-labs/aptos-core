@@ -231,15 +231,15 @@ static NUM_TXN_PER_BATCH: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_num_txn_per_batch",
         "Histogram for the number of transanctions per batch.",
-        &["bucket"],
+        &["bucket", "batch_version"],
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub fn num_txn_per_batch(bucket_start: &str, num: usize) {
+pub fn num_txn_per_batch(bucket_start: &str, num: usize, batch_version: &str) {
     NUM_TXN_PER_BATCH
-        .with_label_values(&[bucket_start])
+        .with_label_values(&[bucket_start, batch_version])
         .observe(num as f64)
 }
 
@@ -628,11 +628,22 @@ pub static BATCH_PULL_EXCLUDED_TXNS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the created batches since last restart.
-pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+/// Count of the created batches since last restart, by version and kind.
+pub static CREATED_BATCHES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "quorum_store_created_batch_count",
-        "Count of the created batches since last restart."
+        "Count of the created batches since last restart.",
+        &["batch_version", "batch_kind"]
+    )
+    .unwrap()
+});
+
+/// Count of total transactions created, by version and kind.
+pub static CREATED_TXNS_BY_KIND: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_created_txns_by_kind",
+        "Count of total transactions created, split by batch version and kind.",
+        &["batch_version", "batch_kind"]
     )
     .unwrap()
 });
@@ -651,14 +662,14 @@ static LOCAL_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "quorum_store_local_PoS_count",
         "Count of the locally created PoS since last restart.",
-        &["bucket"]
+        &["bucket", "batch_version"]
     )
     .unwrap()
 });
 
-pub fn inc_local_pos_count(bucket: u64) {
+pub fn inc_local_pos_count(bucket: u64, batch_version: &str) {
     LOCAL_POS_COUNT
-        .with_label_values(&[bucket.to_string().as_str()])
+        .with_label_values(&[bucket.to_string().as_str(), batch_version])
         .inc()
 }
 
@@ -667,14 +678,14 @@ static REMOTE_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "quorum_store_remote_PoS_count",
         "Count of the received PoS since last restart.",
-        &["bucket"]
+        &["bucket", "batch_version"]
     )
     .unwrap()
 });
 
-pub fn inc_remote_pos_count(bucket: u64) {
+pub fn inc_remote_pos_count(bucket: u64, batch_version: &str) {
     REMOTE_POS_COUNT
-        .with_label_values(&[bucket.to_string().as_str()])
+        .with_label_values(&[bucket.to_string().as_str(), batch_version])
         .inc()
 }
 
@@ -1055,7 +1066,7 @@ pub static BATCH_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_batch_tracing",
         "Histogram for different stages of a QS batch",
-        &["author", "stage"],
+        &["author", "stage", "batch_version"],
         BATCH_TRACING_BUCKETS.to_vec()
     )
     .unwrap()
@@ -1065,7 +1076,7 @@ pub static BATCH_VOTE_PROGRESS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_batch_vote_progress",
         "Histogram for vote collection of a QS batch",
-        &["author", "vote_pct"],
+        &["author", "vote_pct", "batch_version"],
         BATCH_TRACING_BUCKETS.to_vec()
     )
     .unwrap()

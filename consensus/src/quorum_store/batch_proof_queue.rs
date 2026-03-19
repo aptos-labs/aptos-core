@@ -197,6 +197,7 @@ impl BatchProofQueue {
         let bucket = proof.gas_bucket_start();
         let num_txns = proof.num_txns();
         let expiration = proof.expiration();
+        let batch_version = if proof.info().is_v2() { "v2" } else { "v1" };
 
         let batch_sort_key = BatchSortKey::from_info(proof.info());
         let batches_for_author = self.author_to_batches.entry(author).or_default();
@@ -262,9 +263,9 @@ impl BatchProofQueue {
         }
 
         if author == self.my_peer_id {
-            counters::inc_local_pos_count(bucket);
+            counters::inc_local_pos_count(bucket, batch_version);
         } else {
-            counters::inc_remote_pos_count(bucket);
+            counters::inc_remote_pos_count(bucket, batch_version);
         }
         self.inc_remaining_proofs(&author, num_txns);
 

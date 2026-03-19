@@ -222,7 +222,7 @@ impl Analyzer<'_> {
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.
         for module in self.env.get_modules() {
             for fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_not_prover_target() {
                     continue;
                 }
                 for (variant, target) in self.targets.get_targets(&fun) {
@@ -481,8 +481,11 @@ impl Analyzer<'_> {
                         .entry(callee_env.module_env.get_id())
                         .or_default()
                         .insert(actuals);
-                } else if !callee_env.is_opaque() {
+                } else if !callee_env.is_opaque() && !callee_env.is_struct_api() {
                     // This call needs to be inlined, with targs instantiated by self.inst_opt.
+                    // Struct API wrappers are excluded: their call sites are translated to native
+                    // ops (Pack, BorrowField, etc.) in stackless_bytecode_generator, so there is
+                    // no independent bytecode target to schedule for monomorphization.
                     // Schedule for later processing if this instance has not been processed yet.
                     let entry = (mid.qualified(*fid), FunctionVariant::Baseline, actuals);
                     if !self.done_funs.contains(&entry) {

@@ -331,6 +331,16 @@ DecKeyMetadata:
   STRUCT:
     - epoch: U64
     - round: U64
+DecryptionFailureReason:
+  ENUM:
+    0:
+      CryptoFailure: UNIT
+    1:
+      BatchLimitReached: UNIT
+    2:
+      ConfigUnavailable: UNIT
+    3:
+      DecryptionKeyUnavailable: UNIT
 DepositEvent:
   STRUCT:
     - amount: U64
@@ -362,7 +372,10 @@ EncryptedPayload:
           - payload_hash:
               TYPENAME: HashValue
           - eval_proof:
-              TYPENAME: EvalProof
+              OPTION:
+                TYPENAME: EvalProof
+          - reason:
+              TYPENAME: DecryptionFailureReason
     2:
       Decrypted:
         STRUCT:

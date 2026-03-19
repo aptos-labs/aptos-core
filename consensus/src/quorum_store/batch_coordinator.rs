@@ -99,11 +99,17 @@ impl BatchCoordinator {
                 })
                 .collect();
 
-            if persist_requests[0].batch_info().is_v2() {
+            let first_batch_info = persist_requests[0].batch_info().clone();
+            if first_batch_info.is_v2() {
                 let signed_batch_infos = batch_store.persist(persist_requests);
                 if !signed_batch_infos.is_empty() {
                     if approx_created_ts_usecs > 0 {
-                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+                        observe_batch(
+                            approx_created_ts_usecs,
+                            peer_id,
+                            BatchStage::SIGNED,
+                            &first_batch_info,
+                        );
                     }
                     network_sender
                         .send_signed_batch_info_msg_v2(signed_batch_infos, vec![peer_id])
@@ -117,7 +123,12 @@ impl BatchCoordinator {
                         .expect("must not be empty")
                         .is_v2());
                     if approx_created_ts_usecs > 0 {
-                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+                        observe_batch(
+                            approx_created_ts_usecs,
+                            peer_id,
+                            BatchStage::SIGNED,
+                            &first_batch_info,
+                        );
                     }
                     let signed_batch_infos = signed_batch_infos
                         .into_iter()
@@ -222,6 +233,7 @@ impl BatchCoordinator {
                 approx_created_ts_usecs,
                 batch.author(),
                 BatchStage::RECEIVED,
+                batch.batch_info(),
             );
         }
 
