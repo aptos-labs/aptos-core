@@ -11,7 +11,10 @@
 use crate::{
     payload_client::PayloadClient,
     pipeline::{buffer_manager::OrderedBlocks, pipeline_builder::PipelineBuilder},
-    prefix_consensus::counters::{PROPOSAL_WAIT_DURATION, SLOT_DURATION, SLOT_START_TRIGGER},
+    prefix_consensus::counters::{
+        PROPOSAL_WAIT_DURATION, SLOT_DURATION, SLOT_START_TRIGGER, WAVE_COMMITTED_BLOCKS,
+        WAVE_COMMITTED_TXNS,
+    },
 };
 use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter, Round},
@@ -1108,6 +1111,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             self.v_low_committed_positions.insert(*pos);
         }
 
+        // Compute wave metrics before blocks are moved
+        let wave_label = if is_vhigh_wave { "vhigh" } else { "vlow" };
+        let wave_block_count = blocks.len();
+        let wave_txn_count: usize = blocks
+            .iter()
+            .map(|b| b.payload().map_or(0, |p| p.len()))
+            .sum();
+
         // Build OrderedBlocks with ordered_proof covering the last block
         let last_block_info = blocks.last().unwrap().block_info();
         let ordered = OrderedBlocks {
@@ -1136,7 +1147,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             );
         }
 
-        // Record commit_wave duration (block building + execution send only, excludes finalization)
+        // Record commit_wave metrics
+        WAVE_COMMITTED_BLOCKS
+            .with_label_values(&[wave_label])
+            .observe(wave_block_count as f64);
+        WAVE_COMMITTED_TXNS
+            .with_label_values(&[wave_label])
+            .observe(wave_txn_count as f64);
+
         let stage = if is_vhigh_wave { "vhigh_commit_wave" } else { "vlow_commit_wave" };
         SLOT_DURATION
             .with_label_values(&[stage])
