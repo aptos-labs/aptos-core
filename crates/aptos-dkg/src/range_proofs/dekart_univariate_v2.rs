@@ -257,7 +257,10 @@ fn compute_h_denom_eval<E: Pairing>(
     roots_of_unity_in_eval_dom: &Vec<E::ScalarField>,
 ) -> Vec<E::ScalarField> {
     let num_omegas = roots_of_unity_in_eval_dom.len();
-    assert!(num_omegas >= 2, "num_omegas must be at least 2 (max_n >= 1)");
+    assert!(
+        num_omegas >= 2,
+        "num_omegas must be at least 2 (max_n >= 1)"
+    );
     let mut h_denom_eval = Vec::with_capacity(num_omegas);
 
     // First element: inverse of (max_n * (max_n + 1) / 2)
@@ -753,11 +756,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 9b
         fiat_shamir::append_evaluations_at_gamma::<E>(&mut fs_t, a, a_h, &a_js);
-        
+
         // Step 9c:
         let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("Step 9: a,a_h,a_js + append_evaluations_at_gamma + get_mu_challenges", start.elapsed());
+        print_cumulative(
+            "Step 9: a,a_h,a_js + append_evaluations_at_gamma + get_mu_challenges",
+            start.elapsed(),
+        );
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
@@ -1130,7 +1136,12 @@ mod fiat_shamir {
         <Transcript as RangeProof<E, Proof<E>>>::append_h_commitment(fs_transcript, D);
     }
 
-    pub(crate) fn append_evaluations_at_gamma<E: Pairing>(fs_transcript: &mut Transcript, a: E::ScalarField, a_h: E::ScalarField, a_js: &Vec<E::ScalarField>) {
+    pub(crate) fn append_evaluations_at_gamma<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        a: E::ScalarField,
+        a_h: E::ScalarField,
+        a_js: &Vec<E::ScalarField>,
+    ) {
         let mut points = vec![a, a_h];
         points.extend(a_js);
         fs_transcript.append_evaluation_points(&points);
