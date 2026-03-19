@@ -46,7 +46,6 @@ proptest! {
 fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let transaction_store = &aptos_db.transaction_store;
     let num_write_sets = write_sets.len();
 
     let pruner = LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
@@ -59,9 +58,13 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     // write sets
     let mut batch = SchemaBatch::new();
     for (ver, ws) in write_sets.iter().enumerate() {
-        transaction_store
-            .put_write_set(ver as Version, ws, &mut batch)
-            .unwrap();
+        crate::ledger_db::write_set_db::WriteSetDb::put_write_set(
+            ver as Version,
+            ws,
+            &mut batch,
+            /*persist_hotness=*/ false,
+        )
+        .unwrap();
     }
     aptos_db
         .ledger_db
