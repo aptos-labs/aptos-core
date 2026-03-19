@@ -55,7 +55,8 @@ impl DbDir {
             RocksdbConfig::default(),
             env,
             block_cache,
-            true,
+            /*readonly=*/ true,
+            /*persist_write_set_hotness=*/ false,
         )
     }
 }

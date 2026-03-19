@@ -62,6 +62,7 @@ const TEST_CONFIG: HotStateConfig = HotStateConfig {
     refresh_interval_versions: REFRESH_INTERVAL_VERSIONS,
     delete_on_restart: false,
     compute_root_hash: true,
+    persist_hotness_in_write_set: true,
 };
 
 #[derive(Debug)]
