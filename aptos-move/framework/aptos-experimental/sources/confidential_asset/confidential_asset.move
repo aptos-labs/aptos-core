@@ -331,7 +331,7 @@ module aptos_experimental::confidential_asset {
     /// balances). This way, we could *generically* handle them here, given they are implemented in a type-safe way that
     /// allows us to check they are enabled.
     fun is_safe_for_confidentiality(asset_type: &Object<fungible_asset::Metadata>): bool {
-        !fungible_asset::is_asset_type_dispatchable(asset_type)
+        !fungible_asset::is_asset_type_dispatchable(*asset_type)
     }
 
     /// Registers a confidential store for a specified asset type, encrypted under the given EK.
