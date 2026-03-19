@@ -578,15 +578,16 @@ impl BatchGenerator {
         // BatchPullInfo.bp_txn_count/bp_proof_count), indicating why txns may have been
         // excluded or the pull limit may have been reduced for this batch.
         if !batches.is_empty() {
+            // Record one entry per pull round (not per batch object) so that
+            // wait() counts reflect actual pull rounds, not gas-bucket splits.
             let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
-            let record = aptos_transaction_tracing::types::BatchCreationRecord {
-                timestamp_usecs: now,
-                bp_txn: self.back_pressure.txn_count,
-                bp_proof: self.back_pressure.proof_count,
-            };
-            for _ in 0..batches.len() {
-                self.recent_batch_records.push_back(record);
-            }
+            self.recent_batch_records
+                .push_back(aptos_transaction_tracing::types::BatchCreationRecord {
+                    timestamp_usecs: now,
+                    num_batches: batches.len() as u64,
+                    bp_txn: self.back_pressure.txn_count,
+                    bp_proof: self.back_pressure.proof_count,
+                });
             // Cap at 200 entries to bound memory
             while self.recent_batch_records.len() > 200 {
                 self.recent_batch_records.pop_front();

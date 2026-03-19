@@ -302,47 +302,46 @@ fn build_wait_summary(
 
     if !gap_batches.is_empty() {
         let n = gap_batches.len();
-        parts.push(format!("batches={}", n));
+        // Each entry = one pull round that produced batches; num_batches = gas-bucket splits.
+        let total_batch_objects: u64 = gap_batches.iter().map(|r| r.num_batches).sum();
+        parts.push(format!("rounds={},batches={}", n, total_batch_objects));
 
-        // Interval percentiles (p50/p70/p90) between consecutive batch creations.
-        // Sub-millisecond intervals (0ms after integer division) are excluded to
-        // avoid misleading values from batches created in the same millisecond.
+        // Interval percentiles (p50/p70/p90) between consecutive pull rounds.
         if n >= 2 {
             let mut intervals_ms: Vec<i64> = gap_batches
                 .windows(2)
                 .map(|w| (w[1].timestamp_usecs as i64 - w[0].timestamp_usecs as i64) / 1000)
-                .filter(|&v| v > 0)
                 .collect();
-            if !intervals_ms.is_empty() {
-                intervals_ms.sort_unstable();
-                let pct = |p: f64| {
-                    let idx =
-                        ((intervals_ms.len() as f64 - 1.0) * p / 100.0).round() as usize;
-                    intervals_ms[idx]
-                };
-                parts.push(format!(
-                    "interval=p50:{}ms/p70:{}ms/p90:{}ms",
-                    pct(50.0),
-                    pct(70.0),
-                    pct(90.0),
-                ));
-            }
+            intervals_ms.sort_unstable();
+            let pct = |p: f64| {
+                let idx =
+                    ((intervals_ms.len() as f64 - 1.0) * p / 100.0).round() as usize;
+                intervals_ms[idx]
+            };
+            parts.push(format!(
+                "interval=p50:{}ms/p70:{}ms/p90:{}ms",
+                pct(50.0),
+                pct(70.0),
+                pct(90.0),
+            ));
         }
 
-        // Count batches with each type of back-pressure active at creation time.
-        // bp_txn: txn-count BP was active → pull limit was reduced for this batch.
+        // Count pull rounds with each type of back-pressure active at creation time.
+        // bp_txn: txn-count BP was active → pull limit was reduced for this round.
         // bp_proof: proof-count BP was active → normal pulls were blocked entirely,
         //           only the 250ms force-pull could fire.
-        let bp_txn_batches = gap_batches.iter().filter(|r| r.bp_txn).count();
-        let bp_proof_batches = gap_batches.iter().filter(|r| r.bp_proof).count();
-        match (bp_txn_batches > 0, bp_proof_batches > 0) {
+        let bp_txn_rounds = gap_batches.iter().filter(|r| r.bp_txn).count();
+        let bp_proof_rounds = gap_batches.iter().filter(|r| r.bp_proof).count();
+        match (bp_txn_rounds > 0, bp_proof_rounds > 0) {
             (true, true) => parts.push(format!(
-                "bp_batches={}(txn),{}(proof)",
-                bp_txn_batches, bp_proof_batches
+                "bp_rounds={}(txn),{}(proof)/{}",
+                bp_txn_rounds, bp_proof_rounds, n
             )),
-            (true, false) => parts.push(format!("bp_batches={}(txn)", bp_txn_batches)),
+            (true, false) => {
+                parts.push(format!("bp_rounds={}(txn)/{}", bp_txn_rounds, n))
+            },
             (false, true) => {
-                parts.push(format!("bp_batches={}(proof)", bp_proof_batches))
+                parts.push(format!("bp_rounds={}(proof)/{}", bp_proof_rounds, n))
             },
             (false, false) => {},
         }

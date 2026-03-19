@@ -39,11 +39,14 @@ pub enum ExecutionStatus {
     Discard,
 }
 
-/// A single batch creation event with its timestamp and back-pressure state.
+/// A single batch creation event (one per pull round that produced batches)
+/// with its timestamp, batch count, and back-pressure state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BatchCreationRecord {
-    /// Wall-clock timestamp (usecs) when this batch was created.
+    /// Wall-clock timestamp (usecs) when batches were created in this pull round.
     pub timestamp_usecs: u64,
+    /// Number of batch objects created in this pull round (one per gas bucket).
+    pub num_batches: u64,
     /// Whether txn-count back-pressure was active at creation time.
     pub bp_txn: bool,
     /// Whether proof-count back-pressure was active at creation time.
