@@ -161,8 +161,14 @@ impl TransactionTraceStore {
         metadata: Option<StageMetadata>,
         timestamp_usecs: u64,
     ) {
-        if let Some(txn_hashes) = self.batch_txns.get(batch_digest) {
-            for hash in txn_hashes.value() {
+        // Clone hashes and release the batch_txns shard lock before acquiring
+        // per-txn trace locks, reducing cross-map lock hold time.
+        let txn_hashes: Option<Vec<HashValue>> = self
+            .batch_txns
+            .get(batch_digest)
+            .map(|r| r.value().clone());
+        if let Some(hashes) = txn_hashes {
+            for hash in &hashes {
                 match &metadata {
                     Some(meta) => {
                         self.record_stage_with_metadata_at(
@@ -190,6 +196,11 @@ impl TransactionTraceStore {
         if !traced.is_empty() {
             self.batch_txns.insert(batch_digest, traced);
         }
+    }
+
+    /// Check if a transaction hash has an active trace.
+    pub fn is_traced(&self, hash: &HashValue) -> bool {
+        self.traces.contains_key(hash)
     }
 
     /// Record the gas unit price for a traced transaction (set once at first pull).
@@ -266,6 +277,109 @@ fn is_block_finalization(stage: TransactionStage) -> bool {
     )
 }
 
+/// Build a `wait(...)` summary for the gap between the previous stage and
+/// the first QsBatchPull of a new attempt. Shows gap duration, batch count,
+/// interval percentiles, back-pressure batch counts, and gas range.
+fn build_wait_summary(
+    info: &crate::types::BatchPullInfo,
+    prev_stage_usecs: u64,
+    pull_time_usecs: u64,
+) -> String {
+    use crate::types::BatchCreationRecord;
+
+    // Filter batch records to the half-open window (prev_stage, pull_time).
+    let gap_batches: Vec<&BatchCreationRecord> = info
+        .recent_batches
+        .iter()
+        .filter(|r| r.timestamp_usecs > prev_stage_usecs && r.timestamp_usecs < pull_time_usecs)
+        .collect();
+
+    let mut parts = Vec::new();
+
+    // Always show gap duration (ms between previous stage and this pull).
+    let gap_ms = (pull_time_usecs as i64 - prev_stage_usecs as i64) / 1000;
+    parts.push(format!("{}ms", gap_ms));
+
+    if !gap_batches.is_empty() {
+        let n = gap_batches.len();
+        parts.push(format!("batches={}", n));
+
+        // Interval percentiles (p50/p70/p90) between consecutive batch creations.
+        // Sub-millisecond intervals (0ms after integer division) are excluded to
+        // avoid misleading values from batches created in the same millisecond.
+        if n >= 2 {
+            let mut intervals_ms: Vec<i64> = gap_batches
+                .windows(2)
+                .map(|w| (w[1].timestamp_usecs as i64 - w[0].timestamp_usecs as i64) / 1000)
+                .filter(|&v| v > 0)
+                .collect();
+            if !intervals_ms.is_empty() {
+                intervals_ms.sort_unstable();
+                let pct = |p: f64| {
+                    let idx =
+                        ((intervals_ms.len() as f64 - 1.0) * p / 100.0).round() as usize;
+                    intervals_ms[idx]
+                };
+                parts.push(format!(
+                    "interval=p50:{}ms/p70:{}ms/p90:{}ms",
+                    pct(50.0),
+                    pct(70.0),
+                    pct(90.0),
+                ));
+            }
+        }
+
+        // Count batches with each type of back-pressure active at creation time.
+        // bp_txn: txn-count BP was active → pull limit was reduced for this batch.
+        // bp_proof: proof-count BP was active → normal pulls were blocked entirely,
+        //           only the 250ms force-pull could fire.
+        let bp_txn_batches = gap_batches.iter().filter(|r| r.bp_txn).count();
+        let bp_proof_batches = gap_batches.iter().filter(|r| r.bp_proof).count();
+        match (bp_txn_batches > 0, bp_proof_batches > 0) {
+            (true, true) => parts.push(format!(
+                "bp_batches={}(txn),{}(proof)",
+                bp_txn_batches, bp_proof_batches
+            )),
+            (true, false) => parts.push(format!("bp_batches={}(txn)", bp_txn_batches)),
+            (false, true) => {
+                parts.push(format!("bp_batches={}(proof)", bp_proof_batches))
+            },
+            (false, false) => {},
+        }
+    }
+
+    if let (Some(min_g), Some(max_g)) = (info.prev_batches_min_gas, info.prev_batches_max_gas) {
+        if min_g == max_g {
+            parts.push(format!("batch_gas={}", min_g));
+        } else {
+            parts.push(format!("batch_gas={}..{}", min_g, max_g));
+        }
+    }
+    if info.empty_pulls_since_last_batch > 0 {
+        parts.push(format!(
+            "empty_pulls={}",
+            info.empty_pulls_since_last_batch
+        ));
+    }
+    // bp_*_rounds_since_last_batch count rounds only since the last
+    // batch creation (reset after each batch). For a long wait with many
+    // batches, these reflect only the final batch cycle, not the full gap.
+    if info.bp_proof_rounds_since_last_batch > 0 {
+        parts.push(format!(
+            "bp_proof_rounds={}",
+            info.bp_proof_rounds_since_last_batch
+        ));
+    }
+    if info.bp_txn_rounds_since_last_batch > 0 {
+        parts.push(format!(
+            "bp_txn_rounds={}",
+            info.bp_txn_rounds_since_last_batch
+        ));
+    }
+
+    format!("wait({})", parts.join(","))
+}
+
 fn log_trace(trace: &TransactionTrace) {
     let base = trace.insertion_time_usecs;
     let max_attempt = trace
@@ -285,10 +399,8 @@ fn log_trace(trace: &TransactionTrace) {
     let mut display_attempt: u32 = 0;
     // Track the timestamp of the previous stage to filter batch creation times.
     let mut prev_stage_usecs = base;
-    // Track whether we've already shown batch_create_times for this attempt.
-    let mut shown_batch_times_for_attempt: u32 = 0;
-    // Track the first pull_round seen, to make all subsequent rounds relative.
-    let mut first_pull_round: Option<u64> = None;
+    // Track whether we've already shown wait() for this attempt.
+    let mut shown_wait_for_attempt: u32 = 0;
     for record in &trace.stages {
         // Start a new attempt group when we see a higher attempt on a stage that
         // isn't block finalization (those trail the previous attempt's execution).
@@ -304,121 +416,17 @@ fn log_trace(trace: &TransactionTrace) {
             }
         }
 
-        // For the first QsBatchPull of each attempt, emit a summary of batch
-        // creation activity between the previous stage and this pull.
+        // For the first QsBatchPull of each attempt, emit a wait() summary.
         if record.stage == TransactionStage::QsBatchPull
-            && display_attempt > shown_batch_times_for_attempt
+            && display_attempt > shown_wait_for_attempt
         {
-            shown_batch_times_for_attempt = display_attempt;
+            shown_wait_for_attempt = display_attempt;
             if let Some(StageMetadata::BatchPull(info)) = &record.metadata {
-                // Collect gap batches with their BP flags: timestamps in the
-                // half-open window (prev_stage, pull_time) and the parallel flags.
-                let gap_entries: Vec<(u64, bool, bool)> = info
-                    .recent_batch_create_times_usecs
-                    .iter()
-                    .zip(info.recent_batch_bp_flags.iter())
-                    .filter(|(t, _)| **t > prev_stage_usecs && **t < record.timestamp_usecs)
-                    .map(|(t, bp)| (*t, bp.0, bp.1))
-                    .collect();
-
-                // Summary: gap duration, batch count, interval percentiles,
-                // gas range, back-pressure batch counts.
-                let mut wait_parts = Vec::new();
-
-                // Always show gap duration (ms between previous stage and this pull).
-                let gap_ms =
-                    (record.timestamp_usecs as i64 - prev_stage_usecs as i64) / 1000;
-                wait_parts.push(format!("{}ms", gap_ms));
-
-                if !gap_entries.is_empty() {
-                    let n = gap_entries.len();
-                    wait_parts.push(format!("batches={}", n));
-
-                    // Interval percentiles (p50/p70/p90) between consecutive batch
-                    // creations. Sub-millisecond intervals (0ms after integer division)
-                    // are excluded from the sample to avoid misleading 0ms values.
-                    if n >= 2 {
-                        let mut intervals_ms: Vec<i64> = gap_entries
-                            .windows(2)
-                            .map(|w| (w[1].0 as i64 - w[0].0 as i64) / 1000)
-                            .filter(|&v| v > 0)
-                            .collect();
-                        if !intervals_ms.is_empty() {
-                            intervals_ms.sort_unstable();
-                            let pct = |p: f64| {
-                                let idx = ((intervals_ms.len() as f64 - 1.0) * p / 100.0)
-                                    .round() as usize;
-                                intervals_ms[idx]
-                            };
-                            wait_parts.push(format!(
-                                "interval=p50:{}ms/p70:{}ms/p90:{}ms",
-                                pct(50.0),
-                                pct(70.0),
-                                pct(90.0),
-                            ));
-                        }
-                    }
-
-                    // Count batches with each type of back-pressure active at creation time.
-                    // bp_txn: txn-count BP was active → pull limit was reduced for this batch.
-                    // bp_proof: proof-count BP was active → normal pulls were blocked entirely,
-                    //           only the 250ms force-pull could fire.
-                    let bp_txn_batches = gap_entries.iter().filter(|e| e.1).count();
-                    let bp_proof_batches = gap_entries.iter().filter(|e| e.2).count();
-                    match (bp_txn_batches > 0, bp_proof_batches > 0) {
-                        (true, true) => wait_parts.push(format!(
-                            "bp_batches={}(txn),{}(proof)",
-                            bp_txn_batches, bp_proof_batches
-                        )),
-                        (true, false) => {
-                            wait_parts.push(format!("bp_batches={}(txn)", bp_txn_batches))
-                        },
-                        (false, true) => wait_parts.push(format!(
-                            "bp_batches={}(proof)",
-                            bp_proof_batches
-                        )),
-                        (false, false) => {},
-                    }
-                }
-
-                if let (Some(min_g), Some(max_g)) =
-                    (info.prev_batches_min_gas, info.prev_batches_max_gas)
-                {
-                    if min_g == max_g {
-                        wait_parts.push(format!("batch_gas={}", min_g));
-                    } else {
-                        wait_parts.push(format!("batch_gas={}..{}", min_g, max_g));
-                    }
-                }
-                if info.empty_pulls_since_last_batch > 0 {
-                    wait_parts.push(format!(
-                        "empty_pulls={}",
-                        info.empty_pulls_since_last_batch
-                    ));
-                }
-                // bp_*_rounds_since_last_batch count rounds only since the last
-                // batch creation (reset after each batch). For a long wait with many
-                // batches, these reflect only the final batch cycle, not the full gap.
-                if info.bp_proof_rounds_since_last_batch > 0 {
-                    wait_parts.push(format!(
-                        "bp_proof_rounds={}",
-                        info.bp_proof_rounds_since_last_batch
-                    ));
-                }
-                if info.bp_txn_rounds_since_last_batch > 0 {
-                    wait_parts.push(format!(
-                        "bp_txn_rounds={}",
-                        info.bp_txn_rounds_since_last_batch
-                    ));
-                }
-                stage_parts.push(format!("wait({})", wait_parts.join(",")));
-            }
-        }
-
-        // Track first pull_round to make all QsBatchPull rounds relative.
-        if record.stage == TransactionStage::QsBatchPull && first_pull_round.is_none() {
-            if let Some(StageMetadata::BatchPull(info)) = &record.metadata {
-                first_pull_round = Some(info.pull_round);
+                stage_parts.push(build_wait_summary(
+                    info,
+                    prev_stage_usecs,
+                    record.timestamp_usecs,
+                ));
             }
         }
 

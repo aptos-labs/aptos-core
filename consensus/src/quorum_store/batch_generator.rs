@@ -76,13 +76,10 @@ pub struct BatchGenerator {
     pull_round: u64,
     /// Monotonic counter for total batches created, used by transaction tracing.
     total_batches_created: u64,
-    /// Recent batch creation timestamps (usecs), capped at 200 entries.
+    /// Recent batch creation events (timestamp + BP state), capped at 200 entries.
     /// Included in QsBatchPull metadata so traces can show what the batch
     /// generator was doing between MempoolInsert and the first pull.
-    recent_batch_create_times_usecs: std::collections::VecDeque<u64>,
-    /// Back-pressure flags at each batch creation in recent_batch_create_times_usecs:
-    /// (bp_txn_count, bp_proof_count). Parallel array, same cap and eviction policy.
-    recent_batch_bp_flags: std::collections::VecDeque<(bool, bool)>,
+    recent_batch_records: std::collections::VecDeque<aptos_transaction_tracing::types::BatchCreationRecord>,
     /// Tracing counters reset after each non-empty batch creation.
     empty_pulls_since_last_batch: u64,
     bp_proof_rounds_since_last_batch: u64,
@@ -198,8 +195,7 @@ impl BatchGenerator {
             },
             pull_round: 0,
             total_batches_created: 0,
-            recent_batch_create_times_usecs: std::collections::VecDeque::new(),
-            recent_batch_bp_flags: std::collections::VecDeque::new(),
+            recent_batch_records: std::collections::VecDeque::new(),
             empty_pulls_since_last_batch: 0,
             bp_proof_rounds_since_last_batch: 0,
             bp_txn_rounds_since_last_batch: 0,
@@ -494,48 +490,47 @@ impl BatchGenerator {
 
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
-        // Track gas price range of pulled txns for tracing diagnostics.
-        // Must happen before BatchPullInfo snapshot so the gas range is up-to-date.
-        for txn in pulled_txns.iter() {
-            let gas = txn.gas_unit_price();
-            self.prev_batches_min_gas =
-                Some(self.prev_batches_min_gas.map_or(gas, |m| m.min(gas)));
-            self.prev_batches_max_gas =
-                Some(self.prev_batches_max_gas.map_or(gas, |m| m.max(gas)));
-        }
-
-        // Record QsBatchPull with context for traced transactions
+        // Record QsBatchPull with context for traced transactions.
+        // Lazy-construct BatchPullInfo only when at least one traced txn exists
+        // to avoid allocating Vecs on every pull round when tracing is inactive.
         {
+            use std::sync::Arc;
             let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-            let pull_info = aptos_transaction_tracing::types::BatchPullInfo {
-                pull_round: self.pull_round,
-                total_batches_created: self.total_batches_created,
-                pulled_txn_count: pulled_txns.len() as u64,
-                pull_max_txn: max_count,
-                excluded_txn_count: excluded_count as u64,
-                bp_txn_count: self.back_pressure.txn_count,
-                bp_proof_count: self.back_pressure.proof_count,
-                recent_batch_create_times_usecs: self
-                    .recent_batch_create_times_usecs
-                    .iter()
-                    .copied()
-                    .collect(),
-                recent_batch_bp_flags: self.recent_batch_bp_flags.iter().copied().collect(),
-                prev_batches_min_gas: self.prev_batches_min_gas,
-                prev_batches_max_gas: self.prev_batches_max_gas,
-                empty_pulls_since_last_batch: self.empty_pulls_since_last_batch,
-                bp_proof_rounds_since_last_batch: self.bp_proof_rounds_since_last_batch,
-                bp_txn_rounds_since_last_batch: self.bp_txn_rounds_since_last_batch,
-            };
+            let mut pull_info: Option<Arc<aptos_transaction_tracing::types::BatchPullInfo>> = None;
             for txn in &pulled_txns {
                 let hash = txn.committed_hash();
-                store.set_gas_unit_price(&hash, txn.gas_unit_price());
+                if !store.is_traced(&hash) {
+                    continue;
+                }
+                // Track gas range only for traced txns (avoids unconditional iteration)
+                let gas = txn.gas_unit_price();
+                self.prev_batches_min_gas =
+                    Some(self.prev_batches_min_gas.map_or(gas, |m| m.min(gas)));
+                self.prev_batches_max_gas =
+                    Some(self.prev_batches_max_gas.map_or(gas, |m| m.max(gas)));
+                // Build pull_info once (Arc-shared across all traced txns in this round)
+                let info = pull_info.get_or_insert_with(|| {
+                    Arc::new(aptos_transaction_tracing::types::BatchPullInfo {
+                        pull_round: self.pull_round,
+                        total_batches_created: self.total_batches_created,
+                        pulled_txn_count: pulled_txns.len() as u64,
+                        pull_max_txn: max_count,
+                        excluded_txn_count: excluded_count as u64,
+                        bp_txn_count: self.back_pressure.txn_count,
+                        bp_proof_count: self.back_pressure.proof_count,
+                        recent_batches: self.recent_batch_records.iter().copied().collect(),
+                        prev_batches_min_gas: self.prev_batches_min_gas,
+                        prev_batches_max_gas: self.prev_batches_max_gas,
+                        empty_pulls_since_last_batch: self.empty_pulls_since_last_batch,
+                        bp_proof_rounds_since_last_batch: self.bp_proof_rounds_since_last_batch,
+                        bp_txn_rounds_since_last_batch: self.bp_txn_rounds_since_last_batch,
+                    })
+                });
+                store.set_gas_unit_price(&hash, gas);
                 store.record_stage_with_metadata(
                     &hash,
                     aptos_transaction_tracing::types::TransactionStage::QsBatchPull,
-                    aptos_transaction_tracing::types::StageMetadata::BatchPull(
-                        pull_info.clone(),
-                    ),
+                    aptos_transaction_tracing::types::StageMetadata::BatchPull(Arc::clone(info)),
                 );
             }
         }
@@ -578,21 +573,23 @@ impl BatchGenerator {
         self.empty_pulls_since_last_batch = 0;
         self.bp_proof_rounds_since_last_batch = 0;
         self.bp_txn_rounds_since_last_batch = 0;
-        // Record batch creation timestamp and back-pressure state for tracing diagnostics.
-        // bp_flags captures the BP state active BEFORE this pull (same snapshot as
+        // Record batch creation events for tracing diagnostics.
+        // bp state captures the BP active BEFORE this pull (same snapshot as
         // BatchPullInfo.bp_txn_count/bp_proof_count), indicating why txns may have been
         // excluded or the pull limit may have been reduced for this batch.
         if !batches.is_empty() {
             let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
-            let bp = (self.back_pressure.txn_count, self.back_pressure.proof_count);
+            let record = aptos_transaction_tracing::types::BatchCreationRecord {
+                timestamp_usecs: now,
+                bp_txn: self.back_pressure.txn_count,
+                bp_proof: self.back_pressure.proof_count,
+            };
             for _ in 0..batches.len() {
-                self.recent_batch_create_times_usecs.push_back(now);
-                self.recent_batch_bp_flags.push_back(bp);
+                self.recent_batch_records.push_back(record);
             }
             // Cap at 200 entries to bound memory
-            while self.recent_batch_create_times_usecs.len() > 200 {
-                self.recent_batch_create_times_usecs.pop_front();
-                self.recent_batch_bp_flags.pop_front();
+            while self.recent_batch_records.len() > 200 {
+                self.recent_batch_records.pop_front();
             }
         }
         self.last_end_batch_time = Instant::now();

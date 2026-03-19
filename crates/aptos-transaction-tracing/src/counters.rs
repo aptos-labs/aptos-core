@@ -3,7 +3,7 @@
 
 use aptos_metrics_core::{register_histogram_vec, HistogramVec};
 use once_cell::sync::Lazy;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 /// Histogram buckets for tracing latencies (in seconds).
 const TRACING_BUCKETS: &[f64] = &[
@@ -25,9 +25,7 @@ pub static TXN_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
 
 /// Record latency from insertion to this stage, grouped by sender.
 pub fn observe_stage_latency(insertion_time_usecs: u64, sender: &str, stage: &str) {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO);
+    let now = aptos_infallible::duration_since_epoch();
     if let Some(latency) = now.checked_sub(Duration::from_micros(insertion_time_usecs)) {
         TXN_TRACING
             .with_label_values(&[sender, stage])

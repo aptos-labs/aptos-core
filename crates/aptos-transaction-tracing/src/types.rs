@@ -3,6 +3,7 @@
 
 use aptos_crypto::HashValue;
 use aptos_types::account_address::AccountAddress;
+use std::sync::Arc;
 
 /// Lifecycle stages a transaction passes through.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::AsRefStr)]
@@ -38,6 +39,17 @@ pub enum ExecutionStatus {
     Discard,
 }
 
+/// A single batch creation event with its timestamp and back-pressure state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BatchCreationRecord {
+    /// Wall-clock timestamp (usecs) when this batch was created.
+    pub timestamp_usecs: u64,
+    /// Whether txn-count back-pressure was active at creation time.
+    pub bp_txn: bool,
+    /// Whether proof-count back-pressure was active at creation time.
+    pub bp_proof: bool,
+}
+
 /// Context captured at each QS batch pull for diagnosing pull latency.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchPullInfo {
@@ -61,19 +73,14 @@ pub struct BatchPullInfo {
     pub bp_txn_count: bool,
     /// Whether proof-count back-pressure is active.
     pub bp_proof_count: bool,
-    /// Timestamps (usecs) of recent batch creations. Used to show when
-    /// batches were created between MempoolInsert and the first QsBatchPull,
-    /// revealing what the batch generator was doing during the gap.
-    pub recent_batch_create_times_usecs: Vec<u64>,
-    /// Back-pressure flags active at the time each batch in `recent_batch_create_times_usecs`
-    /// was created: `(bp_txn_count, bp_proof_count)`. Parallel array — same length and index
-    /// correspondence. Used to count how many batches in the wait window were affected by
-    /// each type of back-pressure.
-    pub recent_batch_bp_flags: Vec<(bool, bool)>,
-    /// Min gas price across all txns in batches created since last batch reset.
+    /// Recent batch creation events (timestamps + BP state), capped at 200 entries.
+    /// Used to show what the batch generator was doing between MempoolInsert
+    /// and the first QsBatchPull, and how many batches had back-pressure active.
+    pub recent_batches: Vec<BatchCreationRecord>,
+    /// Min gas price across all txns in batches created since batch generator start.
     /// Compared with this txn's gas_unit_price to show if it was deprioritized.
     pub prev_batches_min_gas: Option<u64>,
-    /// Max gas price across all txns in batches created since last batch reset.
+    /// Max gas price across all txns in batches created since batch generator start.
     pub prev_batches_max_gas: Option<u64>,
     /// How many pull rounds returned zero txns (empty pulls) since last batch
     /// creation. High count = batch generator was polling but mempool had
@@ -89,11 +96,13 @@ pub struct BatchPullInfo {
 }
 
 /// Additional metadata for specific stages.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum StageMetadata {
     BatchInclusion(BatchInclusionType),
     Execution(ExecutionStatus),
-    BatchPull(BatchPullInfo),
+    /// Arc-wrapped to avoid cloning the inner Vecs when the same pull info
+    /// is recorded for multiple traced txns in the same pull round.
+    BatchPull(Arc<BatchPullInfo>),
 }
 
 /// A single recorded stage in a transaction's lifecycle.
