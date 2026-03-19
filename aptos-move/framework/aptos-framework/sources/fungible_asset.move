@@ -750,7 +750,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[view]
-    public fun is_asset_type_dispatchable(metadata: &Object<Metadata>): bool {
+    public fun is_asset_type_dispatchable(metadata: Object<Metadata>): bool {
         let metadata_addr = metadata.object_address();
         exists<DispatchFunctionStore>(metadata_addr) || exists<DeriveSupply>(metadata_addr)
     }
