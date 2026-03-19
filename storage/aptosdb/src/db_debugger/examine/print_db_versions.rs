@@ -17,7 +17,7 @@ use crate::{
     },
     AptosDB,
 };
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, DB};
 use aptos_storage_interface::Result;
 use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
@@ -45,7 +45,11 @@ impl Cmd {
                 block_cache,
                 /*readonly=*/ true,
                 /*max_num_nodes_per_lru_cache_shard=*/ 0,
-                /*reset_hot_state=*/ false,
+                HotStateConfig {
+                    delete_on_restart: false,
+                    persist_hotness_in_write_set: false,
+                    ..HotStateConfig::default()
+                },
             )?;
 
         println!(

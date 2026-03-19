@@ -115,6 +115,7 @@ impl LedgerDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        persist_write_set_hotness: bool,
     ) -> Result<Self> {
         let ledger_metadata_db_path = Self::metadata_db_path(db_root_path.as_ref());
         let ledger_metadata_db = Arc::new(Self::open_rocksdb(
@@ -224,17 +225,20 @@ impl LedgerDb {
                 )));
             });
             s.spawn(|_| {
-                write_set_db = Some(WriteSetDb::new(Arc::new(
-                    Self::open_rocksdb(
-                        ledger_db_folder.join(WRITE_SET_DB_NAME),
-                        WRITE_SET_DB_NAME,
-                        &ledger_db_config,
-                        env,
-                        block_cache,
-                        readonly,
-                    )
-                    .unwrap(),
-                )));
+                write_set_db = Some(WriteSetDb::new(
+                    Arc::new(
+                        Self::open_rocksdb(
+                            ledger_db_folder.join(WRITE_SET_DB_NAME),
+                            WRITE_SET_DB_NAME,
+                            &ledger_db_config,
+                            env,
+                            block_cache,
+                            readonly,
+                        )
+                        .unwrap(),
+                    ),
+                    persist_write_set_hotness,
+                ));
             });
         });
 
@@ -262,6 +266,7 @@ impl LedgerDb {
             None,
             None,
             /*readonly=*/ false,
+            /*persist_write_set_hotness=*/ false,
         )?;
         let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
