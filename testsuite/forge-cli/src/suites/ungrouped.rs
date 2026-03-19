@@ -48,6 +48,7 @@ use aptos_testcases::{
     quorum_store_onchain_enable_test::QuorumStoreOnChainEnableTest,
     reconfiguration_test::ReconfigurationTest,
     three_region_simulation_test::ThreeRegionSameCloudSimulationTest,
+    transaction_tracing_test::TransactionTracingTest,
     twin_validator_test::TwinValidatorTest,
     two_traffics_test::TwoTrafficsTest,
     validator_join_leave_test::ValidatorJoinLeaveTest,
@@ -99,6 +100,7 @@ pub fn get_ungrouped_test(test_name: &str, duration: Duration) -> Option<ForgeCo
         "gather_metrics" => Some(gather_metrics()),
         "setup_test" => Some(setup_test()),
         "config" => Some(reconfiguration_test()),
+        "transaction_tracing_test" => Some(transaction_tracing_test()),
 
         // Db
         "large_db_simple_test" => Some(large_db_simple_test()),
@@ -1132,6 +1134,12 @@ pub(crate) fn setup_test() -> ForgeConfig {
 
 pub(crate) fn reconfiguration_test() -> ForgeConfig {
     ForgeConfig::default().add_network_test(ReconfigurationTest)
+}
+
+pub(crate) fn transaction_tracing_test() -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+        .add_network_test(TransactionTracingTest)
 }
 
 #[derive(Debug)]

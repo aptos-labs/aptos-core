@@ -992,6 +992,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-transaction-filters",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-validator-transaction-pool",
  "aptos-vm",
@@ -1557,6 +1558,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-transaction-simulation",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -2722,6 +2724,7 @@ dependencies = [
  "aptos-storage-service-client",
  "aptos-telemetry",
  "aptos-time-service",
+ "aptos-transaction-tracing",
  "assert_approx_eq",
  "futures",
  "hyper 0.14.28",
@@ -3072,6 +3075,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-time-service",
  "aptos-transaction-filters",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-vm-validator",
  "bcs 0.1.4",
@@ -4551,6 +4555,7 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "reqwest 0.11.23",
+ "serde_json",
  "tokio",
 ]
 
@@ -4762,6 +4767,24 @@ dependencies = [
  "serde_json",
  "tempfile",
  "url",
+]
+
+[[package]]
+name = "aptos-transaction-tracing"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "arc-swap",
+ "dashmap 7.0.0-rc2",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "strum 0.27.1",
+ "strum_macros 0.27.1",
 ]
 
 [[package]]

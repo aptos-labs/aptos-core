@@ -24,6 +24,7 @@ mod json_encoder;
 mod metrics;
 mod peer_information;
 mod system_information;
+mod transaction_tracing;
 pub mod utils;
 
 #[cfg(test)]
@@ -39,6 +40,7 @@ pub const JSON_METRICS_PATH: &str = "/json_metrics";
 pub const METRICS_PATH: &str = "/metrics";
 pub const PEER_INFORMATION_PATH: &str = "/peer_information";
 pub const SYSTEM_INFORMATION_PATH: &str = "/system_information";
+pub const TRANSACTION_TRACING_PATH: &str = "/transaction_tracing";
 
 // Useful string constants
 pub const HEADER_CONTENT_TYPE: &str = "Content-Type";
@@ -109,6 +111,28 @@ async fn serve_requests(
     aptos_data_client: AptosDataClient,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Result<Response<Body>, hyper::Error> {
+    // Handle transaction_tracing endpoint separately (supports POST)
+    if req.uri().path() == TRANSACTION_TRACING_PATH {
+        let (status_code, body, content_type) = match *req.method() {
+            Method::GET => transaction_tracing::handle_get_request(),
+            Method::POST => {
+                let (_, body) = req.into_parts();
+                transaction_tracing::handle_post_request(body).await
+            },
+            _ => {
+                return Ok(Response::builder()
+                    .status(StatusCode::METHOD_NOT_ALLOWED)
+                    .body(Body::empty())
+                    .expect("Failed to build response"));
+            },
+        };
+        return Ok(Response::builder()
+            .header(HEADER_CONTENT_TYPE, content_type)
+            .status(status_code)
+            .body(body)
+            .expect("Failed to build response"));
+    }
+
     // Process the request and get the response components
     let (status_code, body, content_type) = match req.uri().path() {
         CONFIGURATION_PATH => {

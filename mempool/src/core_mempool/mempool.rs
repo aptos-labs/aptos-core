@@ -349,6 +349,8 @@ impl Mempool {
         let now = aptos_infallible::duration_since_epoch().as_millis() as u64;
 
         if status.code == MempoolStatusCode::Accepted {
+            aptos_transaction_tracing::store::TransactionTraceStore::global()
+                .maybe_start_trace(txn.committed_hash(), sender, now * 1000);
             counters::SENDER_BUCKET_FREQUENCIES
                 .with_label_values(&[sender_bucket(
                     &sender,

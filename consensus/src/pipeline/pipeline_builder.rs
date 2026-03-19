@@ -249,6 +249,43 @@ impl Drop for Tracker {
 }
 
 impl PipelineBuilder {
+    /// Extract all batch digests from a block's payload (V1/V2 OptQuorumStore).
+    fn extract_batch_digests(block: &Block) -> Vec<HashValue> {
+        use aptos_consensus_types::{
+            common::Payload, payload::OptQuorumStorePayload, proof_of_store::TBatchInfo,
+        };
+        let Some(payload) = block.payload() else {
+            return Vec::new();
+        };
+        let mut digests = Vec::new();
+        match payload {
+            Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
+                for b in p.inline_batches().iter() {
+                    digests.push(*b.info().digest());
+                }
+                for b in p.opt_batches().iter() {
+                    digests.push(*b.digest());
+                }
+                for b in p.proof_with_data().iter() {
+                    digests.push(*b.info().digest());
+                }
+            },
+            Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+                for b in p.inline_batches().iter() {
+                    digests.push(*b.info().digest());
+                }
+                for b in p.opt_batches().iter() {
+                    digests.push(*b.digest());
+                }
+                for b in p.proof_with_data().iter() {
+                    digests.push(*b.info().digest());
+                }
+            },
+            _ => {},
+        }
+        digests
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         block_preparer: Arc<BlockPreparer>,
@@ -1101,6 +1138,7 @@ impl PipelineBuilder {
         }
 
         tracker.start_working();
+        let batch_digests = Self::extract_batch_digests(&block);
         tokio::task::spawn_blocking(move || {
             executor
                 .pre_commit_block(block.id())
@@ -1108,6 +1146,15 @@ impl PipelineBuilder {
         })
         .await
         .expect("spawn blocking failed")?;
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            for d in &batch_digests {
+                store.record_batch_stage(
+                    d,
+                    aptos_transaction_tracing::types::TransactionStage::PreCommit,
+                );
+            }
+        }
         Ok(compute_result)
     }
 
@@ -1131,6 +1178,7 @@ impl PipelineBuilder {
         }
 
         tracker.start_working();
+        let batch_digests = Self::extract_batch_digests(&block);
         let ledger_info_with_sigs_clone = ledger_info_with_sigs.clone();
         tokio::task::spawn_blocking(move || {
             executor
@@ -1139,6 +1187,15 @@ impl PipelineBuilder {
         })
         .await
         .expect("spawn blocking failed")?;
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            for d in &batch_digests {
+                store.record_batch_stage(
+                    d,
+                    aptos_transaction_tracing::types::TransactionStage::Committed,
+                );
+            }
+        }
         Ok(Some(ledger_info_with_sigs))
     }
 
