@@ -1,0 +1,208 @@
+module 0x66::arg_regs
+
+// ---------------------------------------------------------------------------
+// Helper callees
+// ---------------------------------------------------------------------------
+
+fun identity(x: u64): u64
+    move_loc x
+    ret
+
+fun add_two(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun swap(a: u64, b: u64): (u64, u64)
+    move_loc b
+    move_loc a
+    ret
+
+fun three_args(a: u64, b: u64, c: u64): u64
+    copy_loc a
+    copy_loc b
+    add
+    copy_loc c
+    add
+    ret
+
+// ---------------------------------------------------------------------------
+// 1. Simple arg + ret promotion
+// ---------------------------------------------------------------------------
+fun simple_promotion(): u64
+    ld_u64 42
+    call identity
+    ret
+
+// ---------------------------------------------------------------------------
+// 2. Multi-arg: both args promotable
+// ---------------------------------------------------------------------------
+fun multi_arg(): u64
+    ld_u64 1
+    ld_u64 2
+    call add_two
+    ret
+
+// ---------------------------------------------------------------------------
+// 3. f(g(x)) — nested composition. g's ret flows directly into f's arg.
+//    Both the inner ret and outer arg should be a0.
+// ---------------------------------------------------------------------------
+fun nested_fg(): u64
+    ld_u64 7
+    call identity
+    call identity
+    ret
+
+// ---------------------------------------------------------------------------
+// 4. f(g(x), h(y)) — two inner calls feed into a 2-arg outer call.
+//    g's result must be saved across the h call, so it can't stay in a0.
+//    h's result can be promoted though.
+// ---------------------------------------------------------------------------
+fun two_inner_calls(): u64
+    ld_u64 10
+    call identity
+    ld_u64 20
+    call identity
+    call add_two
+    ret
+
+// ---------------------------------------------------------------------------
+// 5. Arg computed via arithmetic: f(x + 1).
+//    The add result is a temp that goes straight into the call arg.
+// ---------------------------------------------------------------------------
+fun computed_arg(x: u64): u64
+    copy_loc x
+    ld_u64 1
+    add
+    call identity
+    ret
+
+// ---------------------------------------------------------------------------
+// 6. Partial promotion: mix of pinned param and computed temp in one call.
+//    add_two(x, x + 1) — first arg is a param (not promoted), second is temp.
+// ---------------------------------------------------------------------------
+fun partial_promotion(x: u64): u64
+    copy_loc x
+    copy_loc x
+    ld_u64 1
+    add
+    call add_two
+    ret
+
+// ---------------------------------------------------------------------------
+// 7. Not promotable: source is a param (pinned, not a temp).
+// ---------------------------------------------------------------------------
+fun call_with_param(x: u64): u64
+    copy_loc x
+    call identity
+    ret
+
+// ---------------------------------------------------------------------------
+// 8. Not promotable: arg value is live after the call.
+// ---------------------------------------------------------------------------
+fun arg_live_after_call(x: u64): u64
+    local tmp: u64
+    copy_loc x
+    call identity
+    st_loc tmp
+    copy_loc x
+    move_loc tmp
+    add
+    ret
+
+// ---------------------------------------------------------------------------
+// 9. Ret not promoted: result of call 1 is used after call 2.
+// ---------------------------------------------------------------------------
+fun ret_used_past_next_call(): u64
+    local first: u64
+    ld_u64 10
+    call identity
+    st_loc first
+    ld_u64 20
+    call identity
+    move_loc first
+    add
+    ret
+
+// ---------------------------------------------------------------------------
+// 10. Multiple return values — both rets should be promoted.
+// ---------------------------------------------------------------------------
+fun multi_ret(): u64
+    ld_u64 3
+    ld_u64 4
+    call swap
+    call add_two
+    ret
+
+// ---------------------------------------------------------------------------
+// 11. arg_regs width: call with 3 args sets num_arg_regs to 3, even though
+//     other calls in the function only need 1.
+// ---------------------------------------------------------------------------
+fun width_from_max(): u64
+    ld_u64 1
+    call identity
+    ld_u64 10
+    ld_u64 20
+    ld_u64 30
+    call three_args
+    add
+    ret
+
+// ---------------------------------------------------------------------------
+// 12. Call in a loop — arg registers in a loop-body block.
+// ---------------------------------------------------------------------------
+fun call_in_loop(n: u64): u64
+    local acc: u64
+    ld_u64 0
+    st_loc acc
+l1: copy_loc n
+    ld_u64 0
+    gt
+    br_false l2
+    copy_loc n
+    call identity
+    move_loc acc
+    add
+    st_loc acc
+    copy_loc n
+    ld_u64 1
+    sub
+    st_loc n
+    branch l1
+l2: move_loc acc
+    ret
+
+// ---------------------------------------------------------------------------
+// 13. Mixed call site: three_args(10, x, 30). The two literal args are
+//     promotable temps; the param x in the middle stays Home.
+//     Expected args: [a0, r0, a2]
+// ---------------------------------------------------------------------------
+fun mixed_at_callsite(x: u64): u64
+    ld_u64 10
+    copy_loc x
+    ld_u64 30
+    call three_args
+    ret
+
+// ---------------------------------------------------------------------------
+// 14. Mixed call site from intervening call: result of call 1 must stay Home
+//     because a second call sits between its def and the three_args call.
+//     The other two args are fresh temps, promotable.
+//     Expected args: [r_home, a1, a2]
+// ---------------------------------------------------------------------------
+fun mixed_intervening_call(): u64
+    ld_u64 10
+    call identity
+    ld_u64 20
+    call identity
+    ld_u64 30
+    call three_args
+    ret
+
+// ---------------------------------------------------------------------------
+// 15. No calls at all — baseline, should have zero arg_regs.
+// ---------------------------------------------------------------------------
+fun no_calls(): u64
+    ld_u64 99
+    ret

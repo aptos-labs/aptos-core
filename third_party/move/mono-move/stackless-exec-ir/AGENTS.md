@@ -1,7 +1,6 @@
 # stackless-exec-ir
 
-This crate defines a polymorphic stackless execution IR and performs conversion from Move bytecode to the stackless execution IR.
-There are currently two pipelines, v1 and v2: v1 is there only for comparison purposes and is intended to be removed.
+This crate defines a polymorphic stackless execution IR and performs conversion from Move bytecode to the stackless execution IR using the V2 pipeline.
 The stackless execution IR is then lowered into monomorphic micro-ops, when all types used in the function are fully concrete and thus type size and layout information is available.
 
 ## Goals of converting from Move bytecode to stackless-exec-ir
@@ -25,8 +24,6 @@ Two runners are registered, one per input format:
 - **`masm_runner`** — Takes `.masm` files (Move assembly), assembles them via `move-asm`, then runs `run_pipeline`.
 - **`move_runner`** — Takes `.move` files, compiles them with `move-compiler-v2`, then runs `run_pipeline`. Move test output additionally includes the disassembled masm for reference.
 
-Both runners execute the pipeline twice: once with `PipelineVersion::V1` and once with `PipelineVersion::V2`.
-
 ## Test Cases
 
 Located under `tests/test_cases/`:
@@ -36,9 +33,8 @@ Located under `tests/test_cases/`:
 
 ## Baseline (Golden) Files
 
-Each input file has two expected-output baselines:
+Each input file has an expected-output baseline:
 
-- `<name>.v1.exp` — Expected output from the V1 pipeline.
 - `<name>.v2.exp` — Expected output from the V2 pipeline.
 
 Baselines are verified (or auto-updated). To update baselines after intentional output changes, set `UPBL=1` (update baseline env var) and re-run the tests. The updates should be explainable for the given change.

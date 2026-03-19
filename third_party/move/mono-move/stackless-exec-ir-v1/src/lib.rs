@@ -1,17 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-pub mod analysis_v2;
-pub mod convert_v2;
+pub mod arg_regs;
+pub mod convert_v1;
 pub mod display;
-pub mod instr_utils_v2;
 pub mod ir;
 pub mod lower;
 pub mod lowering_context;
 pub mod micro_ops_display;
-pub mod optimize_v2;
-pub mod pipeline_v2;
-pub mod regalloc_v2;
+pub mod optimize_v1;
 pub mod type_conversion;
 
 use anyhow::{bail, Result};
@@ -19,7 +16,7 @@ use ir::ModuleIR;
 use move_binary_format::CompiledModule;
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 
-/// Configuration for the conversion + optimization pipeline.
+/// Configuration for the V1 conversion + optimization pipeline.
 pub struct PipelineConfig {
     /// Whether to run the bytecode verifier before conversion to stackless-exec-ir.
     /// Set to `false` when the module comes from a trusted source (e.g., the
@@ -35,7 +32,7 @@ impl Default for PipelineConfig {
     }
 }
 
-/// Run the full conversion + optimization pipeline on a compiled module.
+/// Run the V1 conversion + optimization pipeline on a compiled module.
 ///
 /// `struct_name_table` maps `StructHandleIndex` ordinals to globally unique
 /// `StructNameIndex` values, used to convert bytecode-level struct references
@@ -51,5 +48,8 @@ pub fn run_pipeline(
         bail!("bytecode verification failed: {:#}", e);
     }
 
-    pipeline_v2::run_v2_pipeline(module, struct_name_table)
+    let mut module_ir = convert_v1::convert_module_v1(module, struct_name_table);
+    optimize_v1::optimize_module_v1(&mut module_ir);
+    arg_regs::introduce_arg_registers_module(&mut module_ir);
+    Ok(module_ir)
 }

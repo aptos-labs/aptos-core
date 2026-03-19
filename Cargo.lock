@@ -18275,7 +18275,26 @@ dependencies = [
  "clap 4.5.60",
  "codespan-reporting",
  "datatest-stable",
- "either",
+ "legacy-move-compiler",
+ "mono-move-micro-ops",
+ "move-asm",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-model",
+ "move-prover-test-utils",
+ "move-vm-types",
+ "triomphe",
+]
+
+[[package]]
+name = "stackless-exec-ir-v1"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "codespan-reporting",
+ "datatest-stable",
  "legacy-move-compiler",
  "mono-move-micro-ops",
  "move-asm",

@@ -7,7 +7,7 @@ use move_asm::assembler::{self, Options as AsmOptions};
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_model::metadata::LanguageVersion;
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
-use stackless_exec_ir::{
+use stackless_exec_ir_v1::{
     ir::ModuleIR,
     lower::lower_function,
     lowering_context::{build_func_id_map, try_build_context},
@@ -75,7 +75,7 @@ fn format_micro_ops(module_ir: &ModuleIR) -> String {
     out
 }
 
-const V2_EXT: &str = "v2.exp";
+const V1_EXT: &str = "v1.exp";
 
 datatest_stable::harness!(
     masm_runner, "tests/test_cases/masm", r".*\.masm$",
@@ -97,7 +97,7 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
     let mut output = format!("{}", ir.display());
     output.push_str("\n=== micro-ops ===\n");
     output.push_str(&format_micro_ops(&ir));
-    let baseline_path = path.with_extension(V2_EXT);
+    let baseline_path = path.with_extension(V1_EXT);
     move_prover_test_utils::baseline_test::verify_or_update_baseline(
         baseline_path.as_path(),
         &output,
@@ -164,7 +164,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         output.push_str("\n=== micro-ops ===\n");
         output.push_str(&format_micro_ops(&module_ir));
     }
-    let baseline_path = path.with_extension(V2_EXT);
+    let baseline_path = path.with_extension(V1_EXT);
     move_prover_test_utils::baseline_test::verify_or_update_baseline(
         baseline_path.as_path(),
         &output,
