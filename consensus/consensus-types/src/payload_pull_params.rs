@@ -3,15 +3,56 @@
 
 use crate::{
     common::{Author, PayloadFilter},
+    proof_of_store::BatchKind,
     utils::PayloadTxnsSize,
 };
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
+
+/// Per-block transaction count limits, keyed by BatchKind.
+/// Batches whose kind is absent from the map have no additional limit
+/// beyond the global max_txns.
+#[derive(Clone, Debug, Default)]
+pub struct PerBatchKindTxnLimits {
+    limits: HashMap<BatchKind, u64>,
+}
+
+impl PerBatchKindTxnLimits {
+    pub fn new(limits: HashMap<BatchKind, u64>) -> Self {
+        Self { limits }
+    }
+
+    pub fn get(&self, kind: &BatchKind) -> Option<u64> {
+        self.limits.get(kind).copied()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.limits.is_empty()
+    }
+
+    /// Returns a new `PerBatchKindTxnLimits` with each limit reduced by the
+    /// corresponding count already consumed.
+    pub fn remaining(&self, consumed: &HashMap<BatchKind, u64>) -> Self {
+        let limits = self
+            .limits
+            .iter()
+            .map(|(kind, limit)| {
+                let used = consumed.get(kind).copied().unwrap_or(0);
+                (*kind, limit.saturating_sub(used))
+            })
+            .collect();
+        Self { limits }
+    }
+}
 
 #[derive(Clone)]
 pub struct OptQSPayloadPullParams {
     pub exclude_authors: HashSet<Author>,
     pub minimum_batch_age_usecs: u64,
     pub enable_opt_qs_v2_payload: bool,
+    pub per_kind_txn_limits: PerBatchKindTxnLimits,
 }
 
 pub struct PayloadPullParameters {
@@ -34,6 +75,7 @@ impl std::fmt::Debug for OptQSPayloadPullParams {
             .field("exclude_authors", &self.exclude_authors)
             .field("minimum_batch_age_useds", &self.minimum_batch_age_usecs)
             .field("enable_opt_qs_v2_payload", &self.enable_opt_qs_v2_payload)
+            .field("per_kind_txn_limits", &self.per_kind_txn_limits)
             .finish()
     }
 }
