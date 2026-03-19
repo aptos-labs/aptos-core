@@ -17,8 +17,7 @@ module aptos_experimental::confidential_asset {
     use aptos_framework::system_addresses;
     use aptos_experimental::confidential_balance::{Self, get_chunk_size_bits, get_chunk_upper_bound,
         new_pending_u64_no_randomness, add_assign_pending, new_compressed_available_from_bytes,
-        add_assign_available_excluding_auditor, new_zero_pending_compressed, new_zero_available_compressed
-    };
+        new_zero_pending_compressed, new_zero_available_compressed};
     use aptos_experimental::sigma_protocol_utils::deserialize_compressed_points;
     use aptos_experimental::confidential_amount::{Self, CompressedAmount};
     use aptos_experimental::confidential_balance::{Pending, Available, CompressedBalance, Balance};
@@ -136,6 +135,14 @@ module aptos_experimental::confidential_asset {
         }
     }
 
+    /// When auditors fetch the effective auditor epoch from a `ConfidentialStore`, they need both the `epoch` number and the `is_global` flag to tell if the auditor ciphertext is stale
+    enum EffectiveAuditorHint has store, drop, copy {
+        V1 {
+            is_global: bool,
+            epoch: u64,
+        }
+    }
+
     /// Global configuration for the confidential asset protocol, installed during `init_module`.
     enum GlobalConfig has key {
         V1 {
@@ -178,7 +185,9 @@ module aptos_experimental::confidential_asset {
             /// Spendable balance (8 chunks, 128-bit). R_aud components for auditor decryption (empty if no auditor).
             available_balance: CompressedBalance<Available>,
             /// User's encryption key for this asset type.
-            ek: CompressedRistretto
+            ek: CompressedRistretto,
+            /// Tracks which auditor the balance ciphertext is encrypted for: global/effective and epoch
+            auditor_hint: Option<EffectiveAuditorHint>
         }
     }
 
@@ -348,7 +357,8 @@ module aptos_experimental::confidential_asset {
             transfers_received: 0,
             pending_balance: new_zero_pending_compressed(),
             available_balance: new_zero_available_compressed(),
-            ek
+            ek,
+            auditor_hint: std::option::none() // balance == 0 is publicly-known ==> auditor ciphertext is left empty
         };
 
         move_to(&get_confidential_store_signer(sender, asset_type), ca_store);
@@ -431,16 +441,17 @@ module aptos_experimental::confidential_asset {
         // Read values before mutable borrow to avoid conflicting borrows of ConfidentialStore
         let ek = get_encryption_key(sender_addr, asset_type);
         let old_balance = get_available_balance(sender_addr, asset_type);
-        let auditor_ek = get_effective_auditor_config(asset_type).config.ek;
+        let effective_auditor = get_effective_auditor_config(asset_type);
 
         let compressed_new_balance = assert_valid_withdrawal_proof(
             sender, asset_type,
-            &ek, amount, &old_balance, &auditor_ek, proof
+            &ek, amount, &old_balance, &effective_auditor.config.ek, proof
         );
 
         let ca_store = borrow_confidential_store_mut(sender_addr, asset_type);
         ca_store.normalized = true;
         ca_store.available_balance = compressed_new_balance;
+        ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
 
         if (amount > 0) {
             let pool_fa_store = get_pool_fa_store(asset_type);  // must exist b.c. sender's CA store exists
@@ -516,7 +527,7 @@ module aptos_experimental::confidential_asset {
 
         let from = signer::address_of(sender);
         assert!(from != to, error::invalid_argument(E_SELF_TRANSFER));
-        let ek_effective_auditor = get_effective_auditor_config(asset_type).config.ek;
+        let effective_auditor = get_effective_auditor_config(asset_type);
         let ek_sender = get_encryption_key(from, asset_type);
         let ek_recip = get_encryption_key(to, asset_type);
         let old_balance = get_available_balance(from, asset_type);
@@ -526,7 +537,7 @@ module aptos_experimental::confidential_asset {
             assert_valid_transfer_proof(
                 sender, to, asset_type,
                 &ek_sender, &ek_recip,
-                &old_balance, &ek_effective_auditor,
+                &old_balance, &effective_auditor.config.ek,
                 proof
             );
 
@@ -534,6 +545,7 @@ module aptos_experimental::confidential_asset {
         let sender_ca_store = borrow_confidential_store_mut(from, asset_type);
         sender_ca_store.normalized = true;
         sender_ca_store.available_balance = compressed_new_balance;
+        sender_ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
 
         // Update recipient's confidential store
         let recip_ca_store = borrow_confidential_store_mut(to, asset_type);
@@ -652,8 +664,9 @@ module aptos_experimental::confidential_asset {
         assert!(ca_store.normalized, error::invalid_state(E_NORMALIZATION_REQUIRED));
         assert!(ca_store.transfers_received > 0, error::invalid_state(E_NOTHING_TO_ROLLOVER));
 
-        add_assign_available_excluding_auditor(&mut ca_store.available_balance, &ca_store.pending_balance);
+        ca_store.available_balance.add_assign_available_excluding_auditor(&ca_store.pending_balance);
         // Note: R_aud components [must] remain stale, but will be refreshed on the next normalize/withdraw/transfer
+        // Note: Since this function does not update the *auditor's* available balance, we do not update the auditor hint.
 
         ca_store.normalized = false;
         ca_store.transfers_received = 0;
@@ -895,6 +908,20 @@ module aptos_experimental::confidential_asset {
     }
 
     // === Private, internal functions (10 out of 13) ===
+
+    /// Updates the auditor hint stored in a confidential store to track the currently-set on-chain effective auditor
+    fun update_auditor_hint(self: &mut ConfidentialStore, effective_auditor: &EffectiveAuditorConfig) {
+        if (effective_auditor.config.ek.is_none()) {
+            // If there is no effective auditor EK set, we unset the effective auditor hint
+            self.auditor_hint = std::option::none()
+        } else {
+            // Otherwise, we update the effective auditor hint: type [global or asset-specific] and epoch
+            self.auditor_hint = std::option::some(EffectiveAuditorHint::V1 {
+                is_global: effective_auditor.is_global,
+                epoch: effective_auditor.config.epoch,
+            })
+        };
+    }
 
     fun get_asset_config_address(asset_type: Object<fungible_asset::Metadata>): address acquires GlobalConfig {
         let config_ext = &borrow_global<GlobalConfig>(@aptos_experimental).extend_ref;
