@@ -1548,9 +1548,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     async fn pull_payload(&self) -> (Vec<aptos_types::validator_txn::ValidatorTransaction>, Payload) {
         let params = PayloadPullParameters {
             max_poll_time: Duration::from_millis(300),
-            max_txns: PayloadTxnsSize::new(2000, 4 * 1024 * 1024),
-            max_txns_after_filtering: 2000,
-            soft_max_txns_after_filtering: 2000,
+            max_txns: PayloadTxnsSize::new(1000, 4 * 1024 * 1024),
+            max_txns_after_filtering: 1000,
+            soft_max_txns_after_filtering: 1000,
             max_inline_txns: PayloadTxnsSize::new(400, 400 * 1024),
             user_txn_filter: PayloadFilter::Empty,
             pending_ordering: false,
