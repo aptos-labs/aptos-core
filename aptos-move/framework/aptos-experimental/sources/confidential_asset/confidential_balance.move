@@ -215,9 +215,9 @@ module aptos_experimental::confidential_balance {
     }
 
     /// Adds a pending balance to an available balance in place. R_aud is NOT touched (stale after rollover).
-    public fun add_assign_available_excluding_auditor(balance: &mut CompressedBalance<Available>, rhs: &CompressedBalance<Pending>) {
-        let lhs_P = balance.P.map_ref(|p| p.point_decompress());
-        let lhs_R = balance.R.map_ref(|r| r.point_decompress());
+    public fun add_assign_available_excluding_auditor(self: &mut CompressedBalance<Available>, rhs: &CompressedBalance<Pending>) {
+        let lhs_P = self.P.map_ref(|p| p.point_decompress());
+        let lhs_R = self.R.map_ref(|r| r.point_decompress());
         let rhs_P = rhs.P.map_ref(|p| p.point_decompress());
         let rhs_R = rhs.R.map_ref(|r| r.point_decompress());
 
@@ -226,8 +226,8 @@ module aptos_experimental::confidential_balance {
             lhs_R[i].point_add_assign(&rhs_R[i]);
         });
 
-        balance.P = lhs_P.map_ref(|p| p.point_compress());
-        balance.R = lhs_R.map_ref(|r| r.point_compress());
+        self.P = lhs_P.map_ref(|p| p.point_compress());
+        self.R = lhs_R.map_ref(|r| r.point_compress());
     }
 
     #[view]
