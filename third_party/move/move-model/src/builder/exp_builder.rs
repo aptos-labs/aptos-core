@@ -2922,6 +2922,13 @@ impl ExpTranslator<'_, '_, '_> {
                 // node the original (possibly reference) type for AST consistency.
                 let inner_expected = expected_type.skip_reference();
                 if let Some((value, ty)) = self.translate_value(val, inner_expected, context) {
+                    self.check_type_with_order(
+                        expected_order,
+                        loc,
+                        &ty,
+                        inner_expected,
+                        context,
+                    );
                     let pat_ty = if expected_type.is_reference() {
                         expected_type.clone()
                     } else {
