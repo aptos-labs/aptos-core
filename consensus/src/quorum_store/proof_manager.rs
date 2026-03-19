@@ -17,7 +17,7 @@ use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
+use std::{cmp::min, collections::HashSet, sync::Arc, time::{Duration, Instant}};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -100,7 +100,7 @@ impl ProofManager {
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         let GetPayloadCommand::GetPayloadRequest(request) = msg;
 
-        let excluded_batches: HashSet<_> = match request.filter {
+        let mut excluded_batches: HashSet<_> = match request.filter {
             PayloadFilter::Empty => HashSet::new(),
             PayloadFilter::DirectMempool(_) => {
                 unreachable!()
@@ -108,6 +108,7 @@ impl ProofManager {
             PayloadFilter::InQuorumStore(batches) => batches,
         };
 
+        let pull_proofs_start = Instant::now();
         let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
             self.batch_proof_queue.pull_proofs(
                 &excluded_batches,
@@ -117,12 +118,19 @@ impl ProofManager {
                 request.return_non_full,
                 request.block_timestamp,
             );
+        counters::PULL_PROOFS_DURATION.observe_duration(pull_proofs_start.elapsed());
 
         counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
             .observe(self.batch_proof_queue.num_batches_without_proof() as f64);
         counters::PROOF_QUEUE_FULLY_UTILIZED
             .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
+        // Extend excluded set in-place with pulled proofs
+        for proof in &proof_block {
+            excluded_batches.insert(proof.info().clone());
+        }
+
+        let pull_batches_start = Instant::now();
         let (opt_batches, opt_batch_txns_size) =
             // TODO(ibalajiarun): Support unique txn calculation
             if let Some(ref params) = request.maybe_optqs_payload_pull_params {
@@ -130,11 +138,7 @@ impl ProofManager {
                 let max_opt_batch_txns_after_filtering = request.max_txns_after_filtering - cur_unique_txns;
                 let (opt_batches, opt_payload_size, _) =
                     self.batch_proof_queue.pull_batches(
-                        &excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .collect(),
+                        &excluded_batches,
                         &params.exclude_authors,
                         max_opt_batch_txns_size,
                         max_opt_batch_txns_after_filtering,
@@ -147,7 +151,14 @@ impl ProofManager {
             } else {
                 (Vec::new(), PayloadTxnsSize::zero())
             };
+        counters::PULL_BATCHES_DURATION.observe_duration(pull_batches_start.elapsed());
 
+        // Extend excluded set in-place with pulled opt batches
+        for batch in &opt_batches {
+            excluded_batches.insert(batch.clone());
+        }
+
+        let pull_inline_start = Instant::now();
         let cur_txns = txns_with_proof_size + opt_batch_txns_size;
         let (inline_block, inline_block_size) =
             if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
@@ -163,12 +174,7 @@ impl ProofManager {
                 ));
                 let (inline_batches, inline_payload_size, _) =
                     self.batch_proof_queue.pull_batches_with_transactions(
-                        &excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .chain(opt_batches.clone())
-                            .collect(),
+                        &excluded_batches,
                         max_inline_txns_to_pull,
                         request.max_txns_after_filtering,
                         request.soft_max_txns_after_filtering,
@@ -179,6 +185,7 @@ impl ProofManager {
             } else {
                 (Vec::new(), PayloadTxnsSize::zero())
             };
+        counters::PULL_INLINE_DURATION.observe_duration(pull_inline_start.elapsed());
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 

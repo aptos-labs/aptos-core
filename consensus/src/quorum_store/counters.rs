@@ -139,6 +139,36 @@ pub static PROOF_QUEUE_REMAINING_TXNS_DURATION: Lazy<DurationHistogram> = Lazy::
     )
 });
 
+pub static PULL_PROOFS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_pull_proofs_duration",
+            "Duration of pull_proofs phase in handle_proposal_request"
+        )
+        .unwrap(),
+    )
+});
+
+pub static PULL_BATCHES_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_pull_batches_duration",
+            "Duration of pull_batches phase in handle_proposal_request"
+        )
+        .unwrap(),
+    )
+});
+
+pub static PULL_INLINE_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_pull_inline_duration",
+            "Duration of pull_batches_with_transactions phase in handle_proposal_request"
+        )
+        .unwrap(),
+    )
+});
+
 /// Duration of each run of the event loop.
 pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
