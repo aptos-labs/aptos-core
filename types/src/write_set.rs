@@ -597,6 +597,13 @@ impl WriteSet {
         self.into_v0().0
     }
 
+    pub fn new_from_value(value: ValueWriteSet) -> Self {
+        Self {
+            value,
+            hotness: BTreeMap::new(),
+        }
+    }
+
     pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
         WriteSetMut::new(write_ops).freeze()
     }
@@ -675,6 +682,14 @@ impl WriteSet {
                     EitherOrBoth::Both(e, _) => e,
                 }
             })
+    }
+
+    pub fn hotness_keys(&self) -> impl Iterator<Item = &StateKey> {
+        self.hotness.keys()
+    }
+
+    pub fn has_hotness(&self) -> bool {
+        !self.hotness.is_empty()
     }
 
     pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {

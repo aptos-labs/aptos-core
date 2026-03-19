@@ -7,7 +7,7 @@ use crate::{
         get_current_version_in_state_merkle_db, get_state_kv_commit_progress,
     },
 };
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use claims::assert_le;
 use clap::Parser;
@@ -66,7 +66,10 @@ impl Cmd {
                     None,
                     /*readonly=*/ false,
                     /*max_num_nodes_per_lru_cache_shard=*/ 0,
-                    /*reset_hot_state=*/ true,
+                    HotStateConfig {
+                        delete_on_restart: true,
+                        ..HotStateConfig::default()
+                    },
                 )?;
 
             let ledger_db = Arc::new(ledger_db);
