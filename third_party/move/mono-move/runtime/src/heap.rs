@@ -137,8 +137,8 @@ impl InterpreterContext<'_> {
     /// `fp` must point to a valid frame. `vec_ref_offset` must be the byte
     /// offset of a 16-byte fat pointer `(base, offset)` whose target holds
     /// the current vector heap pointer. `alloc_vec` may trigger GC which
-    /// relocates objects; the fat pointer's base in `pointer_slots` and the
-    /// vector pointer in the struct's `ref_offsets` are updated by the GC.
+    /// relocates objects; the fat pointer's base in `pointer_offsets` and the
+    /// vector pointer in the struct's `pointer_offsets` are updated by the GC.
     /// We re-read through the fat pointer after allocation.
     pub(crate) fn grow_vec_ref(
         &mut self,
@@ -201,7 +201,7 @@ impl InterpreterContext<'_> {
     ///   and `pc` are written by `CallFunc`/`Return` and never modified by
     ///   user-visible micro-ops. A corrupted saved `fp` leads to
     ///   out-of-bounds stack reads (UB).
-    /// - **Pointer-slot accuracy**: `Function::pointer_slots` lists every
+    /// - **Pointer-slot accuracy**: `Function::pointer_offsets` lists every
     ///   frame offset that may hold a live heap pointer, and *only* those
     ///   offsets. Missing entries → dangling pointers after GC; extra
     ///   entries → non-pointer data reinterpreted as a pointer (UB).
@@ -220,13 +220,13 @@ impl InterpreterContext<'_> {
         let mut fid = self.func_id;
 
         loop {
-            let ref_offsets = &self.functions[fid].pointer_slots;
+            let pointer_offsets = &self.functions[fid].pointer_offsets;
             // SAFETY: `fp` points into the interpreter stack at a valid frame
-            // boundary. `pointer_slots` offsets are within the frame's data
+            // boundary. `pointer_offsets` offsets are within the frame's data
             // segment (verified by the micro-op verifier). `fp.sub` retrieves
             // saved metadata written by the call protocol.
             unsafe {
-                for &offset in ref_offsets {
+                for &offset in pointer_offsets {
                     let old_ptr = read_ptr(fp, offset);
                     if !old_ptr.is_null() && self.is_heap_ptr(old_ptr) {
                         let new_ptr = self.gc_copy_object(old_ptr, &mut free_ptr);
@@ -335,8 +335,8 @@ impl InterpreterContext<'_> {
     /// - `descriptor_id` must match the object's actual type (read from its
     ///   header by the caller).
     /// - The `ObjectDescriptor` at `descriptor_id` must accurately describe
-    ///   the reference layout of the object — incorrect `ref_offsets` or
-    ///   `elem_ref_offsets` will cause the GC to follow non-pointer data (UB).
+    ///   the reference layout of the object — incorrect `pointer_offsets` or
+    ///   `elem_pointer_offsets` will cause the GC to follow non-pointer data (UB).
     /// - `free_ptr` must point to the next free byte in to-space with enough
     ///   room for any objects that will be copied.
     fn gc_scan_object(&mut self, obj_ptr: *mut u8, descriptor_id: u32, free_ptr: &mut *mut u8) {
@@ -350,10 +350,10 @@ impl InterpreterContext<'_> {
             ObjectDescriptor::Trivial => {},
             ObjectDescriptor::Vector {
                 elem_size,
-                elem_ref_offsets,
+                elem_pointer_offsets,
             } => {
                 debug_assert!(*elem_size > 0, "elem_size must not be zero");
-                if elem_ref_offsets.is_empty() {
+                if elem_pointer_offsets.is_empty() {
                     return;
                 }
                 unsafe {
@@ -362,22 +362,24 @@ impl InterpreterContext<'_> {
 
                     for i in 0..length {
                         let elem_base = data_start.add(i * (*elem_size as usize));
-                        for &ref_off in elem_ref_offsets {
-                            let old_ptr = read_ptr(elem_base, ref_off as usize);
+                        for &ptr_off in elem_pointer_offsets {
+                            let old_ptr = read_ptr(elem_base, ptr_off as usize);
                             if !old_ptr.is_null() && self.is_heap_ptr(old_ptr) {
                                 let new_ptr = self.gc_copy_object(old_ptr, free_ptr);
-                                write_ptr(elem_base, ref_off as usize, new_ptr);
+                                write_ptr(elem_base, ptr_off as usize, new_ptr);
                             }
                         }
                     }
                 }
             },
-            ObjectDescriptor::Struct { ref_offsets, .. } => {
-                if ref_offsets.is_empty() {
+            ObjectDescriptor::Struct {
+                pointer_offsets, ..
+            } => {
+                if pointer_offsets.is_empty() {
                     return;
                 }
                 unsafe {
-                    for &off in ref_offsets {
+                    for &off in pointer_offsets {
                         let old_ptr = read_ptr(obj_ptr, STRUCT_DATA_OFFSET + off as usize);
                         if !old_ptr.is_null() && self.is_heap_ptr(old_ptr) {
                             let new_ptr = self.gc_copy_object(old_ptr, free_ptr);
@@ -387,18 +389,18 @@ impl InterpreterContext<'_> {
                 }
             },
             ObjectDescriptor::Enum {
-                variant_ref_offsets,
+                variant_pointer_offsets,
                 ..
             } => unsafe {
                 let tag = read_u64(obj_ptr, ENUM_TAG_OFFSET) as usize;
-                if tag >= variant_ref_offsets.len() {
+                if tag >= variant_pointer_offsets.len() {
                     return;
                 }
-                let ref_offsets = &variant_ref_offsets[tag];
-                if ref_offsets.is_empty() {
+                let pointer_offsets = &variant_pointer_offsets[tag];
+                if pointer_offsets.is_empty() {
                     return;
                 }
-                for &off in ref_offsets {
+                for &off in pointer_offsets {
                     let old_ptr = read_ptr(obj_ptr, ENUM_DATA_OFFSET + off as usize);
                     if !old_ptr.is_null() && self.is_heap_ptr(old_ptr) {
                         let new_ptr = self.gc_copy_object(old_ptr, free_ptr);

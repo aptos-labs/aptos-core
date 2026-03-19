@@ -21,10 +21,11 @@ pub enum ObjectDescriptor {
 
     /// Vector whose elements may contain heap pointers at known offsets.
     Vector {
-        /// Byte stride between consecutive elements.
+        /// Size of each element in bytes.
+        /// The address of element `i` is `data_start + i * elem_size`.
         elem_size: u32,
         /// Byte offsets within each element that are heap pointers.
-        elem_ref_offsets: Vec<u32>,
+        elem_pointer_offsets: Vec<u32>,
     },
 
     /// Fixed-size struct allocated on the heap.
@@ -34,7 +35,7 @@ pub enum ObjectDescriptor {
         /// Byte offsets within the payload that hold owned heap pointers.
         /// Move forbids references inside structs, so these are always
         /// 8-byte pointers to other heap objects (vectors, structs, etc.).
-        ref_offsets: Vec<u32>,
+        pointer_offsets: Vec<u32>,
     },
 
     /// Enum (tagged union) allocated on the heap.
@@ -42,10 +43,10 @@ pub enum ObjectDescriptor {
     Enum {
         /// Total payload size in bytes (tag + max variant fields, excluding header).
         size: u32,
-        /// Per-variant reference layouts. `variant_ref_offsets[tag]` gives
+        /// Per-variant pointer layouts. `variant_pointer_offsets[tag]` gives
         /// byte offsets (relative to `ENUM_DATA_OFFSET`) that hold heap
         /// pointers for that variant.
-        variant_ref_offsets: Vec<Vec<u32>>,
+        variant_pointer_offsets: Vec<Vec<u32>>,
     },
 }
 
@@ -53,35 +54,52 @@ pub enum ObjectDescriptor {
 // Function representation
 // ---------------------------------------------------------------------------
 
+/// Frame layout (fp-relative):
+///
+/// ```text
+///   [0 .. args_size)                    arguments (written by caller)
+///   [args_size .. args_and_locals_size)          locals
+///   [args_and_locals_size .. args_and_locals_size+24)     metadata (saved_pc, saved_fp, saved_func_id)
+///   [args_and_locals_size+24 .. extended_frame_size)  callee arg/return slots
+/// ```
+///
+/// `extended_frame_size` == `args_and_locals_size + FRAME_METADATA_SIZE` for leaf
+/// functions (no callee region).
 #[derive(Debug)]
 pub struct Function {
     pub code: Vec<MicroOp>,
-    /// Size of the argument region at the start of the data segment.
+    /// Size of the argument region at the start of the frame.
     /// Arguments are placed by the caller before `CallFunc`; when
     /// `zero_frame` is true, the runtime zeroes everything beyond args
     /// (`args_size..extended_frame_size`) at frame creation to ensure
-    /// pointer slots start as null.
+    /// pointer_offsets start as null.
     pub args_size: usize,
-    /// Size of the data segment (arguments + locals). Frame metadata is stored
-    /// immediately after this region at offset `data_size`.
-    pub data_size: usize,
-    /// Total frame footprint including metadata. Must be >= `frame_size()`
-    /// (i.e., `data_size + FRAME_METADATA_SIZE`). For non-calling leaf
-    /// functions this equals `frame_size()`; for calling functions it
-    /// additionally includes callee argument / return value slots.
+    /// Size of the arguments + locals region. Frame metadata is stored
+    /// immediately after this region at offset `args_and_locals_size`.
+    pub args_and_locals_size: usize,
+    /// Total frame footprint including metadata and callee slots.
+    /// Must be >= `frame_size()` (i.e., `args_and_locals_size + FRAME_METADATA_SIZE`).
+    /// For leaf functions this equals `frame_size()`; for calling functions
+    /// it additionally includes callee argument / return value slots
+    /// (sized to fit the largest callee's args or return values).
     pub extended_frame_size: usize,
     /// Whether the runtime must zero-initialize the region beyond args
     /// (`args_size..extended_frame_size`) when a new frame is created.
-    /// This is required when pointer slots exist so the GC sees null
-    /// instead of garbage. Functions with no pointer slots (beyond args)
-    /// can set this to `false` to skip the memset.
+    /// This is required when pointer_offsets exist so the GC sees null
+    /// instead of garbage. Functions with no heap pointer slots (beyond
+    /// args) can set this to `false` to skip the memset.
     pub zero_frame: bool,
-    /// Frame byte-offsets that may hold heap pointers (GC roots).
+    /// Frame byte-offsets of slots that may hold heap pointers (GC roots).
     ///
     /// Offsets span `[0..extended_frame_size)` — they may reference the
-    /// data segment, AND the callee argument/return region beyond the
+    /// data segment AND the callee argument/return region beyond the
     /// metadata. The GC scans these slots in every live frame — no
     /// per-PC stack maps are needed (see docs/gc_design.md).
+    ///
+    /// Each entry is the offset of an 8-byte slot that holds a heap
+    /// pointer (or null). For a 16-byte fat pointer `(base, offset)` at
+    /// frame offset `X`, list `X` here — the base is the heap pointer;
+    /// `X+8` is a scalar offset and is not listed.
     ///
     /// Invariants:
     ///
@@ -89,27 +107,22 @@ pub struct Function {
     ///   runtime zeroes `args_size..extended_frame_size` when a frame
     ///   is created, so all non-argument pointer slots (including the
     ///   callee arg/return region) start as null.
-    /// - **Pointer-only writes**: a pointer slot may only be overwritten
-    ///   with another valid heap pointer (or null). The re-compiler must
-    ///   guarantee this.
-    /// - **Fat pointers**: for a 16-byte `(base, offset)` fat pointer at
-    ///   offset `X`, only `X` (the base) is listed here. The second word
-    ///   (`X+8`, the offset) is a scalar.
+    /// - **Pointer-only writes**: a pointer_offset slot may only be
+    ///   overwritten with another valid heap pointer (or null). The
+    ///   re-compiler must guarantee this.
     ///
-    /// Callee arg region (`frame_size()..extended_frame_size`):
-    ///
-    /// This region overlaps with the callee's frame during GC
-    /// traversal — both frames may scan the same memory. The
-    /// forwarding markers in `gc_copy_object` handle double-scans
-    /// correctly.
-    pub pointer_slots: Vec<FrameOffset>,
+    /// The callee arg region (`frame_size()..extended_frame_size`)
+    /// overlaps with the callee's frame during GC traversal — both
+    /// frames may scan the same memory. The forwarding markers in
+    /// `gc_copy_object` handle double-scans correctly.
+    pub pointer_offsets: Vec<FrameOffset>,
 }
 
 impl Function {
-    /// The frame size including metadata: `data_size + FRAME_METADATA_SIZE`.
+    /// The frame size including metadata: `args_and_locals_size + FRAME_METADATA_SIZE`.
     /// This is the offset where callee arguments begin.
     pub fn frame_size(&self) -> usize {
-        self.data_size + FRAME_METADATA_SIZE
+        self.args_and_locals_size + FRAME_METADATA_SIZE
     }
 }
 

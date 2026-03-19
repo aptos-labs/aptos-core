@@ -40,14 +40,14 @@ fn enum_basic() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 24,
+        args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_slots: vec![FO(shape)],
+        pointer_offsets: vec![FO(shape)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
-        variant_ref_offsets: vec![vec![], vec![]],
+        variant_pointer_offsets: vec![vec![], vec![]],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -91,14 +91,14 @@ fn enum_survives_gc() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 24,
+        args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_slots: vec![FO(shape)],
+        pointer_offsets: vec![FO(shape)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
-        variant_ref_offsets: vec![vec![], vec![]],
+        variant_pointer_offsets: vec![vec![], vec![]],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -149,15 +149,15 @@ fn enum_gc_traces_refs() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(val), FO(vec), FO(vec_ref)],
+        pointer_offsets: vec![FO(val), FO(vec), FO(vec_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Enum {
             size: 16,
-            variant_ref_offsets: vec![vec![], vec![0]],
+            variant_pointer_offsets: vec![vec![], vec![0]],
         },
         ObjectDescriptor::Trivial,
     ];
@@ -214,14 +214,14 @@ fn enum_pattern_match() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 24,
+        args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_slots: vec![FO(op)],
+        pointer_offsets: vec![FO(op)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
-        variant_ref_offsets: vec![vec![], vec![]],
+        variant_pointer_offsets: vec![vec![], vec![]],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -260,14 +260,14 @@ fn enum_variant_switch() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 24,
+        args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_slots: vec![FO(e)],
+        pointer_offsets: vec![FO(e)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 16,
-        variant_ref_offsets: vec![vec![], vec![]],
+        variant_pointer_offsets: vec![vec![], vec![]],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -308,14 +308,14 @@ fn enum_borrow_field() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(e), FO(r#ref), FO(e_ref)],
+        pointer_offsets: vec![FO(e), FO(r#ref), FO(e_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
-        variant_ref_offsets: vec![vec![], vec![]],
+        variant_pointer_offsets: vec![vec![], vec![]],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -361,15 +361,15 @@ fn enum_gc_variant_switching() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(ctr), FO(vec), FO(vec_ref)],
+        pointer_offsets: vec![FO(ctr), FO(vec), FO(vec_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Enum {
             size: 16,
-            variant_ref_offsets: vec![vec![], vec![0]],
+            variant_pointer_offsets: vec![vec![], vec![0]],
         },
         ObjectDescriptor::Trivial,
     ];
@@ -419,19 +419,19 @@ fn enum_in_struct() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 32,
+        args_and_locals_size: 32,
         extended_frame_size: 56,
         zero_frame: true,
-        pointer_slots: vec![FO(wrapper), FO(payload)],
+        pointer_offsets: vec![FO(wrapper), FO(payload)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Struct {
             size: 16,
-            ref_offsets: vec![8],
+            pointer_offsets: vec![8],
         },
         ObjectDescriptor::Enum {
             size: 16,
-            variant_ref_offsets: vec![vec![], vec![]],
+            variant_pointer_offsets: vec![vec![], vec![]],
         },
     ];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -491,19 +491,19 @@ fn enum_in_vector() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(vec), FO(e), FO(vec_ref)],
+        pointer_offsets: vec![FO(vec), FO(e), FO(vec_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Enum {
             size: 24,
-            variant_ref_offsets: vec![vec![], vec![]],
+            variant_pointer_offsets: vec![vec![], vec![]],
         },
         ObjectDescriptor::Vector {
             elem_size: 8,
-            elem_ref_offsets: vec![0],
+            elem_pointer_offsets: vec![0],
         },
     ];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);

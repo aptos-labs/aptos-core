@@ -31,10 +31,10 @@ fn struct_inline() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 24,
+        args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -71,10 +71,10 @@ fn struct_inline_borrow() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 40,
+        args_and_locals_size: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        pointer_slots: vec![FO(r#ref)],
+        pointer_offsets: vec![FO(r#ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -111,14 +111,14 @@ fn struct_heap_basic() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 24,
+        args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_slots: vec![FO(entry)],
+        pointer_offsets: vec![FO(entry)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
-        ref_offsets: vec![],
+        pointer_offsets: vec![],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -155,14 +155,14 @@ fn struct_heap_survives_gc() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 24,
+        args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_slots: vec![FO(entry)],
+        pointer_offsets: vec![FO(entry)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
-        ref_offsets: vec![],
+        pointer_offsets: vec![],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -215,15 +215,15 @@ fn struct_with_vector_field() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 64,
+        args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_slots: vec![FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)],
+        pointer_offsets: vec![FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)],
     }];
     let descriptors = vec![
         ObjectDescriptor::Struct {
             size: 16,
-            ref_offsets: vec![8],
+            pointer_offsets: vec![8],
         },
         ObjectDescriptor::Trivial,
     ];
@@ -277,14 +277,14 @@ fn struct_borrow_field() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(entry), FO(r#ref), FO(entry_ref)],
+        pointer_offsets: vec![FO(entry), FO(r#ref), FO(entry_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
-        ref_offsets: vec![],
+        pointer_offsets: vec![],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -327,14 +327,14 @@ fn struct_borrow_survives_gc() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(entry), FO(ref_base), FO(entry_ref)],
+        pointer_offsets: vec![FO(entry), FO(ref_base), FO(entry_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
-        ref_offsets: vec![],
+        pointer_offsets: vec![],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();

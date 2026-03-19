@@ -122,10 +122,10 @@ fn make_gc_stress_program(
     let callee_func = Function {
         code: make_entry_code,
         args_size: 8,
-        data_size: 40,
+        args_and_locals_size: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        pointer_slots: vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)],
+        pointer_offsets: vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)],
     };
 
     // -- Function 0: main --
@@ -136,7 +136,7 @@ fn make_gc_stress_program(
     let tmp: u32 = 32;
     let const_hundred: u32 = 40;
     let outer_vec_ref: u32 = 48; // 16-byte fat pointer to outer_vec slot
-    let callee_arg: u32 = 88; // data_size (64) + FRAME_METADATA_SIZE (24)
+    let callee_arg: u32 = 88; // args_and_locals_size (64) + FRAME_METADATA_SIZE (24)
     let entry_ptr: u32 = 104; // callee result slot (callee fp + 16)
 
     #[rustfmt::skip]
@@ -223,10 +223,10 @@ fn make_gc_stress_program(
     let main_func = Function {
         code,
         args_size: 0,
-        data_size: 64,
+        args_and_locals_size: 64,
         extended_frame_size: 128,
         zero_frame: true,
-        pointer_slots: vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)],
+        pointer_offsets: vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)],
     };
 
     let descriptors = vec![
@@ -235,12 +235,12 @@ fn make_gc_stress_program(
         // Descriptor 1: Entry struct { key: u64, values: *vec }
         ObjectDescriptor::Struct {
             size: 16,
-            ref_offsets: vec![8],
+            pointer_offsets: vec![8],
         },
         // Descriptor 2: outer vector whose 8-byte elements are heap pointers (to Entry structs)
         ObjectDescriptor::Vector {
             elem_size: 8,
-            elem_ref_offsets: vec![0],
+            elem_pointer_offsets: vec![0],
         },
     ];
 

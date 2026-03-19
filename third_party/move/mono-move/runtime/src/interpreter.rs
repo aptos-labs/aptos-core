@@ -215,7 +215,7 @@ impl InterpreterContext<'_> {
                 MicroOp::CallFunc { func_id } => {
                     let func_id = func_id as usize;
                     let callee = &self.functions[func_id];
-                    let new_fp = fp.add(func.data_size + FRAME_METADATA_SIZE);
+                    let new_fp = fp.add(func.args_and_locals_size + FRAME_METADATA_SIZE);
                     let stack_end = self.stack.as_ptr().add(self.stack.len());
                     if new_fp.add(callee.extended_frame_size) > stack_end {
                         bail!("stack overflow");
@@ -228,7 +228,7 @@ impl InterpreterContext<'_> {
                         let zero_size = callee.extended_frame_size - callee.args_size;
                         std::ptr::write_bytes(new_fp.add(callee.args_size), 0, zero_size);
                     }
-                    let meta = fp.add(func.data_size);
+                    let meta = fp.add(func.args_and_locals_size);
                     write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
                     write_ptr(meta, META_SAVED_FP_OFFSET, fp);
                     write_u64(meta, META_SAVED_FUNC_ID_OFFSET, self.func_id as u64);

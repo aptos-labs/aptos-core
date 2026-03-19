@@ -46,10 +46,10 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
     let func = Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(slot_vec), FO(slot_vec_ref)],
+        pointer_offsets: vec![FO(slot_vec), FO(slot_vec_ref)],
     };
 
     let descriptors = vec![ObjectDescriptor::Trivial];

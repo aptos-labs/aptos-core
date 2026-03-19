@@ -69,7 +69,7 @@ mod micro_op {
         let i = 16u32;
         let j = 24u32;
         let tmp = 32u32;
-        let data_size = 40u32;
+        let args_and_locals_size = 40u32;
 
         #[rustfmt::skip]
         let code = vec![
@@ -100,10 +100,11 @@ mod micro_op {
         let func = Function {
             code,
             args_size: 8,
-            data_size: data_size as usize,
-            extended_frame_size: data_size as usize + mono_move_runtime::FRAME_METADATA_SIZE,
+            args_and_locals_size: args_and_locals_size as usize,
+            extended_frame_size: args_and_locals_size as usize
+                + mono_move_runtime::FRAME_METADATA_SIZE,
             zero_frame: false,
-            pointer_slots: vec![],
+            pointer_offsets: vec![],
         };
 
         (vec![func], vec![ObjectDescriptor::Trivial])

@@ -12,15 +12,15 @@ fn trivial_descriptors() -> Vec<ObjectDescriptor> {
     vec![ObjectDescriptor::Trivial]
 }
 
-/// A minimal well-formed function: one `Return`, data_size 8.
+/// A minimal well-formed function: one `Return`, args_and_locals_size 8.
 fn minimal_func() -> Function {
     Function {
         code: vec![MicroOp::Return],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     }
 }
 
@@ -50,10 +50,10 @@ fn valid_with_arithmetic_and_jumps() {
     let func = Function {
         code,
         args_size: 0,
-        data_size: 16,
+        args_and_locals_size: 16,
         extended_frame_size: 40,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
@@ -75,10 +75,10 @@ fn valid_with_vec_and_pointer_slots() {
     let func = Function {
         code,
         args_size: 0,
-        data_size: 32,
+        args_and_locals_size: 32,
         extended_frame_size: 56,
         zero_frame: true,
-        pointer_slots: vec![FO(0)],
+        pointer_offsets: vec![FO(0)],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
@@ -93,11 +93,11 @@ fn frame_bounds_store_u64() {
     use MicroOp::*;
     let func = Function {
         code: vec![StoreImm8 { dst: FO(8), imm: 0 }, Return],
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
         args_size: 0,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert_eq!(errors.len(), 1);
@@ -120,11 +120,11 @@ fn frame_bounds_mov() {
             },
             Return,
         ],
-        data_size: 16,
+        args_and_locals_size: 16,
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
         args_size: 0,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -145,11 +145,11 @@ fn frame_bounds_fat_ptr_write() {
             },
             Return,
         ],
-        data_size: 16,
+        args_and_locals_size: 16,
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
         args_size: 0,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -164,11 +164,11 @@ fn frame_bounds_callfunc_metadata() {
     let callee = minimal_func();
     let func = Function {
         code: vec![CallFunc { func_id: 1 }, Return],
-        data_size: 8,
-        extended_frame_size: 16, // data_size 8 + 24 = 32 > 16
+        args_and_locals_size: 8,
+        extended_frame_size: 16, // args_and_locals_size 8 + 24 = 32 > 16
         args_size: 0,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func, callee], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -186,10 +186,10 @@ fn pointer_slots_offset_out_of_bounds() {
     let func = Function {
         code: vec![MicroOp::Return],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: true,
-        pointer_slots: vec![FO(100)], // offset 100 + 8 > extended_frame_size 32
+        pointer_offsets: vec![FO(100)], // offset 100 + 8 > extended_frame_size 32
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -203,10 +203,10 @@ fn pointer_slots_overlaps_metadata() {
     let func = Function {
         code: vec![MicroOp::Return],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 40,
         zero_frame: true,
-        pointer_slots: vec![FO(8)], // offset 8 overlaps metadata [8, 32) since data_size = 8
+        pointer_offsets: vec![FO(8)], // offset 8 overlaps metadata [8, 32) since args_and_locals_size = 8
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -219,11 +219,11 @@ fn pointer_slots_overlaps_metadata() {
 fn args_size_exceeds_data_size() {
     let func = Function {
         code: vec![MicroOp::Return],
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
-        args_size: 16, // > data_size 8
+        args_size: 16, // > args_and_locals_size 8
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -243,10 +243,10 @@ fn invalid_jump_target() {
             Return,
         ],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -266,10 +266,10 @@ fn invalid_conditional_jump_target() {
             Return,
         ],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -286,10 +286,10 @@ fn invalid_callfunc_func_id() {
     let func = Function {
         code: vec![CallFunc { func_id: 42 }, Return],
         args_size: 0,
-        data_size: 0,
+        args_and_locals_size: 0,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -315,10 +315,10 @@ fn invalid_descriptor_id() {
             Return,
         ],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: true,
-        pointer_slots: vec![FO(0)],
+        pointer_offsets: vec![FO(0)],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -342,10 +342,10 @@ fn zero_size_mov() {
             Return,
         ],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -367,10 +367,10 @@ fn zero_elem_size_vec_new() {
             Return,
         ],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: true,
-        pointer_slots: vec![FO(0)],
+        pointer_offsets: vec![FO(0)],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -386,10 +386,10 @@ fn empty_code() {
     let func = Function {
         code: vec![],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -401,10 +401,10 @@ fn zero_frame_size() {
     let func = Function {
         code: vec![MicroOp::Return],
         args_size: 0,
-        data_size: 0,
+        args_and_locals_size: 0,
         extended_frame_size: 0,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -428,10 +428,10 @@ fn multiple_errors_collected() {
             Return,
         ],
         args_size: 0,
-        data_size: 8,
+        args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_slots: vec![],
+        pointer_offsets: vec![],
     };
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(

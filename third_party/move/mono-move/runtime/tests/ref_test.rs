@@ -47,10 +47,10 @@ fn ref_basic() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 72,
+        args_and_locals_size: 72,
         extended_frame_size: 96,
         zero_frame: true,
-        pointer_slots: vec![FO(vec), FO(r#ref), FO(vec_ref)],
+        pointer_offsets: vec![FO(vec), FO(r#ref), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -105,10 +105,10 @@ fn ref_survives_gc() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 64,
+        args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_slots: vec![FO(vec), FO(ref_base), FO(vec_ref)],
+        pointer_offsets: vec![FO(vec), FO(ref_base), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -152,10 +152,10 @@ fn ref_cross_frame() {
     let callee_func = Function {
         code: callee_code,
         args_size: 16,
-        data_size: 24,
+        args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_slots: vec![FO(c_ref_base)],
+        pointer_offsets: vec![FO(c_ref_base)],
     };
 
     // -- Function 0: main --
@@ -187,10 +187,10 @@ fn ref_cross_frame() {
     let main_func = Function {
         code: main_code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_slots: vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)],
+        pointer_offsets: vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)],
     };
 
     let descriptors = vec![ObjectDescriptor::Trivial];
@@ -260,10 +260,10 @@ fn ref_multiple_borrows() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 88,
+        args_and_locals_size: 88,
         extended_frame_size: 112,
         zero_frame: true,
-        pointer_slots: vec![FO(vec), FO(ref_a_base), FO(ref_b_base), FO(vec_ref)],
+        pointer_offsets: vec![FO(vec), FO(ref_a_base), FO(ref_b_base), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -319,12 +319,12 @@ fn ref_borrow_local() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 64,
+        args_and_locals_size: 64,
         extended_frame_size: 88,
         // ref_base holds a stack address → is_heap_ptr returns false, GC skips it.
         // vec is a genuine heap root.
         zero_frame: true,
-        pointer_slots: vec![FO(ref_base), FO(vec), FO(vec_ref)],
+        pointer_offsets: vec![FO(ref_base), FO(vec), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -396,10 +396,10 @@ fn ref_nested_vectors() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 96,
+        args_and_locals_size: 96,
         extended_frame_size: 120,
         zero_frame: true,
-        pointer_slots: vec![
+        pointer_offsets: vec![
             FO(outer),
             FO(inner_ptr),
             FO(ref_base),
@@ -409,7 +409,7 @@ fn ref_nested_vectors() {
     }];
     let descriptors = vec![ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
         elem_size: 8,
-        elem_ref_offsets: vec![0],
+        elem_pointer_offsets: vec![0],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -484,10 +484,10 @@ fn ref_survives_double_gc() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 64,
+        args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_slots: vec![FO(vec), FO(ref_base), FO(vec_ref)],
+        pointer_offsets: vec![FO(vec), FO(ref_base), FO(vec_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
@@ -539,14 +539,14 @@ fn ref_struct_field_borrow() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(entry), FO(r#ref), FO(entry_ref)],
+        pointer_offsets: vec![FO(entry), FO(r#ref), FO(entry_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
-        ref_offsets: vec![],
+        pointer_offsets: vec![],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -592,14 +592,14 @@ fn ref_struct_field_survives_gc() {
     let functions = [Function {
         code,
         args_size: 0,
-        data_size: 48,
+        args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_slots: vec![FO(entry), FO(ref_base), FO(entry_ref)],
+        pointer_offsets: vec![FO(entry), FO(ref_base), FO(entry_ref)],
     }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
-        ref_offsets: vec![],
+        pointer_offsets: vec![],
     }];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();

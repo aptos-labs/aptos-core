@@ -85,8 +85,8 @@ mod micro_op {
             let vec = 0u32;
             let len = 8u32;
             let vec_ref = 16u32;
-            let data_size = 32u32;
-            let callee_vec = data_size + meta;
+            let args_and_locals_size = 32u32;
+            let callee_vec = args_and_locals_size + meta;
             let callee_lo = callee_vec + 8;
             let callee_hi = callee_lo + 8;
 
@@ -104,10 +104,10 @@ mod micro_op {
             Function {
                 code,
                 args_size: 8,
-                data_size: data_size as usize,
+                args_and_locals_size: args_and_locals_size as usize,
                 extended_frame_size: (callee_hi + 8) as usize,
                 zero_frame: true,
-                pointer_slots: vec![FO(vec), FO(vec_ref)],
+                pointer_offsets: vec![FO(vec), FO(vec_ref)],
             }
         };
 
@@ -132,8 +132,8 @@ mod micro_op {
             let hi = 16u32;
             let mid = 24u32;
             let tmp = 32u32;
-            let data_size = 40u32;
-            let callee_0 = data_size + meta;
+            let args_and_locals_size = 40u32;
+            let callee_0 = args_and_locals_size + meta;
             let callee_1 = callee_0 + 8;
             let callee_2 = callee_1 + 8;
             let callee_3 = callee_2 + 8;
@@ -169,10 +169,10 @@ mod micro_op {
             Function {
                 code,
                 args_size: 24,
-                data_size: data_size as usize,
+                args_and_locals_size: args_and_locals_size as usize,
                 extended_frame_size: (callee_3 + 8) as usize,
                 zero_frame: true,
-                pointer_slots: vec![FO(vec)],
+                pointer_offsets: vec![FO(vec)],
             }
         };
 
@@ -278,10 +278,10 @@ mod micro_op {
             Function {
                 code,
                 args_size: 32,
-                data_size: 120,
+                args_and_locals_size: 120,
                 extended_frame_size: 144,
                 zero_frame: true,
-                pointer_slots: vec![FO(vec), FO(tmp), FO(vec_ref), FO(tmp_ref)],
+                pointer_offsets: vec![FO(vec), FO(tmp), FO(vec_ref), FO(tmp_ref)],
             }
         };
 

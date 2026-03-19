@@ -75,25 +75,25 @@ impl FunctionVerifier<'_> {
             self.err(
                 None,
                 format!(
-                    "extended_frame_size ({}) must be >= frame_size() (data_size {} + FRAME_METADATA_SIZE {} = {})",
+                    "extended_frame_size ({}) must be >= frame_size() (args_and_locals_size {} + FRAME_METADATA_SIZE {} = {})",
                     self.func.extended_frame_size,
-                    self.func.data_size,
+                    self.func.args_and_locals_size,
                     FRAME_METADATA_SIZE,
                     self.func.frame_size()
                 ),
             );
         }
-        if self.func.args_size > self.func.data_size {
+        if self.func.args_size > self.func.args_and_locals_size {
             self.err(
                 None,
                 format!(
-                    "args_size ({}) must be <= data_size ({})",
-                    self.func.args_size, self.func.data_size
+                    "args_size ({}) must be <= args_and_locals_size ({})",
+                    self.func.args_size, self.func.args_and_locals_size
                 ),
             );
         }
 
-        for &off in &self.func.pointer_slots {
+        for &off in &self.func.pointer_offsets {
             self.check_frame_access(None, off, 8);
         }
 
@@ -371,8 +371,8 @@ impl FunctionVerifier<'_> {
             return;
         }
 
-        let meta_start = self.func.data_size;
-        let meta_end = self.func.data_size + FRAME_METADATA_SIZE;
+        let meta_start = self.func.args_and_locals_size;
+        let meta_end = self.func.args_and_locals_size + FRAME_METADATA_SIZE;
         if offset < meta_end && meta_start < end {
             self.err(
                 pc,

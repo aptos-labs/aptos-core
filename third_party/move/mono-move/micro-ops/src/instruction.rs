@@ -271,8 +271,8 @@ pub enum MicroOp {
     /// Call function `func_id`. The compiler has already emitted micro-ops
     /// to place arguments into the callee's frame. This instruction
     /// implicitly writes the metadata `(pc, fp, func_id)` at
-    /// `current_fp + data_size` and sets `fp` to
-    /// `current_fp + data_size + FRAME_METADATA_SIZE`.
+    /// `current_fp + args_and_locals_size` and sets `fp` to
+    /// `current_fp + args_and_locals_size + FRAME_METADATA_SIZE`.
     CallFunc { func_id: u32 },
 
     /// Return from the current function call. The compiler has already

@@ -48,8 +48,8 @@ mod micro_op {
         let n = 0u32;
         let result = n;
         let tmp = 8u32;
-        let data_size = 16u32;
-        let callee_n = data_size + FRAME_METADATA_SIZE as u32;
+        let args_and_locals_size = 16u32;
+        let callee_n = args_and_locals_size + FRAME_METADATA_SIZE as u32;
         let callee_result = callee_n;
 
         #[rustfmt::skip]
@@ -77,10 +77,10 @@ mod micro_op {
         let func = Function {
             code,
             args_size: 8,
-            data_size: data_size as usize,
+            args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (callee_n + 8) as usize,
             zero_frame: false,
-            pointer_slots: vec![],
+            pointer_offsets: vec![],
         };
 
         (vec![func], vec![ObjectDescriptor::Trivial])

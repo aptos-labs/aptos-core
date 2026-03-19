@@ -294,7 +294,7 @@ mod micro_op {
             ObjectDescriptor::Struct {
                 // 1: BstMap { nodes, free_list, root }
                 size: 24,
-                ref_offsets: vec![0, 8], // nodes and free_list are heap pointers
+                pointer_offsets: vec![0, 8], // nodes and free_list are heap pointers
             },
         ];
         (
@@ -342,10 +342,10 @@ mod micro_op {
         Function {
             code,
             args_size: 0,
-            data_size: 24,
+            args_and_locals_size: 24,
             extended_frame_size: 24 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            pointer_slots: vec![FO(bst), FO(nodes), FO(free_list)],
+            pointer_offsets: vec![FO(bst), FO(nodes), FO(free_list)],
         }
     }
 
@@ -404,10 +404,10 @@ mod micro_op {
         Function {
             code,
             args_size: 16,
-            data_size: 96,
+            args_and_locals_size: 96,
             extended_frame_size: 96 + FRAME_METADATA_SIZE,
             zero_frame: false,
-            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
         }
     }
 
@@ -439,8 +439,8 @@ mod micro_op {
         let node_val = 80u32;
         let node_left = 88u32;
         let node_right = 96u32;
-        let data_size = 104u32;
-        let c0 = data_size + meta; // 128
+        let args_and_locals_size = 104u32;
+        let c0 = args_and_locals_size + meta; // 128
         let c1 = c0 + 8; // 136
         let c2 = c1 + 8; // 144
 
@@ -511,10 +511,10 @@ mod micro_op {
         Function {
             code,
             args_size: 24,
-            data_size: data_size as usize,
+            args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
-            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
         }
     }
 
@@ -581,10 +581,10 @@ mod micro_op {
         Function {
             code,
             args_size: 24,
-            data_size: 120,
+            args_and_locals_size: 120,
             extended_frame_size: 120 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)],
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)],
         }
     }
 
@@ -615,8 +615,8 @@ mod micro_op {
         let node_key = 72u32;
         let node_left = 88u32;
         let node_right = 96u32;
-        let data_size = 104u32;
-        let c0 = data_size + meta; // 128 — also holds replacement after CallFunc
+        let args_and_locals_size = 104u32;
+        let c0 = args_and_locals_size + meta; // 128 — also holds replacement after CallFunc
         let c1 = c0 + 8; // 136
 
         #[rustfmt::skip]
@@ -675,10 +675,10 @@ mod micro_op {
         Function {
             code,
             args_size: 16,
-            data_size: data_size as usize,
+            args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c1 + 8) as usize,
             zero_frame: true,
-            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
         }
     }
 
@@ -779,10 +779,10 @@ mod micro_op {
         Function {
             code,
             args_size: 16,
-            data_size: 136,
+            args_and_locals_size: 136,
             extended_frame_size: 136 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            pointer_slots: vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)],
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)],
         }
     }
 
@@ -811,8 +811,8 @@ mod micro_op {
         let key = 40u32;
         let value = 48u32;
         let ops_ref = 56u32;
-        let data_size = 72u32;
-        let c0 = data_size + meta; // 96
+        let args_and_locals_size = 72u32;
+        let c0 = args_and_locals_size + meta; // 96
         let c1 = c0 + 8; // 104
         let c2 = c1 + 8; // 112
 
@@ -868,10 +868,10 @@ mod micro_op {
         Function {
             code,
             args_size: 8,
-            data_size: data_size as usize,
+            args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
-            pointer_slots: vec![FO(ops), FO(bst), FO(ops_ref)],
+            pointer_offsets: vec![FO(ops), FO(bst), FO(ops_ref)],
         }
     }
 }
