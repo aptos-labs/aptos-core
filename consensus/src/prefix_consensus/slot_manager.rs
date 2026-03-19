@@ -11,7 +11,7 @@
 use crate::{
     payload_client::PayloadClient,
     pipeline::{buffer_manager::OrderedBlocks, pipeline_builder::PipelineBuilder},
-    prefix_consensus::counters::SLOT_DURATION,
+    prefix_consensus::counters::{PROPOSAL_WAIT_DURATION, SLOT_DURATION, SLOT_START_TRIGGER},
 };
 use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter, Round},
@@ -599,6 +599,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .get(&slot)
             .map_or(false, |s| s.has_all_proposals());
         if all_received {
+            if let Some(wait_start) = self.proposal_wait_start {
+                PROPOSAL_WAIT_DURATION
+                    .with_label_values(&[&self.epoch.to_string()])
+                    .observe(wait_start.elapsed().as_secs_f64());
+            }
+            SLOT_START_TRIGGER
+                .with_label_values(&["all_proposals"])
+                .inc();
             self.slot_timer = None;
             self.run_spc(slot).await;
         }
@@ -661,6 +669,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             && slot_state.has_all_proposals()
             && self.spc_msg_tx.is_none()
         {
+            if let Some(wait_start) = self.proposal_wait_start {
+                PROPOSAL_WAIT_DURATION
+                    .with_label_values(&[&self.epoch.to_string()])
+                    .observe(wait_start.elapsed().as_secs_f64());
+            }
+            SLOT_START_TRIGGER
+                .with_label_values(&["all_proposals"])
+                .inc();
             info!(epoch = self.epoch, slot = slot, "All proposals received, starting SPC");
             self.slot_timer = None;
             self.run_spc(slot).await;
@@ -684,6 +700,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         if self.spc_msg_tx.is_some() {
             return; // SPC already running
         }
+        SLOT_START_TRIGGER
+            .with_label_values(&["timer_expired"])
+            .inc();
         info!(
             epoch = self.epoch,
             slot = slot,

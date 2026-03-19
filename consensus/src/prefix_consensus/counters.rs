@@ -3,7 +3,7 @@
 
 //! Prometheus metrics for prefix consensus slot pipeline.
 
-use aptos_metrics_core::{register_histogram_vec, HistogramVec};
+use aptos_metrics_core::{register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec};
 use once_cell::sync::Lazy;
 
 /// Bucket boundaries (in seconds) covering sub-ms to 5s.
@@ -30,6 +30,34 @@ pub static SLOT_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
         "Latency histogram for each stage of a prefix consensus slot",
         &["stage"],
         SLOT_DURATION_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram: time from slot start (proposal broadcast) to all proposals received.
+///
+/// Only recorded when the fast path fires (all proposals arrive before the timer).
+/// Use with `pc_slot_start_trigger_total` to see how often each path fires.
+pub static PROPOSAL_WAIT_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "pc_proposal_wait_duration_s",
+        "Time from slot start to all proposals received (fast path only)",
+        &["epoch"],
+        SLOT_DURATION_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Counter: how SPC was triggered for each slot.
+///
+/// Labels:
+///   "all_proposals" — all proposals arrived before the timer
+///   "timer_expired" — 2Δ timer fired before all proposals arrived
+pub static SLOT_START_TRIGGER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "pc_slot_start_trigger",
+        "How SPC was triggered: all_proposals or timer_expired",
+        &["trigger"]
     )
     .unwrap()
 });
