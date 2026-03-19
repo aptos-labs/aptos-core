@@ -141,7 +141,7 @@ impl AptosDB {
                 Some(&block_cache),
                 readonly,
                 max_num_nodes_per_lru_cache_shard,
-                hot_state_config.delete_on_restart,
+                hot_state_config,
             )?;
 
         let myself = Self::new_with_dbs(
@@ -230,7 +230,11 @@ impl AptosDB {
                 None,  // block_cache
                 false, // readonly
                 0,     // max_num_nodes_per_lru_cache_shard
-                true,  // reset_hot_state
+                HotStateConfig {
+                    delete_on_restart: true,
+                    persist_hotness_in_write_set: false,
+                    ..HotStateConfig::default()
+                },
             )?;
 
         let ledger_db = Arc::new(ledger_db);
