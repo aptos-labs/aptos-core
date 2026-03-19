@@ -127,7 +127,7 @@ fn enum_gc_traces_refs() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
@@ -339,7 +339,7 @@ fn enum_gc_variant_switching() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
@@ -461,7 +461,7 @@ fn enum_in_vector() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(vec), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),

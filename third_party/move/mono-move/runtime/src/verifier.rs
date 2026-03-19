@@ -183,15 +183,8 @@ impl FunctionVerifier<'_> {
             },
 
             // ----- VecNew -----
-            MicroOp::VecNew {
-                dst,
-                descriptor_id,
-                elem_size,
-                ..
-            } => {
+            MicroOp::VecNew { dst } => {
                 self.check_frame_access_8(pc, dst);
-                self.check_nonzero_size(pc, elem_size);
-                self.check_descriptor(pc, descriptor_id);
             },
 
             MicroOp::VecLen { dst, vec_ref } => {

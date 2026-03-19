@@ -288,7 +288,7 @@ mod micro_op {
     pub const FN_GET: usize = 2;
     pub const FN_REMOVE: usize = 4;
 
-    pub fn program(capacity: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
+    pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
         let descriptors = vec![
             ObjectDescriptor::Trivial, // 0: node elements, free_list elements
             ObjectDescriptor::Struct {
@@ -299,7 +299,7 @@ mod micro_op {
         ];
         (
             vec![
-                make_new(capacity), // 0
+                make_new(),         // 0
                 make_insert(3),     // 1, calls alloc_node at 3
                 make_get(),         // 2
                 make_alloc_node(),  // 3
@@ -320,17 +320,15 @@ mod micro_op {
     // Frame layout:
     //   [0] result: bst_ref   [8] nodes (temp)   [16] free_list (temp)
     // =================================================================
-    fn make_new(capacity: u64) -> Function {
+    fn make_new() -> Function {
         let bst = 0u32;
         let nodes = 8u32;
         let free_list = 16u32;
 
         #[rustfmt::skip]
         let code = vec![
-            VecNew { dst: FO(nodes), descriptor_id: DESC_TRIVIAL,
-                     elem_size: NODE_SIZE, initial_capacity: capacity },           // 0
-            VecNew { dst: FO(free_list), descriptor_id: DESC_TRIVIAL,
-                     elem_size: 8, initial_capacity: 4 },                          // 1
+            VecNew { dst: FO(nodes) },                                             // 0
+            VecNew { dst: FO(free_list) },                                         // 1
             HeapNew { dst: FO(bst), descriptor_id: DESC_BST_MAP },                 // 2
             Op::struct_store8(FO(bst), BST_NODES, FO(nodes)),                 // 3
             Op::struct_store8(FO(bst), BST_FREE_LIST, FO(free_list)),         // 4

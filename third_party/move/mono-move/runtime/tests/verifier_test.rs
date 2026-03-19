@@ -65,7 +65,7 @@ fn valid_with_vec_and_pointer_slots() {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(0), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(0) },
         SlotBorrow { dst: FO(16), local: FO(0) },
         StoreImm8 { dst: FO(8), imm: 42 },
         VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, descriptor_id: DescriptorId(0) },
@@ -306,17 +306,26 @@ fn invalid_descriptor_id() {
 
     let func = Function {
         code: vec![
-            VecNew {
-                dst: FO(0),
-                descriptor_id: DescriptorId(99),
+            VecNew { dst: FO(0) },
+            SlotBorrow {
+                dst: FO(8),
+                local: FO(0),
+            },
+            StoreImm8 {
+                dst: FO(24),
+                imm: 42,
+            },
+            VecPushBack {
+                vec_ref: FO(8),
+                elem: FO(24),
                 elem_size: 8,
-                initial_capacity: 4,
+                descriptor_id: DescriptorId(99),
             },
             Return,
         ],
         args_size: 0,
-        args_and_locals_size: 8,
-        extended_frame_size: 32,
+        args_and_locals_size: 32,
+        extended_frame_size: 56,
         zero_frame: true,
         pointer_offsets: vec![FO(0)],
     };
@@ -353,22 +362,31 @@ fn zero_size_mov() {
 }
 
 #[test]
-fn zero_elem_size_vec_new() {
+fn zero_elem_size_vec_push() {
     use MicroOp::*;
 
     let func = Function {
         code: vec![
-            VecNew {
-                dst: FO(0),
-                descriptor_id: DescriptorId(0),
+            VecNew { dst: FO(0) },
+            SlotBorrow {
+                dst: FO(8),
+                local: FO(0),
+            },
+            StoreImm8 {
+                dst: FO(24),
+                imm: 42,
+            },
+            VecPushBack {
+                vec_ref: FO(8),
+                elem: FO(24),
                 elem_size: 0,
-                initial_capacity: 4,
+                descriptor_id: DescriptorId(0),
             },
             Return,
         ],
         args_size: 0,
-        args_and_locals_size: 8,
-        extended_frame_size: 32,
+        args_and_locals_size: 32,
+        extended_frame_size: 56,
         zero_frame: true,
         pointer_offsets: vec![FO(0)],
     };

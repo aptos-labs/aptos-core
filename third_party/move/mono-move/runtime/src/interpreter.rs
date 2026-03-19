@@ -393,12 +393,7 @@ impl InterpreterContext<'_> {
                 },
 
                 // ----- Vector instructions -----
-                MicroOp::VecNew {
-                    dst,
-                    descriptor_id: _,
-                    elem_size: _,
-                    initial_capacity: _,
-                } => {
+                MicroOp::VecNew { dst } => {
                     write_ptr(fp, dst, std::ptr::null());
                 },
 
@@ -641,6 +636,9 @@ impl InterpreterContext<'_> {
                     let ref_base = read_ptr(fp, obj_ref);
                     let ref_off = read_u64(fp, obj_ref + 8) as usize;
                     let obj_ptr = read_ptr(ref_base, ref_off);
+                    // Unlike vectors, heap objects are never null — they
+                    // are always allocated by HeapNew before being borrowed.
+                    debug_assert!(!obj_ptr.is_null(), "HeapBorrow: null object pointer");
                     write_ptr(fp, dst, obj_ptr);
                     write_u64(fp, dst + 8, offset as u64);
                 },

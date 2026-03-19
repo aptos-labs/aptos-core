@@ -23,7 +23,7 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
 
     #[rustfmt::skip]
     let code = vec![
-        VecNew { dst: FO(slot_vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(slot_vec) },
         SlotBorrow { dst: FO(slot_vec_ref), local: FO(slot_vec) },
         StoreImm8 { dst: FO(slot_i), imm: 0 },
         JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },

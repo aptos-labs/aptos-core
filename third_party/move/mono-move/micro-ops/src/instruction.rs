@@ -147,7 +147,7 @@ impl From<CodeOffset> for usize {
 
 /// Typed index into the program's object descriptor table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DescriptorId(pub u16);
+pub struct DescriptorId(pub u32);
 
 impl DescriptorId {
     #[inline(always)]
@@ -157,7 +157,7 @@ impl DescriptorId {
 
     #[inline(always)]
     pub fn as_u32(self) -> u32 {
-        self.0 as u32
+        self.0
     }
 }
 
@@ -342,16 +342,9 @@ pub enum MicroOp {
     //   byte strings, 8-byte for primitives).
     //======================================================================
     /// Initialize an empty vector by writing a null pointer to `dst`.
-    /// No heap allocation occurs; the first `VecPushBack` allocates lazily.
-    /// `descriptor_id` and `elem_size` are retained for use by `VecPushBack`
-    /// (and may be used by future instructions). `initial_capacity` is
-    /// currently unused but reserved.
-    VecNew {
-        dst: FrameOffset,
-        descriptor_id: DescriptorId,
-        elem_size: u32,
-        initial_capacity: u64,
-    },
+    /// No heap allocation occurs; the first `VecPushBack` allocates lazily
+    /// using the `descriptor_id` and `elem_size` it carries.
+    VecNew { dst: FrameOffset },
 
     /// Write the length (u64) of the vector to `dst`.
     /// `vec_ref` is a 16-byte fat pointer `(base, offset)` whose target
@@ -718,7 +711,7 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // Current size is 24 bytes due to large variants (e.g. VecNew,
+        // Current size is 24 bytes due to large variants (e.g.
         // JumpGreaterEqualU64Imm). We should aim to bring this down to 16.
         assert_eq!(std::mem::size_of::<MicroOp>(), 24);
     }

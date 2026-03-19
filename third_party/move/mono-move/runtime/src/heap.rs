@@ -155,7 +155,7 @@ impl InterpreterContext<'_> {
             let old_len = read_u64(old_ptr, VEC_LENGTH_OFFSET);
             let old_size = read_u32(old_ptr, HEADER_SIZE_OFFSET) as usize;
             let old_cap = ((old_size - VEC_DATA_OFFSET) / elem_size as usize) as u64;
-            let descriptor_id = DescriptorId(read_u32(old_ptr, HEADER_DESCRIPTOR_OFFSET) as u16);
+            let descriptor_id = DescriptorId(read_u32(old_ptr, HEADER_DESCRIPTOR_OFFSET));
 
             let mut new_cap = if old_cap == 0 { 4 } else { old_cap * 2 };
             if new_cap < required_cap {
@@ -340,6 +340,12 @@ impl InterpreterContext<'_> {
     /// - `free_ptr` must point to the next free byte in to-space with enough
     ///   room for any objects that will be copied.
     fn gc_scan_object(&mut self, obj_ptr: *mut u8, descriptor_id: u32, free_ptr: &mut *mut u8) {
+        debug_assert!(
+            (descriptor_id as usize) < self.descriptors.len(),
+            "gc_scan_object: descriptor_id {} out of bounds (have {} descriptors)",
+            descriptor_id,
+            self.descriptors.len()
+        );
         let desc = if (descriptor_id as usize) < self.descriptors.len() {
             &self.descriptors[descriptor_id as usize]
         } else {

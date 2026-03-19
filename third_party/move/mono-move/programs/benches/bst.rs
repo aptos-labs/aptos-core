@@ -27,7 +27,7 @@ fn bench_bst(c: &mut Criterion) {
             b.iter(|| native_run_ops(black_box(&ops)));
         });
 
-        let (functions, descriptors) = micro_op_bst(KEY_RANGE);
+        let (functions, descriptors) = micro_op_bst();
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {

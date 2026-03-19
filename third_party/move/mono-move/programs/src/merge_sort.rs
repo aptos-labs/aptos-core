@@ -214,8 +214,7 @@ mod micro_op {
                 // i = lo; j = mid; tmp = new vec
                 Move8 { dst: FO(i), src: FO(lo) },                              // 0
                 Move8 { dst: FO(j), src: FO(mid) },                             // 1
-                VecNew { dst: FO(tmp), descriptor_id: DescriptorId(0), elem_size: 8,
-                         initial_capacity: 4 },                                  // 2
+                VecNew { dst: FO(tmp) },                                          // 2
                 SlotBorrow { dst: FO(vec_ref), local: FO(vec) },                 // 3
                 SlotBorrow { dst: FO(tmp_ref), local: FO(tmp) },                 // 4
 

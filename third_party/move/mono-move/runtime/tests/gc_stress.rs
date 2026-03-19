@@ -104,7 +104,7 @@ fn make_gc_stress_program(
     #[rustfmt::skip]
     let make_entry_code = vec![
         // PC 0: vec = VecNew(descriptor=0, elem_size=8)
-        VecNew { dst: FO(callee_vec), descriptor_id: DescriptorId(0), elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(callee_vec) },
         // PC 1: vec_ref = SlotBorrow(vec)
         SlotBorrow { dst: FO(callee_vec_ref), local: FO(callee_vec) },
         // PC 2: VecPushBack(vec_ref, val)
@@ -143,7 +143,7 @@ fn make_gc_stress_program(
     let code = vec![
         // ---- Setup ----
         // PC 0: outer_vec = VecNew(descriptor=2, elem_size=8)
-        VecNew { dst: FO(outer_vec), descriptor_id: DescriptorId(2), elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(outer_vec) },
         // PC 1: outer_vec_ref = SlotBorrow(outer_vec)
         SlotBorrow { dst: FO(outer_vec_ref), local: FO(outer_vec) },
         // PC 2: i = 0

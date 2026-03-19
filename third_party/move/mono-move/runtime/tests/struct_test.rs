@@ -195,7 +195,7 @@ fn struct_with_vector_field() {
         HeapNew { dst: FO(ctr), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 999 },
         MicroOp::struct_store8(FO(ctr), 0, FO(tmp)),
-        VecNew { dst: FO(items), descriptor_id: DescriptorId(1), elem_size: 8, initial_capacity: 4 },
+        VecNew { dst: FO(items) },
         SlotBorrow { dst: FO(vec_ref), local: FO(items) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
