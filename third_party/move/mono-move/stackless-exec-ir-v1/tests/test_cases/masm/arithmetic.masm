@@ -1,0 +1,18 @@
+module 0x66::test
+
+fun add_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun complex_arith(x: u64): u64
+    local tmp: u64
+    copy_loc x
+    ld_u64 2
+    mul
+    st_loc tmp
+    copy_loc tmp
+    ld_u64 1
+    add
+    ret
