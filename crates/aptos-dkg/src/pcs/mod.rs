@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use anyhow::ensure;
 use ark_serialize::CanonicalSerialize;
 
 pub mod shplonked;
@@ -17,6 +18,11 @@ pub mod zeromorph;
 
 /// Per-polynomial evaluation set: S_i = S_i^rev ⊔ S_i^hid.
 /// Order of points in `rev` and `hid` determines the flat index in y^rev and y^hid.
+///
+/// **Precondition for Shplonked:** Each evaluation set must have distinct points:
+/// no duplicates within `rev`, none within `hid`, and `rev` and `hid` must be disjoint.
+/// Call [`validate_no_duplicate_points`](EvaluationSet::validate_no_duplicate_points) before
+/// using in batch open/verify.
 #[derive(CanonicalSerialize, Clone, Debug)]
 pub struct EvaluationSet<F: CanonicalSerialize> {
     /// Points at which the prover reveals the evaluation (y^rev).
