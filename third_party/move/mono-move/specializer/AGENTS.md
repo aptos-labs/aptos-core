@@ -1,6 +1,6 @@
 # specializer
 
-This crate defines a polymorphic stackless execution IR and performs conversion from Move bytecode to the stackless execution IR using the V2 pipeline.
+This crate defines a polymorphic stackless execution IR and performs conversion from Move bytecode to the stackless execution IR.
 The stackless execution IR is then lowered into monomorphic micro-ops, when all types used in the function are fully concrete and thus type size and layout information is available.
 
 ## Goals of converting from Move bytecode to stackless-exec-ir
@@ -35,7 +35,7 @@ Located under `tests/test_cases/`:
 
 Each input file has an expected-output baseline:
 
-- `<name>.v2.exp` — Expected output from the V2 pipeline.
+- `<name>.exp` — Expected output from the pipeline.
 
 Baselines are verified (or auto-updated). To update baselines after intentional output changes, set `UPBL=1` (update baseline env var) and re-run the tests. The updates should be explainable for the given change.
 

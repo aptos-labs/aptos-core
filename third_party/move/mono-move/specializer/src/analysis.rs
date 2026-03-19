@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Block analysis phase for the V2 register allocator.
+//! Block analysis phase for the register allocator.
 //!
-//! Pure analysis producing immutable data consumed by `regalloc_v2`.
+//! Pure analysis producing immutable data consumed by `regalloc`.
 
-use crate::instr_utils_v2::get_defs_uses;
+use crate::instr_utils::get_defs_uses;
 use crate::ir::{Instr, Reg};
 use std::collections::BTreeMap;
 

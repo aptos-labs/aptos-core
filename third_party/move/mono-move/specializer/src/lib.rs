@@ -1,17 +1,17 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-pub mod analysis_v2;
-pub mod convert_v2;
+pub mod analysis;
+pub mod convert;
 pub mod display;
-pub mod instr_utils_v2;
+pub mod instr_utils;
 pub mod ir;
 pub mod lower;
 pub mod lowering_context;
 pub mod micro_ops_display;
-pub mod optimize_v2;
-pub mod pipeline_v2;
-pub mod regalloc_v2;
+pub mod optimize;
+pub mod pipeline;
+pub mod regalloc;
 pub mod type_conversion;
 
 use anyhow::{bail, Result};
@@ -51,5 +51,5 @@ pub fn run_pipeline(
         bail!("bytecode verification failed: {:#}", e);
     }
 
-    pipeline_v2::run_v2_pipeline(module, struct_name_table)
+    pipeline::run_pipeline(module, struct_name_table)
 }

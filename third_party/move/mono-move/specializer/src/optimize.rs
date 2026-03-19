@@ -1,23 +1,21 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! V2 post-allocation optimization passes.
-//!
-//! Self-contained — uses only `instr_utils_v2`, no dependency on optimize_v1.
+//! Post-allocation optimization passes.
 //!
 //! Pass 3: Copy propagation
 //! Pass 4: Identity move elimination
 //! Pass 5: Dead instruction elimination
 //! Pass 6: Register renumbering
 
-use crate::instr_utils_v2::{
+use crate::instr_utils::{
     apply_subst_to_sources, get_defs_uses, rename_instr, split_into_blocks,
 };
 use crate::ir::{FunctionIR, Instr, ModuleIR, Reg};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Optimize all functions in a module IR using the v2 pipeline.
-pub fn optimize_module_v2(module_ir: &mut ModuleIR) {
+/// Optimize all functions in a module IR.
+pub fn optimize_module(module_ir: &mut ModuleIR) {
     for func in &mut module_ir.functions {
         eliminate_identity_moves(func);
         copy_propagation(func);
