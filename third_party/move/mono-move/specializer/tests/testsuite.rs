@@ -7,7 +7,7 @@ use move_asm::assembler::{self, Options as AsmOptions};
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_model::metadata::LanguageVersion;
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
-use stackless_exec_ir::{
+use specializer::{
     ir::ModuleIR,
     lower::lower_function,
     lowering_context::{build_func_id_map, try_build_context},
@@ -159,7 +159,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         let ir_output = format!("{}", module_ir.display());
         output.push_str("=== masm ===\n");
         output.push_str(&masm_output);
-        output.push_str("\n=== stackless-exec-ir ===\n");
+        output.push_str("\n=== specializer ===\n");
         output.push_str(&ir_output);
         output.push_str("\n=== micro-ops ===\n");
         output.push_str(&format_micro_ops(&module_ir));

@@ -1,5 +1,5 @@
 [package]
-name = "stackless-exec-ir"
+name = "specializer"
 version = "0.1.0"
 edition = { workspace = true }
 publish = false

@@ -1,4 +1,4 @@
-# stackless-exec-ir
+# specializer
 
 This crate defines a polymorphic stackless execution IR and performs conversion from Move bytecode to the stackless execution IR using the V2 pipeline.
 The stackless execution IR is then lowered into monomorphic micro-ops, when all types used in the function are fully concrete and thus type size and layout information is available.
@@ -42,6 +42,6 @@ Baselines are verified (or auto-updated). To update baselines after intentional 
 ## Running Tests
 
 ```bash
-cargo test -p stackless-exec-ir  # normal mode, verify against baselines
-UPBL=1 cargo test -p stackless-exec-ir   # update baselines
+cargo test -p specializer  # normal mode, verify against baselines
+UPBL=1 cargo test -p specializer   # update baselines
 ```

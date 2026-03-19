@@ -24,7 +24,7 @@ l0: copy_loc l0
     ret
 
 
-=== stackless-exec-ir ===
+=== specializer ===
 === Module 0x42::fibonacci ===
 
 fun fib(r0): u64 {
