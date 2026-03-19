@@ -3,11 +3,12 @@
 
 //! Placeholder types for executables (compiled modules / scripts).
 
-use crate::{alloc::GlobalArenaPtr, ArenaRef};
+use crate::{alloc::GlobalArenaPtr, ArenaRef, ExecutableId, ExecutionGuard};
 use bumpalo::Bump;
-use fxhash::FxHashMap;
+use fxhash::FxBuildHasher;
+use move_binary_format::{access::ModuleAccess, CompiledModule};
 use parking_lot::Mutex;
-use std::ptr::NonNull;
+use std::{collections::HashMap, ptr::NonNull};
 
 /// A pointer into an executable's private [`Bump`] arena. The executable owns
 /// the arena, so the pointer is valid for the lifetime of the executable.
@@ -83,9 +84,7 @@ impl Function {
 
 /// A loaded executable (from module or script).
 pub struct Executable {
-    /// Non-generic functions.
-    #[allow(dead_code)]
-    functions: FxHashMap<GlobalArenaPtr<str>, ExecutableArenaPtr<Function>>,
+    data: ExecutableData,
 
     /// Arena where data is allocated for this executable. **Must** be the
     /// last field so that it is dropped after any data structure that holds
@@ -94,16 +93,75 @@ pub struct Executable {
     arena: Mutex<Bump>,
 }
 
+struct ExecutableData {
+    /// Executable ID which uniquely identifies this executable.
+    #[allow(dead_code)]
+    id: GlobalArenaPtr<ExecutableId>,
+
+    /// Non-generic functions.
+    functions: HashMap<GlobalArenaPtr<str>, ExecutableArenaPtr<Function>, FxBuildHasher>,
+}
+
 impl Executable {
     /// Returns a non-generic function from this executable. Returns [`None`]
     /// if such function does not exist.
     pub fn get_function(&self, name: ArenaRef<'_, str>) -> Option<&Function> {
-        self.functions
+        self.data
+            .functions
             .get(&name.into_global_arena_ptr())
             .map(|ptr| {
                 // SAFETY: Because executable is alive, all its allocations are
                 // still valid.
                 unsafe { ptr.as_ref_unchecked() }
             })
+    }
+}
+
+// TODO: this is likely to change. Placeholder.
+#[allow(dead_code)]
+pub struct ExecutableBuilder<'a> {
+    // TODO: support scripts.
+    module: &'a CompiledModule,
+    arena: Bump,
+}
+
+#[allow(dead_code)]
+impl<'a> ExecutableBuilder<'a> {
+    pub fn new_for_module(module: &'a CompiledModule) -> Self {
+        // TODO: run verifier here?
+        Self {
+            module,
+            arena: Bump::new(),
+        }
+    }
+
+    /// Builds an executable from the provided compiled module.
+    pub fn build(self, guard: &ExecutionGuard<'_>) -> anyhow::Result<Box<Executable>> {
+        let address = self.module.self_addr();
+        let module_name = self.module.self_name();
+        let id = guard.intern_address_name_internal(*address, module_name);
+
+        let mut data = ExecutableData {
+            id,
+            functions: HashMap::with_hasher(FxBuildHasher::default()),
+        };
+
+        for function in self.module.function_defs() {
+            let handle = self.module.function_handle_at(function.function);
+            if !handle.type_parameters.is_empty() {
+                todo!("Not yet implemented");
+            }
+
+            let identifier = self.module.identifier_at(handle.name);
+            let name = guard.intern_identifier_internal(identifier);
+            let function = Function { name };
+            let ptr = ExecutableArenaPtr(NonNull::from(self.arena.alloc(function)));
+            data.functions.insert(name, ptr);
+        }
+
+        Ok(Box::new(Executable {
+            data,
+            arena: Mutex::new(self.arena),
+        }))
     }
 }

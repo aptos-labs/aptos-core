@@ -56,7 +56,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     where
         'ctx: 'guard,
     {
-        let ptr = self.intern_identifier_impl(identifier);
+        let ptr = self.intern_identifier_internal(identifier);
 
         // SAFETY: If the returned pointer is the one that was allocated, it is
         // trivially valid until the next maintenance phase, and it is safe to
@@ -73,7 +73,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 // ------------------------
 
 impl<'ctx> ExecutionGuard<'ctx> {
-    pub(super) fn intern_identifier_impl(&self, identifier: &IdentStr) -> GlobalArenaPtr<str> {
+    pub(super) fn intern_identifier_internal(&self, identifier: &IdentStr) -> GlobalArenaPtr<str> {
         // TODO:
         //   Consider checking that the identifier size is within bounds. While
         //   CompiledModule / CompiledScript deserializer enforces 256 byte

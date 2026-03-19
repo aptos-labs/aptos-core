@@ -135,7 +135,7 @@ pub struct ExecutableId {
 
 #[allow(private_interfaces)]
 impl<'ctx> ExecutionGuard<'ctx> {
-    fn intern_address_name_internal(
+    pub(super) fn intern_address_name_internal(
         &self,
         address: AccountAddress,
         name: &IdentStr,
@@ -148,7 +148,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
         // SAFETY: Name pointer has been just interned - it is valid and can be
         // used safely for ID construction.
-        let name = self.intern_identifier_impl(name);
+        let name = self.intern_identifier_internal(name);
         let ptr = self.global_arena.alloc(ExecutableId { address, name });
 
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
