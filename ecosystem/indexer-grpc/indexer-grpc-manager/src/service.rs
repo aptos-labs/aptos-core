@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{data_manager::DataManager, metadata_manager::MetadataManager, metrics::COUNTER};
-use aptos_indexer_grpc_utils::trace_context::extract_or_create_trace_context;
+use aptos_indexer_grpc_utils::trace_context::{extract_or_create_trace_context, set_otel_parent};
 use aptos_protos::indexer::v1::{
     grpc_manager_server::GrpcManager, service_info::Info, GetDataServiceForRequestRequest,
     GetDataServiceForRequestResponse, GetTransactionsRequest, HeartbeatRequest, HeartbeatResponse,
@@ -120,6 +120,7 @@ impl GrpcManager for GrpcManagerService {
             parent_span_id = %trace_ctx.parent_span_id,
             otel.kind = "server",
         );
+        set_otel_parent(&span, &trace_ctx);
 
         async {
             let request = request.into_inner();
@@ -151,6 +152,7 @@ impl GrpcManager for GrpcManagerService {
             otel.kind = "server",
             starting_version = ?request.get_ref().starting_version,
         );
+        set_otel_parent(&span, &trace_ctx);
 
         async {
             let request = request.into_inner();
@@ -182,6 +184,7 @@ impl GrpcManager for GrpcManagerService {
             parent_span_id = %trace_ctx.parent_span_id,
             otel.kind = "server",
         );
+        set_otel_parent(&span, &trace_ctx);
 
         async {
             let request = request.into_inner();

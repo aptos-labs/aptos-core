@@ -3,7 +3,7 @@
 
 use crate::connection_manager::ConnectionManager;
 use aptos_indexer_grpc_utils::trace_context::{
-    inject_trace_context_into_request, TraceContext,
+    inject_trace_context_into_request, trace_context_from_current_otel_span, TraceContext,
 };
 use aptos_protos::{indexer::v1::GetTransactionsRequest, transaction::v1::Transaction};
 use std::sync::Arc;
@@ -34,7 +34,8 @@ impl DataClient {
                 batch_size: None,
                 transaction_filter: None,
             };
-            let trace_ctx = TraceContext::new_root();
+            let trace_ctx =
+                trace_context_from_current_otel_span().unwrap_or_else(TraceContext::new_root);
             loop {
                 let mut client = self
                     .connection_manager

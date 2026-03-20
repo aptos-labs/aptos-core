@@ -185,11 +185,13 @@ fn generate_trace_id() -> String {
 /// Generates a 16-hex-character random span ID.
 fn generate_span_id() -> String {
     let bytes = Uuid::new_v4().into_bytes();
-    bytes[..8].iter().fold(String::with_capacity(16), |mut s, b| {
-        use std::fmt::Write;
-        write!(s, "{:02x}", b).unwrap();
-        s
-    })
+    bytes[..8]
+        .iter()
+        .fold(String::with_capacity(16), |mut s, b| {
+            use std::fmt::Write;
+            write!(s, "{:02x}", b).unwrap();
+            s
+        })
 }
 
 #[cfg(test)]
@@ -211,15 +213,13 @@ mod tests {
         assert!(parse_traceparent("00-short-id-01").is_none());
         assert!(parse_traceparent("").is_none());
         // W3C spec: all-zeros trace_id is invalid.
-        assert!(parse_traceparent(
-            "00-00000000000000000000000000000000-b7ad6b7169203331-01"
-        )
-        .is_none());
+        assert!(
+            parse_traceparent("00-00000000000000000000000000000000-b7ad6b7169203331-01").is_none()
+        );
         // W3C spec: all-zeros parent_id is invalid.
-        assert!(parse_traceparent(
-            "00-0af7651916cd43dd8448eb211c80319c-0000000000000000-01"
-        )
-        .is_none());
+        assert!(
+            parse_traceparent("00-0af7651916cd43dd8448eb211c80319c-0000000000000000-01").is_none()
+        );
     }
 
     #[test]

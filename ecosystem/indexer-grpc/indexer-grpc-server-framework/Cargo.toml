@@ -20,8 +20,8 @@ backtrace = { workspace = true }
 clap = { workspace = true }
 figment = { workspace = true }
 opentelemetry = { workspace = true }
-opentelemetry_sdk = { workspace = true }
 opentelemetry-otlp = { workspace = true }
+opentelemetry_sdk = { workspace = true }
 prometheus = { workspace = true }
 serde = { workspace = true }
 tempfile = { workspace = true }

@@ -108,10 +108,7 @@ fn extract_trace_context_from_headers(headers: &axum::http::HeaderMap) -> TraceC
     ctx.unwrap_or_else(TraceContext::new_root)
 }
 
-fn inject_trace_context_into_headers(
-    headers: &mut axum::http::HeaderMap,
-    ctx: &TraceContext,
-) {
+fn inject_trace_context_into_headers(headers: &mut axum::http::HeaderMap, ctx: &TraceContext) {
     if let Ok(val) = ctx.to_traceparent().parse() {
         headers.insert(TRACEPARENT_HEADER, val);
     }
@@ -175,17 +172,18 @@ async fn get_data_service_url_inner(
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
                 .to_bytes();
             let restored_body = body_bytes.clone().into();
-            let stream = Streaming::<GetTransactionsRequest>::new_request(
-                <ProstCodec<GetTransactionsRequest, GetTransactionsRequest> as Codec>::decoder(
-                    &mut tonic::codec::ProstCodec::<
-                        GetTransactionsRequest,
-                        GetTransactionsRequest,
-                    >::default(),
-                ),
-                Full::new(body_bytes),
-                request_compression_encoding,
-                None,
-            );
+            let stream =
+                Streaming::<GetTransactionsRequest>::new_request(
+                    <ProstCodec<GetTransactionsRequest, GetTransactionsRequest> as Codec>::decoder(
+                        &mut tonic::codec::ProstCodec::<
+                            GetTransactionsRequest,
+                            GetTransactionsRequest,
+                        >::default(),
+                    ),
+                    Full::new(body_bytes),
+                    request_compression_encoding,
+                    None,
+                );
 
             tokio::pin!(stream);
 

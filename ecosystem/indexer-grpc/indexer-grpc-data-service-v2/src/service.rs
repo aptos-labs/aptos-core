@@ -86,13 +86,19 @@ impl DataService for DataServiceWrapperWrapper {
                     .await?;
 
                     if live_has_data {
-                        debug!(selected_path = "live", "Live service has data, using live path");
+                        debug!(
+                            selected_path = "live",
+                            "Live service has data, using live path"
+                        );
                         return live_data_service
                             .get_transactions(Request::new(request.clone()))
                             .await;
                     }
 
-                    debug!(selected_path = "historical", "Falling back to historical path");
+                    debug!(
+                        selected_path = "historical",
+                        "Falling back to historical path"
+                    );
                     historical_data_service
                         .get_transactions(Request::new(request))
                         .await
@@ -101,7 +107,10 @@ impl DataService for DataServiceWrapperWrapper {
                     live_data_service.get_transactions(req).await
                 }
             } else if let Some(historical_data_service) = self.historical_data_service.as_ref() {
-                debug!(selected_path = "historical", "Only historical service configured");
+                debug!(
+                    selected_path = "historical",
+                    "Only historical service configured"
+                );
                 historical_data_service.get_transactions(req).await
             } else {
                 unreachable!("Must have at least one of the data services enabled.");
@@ -205,7 +214,7 @@ impl DataService for DataServiceWrapper {
         let cross_process_ctx = extract_trace_context_from_metadata(req.metadata());
         let trace_ctx = cross_process_ctx
             .clone()
-            .unwrap_or_else(|| aptos_indexer_grpc_utils::trace_context::TraceContext::new_root());
+            .unwrap_or_else(aptos_indexer_grpc_utils::trace_context::TraceContext::new_root);
         let span = info_span!(
             "data_service_wrapper.get_transactions",
             trace_id = %trace_ctx.trace_id,

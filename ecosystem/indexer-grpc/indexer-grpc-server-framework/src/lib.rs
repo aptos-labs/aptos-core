@@ -216,10 +216,12 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
 /// Attempt to initialise an OpenTelemetry OTLP exporter layer. Returns `None`
 /// when `OTEL_EXPORTER_OTLP_ENDPOINT` is not set or the pipeline fails to
 /// initialise, so callers can treat OTLP export as opt-in.
-fn try_init_otel_layer() -> Option<tracing_opentelemetry::OpenTelemetryLayer<
-    tracing_subscriber::Registry,
-    opentelemetry_sdk::trace::Tracer,
->> {
+fn try_init_otel_layer() -> Option<
+    tracing_opentelemetry::OpenTelemetryLayer<
+        tracing_subscriber::Registry,
+        opentelemetry_sdk::trace::Tracer,
+    >,
+> {
     if std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_err() {
         return None;
     }
@@ -229,8 +231,7 @@ fn try_init_otel_layer() -> Option<tracing_opentelemetry::OpenTelemetryLayer<
         .build()
         .ok()?;
 
-    let service_name =
-        std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "unknown".to_string());
+    let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "unknown".to_string());
 
     let provider = opentelemetry_sdk::trace::TracerProvider::builder()
         .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
