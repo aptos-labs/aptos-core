@@ -44,7 +44,6 @@ use tokio_retry::strategy::ExponentialBackoff;
 /// Starts a task to collect transcripts from all validators. The subtranscripts are
 /// extracted from valid transcripts and aggregated. When a quorum is aggragated,
 /// the [ChunkyDKGManager] is notified via the channel.
-#[allow(dead_code)]
 pub fn start_subtranscript_aggregation(
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     epoch_state: Arc<EpochState>,

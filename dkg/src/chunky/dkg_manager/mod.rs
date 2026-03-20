@@ -59,7 +59,6 @@ use tokio_retry::strategy::ExponentialBackoff;
 #[cfg(test)]
 mod tests;
 
-#[allow(dead_code)]
 #[derive(Default)]
 enum InnerState {
     #[default]
@@ -92,7 +91,6 @@ impl fmt::Debug for InnerState {
 }
 
 impl InnerState {
-    #[allow(dead_code)]
     fn variant_name(&self) -> &str {
         match self {
             InnerState::Init => "NotStarted",
@@ -105,7 +103,6 @@ impl InnerState {
     }
 }
 
-#[allow(dead_code)]
 pub struct ChunkyDKGManager {
     ssk: Arc<DealerPrivateKey>,
     spk: Arc<DealerPublicKey>,
@@ -136,7 +133,6 @@ pub struct ChunkyDKGManager {
     state: InnerState,
 }
 
-#[allow(dead_code)]
 impl ChunkyDKGManager {
     pub fn new(
         ssk: Arc<DealerPrivateKey>,

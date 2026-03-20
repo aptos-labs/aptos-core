@@ -27,7 +27,6 @@ use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
-#[allow(dead_code)]
 pub fn start_chunky_subtranscript_certification(
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     start_time: Duration,

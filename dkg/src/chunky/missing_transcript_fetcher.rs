@@ -25,7 +25,6 @@ const MAX_RETRIES: usize = 10;
 
 const RETRY_DELAY: Duration = Duration::from_millis(500);
 
-#[allow(dead_code)]
 /// Fetches transcripts from a specific peer via RPC. Handles both missing and equivocated
 /// transcripts (where the local copy differs from the requester's).
 pub struct TranscriptFetcher {
@@ -44,7 +43,6 @@ type RpcFuture = std::pin::Pin<
     >,
 >;
 
-#[allow(dead_code)]
 impl TranscriptFetcher {
     pub fn new(
         sender: AccountAddress,

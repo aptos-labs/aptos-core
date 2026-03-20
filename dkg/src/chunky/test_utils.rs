@@ -23,7 +23,6 @@ use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-#[allow(dead_code)]
 pub struct ChunkyTestSetup {
     pub private_keys: Vec<Arc<PrivateKey>>,
     pub public_keys: Vec<PublicKey>,
