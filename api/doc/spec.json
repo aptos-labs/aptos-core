@@ -17332,12 +17332,15 @@
             "$ref": "#/components/schemas/HashValue"
           },
           "block_timestamp": {
+            "description": "The block timestamp in Unix epoch microseconds",
             "$ref": "#/components/schemas/U64"
           },
           "first_version": {
+            "description": "The first ledger version of the block inclusive",
             "$ref": "#/components/schemas/U64"
           },
           "last_version": {
+            "description": "The last ledger version of the block inclusive",
             "$ref": "#/components/schemas/U64"
           },
           "transactions": {

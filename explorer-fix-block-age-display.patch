@@ -1,0 +1,55 @@
+diff --git a/app/pages/Blocks/Table.tsx b/app/pages/Blocks/Table.tsx
+index 3709d9b..6f6462f 100644
+--- a/app/pages/Blocks/Table.tsx
++++ b/app/pages/Blocks/Table.tsx
+@@ -25,11 +25,29 @@ import {
+ import {assertNever} from "../../utils";
+ import {getTimeDiffInSeconds, parseTimestamp} from "../utils";
+ 
+-function getAgeInSeconds(block: Types.Block): string {
++function formatAge(seconds: number): string {
++  if (seconds < 60) {
++    return `${seconds}s ago`;
++  } else if (seconds < 3600) {
++    const mins = Math.floor(seconds / 60);
++    return `${mins}min ago`;
++  } else if (seconds < 86400) {
++    const hrs = Math.floor(seconds / 3600);
++    return `${hrs}h ago`;
++  } else {
++    const days = Math.floor(seconds / 86400);
++    return `${days}d ago`;
++  }
++}
++
++function getBlockAge(block: Types.Block): string {
+   const blockTimestamp = parseTimestamp(block.block_timestamp);
+   const nowTimestamp = new Date();
+-  const durationInSec = getTimeDiffInSeconds(blockTimestamp, nowTimestamp);
+-  return durationInSec.toFixed(0);
++  const durationInSec = Math.max(
++    0,
++    Math.floor(getTimeDiffInSeconds(blockTimestamp, nowTimestamp)),
++  );
++  return formatAge(durationInSec);
+ }
+ 
+ type BlockCellProps = {
+@@ -49,7 +67,7 @@ function BlockHeightCell({block}: BlockCellProps) {
+ function BlockAgeCell({block}: BlockCellProps) {
+   return (
+     <GeneralTableCell sx={{textAlign: "left"}}>
+-      {`${getAgeInSeconds(block)}s ago`}
++      {getBlockAge(block)}
+     </GeneralTableCell>
+   );
+ }
+@@ -187,7 +205,7 @@ const BlockCard = React.memo(function BlockCard({block}: BlockCardProps) {
+           Block {block.block_height}
+         </Typography>
+         <Typography variant="caption" color="text.secondary">
+-          {`${getAgeInSeconds(block)}s ago`}
++          {getBlockAge(block)}
+         </Typography>
+       </Stack>
+ 

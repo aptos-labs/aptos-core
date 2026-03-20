@@ -13,8 +13,11 @@ use serde::{Deserialize, Serialize};
 pub struct Block {
     pub block_height: U64,
     pub block_hash: HashValue,
+    /// The block timestamp in Unix epoch microseconds
     pub block_timestamp: U64,
+    /// The first ledger version of the block inclusive
     pub first_version: U64,
+    /// The last ledger version of the block inclusive
     pub last_version: U64,
     /// The transactions in the block in sequential order
     #[serde(skip_serializing_if = "Option::is_none")]
