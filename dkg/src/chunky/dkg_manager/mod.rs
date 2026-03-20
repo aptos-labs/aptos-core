@@ -127,8 +127,9 @@ pub struct ChunkyDKGManager {
     // Shared map to track transcripts received from each recipient
     received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
 
-    // Guards for spawned RPC handler tasks; dropped on close to abort them.
-    rpc_handler_guards: Vec<DropGuard>,
+    // Guards for spawned RPC handler tasks, keyed by requesting validator's address.
+    // If a new request arrives from the same sender, the old handler is aborted and replaced.
+    rpc_handler_guards: HashMap<AccountAddress, DropGuard>,
 
     // Control states.
     stopped: bool,
@@ -163,7 +164,7 @@ impl ChunkyDKGManager {
             pull_notification_tx,
             pull_notification_rx,
             received_transcripts: Arc::new(Mutex::new(HashMap::new())),
-            rpc_handler_guards: Vec::new(),
+            rpc_handler_guards: HashMap::new(),
             stopped: false,
             state: InnerState::Init,
         }
@@ -692,32 +693,57 @@ impl ChunkyDKGManager {
             },
         };
 
-        // Spawn a tokio task to handle the validation computation
+        // Spawn a tokio task to handle the validation computation.
+        // Keyed by sender — if a handler for this sender already exists, the old DropGuard is
+        // dropped (aborting the previous task) and replaced with the new one. This ensures the
+        // latest request from each validator is always served.
         let received_transcripts = self.received_transcripts.clone();
         let epoch_state = self.epoch_state.clone();
         let ssk = self.ssk.clone();
         let my_addr = self.my_addr;
+        let epoch = self.epoch_state.epoch;
         let network_sender = self.network_sender.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(
             async move {
-                let response = Self::handle_subtranscript_signature_request(
-                    sender,
-                    req,
-                    aggregated_transcript,
-                    dkg_config,
-                    ssk,
-                    my_addr,
-                    received_transcripts,
-                    epoch_state,
-                    network_sender,
+                const HANDLER_TIMEOUT: Duration = Duration::from_secs(30);
+                let result = tokio::time::timeout(
+                    HANDLER_TIMEOUT,
+                    Self::handle_subtranscript_signature_request(
+                        sender,
+                        req,
+                        aggregated_transcript,
+                        dkg_config,
+                        ssk,
+                        my_addr,
+                        received_transcripts,
+                        epoch_state,
+                        network_sender,
+                    ),
                 )
                 .await;
+                let response = match result {
+                    Ok(r) => r,
+                    Err(_) => {
+                        warn!(
+                            epoch = epoch,
+                            sender = sender,
+                            "[ChunkyDKG] signature request handler timed out after {}s",
+                            HANDLER_TIMEOUT.as_secs()
+                        );
+                        Err(anyhow!(
+                            "signature request handler timed out after {}s",
+                            HANDLER_TIMEOUT.as_secs()
+                        ))
+                    },
+                };
                 response_sender.send(response);
             },
             abort_registration,
         ));
-        self.rpc_handler_guards.push(DropGuard::new(abort_handle));
+        // Insert replaces any existing handler for this sender, aborting the old task.
+        self.rpc_handler_guards
+            .insert(sender, DropGuard::new(abort_handle));
 
         Ok(())
     }
@@ -895,7 +921,7 @@ impl ChunkyDKGManager {
             pull_notification_tx,
             pull_notification_rx,
             received_transcripts: Arc::new(Mutex::new(HashMap::new())),
-            rpc_handler_guards: Vec::new(),
+            rpc_handler_guards: HashMap::new(),
             stopped: false,
             state: InnerState::Init,
         }
