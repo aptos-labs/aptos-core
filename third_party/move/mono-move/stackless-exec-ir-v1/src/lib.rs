@@ -16,22 +16,6 @@ use ir::ModuleIR;
 use move_binary_format::CompiledModule;
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 
-/// Configuration for the V1 conversion + optimization pipeline.
-pub struct PipelineConfig {
-    /// Whether to run the bytecode verifier before conversion to stackless-exec-ir.
-    /// Set to `false` when the module comes from a trusted source (e.g., the
-    /// Move compiler, which verifies internally).
-    pub verify_bytecode: bool,
-}
-
-impl Default for PipelineConfig {
-    fn default() -> Self {
-        Self {
-            verify_bytecode: true,
-        }
-    }
-}
-
 /// Run the V1 conversion + optimization pipeline on a compiled module.
 ///
 /// `struct_name_table` maps `StructHandleIndex` ordinals to globally unique
@@ -39,12 +23,9 @@ impl Default for PipelineConfig {
 /// into runtime `Type` representations.
 pub fn run_pipeline(
     module: CompiledModule,
-    config: &PipelineConfig,
     struct_name_table: &[StructNameIndex],
 ) -> Result<ModuleIR> {
-    if config.verify_bytecode
-        && let Err(e) = move_bytecode_verifier::verify_module(&module)
-    {
+    if let Err(e) = move_bytecode_verifier::verify_module(&module) {
         bail!("bytecode verification failed: {:#}", e);
     }
 

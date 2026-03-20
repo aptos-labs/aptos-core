@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Conversion pipeline: Intra-block SSA + greedy register allocation.
+//! Conversion pipeline: Intra-block SSA + some instruction fusion + greedy register allocation.
 //!
 //! Pass 1: Simulate the operand stack, assigning fresh sequential value IDs
 //!         (pure SSA within each basic block). Locals (params + declared locals)
@@ -10,7 +10,7 @@
 //! Pass 2: Map value IDs to named registers using liveness-driven reuse
 //!         with StLoc look-ahead and CopyLoc/MoveLoc coalescing.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use crate::ir::{BinaryOp, FunctionIR, Instr, Label, ModuleIR, Reg, UnaryOp};
 use crate::instr_utils::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
 use crate::type_conversion::{convert_sig_token, convert_sig_tokens};
@@ -27,6 +27,142 @@ use move_vm_types::loaded_data::{
     struct_name_indexing::StructNameIndex,
 };
 use std::collections::BTreeMap;
+
+/// Intermediate SSA representation of a single function, before register allocation.
+pub(crate) struct SSAFunction {
+    pub instrs: Vec<Instr>,
+    pub vid_types: Vec<Type>,
+    pub local_types: Vec<Type>,
+}
+
+impl SSAFunction {
+    /// Fuse consecutive borrow+deref patterns into combined field access instructions.
+    fn fuse_field_access_instrs(&mut self) {
+        let instrs = &mut self.instrs;
+        let mut i = 0;
+        while i + 1 < instrs.len() {
+            let fused = match (&instrs[i], &instrs[i + 1]) {
+                (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+                    if *ref_r == *read_src =>
+                {
+                    Some(Instr::ReadField(*dst, *fld, *src))
+                },
+                (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+                    if *ref_r == *read_src =>
+                {
+                    Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
+                },
+                (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+                    if *ref_r == *write_ref =>
+                {
+                    Some(Instr::WriteField(*fld, *dst_ref, *val))
+                },
+                (Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+                    if *ref_r == *write_ref =>
+                {
+                    Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val))
+                },
+                (
+                    Instr::ImmBorrowVariantField(ref_r, fld, src),
+                    Instr::ReadRef(dst, read_src),
+                ) if *ref_r == *read_src => {
+                    Some(Instr::ReadVariantField(*dst, *fld, *src))
+                },
+                (
+                    Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src),
+                    Instr::ReadRef(dst, read_src),
+                ) if *ref_r == *read_src => {
+                    Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src))
+                },
+                (
+                    Instr::MutBorrowVariantField(ref_r, fld, dst_ref),
+                    Instr::WriteRef(write_ref, val),
+                ) if *ref_r == *write_ref => {
+                    Some(Instr::WriteVariantField(*fld, *dst_ref, *val))
+                },
+                (
+                    Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
+                    Instr::WriteRef(write_ref, val),
+                ) if *ref_r == *write_ref => {
+                    Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val))
+                },
+                _ => None,
+            };
+
+            if let Some(fused_instr) = fused {
+                instrs[i] = fused_instr;
+                instrs.remove(i + 1);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    /// Fuse consecutive `Ld*` + `BinaryOp` pairs into `BinaryOpImm` in the SSA IR.
+    fn fuse_immediate_binops(&mut self) {
+        let instrs = &self.instrs;
+        let blocks = split_into_blocks(instrs);
+        let mut result = Vec::with_capacity(instrs.len());
+
+        let mut block_idx = 0;
+        let mut skip_next = false;
+
+        for i in 0..instrs.len() {
+            if skip_next {
+                skip_next = false;
+                continue;
+            }
+
+            // Advance to the current block.
+            while block_idx < blocks.len() && i >= blocks[block_idx].1 {
+                block_idx += 1;
+            }
+
+            // Only fuse within the same basic block.
+            if i + 1 < instrs.len()
+                && block_idx < blocks.len()
+                && i + 1 < blocks[block_idx].1
+                && let Some((tmp, imm)) = extract_imm_value(&instrs[i])
+            {
+                let fused = match &instrs[i + 1] {
+                    Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
+                        Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm.clone()))
+                    },
+                    Instr::BinaryOp(dst, op, lhs, rhs)
+                        if *lhs == tmp && is_commutative(op) =>
+                    {
+                        Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm.clone()))
+                    },
+                    _ => None,
+                };
+                if let Some(fused_instr) = fused {
+                    debug_assert!({
+                        let (bstart, bend) = blocks[block_idx];
+                        instrs[bstart..bend]
+                            .iter()
+                            .enumerate()
+                            .filter(|&(j, _)| bstart + j != i + 1)
+                            .all(|(_, ins)| {
+                                let (_, uses) = get_defs_uses(ins);
+                                !uses.contains(&tmp)
+                            })
+                    },
+                        "BinaryOpImm SSA fusion: VID {:?} has uses outside the \
+                         consecutive Ld+BinaryOp pair — stack machine invariant violated",
+                        tmp,
+                    );
+                    result.push(fused_instr);
+                    skip_next = true;
+                    continue;
+                }
+            }
+
+            result.push(instrs[i].clone());
+        }
+
+        self.instrs = result;
+    }
+}
 
 /// Convert an entire compiled module to stackless IR.
 ///
@@ -56,7 +192,7 @@ use std::collections::BTreeMap;
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed registers
 ///   truly hold dead values, so type-keyed register recycling is sound.
-pub fn convert_module(module: CompiledModule, struct_name_table: &[StructNameIndex]) -> Result<ModuleIR> {
+pub fn translate_module(module: CompiledModule, struct_name_table: &[StructNameIndex]) -> Result<ModuleIR> {
     let functions = module
         .function_defs
         .iter()
@@ -67,44 +203,35 @@ pub fn convert_module(module: CompiledModule, struct_name_table: &[StructNameInd
                 let num_locals = module.signature_at(code.locals).0.len() as u16;
                 let name_idx = handle.name;
                 let handle_idx = fdef.function;
-                let num_pinned = num_params + num_locals;
+                let param_sig_toks = &module.signature_at(handle.parameters).0;
+                let local_sig_toks = &module.signature_at(code.locals).0;
+                let all_sig_toks: Vec<SignatureToken> =
+                    param_sig_toks.iter().chain(local_sig_toks.iter()).cloned().collect();
+                // [TODO]: we currently convert signature tokens into the runtime type representation, but
+                // this will change to use more efficient cached type representations.
+                let local_types = convert_sig_tokens(&module, &all_sig_toks, struct_name_table);
 
-                let param_toks = &module.signature_at(handle.parameters).0;
-                let local_toks = &module.signature_at(code.locals).0;
-                let all_toks: Vec<SignatureToken> =
-                    param_toks.iter().chain(local_toks.iter()).cloned().collect();
-                let local_types = convert_sig_tokens(&module, &all_toks, struct_name_table);
+                // Pass: Bytecode -> Intra-Block SSA
+                let converter =
+                    SsaConverter::new(num_params, num_locals, local_types, struct_name_table);
+                let mut ssa = converter.convert_function(&module, &code.code)?;
 
-                // Pass 1: Bytecode → Intra-Block SSA
-                let mut converter =
-                    SsaConverter::new(num_params, num_locals, local_types.clone(), struct_name_table);
-                converter.convert_function(&module, &code.code)?;
-                let ssa_instrs = converter.instrs;
-                let vid_types = converter.vid_types;
+                // Pass: Pre-allocation instruction fusion
+                ssa.fuse_field_access_instrs();
+                ssa.fuse_immediate_binops();
 
-                // Pass 1.5: Pre-allocation instruction fusion
-                let mut ssa_instrs = ssa_instrs;
-                fuse_field_access_instrs(&mut ssa_instrs);
-                let ssa_instrs = fuse_immediate_binops_ssa(ssa_instrs, num_pinned);
-
-                // Pass 2: Greedy Register Allocation
-                let (allocated_instrs, num_regs, num_arg_regs, reg_types) =
-                    crate::regalloc::allocate_registers(
-                        &ssa_instrs,
-                        num_pinned,
-                        &local_types,
-                        &vid_types,
-                    )?;
+                // Pass: Greedy Register Allocation
+                let alloc = crate::regalloc::allocate_registers(&ssa)?;
 
                 Ok(FunctionIR {
                     name_idx,
                     handle_idx,
                     num_params,
                     num_locals,
-                    num_regs,
-                    num_arg_regs,
-                    instrs: allocated_instrs,
-                    reg_types,
+                    num_regs: alloc.num_regs,
+                    num_arg_regs: alloc.num_arg_regs,
+                    instrs: alloc.instrs,
+                    reg_types: alloc.reg_types,
                 })
             })
         })
@@ -114,7 +241,7 @@ pub fn convert_module(module: CompiledModule, struct_name_table: &[StructNameInd
 }
 
 // ================================================================================================
-// Pass 1: Bytecode → Intra-Block SSA
+// Pass: Bytecode -> Intra-Block SSA
 // ================================================================================================
 
 struct SsaConverter<'a> {
@@ -199,6 +326,7 @@ impl<'a> SsaConverter<'a> {
                 },
                 _ => {},
             }
+            // Conditional branches also need a label for the fall-through target.
             if matches!(bc, Bytecode::BrTrue(_) | Bytecode::BrFalse(_)) {
                 self.get_or_create_label((offset + 1) as CodeOffset);
             }
@@ -206,7 +334,7 @@ impl<'a> SsaConverter<'a> {
     }
 
     // --------------------------------------------------------------------------------------------
-    // Type helpers
+    // Type helpers: these will all be replaced by cached type representations.
     // --------------------------------------------------------------------------------------------
 
     fn struct_type(&self, module: &CompiledModule, idx: StructDefinitionIndex) -> Type {
@@ -303,13 +431,13 @@ impl<'a> SsaConverter<'a> {
     // Function conversion
     // --------------------------------------------------------------------------------------------
 
-    #[allow(clippy::needless_range_loop)]
-    fn convert_function(&mut self, module: &CompiledModule, code: &[Bytecode]) -> Result<()> {
+    /// Converts the function's bytecode into SSA form, consuming the converter.
+    fn convert_function(mut self, module: &CompiledModule, code: &[Bytecode]) -> Result<SSAFunction> {
         self.assign_labels(code);
 
         // Split into basic blocks
         let mut block_start = 0;
-        let mut block_boundaries = Vec::new();
+        let mut block_boundaries: Vec<(usize, usize)> = Vec::new(); // [start, end) bytecode offsets
 
         for (offset, bc) in code.iter().enumerate() {
             if self.label_map.contains_key(&(offset as CodeOffset)) && offset > block_start {
@@ -329,133 +457,148 @@ impl<'a> SsaConverter<'a> {
                 _ => {},
             }
         }
-        if block_start < code.len() {
-            block_boundaries.push((block_start, code.len()));
-        }
+        // The bytecode verifier's `verify_fallthrough` rejects code whose last
+        // instruction is not an unconditional branch (Ret/Abort/Branch), so every
+        // block-ending terminator in the loop above will have consumed all code.
+        ensure!(
+            block_start >= code.len(),
+            "verified bytecode must end with a terminator"
+        );
 
         for (start, end) in block_boundaries {
-            self.stack.clear();
+            ensure!(self.stack.is_empty(), "stack must be empty at block boundary");
 
-            for offset in start..end {
+            for (i, bc) in code[start..end].iter().enumerate() {
+                let offset = start + i;
                 if let Some(&label) = self.label_map.get(&(offset as CodeOffset)) {
                     self.instrs.push(Instr::Label(label));
                 }
-                self.convert_bytecode(module, &code[offset])?;
+                self.convert_bytecode(module, bc)?;
             }
         }
-        Ok(())
+        Ok(SSAFunction {
+            instrs: self.instrs,
+            vid_types: self.vid_types,
+            local_types: self.local_types,
+        })
     }
 
+    /// Converts a single stack-based bytecode into register-based SSA instruction(s).
+    ///
+    /// Each bytecode pops its operands from the simulated stack, allocates a fresh
+    /// value ID for each result, emits the corresponding register instruction, and
+    /// pushes the results back. The stack is only a compile-time simulation — the
+    /// emitted IR is purely register-based.
     fn convert_bytecode(&mut self, module: &CompiledModule, bc: &Bytecode) -> Result<()> {
         use Bytecode as B;
         match bc {
             // --- Loads ---
             B::LdU8(v) => {
                 let ty = Type::U8;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdU8(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdU8(dst, *v));
+                self.push(dst, ty);
             },
             B::LdU16(v) => {
                 let ty = Type::U16;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdU16(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdU16(dst, *v));
+                self.push(dst, ty);
             },
             B::LdU32(v) => {
                 let ty = Type::U32;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdU32(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdU32(dst, *v));
+                self.push(dst, ty);
             },
             B::LdU64(v) => {
                 let ty = Type::U64;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdU64(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdU64(dst, *v));
+                self.push(dst, ty);
             },
             B::LdU128(v) => {
                 let ty = Type::U128;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdU128(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdU128(dst, *v));
+                self.push(dst, ty);
             },
             B::LdU256(v) => {
                 let ty = Type::U256;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdU256(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdU256(dst, *v));
+                self.push(dst, ty);
             },
             B::LdI8(v) => {
                 let ty = Type::I8;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdI8(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdI8(dst, *v));
+                self.push(dst, ty);
             },
             B::LdI16(v) => {
                 let ty = Type::I16;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdI16(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdI16(dst, *v));
+                self.push(dst, ty);
             },
             B::LdI32(v) => {
                 let ty = Type::I32;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdI32(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdI32(dst, *v));
+                self.push(dst, ty);
             },
             B::LdI64(v) => {
                 let ty = Type::I64;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdI64(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdI64(dst, *v));
+                self.push(dst, ty);
             },
             B::LdI128(v) => {
                 let ty = Type::I128;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdI128(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdI128(dst, *v));
+                self.push(dst, ty);
             },
             B::LdI256(v) => {
                 let ty = Type::I256;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdI256(d, *v));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdI256(dst, *v));
+                self.push(dst, ty);
             },
             B::LdConst(idx) => {
                 let tok = &module.constant_pool[idx.0 as usize].type_;
                 let ty = convert_sig_token(module, tok, self.struct_name_table);
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdConst(d, *idx));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdConst(dst, *idx));
+                self.push(dst, ty);
             },
             B::LdTrue => {
                 let ty = Type::Bool;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdTrue(d));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdTrue(dst));
+                self.push(dst, ty);
             },
             B::LdFalse => {
                 let ty = Type::Bool;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::LdFalse(d));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::LdFalse(dst));
+                self.push(dst, ty);
             },
 
             // --- Locals ---
             B::CopyLoc(idx) => {
                 let src = Reg::Home(*idx as u16);
                 let ty = self.local_types[*idx as usize].clone();
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::Copy(d, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::Copy(dst, src));
+                self.push(dst, ty);
             },
             B::MoveLoc(idx) => {
                 let src = Reg::Home(*idx as u16);
                 let ty = self.local_types[*idx as usize].clone();
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::Move(d, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::Move(dst, src));
+                self.push(dst, ty);
             },
             B::StLoc(_idx) => {
                 let (src, _ty) = self.pop()?;
@@ -468,42 +611,44 @@ impl<'a> SsaConverter<'a> {
                 let _ = self.pop()?;
             },
 
-            // --- Binary ops ---
-            B::Add => self.convert_binop(BinaryOp::Add)?,
-            B::Sub => self.convert_binop(BinaryOp::Sub)?,
-            B::Mul => self.convert_binop(BinaryOp::Mul)?,
-            B::Div => self.convert_binop(BinaryOp::Div)?,
-            B::Mod => self.convert_binop(BinaryOp::Mod)?,
-            B::BitOr => self.convert_binop(BinaryOp::BitOr)?,
-            B::BitAnd => self.convert_binop(BinaryOp::BitAnd)?,
-            B::Xor => self.convert_binop(BinaryOp::Xor)?,
-            B::Shl => self.convert_binop(BinaryOp::Shl)?,
-            B::Shr => self.convert_binop(BinaryOp::Shr)?,
-            B::Lt => self.convert_binop(BinaryOp::Lt)?,
-            B::Gt => self.convert_binop(BinaryOp::Gt)?,
-            B::Le => self.convert_binop(BinaryOp::Le)?,
-            B::Ge => self.convert_binop(BinaryOp::Ge)?,
-            B::Eq => self.convert_binop(BinaryOp::Eq)?,
-            B::Neq => self.convert_binop(BinaryOp::Neq)?,
-            B::Or => self.convert_binop(BinaryOp::Or)?,
-            B::And => self.convert_binop(BinaryOp::And)?,
+            // --- Binary ops (result type = operand type) ---
+            B::Add => self.convert_binop(BinaryOp::Add, false)?,
+            B::Sub => self.convert_binop(BinaryOp::Sub, false)?,
+            B::Mul => self.convert_binop(BinaryOp::Mul, false)?,
+            B::Div => self.convert_binop(BinaryOp::Div, false)?,
+            B::Mod => self.convert_binop(BinaryOp::Mod, false)?,
+            B::BitOr => self.convert_binop(BinaryOp::BitOr, false)?,
+            B::BitAnd => self.convert_binop(BinaryOp::BitAnd, false)?,
+            B::Xor => self.convert_binop(BinaryOp::Xor, false)?,
+            B::Shl => self.convert_binop(BinaryOp::Shl, false)?,
+            B::Shr => self.convert_binop(BinaryOp::Shr, false)?,
+            // --- Comparisons / logical (result type = bool) ---
+            B::Lt => self.convert_binop(BinaryOp::Lt, true)?,
+            B::Gt => self.convert_binop(BinaryOp::Gt, true)?,
+            B::Le => self.convert_binop(BinaryOp::Le, true)?,
+            B::Ge => self.convert_binop(BinaryOp::Ge, true)?,
+            B::Eq => self.convert_binop(BinaryOp::Eq, true)?,
+            B::Neq => self.convert_binop(BinaryOp::Neq, true)?,
+            B::Or => self.convert_binop(BinaryOp::Or, true)?,
+            B::And => self.convert_binop(BinaryOp::And, true)?,
 
-            // --- Unary ops ---
-            B::CastU8 => self.convert_unop(UnaryOp::CastU8)?,
-            B::CastU16 => self.convert_unop(UnaryOp::CastU16)?,
-            B::CastU32 => self.convert_unop(UnaryOp::CastU32)?,
-            B::CastU64 => self.convert_unop(UnaryOp::CastU64)?,
-            B::CastU128 => self.convert_unop(UnaryOp::CastU128)?,
-            B::CastU256 => self.convert_unop(UnaryOp::CastU256)?,
-            B::CastI8 => self.convert_unop(UnaryOp::CastI8)?,
-            B::CastI16 => self.convert_unop(UnaryOp::CastI16)?,
-            B::CastI32 => self.convert_unop(UnaryOp::CastI32)?,
-            B::CastI64 => self.convert_unop(UnaryOp::CastI64)?,
-            B::CastI128 => self.convert_unop(UnaryOp::CastI128)?,
-            B::CastI256 => self.convert_unop(UnaryOp::CastI256)?,
-            B::Not => self.convert_unop(UnaryOp::Not)?,
-            B::Negate => self.convert_unop(UnaryOp::Negate)?,
-            B::FreezeRef => self.convert_unop(UnaryOp::FreezeRef)?,
+            // --- Unary ops (result type specified) ---
+            B::CastU8 => self.convert_unop(UnaryOp::CastU8, Some(Type::U8))?,
+            B::CastU16 => self.convert_unop(UnaryOp::CastU16, Some(Type::U16))?,
+            B::CastU32 => self.convert_unop(UnaryOp::CastU32, Some(Type::U32))?,
+            B::CastU64 => self.convert_unop(UnaryOp::CastU64, Some(Type::U64))?,
+            B::CastU128 => self.convert_unop(UnaryOp::CastU128, Some(Type::U128))?,
+            B::CastU256 => self.convert_unop(UnaryOp::CastU256, Some(Type::U256))?,
+            B::CastI8 => self.convert_unop(UnaryOp::CastI8, Some(Type::I8))?,
+            B::CastI16 => self.convert_unop(UnaryOp::CastI16, Some(Type::I16))?,
+            B::CastI32 => self.convert_unop(UnaryOp::CastI32, Some(Type::I32))?,
+            B::CastI64 => self.convert_unop(UnaryOp::CastI64, Some(Type::I64))?,
+            B::CastI128 => self.convert_unop(UnaryOp::CastI128, Some(Type::I128))?,
+            B::CastI256 => self.convert_unop(UnaryOp::CastI256, Some(Type::I256))?,
+            B::Not => self.convert_unop(UnaryOp::Not, Some(Type::Bool))?,
+            // --- Unary ops (result type derived from operand) ---
+            B::Negate => self.convert_unop(UnaryOp::Negate, None)?,
+            B::FreezeRef => self.convert_unop(UnaryOp::FreezeRef, None)?,
 
             // --- Struct ops ---
             B::Pack(idx) => {
@@ -511,9 +656,9 @@ impl<'a> SsaConverter<'a> {
                 let fields_typed = self.pop_n_reverse(n)?;
                 let fields: Vec<Reg> = fields_typed.iter().map(|(r, _)| *r).collect();
                 let result_ty = self.struct_type(module, *idx);
-                let d = self.alloc_vid(result_ty.clone());
-                self.instrs.push(Instr::Pack(d, *idx, fields));
-                self.push(d, result_ty);
+                let dst = self.alloc_vid(result_ty.clone());
+                self.instrs.push(Instr::Pack(dst, *idx, fields));
+                self.push(dst, result_ty);
             },
             B::PackGeneric(idx) => {
                 let inst = &module.struct_def_instantiations[idx.0 as usize];
@@ -521,9 +666,9 @@ impl<'a> SsaConverter<'a> {
                 let fields_typed = self.pop_n_reverse(n)?;
                 let fields: Vec<Reg> = fields_typed.iter().map(|(r, _)| *r).collect();
                 let result_ty = self.struct_inst_type(module, *idx);
-                let d = self.alloc_vid(result_ty.clone());
-                self.instrs.push(Instr::PackGeneric(d, *idx, fields));
-                self.push(d, result_ty);
+                let dst = self.alloc_vid(result_ty.clone());
+                self.instrs.push(Instr::PackGeneric(dst, *idx, fields));
+                self.push(dst, result_ty);
             },
             B::Unpack(idx) => {
                 let (src, _src_ty) = self.pop()?;
@@ -537,8 +682,8 @@ impl<'a> SsaConverter<'a> {
                     dsts.push(self.alloc_vid(fty));
                 }
                 self.instrs.push(Instr::Unpack(dsts.clone(), *idx, src));
-                for (d, fty) in dsts.into_iter().zip(ftypes) {
-                    self.push(d, fty);
+                for (dst, fty) in dsts.into_iter().zip(ftypes) {
+                    self.push(dst, fty);
                 }
             },
             B::UnpackGeneric(idx) => {
@@ -559,8 +704,8 @@ impl<'a> SsaConverter<'a> {
                     dsts.push(self.alloc_vid(fty));
                 }
                 self.instrs.push(Instr::UnpackGeneric(dsts.clone(), *idx, src));
-                for (d, fty) in dsts.into_iter().zip(ftypes) {
-                    self.push(d, fty);
+                for (dst, fty) in dsts.into_iter().zip(ftypes) {
+                    self.push(dst, fty);
                 }
             },
 
@@ -571,9 +716,9 @@ impl<'a> SsaConverter<'a> {
                 let fields_typed = self.pop_n_reverse(n)?;
                 let fields: Vec<Reg> = fields_typed.iter().map(|(r, _)| *r).collect();
                 let result_ty = self.struct_type(module, handle.struct_index);
-                let d = self.alloc_vid(result_ty.clone());
-                self.instrs.push(Instr::PackVariant(d, *idx, fields));
-                self.push(d, result_ty);
+                let dst = self.alloc_vid(result_ty.clone());
+                self.instrs.push(Instr::PackVariant(dst, *idx, fields));
+                self.push(dst, result_ty);
             },
             B::PackVariantGeneric(idx) => {
                 let inst = &module.struct_variant_instantiations[idx.0 as usize];
@@ -585,9 +730,9 @@ impl<'a> SsaConverter<'a> {
                 let def = &module.struct_defs[handle.struct_index.0 as usize];
                 let tok = SignatureToken::StructInstantiation(def.struct_handle, type_params);
                 let result_ty = convert_sig_token(module, &tok, self.struct_name_table);
-                let d = self.alloc_vid(result_ty.clone());
-                self.instrs.push(Instr::PackVariantGeneric(d, *idx, fields));
-                self.push(d, result_ty);
+                let dst = self.alloc_vid(result_ty.clone());
+                self.instrs.push(Instr::PackVariantGeneric(dst, *idx, fields));
+                self.push(dst, result_ty);
             },
             B::UnpackVariant(idx) => {
                 let (src, _src_ty) = self.pop()?;
@@ -602,8 +747,8 @@ impl<'a> SsaConverter<'a> {
                     dsts.push(self.alloc_vid(fty));
                 }
                 self.instrs.push(Instr::UnpackVariant(dsts.clone(), *idx, src));
-                for (d, fty) in dsts.into_iter().zip(ftypes) {
-                    self.push(d, fty);
+                for (dst, fty) in dsts.into_iter().zip(ftypes) {
+                    self.push(dst, fty);
                 }
             },
             B::UnpackVariantGeneric(idx) => {
@@ -626,23 +771,23 @@ impl<'a> SsaConverter<'a> {
                 }
                 self.instrs
                     .push(Instr::UnpackVariantGeneric(dsts.clone(), *idx, src));
-                for (d, fty) in dsts.into_iter().zip(ftypes) {
-                    self.push(d, fty);
+                for (dst, fty) in dsts.into_iter().zip(ftypes) {
+                    self.push(dst, fty);
                 }
             },
             B::TestVariant(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let ty = Type::Bool;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::TestVariant(d, *idx, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::TestVariant(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::TestVariantGeneric(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let ty = Type::Bool;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::TestVariantGeneric(d, *idx, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::TestVariantGeneric(dst, *idx, src));
+                self.push(dst, ty);
             },
 
             // --- References ---
@@ -650,83 +795,83 @@ impl<'a> SsaConverter<'a> {
                 let src = Reg::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize].clone();
                 let ty = Type::Reference(Box::new(inner));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ImmBorrowLoc(d, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::ImmBorrowLoc(dst, src));
+                self.push(dst, ty);
             },
             B::MutBorrowLoc(idx) => {
                 let src = Reg::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize].clone();
                 let ty = Type::MutableReference(Box::new(inner));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MutBorrowLoc(d, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::MutBorrowLoc(dst, src));
+                self.push(dst, ty);
             },
             B::ImmBorrowField(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let fty = self.field_type(module, *idx)?;
                 let ty = Type::Reference(Box::new(fty));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ImmBorrowField(d, *idx, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::ImmBorrowField(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::MutBorrowField(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let fty = self.field_type(module, *idx)?;
                 let ty = Type::MutableReference(Box::new(fty));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MutBorrowField(d, *idx, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::MutBorrowField(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::ImmBorrowFieldGeneric(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let fty = self.field_inst_type(module, *idx)?;
                 let ty = Type::Reference(Box::new(fty));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ImmBorrowFieldGeneric(d, *idx, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::ImmBorrowFieldGeneric(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::MutBorrowFieldGeneric(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let fty = self.field_inst_type(module, *idx)?;
                 let ty = Type::MutableReference(Box::new(fty));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MutBorrowFieldGeneric(d, *idx, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::MutBorrowFieldGeneric(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::ImmBorrowVariantField(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let fty = self.variant_field_handle_type(module, *idx)?;
                 let ty = Type::Reference(Box::new(fty));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ImmBorrowVariantField(d, *idx, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::ImmBorrowVariantField(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::MutBorrowVariantField(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let fty = self.variant_field_handle_type(module, *idx)?;
                 let ty = Type::MutableReference(Box::new(fty));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MutBorrowVariantField(d, *idx, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::MutBorrowVariantField(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::ImmBorrowVariantFieldGeneric(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let fty = self.variant_field_inst_type(module, *idx)?;
                 let ty = Type::Reference(Box::new(fty));
-                let d = self.alloc_vid(ty.clone());
+                let dst = self.alloc_vid(ty.clone());
                 self.instrs
-                    .push(Instr::ImmBorrowVariantFieldGeneric(d, *idx, src));
-                self.push(d, ty);
+                    .push(Instr::ImmBorrowVariantFieldGeneric(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::MutBorrowVariantFieldGeneric(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let fty = self.variant_field_inst_type(module, *idx)?;
                 let ty = Type::MutableReference(Box::new(fty));
-                let d = self.alloc_vid(ty.clone());
+                let dst = self.alloc_vid(ty.clone());
                 self.instrs
-                    .push(Instr::MutBorrowVariantFieldGeneric(d, *idx, src));
-                self.push(d, ty);
+                    .push(Instr::MutBorrowVariantFieldGeneric(dst, *idx, src));
+                self.push(dst, ty);
             },
             B::ReadRef => {
                 let (src, src_ty) = self.pop()?;
@@ -734,9 +879,9 @@ impl<'a> SsaConverter<'a> {
                     Type::Reference(inner) | Type::MutableReference(inner) => (**inner).clone(),
                     other => other.clone(),
                 };
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ReadRef(d, src));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::ReadRef(dst, src));
+                self.push(dst, ty);
             },
             B::WriteRef => {
                 let (ref_r, _ref_ty) = self.pop()?;
@@ -748,30 +893,30 @@ impl<'a> SsaConverter<'a> {
             B::Exists(idx) => {
                 let (addr, _addr_ty) = self.pop()?;
                 let ty = Type::Bool;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::Exists(d, *idx, addr));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::Exists(dst, *idx, addr));
+                self.push(dst, ty);
             },
             B::ExistsGeneric(idx) => {
                 let (addr, _addr_ty) = self.pop()?;
                 let ty = Type::Bool;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ExistsGeneric(d, *idx, addr));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::ExistsGeneric(dst, *idx, addr));
+                self.push(dst, ty);
             },
             B::MoveFrom(idx) => {
                 let (addr, _addr_ty) = self.pop()?;
                 let ty = self.struct_type(module, *idx);
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MoveFrom(d, *idx, addr));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::MoveFrom(dst, *idx, addr));
+                self.push(dst, ty);
             },
             B::MoveFromGeneric(idx) => {
                 let (addr, _addr_ty) = self.pop()?;
                 let ty = self.struct_inst_type(module, *idx);
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MoveFromGeneric(d, *idx, addr));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::MoveFromGeneric(dst, *idx, addr));
+                self.push(dst, ty);
             },
             B::MoveTo(idx) => {
                 let (val, _val_ty) = self.pop()?;
@@ -786,32 +931,32 @@ impl<'a> SsaConverter<'a> {
             B::ImmBorrowGlobal(idx) => {
                 let (addr, _addr_ty) = self.pop()?;
                 let ty = Type::Reference(Box::new(self.struct_type(module, *idx)));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ImmBorrowGlobal(d, *idx, addr));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::ImmBorrowGlobal(dst, *idx, addr));
+                self.push(dst, ty);
             },
             B::ImmBorrowGlobalGeneric(idx) => {
                 let (addr, _addr_ty) = self.pop()?;
                 let ty = Type::Reference(Box::new(self.struct_inst_type(module, *idx)));
-                let d = self.alloc_vid(ty.clone());
+                let dst = self.alloc_vid(ty.clone());
                 self.instrs
-                    .push(Instr::ImmBorrowGlobalGeneric(d, *idx, addr));
-                self.push(d, ty);
+                    .push(Instr::ImmBorrowGlobalGeneric(dst, *idx, addr));
+                self.push(dst, ty);
             },
             B::MutBorrowGlobal(idx) => {
                 let (addr, _addr_ty) = self.pop()?;
                 let ty = Type::MutableReference(Box::new(self.struct_type(module, *idx)));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MutBorrowGlobal(d, *idx, addr));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::MutBorrowGlobal(dst, *idx, addr));
+                self.push(dst, ty);
             },
             B::MutBorrowGlobalGeneric(idx) => {
                 let (addr, _addr_ty) = self.pop()?;
                 let ty = Type::MutableReference(Box::new(self.struct_inst_type(module, *idx)));
-                let d = self.alloc_vid(ty.clone());
+                let dst = self.alloc_vid(ty.clone());
                 self.instrs
-                    .push(Instr::MutBorrowGlobalGeneric(d, *idx, addr));
-                self.push(d, ty);
+                    .push(Instr::MutBorrowGlobalGeneric(dst, *idx, addr));
+                self.push(dst, ty);
             },
 
             // --- Calls ---
@@ -868,10 +1013,10 @@ impl<'a> SsaConverter<'a> {
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
                 let ty = convert_sig_token(module, &tok, self.struct_name_table);
-                let d = self.alloc_vid(ty.clone());
+                let dst = self.alloc_vid(ty.clone());
                 self.instrs
-                    .push(Instr::PackClosure(d, *fhi, *mask, captured));
-                self.push(d, ty);
+                    .push(Instr::PackClosure(dst, *fhi, *mask, captured));
+                self.push(dst, ty);
             },
             B::PackClosureGeneric(fii, mask) => {
                 let captured_count = mask.captured_count() as usize;
@@ -887,10 +1032,10 @@ impl<'a> SsaConverter<'a> {
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
                 let ty = convert_sig_token(module, &tok, self.struct_name_table);
-                let d = self.alloc_vid(ty.clone());
+                let dst = self.alloc_vid(ty.clone());
                 self.instrs
-                    .push(Instr::PackClosureGeneric(d, *fii, *mask, captured));
-                self.push(d, ty);
+                    .push(Instr::PackClosureGeneric(dst, *fii, *mask, captured));
+                self.push(dst, ty);
             },
             B::CallClosure(sig_idx) => {
                 let sig = module.signature_at(*sig_idx);
@@ -923,16 +1068,16 @@ impl<'a> SsaConverter<'a> {
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
                 let elem_ty = convert_sig_token(module, elem_tok, self.struct_name_table);
                 let ty = Type::Vector(triomphe::Arc::new(elem_ty));
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::VecPack(d, *sig_idx, *count, elems));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::VecPack(dst, *sig_idx, *count, elems));
+                self.push(dst, ty);
             },
             B::VecLen(sig_idx) => {
                 let (vec_ref, _vec_ty) = self.pop()?;
                 let ty = Type::U64;
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::VecLen(d, *sig_idx, vec_ref));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::VecLen(dst, *sig_idx, vec_ref));
+                self.push(dst, ty);
             },
             B::VecImmBorrow(sig_idx) => {
                 let (idx_r, _idx_ty) = self.pop()?;
@@ -940,10 +1085,10 @@ impl<'a> SsaConverter<'a> {
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
                 let elem_ty = convert_sig_token(module, elem_tok, self.struct_name_table);
                 let ty = Type::Reference(Box::new(elem_ty));
-                let d = self.alloc_vid(ty.clone());
+                let dst = self.alloc_vid(ty.clone());
                 self.instrs
-                    .push(Instr::VecImmBorrow(d, *sig_idx, vec_ref, idx_r));
-                self.push(d, ty);
+                    .push(Instr::VecImmBorrow(dst, *sig_idx, vec_ref, idx_r));
+                self.push(dst, ty);
             },
             B::VecMutBorrow(sig_idx) => {
                 let (idx_r, _idx_ty) = self.pop()?;
@@ -951,10 +1096,10 @@ impl<'a> SsaConverter<'a> {
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
                 let elem_ty = convert_sig_token(module, elem_tok, self.struct_name_table);
                 let ty = Type::MutableReference(Box::new(elem_ty));
-                let d = self.alloc_vid(ty.clone());
+                let dst = self.alloc_vid(ty.clone());
                 self.instrs
-                    .push(Instr::VecMutBorrow(d, *sig_idx, vec_ref, idx_r));
-                self.push(d, ty);
+                    .push(Instr::VecMutBorrow(dst, *sig_idx, vec_ref, idx_r));
+                self.push(dst, ty);
             },
             B::VecPushBack(sig_idx) => {
                 let (val, _val_ty) = self.pop()?;
@@ -965,9 +1110,9 @@ impl<'a> SsaConverter<'a> {
                 let (vec_ref, _vec_ty) = self.pop()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
                 let ty = convert_sig_token(module, elem_tok, self.struct_name_table);
-                let d = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::VecPopBack(d, *sig_idx, vec_ref));
-                self.push(d, ty);
+                let dst = self.alloc_vid(ty.clone());
+                self.instrs.push(Instr::VecPopBack(dst, *sig_idx, vec_ref));
+                self.push(dst, ty);
             },
             B::VecUnpack(sig_idx, count) => {
                 let (src, _src_ty) = self.pop()?;
@@ -979,8 +1124,8 @@ impl<'a> SsaConverter<'a> {
                 }
                 self.instrs
                     .push(Instr::VecUnpack(dsts.clone(), *sig_idx, *count, src));
-                for d in dsts {
-                    self.push(d, elem_ty.clone());
+                for dst in dsts {
+                    self.push(dst, elem_ty.clone());
                 }
             },
             B::VecSwap(sig_idx) => {
@@ -1024,197 +1169,34 @@ impl<'a> SsaConverter<'a> {
         Ok(())
     }
 
-    fn convert_binop(&mut self, op: BinaryOp) -> Result<()> {
+    fn convert_binop(&mut self, op: BinaryOp, result_is_bool: bool) -> Result<()> {
         let (rhs, _rhs_ty) = self.pop()?;
         let (lhs, lhs_ty) = self.pop()?;
-        let result_ty = match op {
-            BinaryOp::Lt
-            | BinaryOp::Gt
-            | BinaryOp::Le
-            | BinaryOp::Ge
-            | BinaryOp::Eq
-            | BinaryOp::Neq
-            | BinaryOp::Or
-            | BinaryOp::And => Type::Bool,
-            _ => lhs_ty,
-        };
-        let d = self.alloc_vid(result_ty.clone());
-        self.instrs.push(Instr::BinaryOp(d, op, lhs, rhs));
-        self.push(d, result_ty);
+        let result_ty = if result_is_bool { Type::Bool } else { lhs_ty };
+        let dst = self.alloc_vid(result_ty.clone());
+        self.instrs.push(Instr::BinaryOp(dst, op, lhs, rhs));
+        self.push(dst, result_ty);
         Ok(())
     }
 
-    fn convert_unop(&mut self, op: UnaryOp) -> Result<()> {
+    /// If `result_ty` is `Some`, use it directly. If `None`, derive from the operand type:
+    /// `Negate` preserves the type, `FreezeRef` converts `&mut T` → `&T`.
+    fn convert_unop(&mut self, op: UnaryOp, result_ty: Option<Type>) -> Result<()> {
         let (src, src_ty) = self.pop()?;
-        let result_ty = match op {
-            UnaryOp::CastU8 => Type::U8,
-            UnaryOp::CastU16 => Type::U16,
-            UnaryOp::CastU32 => Type::U32,
-            UnaryOp::CastU64 => Type::U64,
-            UnaryOp::CastU128 => Type::U128,
-            UnaryOp::CastU256 => Type::U256,
-            UnaryOp::CastI8 => Type::I8,
-            UnaryOp::CastI16 => Type::I16,
-            UnaryOp::CastI32 => Type::I32,
-            UnaryOp::CastI64 => Type::I64,
-            UnaryOp::CastI128 => Type::I128,
-            UnaryOp::CastI256 => Type::I256,
-            UnaryOp::Not => Type::Bool,
-            UnaryOp::Negate => src_ty.clone(),
-            UnaryOp::FreezeRef => match &src_ty {
-                Type::MutableReference(inner) => Type::Reference(Box::new((**inner).clone())),
-                other => other.clone(),
+        let result_ty = match result_ty {
+            Some(ty) => ty,
+            None => match (&op, src_ty) {
+                (UnaryOp::FreezeRef, Type::MutableReference(inner)) => {
+                    Type::Reference(inner)
+                },
+                (UnaryOp::Negate | UnaryOp::FreezeRef, ty) => ty,
+                _ => bail!("unary op {:?} requires an explicit result type", op),
             },
         };
-        let d = self.alloc_vid(result_ty.clone());
-        self.instrs.push(Instr::UnaryOp(d, op, src));
-        self.push(d, result_ty);
+        let dst = self.alloc_vid(result_ty.clone());
+        self.instrs.push(Instr::UnaryOp(dst, op, src));
+        self.push(dst, result_ty);
         Ok(())
-    }
-}
-
-// ================================================================================================
-// Pass 1.5: Fuse Immediate BinaryOps (SSA level)
-// ================================================================================================
-
-/// Fuse consecutive `Ld*` + `BinaryOp` pairs into `BinaryOpImm` in the SSA IR.
-///
-/// Safety: the stack machine guarantees that consecutive `Ld + BinaryOp` means
-/// the loaded VID was pushed and immediately consumed (Move has no dup
-/// instruction; reuse requires `st_loc`+`copy_loc` which inserts intervening
-/// instructions that break consecutiveness). The within-block boundary check
-/// prevents fusing across labels (where VIDs restart and have unrelated
-/// definitions).
-///
-/// Since V2 VIDs are true SSA within a block (monotonically allocated, never
-/// recycled), a debug_assert verifies single-use as an invariant check.
-fn fuse_immediate_binops_ssa(instrs: Vec<Instr>, _num_pinned: u16) -> Vec<Instr> {
-    let blocks = split_into_blocks(&instrs);
-    let mut result = Vec::with_capacity(instrs.len());
-
-    let mut block_idx = 0;
-    let mut skip_next = false;
-
-    for i in 0..instrs.len() {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
-
-        // Advance to the current block.
-        while block_idx < blocks.len() && i >= blocks[block_idx].1 {
-            block_idx += 1;
-        }
-
-        // Only fuse within the same basic block.
-        if i + 1 < instrs.len()
-            && block_idx < blocks.len()
-            && i + 1 < blocks[block_idx].1
-            && let Some((tmp, imm)) = extract_imm_value(&instrs[i])
-        {
-            let fused = match &instrs[i + 1] {
-                Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
-                    Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm.clone()))
-                },
-                Instr::BinaryOp(dst, op, lhs, rhs)
-                    if *lhs == tmp && is_commutative(op) =>
-                {
-                    Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm.clone()))
-                },
-                _ => None,
-            };
-            if let Some(fused_instr) = fused {
-                // V2 VIDs are true SSA within a block (alloc_vid is monotonic,
-                // no free list). Verify the loaded VID is single-use.
-                debug_assert!({
-                    let (bstart, bend) = blocks[block_idx];
-                    instrs[bstart..bend]
-                        .iter()
-                        .enumerate()
-                        .filter(|&(j, _)| bstart + j != i + 1)
-                        .all(|(_, ins)| {
-                            let (_, uses) = get_defs_uses(ins);
-                            !uses.contains(&tmp)
-                        })
-                },
-                    "BinaryOpImm SSA fusion: VID {:?} has uses outside the \
-                     consecutive Ld+BinaryOp pair — stack machine invariant violated",
-                    tmp,
-                );
-                result.push(fused_instr);
-                skip_next = true;
-                continue;
-            }
-        }
-
-        result.push(instrs[i].clone());
-    }
-
-    result
-}
-
-// ================================================================================================
-// Field access fusion (local copy for V2 pipeline independence)
-// ================================================================================================
-
-/// Fuse consecutive borrow+deref patterns into combined field access instructions.
-fn fuse_field_access_instrs(instrs: &mut Vec<Instr>) {
-    let mut i = 0;
-    while i + 1 < instrs.len() {
-        let fused = match (&instrs[i], &instrs[i + 1]) {
-            (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-                if *ref_r == *read_src =>
-            {
-                Some(Instr::ReadField(*dst, *fld, *src))
-            },
-            (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-                if *ref_r == *read_src =>
-            {
-                Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
-            },
-            (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-                if *ref_r == *write_ref =>
-            {
-                Some(Instr::WriteField(*fld, *dst_ref, *val))
-            },
-            (Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-                if *ref_r == *write_ref =>
-            {
-                Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val))
-            },
-            (
-                Instr::ImmBorrowVariantField(ref_r, fld, src),
-                Instr::ReadRef(dst, read_src),
-            ) if *ref_r == *read_src => {
-                Some(Instr::ReadVariantField(*dst, *fld, *src))
-            },
-            (
-                Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src),
-                Instr::ReadRef(dst, read_src),
-            ) if *ref_r == *read_src => {
-                Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src))
-            },
-            (
-                Instr::MutBorrowVariantField(ref_r, fld, dst_ref),
-                Instr::WriteRef(write_ref, val),
-            ) if *ref_r == *write_ref => {
-                Some(Instr::WriteVariantField(*fld, *dst_ref, *val))
-            },
-            (
-                Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
-                Instr::WriteRef(write_ref, val),
-            ) if *ref_r == *write_ref => {
-                Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val))
-            },
-            _ => None,
-        };
-
-        if let Some(fused_instr) = fused {
-            instrs[i] = fused_instr;
-            instrs.remove(i + 1);
-        } else {
-            i += 1;
-        }
     }
 }
 
