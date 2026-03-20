@@ -3,8 +3,13 @@
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_forge::{Node, Swarm};
+use aptos_forge::{
+    args::TransactionTypeArg, EmitJobMode, EmitJobRequest, Node, NodeExt, Swarm, TxnEmitter,
+};
+use aptos_sdk::transaction_builder::TransactionFactory;
+use rand::{rngs::OsRng, SeedableRng};
 use reqwest::Url;
+use std::time::Duration;
 
 /// Smoke test for transaction tracing:
 /// 1. Spins up a local swarm with 4 validators
@@ -175,4 +180,151 @@ async fn test_transaction_tracing() {
     let body: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(body["enabled"], false);
     println!("Tracing disabled successfully");
+}
+
+/// Trace-all mode: traces EVERY transaction (empty allowlist = wildcard).
+///
+/// Generates sustained coin-transfer traffic for ~20 seconds so the batch
+/// generator fires many pull rounds, producing TxnTrace logs with wait()
+/// summaries showing pull-round counts, interval percentiles, back-pressure
+/// breakdown, and gas-bucket distributions.
+///
+/// Run with:
+///   cargo test -p smoke-test -- test_transaction_tracing_trace_all --ignored --nocapture
+#[ignore]
+#[tokio::test]
+async fn test_transaction_tracing_trace_all() {
+    let swarm = new_local_swarm_with_aptos(4).await;
+
+    // --- Enable tracing with empty allowlist (trace ALL senders) ----------
+    let client = reqwest::Client::new();
+    let filter_json = serde_json::json!({
+        "enabled": true,
+        "sender_allowlist": [],
+    });
+
+    for validator in swarm.validators() {
+        let mut url = validator.inspection_service_endpoint();
+        url.set_path("transaction_tracing");
+        let resp = client
+            .post(url)
+            .json(&filter_json)
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            resp.status().is_success(),
+            "Failed to set tracing filter on {}",
+            validator.peer_id()
+        );
+    }
+    println!("Tracing enabled in trace-all mode on all validators");
+
+    // --- Generate sustained traffic for ~20 seconds -----------------------
+    let traffic_duration = Duration::from_secs(20);
+    let gas_price = 100;
+
+    let validator_clients: Vec<_> = swarm
+        .validators()
+        .map(|v| v.rest_client())
+        .collect();
+
+    let emit_job_request = EmitJobRequest::default()
+        .rest_clients(validator_clients)
+        .gas_price(gas_price)
+        .expected_gas_per_txn(10_000_000)
+        .max_gas_per_txn(20_000_000)
+        .transaction_type(TransactionTypeArg::CoinTransfer.materialize_default())
+        .mode(EmitJobMode::ConstTps { tps: 30 });
+
+    let chain_info = swarm.chain_info();
+    let txn_factory =
+        TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(gas_price);
+    let rng = SeedableRng::from_rng(OsRng).unwrap();
+    let rest_cli = chain_info.rest_client();
+    let emitter = TxnEmitter::new(txn_factory, rng, rest_cli);
+
+    println!(
+        "\n=== Generating traffic for {}s at 30 TPS ===",
+        traffic_duration.as_secs()
+    );
+    let stats = emitter
+        .emit_txn_for_with_stats(
+            chain_info.root_account,
+            emit_job_request,
+            traffic_duration,
+            3,
+        )
+        .await
+        .unwrap();
+
+    println!(
+        "Traffic stats: submitted={} committed={} rate={:?}",
+        stats.submitted,
+        stats.committed,
+        stats.rate()
+    );
+    assert!(stats.committed > 0, "No transactions committed");
+
+    // --- Wait for traces to be flushed ------------------------------------
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    // --- Collect and print all TxnTrace lines -----------------------------
+    println!("\n=== TxnTrace log entries ===");
+    let mut total_traces = 0;
+    let mut traces_with_wait = 0;
+    let mut all_trace_lines: Vec<String> = Vec::new();
+
+    for validator in swarm.validators() {
+        let logs = validator.get_log_contents().unwrap_or_default();
+        let trace_lines: Vec<String> = logs
+            .lines()
+            .filter(|l| l.contains("TxnTrace"))
+            .map(|l| l.to_string())
+            .collect();
+
+        if !trace_lines.is_empty() {
+            println!(
+                "\n--- Validator {} ({} traces) ---",
+                validator.peer_id(),
+                trace_lines.len()
+            );
+            for line in &trace_lines {
+                println!("{}", line);
+                if line.contains("wait(") {
+                    traces_with_wait += 1;
+                }
+            }
+            total_traces += trace_lines.len();
+            all_trace_lines.extend(trace_lines);
+        }
+    }
+
+    println!("\n=== Summary ===");
+    println!("Total TxnTrace entries: {}", total_traces);
+    println!("Traces with wait() summary: {}", traces_with_wait);
+
+    // With 30 TPS * 20s = ~600 txns, we should see plenty of traces
+    assert!(
+        total_traces > 10,
+        "Expected many TxnTrace entries but only found {}",
+        total_traces
+    );
+
+    // Print a few example wait() summaries for easy inspection
+    let wait_lines: Vec<&String> = all_trace_lines
+        .iter()
+        .filter(|l| l.contains("wait("))
+        .collect();
+    if !wait_lines.is_empty() {
+        println!("\n=== Example wait() summaries (first 10) ===");
+        for line in wait_lines.iter().take(10) {
+            // Extract just the wait(...) portion for readability
+            if let Some(start) = line.find("wait(") {
+                if let Some(end) = line[start..].find(") ") {
+                    println!("  {}", &line[start..start + end + 1]);
+                }
+            }
+        }
+    }
 }

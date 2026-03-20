@@ -7,14 +7,23 @@ use crate::{
     types::{ExecutionStatus, StageMetadata, TransactionStage, TransactionTrace},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_types::account_address::AccountAddress;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 static GLOBAL_STORE: Lazy<TransactionTraceStore> = Lazy::new(TransactionTraceStore::new);
+
+/// How often `finalize_trace()` triggers a GC sweep (30 seconds).
+const GC_INTERVAL_USECS: u64 = 30_000_000;
+
+/// Traces older than this TTL are considered orphaned and evicted (60 seconds).
+const GC_TTL_USECS: u64 = 60_000_000;
 
 /// Global store for transaction lifecycle traces.
 ///
@@ -29,6 +38,9 @@ pub struct TransactionTraceStore {
     /// Filter controlling which senders to trace. Updated via ArcSwap for
     /// lock-free reads and atomic swaps (e.g., from admin API).
     filter: ArcSwap<TransactionFilter>,
+    /// Timestamp (usecs) of the last GC sweep. Used by `finalize_trace()` to
+    /// throttle periodic GC to once per `GC_INTERVAL_USECS`.
+    last_gc_usecs: AtomicU64,
 }
 
 impl TransactionTraceStore {
@@ -37,6 +49,7 @@ impl TransactionTraceStore {
             traces: DashMap::new(),
             batch_txns: DashMap::new(),
             filter: ArcSwap::new(Arc::new(TransactionFilter::default())),
+            last_gc_usecs: AtomicU64::new(0),
         }
     }
 
@@ -220,9 +233,26 @@ impl TransactionTraceStore {
     }
 
     /// Finalize and log the completed trace. Removes from store.
+    /// Also triggers periodic GC to clean up orphaned traces and stale batch mappings.
     pub fn finalize_trace(&self, hash: &HashValue) {
         if let Some((_, trace)) = self.traces.remove(hash) {
             log_trace(&trace);
+        }
+        self.maybe_gc();
+    }
+
+    /// Run GC if at least `GC_INTERVAL_USECS` have elapsed since the last sweep.
+    /// Uses compare-exchange so only one thread runs GC when multiple call concurrently.
+    fn maybe_gc(&self) {
+        let now = now_usecs();
+        let last = self.last_gc_usecs.load(Ordering::Relaxed);
+        if now.saturating_sub(last) >= GC_INTERVAL_USECS
+            && self
+                .last_gc_usecs
+                .compare_exchange(last, now, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+        {
+            self.gc(GC_TTL_USECS);
         }
     }
 
@@ -250,15 +280,42 @@ impl TransactionTraceStore {
     }
 
     /// Cleanup traces older than TTL and stale batch mappings.
+    /// Orphaned traces are logged before eviction so operators can see incomplete pipelines.
     pub fn gc(&self, ttl_usecs: u64) {
         let cutoff = now_usecs().saturating_sub(ttl_usecs);
-        self.traces
-            .retain(|_, trace| trace.insertion_time_usecs > cutoff);
+        let mut evicted = 0u64;
+        self.traces.retain(|_, trace| {
+            if trace.insertion_time_usecs > cutoff {
+                return true;
+            }
+            // Log the orphaned trace before evicting so partial pipeline data is visible.
+            warn!(
+                "TxnTrace GC evicting orphaned trace: hash=0x{} sender={} age_ms={} stages={}",
+                trace.hash.to_hex(),
+                trace.sender,
+                now_usecs().saturating_sub(trace.insertion_time_usecs) / 1000,
+                trace.stages.len(),
+            );
+            evicted += 1;
+            false
+        });
         // Clean up batch mappings that no longer reference any active traces
+        let batch_before = self.batch_txns.len();
         self.batch_txns.retain(|_, hashes| {
             hashes.retain(|h| self.traces.contains_key(h));
             !hashes.is_empty()
         });
+        let batch_evicted = batch_before - self.batch_txns.len();
+        if evicted > 0 || batch_evicted > 0 {
+            info!(
+                "TxnTrace GC: evicted {} orphaned traces, {} stale batch mappings. \
+                 Remaining: {} traces, {} batch mappings.",
+                evicted,
+                batch_evicted,
+                self.traces.len(),
+                self.batch_txns.len(),
+            );
+        }
     }
 }
 
