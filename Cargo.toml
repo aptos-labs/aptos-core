@@ -706,6 +706,9 @@ num-integer = "0.1.42"
 num-traits = "0.2.19"
 once_cell = "1.10.0"
 open = "5.3.1"
+opentelemetry = { version = "0.27.0", features = ["trace"] }
+opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"
@@ -827,7 +830,8 @@ tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.37"
 tracing-log = "0.2.0"
-tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
+tracing-opentelemetry = "0.28.0"
+tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter", "registry"] }
 triomphe = "0.1.14"
 trybuild = "1.0.80"
 try_match = "0.4.2"
