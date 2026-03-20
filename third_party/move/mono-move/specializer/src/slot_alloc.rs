@@ -10,7 +10,7 @@ use anyhow::{bail, Context, Result};
 use crate::analysis::analyze_block;
 use crate::instr_utils::{get_defs_uses, remap_instr, split_into_blocks};
 use crate::ir::{Instr, Slot};
-use crate::translate::SSAFunction;
+use crate::ssa_function::SSAFunction;
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::BTreeMap;
 

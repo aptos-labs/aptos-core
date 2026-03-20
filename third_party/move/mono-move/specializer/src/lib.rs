@@ -2,7 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub mod analysis;
-pub mod translate;
 pub mod display;
 pub mod instr_utils;
 pub mod ir;
@@ -11,6 +10,9 @@ pub mod lowering_context;
 pub mod micro_ops_display;
 pub mod optimize;
 pub mod slot_alloc;
+pub mod ssa_conversion;
+pub mod ssa_function;
+pub mod translate;
 pub mod type_conversion;
 
 use anyhow::{bail, Result};
