@@ -221,7 +221,7 @@ impl<'env> SpecTranslator<'env> {
             ExpData::Call(_, Operation::Len, args) if args.len() == 1 => {
                 self.try_eval_small_vector_len(&args[0])
             },
-            _ => self.try_eval_small_vector_len(exp),
+            _ => None,
         }
     }
 
