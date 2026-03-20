@@ -3,7 +3,7 @@
 
 //! Instruction utilities for the pipeline.
 //!
-//! Helpers used by `convert`, `slot_alloc`, and `optimize`.
+//! Helpers used by `ssa_conversion`, `slot_alloc`, and `optimize`.
 
 use crate::ir::{BinaryOp, ImmValue, Instr, Slot};
 use std::collections::BTreeMap;
@@ -196,15 +196,15 @@ pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Slot>, Vec<Slot>) {
 
 /// Apply named-slot remapping to all operands of an instruction.
 pub(crate) fn remap_instr(instr: &mut Instr, map: &BTreeMap<Slot, Slot>) {
-    fn r(reg: &mut Slot, map: &BTreeMap<Slot, Slot>) {
-        if let Some(&new) = map.get(reg) {
-            *reg = new;
+    fn r(slot: &mut Slot, map: &BTreeMap<Slot, Slot>) {
+        if let Some(&new) = map.get(slot) {
+            *slot = new;
         }
     }
 
-    fn r_vec(regs: &mut [Slot], map: &BTreeMap<Slot, Slot>) {
-        for reg in regs.iter_mut() {
-            r(reg, map);
+    fn r_vec(slots: &mut [Slot], map: &BTreeMap<Slot, Slot>) {
+        for slot in slots.iter_mut() {
+            r(slot, map);
         }
     }
 

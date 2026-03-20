@@ -172,8 +172,7 @@ fn allocate_block(
         // Free slots for defs that are never used (last_use == def site).
         for d in &defs {
             if is_vid(d) && analysis.last_use.get(d) == Some(&i) {
-                let (_, ref uses_list) = get_defs_uses(instr);
-                if !uses_list.contains(d)
+                if !uses.contains(d)
                     && let Some(&phys) = vid_to_phys.get(d)
                     && matches!(phys, Slot::Home(i) if i >= num_pinned)
                 {

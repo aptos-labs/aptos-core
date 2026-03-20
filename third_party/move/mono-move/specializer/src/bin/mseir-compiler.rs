@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! CLI tool that reads a compiled Move bytecode file (.mv) and produces
-//! a stackless execution IR (.mseir) using the V2 pipeline.
+//! a stackless execution IR (.mseir).
 
 use anyhow::{Context, Result};
 use clap::Parser;

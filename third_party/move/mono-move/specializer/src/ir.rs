@@ -47,26 +47,9 @@ pub enum Slot {
 }
 
 impl Slot {
-    pub fn home(i: u16) -> Self {
-        Slot::Home(i)
-    }
-
-    pub fn xfer(i: u16) -> Self {
-        Slot::Xfer(i)
-    }
-
-    pub fn vid(i: u16) -> Self {
-        Slot::Vid(i)
-    }
-
     /// Returns `true` if this is a Vid slot (SSA value ID).
     pub fn is_vid(self) -> bool {
         matches!(self, Slot::Vid(_))
-    }
-
-    /// Returns `true` if this is a Xfer slot.
-    pub fn is_xfer(self) -> bool {
-        matches!(self, Slot::Xfer(_))
     }
 }
 

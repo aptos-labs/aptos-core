@@ -50,12 +50,12 @@ pub fn translate_module(
         .filter_map(|fdef| {
             fdef.code.as_ref().map(|code| -> Result<FunctionIR> {
                 let handle = module.function_handle_at(fdef.function);
-                let num_params = module.signature_at(handle.parameters).0.len() as u16;
-                let num_locals = module.signature_at(code.locals).0.len() as u16;
                 let name_idx = handle.name;
                 let handle_idx = fdef.function;
                 let param_sig_toks = &module.signature_at(handle.parameters).0;
                 let local_sig_toks = &module.signature_at(code.locals).0;
+                let num_params = param_sig_toks.len() as u16;
+                let num_locals = local_sig_toks.len() as u16;
                 let all_sig_toks: Vec<SignatureToken> = param_sig_toks
                     .iter()
                     .chain(local_sig_toks.iter())
