@@ -4,7 +4,7 @@
 //! Human-readable display for the stackless execution IR.
 //! Resolves pool indices using the CompiledModule for readable output.
 
-use crate::ir::{BinaryOp, FunctionIR, ImmValue, Instr, ModuleIR, Reg, UnaryOp};
+use crate::ir::{BinaryOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -63,7 +63,7 @@ fn display_function(
         if i > 0 {
             write!(f, ", ")?;
         }
-        write!(f, "{}", reg(Reg::Home(i as u16)))?;
+        write!(f, "{}", slot_name(Slot::Home(i as u16)))?;
     }
     write!(f, ")")?;
     if !returns.is_empty() {
@@ -76,12 +76,12 @@ fn display_function(
         }
     }
     writeln!(f, " {{")?;
-    let num_temps = func.num_regs - func.num_params - func.num_locals;
-    if func.num_arg_regs > 0 {
+    let num_temps = func.num_home_slots - func.num_params - func.num_locals;
+    if func.num_xfer_slots > 0 {
         writeln!(
             f,
-            "  slots: params({}), locals({}), temps({}), args({})",
-            func.num_params, func.num_locals, num_temps, func.num_arg_regs
+            "  slots: params({}), locals({}), temps({}), xfer({})",
+            func.num_params, func.num_locals, num_temps, func.num_xfer_slots
         )?;
     } else {
         writeln!(
@@ -91,9 +91,9 @@ fn display_function(
         )?;
     }
 
-    // Display register declarations with types
-    for i in 0..func.num_regs {
-        let ty = &func.reg_types[i as usize];
+    // Display slot declarations with types
+    for i in 0..func.num_home_slots {
+        let ty = &func.slot_types[i as usize];
         write!(f, "    r{}: ", i)?;
         display_type(f, module, ty)?;
         writeln!(f)?;
@@ -117,35 +117,35 @@ fn display_function(
     Ok(())
 }
 
-fn reg(r: Reg) -> String {
-    match r {
-        Reg::Home(i) => format!("r{}", i),
-        Reg::Arg(i) => format!("a{}", i),
+fn slot_name(s: Slot) -> String {
+    match s {
+        Slot::Home(i) => format!("r{}", i),
+        Slot::Xfer(i) => format!("x{}", i),
     }
 }
 
-fn regs(rs: &[Reg]) -> String {
-    let parts: Vec<String> = rs.iter().map(|r| reg(*r)).collect();
+fn slot_names(ss: &[Slot]) -> String {
+    let parts: Vec<String> = ss.iter().map(|s| slot_name(*s)).collect();
     format!("[{}]", parts.join(", "))
 }
 
-/// Format a destination: single register bare, multiple in brackets.
-fn dst(r: Reg) -> String {
-    reg(r)
+/// Format a destination: single slot bare, multiple in brackets.
+fn dst(s: Slot) -> String {
+    slot_name(s)
 }
 
 /// Format multiple destinations in brackets.
-fn dsts(rs: &[Reg]) -> String {
-    regs(rs)
+fn dsts(ss: &[Slot]) -> String {
+    slot_names(ss)
 }
 
-/// Write `dest := ` prefix for a single destination register.
-fn write_dst(f: &mut fmt::Formatter<'_>, d: Reg) -> fmt::Result {
+/// Write `dest := ` prefix for a single destination slot.
+fn write_dst(f: &mut fmt::Formatter<'_>, d: Slot) -> fmt::Result {
     write!(f, "{} := ", dst(d))
 }
 
-/// Write `[dests] := ` prefix for multiple destination registers.
-fn write_dsts(f: &mut fmt::Formatter<'_>, ds: &[Reg]) -> fmt::Result {
+/// Write `[dests] := ` prefix for multiple destination slots.
+fn write_dsts(f: &mut fmt::Formatter<'_>, ds: &[Slot]) -> fmt::Result {
     write!(f, "{} := ", dsts(ds))
 }
 
@@ -262,241 +262,241 @@ fn display_instr(
         Instr::LdI128(d, v) => { write_dst(f, *d)?; write!(f, "ld_i128 {}", v) },
         Instr::LdI256(d, v) => { write_dst(f, *d)?; write!(f, "ld_i256 {}", v) },
 
-        // --- Register ops: dst := copy/move src ---
-        Instr::Copy(d, s) => { write_dst(f, *d)?; write!(f, "copy {}", reg(*s)) },
-        Instr::Move(d, s) => { write_dst(f, *d)?; write!(f, "move {}", reg(*s)) },
+        // --- Slot ops: dst := copy/move src ---
+        Instr::Copy(d, s) => { write_dst(f, *d)?; write!(f, "copy {}", slot_name(*s)) },
+        Instr::Move(d, s) => { write_dst(f, *d)?; write!(f, "move {}", slot_name(*s)) },
 
         // --- Unary: dst := op src ---
         Instr::UnaryOp(d, op, s) => {
-            write_dst(f, *d)?; write!(f, "{} {}", unary_op_name(op), reg(*s))
+            write_dst(f, *d)?; write!(f, "{} {}", unary_op_name(op), slot_name(*s))
         },
         // --- Binary: dst := op lhs, rhs ---
         Instr::BinaryOp(d, op, l, r) => {
-            write_dst(f, *d)?; write!(f, "{} {}, {}", binary_op_name(op), reg(*l), reg(*r))
+            write_dst(f, *d)?; write!(f, "{} {}, {}", binary_op_name(op), slot_name(*l), slot_name(*r))
         },
         // --- Binary immediate: dst := op lhs, #imm ---
         Instr::BinaryOpImm(d, op, l, imm) => {
-            write_dst(f, *d)?; write!(f, "{} {}, {}", binary_op_name(op), reg(*l), imm_value(imm))
+            write_dst(f, *d)?; write!(f, "{} {}, {}", binary_op_name(op), slot_name(*l), imm_value(imm))
         },
 
         // --- Struct ---
         Instr::Pack(d, idx, fields) => {
             write_dst(f, *d)?;
-            write!(f, "pack {}, {}", struct_name(module, *idx), regs(fields))
+            write!(f, "pack {}, {}", struct_name(module, *idx), slot_names(fields))
         },
         Instr::PackGeneric(d, idx, fields) => {
             write_dst(f, *d)?;
-            write!(f, "pack {}, {}", struct_inst_name(module, *idx), regs(fields))
+            write!(f, "pack {}, {}", struct_inst_name(module, *idx), slot_names(fields))
         },
         Instr::Unpack(ds, idx, s) => {
             write_dsts(f, ds)?;
-            write!(f, "unpack {}, {}", struct_name(module, *idx), reg(*s))
+            write!(f, "unpack {}, {}", struct_name(module, *idx), slot_name(*s))
         },
         Instr::UnpackGeneric(ds, idx, s) => {
             write_dsts(f, ds)?;
-            write!(f, "unpack {}, {}", struct_inst_name(module, *idx), reg(*s))
+            write!(f, "unpack {}, {}", struct_inst_name(module, *idx), slot_name(*s))
         },
 
         // --- Variant ---
         Instr::PackVariant(d, idx, fields) => {
             write_dst(f, *d)?;
-            write!(f, "pack_variant {}, {}", variant_handle_name(module, *idx), regs(fields))
+            write!(f, "pack_variant {}, {}", variant_handle_name(module, *idx), slot_names(fields))
         },
         Instr::PackVariantGeneric(d, idx, fields) => {
             write_dst(f, *d)?;
-            write!(f, "pack_variant {}, {}", variant_inst_name(module, *idx), regs(fields))
+            write!(f, "pack_variant {}, {}", variant_inst_name(module, *idx), slot_names(fields))
         },
         Instr::UnpackVariant(ds, idx, s) => {
             write_dsts(f, ds)?;
-            write!(f, "unpack_variant {}, {}", variant_handle_name(module, *idx), reg(*s))
+            write!(f, "unpack_variant {}, {}", variant_handle_name(module, *idx), slot_name(*s))
         },
         Instr::UnpackVariantGeneric(ds, idx, s) => {
             write_dsts(f, ds)?;
-            write!(f, "unpack_variant {}, {}", variant_inst_name(module, *idx), reg(*s))
+            write!(f, "unpack_variant {}, {}", variant_inst_name(module, *idx), slot_name(*s))
         },
         Instr::TestVariant(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "test_variant {}, {}", variant_handle_name(module, *idx), reg(*s))
+            write!(f, "test_variant {}, {}", variant_handle_name(module, *idx), slot_name(*s))
         },
         Instr::TestVariantGeneric(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "test_variant {}, {}", variant_inst_name(module, *idx), reg(*s))
+            write!(f, "test_variant {}, {}", variant_inst_name(module, *idx), slot_name(*s))
         },
 
         // --- References ---
-        Instr::ImmBorrowLoc(d, s) => { write_dst(f, *d)?; write!(f, "imm_borrow_loc {}", reg(*s)) },
-        Instr::MutBorrowLoc(d, s) => { write_dst(f, *d)?; write!(f, "mut_borrow_loc {}", reg(*s)) },
+        Instr::ImmBorrowLoc(d, s) => { write_dst(f, *d)?; write!(f, "imm_borrow_loc {}", slot_name(*s)) },
+        Instr::MutBorrowLoc(d, s) => { write_dst(f, *d)?; write!(f, "mut_borrow_loc {}", slot_name(*s)) },
         Instr::ImmBorrowField(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "imm_borrow_field {}, {}", field_name(module, *idx), reg(*s))
+            write!(f, "imm_borrow_field {}, {}", field_name(module, *idx), slot_name(*s))
         },
         Instr::MutBorrowField(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "mut_borrow_field {}, {}", field_name(module, *idx), reg(*s))
+            write!(f, "mut_borrow_field {}, {}", field_name(module, *idx), slot_name(*s))
         },
         Instr::ImmBorrowFieldGeneric(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "imm_borrow_field {}, {}", field_inst_name(module, *idx), reg(*s))
+            write!(f, "imm_borrow_field {}, {}", field_inst_name(module, *idx), slot_name(*s))
         },
         Instr::MutBorrowFieldGeneric(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "mut_borrow_field {}, {}", field_inst_name(module, *idx), reg(*s))
+            write!(f, "mut_borrow_field {}, {}", field_inst_name(module, *idx), slot_name(*s))
         },
         Instr::ImmBorrowVariantField(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "imm_borrow_variant_field {}, {}", variant_field_name(module, *idx), reg(*s))
+            write!(f, "imm_borrow_variant_field {}, {}", variant_field_name(module, *idx), slot_name(*s))
         },
         Instr::MutBorrowVariantField(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "mut_borrow_variant_field {}, {}", variant_field_name(module, *idx), reg(*s))
+            write!(f, "mut_borrow_variant_field {}, {}", variant_field_name(module, *idx), slot_name(*s))
         },
         Instr::ImmBorrowVariantFieldGeneric(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "imm_borrow_variant_field {}, {}", variant_field_inst_name(module, *idx), reg(*s))
+            write!(f, "imm_borrow_variant_field {}, {}", variant_field_inst_name(module, *idx), slot_name(*s))
         },
         Instr::MutBorrowVariantFieldGeneric(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "mut_borrow_variant_field {}, {}", variant_field_inst_name(module, *idx), reg(*s))
+            write!(f, "mut_borrow_variant_field {}, {}", variant_field_inst_name(module, *idx), slot_name(*s))
         },
-        Instr::ReadRef(d, s) => { write_dst(f, *d)?; write!(f, "read_ref {}", reg(*s)) },
+        Instr::ReadRef(d, s) => { write_dst(f, *d)?; write!(f, "read_ref {}", slot_name(*s)) },
         // WriteRef has no destination (side-effect only)
-        Instr::WriteRef(d, v) => write!(f, "write_ref {}, {}", reg(*d), reg(*v)),
+        Instr::WriteRef(d, v) => write!(f, "write_ref {}, {}", slot_name(*d), slot_name(*v)),
 
         // --- Fused field access ---
         Instr::ReadField(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "read_field {}, {}", field_name(module, *idx), reg(*s))
+            write!(f, "read_field {}, {}", field_name(module, *idx), slot_name(*s))
         },
         Instr::ReadFieldGeneric(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "read_field {}, {}", field_inst_name(module, *idx), reg(*s))
+            write!(f, "read_field {}, {}", field_inst_name(module, *idx), slot_name(*s))
         },
         Instr::WriteField(idx, d, v) => {
-            write!(f, "write_field {}, {}, {}", field_name(module, *idx), reg(*d), reg(*v))
+            write!(f, "write_field {}, {}, {}", field_name(module, *idx), slot_name(*d), slot_name(*v))
         },
         Instr::WriteFieldGeneric(idx, d, v) => {
-            write!(f, "write_field {}, {}, {}", field_inst_name(module, *idx), reg(*d), reg(*v))
+            write!(f, "write_field {}, {}, {}", field_inst_name(module, *idx), slot_name(*d), slot_name(*v))
         },
         Instr::ReadVariantField(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "read_variant_field {}, {}", variant_field_name(module, *idx), reg(*s))
+            write!(f, "read_variant_field {}, {}", variant_field_name(module, *idx), slot_name(*s))
         },
         Instr::ReadVariantFieldGeneric(d, idx, s) => {
             write_dst(f, *d)?;
-            write!(f, "read_variant_field {}, {}", variant_field_inst_name(module, *idx), reg(*s))
+            write!(f, "read_variant_field {}, {}", variant_field_inst_name(module, *idx), slot_name(*s))
         },
         Instr::WriteVariantField(idx, d, v) => {
-            write!(f, "write_variant_field {}, {}, {}", variant_field_name(module, *idx), reg(*d), reg(*v))
+            write!(f, "write_variant_field {}, {}, {}", variant_field_name(module, *idx), slot_name(*d), slot_name(*v))
         },
         Instr::WriteVariantFieldGeneric(idx, d, v) => {
-            write!(f, "write_variant_field {}, {}, {}", variant_field_inst_name(module, *idx), reg(*d), reg(*v))
+            write!(f, "write_variant_field {}, {}, {}", variant_field_inst_name(module, *idx), slot_name(*d), slot_name(*v))
         },
 
         // --- Globals ---
         Instr::Exists(d, idx, a) => {
             write_dst(f, *d)?;
-            write!(f, "exists {}, {}", struct_name(module, *idx), reg(*a))
+            write!(f, "exists {}, {}", struct_name(module, *idx), slot_name(*a))
         },
         Instr::ExistsGeneric(d, idx, a) => {
             write_dst(f, *d)?;
-            write!(f, "exists {}, {}", struct_inst_name(module, *idx), reg(*a))
+            write!(f, "exists {}, {}", struct_inst_name(module, *idx), slot_name(*a))
         },
         Instr::MoveFrom(d, idx, a) => {
             write_dst(f, *d)?;
-            write!(f, "move_from {}, {}", struct_name(module, *idx), reg(*a))
+            write!(f, "move_from {}, {}", struct_name(module, *idx), slot_name(*a))
         },
         Instr::MoveFromGeneric(d, idx, a) => {
             write_dst(f, *d)?;
-            write!(f, "move_from {}, {}", struct_inst_name(module, *idx), reg(*a))
+            write!(f, "move_from {}, {}", struct_inst_name(module, *idx), slot_name(*a))
         },
         // MoveTo has no destination (side-effect)
         Instr::MoveTo(idx, s, v) => {
-            write!(f, "move_to {}, {}, {}", struct_name(module, *idx), reg(*s), reg(*v))
+            write!(f, "move_to {}, {}, {}", struct_name(module, *idx), slot_name(*s), slot_name(*v))
         },
         Instr::MoveToGeneric(idx, s, v) => {
-            write!(f, "move_to {}, {}, {}", struct_inst_name(module, *idx), reg(*s), reg(*v))
+            write!(f, "move_to {}, {}, {}", struct_inst_name(module, *idx), slot_name(*s), slot_name(*v))
         },
         Instr::ImmBorrowGlobal(d, idx, a) => {
             write_dst(f, *d)?;
-            write!(f, "imm_borrow_global {}, {}", struct_name(module, *idx), reg(*a))
+            write!(f, "imm_borrow_global {}, {}", struct_name(module, *idx), slot_name(*a))
         },
         Instr::ImmBorrowGlobalGeneric(d, idx, a) => {
             write_dst(f, *d)?;
-            write!(f, "imm_borrow_global {}, {}", struct_inst_name(module, *idx), reg(*a))
+            write!(f, "imm_borrow_global {}, {}", struct_inst_name(module, *idx), slot_name(*a))
         },
         Instr::MutBorrowGlobal(d, idx, a) => {
             write_dst(f, *d)?;
-            write!(f, "mut_borrow_global {}, {}", struct_name(module, *idx), reg(*a))
+            write!(f, "mut_borrow_global {}, {}", struct_name(module, *idx), slot_name(*a))
         },
         Instr::MutBorrowGlobalGeneric(d, idx, a) => {
             write_dst(f, *d)?;
-            write!(f, "mut_borrow_global {}, {}", struct_inst_name(module, *idx), reg(*a))
+            write!(f, "mut_borrow_global {}, {}", struct_inst_name(module, *idx), slot_name(*a))
         },
 
         // --- Calls ---
         Instr::Call(rets, idx, args) => {
             write_dsts(f, rets)?;
-            write!(f, "call {}, {}", func_name(module, *idx), regs(args))
+            write!(f, "call {}, {}", func_name(module, *idx), slot_names(args))
         },
         Instr::CallGeneric(rets, idx, args) => {
             write_dsts(f, rets)?;
-            write!(f, "call {}, {}", func_inst_name(module, *idx), regs(args))
+            write!(f, "call {}, {}", func_inst_name(module, *idx), slot_names(args))
         },
 
         // --- Closures ---
         Instr::PackClosure(d, idx, mask, captured) => {
             write_dst(f, *d)?;
-            write!(f, "pack_closure {}, {}, {}", func_name(module, *idx), mask, regs(captured))
+            write!(f, "pack_closure {}, {}, {}", func_name(module, *idx), mask, slot_names(captured))
         },
         Instr::PackClosureGeneric(d, idx, mask, captured) => {
             write_dst(f, *d)?;
-            write!(f, "pack_closure {}, {}, {}", func_inst_name(module, *idx), mask, regs(captured))
+            write!(f, "pack_closure {}, {}, {}", func_inst_name(module, *idx), mask, slot_names(captured))
         },
         Instr::CallClosure(rets, sig_idx, args) => {
             write_dsts(f, rets)?;
-            write!(f, "call_closure #{}, {}", sig_idx.0, regs(args))
+            write!(f, "call_closure #{}, {}", sig_idx.0, slot_names(args))
         },
 
         // --- Vector ---
         Instr::VecPack(d, sig, count, elems) => {
             write_dst(f, *d)?;
-            write!(f, "vec_pack #{}, {}, {}", sig.0, count, regs(elems))
+            write!(f, "vec_pack #{}, {}, {}", sig.0, count, slot_names(elems))
         },
         Instr::VecLen(d, sig, s) => {
-            write_dst(f, *d)?; write!(f, "vec_len #{}, {}", sig.0, reg(*s))
+            write_dst(f, *d)?; write!(f, "vec_len #{}, {}", sig.0, slot_name(*s))
         },
         Instr::VecImmBorrow(d, sig, v, i) => {
             write_dst(f, *d)?;
-            write!(f, "vec_imm_borrow #{}, {}, {}", sig.0, reg(*v), reg(*i))
+            write!(f, "vec_imm_borrow #{}, {}, {}", sig.0, slot_name(*v), slot_name(*i))
         },
         Instr::VecMutBorrow(d, sig, v, i) => {
             write_dst(f, *d)?;
-            write!(f, "vec_mut_borrow #{}, {}, {}", sig.0, reg(*v), reg(*i))
+            write!(f, "vec_mut_borrow #{}, {}, {}", sig.0, slot_name(*v), slot_name(*i))
         },
         // VecPushBack has no destination
         Instr::VecPushBack(sig, v, val) => {
-            write!(f, "vec_push_back #{}, {}, {}", sig.0, reg(*v), reg(*val))
+            write!(f, "vec_push_back #{}, {}, {}", sig.0, slot_name(*v), slot_name(*val))
         },
         Instr::VecPopBack(d, sig, s) => {
-            write_dst(f, *d)?; write!(f, "vec_pop_back #{}, {}", sig.0, reg(*s))
+            write_dst(f, *d)?; write!(f, "vec_pop_back #{}, {}", sig.0, slot_name(*s))
         },
         Instr::VecUnpack(ds, sig, count, s) => {
             write_dsts(f, ds)?;
-            write!(f, "vec_unpack #{}, {}, {}", sig.0, count, reg(*s))
+            write!(f, "vec_unpack #{}, {}, {}", sig.0, count, slot_name(*s))
         },
         // VecSwap has no destination
         Instr::VecSwap(sig, v, i, j) => {
-            write!(f, "vec_swap #{}, {}, {}, {}", sig.0, reg(*v), reg(*i), reg(*j))
+            write!(f, "vec_swap #{}, {}, {}, {}", sig.0, slot_name(*v), slot_name(*i), slot_name(*j))
         },
 
         // --- Control flow (no destinations) ---
         Instr::Label(l) => write!(f, "L{}:", l.0),
         Instr::Branch(l) => write!(f, "branch L{}", l.0),
-        Instr::BrTrue(l, c) => write!(f, "br_true L{}, {}", l.0, reg(*c)),
-        Instr::BrFalse(l, c) => write!(f, "br_false L{}, {}", l.0, reg(*c)),
-        Instr::Ret(rs) => write!(f, "ret {}", regs(rs)),
-        Instr::Abort(c) => write!(f, "abort {}", reg(*c)),
-        Instr::AbortMsg(c, m) => write!(f, "abort_msg {}, {}", reg(*c), reg(*m)),
+        Instr::BrTrue(l, c) => write!(f, "br_true L{}, {}", l.0, slot_name(*c)),
+        Instr::BrFalse(l, c) => write!(f, "br_false L{}, {}", l.0, slot_name(*c)),
+        Instr::Ret(rs) => write!(f, "ret {}", slot_names(rs)),
+        Instr::Abort(c) => write!(f, "abort {}", slot_name(*c)),
+        Instr::AbortMsg(c, m) => write!(f, "abort_msg {}, {}", slot_name(*c), slot_name(*m)),
 
     }
 }

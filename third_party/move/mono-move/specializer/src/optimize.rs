@@ -6,12 +6,12 @@
 //! Pass 3: Copy propagation
 //! Pass 4: Identity move elimination
 //! Pass 5: Dead instruction elimination
-//! Pass 6: Register renumbering
+//! Pass 6: Slot renumbering
 
 use crate::instr_utils::{
-    apply_subst_to_sources, get_defs_uses, rename_instr, split_into_blocks,
+    apply_subst_to_sources, get_defs_uses, remap_instr, split_into_blocks,
 };
-use crate::ir::{FunctionIR, Instr, ModuleIR, Reg};
+use crate::ir::{FunctionIR, Instr, ModuleIR, Slot};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Optimize all functions in a module IR.
@@ -21,13 +21,13 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
         copy_propagation(func);
         eliminate_identity_moves(func);
         dead_instruction_elimination(func);
-        renumber_registers(func);
+        renumber_slots(func);
     }
 }
 
 /// Pass 3: Forward copy propagation within each basic block.
 ///
-/// Pre: allocated instruction stream (physical registers).
+/// Pre: allocated instruction stream (physical slots).
 /// Post: Copy/Move sources propagated to downstream uses; no instructions removed.
 ///
 /// # Correctness
@@ -37,9 +37,9 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 /// - **MoveLoc(L) forbidden while L is borrowed**
 /// - **CopyLoc(L) forbidden while L is mutably borrowed**
 ///
-/// ## Two kinds of register use
-/// 1. **Value use** — reads the register's current value (e.g., `Add(dst, r, #5)`)
-/// 2. **Storage-location use** — takes a reference to the register's slot
+/// ## Two kinds of slot use
+/// 1. **Value use** — reads the slot's current value (e.g., `Add(dst, r, #5)`)
+/// 2. **Storage-location use** — takes a reference to the slot's storage location
 ///    (only `ImmBorrowLoc` and `MutBorrowLoc`)
 ///
 /// Copy propagation is sound for value uses (value equality suffices) but
@@ -47,7 +47,7 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 /// `apply_subst_to_sources` skips BorrowLoc sources to enforce this.
 ///
 /// ## The MutBorrowLoc hidden-write problem
-/// `WriteRef` through a mutable reference modifies the borrowed register's
+/// `WriteRef` through a mutable reference modifies the borrowed slot's
 /// storage, but `get_defs_uses` reports NO defs for `WriteRef` — only uses.
 /// So the standard def-based subst invalidation misses it:
 /// ```text
@@ -56,11 +56,11 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 /// WriteRef(ref, 99)            // local is now 99, but NO defs reported
 /// use(local)                   // subst says use(param) -- WRONG
 /// ```
-/// Fix: kill subst entries for the borrowed register when `MutBorrowLoc` is
+/// Fix: kill subst entries for the borrowed slot when `MutBorrowLoc` is
 /// encountered.
 ///
 /// `ImmBorrowLoc` does NOT need this kill — the verifier guarantees the
-/// borrowed register cannot be modified while immutably borrowed.
+/// borrowed slot cannot be modified while immutably borrowed.
 ///
 /// ## Why cross-block mutable borrows are safe
 ///
@@ -71,7 +71,7 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 ///    preventing stale substitutions after the borrow point. Covers all
 ///    downstream writes through the ref, including function calls.
 /// 2. **Borrow in different block**: That block starts with empty subst. No
-///    propagation of the borrowed register occurs. Cross-block DCE safety
+///    propagation of the borrowed slot occurs. Cross-block DCE safety
 ///    protects the copy in the original block from removal.
 /// 3. **Ref escapes via function call**: The MutBorrowLoc kill is
 ///    conservative — fires at borrow creation, before any actual write.
@@ -79,21 +79,21 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 ///
 /// No block-crossing problem can arise because: (a) subst maps are
 /// block-local, and (b) the verifier forbids explicit redefinition
-/// (StLoc/MoveLoc) of a register while it's borrowed, so any modification
+/// (StLoc/MoveLoc) of a slot while it's borrowed, so any modification
 /// must go through the ref — which is handled by the MutBorrowLoc kill in
 /// the block where the borrow is created.
 fn copy_propagation(func: &mut FunctionIR) {
     let blocks = split_into_blocks(&func.instrs);
 
     for (start, end) in blocks {
-        let mut subst: BTreeMap<Reg, Reg> = BTreeMap::new();
+        let mut subst: BTreeMap<Slot, Slot> = BTreeMap::new();
 
         for i in start..end {
             apply_subst_to_sources(&mut func.instrs[i], &subst);
 
-            // MutBorrowLoc kill: the borrowed register may be silently written
+            // MutBorrowLoc kill: the borrowed slot may be silently written
             // through the resulting reference (WriteRef), which is not tracked
-            // as a def. Kill any substitution involving the borrowed register.
+            // as a def. Kill any substitution involving the borrowed slot.
             if let Instr::MutBorrowLoc(_, src) = &func.instrs[i] {
                 subst.remove(src);
                 subst.retain(|_, v| v != src);
@@ -125,26 +125,26 @@ fn eliminate_identity_moves(func: &mut FunctionIR) {
 /// Pass 5: Backward dead-code elimination within each basic block.
 ///
 /// Pre: after copy propagation and identity move elimination.
-/// Post: dead Copy/Move to unused registers removed.
+/// Post: dead Copy/Move to unused slots removed.
 ///
-/// Registers that appear in more than one basic block are excluded from
+/// Slots that appear in more than one basic block are excluded from
 /// removal — their liveness cannot be determined by block-local analysis.
 fn dead_instruction_elimination(func: &mut FunctionIR) {
     let blocks = split_into_blocks(&func.instrs);
 
-    // Pre-scan: identify registers that appear in more than one block.
-    let mut reg_block: BTreeMap<Reg, usize> = BTreeMap::new();
-    let mut cross_block_regs: BTreeSet<Reg> = BTreeSet::new();
+    // Pre-scan: identify slots that appear in more than one block.
+    let mut slot_block: BTreeMap<Slot, usize> = BTreeMap::new();
+    let mut cross_block_slots: BTreeSet<Slot> = BTreeSet::new();
     for (block_id, &(start, end)) in blocks.iter().enumerate() {
         for i in start..end {
             let (dsts, srcs) = get_defs_uses(&func.instrs[i]);
             for r in dsts.into_iter().chain(srcs) {
-                match reg_block.get(&r) {
+                match slot_block.get(&r) {
                     Some(&prev) if prev != block_id => {
-                        cross_block_regs.insert(r);
+                        cross_block_slots.insert(r);
                     },
                     None => {
-                        reg_block.insert(r, block_id);
+                        slot_block.insert(r, block_id);
                     },
                     _ => {},
                 }
@@ -155,14 +155,14 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
     let mut dead_indices: BTreeSet<usize> = BTreeSet::new();
 
     for (start, end) in blocks {
-        let mut live: BTreeSet<Reg> = BTreeSet::new();
+        let mut live: BTreeSet<Slot> = BTreeSet::new();
 
         for i in (start..end).rev() {
             let (dsts, srcs) = get_defs_uses(&func.instrs[i]);
 
             let is_removable = match &func.instrs[i] {
                 Instr::Copy(dst, _) | Instr::Move(dst, _)
-                    if !cross_block_regs.contains(dst) =>
+                    if !cross_block_slots.contains(dst) =>
                 {
                     !live.contains(dst)
                 },
@@ -193,57 +193,57 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
     }
 }
 
-/// Pass 6: Compact Home register indices while preserving param ABI indices.
+/// Pass 6: Compact Home slot indices while preserving param ABI indices.
 ///
-/// Pre: after DCE (some registers may be unused).
+/// Pre: after DCE (some slots may be unused).
 /// Post: Params keep indices 0..num_params-1 (ABI-visible). Surviving locals
 ///       and temps are compacted contiguously starting at num_params.
-///       `num_locals`, `num_regs`, and `reg_types` are updated.
-fn renumber_registers(func: &mut FunctionIR) {
+///       `num_locals`, `num_home_slots`, and `slot_types` are updated.
+fn renumber_slots(func: &mut FunctionIR) {
     let num_params = func.num_params;
 
-    let mut used_home_regs: BTreeSet<u16> = BTreeSet::new();
+    let mut used_home_slots: BTreeSet<u16> = BTreeSet::new();
     for instr in &func.instrs {
         let (defs, uses_) = get_defs_uses(instr);
         for r in defs.into_iter().chain(uses_) {
-            if let Reg::Home(i) = r {
-                used_home_regs.insert(i);
+            if let Slot::Home(i) = r {
+                used_home_slots.insert(i);
             }
         }
     }
 
-    let mut rename_map: BTreeMap<Reg, Reg> = BTreeMap::new();
-    let mut next_reg = num_params;
+    let mut remap: BTreeMap<Slot, Slot> = BTreeMap::new();
+    let mut next_slot = num_params;
     let mut num_surviving_locals: u16 = 0;
     let old_num_pinned = num_params + func.num_locals;
-    for &i in &used_home_regs {
+    for &i in &used_home_slots {
         if i < num_params {
             // Params keep their ABI indices.
-            rename_map.insert(Reg::Home(i), Reg::Home(i));
+            remap.insert(Slot::Home(i), Slot::Home(i));
         } else {
-            rename_map.insert(Reg::Home(i), Reg::Home(next_reg));
+            remap.insert(Slot::Home(i), Slot::Home(next_slot));
             if i < old_num_pinned {
                 num_surviving_locals += 1;
             }
-            next_reg += 1;
+            next_slot += 1;
         }
     }
 
     for instr in &mut func.instrs {
-        rename_instr(instr, &rename_map);
+        remap_instr(instr, &remap);
     }
 
-    // Bool placeholder — overwritten for every used register by the loop below.
-    let mut new_reg_types = vec![move_vm_types::loaded_data::runtime_types::Type::Bool; next_reg as usize];
-    for (&old, &new) in &rename_map {
-        if let (Reg::Home(old_i), Reg::Home(new_i)) = (old, new)
-            && (old_i as usize) < func.reg_types.len()
+    // Bool placeholder — overwritten for every used slot by the loop below.
+    let mut new_slot_types = vec![move_vm_types::loaded_data::runtime_types::Type::Bool; next_slot as usize];
+    for (&old, &new) in &remap {
+        if let (Slot::Home(old_i), Slot::Home(new_i)) = (old, new)
+            && (old_i as usize) < func.slot_types.len()
         {
-            new_reg_types[new_i as usize] = func.reg_types[old_i as usize].clone();
+            new_slot_types[new_i as usize] = func.slot_types[old_i as usize].clone();
         }
     }
-    func.reg_types = new_reg_types;
+    func.slot_types = new_slot_types;
 
     func.num_locals = num_surviving_locals;
-    func.num_regs = next_reg;
+    func.num_home_slots = next_slot;
 }

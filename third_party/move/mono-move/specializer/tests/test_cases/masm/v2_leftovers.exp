@@ -18,19 +18,19 @@ fun add_two(r0, r1): u64 {
 }
 
 fun copy_to_call(r0): u64 {
-  slots: params(1), locals(0), temps(0), args(1)
+  slots: params(1), locals(0), temps(0), xfer(1)
     r0: u64
   code:
-    0: [a0] := call identity, [r0]
-    1: ret [a0]
+    0: [x0] := call identity, [r0]
+    1: ret [x0]
 }
 
 fun move_to_call(r0): u64 {
-  slots: params(1), locals(0), temps(0), args(1)
+  slots: params(1), locals(0), temps(0), xfer(1)
     r0: u64
   code:
-    0: [a0] := call identity, [r0]
-    1: ret [a0]
+    0: [x0] := call identity, [r0]
+    1: ret [x0]
 }
 
 fun multi_use_local_alias(r0): u64 {
@@ -44,22 +44,22 @@ fun multi_use_local_alias(r0): u64 {
 }
 
 fun copy_call_then_use(r0): u64 {
-  slots: params(1), locals(0), temps(1), args(1)
+  slots: params(1), locals(0), temps(1), xfer(1)
     r0: u64
     r1: u64
   code:
-    0: [a0] := call identity, [r0]
-    1: r1 := add a0, r0
+    0: [x0] := call identity, [r0]
+    1: r1 := add x0, r0
     2: ret [r1]
 }
 
 fun two_copies_to_call(r0, r1): u64 {
-  slots: params(2), locals(0), temps(0), args(2)
+  slots: params(2), locals(0), temps(0), xfer(2)
     r0: u64
     r1: u64
   code:
-    0: [a0] := call add_two, [r0, r1]
-    1: ret [a0]
+    0: [x0] := call add_two, [r0, r1]
+    1: ret [x0]
 }
 
 === micro-ops ===

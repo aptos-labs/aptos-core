@@ -85,16 +85,16 @@ fn print_stats(module_ir: &specializer::ir::ModuleIR) {
             .count();
 
         let num_temps = func_ir
-            .num_regs
+            .num_home_slots
             .saturating_sub(func_ir.num_params + func_ir.num_locals);
-        let total_regs = func_ir.num_regs + func_ir.num_arg_regs;
+        let total_slots = func_ir.num_home_slots + func_ir.num_xfer_slots;
 
         eprintln!(
             "{mod_prefix}::{func_name}  \
              bytecode: {bc_instrs} instrs, {bc_locals} locals  |  \
-             IR: {ir_instrs} instrs, {total_regs} regs \
-             (= {} params + {} locals + {num_temps} temps + {} arg_regs)",
-            func_ir.num_params, func_ir.num_locals, func_ir.num_arg_regs,
+             IR: {ir_instrs} instrs, {total_slots} slots \
+             (= {} params + {} locals + {num_temps} temps + {} xfer)",
+            func_ir.num_params, func_ir.num_locals, func_ir.num_xfer_slots,
         );
     }
 }

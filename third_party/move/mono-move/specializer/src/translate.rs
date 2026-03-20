@@ -1,18 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Conversion pipeline: Intra-block SSA + some instruction fusion + greedy register allocation.
+//! Conversion pipeline: Intra-block SSA + some instruction fusion + greedy slot allocation.
 //!
 //! Pass 1: Simulate the operand stack, assigning fresh sequential value IDs
 //!         (pure SSA within each basic block). Locals (params + declared locals)
-//!         are mutable across blocks and keep their original register indices.
+//!         are mutable across blocks and keep their original slot indices.
 //!
-//! Pass 2: Map value IDs to named registers using liveness-driven reuse
+//! Pass 2: Map value IDs to named slots using liveness-driven reuse
 //!         with StLoc look-ahead and CopyLoc/MoveLoc coalescing.
 
 use crate::{
     instr_utils::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks},
-    ir::{BinaryOp, FunctionIR, Instr, Label, ModuleIR, Reg, UnaryOp},
+    ir::{BinaryOp, FunctionIR, Instr, Label, ModuleIR, Slot, UnaryOp},
     type_conversion::{convert_sig_token, convert_sig_tokens},
 };
 use anyhow::{bail, ensure, Context, Result};
@@ -53,8 +53,8 @@ use std::collections::BTreeMap;
 ///   are well-formed.
 /// - **Type parameter bounds**: `TypeParameter(idx)` indices fall within the
 ///   type-parameter list of the enclosing generic context.
-/// - **Reference safety**: the borrow checker guarantees that freed registers
-///   truly hold dead values, so type-keyed register recycling is sound.
+/// - **Reference safety**: the borrow checker guarantees that freed slots
+///   truly hold dead values, so type-keyed slot recycling is sound.
 pub fn translate_module(
     module: CompiledModule,
     struct_name_table: &[StructNameIndex],
@@ -89,18 +89,18 @@ pub fn translate_module(
                 ssa.fuse_field_access_instrs();
                 ssa.fuse_immediate_binops();
 
-                // Pass: Greedy Register Allocation
-                let alloc = crate::regalloc::allocate_registers(&ssa)?;
+                // Pass: Greedy Slot Allocation
+                let alloc = crate::slot_alloc::allocate_slots(&ssa)?;
 
                 Ok(FunctionIR {
                     name_idx,
                     handle_idx,
                     num_params,
                     num_locals,
-                    num_regs: alloc.num_regs,
-                    num_arg_regs: alloc.num_arg_regs,
+                    num_home_slots: alloc.num_home_slots,
+                    num_xfer_slots: alloc.num_xfer_slots,
                     instrs: alloc.instrs,
-                    reg_types: alloc.reg_types,
+                    slot_types: alloc.slot_types,
                 })
             })
         })
@@ -113,7 +113,7 @@ pub fn translate_module(
 // SSA intermediate representation
 // ================================================================================================
 
-/// Intermediate SSA representation of a single function, before register allocation.
+/// Intermediate SSA representation of a single function, before slot allocation.
 pub(crate) struct SSAFunction {
     /// Stackless instructions in SSA form.
     pub instrs: Vec<Instr>,
@@ -309,7 +309,7 @@ struct SsaConverter<'a> {
     /// Next value ID (starts at num_pinned, monotonically increasing across blocks)
     next_vid: u16,
     /// Simulated operand stack with type information.
-    stack: Vec<(Reg, Type)>,
+    stack: Vec<(Slot, Type)>,
     /// Types of all locals (params ++ declared locals).
     local_types: Vec<Type>,
     /// Types of value IDs (indexed by vid - num_pinned). Set when vid is allocated.
@@ -344,22 +344,22 @@ impl<'a> SsaConverter<'a> {
         }
     }
 
-    fn alloc_vid(&mut self, ty: Type) -> Reg {
-        let vid = Reg::Home(self.next_vid);
+    fn alloc_vid(&mut self, ty: Type) -> Slot {
+        let vid = Slot::Home(self.next_vid);
         self.next_vid += 1;
         self.vid_types.push(ty);
         vid
     }
 
-    fn push(&mut self, r: Reg, ty: Type) {
+    fn push(&mut self, r: Slot, ty: Type) {
         self.stack.push((r, ty));
     }
 
-    fn pop(&mut self) -> Result<(Reg, Type)> {
+    fn pop(&mut self) -> Result<(Slot, Type)> {
         self.stack.pop().context("stack underflow")
     }
 
-    fn pop_n_reverse(&mut self, n: usize) -> Result<Vec<(Reg, Type)>> {
+    fn pop_n_reverse(&mut self, n: usize) -> Result<Vec<(Slot, Type)>> {
         let mut items = Vec::with_capacity(n);
         for _ in 0..n {
             items.push(self.pop()?);
@@ -517,12 +517,12 @@ impl<'a> SsaConverter<'a> {
         })
     }
 
-    /// Converts a single stack-based bytecode into register-based SSA instruction(s).
+    /// Converts a single stack-based bytecode into slot-based SSA instruction(s).
     ///
     /// Each bytecode pops its operands from the simulated stack, allocates a fresh
-    /// value ID for each result, emits the corresponding register instruction, and
+    /// value ID for each result, emits the corresponding slot-based instruction, and
     /// pushes the results back. The stack is only a compile-time simulation — the
-    /// emitted IR is purely register-based.
+    /// emitted IR is purely slot-based.
     fn convert_bytecode(&mut self, module: &CompiledModule, bc: &Bytecode) -> Result<()> {
         use Bytecode as B;
         match bc {
@@ -621,14 +621,14 @@ impl<'a> SsaConverter<'a> {
 
             // --- Locals ---
             B::CopyLoc(idx) => {
-                let src = Reg::Home(*idx as u16);
+                let src = Slot::Home(*idx as u16);
                 let ty = self.local_types[*idx as usize].clone();
                 let dst = self.alloc_vid(ty.clone());
                 self.instrs.push(Instr::Copy(dst, src));
                 self.push(dst, ty);
             },
             B::MoveLoc(idx) => {
-                let src = Reg::Home(*idx as u16);
+                let src = Slot::Home(*idx as u16);
                 let ty = self.local_types[*idx as usize].clone();
                 let dst = self.alloc_vid(ty.clone());
                 self.instrs.push(Instr::Move(dst, src));
@@ -636,7 +636,7 @@ impl<'a> SsaConverter<'a> {
             },
             B::StLoc(_idx) => {
                 let (src, _ty) = self.pop()?;
-                let dst = Reg::Home(*_idx as u16);
+                let dst = Slot::Home(*_idx as u16);
                 self.instrs.push(Instr::Move(dst, src));
             },
 
@@ -688,7 +688,7 @@ impl<'a> SsaConverter<'a> {
             B::Pack(idx) => {
                 let n = struct_field_count(module, *idx);
                 let fields_typed = self.pop_n_reverse(n)?;
-                let fields: Vec<Reg> = fields_typed.iter().map(|(r, _)| *r).collect();
+                let fields: Vec<Slot> = fields_typed.iter().map(|(r, _)| *r).collect();
                 let result_ty = self.struct_type(module, *idx);
                 let dst = self.alloc_vid(result_ty.clone());
                 self.instrs.push(Instr::Pack(dst, *idx, fields));
@@ -698,7 +698,7 @@ impl<'a> SsaConverter<'a> {
                 let inst = &module.struct_def_instantiations[idx.0 as usize];
                 let n = struct_field_count(module, inst.def);
                 let fields_typed = self.pop_n_reverse(n)?;
-                let fields: Vec<Reg> = fields_typed.iter().map(|(r, _)| *r).collect();
+                let fields: Vec<Slot> = fields_typed.iter().map(|(r, _)| *r).collect();
                 let result_ty = self.struct_inst_type(module, *idx);
                 let dst = self.alloc_vid(result_ty.clone());
                 self.instrs.push(Instr::PackGeneric(dst, *idx, fields));
@@ -754,7 +754,7 @@ impl<'a> SsaConverter<'a> {
                 let handle = &module.struct_variant_handles[idx.0 as usize];
                 let n = variant_field_count(module, handle.struct_index, handle.variant);
                 let fields_typed = self.pop_n_reverse(n)?;
-                let fields: Vec<Reg> = fields_typed.iter().map(|(r, _)| *r).collect();
+                let fields: Vec<Slot> = fields_typed.iter().map(|(r, _)| *r).collect();
                 let result_ty = self.struct_type(module, handle.struct_index);
                 let dst = self.alloc_vid(result_ty.clone());
                 self.instrs.push(Instr::PackVariant(dst, *idx, fields));
@@ -765,7 +765,7 @@ impl<'a> SsaConverter<'a> {
                 let handle = &module.struct_variant_handles[inst.handle.0 as usize];
                 let n = variant_field_count(module, handle.struct_index, handle.variant);
                 let fields_typed = self.pop_n_reverse(n)?;
-                let fields: Vec<Reg> = fields_typed.iter().map(|(r, _)| *r).collect();
+                let fields: Vec<Slot> = fields_typed.iter().map(|(r, _)| *r).collect();
                 let type_params = module.signature_at(inst.type_parameters).0.clone();
                 let def = &module.struct_defs[handle.struct_index.0 as usize];
                 let tok = SignatureToken::StructInstantiation(def.struct_handle, type_params);
@@ -842,7 +842,7 @@ impl<'a> SsaConverter<'a> {
 
             // --- References ---
             B::ImmBorrowLoc(idx) => {
-                let src = Reg::Home(*idx as u16);
+                let src = Slot::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize].clone();
                 let ty = Type::Reference(Box::new(inner));
                 let dst = self.alloc_vid(ty.clone());
@@ -850,7 +850,7 @@ impl<'a> SsaConverter<'a> {
                 self.push(dst, ty);
             },
             B::MutBorrowLoc(idx) => {
-                let src = Reg::Home(*idx as u16);
+                let src = Slot::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize].clone();
                 let ty = Type::MutableReference(Box::new(inner));
                 let dst = self.alloc_vid(ty.clone());
@@ -1020,7 +1020,7 @@ impl<'a> SsaConverter<'a> {
                 let ret_toks = &module.signature_at(handle.return_).0;
                 let ret_types = convert_sig_tokens(module, ret_toks, self.struct_name_table);
                 let args_typed = self.pop_n_reverse(num_args)?;
-                let args: Vec<Reg> = args_typed.iter().map(|(r, _)| *r).collect();
+                let args: Vec<Slot> = args_typed.iter().map(|(r, _)| *r).collect();
                 let mut rets = Vec::with_capacity(ret_types.len());
                 for rty in &ret_types {
                     rets.push(self.alloc_vid(rty.clone()));
@@ -1042,7 +1042,7 @@ impl<'a> SsaConverter<'a> {
                     .collect();
                 let ret_types = convert_sig_tokens(module, &ret_toks, self.struct_name_table);
                 let args_typed = self.pop_n_reverse(num_args)?;
-                let args: Vec<Reg> = args_typed.iter().map(|(r, _)| *r).collect();
+                let args: Vec<Slot> = args_typed.iter().map(|(r, _)| *r).collect();
                 let mut rets = Vec::with_capacity(ret_types.len());
                 for rty in &ret_types {
                     rets.push(self.alloc_vid(rty.clone()));
@@ -1058,7 +1058,7 @@ impl<'a> SsaConverter<'a> {
             B::PackClosure(fhi, mask) => {
                 let captured_count = mask.captured_count() as usize;
                 let captured_typed = self.pop_n_reverse(captured_count)?;
-                let captured: Vec<Reg> = captured_typed.iter().map(|(r, _)| *r).collect();
+                let captured: Vec<Slot> = captured_typed.iter().map(|(r, _)| *r).collect();
                 let handle = module.function_handle_at(*fhi);
                 let params = &module.signature_at(handle.parameters).0;
                 let returns = &module.signature_at(handle.return_).0;
@@ -1076,7 +1076,7 @@ impl<'a> SsaConverter<'a> {
             B::PackClosureGeneric(fii, mask) => {
                 let captured_count = mask.captured_count() as usize;
                 let captured_typed = self.pop_n_reverse(captured_count)?;
-                let captured: Vec<Reg> = captured_typed.iter().map(|(r, _)| *r).collect();
+                let captured: Vec<Slot> = captured_typed.iter().map(|(r, _)| *r).collect();
                 let inst = &module.function_instantiations[fii.0 as usize];
                 let handle = module.function_handle_at(inst.handle);
                 let params = &module.signature_at(handle.parameters).0;
@@ -1103,7 +1103,7 @@ impl<'a> SsaConverter<'a> {
                 let ret_types = convert_sig_tokens(module, &ret_toks, self.struct_name_table);
                 let (closure, _closure_ty) = self.pop()?;
                 let args_typed = self.pop_n_reverse(num_args)?;
-                let mut all_args: Vec<Reg> = args_typed.iter().map(|(r, _)| *r).collect();
+                let mut all_args: Vec<Slot> = args_typed.iter().map(|(r, _)| *r).collect();
                 all_args.push(closure);
                 let mut rets = Vec::with_capacity(ret_types.len());
                 for rty in &ret_types {
@@ -1119,7 +1119,7 @@ impl<'a> SsaConverter<'a> {
             // --- Vector ops ---
             B::VecPack(sig_idx, count) => {
                 let elems_typed = self.pop_n_reverse(*count as usize)?;
-                let elems: Vec<Reg> = elems_typed.iter().map(|(r, _)| *r).collect();
+                let elems: Vec<Slot> = elems_typed.iter().map(|(r, _)| *r).collect();
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
                 let elem_ty = convert_sig_token(module, elem_tok, self.struct_name_table);
                 let ty = Type::Vector(triomphe::Arc::new(elem_ty));
@@ -1207,7 +1207,7 @@ impl<'a> SsaConverter<'a> {
                 self.instrs.push(Instr::BrFalse(label, cond));
             },
             B::Ret => {
-                let rets: Vec<Reg> = self.stack.drain(..).map(|(r, _)| r).collect();
+                let rets: Vec<Slot> = self.stack.drain(..).map(|(r, _)| r).collect();
                 self.instrs.push(Instr::Ret(rets));
             },
             B::Abort => {
