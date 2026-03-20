@@ -68,13 +68,13 @@ fn split_bytecode_into_blocks(
 }
 
 pub(crate) struct SsaConverter<'a> {
-    /// Next value ID (starts at num_pinned, monotonically increasing across blocks)
+    /// Next value ID number (0-based, monotonically increasing across blocks).
     next_vid: u16,
     /// Simulated operand stack with type information.
     stack: Vec<(Slot, Type)>,
     /// Types of all locals (params ++ declared locals).
     local_types: Vec<Type>,
-    /// Types of value IDs (indexed by vid - num_pinned). Set when vid is allocated.
+    /// Types of value IDs, indexed directly by value ID number.
     vid_types: Vec<Type>,
     /// Struct name table for type conversion.
     struct_name_table: &'a [StructNameIndex],
@@ -87,15 +87,9 @@ pub(crate) struct SsaConverter<'a> {
 }
 
 impl<'a> SsaConverter<'a> {
-    pub(crate) fn new(
-        num_params: u16,
-        num_locals: u16,
-        local_types: Vec<Type>,
-        struct_name_table: &'a [StructNameIndex],
-    ) -> Self {
-        let num_pinned = num_params + num_locals;
+    pub(crate) fn new(local_types: Vec<Type>, struct_name_table: &'a [StructNameIndex]) -> Self {
         Self {
-            next_vid: num_pinned,
+            next_vid: 0,
             stack: Vec::new(),
             local_types,
             vid_types: Vec::new(),
@@ -107,7 +101,7 @@ impl<'a> SsaConverter<'a> {
     }
 
     fn alloc_vid(&mut self, ty: Type) -> Slot {
-        let vid = Slot::Home(self.next_vid);
+        let vid = Slot::Vid(self.next_vid);
         self.next_vid += 1;
         self.vid_types.push(ty);
         vid

@@ -135,8 +135,7 @@ pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Slot>, Vec<Slot>) {
             defs.extend_from_slice(rets);
             uses.extend_from_slice(args);
         },
-        Instr::PackClosure(d, _, _, captured)
-        | Instr::PackClosureGeneric(d, _, _, captured) => {
+        Instr::PackClosure(d, _, _, captured) | Instr::PackClosureGeneric(d, _, _, captured) => {
             defs.push(*d);
             uses.extend_from_slice(captured);
         },
@@ -416,9 +415,7 @@ pub(crate) fn apply_subst_to_sources(instr: &mut Instr, subst: &BTreeMap<Slot, S
         Instr::PackVariant(_, _, fields) | Instr::PackVariantGeneric(_, _, fields) => {
             s_vec(fields, subst)
         },
-        Instr::UnpackVariant(_, _, src) | Instr::UnpackVariantGeneric(_, _, src) => {
-            s(src, subst)
-        },
+        Instr::UnpackVariant(_, _, src) | Instr::UnpackVariantGeneric(_, _, src) => s(src, subst),
         Instr::TestVariant(_, _, src) | Instr::TestVariantGeneric(_, _, src) => s(src, subst),
 
         // References — BorrowLoc sources are storage-location uses (identity of the

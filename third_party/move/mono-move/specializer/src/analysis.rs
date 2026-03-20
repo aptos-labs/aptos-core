@@ -5,12 +5,14 @@
 //!
 //! Pure analysis producing immutable data consumed by `slotalloc`.
 
-use crate::instr_utils::get_defs_uses;
-use crate::ir::{Instr, Slot};
+use crate::{
+    instr_utils::get_defs_uses,
+    ir::{Instr, Slot},
+};
 use std::collections::BTreeMap;
 
 /// Analysis results for a single basic block.
-/// All Slot keys are temp VIDs (Home(i) where i >= num_pinned).
+/// All Slot keys are VIDs (`Vid(i)`).
 pub(crate) struct BlockAnalysis {
     pub last_use: BTreeMap<Slot, usize>,
     pub stloc_targets: BTreeMap<Slot, Slot>,
@@ -35,9 +37,9 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
 ///      Temp VIDs are defined exactly once.
 /// Post: all tables are conservative — every entry is safe to use.
 ///       stloc_targets and coalesce_to_local are disjoint from xfer_precolor.
-pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis {
-    let is_temp_vid = |r: &Slot| -> bool { r.is_temp(num_pinned) };
-    let is_pinned = |r: &Slot| -> bool { matches!(r, Slot::Home(i) if *i < num_pinned) };
+pub(crate) fn analyze_block(instrs: &[Instr]) -> BlockAnalysis {
+    let is_temp_vid = |r: &Slot| -> bool { r.is_vid() };
+    let is_pinned = |r: &Slot| -> bool { matches!(r, Slot::Home(_)) };
 
     // Forward scan: def_pos and last_use for temp vids.
     // Also build per-local position indices for pinned locals:
@@ -90,7 +92,10 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
             && !stloc_targets.contains_key(src)
         {
             let dp = def_pos.get(src).copied().unwrap_or(0);
-            let touches = local_touch_pos.get(dst).map(|v| v.as_slice()).unwrap_or(&[]);
+            let touches = local_touch_pos
+                .get(dst)
+                .map(|v| v.as_slice())
+                .unwrap_or(&[]);
             let local_touched = has_any_in_range(touches, dp + 1, i);
             if !local_touched {
                 stloc_targets.insert(*src, *dst);
@@ -103,16 +108,17 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
     let mut coalesce_to_local: BTreeMap<Slot, Slot> = BTreeMap::new();
     for (i, instr) in instrs.iter().enumerate() {
         match instr {
-            Instr::Copy(dst, src) | Instr::Move(dst, src)
-                if is_temp_vid(dst) && is_pinned(src) =>
-            {
+            Instr::Copy(dst, src) | Instr::Move(dst, src) if is_temp_vid(dst) && is_pinned(src) => {
                 let vid = *dst;
                 if let Some(&lu) = last_use.get(&vid)
                     && lu > i
                     && !stloc_targets.contains_key(&vid)
                 {
                     let local = *src;
-                    let defs = local_def_pos.get(&local).map(|v| v.as_slice()).unwrap_or(&[]);
+                    let defs = local_def_pos
+                        .get(&local)
+                        .map(|v| v.as_slice())
+                        .unwrap_or(&[]);
                     let local_redefined = has_any_in_range(defs, i + 1, lu);
                     if !local_redefined {
                         coalesce_to_local.insert(vid, local);

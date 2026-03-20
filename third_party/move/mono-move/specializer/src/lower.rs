@@ -86,6 +86,7 @@ impl<'a> LoweringState<'a> {
         match slot {
             Slot::Home(i) => self.ctx.home_slots[i as usize],
             Slot::Xfer(j) => self.active_xfer_slots[j as usize],
+            Slot::Vid(_) => unreachable!("Vid slot in post-allocation IR"),
         }
     }
 
@@ -103,6 +104,7 @@ impl<'a> LoweringState<'a> {
                 self.active_xfer_types[j as usize] = ty;
                 slot
             },
+            Slot::Vid(_) => unreachable!("Vid slot in post-allocation IR"),
         }
     }
 
@@ -132,6 +134,7 @@ impl<'a> LoweringState<'a> {
         match slot {
             Slot::Home(i) => &self.slot_types[i as usize],
             Slot::Xfer(j) => &self.active_xfer_types[j as usize],
+            Slot::Vid(_) => unreachable!("Vid slot in post-allocation IR"),
         }
     }
 

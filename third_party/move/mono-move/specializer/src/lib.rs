@@ -25,10 +25,7 @@ use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 /// `struct_name_table` maps `StructHandleIndex` ordinals to globally unique
 /// `StructNameIndex` values, used to convert bytecode-level struct references
 /// into runtime `Type` representations.
-pub fn destack(
-    module: CompiledModule,
-    struct_name_table: &[StructNameIndex],
-) -> Result<ModuleIR> {
+pub fn destack(module: CompiledModule, struct_name_table: &[StructNameIndex]) -> Result<ModuleIR> {
     if let Err(e) = move_bytecode_verifier::verify_module(&module) {
         bail!("bytecode verification failed: {:#}", e);
     }
