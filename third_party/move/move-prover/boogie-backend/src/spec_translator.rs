@@ -888,22 +888,49 @@ impl SpecTranslator<'_> {
 
 impl SpecTranslator<'_> {
     pub(crate) fn finalize(&self) {
-        self.translate_choice_functions();
-        self.translate_exists_functions();
+        // Recursively translating helper bodies can discover additional lifted choices/exists.
+        // Keep emitting newly discovered helpers until both sets reach a fixed point.
+        let mut translated_choice_count = 0;
+        let mut translated_exists_count = 0;
+        loop {
+            let processed_choice_count = self.translate_choice_functions(translated_choice_count);
+            let processed_exists_count = self.translate_exists_functions(translated_exists_count);
+            let current_choice_count = self.lifted_choice_infos.borrow().len();
+            let current_exists_count = self.lifted_exists_infos.borrow().len();
+            if current_choice_count == processed_choice_count
+                && current_exists_count == processed_exists_count
+            {
+                break;
+            }
+            translated_choice_count = processed_choice_count;
+            translated_exists_count = processed_exists_count;
+        }
         self.translate_arbitrary_value_functions();
     }
 
     /// Translate lifted functions for choice expressions.
     #[allow(clippy::literal_string_with_formatting_args)]
-    fn translate_choice_functions(&self) {
+    fn translate_choice_functions(&self, already_translated: usize) -> usize {
         let env = self.env;
-        let infos_ref = self.lifted_choice_infos.borrow();
+        // Snapshot the lifted choices first so recursive translation can safely extend the
+        // underlying map without tripping RefCell borrow rules.
+        let mut infos_sorted_with_keys = {
+            let infos_ref = self.lifted_choice_infos.borrow();
+            infos_ref
+                .iter()
+                .map(|(key, info)| (key.clone(), info.clone()))
+                .collect_vec()
+        };
         // need the sorting here because `lifted_choice_infos` is a hashmap while we want
         // deterministic ordering of the output. Sorting uses the `.id` field, which represents the
         // insertion order.
-        let infos_sorted_with_keys = infos_ref.iter().sorted_by(|v1, v2| v1.1.id.cmp(&v2.1.id));
+        infos_sorted_with_keys.sort_by(|v1, v2| v1.1.id.cmp(&v2.1.id));
+        let snapshot_len = infos_sorted_with_keys.len();
         assert!(self.type_inst.is_empty());
-        for (key, info) in infos_sorted_with_keys {
+        for (key, info) in infos_sorted_with_keys
+            .into_iter()
+            .filter(|(_, info)| info.id >= already_translated)
+        {
             let fun_name = boogie_choice_fun_name(info.id);
             let result_ty = &info.result_type;
             let exp_loc = env.get_node_loc(info.node_id);
@@ -1113,16 +1140,29 @@ impl SpecTranslator<'_> {
             }
             emitln!(new_spec_trans.writer, ");\n");
         }
+        snapshot_len
     }
 
     /// Translate lifted helper functions for `exists` expressions.
     #[allow(clippy::literal_string_with_formatting_args)]
-    fn translate_exists_functions(&self) {
+    fn translate_exists_functions(&self, already_translated: usize) -> usize {
         let env = self.env;
-        let infos_ref = self.lifted_exists_infos.borrow();
-        let infos_sorted_with_keys = infos_ref.iter().sorted_by(|v1, v2| v1.1.id.cmp(&v2.1.id));
+        // Snapshot the lifted exists helpers first so nested `exists` encountered during
+        // recursive translation can register additional helpers without panicking.
+        let mut infos_sorted_with_keys = {
+            let infos_ref = self.lifted_exists_infos.borrow();
+            infos_ref
+                .iter()
+                .map(|(key, info)| (key.clone(), info.clone()))
+                .collect_vec()
+        };
+        infos_sorted_with_keys.sort_by(|v1, v2| v1.1.id.cmp(&v2.1.id));
+        let snapshot_len = infos_sorted_with_keys.len();
         assert!(self.type_inst.is_empty());
-        for (key, info) in infos_sorted_with_keys {
+        for (key, info) in infos_sorted_with_keys
+            .into_iter()
+            .filter(|(_, info)| info.id >= already_translated)
+        {
             let exists_fun_name = boogie_exists_fun_name(info.id);
             let witness_fun_name = boogie_exists_witness_fun_name(info.id);
             let result_ty = &info.result_type;
@@ -1337,6 +1377,7 @@ impl SpecTranslator<'_> {
             }
             emitln!(new_spec_trans.writer, ");\n");
         }
+        snapshot_len
     }
 
     /// Translate uninterpreted functions for arbitrary value expressions.

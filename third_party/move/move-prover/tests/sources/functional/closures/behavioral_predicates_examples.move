@@ -402,4 +402,38 @@ module 0x42::behavioral_predicates_examples {
     spec reduce_opaque_test_fail {
         ensures result == 7; // expected failure: result == 8
     }
+
+    fun nested_bounded_exists(v: &vector<u64>): bool {
+        std::vector::length(v) > 0
+    }
+    spec nested_bounded_exists {
+        aborts_if false;
+        ensures result == (exists i in 0..len(v): exists j in 0..len(v): i == j);
+    }
+
+    fun nested_bounded_exists_test(): bool {
+        let v = vector[9, 2, 5];
+        nested_bounded_exists(&v)
+    }
+    spec nested_bounded_exists_test {
+        ensures result == true;
+    }
+
+    fun nested_contains(v: &vector<u64>, pred: |&u64| bool has copy + drop): bool {
+        contains_opaque(v, pred)
+    }
+    spec nested_contains {
+        requires forall x in 0..len(v): !aborts_of<pred>(v[x]);
+        aborts_if false;
+        ensures result ==
+            (exists i in 0..len(v): exists j in 0..len(v): i == j && result_of<pred>(v[j]));
+    }
+
+    fun nested_contains_test_found(): bool {
+        let v = vector[1, 4, 2];
+        nested_contains(&v, |x| (*x > 2) spec { ensures result == (x > 2); })
+    }
+    spec nested_contains_test_found {
+        ensures result == true;
+    }
 }
