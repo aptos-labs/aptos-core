@@ -1,115 +1,115 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Greedy register allocation.
+//! Greedy slot allocation.
 //!
 //! Consumes `BlockAnalysis` from `analysis` and maps SSA temp VIDs to
-//! physical Home/Arg registers using liveness-driven type-keyed reuse.
+//! physical Home/Xfer slots using liveness-driven type-keyed reuse.
 
 use anyhow::{bail, Context, Result};
 use crate::analysis::analyze_block;
-use crate::instr_utils::{get_defs_uses, rename_instr, split_into_blocks};
-use crate::ir::{Instr, Reg};
+use crate::instr_utils::{get_defs_uses, remap_instr, split_into_blocks};
+use crate::ir::{Instr, Slot};
 use crate::translate::SSAFunction;
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::BTreeMap;
 
-/// Output of register allocation for a single function.
+/// Output of slot allocation for a single function.
 pub(crate) struct AllocatedFunction {
     pub instrs: Vec<Instr>,
-    pub num_regs: u16,
-    pub num_arg_regs: u16,
-    pub reg_types: Vec<Type>,
+    pub num_home_slots: u16,
+    pub num_xfer_slots: u16,
+    pub slot_types: Vec<Type>,
 }
 
-/// Map SSA VIDs to physical registers across all blocks.
+/// Map SSA VIDs to physical slots across all blocks.
 ///
 /// Pre: SSA instruction stream after fusion passes; vid_types maps each temp VID
 ///      (Home(num_pinned + i)) to its type at index i.
-/// Post: all temp VIDs replaced with physical Home/Arg registers.
-pub(crate) fn allocate_registers(ssa: &SSAFunction) -> Result<AllocatedFunction> {
+/// Post: all temp VIDs replaced with physical Home/Xfer slots.
+pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
     let num_pinned = ssa.local_types.len() as u16;
     let blocks = split_into_blocks(&ssa.instrs);
     let mut result = Vec::with_capacity(ssa.instrs.len());
-    let mut global_next_reg = num_pinned;
-    let mut global_num_arg_regs: u16 = 0;
-    let mut free_pool: BTreeMap<Type, Vec<Reg>> = BTreeMap::new();
-    let mut phys_reg_types: BTreeMap<Reg, Type> = BTreeMap::new();
+    let mut global_next_slot = num_pinned;
+    let mut global_num_xfer_slots: u16 = 0;
+    let mut free_pool: BTreeMap<Type, Vec<Slot>> = BTreeMap::new();
+    let mut phys_slot_types: BTreeMap<Slot, Type> = BTreeMap::new();
     for (i, ty) in ssa.local_types.iter().enumerate() {
-        phys_reg_types.insert(Reg::Home(i as u16), ty.clone());
+        phys_slot_types.insert(Slot::Home(i as u16), ty.clone());
     }
 
     for (start, end) in blocks {
         let block_instrs = &ssa.instrs[start..end];
         let analysis = analyze_block(block_instrs, num_pinned);
-        let (allocated, block_max, block_arg_regs, returned_pool) = allocate_block(
+        let (allocated, block_max, block_xfer_slots, returned_pool) = allocate_block(
             block_instrs,
             num_pinned,
-            global_next_reg,
+            global_next_slot,
             free_pool,
             &ssa.vid_types,
-            &mut phys_reg_types,
+            &mut phys_slot_types,
             &analysis,
         )?;
         free_pool = returned_pool;
-        if block_max > global_next_reg {
-            global_next_reg = block_max;
+        if block_max > global_next_slot {
+            global_next_slot = block_max;
         }
-        if block_arg_regs > global_num_arg_regs {
-            global_num_arg_regs = block_arg_regs;
+        if block_xfer_slots > global_num_xfer_slots {
+            global_num_xfer_slots = block_xfer_slots;
         }
         result.extend(allocated);
     }
 
-    let mut reg_types = Vec::with_capacity(global_next_reg as usize);
-    for i in 0..global_next_reg {
-        reg_types.push(
-            phys_reg_types
-                .get(&Reg::Home(i))
+    let mut slot_types = Vec::with_capacity(global_next_slot as usize);
+    for i in 0..global_next_slot {
+        slot_types.push(
+            phys_slot_types
+                .get(&Slot::Home(i))
                 .cloned()
-                .context("missing type for physical register")?,
+                .context("missing type for physical slot")?,
         );
     }
 
     Ok(AllocatedFunction {
         instrs: result,
-        num_regs: global_next_reg,
-        num_arg_regs: global_num_arg_regs,
-        reg_types,
+        num_home_slots: global_next_slot,
+        num_xfer_slots: global_num_xfer_slots,
+        slot_types,
     })
 }
 
-fn vid_type(vid: Reg, num_pinned: u16, vid_types: &[Type]) -> Result<Type> {
+fn vid_type(vid: Slot, num_pinned: u16, vid_types: &[Type]) -> Result<Type> {
     match vid {
-        Reg::Home(i) if i >= num_pinned => vid_types
+        Slot::Home(i) if i >= num_pinned => vid_types
             .get((i - num_pinned) as usize)
             .cloned()
             .context("VID type not found during SSA allocation"),
-        _ => bail!("vid_type called on non-temp register {:?}", vid),
+        _ => bail!("vid_type called on non-temp slot {:?}", vid),
     }
 }
 
 fn allocate_block(
     instrs: &[Instr],
     num_pinned: u16,
-    start_reg: u16,
-    carry_pool: BTreeMap<Type, Vec<Reg>>,
+    start_slot: u16,
+    carry_pool: BTreeMap<Type, Vec<Slot>>,
     vid_types: &[Type],
-    phys_reg_types: &mut BTreeMap<Reg, Type>,
+    phys_slot_types: &mut BTreeMap<Slot, Type>,
     analysis: &crate::analysis::BlockAnalysis,
-) -> Result<(Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Reg>>)> {
+) -> Result<(Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Slot>>)> {
     if instrs.is_empty() {
-        return Ok((Vec::new(), start_reg, 0, carry_pool));
+        return Ok((Vec::new(), start_slot, 0, carry_pool));
     }
 
-    let is_temp_vid = |r: &Reg| -> bool { r.is_temp(num_pinned) };
+    let is_temp_vid = |r: &Slot| -> bool { r.is_temp(num_pinned) };
 
-    let mut vid_to_phys: BTreeMap<Reg, Reg> = BTreeMap::new();
+    let mut vid_to_phys: BTreeMap<Slot, Slot> = BTreeMap::new();
     for r in 0..num_pinned {
-        vid_to_phys.insert(Reg::Home(r), Reg::Home(r));
+        vid_to_phys.insert(Slot::Home(r), Slot::Home(r));
     }
     let mut free_pool = carry_pool;
-    let mut next_reg = start_reg;
+    let mut next_slot = start_slot;
 
     let mut output = Vec::with_capacity(instrs.len());
 
@@ -117,13 +117,13 @@ fn allocate_block(
         let mut mapped_instr = instr.clone();
         let (defs, uses) = get_defs_uses(instr);
 
-        // Free use-registers whose last use is this instruction BEFORE allocating
+        // Free use-slots whose last use is this instruction BEFORE allocating
         // for defs. This is safe because IR instruction semantics guarantee all
         // sources are read before any destination is written, so reusing a source
-        // register as a destination (e.g. `r2 := add r2, a0`) is correct: the old
+        // slot as a destination (e.g. `r2 := add r2, a0`) is correct: the old
         // value of r2 is consumed before the result overwrites it. In SSA form,
         // a temp VID is defined exactly once and cannot appear as both a def and
-        // use of the same instruction, so there is no risk of freeing a register
+        // use of the same instruction, so there is no risk of freeing a slot
         // that is also being defined here.
         for r in &uses {
             if is_temp_vid(r)
@@ -132,7 +132,7 @@ fn allocate_block(
                 && let Some(&phys) = vid_to_phys.get(r)
                 && phys.is_temp(num_pinned)
             {
-                let ty = phys_reg_types
+                let ty = phys_slot_types
                     .get(&phys)
                     .cloned()
                     .unwrap_or(Type::Bool);
@@ -140,26 +140,26 @@ fn allocate_block(
             }
         }
 
-        // Allocate physical registers for destination vids
+        // Allocate physical slots for destination vids
         for d in &defs {
             if is_temp_vid(d) && !vid_to_phys.contains_key(d) {
-                if let Some(&arg_r) = analysis.arg_precolor.get(d) {
-                    vid_to_phys.insert(*d, arg_r);
+                if let Some(&xfer_r) = analysis.xfer_precolor.get(d) {
+                    vid_to_phys.insert(*d, xfer_r);
                 } else if let Some(&local_r) = analysis.stloc_targets.get(d) {
                     vid_to_phys.insert(*d, local_r);
                 } else if let Some(&local_r) = analysis.coalesce_to_local.get(d) {
                     vid_to_phys.insert(*d, local_r);
                 } else {
                     let ty = vid_type(*d, num_pinned, vid_types)?;
-                    let phys = if let Some(regs) = free_pool.get_mut(&ty) {
-                        regs.pop()
+                    let phys = if let Some(slots) = free_pool.get_mut(&ty) {
+                        slots.pop()
                     } else {
                         None
                     };
                     let phys = phys.unwrap_or_else(|| {
-                        let r = Reg::Home(next_reg);
-                        next_reg += 1;
-                        phys_reg_types.insert(r, ty);
+                        let r = Slot::Home(next_slot);
+                        next_slot += 1;
+                        phys_slot_types.insert(r, ty);
                         r
                     });
                     vid_to_phys.insert(*d, phys);
@@ -167,10 +167,10 @@ fn allocate_block(
             }
         }
 
-        rename_instr(&mut mapped_instr, &vid_to_phys);
+        remap_instr(&mut mapped_instr, &vid_to_phys);
         output.push(mapped_instr);
 
-        // Free registers for defs that are never used (last_use == def site).
+        // Free slots for defs that are never used (last_use == def site).
         for d in &defs {
             if is_temp_vid(d)
                 && analysis.last_use.get(d) == Some(&i)
@@ -180,7 +180,7 @@ fn allocate_block(
                     && let Some(&phys) = vid_to_phys.get(d)
                     && phys.is_temp(num_pinned)
                 {
-                    let ty = phys_reg_types
+                    let ty = phys_slot_types
                         .get(&phys)
                         .cloned()
                         .unwrap_or(Type::Bool);
@@ -190,5 +190,5 @@ fn allocate_block(
         }
     }
 
-    Ok((output, next_reg, analysis.max_arg_width, free_pool))
+    Ok((output, next_slot, analysis.max_xfer_width, free_pool))
 }

@@ -4,7 +4,7 @@
 //! Lowers stackless exec IR to micro-ops.
 
 use crate::{
-    ir::{BinaryOp, FunctionIR, ImmValue, Instr, Label, Reg},
+    ir::{BinaryOp, FunctionIR, ImmValue, Instr, Label, Slot},
     lowering_context::{LoweringContext, SlotInfo},
 };
 use anyhow::{bail, Result};
@@ -35,11 +35,11 @@ struct LoweringState<'a> {
     /// Indices into ops that need target patching
     branch_fixups: Vec<usize>,
     call_site_cursor: usize,
-    reg_types: &'a [Type],
-    /// Per-position slot info for Arg registers, updated lazily.
-    active_arg_slots: Vec<SlotInfo>,
-    /// Per-position types for Arg registers, updated lazily.
-    active_arg_types: Vec<Type>,
+    slot_types: &'a [Type],
+    /// Per-position slot info for Xfer slots, updated lazily.
+    active_xfer_slots: Vec<SlotInfo>,
+    /// Per-position types for Xfer slots, updated lazily.
+    active_xfer_types: Vec<Type>,
 }
 
 impl<'a> LoweringState<'a> {
@@ -59,15 +59,15 @@ impl<'a> LoweringState<'a> {
             .map(|m| m + 1)
             .unwrap_or(0);
 
-        // Initialize active_arg_slots/types from first callsite's arg_write_slots
-        let num_arg_regs = ctx.num_arg_regs as usize;
-        let mut active_arg_slots = vec![SlotInfo { offset: 0, size: 0 }; num_arg_regs];
-        let mut active_arg_types = vec![Type::U64; num_arg_regs];
+        // Initialize active_xfer_slots/types from first callsite's arg_write_slots
+        let num_xfer_slots = ctx.num_xfer_slots as usize;
+        let mut active_xfer_slots = vec![SlotInfo { offset: 0, size: 0 }; num_xfer_slots];
+        let mut active_xfer_types = vec![Type::U64; num_xfer_slots];
         if !ctx.call_sites.is_empty() {
             let first = &ctx.call_sites[0];
-            let n = num_arg_regs.min(first.arg_write_slots.len());
-            active_arg_slots[..n].copy_from_slice(&first.arg_write_slots[..n]);
-            active_arg_types[..n].clone_from_slice(&first.param_types[..n]);
+            let n = num_xfer_slots.min(first.arg_write_slots.len());
+            active_xfer_slots[..n].copy_from_slice(&first.arg_write_slots[..n]);
+            active_xfer_types[..n].clone_from_slice(&first.param_types[..n]);
         }
 
         LoweringState {
@@ -76,31 +76,31 @@ impl<'a> LoweringState<'a> {
             label_map: vec![None; max_label],
             branch_fixups: Vec::new(),
             call_site_cursor: 0,
-            reg_types: &func_ir.reg_types,
-            active_arg_slots,
-            active_arg_types,
+            slot_types: &func_ir.slot_types,
+            active_xfer_slots,
+            active_xfer_types,
         }
     }
 
-    fn slot(&self, reg: Reg) -> SlotInfo {
-        match reg {
-            Reg::Home(i) => self.ctx.home_slots[i as usize],
-            Reg::Arg(j) => self.active_arg_slots[j as usize],
+    fn slot(&self, slot: Slot) -> SlotInfo {
+        match slot {
+            Slot::Home(i) => self.ctx.home_slots[i as usize],
+            Slot::Xfer(j) => self.active_xfer_slots[j as usize],
         }
     }
 
-    /// Resolve slot info for a destination register. For Arg registers, updates
-    /// `active_arg_slots` and `active_arg_types` from the upcoming callsite
+    /// Resolve slot info for a destination slot. For Xfer slots, updates
+    /// `active_xfer_slots` and `active_xfer_types` from the upcoming callsite
     /// before returning.
-    fn def_slot(&mut self, reg: Reg) -> SlotInfo {
-        match reg {
-            Reg::Home(i) => self.ctx.home_slots[i as usize],
-            Reg::Arg(j) => {
+    fn def_slot(&mut self, slot: Slot) -> SlotInfo {
+        match slot {
+            Slot::Home(i) => self.ctx.home_slots[i as usize],
+            Slot::Xfer(j) => {
                 let cs = &self.ctx.call_sites[self.call_site_cursor];
                 let slot = cs.arg_write_slots[j as usize];
                 let ty = cs.param_types[j as usize].clone();
-                self.active_arg_slots[j as usize] = slot;
-                self.active_arg_types[j as usize] = ty;
+                self.active_xfer_slots[j as usize] = slot;
+                self.active_xfer_types[j as usize] = ty;
                 slot
             },
         }
@@ -128,10 +128,10 @@ impl<'a> LoweringState<'a> {
         }
     }
 
-    fn reg_type(&self, reg: Reg) -> &Type {
-        match reg {
-            Reg::Home(i) => &self.reg_types[i as usize],
-            Reg::Arg(j) => &self.active_arg_types[j as usize],
+    fn slot_type(&self, slot: Slot) -> &Type {
+        match slot {
+            Slot::Home(i) => &self.slot_types[i as usize],
+            Slot::Xfer(j) => &self.active_xfer_types[j as usize],
         }
     }
 
@@ -247,7 +247,7 @@ impl<'a> LoweringState<'a> {
 
             // --- Binary ops ---
             Instr::BinaryOp(dst, op, lhs, rhs) => {
-                let lhs_ty = self.reg_type(*lhs);
+                let lhs_ty = self.slot_type(*lhs);
                 if Self::is_u64_type(lhs_ty) {
                     // Try compare+branch fusion
                     if let Some(fused) = self.try_fuse_compare_branch(op, dst, *lhs, *rhs, next) {
@@ -271,7 +271,7 @@ impl<'a> LoweringState<'a> {
 
             // --- Binary ops with immediate ---
             Instr::BinaryOpImm(dst, op, src, imm) => {
-                let src_ty = self.reg_type(*src);
+                let src_ty = self.slot_type(*src);
                 if Self::is_u64_type(src_ty) {
                     // Try compare+branch fusion
                     if let Some(fused) = self.try_fuse_compare_branch_imm(op, dst, *src, imm, next)
@@ -329,9 +329,9 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Return ---
-            Instr::Ret(regs) => {
-                for (k, reg) in regs.iter().enumerate() {
-                    let src = self.slot(*reg);
+            Instr::Ret(slots) => {
+                for (k, slot) in slots.iter().enumerate() {
+                    let src = self.slot(*slot);
                     let dst = self.ctx.return_slots[k];
                     self.emit_move(dst, src);
                 }
@@ -343,13 +343,13 @@ impl<'a> LoweringState<'a> {
         Ok(false)
     }
 
-    fn lower_call(&mut self, _func_ir: &FunctionIR, args: &[Reg], rets: &[Reg]) {
+    fn lower_call(&mut self, _func_ir: &FunctionIR, args: &[Slot], rets: &[Slot]) {
         let call_site = &self.ctx.call_sites[self.call_site_cursor];
 
         // Copy arguments into callee's parameter slots.
-        // active_arg_slots already set for this call's args by prior def_slot calls.
-        for (k, arg_reg) in args.iter().enumerate() {
-            let src = self.slot(*arg_reg);
+        // active_xfer_slots already set for this call's args by prior def_slot calls.
+        for (k, arg_slot) in args.iter().enumerate() {
+            let src = self.slot(*arg_slot);
             let dst = call_site.arg_write_slots[k];
             self.emit_move(dst, src);
         }
@@ -359,47 +359,47 @@ impl<'a> LoweringState<'a> {
         });
         self.call_site_cursor += 1;
 
-        // Update active_arg_slots for ret Arg positions before doing ret copies.
-        // For each ret that targets an Arg(j), resolve its physical slot:
+        // Update active_xfer_slots for ret Xfer positions before doing ret copies.
+        // For each ret that targets a Xfer(j), resolve its physical slot:
         //  - If there's a next callsite with a param at position j, use that
-        //    callsite's arg_write_slots[j] so the later arg copy is elided.
+        //    callsite's arg_write_slots[j] so the later xfer copy is elided.
         //  - Otherwise fall back to ret_read_slots[k] (no-copy).
         let prev = self.call_site_cursor - 1;
         let prev_cs = &self.ctx.call_sites[prev];
-        for (k, ret_reg) in rets.iter().enumerate() {
-            if let Reg::Arg(j) = ret_reg {
+        for (k, ret_slot) in rets.iter().enumerate() {
+            if let Slot::Xfer(j) = ret_slot {
                 let j = *j as usize;
                 let mut resolved = false;
                 if self.call_site_cursor < self.ctx.call_sites.len() {
                     let next_cs = &self.ctx.call_sites[self.call_site_cursor];
                     if j < next_cs.arg_write_slots.len() {
-                        self.active_arg_slots[j] = next_cs.arg_write_slots[j];
-                        self.active_arg_types[j] = next_cs.param_types[j].clone();
+                        self.active_xfer_slots[j] = next_cs.arg_write_slots[j];
+                        self.active_xfer_types[j] = next_cs.param_types[j].clone();
                         resolved = true;
                     }
                 }
                 if !resolved && k < prev_cs.ret_read_slots.len() {
-                    self.active_arg_slots[j] = prev_cs.ret_read_slots[k];
-                    self.active_arg_types[j] = prev_cs.ret_types[k].clone();
+                    self.active_xfer_slots[j] = prev_cs.ret_read_slots[k];
+                    self.active_xfer_types[j] = prev_cs.ret_types[k].clone();
                 }
             }
         }
 
-        // Move return values to destination registers.
-        for (k, ret_reg) in rets.iter().enumerate() {
+        // Move return values to destination slots.
+        for (k, ret_slot) in rets.iter().enumerate() {
             let src = prev_cs.ret_read_slots[k];
-            let dst = self.slot(*ret_reg);
+            let dst = self.slot(*ret_slot);
             self.emit_move(dst, src);
         }
     }
 
-    /// Try to fuse a comparison (reg-reg) + branch into a single micro-op.
+    /// Try to fuse a comparison (slot-slot) + branch into a single micro-op.
     fn try_fuse_compare_branch(
         &mut self,
         op: &BinaryOp,
-        dst: &Reg,
-        lhs: Reg,
-        rhs: Reg,
+        dst: &Slot,
+        lhs: Slot,
+        rhs: Slot,
         next: Option<&Instr>,
     ) -> Option<bool> {
         let next = next?;
@@ -420,12 +420,12 @@ impl<'a> LoweringState<'a> {
         }
     }
 
-    /// Try to fuse a comparison (reg-imm) + branch into a single micro-op.
+    /// Try to fuse a comparison (slot-imm) + branch into a single micro-op.
     fn try_fuse_compare_branch_imm(
         &mut self,
         op: &BinaryOp,
-        dst: &Reg,
-        src: Reg,
+        dst: &Slot,
+        src: Slot,
         imm: &ImmValue,
         next: Option<&Instr>,
     ) -> Option<bool> {

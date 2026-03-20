@@ -10,7 +10,7 @@ pub mod lower;
 pub mod lowering_context;
 pub mod micro_ops_display;
 pub mod optimize;
-pub mod regalloc;
+pub mod slot_alloc;
 pub mod type_conversion;
 
 use anyhow::{bail, Result};

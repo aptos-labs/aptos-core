@@ -98,8 +98,8 @@ pub struct LoweringContext {
     pub frame_data_size: u32,
     pub call_sites: Vec<CallSiteInfo>,
     pub return_slots: Vec<SlotInfo>,
-    /// Number of arg registers used (a0..a(num_arg_regs-1)).
-    pub num_arg_regs: u16,
+    /// Maximum number of Xfer slots needed across all call sites in this function.
+    pub num_xfer_slots: u16,
 }
 
 /// Try to build a LoweringContext for a monomorphic function.
@@ -127,10 +127,10 @@ fn try_build_context_inner(
     func_id_map: &[Option<u32>],
 ) -> Option<Result<LoweringContext>> {
     // 1. Compute home slot layout
-    let mut home_slots = Vec::with_capacity(func_ir.num_regs as usize);
+    let mut home_slots = Vec::with_capacity(func_ir.num_home_slots as usize);
     let mut offset: u32 = 0;
-    for reg_ty in &func_ir.reg_types {
-        let size = type_size(reg_ty)? as u32;
+    for slot_ty in &func_ir.slot_types {
+        let size = type_size(slot_ty)? as u32;
         home_slots.push(SlotInfo { offset, size });
         offset += size;
     }
@@ -211,7 +211,7 @@ fn try_build_context_inner(
         frame_data_size,
         call_sites,
         return_slots,
-        num_arg_regs: func_ir.num_arg_regs,
+        num_xfer_slots: func_ir.num_xfer_slots,
     }))
 }
 

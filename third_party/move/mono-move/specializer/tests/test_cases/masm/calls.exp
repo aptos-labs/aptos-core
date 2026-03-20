@@ -8,11 +8,11 @@ fun identity(r0): u64 {
 }
 
 fun caller(): u64 {
-  slots: params(0), locals(0), temps(0), args(1)
+  slots: params(0), locals(0), temps(0), xfer(1)
   code:
-    0: a0 := ld_u64 10
-    1: [a0] := call identity, [a0]
-    2: ret [a0]
+    0: x0 := ld_u64 10
+    1: [x0] := call identity, [x0]
+    2: ret [x0]
 }
 
 === micro-ops ===

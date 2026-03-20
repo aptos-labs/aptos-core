@@ -3,13 +3,13 @@
 
 //! Instruction utilities for the pipeline.
 //!
-//! Helpers used by `convert`, `regalloc`, and `optimize`.
+//! Helpers used by `convert`, `slot_alloc`, and `optimize`.
 
-use crate::ir::{BinaryOp, ImmValue, Instr, Reg};
+use crate::ir::{BinaryOp, ImmValue, Instr, Slot};
 use std::collections::BTreeMap;
 
-/// Get registers defined (written) and used (read) by an instruction.
-pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Reg>, Vec<Reg>) {
+/// Get named slots defined (written) and used (read) by an instruction.
+pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Slot>, Vec<Slot>) {
     let mut defs = Vec::new();
     let mut uses = Vec::new();
 
@@ -195,15 +195,15 @@ pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Reg>, Vec<Reg>) {
     (defs, uses)
 }
 
-/// Apply register renaming to all operands of an instruction.
-pub(crate) fn rename_instr(instr: &mut Instr, map: &BTreeMap<Reg, Reg>) {
-    fn r(reg: &mut Reg, map: &BTreeMap<Reg, Reg>) {
+/// Apply named-slot remapping to all operands of an instruction.
+pub(crate) fn remap_instr(instr: &mut Instr, map: &BTreeMap<Slot, Slot>) {
+    fn r(reg: &mut Slot, map: &BTreeMap<Slot, Slot>) {
         if let Some(&new) = map.get(reg) {
             *reg = new;
         }
     }
 
-    fn r_vec(regs: &mut [Reg], map: &BTreeMap<Reg, Reg>) {
+    fn r_vec(regs: &mut [Slot], map: &BTreeMap<Slot, Slot>) {
         for reg in regs.iter_mut() {
             r(reg, map);
         }
@@ -378,15 +378,15 @@ pub(crate) fn rename_instr(instr: &mut Instr, map: &BTreeMap<Reg, Reg>) {
     }
 }
 
-/// Apply register substitution to source operands only (for copy propagation).
-pub(crate) fn apply_subst_to_sources(instr: &mut Instr, subst: &BTreeMap<Reg, Reg>) {
-    fn s(r: &mut Reg, subst: &BTreeMap<Reg, Reg>) {
+/// Apply slot substitution to source operands only (for copy propagation).
+pub(crate) fn apply_subst_to_sources(instr: &mut Instr, subst: &BTreeMap<Slot, Slot>) {
+    fn s(r: &mut Slot, subst: &BTreeMap<Slot, Slot>) {
         if let Some(&replacement) = subst.get(r) {
             *r = replacement;
         }
     }
 
-    fn s_vec(regs: &mut [Reg], subst: &BTreeMap<Reg, Reg>) {
+    fn s_vec(regs: &mut [Slot], subst: &BTreeMap<Slot, Slot>) {
         for r in regs.iter_mut() {
             s(r, subst);
         }
@@ -405,7 +405,7 @@ pub(crate) fn apply_subst_to_sources(instr: &mut Instr, subst: &BTreeMap<Reg, Re
             s(rhs, subst);
         },
 
-        // Binary immediate: substitute lhs only (immediate has no register)
+        // Binary immediate: substitute lhs only (immediate has no slot)
         Instr::BinaryOpImm(_, _, lhs, _) => s(lhs, subst),
 
         // Struct ops
@@ -554,9 +554,9 @@ pub(crate) fn split_into_blocks(instrs: &[Instr]) -> Vec<(usize, usize)> {
     blocks
 }
 
-/// Extract the destination register and immediate value from a load instruction.
+/// Extract the destination slot and immediate value from a load instruction.
 /// Returns None for LdU128/LdU256/LdI128/LdI256/LdConst (too large or non-numeric).
-pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Reg, ImmValue)> {
+pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
     match instr {
         Instr::LdTrue(d) => Some((*d, ImmValue::Bool(true))),
         Instr::LdFalse(d) => Some((*d, ImmValue::Bool(false))),

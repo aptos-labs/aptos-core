@@ -1,22 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Block analysis phase for the register allocator.
+//! Block analysis phase for the slot allocator.
 //!
-//! Pure analysis producing immutable data consumed by `regalloc`.
+//! Pure analysis producing immutable data consumed by `slotalloc`.
 
 use crate::instr_utils::get_defs_uses;
-use crate::ir::{Instr, Reg};
+use crate::ir::{Instr, Slot};
 use std::collections::BTreeMap;
 
 /// Analysis results for a single basic block.
-/// All Reg keys are temp VIDs (Home(i) where i >= num_pinned).
+/// All Slot keys are temp VIDs (Home(i) where i >= num_pinned).
 pub(crate) struct BlockAnalysis {
-    pub last_use: BTreeMap<Reg, usize>,
-    pub stloc_targets: BTreeMap<Reg, Reg>,
-    pub coalesce_to_local: BTreeMap<Reg, Reg>,
-    pub arg_precolor: BTreeMap<Reg, Reg>,
-    pub max_arg_width: u16,
+    pub last_use: BTreeMap<Slot, usize>,
+    pub stloc_targets: BTreeMap<Slot, Slot>,
+    pub coalesce_to_local: BTreeMap<Slot, Slot>,
+    pub xfer_precolor: BTreeMap<Slot, Slot>,
+    pub max_xfer_width: u16,
 }
 
 /// Returns true if `sorted` contains any element in the half-open range [lo, hi).
@@ -29,24 +29,24 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
     idx < sorted.len() && sorted[idx] < hi
 }
 
-/// Analyze a basic block to produce data for register allocation.
+/// Analyze a basic block to produce data for named slot allocation.
 ///
 /// Pre: `instrs` is an intra-block SSA slice (after Pass 1 + 1.5).
 ///      Temp VIDs are defined exactly once.
 /// Post: all tables are conservative — every entry is safe to use.
-///       stloc_targets and coalesce_to_local are disjoint from arg_precolor.
+///       stloc_targets and coalesce_to_local are disjoint from xfer_precolor.
 pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis {
-    let is_temp_vid = |r: &Reg| -> bool { r.is_temp(num_pinned) };
-    let is_pinned = |r: &Reg| -> bool { matches!(r, Reg::Home(i) if *i < num_pinned) };
+    let is_temp_vid = |r: &Slot| -> bool { r.is_temp(num_pinned) };
+    let is_pinned = |r: &Slot| -> bool { matches!(r, Slot::Home(i) if *i < num_pinned) };
 
     // Forward scan: def_pos and last_use for temp vids.
     // Also build per-local position indices for pinned locals:
     //   local_touch_pos — all positions where local appears as def or use
     //   local_def_pos   — positions where local appears as def only
-    let mut last_use: BTreeMap<Reg, usize> = BTreeMap::new();
-    let mut def_pos: BTreeMap<Reg, usize> = BTreeMap::new();
-    let mut local_touch_pos: BTreeMap<Reg, Vec<usize>> = BTreeMap::new();
-    let mut local_def_pos: BTreeMap<Reg, Vec<usize>> = BTreeMap::new();
+    let mut last_use: BTreeMap<Slot, usize> = BTreeMap::new();
+    let mut def_pos: BTreeMap<Slot, usize> = BTreeMap::new();
+    let mut local_touch_pos: BTreeMap<Slot, Vec<usize>> = BTreeMap::new();
+    let mut local_def_pos: BTreeMap<Slot, Vec<usize>> = BTreeMap::new();
 
     for (i, instr) in instrs.iter().enumerate() {
         let (defs, uses) = get_defs_uses(instr);
@@ -82,7 +82,7 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
     // StLoc look-ahead: map VID → local when VID is produced and later stored
     // to that local, and the local is not accessed in between.
     // Check uses binary search on local_touch_pos: O(log n) per candidate.
-    let mut stloc_targets: BTreeMap<Reg, Reg> = BTreeMap::new();
+    let mut stloc_targets: BTreeMap<Slot, Slot> = BTreeMap::new();
     for (i, instr) in instrs.iter().enumerate() {
         if let Instr::Move(dst, src) = instr
             && is_pinned(dst)
@@ -100,7 +100,7 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
 
     // CopyLoc/MoveLoc coalescing.
     // Check uses binary search on local_def_pos: O(log n) per candidate.
-    let mut coalesce_to_local: BTreeMap<Reg, Reg> = BTreeMap::new();
+    let mut coalesce_to_local: BTreeMap<Slot, Slot> = BTreeMap::new();
     for (i, instr) in instrs.iter().enumerate() {
         match instr {
             Instr::Copy(dst, src) | Instr::Move(dst, src)
@@ -123,10 +123,10 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
         }
     }
 
-    // Arg register precoloring.
+    // Xfer slot precoloring.
     // has_call_between uses binary search on call_positions: O(log c) per query.
-    let mut arg_precolor: BTreeMap<Reg, Reg> = BTreeMap::new();
-    let mut max_arg_width: u16 = 0;
+    let mut xfer_precolor: BTreeMap<Slot, Slot> = BTreeMap::new();
+    let mut max_xfer_width: u16 = 0;
 
     for (ci_idx, &ci) in call_positions.iter().enumerate() {
         let (rets, args) = match &instrs[ci] {
@@ -142,8 +142,8 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
             .unwrap_or(instrs.len());
 
         let call_width = std::cmp::max(args.len(), rets.len()) as u16;
-        if call_width > max_arg_width {
-            max_arg_width = call_width;
+        if call_width > max_xfer_width {
+            max_xfer_width = call_width;
         }
 
         for (j, vid) in args.iter().enumerate() {
@@ -155,11 +155,11 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
             }
             // Skip VIDs coalesced to a pinned local (e.g. Copy(vid, param)).
             // Copy propagation will replace the VID with the local, so the
-            // call ends up passing the local directly — no arg copy needed.
+            // call ends up passing the local directly — no xfer copy needed.
             if coalesce_to_local.contains_key(vid) {
                 continue;
             }
-            if arg_precolor.contains_key(vid) {
+            if xfer_precolor.contains_key(vid) {
                 continue;
             }
             let dp = match def_pos.get(vid) {
@@ -172,7 +172,7 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
             if last_use.get(vid) != Some(&ci) {
                 continue;
             }
-            arg_precolor.insert(*vid, Reg::Arg(j as u16));
+            xfer_precolor.insert(*vid, Slot::Xfer(j as u16));
         }
 
         for (k, vid) in rets.iter().enumerate() {
@@ -182,7 +182,7 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
             if stloc_targets.contains_key(vid) {
                 continue;
             }
-            if arg_precolor.contains_key(vid) {
+            if xfer_precolor.contains_key(vid) {
                 continue;
             }
             if let Some(&lu) = last_use.get(vid)
@@ -190,7 +190,7 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
             {
                 continue;
             }
-            arg_precolor.insert(*vid, Reg::Arg(k as u16));
+            xfer_precolor.insert(*vid, Slot::Xfer(k as u16));
         }
     }
 
@@ -198,7 +198,7 @@ pub(crate) fn analyze_block(instrs: &[Instr], num_pinned: u16) -> BlockAnalysis 
         last_use,
         stloc_targets,
         coalesce_to_local,
-        arg_precolor,
-        max_arg_width,
+        xfer_precolor,
+        max_xfer_width,
     }
 }
