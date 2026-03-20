@@ -21,7 +21,12 @@ use std::collections::BTreeSet;
 // Trait
 // ---------------------------------------------------------------------------
 
-/// Implemented by instruction types to plug into [`compute_basic_blocks`].
+/// Identifies basic-block boundaries in a flat instruction sequence.
+///
+/// Implement this trait for an instruction type to make it usable with
+/// [`compute_basic_blocks`] and [`GasInstrumentor`][crate::instrument::GasInstrumentor].
+/// The only required information is whether an instruction branches and, if so,
+/// where.
 pub trait HasCfgInfo {
     /// Returns the explicit branch target of this instruction, if any.
     ///
