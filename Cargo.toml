@@ -155,6 +155,7 @@ members = [
     "execution/executor-types",
     "experimental/bulk-txn-submit",
     "experimental/execution/ptx-executor",
+
     "experimental/runtimes",
     "experimental/storage/hexy",
     "experimental/storage/layered-map",
@@ -208,6 +209,8 @@ members = [
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/global-context",
     "third_party/move/mono-move/micro-ops",
+    "third_party/move/mono-move/programs",
+    "third_party/move/mono-move/runtime",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -868,6 +871,9 @@ x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cd
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
+mono-move-micro-ops = { path = "third_party/move/mono-move/micro-ops" }
+mono-move-programs = { path = "third_party/move/mono-move/programs" }
+mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 move-abigen = { path = "third_party/move/tools/move-abigen" }
 move-asm = { path = "third_party/move/tools/move-asm" }
 move-binary-format = { path = "third_party/move/move-binary-format" }

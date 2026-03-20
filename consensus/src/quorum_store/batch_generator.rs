@@ -306,7 +306,11 @@ impl BatchGenerator {
             if *total_batches_remaining == 0 {
                 return;
             }
-            let num_take_txns = std::cmp::min(self.config.sender_max_batch_txns, txns_remaining);
+            let max_batch_txns = match batch_kind {
+                BatchKind::Encrypted => self.config.sender_max_encrypted_batch_txns,
+                BatchKind::Normal => self.config.sender_max_batch_txns,
+            };
+            let num_take_txns = std::cmp::min(max_batch_txns, txns_remaining);
             let mut batch_bytes_remaining = self.config.sender_max_batch_bytes as u64;
             let num_batch_txns = txns
                 .iter()

@@ -12640,6 +12640,32 @@ name = "mono-move-micro-ops"
 version = "0.1.0"
 
 [[package]]
+name = "mono-move-programs"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "legacy-move-compiler",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "rand 0.7.3",
+ "tempfile",
+]
+
+[[package]]
+name = "mono-move-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "mono-move-micro-ops",
+ "rand 0.7.3",
+]
+
+[[package]]
 name = "more-asserts"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

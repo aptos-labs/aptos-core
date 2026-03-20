@@ -5,7 +5,10 @@ use super::round_state::NewRoundReason;
 use crate::counters;
 use aptos_collections::BoundedVecDeque;
 use aptos_consensus_types::{
-    common::Author, payload_pull_params::OptQSPayloadPullParams, round_timeout::RoundTimeoutReason,
+    common::Author,
+    payload_pull_params::{OptQSPayloadPullParams, PerBatchKindTxnLimits},
+    proof_of_store::BatchKind,
+    round_timeout::RoundTimeoutReason,
 };
 use aptos_infallible::Mutex;
 use aptos_logger::warn;
@@ -109,6 +112,9 @@ pub struct OptQSPullParamsProvider {
     minimum_batch_age_usecs: u64,
     failure_tracker: Arc<Mutex<ExponentialWindowFailureTracker>>,
     enable_opt_qs_v2_payload: bool,
+    /// Max encrypted txns per block from SecretShareConfig. None means no
+    /// decryption config exists, so encrypted batches are blocked (limit = 0).
+    encrypted_txn_limit: Option<u64>,
 }
 
 impl OptQSPullParamsProvider {
@@ -117,12 +123,14 @@ impl OptQSPullParamsProvider {
         minimum_batch_age_usecs: u64,
         failure_tracker: Arc<Mutex<ExponentialWindowFailureTracker>>,
         enable_opt_qs_v2_payload: bool,
+        encrypted_txn_limit: Option<u64>,
     ) -> Self {
         Self {
             enable_opt_qs,
             minimum_batch_age_usecs,
             failure_tracker,
             enable_opt_qs_v2_payload,
+            encrypted_txn_limit,
         }
     }
 }
@@ -156,10 +164,16 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
             }
             warn!("OptQS exclude authors: {:?}", exclude_authors_str);
         }
+        let per_kind_txn_limits = PerBatchKindTxnLimits::new(
+            [(BatchKind::Encrypted, self.encrypted_txn_limit.unwrap_or(0))]
+                .into_iter()
+                .collect(),
+        );
         Some(OptQSPayloadPullParams {
             exclude_authors,
             minimum_batch_age_usecs: self.minimum_batch_age_usecs,
             enable_opt_qs_v2_payload: self.enable_opt_qs_v2_payload,
+            per_kind_txn_limits,
         })
     }
 }
