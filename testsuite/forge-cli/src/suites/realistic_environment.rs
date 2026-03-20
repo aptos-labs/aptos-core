@@ -433,6 +433,11 @@ pub(crate) fn realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Disable back pressure for apples-to-apples comparison with prefix consensus
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.execution_backpressure = None;
+        }))
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
@@ -479,7 +484,6 @@ pub(crate) fn realistic_env_max_load_test(
         .with_success_criteria(success_criteria)
         .with_validator_resource_override(resource_override)
         .with_fullnode_resource_override(resource_override)
-        .with_num_pfns(1)
 }
 
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
