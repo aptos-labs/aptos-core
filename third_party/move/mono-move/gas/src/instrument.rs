@@ -65,6 +65,11 @@ pub trait RemapTargets: Sized + HasCfgInfo {
 /// costs. For each `Dynamic`-cost instruction, also inserts a runtime charge
 /// immediately after it. Branch targets are remapped to account for all
 /// inserted ops.
+///
+/// TODO: this runs as a separate pass over the instruction sequence. Ideally
+/// it would be fused with an earlier compiler pass to avoid redundant
+/// traversals, since instrumentation may run on a critical path (e.g. on a
+/// cache miss).
 pub struct GasInstrumentor<S> {
     pub schedule: S,
 }
