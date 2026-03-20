@@ -8,7 +8,7 @@ use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
 use move_model::{
     ast,
-    ast::{Exp, ExpData, QuantKind, TempIndex, Value},
+    ast::{Exp, ExpData, QuantKind, RewriteResult, TempIndex, Value},
     exp_generator::ExpGenerator,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
@@ -24,8 +24,8 @@ use move_stackless_bytecode::{
     livevar_analysis::LiveVarAnalysisProcessor,
     reaching_def_analysis::ReachingDefProcessor,
     stackless_bytecode::{
-        AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, HavocKind, Label,
-        Operation, PropKind,
+        AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind,
+        Label, Operation, PropKind,
     },
     usage_analysis, COMPILED_MODULE_AVAILABLE,
 };
@@ -253,6 +253,7 @@ struct Instrumenter<'a> {
     abort_label: Label,
     can_abort: bool,
     mem_info: &'a BTreeSet<QualifiedInstId<StructId>>,
+    known_pure_exps: BTreeMap<TempIndex, Exp>,
 }
 
 impl<'a> Instrumenter<'a> {
@@ -350,6 +351,7 @@ impl<'a> Instrumenter<'a> {
             abort_label,
             can_abort: false,
             mem_info: &mem_info,
+            known_pure_exps: BTreeMap::new(),
         };
         instrumenter.instrument(&spec, &inlined_props);
 
@@ -365,6 +367,197 @@ impl<'a> Instrumenter<'a> {
 
     fn is_verified(&self) -> bool {
         self.builder.data.variant.is_verified()
+    }
+
+    fn constant_to_exp(&self, loc: Loc, dest: TempIndex, constant: &Constant) -> Exp {
+        let ty = self.builder.get_local_type(dest).skip_reference().clone();
+        let id = self.builder.global_env().new_node(loc, ty);
+        ExpData::Value(id, constant.to_model_value()).into_exp()
+    }
+
+    fn vector_to_exp(&self, loc: Loc, dest: TempIndex, elements: Vec<Exp>) -> Exp {
+        let ty = self.builder.get_local_type(dest).skip_reference().clone();
+        let id = self.builder.global_env().new_node(loc, ty);
+        ExpData::Call(id, ast::Operation::Vector, elements).into_exp()
+    }
+
+    fn rewrite_known_temp_substitutions(
+        &self,
+        exp: Exp,
+        substitutions: &BTreeMap<TempIndex, Exp>,
+    ) -> Exp {
+        ExpData::rewrite(exp, &mut |e| match e.as_ref() {
+            ExpData::Temporary(_, idx) => {
+                if let Some(replacement) = substitutions.get(idx) {
+                    RewriteResult::Rewritten(replacement.clone())
+                } else {
+                    RewriteResult::Unchanged(e)
+                }
+            },
+            _ => RewriteResult::Unchanged(e),
+        })
+    }
+
+    fn specialize_translated_spec(
+        &self,
+        callee_spec: &mut TranslatedSpec,
+        substitutions: &BTreeMap<TempIndex, Exp>,
+    ) {
+        if substitutions.is_empty() {
+            return;
+        }
+        let rewrite = |exp: Exp| self.rewrite_known_temp_substitutions(exp, substitutions);
+
+        for (_, exp) in &mut callee_spec.pre {
+            *exp = rewrite(exp.clone());
+        }
+        for (_, exp) in &mut callee_spec.post {
+            *exp = rewrite(exp.clone());
+        }
+        for (_, exp, code_opt) in &mut callee_spec.aborts {
+            *exp = rewrite(exp.clone());
+            if let Some(code) = code_opt {
+                *code = rewrite(code.clone());
+            }
+        }
+        for (_, codes) in &mut callee_spec.aborts_with {
+            for code in codes {
+                *code = rewrite(code.clone());
+            }
+        }
+        for (_, msg, handle, cond_opt) in &mut callee_spec.emits {
+            *msg = rewrite(msg.clone());
+            *handle = rewrite(handle.clone());
+            if let Some(cond) = cond_opt {
+                *cond = rewrite(cond.clone());
+            }
+        }
+        for (_, exp) in &mut callee_spec.modifies {
+            *exp = rewrite(exp.clone());
+        }
+        for (_, _, exp) in &mut callee_spec.invariants {
+            *exp = rewrite(exp.clone());
+        }
+        for (_, _, _, exp) in &mut callee_spec.lets {
+            *exp = rewrite(exp.clone());
+        }
+        for (_, lhs, rhs) in &mut callee_spec.updates {
+            *lhs = rewrite(lhs.clone());
+            *rhs = rewrite(rhs.clone());
+        }
+        for (_, _, exp) in &mut callee_spec.debug_traces {
+            *exp = rewrite(exp.clone());
+        }
+    }
+
+    fn specialize_call_spec_with_known_pure_exps(
+        &self,
+        callee_spec: &mut TranslatedSpec,
+        srcs: &[TempIndex],
+    ) {
+        let mut substitutions = srcs
+            .iter()
+            .filter_map(|src| {
+                self.known_pure_exps
+                    .get(src)
+                    .cloned()
+                    .map(|exp| (*src, exp))
+            })
+            .collect::<BTreeMap<_, _>>();
+        for (original_temp, saved_temp) in &callee_spec.saved_params {
+            if let Some(exp) = self.known_pure_exps.get(original_temp).cloned() {
+                substitutions.insert(*saved_temp, exp);
+            }
+        }
+        self.specialize_translated_spec(callee_spec, &substitutions);
+    }
+
+    fn clear_known_pure_exps(&mut self) {
+        self.known_pure_exps.clear();
+    }
+
+    fn update_known_pure_exps(&mut self, bc: &Bytecode) {
+        use Bytecode::*;
+
+        match bc {
+            Assign(_, dest, src, _) => {
+                if let Some(exp) = self.known_pure_exps.get(src).cloned() {
+                    self.known_pure_exps.insert(*dest, exp);
+                } else {
+                    self.known_pure_exps.remove(dest);
+                }
+            },
+            Load(attr_id, dest, constant) => {
+                let loc = self.builder.get_loc(*attr_id);
+                let exp = self.constant_to_exp(loc, *dest, constant);
+                self.known_pure_exps.insert(*dest, exp);
+            },
+            Call(attr_id, dests, Operation::Vector, srcs, _) if dests.len() == 1 => {
+                let loc = self.builder.get_loc(*attr_id);
+                let elements = srcs
+                    .iter()
+                    .map(|src| self.known_pure_exps.get(src).cloned())
+                    .collect::<Option<Vec<_>>>();
+                for dest in dests {
+                    self.known_pure_exps.remove(dest);
+                }
+                if let Some(elements) = elements {
+                    let exp = self.vector_to_exp(loc, dests[0], elements);
+                    self.known_pure_exps.insert(dests[0], exp);
+                }
+            },
+            Call(_, dests, _, _, _) => {
+                for dest in dests {
+                    self.known_pure_exps.remove(dest);
+                }
+            },
+            Branch(..) | Jump(..) | Label(..) | Ret(..) | Abort(..) => {
+                self.clear_known_pure_exps();
+            },
+            Prop(..) | Nop(..) | SpecBlock(..) | SaveMem(..) | SaveSpecVar(..) => {},
+        }
+    }
+
+    /// Returns whether we should assume a transparent callee's postconditions at the call site.
+    ///
+    /// This is restricted to verification entry points and callees which are themselves part of
+    /// the verification scope. For exclusive debug scopes like `--verify-only foo`, we also allow
+    /// summaries from transparent callees outside the current target set so single-function debug
+    /// runs can still reuse callee contracts.
+    fn should_assume_transparent_postconditions(&self, callee_env: &FunctionEnv<'_>) -> bool {
+        self.is_verified()
+            && !self.options.for_interpretation
+            && !self.options.inference
+            && (callee_env.should_verify(&self.options.verify_scope)
+                || self.options.verify_scope.is_exclusive())
+    }
+
+    /// Emits the state snapshots needed to evaluate a translated spec in post-state.
+    fn emit_saved_state_for_spec(&mut self, spec: &TranslatedSpec) {
+        for (mem, label) in &spec.saved_memory {
+            let mem = mem.clone();
+            self.builder
+                .emit_with(|attr_id| Bytecode::SaveMem(attr_id, *label, mem));
+        }
+        for (spec_var, label) in &spec.saved_spec_vars {
+            let spec_var = spec_var.clone();
+            self.builder
+                .emit_with(|attr_id| Bytecode::SaveSpecVar(attr_id, *label, spec_var));
+        }
+        let saved_params = spec.saved_params.clone();
+        self.emit_save_for_old(&saved_params);
+    }
+
+    /// Assumes the translated postconditions of a callee after a normal return.
+    fn emit_assumed_postconditions(&mut self, spec: &mut TranslatedSpec) {
+        self.emit_lets(spec, true);
+        self.emit_choice_wellformedness(spec, true);
+        let post_conditions = std::mem::take(&mut spec.post);
+        for (_, cond) in post_conditions {
+            self.emit_traces(spec, &cond);
+            self.builder
+                .emit_with(|id| Bytecode::Prop(id, PropKind::Assume, cond));
+        }
     }
 
     fn instrument(
@@ -445,7 +638,8 @@ impl<'a> Instrumenter<'a> {
 
         // Instrument and generate new code
         for bc in old_code {
-            self.instrument_bytecode(spec, inlined_props, bc);
+            self.instrument_bytecode(spec, inlined_props, bc.clone());
+            self.update_known_pure_exps(&bc);
         }
 
         // Generate return and abort blocks
@@ -569,6 +763,8 @@ impl<'a> Instrumenter<'a> {
 
         let callee_env = env.get_module(mid).into_function(fid);
         let callee_opaque = callee_env.is_opaque();
+        let assume_transparent_post =
+            !callee_opaque && self.should_assume_transparent_postconditions(&callee_env);
         let mut callee_spec = SpecTranslator::translate_fun_spec(
             self.options.auto_trace_level.functions(),
             true,
@@ -578,6 +774,7 @@ impl<'a> Instrumenter<'a> {
             Some(&srcs),
             &dests,
         );
+        self.specialize_call_spec_with_known_pure_exps(&mut callee_spec, &srcs);
 
         self.builder.set_loc_from_attr(id);
 
@@ -633,6 +830,9 @@ impl<'a> Instrumenter<'a> {
 
         // From here on code differs depending on whether the callee is opaque or not.
         if !callee_env.is_opaque() || self.options.for_interpretation || self.options.inference {
+            if assume_transparent_post {
+                self.emit_saved_state_for_spec(&callee_spec);
+            }
             self.builder.emit(Call(
                 id,
                 dests,
@@ -640,6 +840,9 @@ impl<'a> Instrumenter<'a> {
                 srcs,
                 Some(AbortAction(self.abort_label, self.abort_local)),
             ));
+            if assume_transparent_post {
+                self.emit_assumed_postconditions(&mut callee_spec);
+            }
             self.can_abort = true;
         } else {
             // Generates OpaqueCallBegin.
