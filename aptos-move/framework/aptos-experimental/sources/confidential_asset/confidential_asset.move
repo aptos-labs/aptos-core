@@ -274,7 +274,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Initializes the module for devnet/tests. Asserts non-mainnet, non-testnet chain.
-    entry fun init_module_for_devnet(deployer: &signer) {
+    fun init_module_for_devnet(deployer: &signer) {
         assert!(
             signer::address_of(deployer) == @aptos_experimental,
             error::invalid_argument(E_INIT_MODULE_FAILED_FOR_DEVNET)
