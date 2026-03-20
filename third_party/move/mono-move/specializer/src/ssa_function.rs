@@ -13,7 +13,7 @@ use move_vm_types::loaded_data::runtime_types::Type;
 pub(crate) struct SSAFunction {
     /// Stackless instructions in SSA form.
     pub instrs: Vec<Instr>,
-    /// Type of each value ID, indexed by `vid - num_pinned` where `num_pinned = local_types.len()`.
+    /// Type of each value ID, indexed directly by the value ID number.
     pub vid_types: Vec<Type>,
     /// Types of all locals (params ++ declared locals).
     pub local_types: Vec<Type>,

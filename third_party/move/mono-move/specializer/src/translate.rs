@@ -9,11 +9,7 @@ use crate::{
     type_conversion::convert_sig_tokens,
 };
 use anyhow::Result;
-use move_binary_format::{
-    access::ModuleAccess,
-    file_format::SignatureToken,
-    CompiledModule,
-};
+use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 
 /// Convert an entire compiled module to stackless IR.
@@ -70,8 +66,7 @@ pub fn translate_module(
                 let local_types = convert_sig_tokens(&module, &all_sig_toks, struct_name_table);
 
                 // Pass: Bytecode -> Intra-Block SSA
-                let converter =
-                    SsaConverter::new(num_params, num_locals, local_types, struct_name_table);
+                let converter = SsaConverter::new(local_types, struct_name_table);
                 let mut ssa = converter.convert_function(&module, &code.code)?;
 
                 // Pass: Pre-allocation instruction fusion

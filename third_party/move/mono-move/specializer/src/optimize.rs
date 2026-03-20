@@ -8,10 +8,10 @@
 //! Pass 5: Dead instruction elimination
 //! Pass 6: Slot renumbering
 
-use crate::instr_utils::{
-    apply_subst_to_sources, get_defs_uses, remap_instr, split_into_blocks,
+use crate::{
+    instr_utils::{apply_subst_to_sources, get_defs_uses, remap_instr, split_into_blocks},
+    ir::{FunctionIR, Instr, ModuleIR, Slot},
 };
-use crate::ir::{FunctionIR, Instr, ModuleIR, Slot};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Optimize all functions in a module IR.
@@ -117,9 +117,8 @@ fn copy_propagation(func: &mut FunctionIR) {
 
 /// Pass 4: Remove `Move(r, r)` and `Copy(r, r)` instructions.
 fn eliminate_identity_moves(func: &mut FunctionIR) {
-    func.instrs.retain(|instr| {
-        !matches!(instr, Instr::Move(d, s) | Instr::Copy(d, s) if d == s)
-    });
+    func.instrs
+        .retain(|instr| !matches!(instr, Instr::Move(d, s) | Instr::Copy(d, s) if d == s));
 }
 
 /// Pass 5: Backward dead-code elimination within each basic block.
@@ -161,9 +160,7 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
             let (dsts, srcs) = get_defs_uses(&func.instrs[i]);
 
             let is_removable = match &func.instrs[i] {
-                Instr::Copy(dst, _) | Instr::Move(dst, _)
-                    if !cross_block_slots.contains(dst) =>
-                {
+                Instr::Copy(dst, _) | Instr::Move(dst, _) if !cross_block_slots.contains(dst) => {
                     !live.contains(dst)
                 },
                 _ => false,
@@ -234,7 +231,8 @@ fn renumber_slots(func: &mut FunctionIR) {
     }
 
     // Bool placeholder — overwritten for every used slot by the loop below.
-    let mut new_slot_types = vec![move_vm_types::loaded_data::runtime_types::Type::Bool; next_slot as usize];
+    let mut new_slot_types =
+        vec![move_vm_types::loaded_data::runtime_types::Type::Bool; next_slot as usize];
     for (&old, &new) in &remap {
         if let (Slot::Home(old_i), Slot::Home(new_i)) = (old, new)
             && (old_i as usize) < func.slot_types.len()

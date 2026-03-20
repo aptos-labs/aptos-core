@@ -6,11 +6,13 @@
 //! Consumes `BlockAnalysis` from `analysis` and maps SSA temp VIDs to
 //! physical Home/Xfer slots using liveness-driven type-keyed reuse.
 
+use crate::{
+    analysis::analyze_block,
+    instr_utils::{get_defs_uses, remap_instr, split_into_blocks},
+    ir::{Instr, Slot},
+    ssa_function::SSAFunction,
+};
 use anyhow::{bail, Context, Result};
-use crate::analysis::analyze_block;
-use crate::instr_utils::{get_defs_uses, remap_instr, split_into_blocks};
-use crate::ir::{Instr, Slot};
-use crate::ssa_function::SSAFunction;
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::BTreeMap;
 
@@ -24,9 +26,9 @@ pub(crate) struct AllocatedFunction {
 
 /// Map SSA VIDs to physical slots across all blocks.
 ///
-/// Pre: SSA instruction stream after fusion passes; vid_types maps each temp VID
-///      (Home(num_pinned + i)) to its type at index i.
-/// Post: all temp VIDs replaced with physical Home/Xfer slots.
+/// Pre: SSA instruction stream after fusion passes; vid_types maps each `Vid(i)`
+///      to its type at index `i`.
+/// Post: all VIDs replaced with physical Home/Xfer slots.
 pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
     let num_pinned = ssa.local_types.len() as u16;
     let blocks = split_into_blocks(&ssa.instrs);
@@ -41,7 +43,7 @@ pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
 
     for (start, end) in blocks {
         let block_instrs = &ssa.instrs[start..end];
-        let analysis = analyze_block(block_instrs, num_pinned);
+        let analysis = analyze_block(block_instrs);
         let (allocated, block_max, block_xfer_slots, returned_pool) = allocate_block(
             block_instrs,
             num_pinned,
@@ -79,13 +81,13 @@ pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
     })
 }
 
-fn vid_type(vid: Slot, num_pinned: u16, vid_types: &[Type]) -> Result<Type> {
+fn vid_type(vid: Slot, vid_types: &[Type]) -> Result<Type> {
     match vid {
-        Slot::Home(i) if i >= num_pinned => vid_types
-            .get((i - num_pinned) as usize)
+        Slot::Vid(i) => vid_types
+            .get(i as usize)
             .cloned()
             .context("VID type not found during SSA allocation"),
-        _ => bail!("vid_type called on non-temp slot {:?}", vid),
+        _ => bail!("vid_type called on non-Vid slot {:?}", vid),
     }
 }
 
@@ -102,7 +104,7 @@ fn allocate_block(
         return Ok((Vec::new(), start_slot, 0, carry_pool));
     }
 
-    let is_temp_vid = |r: &Slot| -> bool { r.is_temp(num_pinned) };
+    let is_vid = |r: &Slot| -> bool { r.is_vid() };
 
     let mut vid_to_phys: BTreeMap<Slot, Slot> = BTreeMap::new();
     for r in 0..num_pinned {
@@ -126,23 +128,20 @@ fn allocate_block(
         // use of the same instruction, so there is no risk of freeing a slot
         // that is also being defined here.
         for r in &uses {
-            if is_temp_vid(r)
+            if is_vid(r)
                 && analysis.last_use.get(r) == Some(&i)
                 && !defs.contains(r)
                 && let Some(&phys) = vid_to_phys.get(r)
-                && phys.is_temp(num_pinned)
+                && matches!(phys, Slot::Home(i) if i >= num_pinned)
             {
-                let ty = phys_slot_types
-                    .get(&phys)
-                    .cloned()
-                    .unwrap_or(Type::Bool);
+                let ty = phys_slot_types.get(&phys).cloned().unwrap_or(Type::Bool);
                 free_pool.entry(ty).or_default().push(phys);
             }
         }
 
         // Allocate physical slots for destination vids
         for d in &defs {
-            if is_temp_vid(d) && !vid_to_phys.contains_key(d) {
+            if is_vid(d) && !vid_to_phys.contains_key(d) {
                 if let Some(&xfer_r) = analysis.xfer_precolor.get(d) {
                     vid_to_phys.insert(*d, xfer_r);
                 } else if let Some(&local_r) = analysis.stloc_targets.get(d) {
@@ -150,7 +149,7 @@ fn allocate_block(
                 } else if let Some(&local_r) = analysis.coalesce_to_local.get(d) {
                     vid_to_phys.insert(*d, local_r);
                 } else {
-                    let ty = vid_type(*d, num_pinned, vid_types)?;
+                    let ty = vid_type(*d, vid_types)?;
                     let phys = if let Some(slots) = free_pool.get_mut(&ty) {
                         slots.pop()
                     } else {
@@ -172,18 +171,13 @@ fn allocate_block(
 
         // Free slots for defs that are never used (last_use == def site).
         for d in &defs {
-            if is_temp_vid(d)
-                && analysis.last_use.get(d) == Some(&i)
-            {
+            if is_vid(d) && analysis.last_use.get(d) == Some(&i) {
                 let (_, ref uses_list) = get_defs_uses(instr);
                 if !uses_list.contains(d)
                     && let Some(&phys) = vid_to_phys.get(d)
-                    && phys.is_temp(num_pinned)
+                    && matches!(phys, Slot::Home(i) if i >= num_pinned)
                 {
-                    let ty = phys_slot_types
-                        .get(&phys)
-                        .cloned()
-                        .unwrap_or(Type::Bool);
+                    let ty = phys_slot_types.get(&phys).cloned().unwrap_or(Type::Bool);
                     free_pool.entry(ty).or_default().push(phys);
                 }
             }

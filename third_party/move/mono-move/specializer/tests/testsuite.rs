@@ -8,11 +8,11 @@ use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_model::metadata::LanguageVersion;
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 use specializer::{
+    destack,
     ir::ModuleIR,
     lower::lower_function,
     lowering_context::{build_func_id_map, try_build_context},
     micro_ops_display::MicroOpsFunctionDisplay,
-    destack,
 };
 use std::path::Path;
 
@@ -54,14 +54,11 @@ fn format_micro_ops(module_ir: &ModuleIR) -> String {
             Ok(Some(ctx)) => match lower_function(func_ir, &ctx) {
                 Ok(ops) => {
                     out.push('\n');
-                    out.push_str(&format!(
-                        "{}",
-                        MicroOpsFunctionDisplay {
-                            func_name: &func_name,
-                            ctx: &ctx,
-                            ops: &ops,
-                        }
-                    ));
+                    out.push_str(&format!("{}", MicroOpsFunctionDisplay {
+                        func_name: &func_name,
+                        ctx: &ctx,
+                        ops: &ops,
+                    }));
                 },
                 Err(e) => {
                     out.push_str(&format!(
@@ -78,8 +75,12 @@ fn format_micro_ops(module_ir: &ModuleIR) -> String {
 const EXP_EXT: &str = "exp";
 
 datatest_stable::harness!(
-    masm_runner, "tests/test_cases/masm", r".*\.masm$",
-    move_runner, "tests/test_cases/move", r".*\.move$",
+    masm_runner,
+    "tests/test_cases/masm",
+    r".*\.masm$",
+    move_runner,
+    "tests/test_cases/move",
+    r".*\.move$",
 );
 
 fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
@@ -145,11 +146,9 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
     let mut output = String::new();
     for module in &modules {
         let table = make_struct_name_table(module);
-        let masm_output =
-            move_asm::disassembler::disassemble_module(String::new(), module)
-                .map_err(|e| format!("disassembly failed: {:#}", e))?;
-        let module_ir =
-            destack(module.clone(), &table).map_err(|e| format!("{:#}", e))?;
+        let masm_output = move_asm::disassembler::disassemble_module(String::new(), module)
+            .map_err(|e| format!("disassembly failed: {:#}", e))?;
+        let module_ir = destack(module.clone(), &table).map_err(|e| format!("{:#}", e))?;
         let ir_output = format!("{}", module_ir.display());
         output.push_str("=== masm ===\n");
         output.push_str(&masm_output);
