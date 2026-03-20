@@ -915,11 +915,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             100,
             epoch_state.verifier.get_ordered_account_addresses(),
         )));
+        let encrypted_txn_limit = secret_sharing_config
+            .as_ref()
+            .map(|c| c.digest_key().max_batch_size() as u64);
         let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
             self.config.quorum_store.enable_opt_quorum_store,
             self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
             failures_tracker.clone(),
             self.config.quorum_store.enable_opt_qs_v2_payload_tx,
+            encrypted_txn_limit,
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");

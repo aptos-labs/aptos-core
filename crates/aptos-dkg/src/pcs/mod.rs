@@ -17,6 +17,9 @@ pub mod zeromorph;
 
 /// Per-polynomial evaluation set: S_i = S_i^rev ⊔ S_i^hid.
 /// Order of points in `rev` and `hid` determines the flat index in y^rev and y^hid.
+///
+/// **Precondition for Shplonked:** Each evaluation set must have distinct points:
+/// no duplicates within `rev`, none within `hid`, and `rev` and `hid` must be disjoint.
 #[derive(CanonicalSerialize, Clone, Debug)]
 pub struct EvaluationSet<F: CanonicalSerialize> {
     /// Points at which the prover reveals the evaluation (y^rev).

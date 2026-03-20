@@ -548,7 +548,8 @@ impl Debug for HotStateOp {
 #[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, PartialEq)]
 pub struct WriteSet {
     value: ValueWriteSet,
-    /// TODO(HotState): this field is not serialized for now.
+    /// Hot state promotions, non-empty only in block epilogues.
+    /// TODO(HotState): not hashed into `TransactionInfo` for now.
     hotness: BTreeMap<StateKey, HotStateOp>,
 }
 
@@ -595,6 +596,20 @@ impl WriteSet {
 
     pub fn into_mut(self) -> WriteSetMut {
         self.into_v0().0
+    }
+
+    pub fn new_from_value(value: ValueWriteSet) -> Self {
+        Self {
+            value,
+            hotness: BTreeMap::new(),
+        }
+    }
+
+    pub fn new_from_value_with_hotness(
+        value: ValueWriteSet,
+        hotness: BTreeMap<StateKey, HotStateOp>,
+    ) -> Self {
+        Self { value, hotness }
     }
 
     pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
@@ -675,6 +690,10 @@ impl WriteSet {
                     EitherOrBoth::Both(e, _) => e,
                 }
             })
+    }
+
+    pub fn hotness_keys(&self) -> impl Iterator<Item = &StateKey> {
+        self.hotness.keys()
     }
 
     pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {

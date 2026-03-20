@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::AptosDB;
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_storage_interface::Result;
 use clap::Parser;
 use std::path::PathBuf;
@@ -30,7 +30,11 @@ impl Cmd {
             block_cache,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
-            /*reset_hot_state=*/ false,
+            HotStateConfig {
+                delete_on_restart: false,
+                persist_hotness_in_write_set: false,
+                ..HotStateConfig::default()
+            },
         )?;
 
         println!(

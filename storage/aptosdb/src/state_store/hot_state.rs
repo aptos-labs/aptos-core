@@ -649,6 +649,7 @@ mod tests {
         refresh_interval_versions: 100,
         delete_on_restart: false,
         compute_root_hash: true,
+        persist_hotness_in_write_set: true,
     };
 
     fn make_hot_slot(version: Version, value: &[u8]) -> StateSlot {

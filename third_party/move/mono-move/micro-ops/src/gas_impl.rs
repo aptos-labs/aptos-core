@@ -30,9 +30,10 @@ impl HasCfgInfo for MicroOp {
             MicroOp::Jump { target }
             | MicroOp::JumpNotZeroU64 { target, .. }
             | MicroOp::JumpGreaterEqualU64Imm { target, .. }
-            | MicroOp::JumpLessU64 { target, .. } => Some(target.0 as usize),
-            // TODO: add JumpLessU64Imm, JumpGreaterEqualU64, JumpNotEqualU64
-            //       when victor/interpreter-loop-prototype is merged.
+            | MicroOp::JumpLessU64Imm { target, .. }
+            | MicroOp::JumpLessU64 { target, .. }
+            | MicroOp::JumpGreaterEqualU64 { target, .. }
+            | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
             MicroOp::StoreImm8 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
@@ -40,6 +41,7 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::AddU64Imm { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
+            | MicroOp::XorU64 { .. }
             | MicroOp::ShrU64Imm { .. }
             | MicroOp::ModU64 { .. }
             | MicroOp::Return
@@ -93,7 +95,21 @@ impl RemapTargets for MicroOp {
                 lhs,
                 rhs,
             },
-            // TODO: remap new jump ops when branches merge.
+            MicroOp::JumpLessU64Imm { target, src, imm } => MicroOp::JumpLessU64Imm {
+                target: co(target),
+                src,
+                imm,
+            },
+            MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => MicroOp::JumpGreaterEqualU64 {
+                target: co(target),
+                lhs,
+                rhs,
+            },
+            MicroOp::JumpNotEqualU64 { target, lhs, rhs } => MicroOp::JumpNotEqualU64 {
+                target: co(target),
+                lhs,
+                rhs,
+            },
             op @ (MicroOp::StoreImm8 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
@@ -101,6 +117,7 @@ impl RemapTargets for MicroOp {
             | MicroOp::AddU64Imm { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
+            | MicroOp::XorU64 { .. }
             | MicroOp::ShrU64Imm { .. }
             | MicroOp::ModU64 { .. }
             | MicroOp::Return
@@ -151,6 +168,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             | MicroOp::AddU64Imm { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
+            | MicroOp::XorU64 { .. }
             | MicroOp::ShrU64Imm { .. } => 3,
             MicroOp::ModU64 { .. } => 5,
 
@@ -160,7 +178,10 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::Jump { .. } => 2,
             MicroOp::JumpNotZeroU64 { .. }
             | MicroOp::JumpGreaterEqualU64Imm { .. }
-            | MicroOp::JumpLessU64 { .. } => 3,
+            | MicroOp::JumpLessU64Imm { .. }
+            | MicroOp::JumpLessU64 { .. }
+            | MicroOp::JumpGreaterEqualU64 { .. }
+            | MicroOp::JumpNotEqualU64 { .. } => 3,
 
             // --- Vector operations ---
             MicroOp::VecNew { .. } => 10,

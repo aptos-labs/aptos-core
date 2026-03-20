@@ -108,27 +108,40 @@ impl ProofManager {
             PayloadFilter::InQuorumStore(batches) => batches,
         };
 
-        let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
-            self.batch_proof_queue.pull_proofs(
-                &excluded_batches,
-                request.max_txns,
-                request.max_txns_after_filtering,
-                request.soft_max_txns_after_filtering,
-                request.return_non_full,
-                request.block_timestamp,
-            );
+        let per_kind_txn_limits = request
+            .maybe_optqs_payload_pull_params
+            .as_ref()
+            .map(|p| p.per_kind_txn_limits.clone())
+            .unwrap_or_default();
+
+        let (
+            proof_block,
+            txns_with_proof_size,
+            cur_unique_txns,
+            proof_queue_fully_utilized,
+            proof_txns_per_kind,
+        ) = self.batch_proof_queue.pull_proofs(
+            &excluded_batches,
+            request.max_txns,
+            request.max_txns_after_filtering,
+            request.soft_max_txns_after_filtering,
+            request.return_non_full,
+            request.block_timestamp,
+            &per_kind_txn_limits,
+        );
 
         counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
             .observe(self.batch_proof_queue.num_batches_without_proof() as f64);
         counters::PROOF_QUEUE_FULLY_UTILIZED
             .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-        let (opt_batches, opt_batch_txns_size) =
+        let (opt_batches, opt_batch_txns_size, opt_batch_txns_per_kind) =
             // TODO(ibalajiarun): Support unique txn calculation
             if let Some(ref params) = request.maybe_optqs_payload_pull_params {
                 let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
                 let max_opt_batch_txns_after_filtering = request.max_txns_after_filtering - cur_unique_txns;
-                let (opt_batches, opt_payload_size, _) =
+                let remaining_per_kind = per_kind_txn_limits.remaining(&proof_txns_per_kind);
+                let (opt_batches, opt_payload_size, _, opt_txns_per_kind) =
                     self.batch_proof_queue.pull_batches(
                         &excluded_batches
                             .iter()
@@ -142,10 +155,11 @@ impl ProofManager {
                         request.return_non_full,
                         request.block_timestamp,
                         Some(params.minimum_batch_age_usecs),
+                        &remaining_per_kind,
                     );
-                (opt_batches, opt_payload_size)
+                (opt_batches, opt_payload_size, opt_txns_per_kind)
             } else {
-                (Vec::new(), PayloadTxnsSize::zero())
+                (Vec::new(), PayloadTxnsSize::zero(), Default::default())
             };
 
         let cur_txns = txns_with_proof_size + opt_batch_txns_size;
@@ -161,6 +175,12 @@ impl ProofManager {
                         .max_txns_after_filtering
                         .saturating_sub(cur_unique_txns),
                 ));
+                // Combine proof + opt batch per-kind counters for inline limits
+                let mut combined_per_kind = proof_txns_per_kind.clone();
+                for (kind, count) in &opt_batch_txns_per_kind {
+                    *combined_per_kind.entry(*kind).or_insert(0) += count;
+                }
+                let remaining_per_kind = per_kind_txn_limits.remaining(&combined_per_kind);
                 let (inline_batches, inline_payload_size, _) =
                     self.batch_proof_queue.pull_batches_with_transactions(
                         &excluded_batches
@@ -174,6 +194,7 @@ impl ProofManager {
                         request.soft_max_txns_after_filtering,
                         request.return_non_full,
                         request.block_timestamp,
+                        &remaining_per_kind,
                     );
                 (inline_batches, inline_payload_size)
             } else {
