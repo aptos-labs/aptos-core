@@ -5,9 +5,11 @@ use crate::{
     chunky::types::CertifiedAggregatedSubtranscript,
     counters,
     types::{
-        ChunkyDKGSubtranscriptSignatureRequest, ChunkyDKGSubtranscriptSignatureResponse, DKGMessage,
+        ChunkyDKGSubtranscriptSignatureRequest, ChunkyDKGSubtranscriptSignatureResponse,
+        DKGMessage,
     },
 };
+use aptos_crypto::HashValue;
 use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel::Sender;
 use aptos_consensus_types::common::Author;
@@ -32,6 +34,7 @@ pub fn start_chunky_subtranscript_certification(
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
     aggregated_subtranscript: AggregatedSubtranscript,
+    dealer_transcript_hashes: Vec<HashValue>,
     certified_agg_subtx_tx: Option<Sender<(), CertifiedAggregatedSubtranscript>>,
 ) -> AbortHandle {
     let epoch = epoch_state.epoch;
@@ -40,6 +43,7 @@ pub fn start_chunky_subtranscript_certification(
         epoch,
         aggregated_subtranscript.hash(),
         aggregated_subtranscript.dealers.clone(),
+        dealer_transcript_hashes,
     );
     let validation_state = Arc::new(ChunkySubtranscriptCertificationState::new(
         start_time,

@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::types::DKGMessage;
+use crate::{chunky::types::AggregatedSubtranscriptWithHashes, types::DKGMessage};
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
-    Uniform,
+    HashValue, Uniform,
 };
 use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
 use aptos_reliable_broadcast::RBNetworkSender;
@@ -155,6 +155,64 @@ impl ChunkyTestSetup {
         AggregatedSubtranscript {
             subtranscript: agg,
             dealers,
+        }
+    }
+
+    /// Like `aggregate_subtranscripts` but also returns per-dealer hashes in the wrapper type.
+    pub fn aggregate_subtranscripts_with_hashes(
+        &self,
+        indices: &[usize],
+    ) -> AggregatedSubtranscriptWithHashes {
+        let transcripts: Vec<_> = indices
+            .iter()
+            .map(|&i| {
+                let (_, trx) = self.deal_transcript(i);
+                trx
+            })
+            .collect();
+
+        let subtranscripts: Vec<_> = transcripts.iter().map(|t| t.get_subtranscript()).collect();
+
+        use aptos_dkg::pvss::traits::transcript::Aggregatable;
+        let agg =
+            Aggregatable::aggregate(&self.dkg_config.threshold_config, subtranscripts).unwrap();
+
+        let mut contributor_addrs: Vec<AccountAddress> =
+            indices.iter().map(|&i| self.addrs[i]).collect();
+        contributor_addrs.sort();
+        let addr_to_index = self
+            .epoch_state
+            .verifier
+            .address_to_validator_index()
+            .clone();
+        let dealers: Vec<Player> = contributor_addrs
+            .iter()
+            .map(|addr| Player {
+                id: *addr_to_index.get(addr).unwrap(),
+            })
+            .collect();
+
+        // Build a map from addr to transcript for hash lookup
+        let addr_to_transcript: HashMap<AccountAddress, &ChunkyTranscript> = indices
+            .iter()
+            .map(|&i| (self.addrs[i], &transcripts[i]))
+            .collect();
+
+        let dealer_transcript_hashes: Vec<HashValue> = contributor_addrs
+            .iter()
+            .map(|addr| {
+                let transcript = addr_to_transcript.get(addr).unwrap();
+                let bytes = bcs::to_bytes(*transcript).unwrap();
+                HashValue::sha3_256_of(&bytes)
+            })
+            .collect();
+
+        AggregatedSubtranscriptWithHashes {
+            aggregated_subtranscript: AggregatedSubtranscript {
+                subtranscript: agg,
+                dealers,
+            },
+            dealer_transcript_hashes,
         }
     }
 

@@ -7,7 +7,8 @@ use crate::{
         missing_transcript_fetcher::MissingTranscriptFetcher,
         subtrx_cert_producer,
         types::{
-            CertifiedAggregatedSubtranscript, MissingTranscriptRequest, MissingTranscriptResponse,
+            AggregatedSubtranscriptWithHashes, CertifiedAggregatedSubtranscript,
+            MissingTranscriptRequest, MissingTranscriptResponse,
         },
         TEST_DIGEST_KEY,
     },
@@ -48,7 +49,7 @@ use futures_util::{
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt, mem,
     sync::Arc,
     time::Duration,
@@ -116,7 +117,7 @@ pub struct ChunkyDKGManager {
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
 
-    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
+    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
     certified_subtrx_tx: Option<aptos_channel::Sender<(), CertifiedAggregatedSubtranscript>>,
 
     // When we put vtxn in the pool, we also put a copy of this so later pool can notify us.
@@ -431,7 +432,7 @@ impl ChunkyDKGManager {
     /// On a locally aggregated transcript, start validation and update inner states.
     async fn process_aggregated_subtranscript(
         &mut self,
-        aggregated_subtranscript: AggregatedSubtranscript,
+        agg_with_hashes: AggregatedSubtranscriptWithHashes,
     ) -> Result<()> {
         info!(
             epoch = self.epoch_state.epoch,
@@ -452,6 +453,11 @@ impl ChunkyDKGManager {
             unreachable!("The ensure! above must take care of this");
         };
 
+        let AggregatedSubtranscriptWithHashes {
+            aggregated_subtranscript,
+            dealer_transcript_hashes,
+        } = agg_with_hashes;
+
         counters::observe_chunky_dkg_stage(start_time, self.my_addr, "agg_transcript_ready");
 
         let abort_handle = subtrx_cert_producer::start_chunky_subtranscript_certification(
@@ -460,6 +466,7 @@ impl ChunkyDKGManager {
             self.my_addr,
             self.epoch_state.clone(),
             aggregated_subtranscript.clone(),
+            dealer_transcript_hashes,
             self.certified_subtrx_tx.clone(),
         );
 
@@ -759,47 +766,62 @@ impl ChunkyDKGManager {
             })
             .collect();
         ensure!(dealer_addresses.len() == req.aggregated_subtrx_dealers.len());
+        ensure!(
+            req.dealer_transcript_hashes.len() == dealer_addresses.len(),
+            "dealer_transcript_hashes length mismatch with dealers"
+        );
 
-        let required_dealers: HashSet<AccountAddress> = dealer_addresses.iter().cloned().collect();
-        let (mut subtranscripts, missing_dealers) = {
-            // Get received transcripts from shared storage
+        // Detect mismatched or missing dealers by comparing per-dealer hashes.
+        // A malicious dealer may have equivocated (sent different transcripts to different
+        // validators), so we must fetch any dealer whose local transcript hash differs from
+        // the requester's hash — not just dealers we're missing entirely.
+        let (mut subtranscripts, mismatched_dealers) = {
             let received_transcripts_map = received_transcripts.lock();
-            let available_addresses: HashSet<AccountAddress> =
-                received_transcripts_map.keys().cloned().collect();
+            let mut subtranscripts: Vec<ChunkySubtranscript> = Vec::new();
+            let mut mismatched_dealers: Vec<AccountAddress> = Vec::new();
 
-            // Collect transcripts for all required dealers
-            let subtranscripts: Vec<ChunkySubtranscript> = required_dealers
-                .iter()
-                .filter_map(|addr| {
-                    received_transcripts_map
-                        .get(addr)
-                        .map(|tx| tx.get_subtranscript())
-                })
-                .collect();
+            for (i, addr) in dealer_addresses.iter().enumerate() {
+                let expected_hash = req.dealer_transcript_hashes[i];
+                match received_transcripts_map.get(addr) {
+                    Some(transcript) => {
+                        let bytes = bcs::to_bytes(transcript)
+                            .map_err(|e| anyhow!("transcript serialization error: {e}"))?;
+                        let local_hash = aptos_crypto::HashValue::sha3_256_of(&bytes);
+                        if local_hash == expected_hash {
+                            subtranscripts.push(transcript.get_subtranscript());
+                        } else {
+                            // Equivocated: local transcript differs from requester's
+                            mismatched_dealers.push(*addr);
+                        }
+                    },
+                    None => {
+                        // Missing entirely
+                        mismatched_dealers.push(*addr);
+                    },
+                }
+            }
 
-            // Find missing dealers
-            let missing_dealers: Vec<AccountAddress> = required_dealers
-                .difference(&available_addresses)
-                .cloned()
-                .collect();
-
-            (subtranscripts, missing_dealers)
+            (subtranscripts, mismatched_dealers)
         };
 
-        // Fetch missing transcripts from network if needed
-        if !missing_dealers.is_empty() {
-            // Create a fetcher and fetch missing transcripts from the sender
+        // Fetch mismatched/missing transcripts from the requester specifically.
+        // Only the requester knows which transcripts they used — we can't fan out to
+        // other peers due to equivocation.
+        if !mismatched_dealers.is_empty() {
             let fetcher = MissingTranscriptFetcher::new(
                 sender,
                 req.dealer_epoch,
-                missing_dealers.clone(),
-                Duration::from_secs(10), // RPC timeout
+                mismatched_dealers,
+                Duration::from_secs(10),
                 dkg_config.clone(),
                 epoch_state.clone(),
             );
 
             let fetched_transcripts = fetcher.run(network_sender).await?;
 
+            // Use fetched transcripts ephemerally for re-aggregation (don't store in
+            // received_transcripts — equivocation is rare and caching would complicate
+            // the map with one dealer → multiple valid transcripts).
             for t in fetched_transcripts.into_values() {
                 subtranscripts.push(t.get_subtranscript());
             }

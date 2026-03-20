@@ -5,7 +5,10 @@ use super::ChunkyDKGManager;
 use crate::{
     chunky::{
         test_utils::{ChunkyTestSetup, DummyNetworkSender},
-        types::{CertifiedAggregatedSubtranscript, MissingTranscriptRequest},
+        types::{
+            AggregatedSubtranscriptWithHashes, CertifiedAggregatedSubtranscript,
+            MissingTranscriptRequest,
+        },
     },
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::DKGMessage,
@@ -135,9 +138,10 @@ async fn test_chunky_dkg_state_transition() {
     assert!(result.is_err());
 
     // process_aggregated_subtranscript should transition to AwaitAggregatedSubtranscriptCertification.
-    let agg_subtrx = setup.aggregate_subtranscripts(&[0, 1, 2]);
+    let agg_with_hashes = setup.aggregate_subtranscripts_with_hashes(&[0, 1, 2]);
+    let agg_subtrx = agg_with_hashes.aggregated_subtranscript.clone();
     let result = manager
-        .process_aggregated_subtranscript(agg_subtrx.clone())
+        .process_aggregated_subtranscript(agg_with_hashes)
         .await;
     assert!(result.is_ok());
     assert_eq!(
@@ -231,9 +235,10 @@ async fn test_close_and_notifications() {
     };
     manager.process_dkg_start_event(event).await.unwrap();
 
-    let agg_subtrx = setup.aggregate_subtranscripts(&[0, 1, 2]);
+    let agg_with_hashes = setup.aggregate_subtranscripts_with_hashes(&[0, 1, 2]);
+    let agg_subtrx = agg_with_hashes.aggregated_subtranscript.clone();
     manager
-        .process_aggregated_subtranscript(agg_subtrx.clone())
+        .process_aggregated_subtranscript(agg_with_hashes)
         .await
         .unwrap();
 

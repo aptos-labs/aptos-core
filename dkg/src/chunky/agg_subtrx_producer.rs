@@ -1,7 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{chunky::types::ChunkyDKGTranscriptRequest, counters, types::DKGMessage};
+use crate::{
+    chunky::types::{AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest},
+    counters,
+    types::DKGMessage,
+};
 use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
@@ -12,6 +16,7 @@ use aptos_dkg::pvss::{
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
+use aptos_crypto::HashValue;
 use aptos_types::{
     dkg::{
         chunky_dkg::{
@@ -45,7 +50,7 @@ pub fn start_subtranscript_aggregation(
     dkg_config: ChunkyDKGConfig,
     spks: Vec<DealerPublicKey>,
     start_time: Duration,
-    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
+    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
     received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
 ) -> AbortHandle {
     let epoch = dkg_config.session_metadata.dealer_epoch;
@@ -84,11 +89,11 @@ struct InnerState {
     contributors: HashSet<AccountAddress>,
     /// Accumulator in projective form; use aggregate_with for each transcript, then normalize when quorum is met.
     subtrx: Option<ChunkySubtranscriptProjective>,
-    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
+    agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
 }
 
 impl InnerState {
-    fn new(agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>) -> Self {
+    fn new(agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>) -> Self {
         Self {
             valid_peer_transcript_seen: false,
             contributors: HashSet::new(),
@@ -115,7 +120,7 @@ impl ChunkyTranscriptAggregationState {
         dkg_config: ChunkyDKGConfig,
         signing_pubkeys: Vec<DealerPublicKey>,
         start_time: Duration,
-        agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscript>>,
+        agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
         received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
     ) -> Self {
         Self {
@@ -286,21 +291,43 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                 let mut contributors: Vec<_> = inner_state.contributors.iter().copied().collect();
                 contributors.sort();
                 let dealers: Vec<Player> = contributors
-                    .into_iter()
+                    .iter()
                     .map(|addr| {
                         self.epoch_state
                             .verifier
                             .address_to_validator_index()
-                            .get(&addr)
+                            .get(addr)
                             .map(|&index| Player { id: index })
                             .expect("Request must be sent to validators in current set only")
                     })
                     .collect();
+                // Compute per-dealer transcript hashes in the same order as dealers.
+                // These are included in the signature request so the responder can detect
+                // equivocated transcripts (where a dealer sent different transcripts to
+                // different validators), not just missing ones.
+                let dealer_transcript_hashes: Vec<HashValue> = {
+                    let received = self.received_transcripts.lock();
+                    contributors
+                        .iter()
+                        .map(|addr| {
+                            let transcript = received
+                                .get(addr)
+                                .expect("contributor must have a stored transcript");
+                            let bytes = bcs::to_bytes(transcript)
+                                .expect("transcript re-serialization should not fail");
+                            HashValue::sha3_256_of(&bytes)
+                        })
+                        .collect()
+                };
                 let agg_subtrx = AggregatedSubtranscript {
                     subtranscript: agg_trx,
                     dealers,
                 };
-                if let Err(e) = tx.push((), agg_subtrx) {
+                let with_hashes = AggregatedSubtranscriptWithHashes {
+                    aggregated_subtranscript: agg_subtrx,
+                    dealer_transcript_hashes,
+                };
+                if let Err(e) = tx.push((), with_hashes) {
                     info!(
                         epoch = epoch,
                         "[ChunkyDKG] Failed to send aggregated chunky transcript to ChunkyDKGManager when quorum met: {:?}", e
@@ -357,7 +384,7 @@ mod tests {
         validator_index: usize,
     ) -> (
         Arc<ChunkyTranscriptAggregationState>,
-        aptos_channel::Receiver<(), AggregatedSubtranscript>,
+        aptos_channel::Receiver<(), AggregatedSubtranscriptWithHashes>,
     ) {
         let (tx, rx) =
             aptos_channel::new(aptos_channels::message_queues::QueueStyle::KLAST, 1, None);
@@ -398,9 +425,10 @@ mod tests {
         // Verify the aggregated subtranscript was sent via the channel.
         let agg = rx.select_next_some().now_or_never();
         assert!(agg.is_some());
-        let agg_subtrx = agg.unwrap();
+        let agg_with_hashes = agg.unwrap();
         // Dealers should be sorted by AccountAddress, then mapped to validator indices.
-        assert_eq!(agg_subtrx.dealers.len(), 3);
+        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealers.len(), 3);
+        assert_eq!(agg_with_hashes.dealer_transcript_hashes.len(), 3);
 
         // Fourth transcript — all received, returns Some(()).
         let (trx3, _) = setup.deal_transcript(3);
@@ -474,7 +502,8 @@ mod tests {
         // Channel should have received the aggregated subtranscript.
         let agg = rx.select_next_some().now_or_never();
         assert!(agg.is_some());
-        let agg_subtrx = agg.unwrap();
-        assert_eq!(agg_subtrx.dealers.len(), 1);
+        let agg_with_hashes = agg.unwrap();
+        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealers.len(), 1);
+        assert_eq!(agg_with_hashes.dealer_transcript_hashes.len(), 1);
     }
 }
