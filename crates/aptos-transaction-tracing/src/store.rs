@@ -183,21 +183,17 @@ impl TransactionTraceStore {
     ) {
         // Clone hashes and release the batch_txns shard lock before acquiring
         // per-txn trace locks, reducing cross-map lock hold time.
-        let txn_hashes: Option<Vec<HashValue>> = self
-            .batch_txns
-            .get(batch_digest)
-            .map(|r| r.value().clone());
+        let txn_hashes: Option<Vec<HashValue>> =
+            self.batch_txns.get(batch_digest).map(|r| r.value().clone());
         if let Some(hashes) = txn_hashes {
             for hash in &hashes {
                 match &metadata {
-                    Some(meta) => {
-                        self.record_stage_with_metadata_at(
-                            hash,
-                            stage,
-                            meta.clone(),
-                            timestamp_usecs,
-                        )
-                    },
+                    Some(meta) => self.record_stage_with_metadata_at(
+                        hash,
+                        stage,
+                        meta.clone(),
+                        timestamp_usecs,
+                    ),
                     None => self.record_stage_at(hash, stage, timestamp_usecs),
                 }
             }
@@ -344,9 +340,7 @@ fn now_usecs() -> u64 {
 fn is_block_finalization(stage: TransactionStage) -> bool {
     matches!(
         stage,
-        TransactionStage::Certified
-            | TransactionStage::PreCommit
-            | TransactionStage::Committed
+        TransactionStage::Certified | TransactionStage::PreCommit | TransactionStage::Committed
     )
 }
 
@@ -376,6 +370,17 @@ fn build_wait_summary(
     let gap_ms = (pull_time_usecs as i64 - prev_stage_usecs as i64) / 1000;
     parts.push(format!("{}ms", gap_ms));
 
+    // When gap is too short for batch records (common after retry), show
+    // snapshot context from this pull round so retries aren't opaque.
+    if gap_batches.is_empty() {
+        parts.push(format!(
+            "excl={},bp={}/{}",
+            info.excluded_txn_count,
+            if info.bp_txn_count { 1 } else { 0 },
+            if info.bp_proof_count { 1 } else { 0 },
+        ));
+    }
+
     if !gap_batches.is_empty() {
         let n = gap_batches.len();
         let total_batch_objects: u64 = gap_batches.iter().map(|r| r.num_batches).sum();
@@ -389,8 +394,7 @@ fn build_wait_summary(
                 .collect();
             intervals_ms.sort_unstable();
             let pct = |p: f64| {
-                let idx =
-                    ((intervals_ms.len() as f64 - 1.0) * p / 100.0).round() as usize;
+                let idx = ((intervals_ms.len() as f64 - 1.0) * p / 100.0).round() as usize;
                 intervals_ms[idx]
             };
             parts.push(format!(
@@ -418,17 +422,14 @@ fn build_wait_summary(
                 "bp_rounds={}(txn),{}(proof)/{}",
                 bp_txn_rounds, bp_proof_rounds, n
             )),
-            (true, false) => {
-                parts.push(format!("bp_rounds={}(txn)/{}", bp_txn_rounds, n))
-            },
-            (false, true) => {
-                parts.push(format!("bp_rounds={}(proof)/{}", bp_proof_rounds, n))
-            },
+            (true, false) => parts.push(format!("bp_rounds={}(txn)/{}", bp_txn_rounds, n)),
+            (false, true) => parts.push(format!("bp_rounds={}(proof)/{}", bp_proof_rounds, n)),
             (false, false) => {},
         }
 
-        // Aggregate gas bucket distribution across all rounds in the gap.
-        // Shows total txns per gas bucket: gas=[0:2700,150:1200,500:600]
+        // Aggregate gas price distribution across all rounds in the gap.
+        // Format: gas=[gas_price_range:num_txns, ...]
+        // e.g. gas=[0-149:2700txns,150-499:1200txns,500+:600txns]
         let mut gas_totals: BTreeMap<u64, u64> = BTreeMap::new();
         for r in &gap_batches {
             for &(bucket, count) in &r.gas_bucket_txn_counts {
@@ -436,11 +437,24 @@ fn build_wait_summary(
             }
         }
         if !gas_totals.is_empty() {
-            let bucket_strs: Vec<String> = gas_totals
+            let keys: Vec<u64> = gas_totals.keys().copied().collect();
+            let bucket_strs: Vec<String> = keys
                 .iter()
-                .map(|(bucket, count)| format!("{}:{}", bucket, count))
+                .enumerate()
+                .map(|(i, &start)| {
+                    let num_txns = gas_totals[&start];
+                    let gas_range = if i + 1 < keys.len() {
+                        format!("{}-{}", start, keys[i + 1] - 1)
+                    } else {
+                        format!("{}+", start)
+                    };
+                    format!("{}:{}txns", gas_range, num_txns)
+                })
                 .collect();
-            parts.push(format!("gas=[{}]", bucket_strs.join(",")));
+            parts.push(format!(
+                "[gas_price_range:num_txns]=[{}]",
+                bucket_strs.join(",")
+            ));
         }
     }
 
@@ -449,12 +463,12 @@ fn build_wait_summary(
 
 fn log_trace(trace: &TransactionTrace) {
     let base = trace.insertion_time_usecs;
-    let max_attempt = trace
-        .stages
-        .iter()
-        .map(|s| s.attempt)
-        .max()
-        .unwrap_or(1);
+
+    // Sort stages by timestamp so concurrent pipeline stages appear in order.
+    let mut sorted_stages = trace.stages.clone();
+    sorted_stages.sort_by_key(|s| s.timestamp_usecs);
+
+    let max_attempt = sorted_stages.iter().map(|s| s.attempt).max().unwrap_or(1);
 
     // Build stage timeline chronologically. Insert [attempt_N] markers when the
     // attempt number increases on a non-block-finalization stage, so that
@@ -464,11 +478,11 @@ fn log_trace(trace: &TransactionTrace) {
     // clears txns_in_progress_sorted → retried txn becomes eligible for re-pull.
     let mut stage_parts = Vec::new();
     let mut display_attempt: u32 = 0;
-    // Track the timestamp of the previous stage to filter batch creation times.
+    // Track the timestamp of the previous stage for relative time display.
     let mut prev_stage_usecs = base;
     // Track whether we've already shown wait() for this attempt.
     let mut shown_wait_for_attempt: u32 = 0;
-    for record in &trace.stages {
+    for record in &sorted_stages {
         // Start a new attempt group when we see a higher attempt on a stage that
         // isn't block finalization (those trail the previous attempt's execution).
         let new_attempt = if is_block_finalization(record.stage) {
@@ -484,8 +498,7 @@ fn log_trace(trace: &TransactionTrace) {
         }
 
         // For the first QsBatchPull of each attempt, emit a wait() summary.
-        if record.stage == TransactionStage::QsBatchPull
-            && display_attempt > shown_wait_for_attempt
+        if record.stage == TransactionStage::QsBatchPull && display_attempt > shown_wait_for_attempt
         {
             shown_wait_for_attempt = display_attempt;
             if let Some(StageMetadata::BatchPull(info)) = &record.metadata {
@@ -497,8 +510,8 @@ fn log_trace(trace: &TransactionTrace) {
             }
         }
 
-        let diff_usecs = record.timestamp_usecs as i64 - base as i64;
-        let diff_ms = diff_usecs / 1000;
+        let delta_usecs = record.timestamp_usecs as i64 - prev_stage_usecs as i64;
+        let delta_ms = delta_usecs / 1000;
         let stage_str = match &record.metadata {
             Some(StageMetadata::Execution(status)) => {
                 format!("{}({})", record.stage.as_ref(), status.as_ref())
@@ -507,12 +520,6 @@ fn log_trace(trace: &TransactionTrace) {
                 format!("{}({})", record.stage.as_ref(), inclusion.as_ref())
             },
             Some(StageMetadata::BatchPull(info)) => {
-                // Compact format: QsBatchPull(n=<pulled>,max=<limit>,excl=<excluded>,bp=<txn>/<proof>)
-                //   n    = txns returned by mempool in this pull
-                //   max  = dynamic pull limit (reduced by txn-count back-pressure)
-                //   excl = txns already in in-flight batches (excluded from pull)
-                //   bp   = back-pressure flags: txn_count / proof_count (1=active, 0=off;
-                //          proof_count=1 blocks normal pulls entirely, only force-pull at 250ms)
                 format!(
                     "{}(n={},max={},excl={},bp={}/{})",
                     record.stage.as_ref(),
@@ -525,21 +532,16 @@ fn log_trace(trace: &TransactionTrace) {
             },
             None => record.stage.as_ref().to_string(),
         };
-        if diff_ms >= 0 {
-            stage_parts.push(format!("{}=+{}ms", stage_str, diff_ms));
-        } else {
-            stage_parts.push(format!("{}={}ms", stage_str, diff_ms));
-        }
+        stage_parts.push(format!("{}=+{}ms", stage_str, delta_ms));
         prev_stage_usecs = record.timestamp_usecs;
     }
 
     // Check if the last stage was a retry
-    let last_status = trace.stages.iter().rev().find_map(|s| match &s.metadata {
+    let last_status = sorted_stages.iter().rev().find_map(|s| match &s.metadata {
         Some(StageMetadata::Execution(status)) => Some(*status),
         _ => None,
     });
-    let total_latency_ms = trace
-        .stages
+    let total_latency_ms = sorted_stages
         .last()
         .map(|s| (s.timestamp_usecs as i64 - base as i64) / 1000)
         .unwrap_or(0);
