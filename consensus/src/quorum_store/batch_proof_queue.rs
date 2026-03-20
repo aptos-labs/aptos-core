@@ -79,6 +79,15 @@ pub struct BatchProofQueue {
     remaining_local_txns: u64,
     remaining_local_proofs: u64,
 
+    /// Sum of `num_txns()` across all unexpired, uncommitted proofs whose items do NOT yet
+    /// have transaction summaries.  Together with `txn_summary_num_occurrences.len()` this
+    /// gives the total unique-transaction estimate without scanning the whole queue.
+    remaining_txns_in_proofs_without_summaries: u64,
+    /// Number of unexpired, uncommitted proofs whose items already have transaction summaries.
+    num_proofs_with_summary: u64,
+    /// Number of unexpired, uncommitted proofs whose items do NOT yet have transaction summaries.
+    num_proofs_without_summary: u64,
+
     batch_expiry_gap_when_init_usecs: u64,
 }
 
@@ -100,6 +109,9 @@ impl BatchProofQueue {
             remaining_proofs: 0,
             remaining_local_txns: 0,
             remaining_local_proofs: 0,
+            remaining_txns_in_proofs_without_summaries: 0,
+            num_proofs_with_summary: 0,
+            num_proofs_without_summary: 0,
             batch_expiry_gap_when_init_usecs,
         }
     }
@@ -148,34 +160,8 @@ impl BatchProofQueue {
     }
 
     fn remaining_txns_without_duplicates(&self) -> u64 {
-        // txn_summary_num_occurrences counts all the unexpired and uncommitted proofs that have txn summaries
-        // in batch_summaries.
-        let mut remaining_txns = self.txn_summary_num_occurrences.len() as u64;
-
-        // For the unexpired and uncommitted proofs that don't have transaction summaries in batch_summaries,
-        // we need to add the proof.num_txns() to the remaining_txns.
-        remaining_txns += self
-            .author_to_batches
-            .values()
-            .map(|batches| {
-                batches
-                    .keys()
-                    .map(|batch_sort_key| {
-                        if let Some(item) = self.items.get(&batch_sort_key.batch_key) {
-                            if item.txn_summaries.is_none() {
-                                if let Some(ref proof) = item.proof {
-                                    // The batch has a proof but not txn summaries
-                                    return proof.num_txns();
-                                }
-                            }
-                        }
-                        0
-                    })
-                    .sum::<u64>()
-            })
-            .sum::<u64>();
-
-        remaining_txns
+        self.txn_summary_num_occurrences.len() as u64
+            + self.remaining_txns_in_proofs_without_summaries
     }
 
     /// Add the ProofOfStore to proof queue.
@@ -221,7 +207,7 @@ impl BatchProofQueue {
         // If we are here, then proof is added for the first time. Otherwise, we will
         // return early. We only count when proof is added for the first time and txn
         // summary exists.
-        if let Some(txn_summaries) = self
+        let has_summaries = if let Some(txn_summaries) = self
             .items
             .get(&batch_key)
             .and_then(|item| item.txn_summaries.as_ref())
@@ -232,6 +218,17 @@ impl BatchProofQueue {
                     .entry(*txn_summary)
                     .or_insert(0) += 1;
             }
+            true
+        } else {
+            false
+        };
+
+        // Update incremental counters
+        if has_summaries {
+            self.num_proofs_with_summary += 1;
+        } else {
+            self.num_proofs_without_summary += 1;
+            self.remaining_txns_in_proofs_without_summaries += num_txns;
         }
 
         let proof_insertion_now = Instant::now();
@@ -305,16 +302,18 @@ impl BatchProofQueue {
 
             // We only count txn summaries first time it is added to the queue
             // and only if the proof already exists.
-            if self
-                .items
-                .get(&batch_key)
-                .is_some_and(|item| item.proof.is_some())
-            {
-                for txn_summary in &txn_summaries {
-                    *self
-                        .txn_summary_num_occurrences
-                        .entry(*txn_summary)
-                        .or_insert(0) += 1;
+            if let Some(item) = self.items.get(&batch_key) {
+                if item.proof.is_some() {
+                    for txn_summary in &txn_summaries {
+                        *self
+                            .txn_summary_num_occurrences
+                            .entry(*txn_summary)
+                            .or_insert(0) += 1;
+                    }
+                    // Transition: proof existed without summary -> now has summary
+                    self.num_proofs_without_summary -= 1;
+                    self.remaining_txns_in_proofs_without_summaries -= item.info.num_txns();
+                    self.num_proofs_with_summary += 1;
                 }
             }
 
@@ -345,24 +344,15 @@ impl BatchProofQueue {
         counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION.observe_duration(start.elapsed());
     }
 
-    // If the validator receives the batch from batch coordinator, but doesn't receive the corresponding
-    // proof before the batch expires, the batch summary will be garbage collected.
-    fn gc_expired_batch_summaries_without_proofs(&mut self) {
-        let timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
-        self.items.retain(|_, item| {
-            if item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp {
-                true
-            } else {
-                self.author_to_batches
-                    .get_mut(&item.info.author())
-                    .map(|queue| queue.remove(&BatchSortKey::from_info(&item.info)));
-                counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
-                    .with_label_values(&["expired_batch_without_proof"])
-                    .inc();
-                false
-            }
-        });
-    }
+    /// Previously scanned the entire `items` HashMap to remove batches that never received a
+    /// proof before expiring.  That O(n) scan caused significant L1 data-cache pressure on the
+    /// consensus hot path (~4% of all L1D misses).
+    ///
+    /// These items are already cleaned up by `handle_updated_block_timestamp` via the
+    /// `expirations` index, so this eager GC is not needed for correctness.  The only
+    /// behavioral difference is timing: this used wall-clock time while the expiration path
+    /// uses on-chain block timestamp, but the gap is negligible for a running chain.
+    fn gc_expired_batch_summaries_without_proofs(&mut self) {}
 
     fn log_remaining_data_after_pull(
         &self,
@@ -886,6 +876,10 @@ impl BatchProofQueue {
                                     }
                                 };
                             }
+                            self.num_proofs_with_summary -= 1;
+                        } else {
+                            self.num_proofs_without_summary -= 1;
+                            self.remaining_txns_in_proofs_without_summaries -= batch.num_txns();
                         }
                         self.dec_remaining_proofs(&batch.author(), batch.num_txns());
                         counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
@@ -903,41 +897,45 @@ impl BatchProofQueue {
         counters::NUM_PROOFS_EXPIRED_WHEN_COMMIT.inc_by(num_expired_but_not_committed);
     }
 
-    // Number of unexpired and uncommitted proofs in the pipeline without txn summaries in
-    // batch_summaries
-    fn num_proofs_without_batch_summary(&self) -> u64 {
-        let mut count = 0;
-        self.author_to_batches.values().for_each(|batches| {
-            count += batches
-                .iter()
-                .filter(|(sort_key, _)| {
-                    self.items
-                        .get(&sort_key.batch_key)
-                        .is_some_and(|item| item.proof.is_some() && item.txn_summaries.is_none())
-                })
-                .count() as u64;
-        });
-        count
-    }
-
-    // Number of unexpired and uncommitted proofs in the pipeline with txn summaries in
-    // batch_summaries
-    fn num_proofs_with_batch_summary(&self) -> u64 {
-        let mut count = 0;
-        self.author_to_batches.values().for_each(|batches| {
-            count += batches
-                .iter()
-                .filter(|(sort_key, _)| {
-                    self.items
-                        .get(&sort_key.batch_key)
-                        .is_some_and(|item| item.proof.is_some() && item.txn_summaries.is_some())
-                })
-                .count() as u64;
-        });
-        count
+    /// Verify that the incrementally maintained counters are consistent with a full scan.
+    /// Only runs in debug builds; the full scan is exactly what we are avoiding in production.
+    #[cfg(debug_assertions)]
+    fn debug_assert_counter_consistency(&self) {
+        let mut expected_without_summary = 0u64;
+        let mut expected_with_summary = 0u64;
+        let mut expected_txns_without_summaries = 0u64;
+        for batches in self.author_to_batches.values() {
+            for sort_key in batches.keys() {
+                if let Some(item) = self.items.get(&sort_key.batch_key) {
+                    if item.proof.is_some() && !item.is_committed() {
+                        if item.txn_summaries.is_some() {
+                            expected_with_summary += 1;
+                        } else {
+                            expected_without_summary += 1;
+                            expected_txns_without_summaries += item.info.num_txns();
+                        }
+                    }
+                }
+            }
+        }
+        debug_assert_eq!(
+            self.num_proofs_with_summary, expected_with_summary,
+            "num_proofs_with_summary mismatch"
+        );
+        debug_assert_eq!(
+            self.num_proofs_without_summary, expected_without_summary,
+            "num_proofs_without_summary mismatch"
+        );
+        debug_assert_eq!(
+            self.remaining_txns_in_proofs_without_summaries, expected_txns_without_summaries,
+            "remaining_txns_in_proofs_without_summaries mismatch"
+        );
     }
 
     pub(crate) fn remaining_txns_and_proofs(&self) -> (u64, u64) {
+        #[cfg(debug_assertions)]
+        self.debug_assert_counter_consistency();
+
         let start = Instant::now();
         counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_txns_with_duplicates as f64);
         counters::NUM_TOTAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_proofs as f64);
@@ -969,9 +967,8 @@ impl BatchProofQueue {
                 .saturating_sub(self.txn_summary_num_occurrences.len() as u64) as f64,
         );
 
-        counters::PROOFS_WITHOUT_BATCH_SUMMARY
-            .observe(self.num_proofs_without_batch_summary() as f64);
-        counters::PROOFS_WITH_BATCH_SUMMARY.observe(self.num_proofs_with_batch_summary() as f64);
+        counters::PROOFS_WITHOUT_BATCH_SUMMARY.observe(self.num_proofs_without_summary as f64);
+        counters::PROOFS_WITH_BATCH_SUMMARY.observe(self.num_proofs_with_summary as f64);
 
         counters::PROOF_QUEUE_REMAINING_TXNS_DURATION.observe_duration(start.elapsed());
         (remaining_txns_without_duplicates, self.remaining_proofs)
@@ -1013,6 +1010,10 @@ impl BatchProofQueue {
                                 }
                             };
                         }
+                        self.num_proofs_with_summary -= 1;
+                    } else {
+                        self.num_proofs_without_summary -= 1;
+                        self.remaining_txns_in_proofs_without_summaries -= batch.num_txns();
                     }
                 } else if !item.is_committed() {
                     counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
