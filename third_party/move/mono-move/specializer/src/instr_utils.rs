@@ -10,9 +10,6 @@ use std::collections::BTreeMap;
 
 /// Get named slots defined (written) and used (read) by an instruction.
 pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Slot>, Vec<Slot>) {
-    let mut defs = Vec::new();
-    let mut uses = Vec::new();
-
     match instr {
         Instr::LdConst(d, _)
         | Instr::LdTrue(d)
@@ -28,55 +25,26 @@ pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Slot>, Vec<Slot>) {
         | Instr::LdI32(d, _)
         | Instr::LdI64(d, _)
         | Instr::LdI128(d, _)
-        | Instr::LdI256(d, _) => {
-            defs.push(*d);
-        },
+        | Instr::LdI256(d, _) => (vec![*d], vec![]),
 
-        Instr::Copy(d, s) | Instr::Move(d, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
+        Instr::Copy(d, s) | Instr::Move(d, s) => (vec![*d], vec![*s]),
 
-        Instr::UnaryOp(d, _, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
-        Instr::BinaryOp(d, _, l, r) => {
-            defs.push(*d);
-            uses.push(*l);
-            uses.push(*r);
-        },
-        Instr::BinaryOpImm(d, _, l, _) => {
-            defs.push(*d);
-            uses.push(*l);
-        },
+        Instr::UnaryOp(d, _, s) => (vec![*d], vec![*s]),
+        Instr::BinaryOp(d, _, l, r) => (vec![*d], vec![*l, *r]),
+        Instr::BinaryOpImm(d, _, l, _) => (vec![*d], vec![*l]),
 
-        Instr::Pack(d, _, fields) | Instr::PackGeneric(d, _, fields) => {
-            defs.push(*d);
-            uses.extend_from_slice(fields);
-        },
-        Instr::Unpack(ds, _, s) | Instr::UnpackGeneric(ds, _, s) => {
-            defs.extend_from_slice(ds);
-            uses.push(*s);
-        },
+        Instr::Pack(d, _, fields) | Instr::PackGeneric(d, _, fields) => (vec![*d], fields.to_vec()),
+        Instr::Unpack(ds, _, s) | Instr::UnpackGeneric(ds, _, s) => (ds.to_vec(), vec![*s]),
 
         Instr::PackVariant(d, _, fields) | Instr::PackVariantGeneric(d, _, fields) => {
-            defs.push(*d);
-            uses.extend_from_slice(fields);
+            (vec![*d], fields.to_vec())
         },
         Instr::UnpackVariant(ds, _, s) | Instr::UnpackVariantGeneric(ds, _, s) => {
-            defs.extend_from_slice(ds);
-            uses.push(*s);
+            (ds.to_vec(), vec![*s])
         },
-        Instr::TestVariant(d, _, s) | Instr::TestVariantGeneric(d, _, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
+        Instr::TestVariant(d, _, s) | Instr::TestVariantGeneric(d, _, s) => (vec![*d], vec![*s]),
 
-        Instr::ImmBorrowLoc(d, s) | Instr::MutBorrowLoc(d, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
+        Instr::ImmBorrowLoc(d, s) | Instr::MutBorrowLoc(d, s) => (vec![*d], vec![*s]),
         Instr::ImmBorrowField(d, _, s)
         | Instr::MutBorrowField(d, _, s)
         | Instr::ImmBorrowFieldGeneric(d, _, s)
@@ -84,114 +52,53 @@ pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Slot>, Vec<Slot>) {
         | Instr::ImmBorrowVariantField(d, _, s)
         | Instr::MutBorrowVariantField(d, _, s)
         | Instr::ImmBorrowVariantFieldGeneric(d, _, s)
-        | Instr::MutBorrowVariantFieldGeneric(d, _, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
-        Instr::ReadRef(d, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
-        Instr::WriteRef(r, v) => {
-            uses.push(*r);
-            uses.push(*v);
-        },
+        | Instr::MutBorrowVariantFieldGeneric(d, _, s) => (vec![*d], vec![*s]),
+        Instr::ReadRef(d, s) => (vec![*d], vec![*s]),
+        Instr::WriteRef(r, v) => (vec![], vec![*r, *v]),
 
         Instr::ReadField(d, _, s)
         | Instr::ReadFieldGeneric(d, _, s)
         | Instr::ReadVariantField(d, _, s)
-        | Instr::ReadVariantFieldGeneric(d, _, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
+        | Instr::ReadVariantFieldGeneric(d, _, s) => (vec![*d], vec![*s]),
         Instr::WriteField(_, r, v)
         | Instr::WriteFieldGeneric(_, r, v)
         | Instr::WriteVariantField(_, r, v)
-        | Instr::WriteVariantFieldGeneric(_, r, v) => {
-            uses.push(*r);
-            uses.push(*v);
-        },
+        | Instr::WriteVariantFieldGeneric(_, r, v) => (vec![], vec![*r, *v]),
 
         Instr::Exists(d, _, a)
         | Instr::ExistsGeneric(d, _, a)
         | Instr::MoveFrom(d, _, a)
-        | Instr::MoveFromGeneric(d, _, a) => {
-            defs.push(*d);
-            uses.push(*a);
-        },
-        Instr::MoveTo(_, s, v) | Instr::MoveToGeneric(_, s, v) => {
-            uses.push(*s);
-            uses.push(*v);
-        },
+        | Instr::MoveFromGeneric(d, _, a) => (vec![*d], vec![*a]),
+        Instr::MoveTo(_, s, v) | Instr::MoveToGeneric(_, s, v) => (vec![], vec![*s, *v]),
         Instr::ImmBorrowGlobal(d, _, a)
         | Instr::ImmBorrowGlobalGeneric(d, _, a)
         | Instr::MutBorrowGlobal(d, _, a)
-        | Instr::MutBorrowGlobalGeneric(d, _, a) => {
-            defs.push(*d);
-            uses.push(*a);
-        },
+        | Instr::MutBorrowGlobalGeneric(d, _, a) => (vec![*d], vec![*a]),
 
         Instr::Call(rets, _, args) | Instr::CallGeneric(rets, _, args) => {
-            defs.extend_from_slice(rets);
-            uses.extend_from_slice(args);
+            (rets.to_vec(), args.to_vec())
         },
         Instr::PackClosure(d, _, _, captured) | Instr::PackClosureGeneric(d, _, _, captured) => {
-            defs.push(*d);
-            uses.extend_from_slice(captured);
+            (vec![*d], captured.to_vec())
         },
-        Instr::CallClosure(rets, _, args) => {
-            defs.extend_from_slice(rets);
-            uses.extend_from_slice(args);
-        },
+        Instr::CallClosure(rets, _, args) => (rets.to_vec(), args.to_vec()),
 
-        Instr::VecPack(d, _, _, elems) => {
-            defs.push(*d);
-            uses.extend_from_slice(elems);
-        },
-        Instr::VecLen(d, _, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
+        Instr::VecPack(d, _, _, elems) => (vec![*d], elems.to_vec()),
+        Instr::VecLen(d, _, s) => (vec![*d], vec![*s]),
         Instr::VecImmBorrow(d, _, v, i) | Instr::VecMutBorrow(d, _, v, i) => {
-            defs.push(*d);
-            uses.push(*v);
-            uses.push(*i);
+            (vec![*d], vec![*v, *i])
         },
-        Instr::VecPushBack(_, v, val) => {
-            uses.push(*v);
-            uses.push(*val);
-        },
-        Instr::VecPopBack(d, _, s) => {
-            defs.push(*d);
-            uses.push(*s);
-        },
-        Instr::VecUnpack(ds, _, _, s) => {
-            defs.extend_from_slice(ds);
-            uses.push(*s);
-        },
-        Instr::VecSwap(_, v, i, j) => {
-            uses.push(*v);
-            uses.push(*i);
-            uses.push(*j);
-        },
+        Instr::VecPushBack(_, v, val) => (vec![], vec![*v, *val]),
+        Instr::VecPopBack(d, _, s) => (vec![*d], vec![*s]),
+        Instr::VecUnpack(ds, _, _, s) => (ds.to_vec(), vec![*s]),
+        Instr::VecSwap(_, v, i, j) => (vec![], vec![*v, *i, *j]),
 
-        Instr::Label(_) | Instr::Branch(_) => {},
-        Instr::BrTrue(_, c) | Instr::BrFalse(_, c) => {
-            uses.push(*c);
-        },
-        Instr::Ret(rets) => {
-            uses.extend_from_slice(rets);
-        },
-        Instr::Abort(c) => {
-            uses.push(*c);
-        },
-        Instr::AbortMsg(c, m) => {
-            uses.push(*c);
-            uses.push(*m);
-        },
+        Instr::Label(_) | Instr::Branch(_) => (vec![], vec![]),
+        Instr::BrTrue(_, c) | Instr::BrFalse(_, c) => (vec![], vec![*c]),
+        Instr::Ret(rets) => (vec![], rets.to_vec()),
+        Instr::Abort(c) => (vec![], vec![*c]),
+        Instr::AbortMsg(c, m) => (vec![], vec![*c, *m]),
     }
-
-    (defs, uses)
 }
 
 /// Apply named-slot remapping to all operands of an instruction.

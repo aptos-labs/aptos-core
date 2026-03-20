@@ -48,7 +48,10 @@ use std::collections::BTreeMap;
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed registers
 ///   truly hold dead values, so type-keyed register recycling is sound.
-pub fn convert_module_v1(module: CompiledModule, struct_name_table: &[StructNameIndex]) -> ModuleIR {
+pub fn convert_module_v1(
+    module: CompiledModule,
+    struct_name_table: &[StructNameIndex],
+) -> ModuleIR {
     let functions = module
         .function_defs
         .iter()

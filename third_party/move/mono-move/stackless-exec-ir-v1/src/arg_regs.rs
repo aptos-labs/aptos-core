@@ -8,8 +8,10 @@
 //! into arg slots avoid a copy at call sites in the downstream micro-op
 //! translation.
 
-use crate::ir::{FunctionIR, Instr, ModuleIR, Reg};
-use crate::optimize_v1::{get_defs_uses, rename_instr, renumber_registers, split_into_blocks};
+use crate::{
+    ir::{FunctionIR, Instr, ModuleIR, Reg},
+    optimize_v1::{get_defs_uses, rename_instr, renumber_registers, split_into_blocks},
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Introduce arg registers for all functions in a module (V1 pipeline).

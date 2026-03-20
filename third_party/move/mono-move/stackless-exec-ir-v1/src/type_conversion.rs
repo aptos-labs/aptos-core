@@ -9,9 +9,7 @@
 //! to avoid a dependency on `move-vm-runtime`.
 
 use move_binary_format::{
-    binary_views::BinaryIndexedView,
-    file_format::SignatureToken,
-    CompiledModule,
+    binary_views::BinaryIndexedView, file_format::SignatureToken, CompiledModule,
 };
 use move_vm_types::loaded_data::{
     runtime_types::{AbilityInfo, Type},
@@ -65,9 +63,11 @@ fn convert_impl(
         SignatureToken::Address => Type::Address,
         SignatureToken::Signer => Type::Signer,
         SignatureToken::TypeParameter(idx) => Type::TyParam(*idx),
-        SignatureToken::Vector(inner) => {
-            Type::Vector(TriompheArc::new(convert_impl(view, inner, struct_name_table)))
-        },
+        SignatureToken::Vector(inner) => Type::Vector(TriompheArc::new(convert_impl(
+            view,
+            inner,
+            struct_name_table,
+        ))),
         SignatureToken::Reference(inner) => {
             Type::Reference(Box::new(convert_impl(view, inner, struct_name_table)))
         },

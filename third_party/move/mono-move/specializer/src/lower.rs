@@ -363,7 +363,7 @@ impl<'a> LoweringState<'a> {
         self.call_site_cursor += 1;
 
         // Update active_xfer_slots for ret Xfer positions before doing ret copies.
-        // For each ret that targets a Xfer(j), resolve its physical slot:
+        // For each ret that targets a Xfer(j), resolve its real slot:
         //  - If there's a next callsite with a param at position j, use that
         //    callsite's arg_write_slots[j] so the later xfer copy is elided.
         //  - Otherwise fall back to ret_read_slots[k] (no-copy).

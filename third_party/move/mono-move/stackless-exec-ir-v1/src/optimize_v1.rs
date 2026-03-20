@@ -55,32 +55,26 @@ pub(crate) fn fuse_field_access_instrs(instrs: &mut Vec<Instr>) {
                 Some(Instr::WriteField(*fld, *dst_ref, *val))
             },
             // MutBorrowFieldGeneric + WriteRef → WriteFieldGeneric
-            (Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-                if *ref_r == *write_ref =>
-            {
-                Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val))
-            },
-            // ImmBorrowVariantField + ReadRef → ReadVariantField
             (
-                Instr::ImmBorrowVariantField(ref_r, fld, src),
-                Instr::ReadRef(dst, read_src),
-            ) if *ref_r == *read_src => {
+                Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref),
+                Instr::WriteRef(write_ref, val),
+            ) if *ref_r == *write_ref => Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val)),
+            // ImmBorrowVariantField + ReadRef → ReadVariantField
+            (Instr::ImmBorrowVariantField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+                if *ref_r == *read_src =>
+            {
                 Some(Instr::ReadVariantField(*dst, *fld, *src))
             },
             // ImmBorrowVariantFieldGeneric + ReadRef → ReadVariantFieldGeneric
             (
                 Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src),
                 Instr::ReadRef(dst, read_src),
-            ) if *ref_r == *read_src => {
-                Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src))
-            },
+            ) if *ref_r == *read_src => Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src)),
             // MutBorrowVariantField + WriteRef → WriteVariantField
             (
                 Instr::MutBorrowVariantField(ref_r, fld, dst_ref),
                 Instr::WriteRef(write_ref, val),
-            ) if *ref_r == *write_ref => {
-                Some(Instr::WriteVariantField(*fld, *dst_ref, *val))
-            },
+            ) if *ref_r == *write_ref => Some(Instr::WriteVariantField(*fld, *dst_ref, *val)),
             // MutBorrowVariantFieldGeneric + WriteRef → WriteVariantFieldGeneric
             (
                 Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
@@ -161,9 +155,7 @@ pub(crate) fn fuse_immediate_binops(func: &mut FunctionIR) {
                 Instr::BinaryOp(dst, op, _lhs, rhs) if *rhs == tmp => {
                     Some(Instr::BinaryOpImm(*dst, op.clone(), *_lhs, imm))
                 },
-                Instr::BinaryOp(dst, op, lhs, _rhs)
-                    if *lhs == tmp && is_commutative(op) =>
-                {
+                Instr::BinaryOp(dst, op, lhs, _rhs) if *lhs == tmp && is_commutative(op) => {
                     Some(Instr::BinaryOpImm(*dst, op.clone(), *_rhs, imm))
                 },
                 _ => None,
@@ -256,9 +248,7 @@ fn apply_subst_to_sources(instr: &mut Instr, subst: &BTreeMap<Reg, Reg>) {
         Instr::PackVariant(_, _, fields) | Instr::PackVariantGeneric(_, _, fields) => {
             s_vec(fields, subst)
         },
-        Instr::UnpackVariant(_, _, src) | Instr::UnpackVariantGeneric(_, _, src) => {
-            s(src, subst)
-        },
+        Instr::UnpackVariant(_, _, src) | Instr::UnpackVariantGeneric(_, _, src) => s(src, subst),
         Instr::TestVariant(_, _, src) | Instr::TestVariantGeneric(_, _, src) => s(src, subst),
 
         // References
@@ -542,8 +532,7 @@ pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Reg>, Vec<Reg>) {
             defs.extend_from_slice(rets);
             uses.extend_from_slice(args);
         },
-        Instr::PackClosure(d, _, _, captured)
-        | Instr::PackClosureGeneric(d, _, _, captured) => {
+        Instr::PackClosure(d, _, _, captured) | Instr::PackClosureGeneric(d, _, _, captured) => {
             defs.push(*d);
             uses.extend_from_slice(captured);
         },

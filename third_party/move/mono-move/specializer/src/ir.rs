@@ -23,18 +23,16 @@ use move_vm_types::loaded_data::runtime_types::Type;
 
 /// Named slot operand.
 ///
-/// - `Home(i)` — frame-local storage: parameters, declared locals, and compiler
-///   temporaries. These map 1:1 to frame slots.
+/// - `Home` — frame-local storage: parameters, declared locals, and temporaries
+///   due to destackification. These map 1:1 to frame slots.
 ///
-/// - `Xfer(j)` — shared call-interface ("transfer") slots used for both
-///   passing arguments to a callee (before the call) and receiving return
-///   values (after the call). `Xfer(j)` overlaps with the callee's
-///   parameter/return area, so values produced directly into a `Xfer`
-///   slot avoid a copy at the call site.
-///   The required width at each call site is `max(#args, #rets)`.
+/// - `Xfer` — transfer slots used for both  passing arguments to a callee
+///   (before the call) and receiving return values (after the call).
+///   `Xfer` overlaps with the callee's  parameter/return area, so values
+///   produced directly into a `Xfer` slot avoid a copy at the call site.
 ///
-/// - `Vid(n)` — SSA value ID, a 0-based temporary that exists only in the
-///   pre-allocation IR. Slot allocation replaces every `Vid` with a physical
+/// - `Vid` — SSA value ID, a 0-based temporary that exists only in the
+///   pre-allocation IR. Slot allocation replaces every `Vid` with a real
 ///   `Home` or `Xfer` slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Slot {
@@ -50,6 +48,11 @@ impl Slot {
     /// Returns `true` if this is a Vid slot (SSA value ID).
     pub fn is_vid(self) -> bool {
         matches!(self, Slot::Vid(_))
+    }
+
+    /// Returns `true` if this is a Home slot (pinned local).
+    pub fn is_home(self) -> bool {
+        matches!(self, Slot::Home(_))
     }
 }
 
