@@ -50,6 +50,7 @@ pub struct LocalFactory {
     cpu_affinities: Vec<String>,
     mem_binds: Vec<String>,
     concurrency_level: u16,
+    auto_restart: bool,
 }
 
 impl LocalFactory {
@@ -60,6 +61,7 @@ impl LocalFactory {
             cpu_affinities: Vec::new(),
             mem_binds: Vec::new(),
             concurrency_level: 1,
+            auto_restart: false,
         }
     }
 
@@ -76,6 +78,25 @@ impl LocalFactory {
         self.cpu_affinities = cpu_affinities;
         self.mem_binds = mem_binds;
         self
+    }
+
+    pub fn with_auto_restart(mut self, auto_restart: bool) -> Self {
+        self.auto_restart = auto_restart;
+        self
+    }
+
+    /// Create a LocalFactory with a pre-built aptos-node binary, skipping cargo build.
+    pub fn from_binary(binary_path: PathBuf, swarm_dir: Option<String>) -> Result<Self> {
+        anyhow::ensure!(
+            binary_path.exists(),
+            "aptos-node binary not found: {:?}",
+            binary_path
+        );
+        let version = Version::new(usize::MAX, "prebuilt".to_string());
+        let local_version = LocalVersion::new(binary_path, version.clone());
+        let mut versions = HashMap::new();
+        versions.insert(version, local_version);
+        Ok(Self::new(versions, swarm_dir))
     }
 
     pub fn from_workspace(swarm_dir: Option<String>) -> Result<Self> {
@@ -165,6 +186,7 @@ impl LocalFactory {
             self.cpu_affinities.clone(),
             self.mem_binds.clone(),
             self.concurrency_level,
+            self.auto_restart,
         )?;
 
         // Launch the swarm
