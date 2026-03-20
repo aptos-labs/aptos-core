@@ -2,21 +2,24 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    chunky::types::{AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest},
+    chunky::{
+        types::{AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest},
+        validation::validate_chunky_transcript,
+    },
     counters,
     types::DKGMessage,
 };
-use anyhow::{anyhow, ensure, Context};
+use anyhow::{ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
+use aptos_crypto::HashValue;
 use aptos_dkg::pvss::{
-    traits::transcript::{Aggregatable, Aggregated, HasAggregatableSubtranscript, Transcript},
+    traits::transcript::{Aggregatable, Aggregated, HasAggregatableSubtranscript},
     Player,
 };
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
-use aptos_crypto::HashValue;
 use aptos_types::{
     dkg::{
         chunky_dkg::{
@@ -31,7 +34,6 @@ use aptos_types::{
 use futures::future::AbortHandle;
 use futures_util::future::Abortable;
 use move_core_types::account_address::AccountAddress;
-use rand::{thread_rng, CryptoRng, RngCore};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -134,15 +136,14 @@ impl ChunkyTranscriptAggregationState {
         }
     }
 
-    /// Validates metadata and deserializes the transcript, and verifies it.
-    fn validate_and_deserialize_transcript<R: RngCore + CryptoRng>(
+    /// Validates metadata, deserializes the transcript, verifies it, and checks dealer ID.
+    fn validate_and_deserialize_transcript(
         &self,
         sender: Author,
         metadata: &DKGTranscriptMetadata,
         transcript_bytes: &[u8],
-        rng: &mut R,
     ) -> anyhow::Result<(ChunkyTranscript, u64)> {
-        // Validate metadata
+        // Validate metadata (epoch, author, voting power) — specific to the aggregation context.
         ensure!(
             metadata.epoch == self.dkg_config.session_metadata.dealer_epoch,
             "[ChunkyDKG] adding peer chunky transcript failed with invalid node epoch",
@@ -158,45 +159,17 @@ impl ChunkyTranscriptAggregationState {
             "[ChunkyDKG] adding peer chunky transcript failed with illegal dealer"
         );
         let peer_power = peer_power.expect("Peer must be valid");
-        // Deserialize transcript
-        let transcript: ChunkyTranscript = bcs::from_bytes(transcript_bytes)
-            .map_err(|e| anyhow!("[ChunkyDKG] Unable to deserialize chunky transcript: {e}"))?;
 
-        // Verify the transcript
-        transcript
-            .verify(
-                &self.dkg_config.threshold_config,
-                &self.dkg_config.public_parameters,
-                &self.signing_pubkeys,
-                &self.dkg_config.eks,
-                &self.dkg_config.session_metadata,
-                rng,
-            )
-            .context("chunky transcript verification failed")?;
-
-        // Ensure the transcript's dealer id matches the sender's validator index.
-        // Otherwise a malicious validator could replay another validator's legitimately-signed
-        // transcript, causing attribution mismatch between the aggregated subtranscript content
-        // and the dealers list built from contributors.
-        let sender_index = self
-            .epoch_state
-            .verifier
-            .address_to_validator_index()
-            .get(&sender)
-            .copied()
-            .ok_or_else(|| anyhow!("[ChunkyDKG] sender not in validator set"))?;
-        let dealers = transcript.get_dealers();
-        ensure!(
-            dealers.len() == 1,
-            "[ChunkyDKG] adding peer chunky transcript failed: expected single dealer, got {}",
-            dealers.len(),
-        );
-        ensure!(
-            dealers[0].id == sender_index,
-            "[ChunkyDKG] adding peer chunky transcript failed: transcript dealer id {} does not match sender validator index {}",
-            dealers[0].id,
-            sender_index,
-        );
+        // Shared validation: deserialize, verify, check dealer ID.
+        let mut rng = rand::thread_rng();
+        let transcript = validate_chunky_transcript(
+            sender,
+            transcript_bytes,
+            &self.dkg_config,
+            &self.signing_pubkeys,
+            &self.epoch_state,
+            &mut rng,
+        )?;
 
         Ok((transcript, peer_power))
     }
@@ -227,9 +200,8 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
         }
 
         // RwLock allows concurrent validation of multiple transcripts
-        let mut rng = thread_rng();
         let (transcript, peer_power) =
-            self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes, &mut rng)?;
+            self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes)?;
 
         let mut inner_state = self.inner_state.write();
         // Re-check under write lock to prevent TOCTOU race (concurrent adds may have

@@ -1,17 +1,19 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{chunky::types::MissingTranscriptRequest, network::NetworkSender, DKGMessage};
+use crate::{
+    chunky::{types::MissingTranscriptRequest, validation::validate_chunky_transcript},
+    network::NetworkSender,
+    DKGMessage,
+};
 use anyhow::{anyhow, Result};
-use aptos_dkg::pvss::traits::transcript::{HasAggregatableSubtranscript, Transcript};
 use aptos_logger::warn;
 use aptos_types::{
-    dkg::chunky_dkg::{ChunkyDKGConfig, ChunkyTranscript},
+    dkg::chunky_dkg::{ChunkyDKGConfig, ChunkyTranscript, DealerPublicKey},
     epoch_state::EpochState,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use move_core_types::account_address::AccountAddress;
-use rand::thread_rng;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -109,7 +111,7 @@ impl MissingTranscriptFetcher {
         }
 
         // Signing pubkeys for transcript verification (derived from session metadata)
-        let signing_pubkeys: Vec<_> = self
+        let signing_pubkeys: Vec<DealerPublicKey> = self
             .dkg_config
             .session_metadata
             .dealer_consensus_infos_cloned()
@@ -119,161 +121,31 @@ impl MissingTranscriptFetcher {
 
         // Process responses in a loop until we have all missing transcripts
         loop {
-            if missing_set.is_empty() {
-                break;
-            }
-            if pending_requests.is_empty() {
+            if missing_set.is_empty() || pending_requests.is_empty() {
                 break;
             }
 
             tokio::select! {
                 Some((dealer_addr, result)) = pending_requests.next() => {
-                    match result {
-                        Ok(response) => {
-                            // Process the response
-                            match response {
-                                DKGMessage::MissingTranscriptResponse(response) => {
-                                    // Process the response - contains a single transcript
-                                    let transcript_response = response.transcript;
-                                    // TODO(ibalajiarun): Is it enough to check epoch and author without
-                                    // an actual signature over them?
-                                    if transcript_response.metadata.epoch == self.epoch
-                                        && transcript_response.metadata.author == dealer_addr
-                                    {
-                                        if let Ok(transcript) = bcs::from_bytes::<ChunkyTranscript>(
-                                            &transcript_response.transcript_bytes,
-                                        ) {
-                                            // TODO(ibalajiarun): There is indexing in verify method which can panic.
-                                            let mut rng = thread_rng();
-                                            if transcript
-                                                .verify(
-                                                    &self.dkg_config.threshold_config,
-                                                    &self.dkg_config.public_parameters,
-                                                    &signing_pubkeys,
-                                                    &self.dkg_config.eks,
-                                                    &self.dkg_config.session_metadata,
-                                                    &mut rng,
-                                                )
-                                                .is_ok()
-                                            {
-                                                // Verify dealer ID matches the expected
-                                                // dealer's validator index (same check as
-                                                // agg_subtrx_producer).
-                                                let dealers = transcript.get_dealers();
-                                                let expected_index = self
-                                                    .epoch_state
-                                                    .verifier
-                                                    .address_to_validator_index()
-                                                    .get(&dealer_addr)
-                                                    .copied();
-                                                if dealers.len() != 1
-                                                    || expected_index.is_none()
-                                                    || dealers[0].id != expected_index.unwrap()
-                                                {
-                                                    warn!(
-                                                        "[ChunkyDKG] Dealer ID check failed for dealer {}, retrying",
-                                                        dealer_addr
-                                                    );
-                                                    let future = create_request_future(
-                                                        dealer_addr,
-                                                        self.sender,
-                                                        self.epoch,
-                                                        network_sender.clone(),
-                                                        self.rpc_timeout,
-                                                        Some(RETRY_DELAY),
-                                                    );
-                                                    pending_requests.push(future);
-                                                } else if missing_set.contains(&dealer_addr) {
-                                                    results.insert(dealer_addr, transcript);
-                                                    missing_set.remove(&dealer_addr);
-                                                }
-                                            } else {
-                                                // Verification failed - retry
-                                                warn!(
-                                                    "[ChunkyDKG] Transcript verification failed for dealer {}, retrying",
-                                                    dealer_addr
-                                                );
-                                                let future = create_request_future(
-                                                    dealer_addr,
-                                                    self.sender,
-                                                    self.epoch,
-                                                    network_sender.clone(),
-                                                    self.rpc_timeout,
-                                                    Some(RETRY_DELAY),
-                                                );
-                                                pending_requests.push(future);
-                                            }
-                                        } else {
-                                            // Failed to deserialize - retry
-                                            warn!(
-                                                "[ChunkyDKG] Failed to deserialize transcript for dealer {}, retrying",
-                                                dealer_addr
-                                            );
-                                            let future = create_request_future(
-                                                dealer_addr,
-                                                self.sender,
-                                                self.epoch,
-                                                network_sender.clone(),
-                                                self.rpc_timeout,
-                                                Some(RETRY_DELAY),
-                                            );
-                                            pending_requests.push(future);
-                                        }
-                                    } else {
-                                        // Epoch or author mismatch - retry
-                                        warn!(
-                                            "[ChunkyDKG] Transcript metadata mismatch for dealer {} (expected epoch {}, author {}), got epoch {} author {}, retrying",
-                                            dealer_addr,
-                                            self.epoch,
-                                            dealer_addr,
-                                            transcript_response.metadata.epoch,
-                                            transcript_response.metadata.author
-                                        );
-                                        let future = create_request_future(
-                                            dealer_addr,
-                                            self.sender,
-                                            self.epoch,
-                                            network_sender.clone(),
-                                            self.rpc_timeout,
-                                            Some(RETRY_DELAY),
-                                        );
-                                        pending_requests.push(future);
-                                    }
-                                },
-                                _ => {
-                                    // Unexpected message type - retry
-                                    warn!(
-                                        "[ChunkyDKG] Unexpected message type for dealer {}, retrying",
-                                        dealer_addr
-                                    );
-                                    let future = create_request_future(
-                                        dealer_addr,
-                                        self.sender,
-                                        self.epoch,
-                                        network_sender.clone(),
-                                        self.rpc_timeout,
-                                        Some(RETRY_DELAY),
-                                    );
-                                    pending_requests.push(future);
-                                },
+                    match self.process_response(dealer_addr, result, &signing_pubkeys) {
+                        Ok(transcript) => {
+                            if missing_set.remove(&dealer_addr) {
+                                results.insert(dealer_addr, transcript);
                             }
                         },
                         Err(e) => {
-                            // Retry with delay
                             warn!(
-                                "[ChunkyDKG] Error fetching transcript for dealer {} from peer {}, retrying: {}",
-                                dealer_addr, self.sender, e
+                                "[ChunkyDKG] Failed to process transcript for dealer {}: {}, retrying",
+                                dealer_addr, e
                             );
-                            // Requeue with delay
-                            let future = create_request_future(
+                            pending_requests.push(create_request_future(
                                 dealer_addr,
                                 self.sender,
                                 self.epoch,
                                 network_sender.clone(),
                                 self.rpc_timeout,
-                                Some(RETRY_DELAY), // Delay before retry
-                            );
-                            pending_requests.push(future);
+                                Some(RETRY_DELAY),
+                            ));
                         },
                     }
                 },
@@ -289,5 +161,46 @@ impl MissingTranscriptFetcher {
         }
 
         Ok(results)
+    }
+
+    /// Process a single RPC response, returning the validated transcript or an error to retry.
+    fn process_response(
+        &self,
+        dealer_addr: AccountAddress,
+        result: Result<DKGMessage>,
+        signing_pubkeys: &[DealerPublicKey],
+    ) -> Result<ChunkyTranscript> {
+        let response = result?;
+        let DKGMessage::MissingTranscriptResponse(response) = response else {
+            return Err(anyhow!("unexpected message type"));
+        };
+
+        let transcript_response = response.transcript;
+
+        // Validate envelope metadata (epoch and author) as belt-and-suspenders.
+        // The transcript is cryptographically verified via validate_chunky_transcript which
+        // checks the dealer's key pair; the dealer-ID check ensures it belongs to the
+        // expected dealer.
+        if transcript_response.metadata.epoch != self.epoch
+            || transcript_response.metadata.author != dealer_addr
+        {
+            return Err(anyhow!(
+                "metadata mismatch: expected epoch {}, author {}, got epoch {} author {}",
+                self.epoch,
+                dealer_addr,
+                transcript_response.metadata.epoch,
+                transcript_response.metadata.author,
+            ));
+        }
+
+        let mut rng = rand::thread_rng();
+        validate_chunky_transcript(
+            dealer_addr,
+            &transcript_response.transcript_bytes,
+            &self.dkg_config,
+            signing_pubkeys,
+            &self.epoch_state,
+            &mut rng,
+        )
     }
 }
