@@ -1,20 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Post-allocation optimization passes.
+//! Post-slot allocation optimization passes.
 //!
-//! Pass 3: Copy propagation
-//! Pass 4: Identity move elimination
-//! Pass 5: Dead instruction elimination
-//! Pass 6: Slot renumbering
+//! Pass: Copy propagation
+//! Pass: Identity move elimination
+//! Pass: Dead instruction elimination
+//! Pass: Slot renumbering
 
 use crate::{
     instr_utils::{apply_subst_to_sources, get_defs_uses, remap_instr, split_into_blocks},
     ir::{FunctionIR, Instr, ModuleIR, Slot},
 };
+use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Optimize all functions in a module IR.
+/// Pre: slot allocation complete — no `Vid`s remain.
 pub fn optimize_module(module_ir: &mut ModuleIR) {
     for func in &mut module_ir.functions {
         eliminate_identity_moves(func);
@@ -25,7 +27,7 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
     }
 }
 
-/// Pass 3: Forward copy propagation within each basic block.
+/// Pass: Forward copy propagation within each basic block.
 ///
 /// Pre: allocated instruction stream (real slots).
 /// Post: Copy/Move sources propagated to downstream uses; no instructions removed.
@@ -47,41 +49,19 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 /// `apply_subst_to_sources` skips BorrowLoc sources to enforce this.
 ///
 /// ## The MutBorrowLoc hidden-write problem
-/// `WriteRef` through a mutable reference modifies the borrowed slot's
-/// storage, but `get_defs_uses` reports NO defs for `WriteRef` — only uses.
-/// So the standard def-based subst invalidation misses it:
-/// ```text
-/// Copy(local, param)           // subst = {local -> param}
-/// MutBorrowLoc(ref, local)     // mutable borrow of local
-/// WriteRef(ref, 99)            // local is now 99, but NO defs reported
-/// use(local)                   // subst says use(param) -- WRONG
-/// ```
-/// Fix: kill subst entries for the borrowed slot when `MutBorrowLoc` is
-/// encountered.
+/// Once a slot is mutably borrowed, it can be silently modified through the
+/// reference (via `WriteRef`, function calls, etc.) without appearing as a
+/// def in `get_defs_uses`. So we kill subst entries for the borrowed slot
+/// at `MutBorrowLoc` — conservatively assuming hidden writes may follow.
 ///
 /// `ImmBorrowLoc` does NOT need this kill — the verifier guarantees the
 /// borrowed slot cannot be modified while immutably borrowed.
 ///
 /// ## Why cross-block mutable borrows are safe
 ///
-/// Copy propagation is block-local — subst is reset at every block boundary.
-/// Three cases:
-///
-/// 1. **Borrow in same block as copy**: MutBorrowLoc kill fires in-block,
-///    preventing stale substitutions after the borrow point. Covers all
-///    downstream writes through the ref, including function calls.
-/// 2. **Borrow in different block**: That block starts with empty subst. No
-///    propagation of the borrowed slot occurs. Cross-block DCE safety
-///    protects the copy in the original block from removal.
-/// 3. **Ref escapes via function call**: The MutBorrowLoc kill is
-///    conservative — fires at borrow creation, before any actual write.
-///    Handles invisible writes through calls in same or other blocks.
-///
-/// No block-crossing problem can arise because: (a) subst maps are
-/// block-local, and (b) the verifier forbids explicit redefinition
-/// (StLoc/MoveLoc) of a slot while it's borrowed, so any modification
-/// must go through the ref — which is handled by the MutBorrowLoc kill in
-/// the block where the borrow is created.
+/// Subst is reset at every block boundary. If `MutBorrowLoc` is in the same
+/// block as the copy, the kill fires before any hidden write. If it's in a
+/// different block, that block's subst is empty — no stale propagation occurs.
 fn copy_propagation(func: &mut FunctionIR) {
     let blocks = split_into_blocks(&func.instrs);
 
@@ -115,13 +95,13 @@ fn copy_propagation(func: &mut FunctionIR) {
     }
 }
 
-/// Pass 4: Remove `Move(r, r)` and `Copy(r, r)` instructions.
+/// Pass: Remove `Move(r, r)` and `Copy(r, r)` instructions.
 fn eliminate_identity_moves(func: &mut FunctionIR) {
     func.instrs
         .retain(|instr| !matches!(instr, Instr::Move(d, s) | Instr::Copy(d, s) if d == s));
 }
 
-/// Pass 5: Backward dead-code elimination within each basic block.
+/// Pass: Backward dead-code elimination within each basic block.
 ///
 /// Pre: after copy propagation and identity move elimination.
 /// Post: dead Copy/Move to unused slots removed.
@@ -190,11 +170,11 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
     }
 }
 
-/// Pass 6: Compact Home slot indices while preserving param ABI indices.
+/// Pass: Compact Home slot indices while preserving param indices.
 ///
 /// Pre: after DCE (some slots may be unused).
-/// Post: Params keep indices 0..num_params-1 (ABI-visible). Surviving locals
-///       and temps are compacted contiguously starting at num_params.
+/// Post: Params keep indices 0..num_params-1 (calling-convention-visible).
+///       Surviving locals and temps are compacted contiguously starting at num_params.
 ///       `num_locals`, `num_home_slots`, and `slot_types` are updated.
 fn renumber_slots(func: &mut FunctionIR) {
     let num_params = func.num_params;
@@ -230,11 +210,20 @@ fn renumber_slots(func: &mut FunctionIR) {
         remap_instr(instr, &remap);
     }
 
-    // Bool placeholder — overwritten for every used slot by the loop below.
-    let mut new_slot_types =
-        vec![move_vm_types::loaded_data::runtime_types::Type::Bool; next_slot as usize];
+    // Build new slot_types. Bool placeholder — every entry is overwritten below:
+    // params are always copied (calling convention requires correct types even if
+    // unused in the body), and non-param slots are copied from the remap.
+    let mut new_slot_types = vec![Type::Bool; next_slot as usize];
+    for i in 0..num_params {
+        if (i as usize) < func.slot_types.len() {
+            new_slot_types[i as usize] = func.slot_types[i as usize].clone();
+        }
+    }
+    // Non-param slots: copy types according to remap. Params are skipped
+    // here — they are already handled by the loop above.
     for (&old, &new) in &remap {
         if let (Slot::Home(old_i), Slot::Home(new_i)) = (old, new)
+            && old_i >= num_params
             && (old_i as usize) < func.slot_types.len()
         {
             new_slot_types[new_i as usize] = func.slot_types[old_i as usize].clone();
