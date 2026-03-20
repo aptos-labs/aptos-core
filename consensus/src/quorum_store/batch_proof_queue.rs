@@ -7,14 +7,21 @@ use super::{
 };
 use crate::quorum_store::counters;
 use aptos_consensus_types::{
-    common::{Author, TxnSummaryWithExpiration},
+    common::TxnSummaryWithExpiration,
     proof_of_store::{BatchInfoExt, ProofOfStore, TBatchInfo},
     utils::PayloadTxnsSize,
 };
-use aptos_logger::{debug, sample, sample::SampleRate, warn};
+#[cfg(test)]
+use aptos_consensus_types::common::Author;
+use aptos_logger::{debug, sample, sample::SampleRate};
+#[cfg(test)]
+use aptos_logger::warn;
+#[cfg(test)]
 use aptos_metrics_core::TimerHelper;
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::PeerId;
+#[cfg(test)]
+use aptos_types::transaction::SignedTransaction;
 use rand::{prelude::SliceRandom, rngs::SmallRng, thread_rng, SeedableRng};
 use std::{
     cmp::Reverse,
@@ -27,20 +34,20 @@ use std::{
 /// QueueItem represents an item in the ProofBatchQueue.
 /// It stores the transaction summaries and proof associated with the
 /// batch.
-struct QueueItem {
+pub(crate) struct QueueItem {
     /// The info of the Batch this item stores
-    info: BatchInfoExt,
+    pub(crate) info: BatchInfoExt,
     /// Contains the summary of transactions in the batch.
     /// It is optional as the summary can be updated after the proof.
-    txn_summaries: Option<Vec<TxnSummaryWithExpiration>>,
+    pub(crate) txn_summaries: Option<Vec<TxnSummaryWithExpiration>>,
 
     /// Contains the proof associated with the batch.
     /// It is optional as the proof can be updated after the summary.
-    proof: Option<ProofOfStore<BatchInfoExt>>,
+    pub(crate) proof: Option<ProofOfStore<BatchInfoExt>>,
     /// The time when the proof is inserted into this item.
-    proof_insertion_time: Option<Instant>,
+    pub(crate) proof_insertion_time: Option<Instant>,
     /// The time when the batch (txn summaries) is first inserted into this item.
-    batch_insertion_time: Option<Instant>,
+    pub(crate) batch_insertion_time: Option<Instant>,
 }
 
 impl QueueItem {
@@ -57,6 +64,13 @@ impl QueueItem {
         self.txn_summaries = None;
         self.batch_insertion_time = None;
     }
+}
+
+/// Owned data extracted from a QueueItem during pull_all, avoiding borrow issues.
+pub(crate) struct PulledItem {
+    pub(crate) info: BatchInfoExt,
+    pub(crate) proof: Option<ProofOfStore<BatchInfoExt>>,
+    pub(crate) proof_insertion_time: Option<Instant>,
 }
 
 pub struct BatchProofQueue {
@@ -131,6 +145,14 @@ impl BatchProofQueue {
             .iter()
             .filter(|(_, item)| item.txn_summaries.is_some())
             .count()
+    }
+
+    pub(crate) fn batch_expiry_gap_when_init_usecs(&self) -> u64 {
+        self.batch_expiry_gap_when_init_usecs
+    }
+
+    pub(crate) fn batch_store(&self) -> &Arc<BatchStore> {
+        &self.batch_store
     }
 
     pub(crate) fn num_batches_without_proof(&self) -> usize {
@@ -401,6 +423,195 @@ impl BatchProofQueue {
         counters::NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL.observe(num_txns_remaining_after_pull as f64);
     }
 
+    /// Combined pull that retrieves all eligible items (both with and without proofs) in a single
+    /// pass, eliminating redundant filtered_txns rebuilds and per-author iterator setup.
+    /// Returns (items, all_txns_size, unique_txns, is_full).
+    pub(crate) fn pull_all(
+        &mut self,
+        excluded_batches: &HashSet<BatchInfoExt>,
+        max_txns: PayloadTxnsSize,
+        max_txns_after_filtering: u64,
+        soft_max_txns_after_filtering: u64,
+        return_non_full: bool,
+        block_timestamp: Duration,
+    ) -> (Vec<PulledItem>, PayloadTxnsSize, u64, bool) {
+        let mut result = Vec::new();
+        let mut cur_unique_txns = 0;
+        let mut cur_all_txns = PayloadTxnsSize::zero();
+        let mut excluded_txns_count = 0;
+        let mut full = false;
+
+        // Build excluded_txns set once from excluded_batches (immutable during loop)
+        let estimated_txns: usize = excluded_batches
+            .iter()
+            .map(|b| b.num_txns() as usize)
+            .sum();
+        let mut excluded_txns: HashSet<TxnSummaryWithExpiration> =
+            HashSet::with_capacity(estimated_txns);
+        for batch_info in excluded_batches {
+            let batch_key = BatchKey::from_info(batch_info);
+            if let Some(txn_summaries) = self
+                .items
+                .get(&batch_key)
+                .and_then(|item| item.txn_summaries.as_ref())
+            {
+                for txn_summary in txn_summaries {
+                    excluded_txns.insert(*txn_summary);
+                }
+            }
+        }
+
+        // filtered_txns only needed for multi-occurrence txns (small capacity)
+        let mut filtered_txns: HashSet<TxnSummaryWithExpiration> =
+            HashSet::with_capacity(max_txns_after_filtering as usize / 5);
+
+        let block_timestamp_secs = block_timestamp.as_secs();
+
+        // Build per-author iterators — NO proof/no-proof filter, NO exclude_authors, NO min_batch_age
+        let mut iters = vec![];
+        for (_, batches) in self.author_to_batches.iter() {
+            let batch_iter = batches.iter().rev().filter_map(|(sort_key, info)| {
+                if let Some(item) = self.items.get(&sort_key.batch_key) {
+                    if item.is_committed() {
+                        return None;
+                    }
+                    return Some((info, item));
+                }
+                None
+            });
+            iters.push(batch_iter);
+        }
+
+        let mut rng =
+            SmallRng::from_rng(&mut thread_rng()).unwrap_or_else(|_| SmallRng::seed_from_u64(0));
+        'outer: loop {
+            iters.shuffle(&mut rng);
+            let mut any_progress = false;
+            let mut i = 0;
+            while i < iters.len() {
+                if let Some((batch, item)) = iters[i].next() {
+                    any_progress = true;
+                    if excluded_batches.contains(batch) {
+                        excluded_txns_count += batch.num_txns();
+                    } else {
+                        // Two-tier unique txn counting:
+                        // Fast path: occurrence == 1, not in excluded_txns, not expired → unique
+                        // Slow path: occurrence > 1 → use filtered_txns for exact dedup
+                        let new_unique =
+                            if let Some(ref txn_summaries) = item.txn_summaries {
+                                txn_summaries
+                                    .iter()
+                                    .filter(|s| {
+                                        block_timestamp_secs < s.expiration_timestamp_secs
+                                            && !excluded_txns.contains(s)
+                                            && (self
+                                                .txn_summary_num_occurrences
+                                                .get(s)
+                                                .copied()
+                                                .unwrap_or(0)
+                                                <= 1
+                                                || filtered_txns.insert(**s))
+                                    })
+                                    .count() as u64
+                            } else {
+                                batch.num_txns()
+                            };
+                        let unique_txns = cur_unique_txns + new_unique;
+                        if cur_all_txns + batch.size() > max_txns
+                            || unique_txns > max_txns_after_filtering
+                        {
+                            full = true;
+                            break 'outer;
+                        }
+                        cur_all_txns += batch.size();
+                        cur_unique_txns = unique_txns;
+                        result.push(PulledItem {
+                            info: item.info.clone(),
+                            proof: item.proof.clone(),
+                            proof_insertion_time: item.proof_insertion_time,
+                        });
+                        if cur_all_txns == max_txns
+                            || cur_unique_txns == max_txns_after_filtering
+                            || cur_unique_txns >= soft_max_txns_after_filtering
+                        {
+                            full = true;
+                            break 'outer;
+                        }
+                    }
+                    i += 1;
+                } else {
+                    let _ = iters.swap_remove(i);
+                }
+            }
+            if !any_progress {
+                break;
+            }
+        }
+
+        debug!(
+            block_total_txns = cur_all_txns,
+            block_unique_txns = cur_unique_txns,
+            max_txns = max_txns,
+            max_txns_after_filtering = max_txns_after_filtering,
+            soft_max_txns_after_filtering = soft_max_txns_after_filtering,
+            max_bytes = max_txns.size_in_bytes(),
+            result_count = result.len(),
+            full = full,
+            return_non_full = return_non_full,
+            "Pull payloads from QuorumStore: pull_all"
+        );
+
+        counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns_count as f64);
+
+        if full || return_non_full {
+            result.sort_by_key(|item| Reverse(item.info.gas_bucket_start()));
+
+            // Batch per-author metrics
+            let now_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
+            let mut author_stats: HashMap<PeerId, (u64, f64, f64)> = HashMap::new();
+            for item in &result {
+                let author = item.info.author();
+                let entry = author_stats.entry(author).or_insert((0, 0.0, 0.0));
+                entry.0 += 1;
+                let batch_create_ts_usecs = item
+                    .info
+                    .expiration()
+                    .saturating_sub(self.batch_expiry_gap_when_init_usecs);
+                entry.1 += now_usecs.saturating_sub(batch_create_ts_usecs) as f64 / 1_000.0;
+            }
+            for (author, (count, total_age_ms, _total_queue_ms)) in &author_stats {
+                let author_str = author.short_str();
+                let author_label = author_str.as_str();
+                counters::BATCH_PULLED_BY_AUTHOR
+                    .with_label_values(&[author_label, "pull_all"])
+                    .inc_by(*count);
+                counters::BATCH_AGE_WHEN_PULLED
+                    .with_label_values(&[author_label, "pull_all"])
+                    .observe(*total_age_ms / *count as f64);
+            }
+
+            // Record proof-specific pull metrics
+            let num_proofs = result.iter().filter(|item| item.proof.is_some()).count();
+            counters::PROOF_SIZE_WHEN_PULL.observe(num_proofs as f64);
+            counters::BLOCK_SIZE_WHEN_PULL.observe(cur_unique_txns as f64);
+            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns.count() as f64);
+            counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
+                .observe((cur_all_txns.count().saturating_sub(cur_unique_txns)) as f64);
+            counters::BLOCK_BYTES_WHEN_PULL.observe(cur_all_txns.size_in_bytes() as f64);
+
+            // Log remaining data using proof items
+            let pulled_proofs: Vec<_> = result
+                .iter()
+                .filter_map(|item| item.proof.clone())
+                .collect();
+            self.log_remaining_data_after_pull(excluded_batches, &pulled_proofs);
+
+            (result, cur_all_txns, cur_unique_txns, full)
+        } else {
+            (Vec::new(), PayloadTxnsSize::zero(), 0, full)
+        }
+    }
+
     // gets excluded and iterates over the vector returning non excluded or expired entries.
     // return the vector of pulled PoS, and the size of the remaining PoS
     // The flag in the second return argument is true iff the entire proof queue is fully utilized
@@ -408,6 +619,7 @@ impl BatchProofQueue {
     // this flag is set false.
     // Returns the proofs, the number of unique transactions in the proofs, and a flag indicating
     // whether the proof queue is fully utilized.
+    #[cfg(test)]
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfoExt>,
@@ -465,6 +677,7 @@ impl BatchProofQueue {
         (proof_of_stores, all_txns, unique_txns, !is_full)
     }
 
+    #[cfg(test)]
     pub fn pull_batches(
         &mut self,
         excluded_batches: &HashSet<BatchInfoExt>,
@@ -499,6 +712,7 @@ impl BatchProofQueue {
         (result, pulled_txns, unique_txns)
     }
 
+    #[cfg(test)]
     fn pull_batches_internal(
         &mut self,
         excluded_batches: &HashSet<BatchInfoExt>,
@@ -527,6 +741,7 @@ impl BatchProofQueue {
         (batches, all_txns, unique_txns, is_full)
     }
 
+    #[cfg(test)]
     pub fn pull_batches_with_transactions(
         &mut self,
         excluded_batches: &HashSet<BatchInfoExt>,
@@ -574,6 +789,7 @@ impl BatchProofQueue {
         (result, pulled_txns, unique_txns)
     }
 
+    #[cfg(test)]
     fn pull_internal(
         &mut self,
         batches_without_proofs: bool,

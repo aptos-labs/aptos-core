@@ -169,6 +169,16 @@ pub static PULL_INLINE_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
+pub static PULL_ALL_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_pull_all_duration",
+            "Duration of combined pull_all in handle_proposal_request"
+        )
+        .unwrap(),
+    )
+});
+
 /// Duration of each run of the event loop.
 pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(

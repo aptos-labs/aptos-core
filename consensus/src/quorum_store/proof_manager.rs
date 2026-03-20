@@ -9,11 +9,13 @@ use crate::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
-    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg},
+    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg, TBatchInfo},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
@@ -100,7 +102,7 @@ impl ProofManager {
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         let GetPayloadCommand::GetPayloadRequest(request) = msg;
 
-        let mut excluded_batches: HashSet<_> = match request.filter {
+        let excluded_batches: HashSet<_> = match request.filter {
             PayloadFilter::Empty => HashSet::new(),
             PayloadFilter::DirectMempool(_) => {
                 unreachable!()
@@ -108,9 +110,9 @@ impl ProofManager {
             PayloadFilter::InQuorumStore(batches) => batches,
         };
 
-        let pull_proofs_start = Instant::now();
-        let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
-            self.batch_proof_queue.pull_proofs(
+        let pull_start = Instant::now();
+        let (all_items, _all_txns_size, all_unique_txns, is_full) =
+            self.batch_proof_queue.pull_all(
                 &excluded_batches,
                 request.max_txns,
                 request.max_txns_after_filtering,
@@ -118,48 +120,86 @@ impl ProofManager {
                 request.return_non_full,
                 request.block_timestamp,
             );
-        counters::PULL_PROOFS_DURATION.observe_duration(pull_proofs_start.elapsed());
+        counters::PULL_ALL_DURATION.observe_duration(pull_start.elapsed());
 
         counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
             .observe(self.batch_proof_queue.num_batches_without_proof() as f64);
+
+        // is_full means the block was filled; proof_queue_fully_utilized = is_full
+        let proof_queue_fully_utilized = is_full;
         counters::PROOF_QUEUE_FULLY_UTILIZED
             .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-        // Extend excluded set in-place with pulled proofs
-        for proof in &proof_block {
-            excluded_batches.insert(proof.info().clone());
-        }
-
-        let pull_batches_start = Instant::now();
-        let (opt_batches, opt_batch_txns_size) =
-            // TODO(ibalajiarun): Support unique txn calculation
-            if let Some(ref params) = request.maybe_optqs_payload_pull_params {
-                let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
-                let max_opt_batch_txns_after_filtering = request.max_txns_after_filtering - cur_unique_txns;
-                let (opt_batches, opt_payload_size, _) =
-                    self.batch_proof_queue.pull_batches(
-                        &excluded_batches,
-                        &params.exclude_authors,
-                        max_opt_batch_txns_size,
-                        max_opt_batch_txns_after_filtering,
-                        request.soft_max_txns_after_filtering,
-                        request.return_non_full,
-                        request.block_timestamp,
-                        Some(params.minimum_batch_age_usecs),
-                    );
-                (opt_batches, opt_payload_size)
+        // Partition into proof items and non-proof items
+        let mut proof_block = Vec::new();
+        let mut non_proof_items = Vec::new();
+        for item in all_items {
+            if item.proof.is_some() {
+                let proof = item.proof.clone().unwrap();
+                let bucket = proof.gas_bucket_start();
+                counters::pos_to_pull(
+                    bucket,
+                    item.proof_insertion_time
+                        .expect("proof must exist due to filter")
+                        .elapsed()
+                        .as_secs_f64(),
+                );
+                proof_block.push(proof);
             } else {
-                (Vec::new(), PayloadTxnsSize::zero())
-            };
-        counters::PULL_BATCHES_DURATION.observe_duration(pull_batches_start.elapsed());
-
-        // Extend excluded set in-place with pulled opt batches
-        for batch in &opt_batches {
-            excluded_batches.insert(batch.clone());
+                non_proof_items.push(item);
+            }
         }
 
-        let pull_inline_start = Instant::now();
+        // opt_batches: non-proof items passing exclude_authors + min_batch_age
+        let batch_expiry_gap = self.batch_proof_queue.batch_expiry_gap_when_init_usecs();
+        let (opt_batches, remaining_non_proof): (Vec<_>, Vec<_>) =
+            if let Some(ref params) = request.maybe_optqs_payload_pull_params {
+                let max_create_ts = aptos_infallible::duration_since_epoch().as_micros() as u64
+                    - params.minimum_batch_age_usecs;
+                non_proof_items.into_iter().partition(|item| {
+                    !params.exclude_authors.contains(&item.info.author())
+                        && item
+                            .info
+                            .expiration()
+                            .saturating_sub(batch_expiry_gap)
+                            <= max_create_ts
+                })
+            } else {
+                (Vec::new(), non_proof_items)
+            };
+
+        // Record per-phase metrics for opt_batches
+        let opt_batches: Vec<BatchInfoExt> =
+            opt_batches.into_iter().map(|item| item.info).collect();
+        let opt_batch_txns_size: PayloadTxnsSize =
+            opt_batches.iter().fold(PayloadTxnsSize::zero(), |acc, b| acc + b.size());
+        counters::CONSENSUS_PULL_NUM_TXNS
+            .observe_with(&["optbatch"], opt_batch_txns_size.count() as f64);
+        counters::CONSENSUS_PULL_SIZE_IN_BYTES
+            .observe_with(&["optbatch"], opt_batch_txns_size.size_in_bytes() as f64);
+
+        // Record too-young skipped batches from the partition
+        if let Some(ref params) = request.maybe_optqs_payload_pull_params {
+            let max_create_ts = aptos_infallible::duration_since_epoch().as_micros() as u64
+                - params.minimum_batch_age_usecs;
+            for item in &remaining_non_proof {
+                let batch_create_ts = item
+                    .info
+                    .expiration()
+                    .saturating_sub(batch_expiry_gap);
+                if batch_create_ts > max_create_ts {
+                    counters::BATCH_SKIPPED_TOO_YOUNG
+                        .with_label_values(&[item.info.author().short_str().as_str()])
+                        .inc();
+                }
+            }
+        }
+
+        // inline_block: remaining non-proof items, capped at max_inline_txns
+        let txns_with_proof_size: PayloadTxnsSize =
+            proof_block.iter().fold(PayloadTxnsSize::zero(), |acc, p| acc + p.info().size());
         let cur_txns = txns_with_proof_size + opt_batch_txns_size;
+        let cur_unique_txns = all_unique_txns;
         let (inline_block, inline_block_size) =
             if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
                 let mut max_inline_txns_to_pull = request
@@ -172,20 +212,34 @@ impl ProofManager {
                         .max_txns_after_filtering
                         .saturating_sub(cur_unique_txns),
                 ));
-                let (inline_batches, inline_payload_size, _) =
-                    self.batch_proof_queue.pull_batches_with_transactions(
-                        &excluded_batches,
-                        max_inline_txns_to_pull,
-                        request.max_txns_after_filtering,
-                        request.soft_max_txns_after_filtering,
-                        request.return_non_full,
-                        request.block_timestamp,
-                    );
-                (inline_batches, inline_payload_size)
+
+                // Fetch transactions for remaining non-proof items up to limit
+                let mut inline_result = Vec::new();
+                let mut inline_size = PayloadTxnsSize::zero();
+                for item in remaining_non_proof {
+                    if inline_size + item.info.size() > max_inline_txns_to_pull {
+                        break;
+                    }
+                    if let Ok(mut persisted_value) =
+                        self.batch_proof_queue.batch_store().get_batch_from_local(
+                            item.info.digest(),
+                        )
+                    {
+                        if let Some(txns) = persisted_value.take_payload() {
+                            inline_size += item.info.size();
+                            inline_result.push((item.info, txns));
+                        }
+                    } else {
+                        warn!(
+                            "Couldn't find a batch in local storage while creating inline block: {:?}",
+                            item.info.digest()
+                        );
+                    }
+                }
+                (inline_result, inline_size)
             } else {
                 (Vec::new(), PayloadTxnsSize::zero())
             };
-        counters::PULL_INLINE_DURATION.observe_duration(pull_inline_start.elapsed());
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
