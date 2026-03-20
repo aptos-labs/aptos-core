@@ -71,6 +71,10 @@ pub struct RuntimeEnvironment {
 
     /// Pool of interned module ids.
     interned_module_id_pool: Arc<InternedModuleIdPool>,
+
+    /// Fingerprint of the verifier config, used to key the global verified module cache.
+    /// This ensures modules verified under one config are not treated as verified under another.
+    verifier_config_fingerprint: u64,
 }
 
 impl RuntimeEnvironment {
@@ -106,6 +110,7 @@ impl RuntimeEnvironment {
     ) -> Self {
         let natives = NativeFunctions::new(natives)
             .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
+        let verifier_config_fingerprint = Self::compute_verifier_config_fingerprint(&vm_config);
         Self {
             vm_config,
             natives,
@@ -113,7 +118,15 @@ impl RuntimeEnvironment {
             ty_tag_cache: Arc::new(TypeTagCache::empty()),
             interned_ty_pool: Arc::new(InternedTypePool::new()),
             interned_module_id_pool: Arc::new(InternedModuleIdPool::new()),
+            verifier_config_fingerprint,
         }
+    }
+
+    /// Computes a fingerprint of the verifier config for use as a cache key component.
+    fn compute_verifier_config_fingerprint(vm_config: &VMConfig) -> u64 {
+        let bytes =
+            bcs::to_bytes(&vm_config.verifier_config).expect("VerifierConfig is serializable");
+        fxhash::hash64(&bytes)
     }
 
     /// Returns the config currently used by this runtime environment.
@@ -181,7 +194,7 @@ impl RuntimeEnvironment {
         module_size: usize,
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
-        if !VERIFIED_MODULES_CACHE.contains(module_hash) {
+        if !VERIFIED_MODULES_CACHE.contains(module_hash, self.verifier_config_fingerprint) {
             let _timer =
                 VM_TIMER.timer_with_label("move_bytecode_verifier::verify_module_with_config");
 
@@ -194,7 +207,7 @@ impl RuntimeEnvironment {
                 compiled_module.as_ref(),
             )?;
             check_natives(compiled_module.as_ref())?;
-            VERIFIED_MODULES_CACHE.put(*module_hash);
+            VERIFIED_MODULES_CACHE.put(*module_hash, self.verifier_config_fingerprint);
         }
 
         Ok(LocallyVerifiedModule(compiled_module, module_size))

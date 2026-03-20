@@ -10,7 +10,13 @@ use std::num::NonZeroUsize;
 /// verifications, possibly even across blocks, for comparative performance we need to have it as
 /// well. For now, we keep it as a separate cache to make sure there is no interference between V1
 /// and V2 implementations.
-pub(crate) struct VerifiedModuleCache(Mutex<lru::LruCache<[u8; 32], ()>>);
+///
+/// The cache stores a verifier config fingerprint alongside each entry. This ensures that if the
+/// verifier configuration changes (e.g., stricter struct definition limits are enabled), modules
+/// verified under the old configuration are not treated as verified under the new one. This is
+/// critical for concurrent replay where different threads may process version ranges with
+/// different verifier configs simultaneously.
+pub(crate) struct VerifiedModuleCache(Mutex<lru::LruCache<[u8; 32], u64>>);
 
 impl VerifiedModuleCache {
     /// Maximum size of the cache. When modules are cached, they can skip re-verification.
@@ -21,19 +27,28 @@ impl VerifiedModuleCache {
         Self(Mutex::new(lru::LruCache::new(Self::VERIFIED_CACHE_SIZE)))
     }
 
-    /// Returns true if the module hash is contained in the cache. For tests, the cache is treated
-    /// as empty at all times.
-    pub(crate) fn contains(&self, module_hash: &[u8; 32]) -> bool {
+    /// Returns true if the module hash is contained in the cache and was verified with a matching
+    /// verifier config. For tests, the cache is treated as empty at all times.
+    pub(crate) fn contains(
+        &self,
+        module_hash: &[u8; 32],
+        verifier_config_fingerprint: u64,
+    ) -> bool {
         // Note: need to use get to update LRU queue.
-        verifier_cache_enabled() && self.0.lock().get(module_hash).is_some()
+        verifier_cache_enabled()
+            && self
+                .0
+                .lock()
+                .get(module_hash)
+                .is_some_and(|&stored| stored == verifier_config_fingerprint)
     }
 
-    /// Inserts the hash into the cache, marking the corresponding as locally verified. For tests,
-    /// entries are not added to the cache.
-    pub(crate) fn put(&self, module_hash: [u8; 32]) {
+    /// Inserts the hash into the cache, marking the corresponding module as locally verified
+    /// under the given verifier config. For tests, entries are not added to the cache.
+    pub(crate) fn put(&self, module_hash: [u8; 32], verifier_config_fingerprint: u64) {
         if verifier_cache_enabled() {
             let mut cache = self.0.lock();
-            cache.put(module_hash, ());
+            cache.put(module_hash, verifier_config_fingerprint);
         }
     }
 

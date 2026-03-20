@@ -80,8 +80,6 @@ impl TimedFeatureOverride {
             // Add overrides for replay here.
             (Replay, _LimitTypeTagSize) => Some(true),
             (Replay, _ModuleComplexityCheck) => Some(true),
-            (Replay, EnableStrictBoundsInProdConfig) => Some(true),
-            (Replay, RevisedBoundsInProdConfig) => Some(true),
             // Add overrides for testing here.
             (Testing, EntryCompatibility) => Some(true),
             // Exhaustive over flags so adding a new flag forces a decision.
