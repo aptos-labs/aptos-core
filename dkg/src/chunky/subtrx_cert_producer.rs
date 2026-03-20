@@ -127,10 +127,24 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkySubtranscriptCertificationState> 
         validation_response: ChunkyDKGSubtranscriptSignatureResponse,
     ) -> anyhow::Result<Option<Self::Aggregated>> {
         let ChunkyDKGSubtranscriptSignatureResponse {
-            dealer_epoch: _,
-            subtranscript_hash: _,
+            dealer_epoch,
+            subtranscript_hash,
             signature,
         } = validation_response;
+
+        // Defense-in-depth: validate response metadata matches what we requested.
+        // While BLS signature verification would catch mismatched content, checking
+        // these fields provides better error messages and catches honest bugs early.
+        ensure!(
+            dealer_epoch == self.epoch_state.epoch,
+            "[ChunkyDKG] signature response epoch {} does not match expected {}",
+            dealer_epoch,
+            self.epoch_state.epoch,
+        );
+        ensure!(
+            subtranscript_hash == self.aggregated_subtranscript.hash(),
+            "[ChunkyDKG] signature response hash does not match local aggregated subtranscript hash",
+        );
 
         let peer_power = self.epoch_state.verifier.get_voting_power(&sender);
         ensure!(

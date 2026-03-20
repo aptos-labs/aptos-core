@@ -148,6 +148,16 @@ impl ChunkyDKGManager {
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
         network_sender: Arc<NetworkSender>,
     ) -> Self {
+        // Signatures are created with ssk but verified with the consensus BLS key from
+        // epoch_state.verifier. Assert they match to catch key misconfiguration early.
+        debug_assert!(
+            epoch_state
+                .verifier
+                .get_public_key(&my_addr)
+                .as_ref()
+                == Some(spk.as_ref()),
+            "[ChunkyDKG] spk does not match consensus public key for my_addr"
+        );
         let (pull_notification_tx, pull_notification_rx) =
             aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
