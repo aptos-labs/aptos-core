@@ -1,3 +1,4 @@
+WARNING Multiple named addresses in package 'Root' share the same address 0x1: [A, B]. If these addresses are different in a non-dev build, the package may behave differently than in testing.
 ResolutionGraph {
     root_package_path: "tests/test_sources/resolution/conflicting_dev_address_with_dev_dep",
     build_options: BuildConfig {

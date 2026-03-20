@@ -354,18 +354,6 @@ impl ResolvingGraph {
         }
 
         if self.build_options.dev_mode && is_root_package {
-            let mut addr_to_name_mapping: BTreeMap<AccountAddress, Vec<NamedAddress>> =
-                BTreeMap::new();
-            for (name, addr) in resolution_table
-                .iter()
-                .filter(|(_name, addr)| addr.value.borrow().is_some())
-            {
-                addr_to_name_mapping
-                    .entry(addr.value.borrow().unwrap())
-                    .or_default()
-                    .push(*name);
-            }
-
             for (name, addr) in package
                 .dev_address_assignments
                 .clone()
@@ -392,24 +380,40 @@ impl ResolvingGraph {
                         );
                     },
                 }
+            }
 
-                if let Some(conflicts) = addr_to_name_mapping.insert(addr, vec![name]) {
-                    let conflict_names = conflicts
-                        .into_iter()
+            let dev_names: BTreeSet<NamedAddress> = package
+                .dev_address_assignments
+                .as_ref()
+                .map(|m| m.keys().copied().collect())
+                .unwrap_or_default();
+
+            let mut addr_to_names: BTreeMap<AccountAddress, Vec<NamedAddress>> = BTreeMap::new();
+            for (name, addr) in resolution_table
+                .iter()
+                .filter(|(_name, addr)| addr.value.borrow().is_some())
+            {
+                addr_to_names
+                    .entry(addr.value.borrow().unwrap())
+                    .or_default()
+                    .push(*name);
+            }
+            for (addr, names) in &addr_to_names {
+                if names.len() > 1 && names.iter().any(|n| dev_names.contains(n)) {
+                    let names_str = names
+                        .iter()
                         .map(|n| n.to_string())
                         .collect::<Vec<_>>()
                         .join(", ");
                     writeln!(
                         writer,
-                        "{} Dev address assignment '{name} = 0x{addr}' in package \
-                         '{pkg}' has the same address as: {conflicts}. If these addresses \
-                         are different in a non-dev build, the package may behave differently \
-                         than in dev mode / testing.",
+                        "{} Multiple named addresses in package '{}' share the \
+                         same address 0x{}: [{}]. If these addresses are different in a \
+                         non-dev build, the package may behave differently than in testing.",
                         "WARNING".bold().yellow(),
-                        name = name,
-                        addr = addr.short_str_lossless(),
-                        pkg = package_name,
-                        conflicts = conflict_names,
+                        package_name,
+                        addr.short_str_lossless(),
+                        names_str,
                     )?;
                 }
             }

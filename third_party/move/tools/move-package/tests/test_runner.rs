@@ -52,6 +52,7 @@ fn run_test_impl(
     let should_compile = path.with_extension(COMPILE_EXT).is_file();
     let should_model = path.with_extension(MODEL_EXT).is_file();
     let contents = fs::read_to_string(path)?;
+    let mut writer_buf = Vec::new();
     let output = match MP::parse_move_manifest_string(contents)
         .and_then(MP::parse_source_manifest)
         .and_then(|parsed_manifest| {
@@ -69,7 +70,7 @@ fn run_test_impl(
                     compiler_config: compiler_config.clone(),
                     ..Default::default()
                 },
-                &mut Vec::new(), /* empty writer as no diags needed */
+                &mut writer_buf,
             )
         })
         .and_then(|rg| rg.resolve())
@@ -122,7 +123,13 @@ fn run_test_impl(
         },
         Err(error) => format!("{:#}\n", error),
     };
-    Ok(output)
+    let writer_output = String::from_utf8(writer_buf).unwrap_or_default();
+    let warnings: String = writer_output
+        .lines()
+        .filter(|line| line.contains("WARNING"))
+        .map(|line| format!("{}\n", line))
+        .collect();
+    Ok(format!("{}{}", warnings, output))
 }
 
 fn check_or_update(
