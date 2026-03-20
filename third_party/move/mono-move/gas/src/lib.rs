@@ -16,18 +16,15 @@
 //!
 //! ## Integration
 //!
-//! A new instruction set plugs in by adding `Charge` and
-//! `ChargeVariable` variants to its instruction type and implementing
-//! the four traits above. [`GasInstrumentor::run`] then instruments
-//! any `Vec<I>` at compile time.
+//! A new instruction set plugs in by adding a `Charge` variant to its
+//! instruction type and implementing the four traits above.
+//! [`GasInstrumentor::run`] then instruments any `Vec<I>` at compile time.
 //!
-//! The interpreter handles the two charge variants:
+//! The interpreter handles the charge variant:
 //!
 //! ```text
 //! match instr {
 //!     MyOp::Charge { cost } => gas_meter.charge(cost)?,
-//!     MyOp::ChargeVariable { per_unit, slot } =>
-//!         gas_meter.charge(per_unit.saturating_mul(frame.read_u64(slot)))?,
 //!     ...
 //! }
 //! ```

@@ -8,8 +8,8 @@
 //!
 //! - **`Charge`** — for each basic block, prepended at the block entry
 //!   with the summed static costs of all instructions in the block.
-//! - **`ChargeVariable`** — for each instruction with a runtime-variable
-//!   cost, appended immediately after the instruction.
+//! - An optional dynamic charge op — for each instruction with a
+//!   runtime-variable cost component, appended immediately after it.
 //!
 //! ## Dead code
 //!
@@ -140,13 +140,13 @@ mod tests {
         Jump(usize),
         CondJump(usize),
         Return,
-        Charge { cost: u64 },
-        ChargeVariable { per_unit: u64 },
+        Charge(u64),
+        ChargeDynamic(u64),
     }
 
     impl GasMeteredInstruction for TestOp {
         fn charge(cost: u64) -> Self {
-            TestOp::Charge { cost }
+            TestOp::Charge(cost)
         }
     }
 
@@ -202,7 +202,7 @@ mod tests {
         let ops = vec![TestOp::Nop, TestOp::Nop, TestOp::Return];
         let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::Charge { cost: 6 },
+            TestOp::Charge(6),
             TestOp::Nop,
             TestOp::Nop,
             TestOp::Return,
@@ -232,11 +232,11 @@ mod tests {
         let ops = vec![TestOp::Jump(2), TestOp::Nop, TestOp::Return];
         let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::Charge { cost: 1 },
+            TestOp::Charge(1),
             TestOp::Jump(4),
-            TestOp::Charge { cost: 1 },
+            TestOp::Charge(1),
             TestOp::Nop,
-            TestOp::Charge { cost: 1 },
+            TestOp::Charge(1),
             TestOp::Return,
         ]);
     }
@@ -271,12 +271,12 @@ mod tests {
         ];
         let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::Charge { cost: 1 },
+            TestOp::Charge(1),
             TestOp::CondJump(5),
-            TestOp::Charge { cost: 2 },
+            TestOp::Charge(2),
             TestOp::Nop,
             TestOp::Jump(0),
-            TestOp::Charge { cost: 1 },
+            TestOp::Charge(1),
             TestOp::Return,
         ]);
     }
@@ -315,23 +315,23 @@ mod tests {
         ];
         let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::Charge { cost: 3 },
+            TestOp::Charge(3),
             TestOp::Nop,
             TestOp::CondJump(3),
-            TestOp::Charge { cost: 4 },
+            TestOp::Charge(4),
             TestOp::Nop,
             TestOp::Return,
         ]);
     }
 
     /// Input:
-    ///   0: Nop    — Dynamic { base: 5, per_unit: 3 }
-    ///   1: Return — Static(5)
+    ///   0: Nop    — base: 5, dynamic: Some(ChargeDynamic(3))
+    ///   1: Return — base: 5, dynamic: None
     ///
     /// Output:
     ///   0: Charge(10)
     ///   1: Nop
-    ///   2: ChargeVariable(3)
+    ///   2: ChargeDynamic(3)
     ///   3: Return
     #[test]
     fn dynamic_charges_inserted_after_instruction() {
@@ -341,7 +341,7 @@ mod tests {
                 match op {
                     TestOp::Nop => InstrCost {
                         base: 5,
-                        dynamic: Some(TestOp::ChargeVariable { per_unit: 3 }),
+                        dynamic: Some(TestOp::ChargeDynamic(3)),
                     },
                     _ => InstrCost::constant(5),
                 }
@@ -350,9 +350,9 @@ mod tests {
         let ops = vec![TestOp::Nop, TestOp::Return];
         let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::Charge { cost: 10 },
+            TestOp::Charge(10),
             TestOp::Nop,
-            TestOp::ChargeVariable { per_unit: 3 },
+            TestOp::ChargeDynamic(3),
             TestOp::Return,
         ]);
     }
@@ -382,11 +382,11 @@ mod tests {
         let ops = vec![TestOp::Jump(2), TestOp::Nop, TestOp::Return];
         let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::Charge { cost: 1 },
+            TestOp::Charge(1),
             TestOp::Jump(4),
-            TestOp::Charge { cost: 1 },
+            TestOp::Charge(1),
             TestOp::Nop,
-            TestOp::Charge { cost: 1 },
+            TestOp::Charge(1),
             TestOp::Return,
         ]);
     }
