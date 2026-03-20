@@ -51,7 +51,6 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
 {
     let node_type = NodeType::extract_from_config(config);
     let transaction_filter_config = config.transaction_filters.mempool_filter.clone();
-    let disable_mempool_broadcast = config.consensus.enable_prefix_consensus;
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, TransactionValidator> =
         SharedMempool::new(
             mempool.clone(),
@@ -62,7 +61,6 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
             validator,
             subscribers,
             node_type,
-            disable_mempool_broadcast,
         );
 
     executor.spawn(coordinator(

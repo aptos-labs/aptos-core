@@ -72,7 +72,6 @@ impl<
         validator: Arc<RwLock<TransactionValidator>>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
         node_type: NodeType,
-        disable_mempool_broadcast: bool,
     ) -> Self {
         let network_interface =
             MempoolNetworkInterface::new(network_client, node_type, config.clone());
@@ -87,7 +86,7 @@ impl<
             db,
             validator,
             subscribers,
-            broadcast_within_validator_network: Arc::new(RwLock::new(!disable_mempool_broadcast)),
+            broadcast_within_validator_network: Arc::new(RwLock::new(true)),
             use_case_history: Arc::new(Mutex::new(use_case_history)),
             transaction_filter_config,
         }

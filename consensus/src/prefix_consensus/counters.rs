@@ -4,7 +4,8 @@
 //! Prometheus metrics for prefix consensus slot pipeline.
 
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
+    register_histogram_vec, register_int_counter_vec, register_int_gauge, HistogramVec,
+    IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -87,6 +88,16 @@ pub static WAVE_COMMITTED_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
 /// Histogram: number of blocks (entries) committed per wave.
 ///
 /// Labels: same as WAVE_COMMITTED_TXNS.
+/// Gauge: number of our own payloads still in the execution pipeline (not yet committed).
+/// Used to size the mempool dedup exclusion filter.
+pub static UNCOMMITTED_PAYLOAD_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "pc_uncommitted_payload_count",
+        "Number of uncommitted own payloads tracked for dedup filtering"
+    )
+    .unwrap()
+});
+
 pub static WAVE_COMMITTED_BLOCKS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "pc_wave_committed_blocks",

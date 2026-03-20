@@ -12,8 +12,8 @@ use crate::{
     payload_client::PayloadClient,
     pipeline::{buffer_manager::OrderedBlocks, pipeline_builder::PipelineBuilder},
     prefix_consensus::counters::{
-        PROPOSAL_WAIT_DURATION, SLOT_DURATION, SLOT_START_TRIGGER, WAVE_COMMITTED_BLOCKS,
-        WAVE_COMMITTED_TXNS,
+        PROPOSAL_WAIT_DURATION, SLOT_DURATION, SLOT_START_TRIGGER, UNCOMMITTED_PAYLOAD_COUNT,
+        WAVE_COMMITTED_BLOCKS, WAVE_COMMITTED_TXNS,
     },
 };
 use aptos_consensus_types::{
@@ -48,7 +48,7 @@ use aptos_types::{
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::{channel::oneshot, SinkExt, StreamExt};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     pin::Pin,
     sync::Arc,
     time::{Duration, Instant},
@@ -308,6 +308,12 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     proposal_wait_start: Option<Instant>,
     spc_start_time: Option<Instant>,
     vlow_received_time: Option<Instant>,
+
+    // Mempool dedup: track our own payloads that haven't been committed by execution yet.
+    // The pipeline callback sends committed slot numbers back to the event loop via this channel.
+    committed_slot_tx: tokio::sync::mpsc::UnboundedSender<u64>,
+    committed_slot_rx: tokio::sync::mpsc::UnboundedReceiver<u64>,
+    uncommitted_own_payloads: BTreeMap<u64, Payload>,
 }
 
 impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager<NS, SP> {
@@ -325,6 +331,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         pipeline_builder: Option<PipelineBuilder>,
         parent_pipeline_futs: Option<PipelineFutures>,
     ) -> Self {
+        let (committed_slot_tx, committed_slot_rx) = tokio::sync::mpsc::unbounded_channel();
         Self {
             author,
             epoch,
@@ -360,6 +367,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             proposal_wait_start: None,
             spc_start_time: None,
             vlow_received_time: None,
+            committed_slot_tx,
+            committed_slot_rx,
+            uncommitted_own_payloads: BTreeMap::new(),
         }
     }
 
@@ -505,6 +515,16 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                         }
                     }
                 }
+
+                // Pipeline committed a slot's blocks — remove from dedup filter
+                Some(committed_slot) = self.committed_slot_rx.recv() => {
+                    self.slot_timer = timer_opt;
+                    self.spc_output_rx = spc_rx_opt;
+                    // Pipeline commits in order: if slot N committed, all slots <= N are too
+                    let remaining = self.uncommitted_own_payloads.split_off(&(committed_slot + 1));
+                    self.uncommitted_own_payloads = remaining;
+                    UNCOMMITTED_PAYLOAD_COUNT.set(self.uncommitted_own_payloads.len() as i64);
+                }
             }
         }
     }
@@ -535,6 +555,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         // Pull payload from mempool
         let pull_start = Instant::now();
         let (validator_txns, payload) = self.pull_payload().await;
+        // Track our own payload for mempool dedup until committed by execution pipeline
+        self.uncommitted_own_payloads.insert(slot, payload.clone());
+        UNCOMMITTED_PAYLOAD_COUNT.set(self.uncommitted_own_payloads.len() as i64);
         SLOT_DURATION
             .with_label_values(&["payload_pull"])
             .observe(pull_start.elapsed().as_secs_f64());
@@ -1051,10 +1074,12 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             // Set up execution pipeline futures
             if let Some(pipeline_builder) = &self.pipeline_builder {
                 if let Some(parent_futs) = self.parent_pipeline_futs.take() {
+                    let tx = self.committed_slot_tx.clone();
+                    let cb_slot = slot;
                     pipeline_builder.build_for_consensus(
                         &pipelined,
                         parent_futs,
-                        Box::new(|_, _| {}),
+                        Box::new(move |_, _| { let _ = tx.send(cb_slot); }),
                     );
                     self.parent_pipeline_futs = pipelined.pipeline_futs();
                 } else {
@@ -1564,13 +1589,17 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     // ========================================================================
 
     async fn pull_payload(&self) -> (Vec<aptos_types::validator_txn::ValidatorTransaction>, Payload) {
+        // Build exclusion filter from uncommitted payloads to avoid pulling duplicate txns.
+        let exclude_payloads: Vec<&Payload> = self.uncommitted_own_payloads.values().collect();
+        let user_txn_filter = PayloadFilter::from(&exclude_payloads);
+
         let params = PayloadPullParameters {
             max_poll_time: Duration::from_millis(300),
             max_txns: PayloadTxnsSize::new(1000, 4 * 1024 * 1024),
             max_txns_after_filtering: 1000,
             soft_max_txns_after_filtering: 1000,
             max_inline_txns: PayloadTxnsSize::new(400, 400 * 1024),
-            user_txn_filter: PayloadFilter::Empty,
+            user_txn_filter,
             pending_ordering: false,
             pending_uncommitted_blocks: 0,
             recent_max_fill_fraction: 0.0,
