@@ -6,6 +6,15 @@ module aptos_experimental::sigma_protocol_utils {
         new_scalar_from_bytes
     };
 
+    // === Shared error codes for sigma protocol proof modules ===
+
+    use std::error;
+
+    public fun e_wrong_num_points(): u64 { error::invalid_argument(1) }
+    public fun e_wrong_num_scalars(): u64 { error::invalid_argument(2) }
+    public fun e_wrong_witness_len(): u64 { error::invalid_argument(3) }
+    public fun e_wrong_output_len(): u64 { error::invalid_argument(4) }
+
     /// Clones a vector of Ristretto255 points
     // TODO(Perf): Annoying limitation of our Ristretto255 module. (Should we "fix" it as per `crypto_algebra`?)
     public fun points_clone(a: &vector<RistrettoPoint>): vector<RistrettoPoint> {
@@ -33,15 +42,6 @@ module aptos_experimental::sigma_protocol_utils {
     public(friend) fun deserialize_scalars(scalars_bytes: vector<vector<u8>>): vector<Scalar> {
         scalars_bytes.map(|scalar_bytes| new_scalar_from_bytes(scalar_bytes).extract())
     }
-
-    // === Shared error codes for sigma protocol proof modules ===
-
-    use std::error;
-
-    public fun e_wrong_num_points(): u64 { error::invalid_argument(1) }
-    public fun e_wrong_num_scalars(): u64 { error::invalid_argument(2) }
-    public fun e_wrong_witness_len(): u64 { error::invalid_argument(3) }
-    public fun e_wrong_output_len(): u64 { error::invalid_argument(4) }
 
     /// Negates a vector of scalars `a`, returns a new vector `c` where `c[i] = -a[i]`.
     public fun neg_scalars(a: &vector<Scalar>): vector<Scalar> {

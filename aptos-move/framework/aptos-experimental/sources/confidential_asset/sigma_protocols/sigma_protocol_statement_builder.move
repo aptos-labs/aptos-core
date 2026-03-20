@@ -64,8 +64,10 @@ module aptos_experimental::sigma_protocol_statement_builder {
         (start, cloned)
     }
 
-    public fun add_scalar<P>(self: &mut StatementBuilder<P>, s: Scalar) {
+    public fun add_scalar<P>(self: &mut StatementBuilder<P>, s: Scalar): u64 {
+        let idx = self.scalars.length();
         self.scalars.push_back(s);
+        idx
     }
 
     public fun build<P>(self: StatementBuilder<P>): Statement<P> {

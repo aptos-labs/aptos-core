@@ -177,9 +177,11 @@ module aptos_experimental::sigma_protocol_transfer {
     //
 
     /// The transfer proof was invalid.
-    const E_INVALID_TRANSFER_PROOF: u64 = 5;
+    const E_INVALID_TRANSFER_PROOF: u64 = 5;  // other error codes in [1, 4] in sigma_protocol_utils.move
     /// The number of auditor R components does not match the expected auditor count.
     const E_AUDITOR_COUNT_MISMATCH: u64 = 6;
+    /// The homomorphism or transformation function implementation is not inserting points at the expected positions.
+    const E_STATEMENT_BUILDER_INCONSISTENCY: u64 = 7;
 
     //
     // Structs
@@ -287,33 +289,43 @@ module aptos_experimental::sigma_protocol_transfer {
             error::invalid_argument(E_AUDITOR_COUNT_MISMATCH)
         );
 
+        let ell = get_ell();
+        let n = get_n();
+        let e = error::internal(E_STATEMENT_BUILDER_INCONSISTENCY);
+
         let b = new_builder();
-        b.add_point(ristretto255::basepoint_compressed());                                     // G
-        b.add_point(ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed());  // H
-        b.add_point(compressed_ek_sender);                                                      // ek_sender
-        b.add_point(compressed_ek_recip);                                                       // ek_recip
-        b.add_points(compressed_old_balance.get_compressed_P());                                // old_P
-        b.add_points(compressed_old_balance.get_compressed_R());                                // old_R
-        let (_, new_balance_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
-        b.add_points(compressed_new_balance.get_compressed_R());                                // new_R
-        let (_, amount_P) = b.add_points_cloned(compressed_amount.get_compressed_P());          // amount_P
-        b.add_points(compressed_amount.get_compressed_R_sender());                              // amount_R_sender
-        let (_, recip_R) = b.add_points_cloned(compressed_amount.get_compressed_R_recip());     // amount_R_recip
+        assert!(b.add_point(ristretto255::basepoint_compressed()) == IDX_G, e);                                            // G
+        assert!(b.add_point(ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed()) == IDX_H, e);         // H
+        assert!(b.add_point(compressed_ek_sender) == IDX_EK_SENDER, e);                                                       // ek_sender
+        assert!(b.add_point(compressed_ek_recip) == IDX_EK_RECIP, e);                                                         // ek_recip
+        assert!(b.add_points(compressed_old_balance.get_compressed_P()) == START_IDX_OLD_P, e);                            // old_P
+        assert!(b.add_points(compressed_old_balance.get_compressed_R()) == START_IDX_OLD_P + ell, e);                      // old_R
+        let (idx, new_balance_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
+        assert!(idx == START_IDX_OLD_P + 2 * ell, e);
+        assert!(b.add_points(compressed_new_balance.get_compressed_R()) == START_IDX_OLD_P + 3 * ell, e);                  // new_R
+        let (idx, amount_P) = b.add_points_cloned(compressed_amount.get_compressed_P());           // amount_P
+        assert!(idx == START_IDX_OLD_P + 4 * ell, e);
+        assert!(b.add_points(compressed_amount.get_compressed_R_sender()) == START_IDX_OLD_P + 4 * ell + n, e);            // amount_R_sender
+        let (idx, recip_R) = b.add_points_cloned(compressed_amount.get_compressed_R_recip());      // amount_R_recip
+        assert!(idx == START_IDX_OLD_P + 4 * ell + 2 * n, e);
 
         // Effective auditor: ek, new_R[1..ℓ], amount_R[1..n]
+        let idx_eff_start = START_IDX_OLD_P + 4 * ell + 3 * n;
         if (has_eff) {
             let ek_eff = *compressed_ek_eff_aud.borrow();
-            b.add_point(ek_eff);                                                                // ek_eff_aud
-            b.add_points(compressed_new_balance.get_compressed_R_aud());                        // new_R_eff_aud
-            b.add_points(compressed_amount.get_compressed_R_eff_aud());                         // amount_R_eff_aud
+            assert!(b.add_point(ek_eff) == idx_eff_start, e);                                                     // ek_eff_aud
+            assert!(b.add_points(compressed_new_balance.get_compressed_R_aud()) == idx_eff_start + 1, e);      // new_R_eff_aud
+            assert!(b.add_points(compressed_amount.get_compressed_R_eff_aud()) == idx_eff_start + 1 + ell, e); // amount_R_eff_aud
         };
 
         // Voluntary auditors: for each, append [ek_volun_aud, amount_R_volun_aud[1..n]]
+        let idx_volun_start = idx_eff_start + if (has_eff) { 1 + ell + n } else { 0 };
         let compressed_R_volun_auds = compressed_amount.get_compressed_R_volun_auds();
         vector::range(0, num_volun).for_each(|i| {
+            let expected_idx = idx_volun_start + i * (1 + n);
             let ek_volun = compressed_ek_volun_auds[i];
-            b.add_point(ek_volun);                                                              // ek_volun_aud
-            b.add_points(&compressed_R_volun_auds[i]);                                          // amount_R_volun_aud
+            assert!(b.add_point(ek_volun) == expected_idx, e);                             // ek_volun_aud
+            assert!(b.add_points(&compressed_R_volun_auds[i]) == expected_idx + 1, e);  // amount_R_volun_aud
         });
 
         let stmt = b.build();
