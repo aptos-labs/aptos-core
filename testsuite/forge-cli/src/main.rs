@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 use futures::{future, FutureExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
-use std::{self, num::NonZeroUsize, process, time::Duration};
+use std::{self, num::NonZeroUsize, path::PathBuf, process, time::Duration};
 use sugars::{boxed, hmap};
 use suites::{
     dag::get_dag_test,
@@ -103,6 +103,13 @@ struct LocalSwarm {
         default_value_t = 1
     )]
     concurrency_level: u16,
+    #[clap(
+        long,
+        help = "Path to a pre-built aptos-node binary (skips cargo build)"
+    )]
+    aptos_node_binary: Option<String>,
+    #[clap(long, help = "Automatically restart crashed validator nodes")]
+    auto_restart: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -310,9 +317,14 @@ fn main() -> Result<()> {
                         .as_deref()
                         .map(|s| s.split(':').map(String::from).collect())
                         .unwrap_or_default();
-                    let factory = LocalFactory::from_workspace(swarm_dir)?
-                        .with_node_affinities(cpu_affinities, mem_binds)
-                        .with_concurrency_level(local_cfg.concurrency_level);
+                    let factory = if let Some(ref binary) = local_cfg.aptos_node_binary {
+                        LocalFactory::from_binary(PathBuf::from(binary), swarm_dir)?
+                    } else {
+                        LocalFactory::from_workspace(swarm_dir)?
+                    }
+                    .with_node_affinities(cpu_affinities, mem_binds)
+                    .with_concurrency_level(local_cfg.concurrency_level)
+                    .with_auto_restart(local_cfg.auto_restart);
                     let forge = Forge::new(&args.options, test_suite, duration, factory);
                     run_forge(forge, &args.options)
                 },
