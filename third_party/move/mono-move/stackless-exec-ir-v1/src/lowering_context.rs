@@ -6,23 +6,27 @@
 //! Builds frame layout information (slot offsets/sizes) needed by the lowerer.
 //! All lookups are O(1) via indexed Vecs — no maps.
 
-use anyhow::Result;
-
 use crate::ir::{FunctionIR, Instr};
+use anyhow::Result;
 use mono_move_micro_ops::instruction::FRAME_METADATA_SIZE;
-use move_binary_format::{
-    access::ModuleAccess,
-    file_format::SignatureToken,
-    CompiledModule,
-};
+use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use move_vm_types::loaded_data::runtime_types::Type;
 
 /// Returns the byte size of a concrete type, or None if the type is
 /// not concrete (e.g., contains type parameters) or not yet handled.
 pub fn type_size(ty: &Type) -> Option<usize> {
     match ty {
-        Type::Bool | Type::U8 | Type::I8 | Type::U16 | Type::I16 | Type::U32 | Type::I32
-        | Type::U64 | Type::I64 | Type::Address | Type::Signer => Some(8),
+        Type::Bool
+        | Type::U8
+        | Type::I8
+        | Type::U16
+        | Type::I16
+        | Type::U32
+        | Type::I32
+        | Type::U64
+        | Type::I64
+        | Type::Address
+        | Type::Signer => Some(8),
         Type::U128 | Type::I128 => Some(16),
         Type::U256 | Type::I256 => Some(32),
         Type::Vector(_) => Some(8),

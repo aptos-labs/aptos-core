@@ -228,7 +228,6 @@ pub enum Instr {
     Ret(Vec<Reg>),
     Abort(Reg),
     AbortMsg(Reg, Reg),
-
 }
 
 /// IR for a single function.

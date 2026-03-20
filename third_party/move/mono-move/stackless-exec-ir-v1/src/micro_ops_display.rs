@@ -76,11 +76,7 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
             )
         },
         MicroOp::JumpLessU64 { target, lhs, rhs } => {
-            write!(
-                f,
-                "JumpLessU64 @{} [{}] < [{}]",
-                target.0, lhs.0, rhs.0
-            )
+            write!(f, "JumpLessU64 @{} [{}] < [{}]", target.0, lhs.0, rhs.0)
         },
         // Vector ops
         MicroOp::VecNew {
@@ -165,25 +161,17 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
             heap_ptr,
             offset,
         } => {
-            write!(
-                f,
-                "HeapBorrow [{}] <- &[{}]+{}",
-                dst.0, heap_ptr.0, offset
-            )
+            write!(f, "HeapBorrow [{}] <- &[{}]+{}", dst.0, heap_ptr.0, offset)
         },
-        MicroOp::ReadRef {
-            dst,
-            ref_ptr,
-            size,
-        } => {
+        MicroOp::ReadRef { dst, ref_ptr, size } => {
             write!(f, "ReadRef [{}] <- *[{}] (size={})", dst.0, ref_ptr.0, size)
         },
-        MicroOp::WriteRef {
-            ref_ptr,
-            src,
-            size,
-        } => {
-            write!(f, "WriteRef *[{}] <- [{}] (size={})", ref_ptr.0, src.0, size)
+        MicroOp::WriteRef { ref_ptr, src, size } => {
+            write!(
+                f,
+                "WriteRef *[{}] <- [{}] (size={})",
+                ref_ptr.0, src.0, size
+            )
         },
         // Heap object ops
         MicroOp::HeapNew { dst, descriptor_id } => {
@@ -217,22 +205,14 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
             offset,
             src,
         } => {
-            write!(
-                f,
-                "HeapMoveTo8 [{}]+{} <- [{}]",
-                heap_ptr.0, offset, src.0
-            )
+            write!(f, "HeapMoveTo8 [{}]+{} <- [{}]", heap_ptr.0, offset, src.0)
         },
         MicroOp::HeapMoveToImm8 {
             heap_ptr,
             offset,
             imm,
         } => {
-            write!(
-                f,
-                "HeapMoveToImm8 [{}]+{} <- #{}",
-                heap_ptr.0, offset, imm
-            )
+            write!(f, "HeapMoveToImm8 [{}]+{} <- #{}", heap_ptr.0, offset, imm)
         },
         MicroOp::HeapMoveTo {
             heap_ptr,

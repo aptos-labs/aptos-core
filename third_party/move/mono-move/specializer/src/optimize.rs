@@ -27,7 +27,7 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 
 /// Pass 3: Forward copy propagation within each basic block.
 ///
-/// Pre: allocated instruction stream (physical slots).
+/// Pre: allocated instruction stream (real slots).
 /// Post: Copy/Move sources propagated to downstream uses; no instructions removed.
 ///
 /// # Correctness
