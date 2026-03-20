@@ -554,24 +554,20 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
 /// outstanding sequence numbers.
 #[cfg(feature = "consensus-only-perf-test")]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, Option<u64>, Option<u64>)>,
+    transactions: Vec<(
+        SignedTransaction,
+        Option<u64>,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
-    statuses: &mut Vec<(
-        SignedTransaction,
-        (
-            MempoolStatus,
-            Option<StatusCode>,
-            Option<BroadcastPeerPriority>,
-        ),
-    )>,
+    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
     client_submitted: bool,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
-    use super::priority;
-
     let mut mempool = smp.mempool.lock();
     for (transaction, account_sequence_number, ready_time_at_sender, priority) in
         transactions.into_iter()
@@ -582,7 +578,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
             account_sequence_number,
             timeline_state,
             client_submitted,
-            read_time_at_sender,
+            ready_time_at_sender,
             priority,
         );
         statuses.push((transaction, (mempool_status, None)));

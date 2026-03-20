@@ -1,27 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{gauged_api, Result};
 use crate::{
+    db::aptosdb_internal::gauged_api,
     metrics::{LATEST_CHECKPOINT_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH},
     AptosDB,
 };
 use anyhow::format_err;
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
-    hash::{CryptoHash, TransactionAccumulatorHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    hash::{CryptoHash, TransactionAccumulatorHasher},
     HashValue,
 };
 use aptos_infallible::Mutex;
 use aptos_logger::debug;
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    db_ensure as ensure,
-    state_store::{
-        state_delta::StateDelta, state_update_refs::BatchedStateUpdateRefs,
-        state_view::cached_state_view::ShardedStateCache,
-    },
-    AptosDbError, DbReader, DbWriter, LedgerSummary, MAX_REQUEST_LIMIT,
+    chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter,
+    LedgerSummary, Order, Result, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -31,7 +26,6 @@ use aptos_types::{
     contract_event::EventWithVersion,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
-    indexer::indexer_db_reader::IndexedTransactionSummary,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, position::Position, AccumulatorConsistencyProof,
@@ -41,15 +35,14 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        combine_sharded_state_updates,
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
-        table,
     },
     transaction::{
-        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
+        IndexedTransactionSummary, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
+        TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionToCommit,
         TransactionWithProof, Version,
     },
     write_set::WriteSet,
@@ -66,85 +59,45 @@ use std::{
 };
 
 /// Alternate implementation of [crate::state_store::buffered_state::BufferedState] for use with consensus-only-perf-test feature.
-/// It stores the [StateDelta]s in memory similar to [crate::state_store::buffered_state::BufferedState] except that it does not
-/// commit it to persistant storage.
+/// It tracks version information in memory without needing the full State/StateDelta machinery.
 #[derive(Debug)]
 pub struct FakeBufferedState {
-    // state until the latest checkpoint.
-    state_until_checkpoint: Option<Box<StateDelta>>,
-    // state after the latest checkpoint.
-    state_after_checkpoint: StateDelta,
+    /// The version of the latest checkpoint (base version).
+    checkpoint_version: Option<Version>,
+    /// The current version (latest version including updates after checkpoint).
+    current_version: Option<Version>,
 }
 
 impl FakeBufferedState {
     pub(crate) fn new_empty() -> Self {
-        let state_after_checkpoint = StateDelta::new_at_checkpoint(
-            *SPARSE_MERKLE_PLACEHOLDER_HASH,
-            StateStorageUsage::zero(),
-            None,
-        );
         let myself = Self {
-            state_until_checkpoint: None,
-            state_after_checkpoint,
+            checkpoint_version: None,
+            current_version: None,
         };
         myself.report_latest_committed_version();
         myself
     }
 
-    pub fn current_state(&self) -> &StateDelta {
-        &self.state_after_checkpoint
+    pub fn checkpoint_version(&self) -> Option<Version> {
+        self.checkpoint_version
     }
 
-    pub fn current_checkpoint_version(&self) -> Option<Version> {
-        self.state_after_checkpoint.base_version
+    pub fn current_version(&self) -> Option<Version> {
+        self.current_version
     }
 
     fn report_latest_committed_version(&self) {
-        LATEST_CHECKPOINT_VERSION.set(
-            self.state_after_checkpoint
-                .base_version
-                .map_or(-1, |v| v as i64),
-        );
+        LATEST_CHECKPOINT_VERSION.set(self.checkpoint_version.map_or(-1, |v| v as i64));
     }
 
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<&BatchedStateUpdateRefs>,
-        new_state_after_checkpoint: StateDelta,
-    ) -> Result<()> {
-        ensure!(
-            new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version,
-            "new state base version smaller than state after checkpoint base version",
-        );
-        if let Some(updates_until_next_checkpoint_since_current) =
-            updates_until_next_checkpoint_since_current_option
-        {
-            ensure!(
-                new_state_after_checkpoint.base_version > self.state_after_checkpoint.base_version,
-                "Diff between base and latest checkpoints provided, while they are the same.",
-            );
-            self.state_after_checkpoint
-                .updates_since_base
-                .clone_merge(updates_until_next_checkpoint_since_current);
-            self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
-            self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
-            let state_after_checkpoint = self
-                .state_after_checkpoint
-                .replace_with(new_state_after_checkpoint);
-            if let Some(ref mut delta) = self.state_until_checkpoint {
-                delta.merge(state_after_checkpoint);
-            } else {
-                self.state_until_checkpoint = Some(Box::new(state_after_checkpoint));
-            }
-        } else {
-            ensure!(
-                new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version,
-                "Diff between base and latest checkpoints not provided.",
-            );
-            self.state_after_checkpoint = new_state_after_checkpoint;
-        }
+        new_checkpoint_version: Option<Version>,
+        new_current_version: Option<Version>,
+    ) {
+        self.checkpoint_version = new_checkpoint_version;
+        self.current_version = new_current_version;
         self.report_latest_committed_version();
-        Ok(())
     }
 }
 
@@ -222,22 +175,21 @@ impl FakeAptosDB {
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        latest_in_memory_state: &StateDelta,
+        last_version: Version,
     ) -> Result<()> {
         let buffered_state = self.buffered_state.lock();
         ensure!(
-            base_state_version == buffered_state.current_state().base_version,
-            "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
+            base_state_version == buffered_state.checkpoint_version(),
+            "base_state_version {:?} does not equal to the checkpoint_version {:?} in buffered state with current version {:?}",
             base_state_version,
-            buffered_state.current_state().base_version,
-            buffered_state.current_state().current_version,
+            buffered_state.checkpoint_version(),
+            buffered_state.current_version(),
         );
 
         // Ensure the incoming committing requests are always consecutive and the version in
         // buffered state is consistent with that in db.
         let next_version_in_buffered_state = buffered_state
-            .current_state()
-            .current_version
+            .current_version()
             .map(|version| version + 1)
             .unwrap_or(0);
         let num_transactions_in_db = self.get_synced_version()?.map_or(0, |v| v + 1);
@@ -256,12 +208,12 @@ impl FakeAptosDB {
             "txns_to_commit is empty while ledger_info_with_sigs is None.",
         );
 
-        let last_version = first_version + num_txns - 1;
+        let expected_last_version = first_version + num_txns - 1;
 
         if let Some(x) = ledger_info_with_sigs {
             let claimed_last_version = x.ledger_info().version();
             ensure!(
-                claimed_last_version  == last_version,
+                claimed_last_version  == expected_last_version,
                 "Transaction batch not applicable: first_version {}, num_txns {}, last_version_in_ledger_info {}",
                 first_version,
                 num_txns,
@@ -270,10 +222,10 @@ impl FakeAptosDB {
         }
 
         ensure!(
-            Some(last_version) == latest_in_memory_state.current_version,
-            "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
+            expected_last_version == last_version,
+            "the last_version {:?} to commit doesn't match the expected_last_version {:?}",
             last_version,
-            latest_in_memory_state.current_version.expect("Must exist"),
+            expected_last_version,
         );
 
         Ok(())
@@ -373,8 +325,7 @@ impl FakeAptosDB {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<BatchedStateUpdateRefs>,
+        last_version: Version,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
             // Executing and committing from more than one threads not allowed -- consensus and
@@ -395,7 +346,7 @@ impl FakeAptosDB {
                 first_version,
                 base_state_version,
                 ledger_info_with_sigs,
-                &latest_in_memory_state,
+                last_version,
             )?;
 
             let current_li = self.get_latest_ledger_info();
@@ -407,11 +358,8 @@ impl FakeAptosDB {
                 self.inner.save_transactions_for_test(
                     txns_to_commit,
                     first_version,
-                    base_state_version,
                     ledger_info_with_sigs,
                     sync_commit,
-                    &latest_in_memory_state,
-                    true,
                 )?;
             }
 
@@ -424,8 +372,10 @@ impl FakeAptosDB {
                 self.commit_and_post_commit(current_li, new_root_hash, ledger_info_with_sigs)?;
 
                 if !txns_to_commit.is_empty() {
-                    buffered_state
-                        .update(state_updates_until_last_checkpoint, latest_in_memory_state)?;
+                    // Update the buffered state with the new checkpoint and current versions.
+                    // For simplicity, in the fake DB we treat the last version as both
+                    // checkpoint and current version.
+                    buffered_state.update(Some(last_version), Some(last_version));
                 }
             }
 
@@ -447,7 +397,7 @@ impl DbWriter for FakeAptosDB {
     fn finalize_state_snapshot(
         &self,
         version: Version,
-        output_with_proof: TransactionOutputListWithProof,
+        output_with_proof: TransactionOutputListWithProofV2,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         self.inner
@@ -456,15 +406,43 @@ impl DbWriter for FakeAptosDB {
 
     fn save_transactions(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
+        chunk: ChunkToCommit,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<BatchedStateUpdateRefs>,
-        _sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
+        // Convert from ChunkToCommit to TransactionToCommit for the internal implementation.
+        // We need the TransactionToCommit representations for the in-memory maps.
+        let first_version = chunk.first_version;
+        let num_txns = chunk.transactions.len();
+        if num_txns == 0 && ledger_info_with_sigs.is_none() {
+            return Ok(());
+        }
+        let last_version = if num_txns > 0 {
+            first_version + num_txns as u64 - 1
+        } else {
+            // Empty chunk but with ledger info
+            return Ok(());
+        };
+
+        // Build TransactionToCommit from the chunk data
+        let txns_to_commit: Vec<TransactionToCommit> = (0..num_txns)
+            .map(|i| {
+                TransactionToCommit::new(
+                    chunk.transactions[i].clone(),
+                    chunk.transaction_infos[i].clone(),
+                    chunk.transaction_outputs[i].write_set().clone(),
+                    chunk.transaction_outputs[i].events().to_vec(),
+                    chunk.is_reconfig && i == num_txns - 1,
+                    chunk.transaction_outputs[i]
+                        .auxiliary_data()
+                        .clone(),
+                )
+            })
+            .collect();
+
+        // For the base_state_version, use the checkpoint version from the buffered state.
+        let base_state_version = self.buffered_state.lock().checkpoint_version();
+
         debug!(
             "save_transaction: first_version {}, len: {}, base_state_version: {:?}, li {:?}",
             first_version,
@@ -473,13 +451,12 @@ impl DbWriter for FakeAptosDB {
             ledger_info_with_sigs
         );
         self.save_transactions_impl(
-            txns_to_commit,
+            &txns_to_commit,
             first_version,
             base_state_version,
             ledger_info_with_sigs,
             sync_commit,
-            latest_in_memory_state,
-            state_updates_until_last_checkpoint,
+            last_version,
         )
     }
 }
@@ -499,12 +476,12 @@ impl DbReader for FakeAptosDB {
         limit: u64,
         ledger_version: Version,
         _fetch_events: bool,
-    ) -> Result<TransactionListWithProof> {
+    ) -> Result<TransactionListWithProofV2> {
         gauged_api("get_transactions", || {
             error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
             if start_version > ledger_version || limit == 0 {
-                return Ok(TransactionListWithProof::new_empty());
+                return Ok(TransactionListWithProofV2::new_empty());
             }
 
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
@@ -531,13 +508,15 @@ impl DbReader for FakeAptosDB {
 
             // None of the consumers check the proof in consensus-only-perf-test mode, so it is fine to
             // return an empty proof.
-            Ok(TransactionListWithProof::new(
-                txn_list,
-                None,
-                Some(start_version),
-                TransactionInfoListWithProof::new(
-                    AccumulatorRangeProof::new_empty(),
-                    txn_info_list,
+            Ok(TransactionListWithProofV2::new_from_v1(
+                TransactionListWithProof::new(
+                    txn_list,
+                    None,
+                    Some(start_version),
+                    TransactionInfoListWithProof::new(
+                        AccumulatorRangeProof::new_empty(),
+                        txn_info_list,
+                    ),
                 ),
             ))
         })
@@ -608,12 +587,12 @@ impl DbReader for FakeAptosDB {
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<TransactionOutputListWithProof> {
+    ) -> Result<TransactionOutputListWithProofV2> {
         gauged_api("get_transactions_outputs", || {
             error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
             if start_version > ledger_version || limit == 0 {
-                return Ok(TransactionOutputListWithProof::new_empty());
+                return Ok(TransactionOutputListWithProofV2::new_empty());
             }
 
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
@@ -649,10 +628,8 @@ impl DbReader for FakeAptosDB {
                 txn_infos,
             );
 
-            Ok(TransactionOutputListWithProof::new(
-                txns_and_outputs,
-                Some(start_version),
-                proof,
+            Ok(TransactionOutputListWithProofV2::new_from_v1(
+                TransactionOutputListWithProof::new(txns_and_outputs, Some(start_version), proof),
             ))
         })
     }
@@ -661,7 +638,7 @@ impl DbReader for FakeAptosDB {
         &self,
         event_key: &aptos_types::event::EventKey,
         start: u64,
-        order: aptos_storage_interface::Order,
+        order: Order,
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
@@ -711,10 +688,19 @@ impl DbReader for FakeAptosDB {
 
     fn get_prefixed_state_value_iterator(
         &self,
-        key_prefix: &StateKeyPrefix,
-        cursor: Option<&StateKey>,
+        key_prefix: &aptos_types::state_store::state_key::prefix::StateKeyPrefix,
+        cursor: Option<&aptos_types::state_store::state_key::StateKey>,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
+    ) -> Result<
+        Box<
+            dyn Iterator<
+                    Item = Result<(
+                        aptos_types::state_store::state_key::StateKey,
+                        aptos_types::state_store::state_value::StateValue,
+                    )>,
+                > + '_,
+        >,
+    > {
         self.inner
             .get_prefixed_state_value_iterator(key_prefix, cursor, version)
     }
@@ -725,11 +711,7 @@ impl DbReader for FakeAptosDB {
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            Ok(self
-                .buffered_state
-                .lock()
-                .state_after_checkpoint
-                .current_version)
+            Ok(self.buffered_state.lock().current_version())
         })
     }
 
@@ -742,7 +724,7 @@ impl DbReader for FakeAptosDB {
 
     fn get_account_ordered_transaction(
         &self,
-        address: aptos_types::PeerId,
+        address: AccountAddress,
         seq_num: u64,
         include_events: bool,
         ledger_version: Version,
@@ -753,7 +735,7 @@ impl DbReader for FakeAptosDB {
 
     fn get_account_ordered_transactions(
         &self,
-        address: aptos_types::PeerId,
+        address: AccountAddress,
         seq_num: u64,
         limit: u64,
         include_events: bool,
@@ -842,9 +824,10 @@ impl DbReader for FakeAptosDB {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
         self.inner
-            .get_state_proof_by_version_ext(key_hash, version, root_depth)
+            .get_state_proof_by_version_ext(key_hash, version, root_depth, use_hot_state)
     }
 
     fn get_state_value_with_proof_by_version_ext(
@@ -852,9 +835,10 @@ impl DbReader for FakeAptosDB {
         key_hash: &HashValue,
         version: Version,
         root_depth: usize,
+        use_hot_state: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.inner
-            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
+            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth, use_hot_state)
     }
 
     fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary> {
@@ -866,22 +850,10 @@ impl DbReader for FakeAptosDB {
             return self.inner.get_pre_committed_ledger_summary();
         }
 
-        gauged_api("get_pre_committed_ledger_summary", || {
-            let buffered_state = self.buffered_state.lock();
-            let num_txns = buffered_state
-                .current_state()
-                .current_version
-                .map_or(0, |v| v + 1);
-
-            let frozen_subtrees = self.get_frozen_subtree_hashes(num_txns)?;
-            let transaction_accumulator =
-                Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
-            let ledger_summary = LedgerSummary::new(
-                buffered_state.current_state().clone(),
-                transaction_accumulator,
-            );
-            Ok(ledger_summary)
-        })
+        // For the fake DB post-genesis, also delegate to the inner DB.
+        // The inner DB maintains the full LedgerSummary with proper LedgerState
+        // and LedgerStateSummary.
+        self.inner.get_pre_committed_ledger_summary()
     }
 
     fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {
@@ -890,14 +862,6 @@ impl DbReader for FakeAptosDB {
 
     fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures> {
         self.inner.get_epoch_ending_ledger_info(known_version)
-    }
-
-    fn get_latest_version(&self) -> Result<Version> {
-        gauged_api("get_latest_version", || {
-            self.latest_version
-                .lock()
-                .ok_or_else(|| AptosDbError::NotFound("No latest version found.".to_string()))
-        })
     }
 
     fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue> {
@@ -953,7 +917,10 @@ impl DbReader for FakeAptosDB {
         self.inner.get_ledger_prune_window()
     }
 
-    fn get_table_info(&self, handle: table::TableHandle) -> Result<table::TableInfo> {
+    fn get_table_info(
+        &self,
+        handle: aptos_types::state_store::table::TableHandle,
+    ) -> Result<aptos_types::state_store::table::TableInfo> {
         self.inner.get_table_info(handle)
     }
 
@@ -995,9 +962,8 @@ mod tests {
     };
     use anyhow::{anyhow, ensure, Result};
     use aptos_crypto::{hash::CryptoHash, HashValue};
-    use aptos_storage_interface::{
-        state_store::state_view::cached_state_view::ShardedStateCache, DbReader, DbWriter,
-    };
+    use aptos_scratchpad::SparseMerkleTree;
+    use aptos_storage_interface::{DbReader, DbWriter};
     use aptos_temppath::TempPath;
     use aptos_types::{
         account_address::AccountAddress,
@@ -1017,24 +983,24 @@ mod tests {
             let tmp_dir = TempPath::new();
             let db = FakeAptosDB::new(AptosDB::new_for_test(&tmp_dir));
 
-            let mut in_memory_state = db
+            let ledger_summary = db
                 .inner
-            .get_pre_committed_ledger_summary().state;
+                .get_pre_committed_ledger_summary().unwrap();
+            let mut global_smt = ledger_summary.state_summary.global_state_summary.clone();
 
             let mut cur_ver: Version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
-                update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-                db.save_transactions(
+                let new_smt = update_in_memory_state(&global_smt, &global_smt, txns_to_commit.as_slice());
+
+                db.save_transactions_for_test(
                     txns_to_commit,
-                    cur_ver,                /* first_version */
-                    cur_ver.checked_sub(1), /* base_state_version */
+                    cur_ver,
                     Some(ledger_info_with_sigs),
                     false, /* sync_commit */
-                    &in_memory_state,
-                    None, // ignored
-                    Some(&ShardedStateCache::default()) // ignored
                 )
                 .unwrap();
+
+                global_smt = new_smt;
 
                 assert_eq!(
                     db.get_latest_ledger_info().unwrap(),
@@ -1114,15 +1080,19 @@ mod tests {
                 )
                 .unwrap();
 
-                let txn_list_with_proof = db
+                let txn_list_with_proof_v2 = db
                     .get_transactions(cur_ver, 1, ledger_version, true /* fetch_events */)
                     .unwrap();
+                let txn_list_with_proof =
+                    txn_list_with_proof_v2.consume_transaction_list_with_proof();
                 verify_txn_list(&txn_list_with_proof, Some(cur_ver)).unwrap();
                 assert_eq!(txn_list_with_proof.transactions.len(), 1);
 
-                let txn_output_list_with_proof = db
+                let txn_output_list_with_proof_v2 = db
                     .get_transaction_outputs(cur_ver, 1, ledger_version)
                     .unwrap();
+                let txn_output_list_with_proof =
+                    txn_output_list_with_proof_v2.consume_output_list_with_proof();
                 verify_txn_outputs(&txn_output_list_with_proof, Some(cur_ver)).unwrap();
                 assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
             }
