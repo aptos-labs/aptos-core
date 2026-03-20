@@ -221,6 +221,22 @@ mod tests {
         ]);
     }
 
+    /// 0: Nop
+    /// 1: Nop
+    /// 2: Nop
+    /// 3: CondJump(1)
+    ///
+    /// Leaders: 0, 1 (branch target)
+    #[test]
+    fn cond_jump_back_edge_no_fallthrough() {
+        let ops = vec![TestOp::Nop, TestOp::Nop, TestOp::Nop, TestOp::CondJump(1)];
+        let blocks = compute_basic_blocks(&ops);
+        assert_eq!(blocks, vec![BasicBlock { start: 0, end: 1 }, BasicBlock {
+            start: 1,
+            end: 4
+        },]);
+    }
+
     /// 0: Jump(2)
     /// 1: Jump(2)
     /// 2: Return

@@ -7,22 +7,16 @@
 //! This is the only place that knows about both the instruction set and the gas
 //! framework. Plug in a different ISA by writing an equivalent file.
 
-use crate::instruction::{CodeOffset, FrameOffset, MicroOp};
-use mono_move_gas::{GasInstr, GasSchedule, HasCfgInfo, InstrCost, RemapTargets};
+use crate::instruction::{CodeOffset, MicroOp};
+use mono_move_gas::{GasMeteredInstruction, GasSchedule, HasCfgInfo, InstrCost, RemapTargets};
 
 // ---------------------------------------------------------------------------
-// GasInstr
+// GasMeteredInstruction
 // ---------------------------------------------------------------------------
 
-impl GasInstr for MicroOp {
-    type Slot = FrameOffset;
-
-    fn charge_block(cost: u64) -> Self {
-        MicroOp::ChargeBlock { cost }
-    }
-
-    fn charge_variable(per_unit: u64, slot: FrameOffset) -> Self {
-        MicroOp::ChargeVariable { per_unit, slot }
+impl GasMeteredInstruction for MicroOp {
+    fn charge(cost: u64) -> Self {
+        MicroOp::Charge { cost }
     }
 }
 
@@ -39,7 +33,38 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpLessU64 { target, .. } => Some(target.0 as usize),
             // TODO: add JumpLessU64Imm, JumpGreaterEqualU64, JumpNotEqualU64
             //       when victor/interpreter-loop-prototype is merged.
-            _ => None,
+            MicroOp::StoreImm8 { .. }
+            | MicroOp::Move8 { .. }
+            | MicroOp::Move { .. }
+            | MicroOp::AddU64 { .. }
+            | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64Imm { .. }
+            | MicroOp::RSubU64Imm { .. }
+            | MicroOp::ShrU64Imm { .. }
+            | MicroOp::ModU64 { .. }
+            | MicroOp::Return
+            | MicroOp::CallFunc { .. }
+            | MicroOp::VecNew { .. }
+            | MicroOp::VecLen { .. }
+            | MicroOp::VecPushBack { .. }
+            | MicroOp::VecPopBack { .. }
+            | MicroOp::VecLoadElem { .. }
+            | MicroOp::VecStoreElem { .. }
+            | MicroOp::SlotBorrow { .. }
+            | MicroOp::VecBorrow { .. }
+            | MicroOp::HeapBorrow { .. }
+            | MicroOp::ReadRef { .. }
+            | MicroOp::WriteRef { .. }
+            | MicroOp::HeapNew { .. }
+            | MicroOp::HeapMoveFrom8 { .. }
+            | MicroOp::HeapMoveFrom { .. }
+            | MicroOp::HeapMoveTo8 { .. }
+            | MicroOp::HeapMoveToImm8 { .. }
+            | MicroOp::HeapMoveTo { .. }
+            | MicroOp::Charge { .. }
+            | MicroOp::ChargeVariable { .. }
+            | MicroOp::StoreRandomU64 { .. }
+            | MicroOp::ForceGC => None,
         }
     }
 }
@@ -70,7 +95,38 @@ impl RemapTargets for MicroOp {
                 rhs,
             },
             // TODO: remap new jump ops when branches merge.
-            other => other,
+            op @ (MicroOp::StoreImm8 { .. }
+            | MicroOp::Move8 { .. }
+            | MicroOp::Move { .. }
+            | MicroOp::AddU64 { .. }
+            | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64Imm { .. }
+            | MicroOp::RSubU64Imm { .. }
+            | MicroOp::ShrU64Imm { .. }
+            | MicroOp::ModU64 { .. }
+            | MicroOp::Return
+            | MicroOp::CallFunc { .. }
+            | MicroOp::VecNew { .. }
+            | MicroOp::VecLen { .. }
+            | MicroOp::VecPushBack { .. }
+            | MicroOp::VecPopBack { .. }
+            | MicroOp::VecLoadElem { .. }
+            | MicroOp::VecStoreElem { .. }
+            | MicroOp::SlotBorrow { .. }
+            | MicroOp::VecBorrow { .. }
+            | MicroOp::HeapBorrow { .. }
+            | MicroOp::ReadRef { .. }
+            | MicroOp::WriteRef { .. }
+            | MicroOp::HeapNew { .. }
+            | MicroOp::HeapMoveFrom8 { .. }
+            | MicroOp::HeapMoveFrom { .. }
+            | MicroOp::HeapMoveTo8 { .. }
+            | MicroOp::HeapMoveToImm8 { .. }
+            | MicroOp::HeapMoveTo { .. }
+            | MicroOp::Charge { .. }
+            | MicroOp::ChargeVariable { .. }
+            | MicroOp::StoreRandomU64 { .. }
+            | MicroOp::ForceGC) => op,
         }
     }
 }
@@ -85,10 +141,8 @@ impl RemapTargets for MicroOp {
 pub struct MicroOpGasSchedule;
 
 impl GasSchedule<MicroOp> for MicroOpGasSchedule {
-    type Slot = FrameOffset;
-
-    fn cost(&self, instr: &MicroOp) -> InstrCost<FrameOffset> {
-        InstrCost::Static(match instr {
+    fn cost(&self, instr: &MicroOp) -> InstrCost<MicroOp> {
+        InstrCost::constant(match instr {
             // --- Data movement ---
             MicroOp::StoreImm8 { .. } => 2,
             MicroOp::Move8 { .. } => 2,
@@ -134,7 +188,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             },
 
             // --- Gas metering (inserted by instrumentation; not in input) ---
-            MicroOp::ChargeBlock { .. } | MicroOp::ChargeVariable { .. } => 0,
+            MicroOp::Charge { .. } | MicroOp::ChargeVariable { .. } => 0,
 
             // --- Debug ---
             MicroOp::StoreRandomU64 { .. } => 1,

@@ -6,10 +6,19 @@
 //!
 //! Two kinds of charge ops are inserted:
 //!
-//! - **`ChargeBlock`** — for each basic block, prepended at the block entry
+//! - **`Charge`** — for each basic block, prepended at the block entry
 //!   with the summed static costs of all instructions in the block.
 //! - **`ChargeVariable`** — for each instruction with a runtime-variable
 //!   cost, appended immediately after the instruction.
+//!
+//! ## Dead code
+//!
+//! The pass instruments every basic block, including unreachable ones,
+//! potentially doubling program size in the worst case.
+//!
+//! TODO: the compiler should eliminate dead basic blocks before this pass
+//! runs, both to avoid wasted allocation and to prevent dead `Charge` ops
+//! from polluting the instruction cache.
 //!
 //! ## Branch-target remapping
 //!
@@ -27,36 +36,27 @@ use crate::{compute_basic_blocks, GasSchedule, HasCfgInfo, InstrCost};
 /// Constructs gas charge instructions within an ISA.
 ///
 /// Implemented alongside the ISA's instruction type.
-pub trait GasInstr: Sized {
-    /// The slot type used to address runtime values for `ChargeVariable`.
-    type Slot;
-
-    /// Construct a static gas charge for a basic block.
+pub trait GasMeteredInstruction: Sized {
+    /// Construct a static gas charge.
     ///
-    /// `cost` is the pre-summed static cost of every instruction in the
-    /// block, computed at instrumentation time.
-    fn charge_block(cost: u64) -> Self;
-
-    /// Construct a runtime-variable gas charge.
-    ///
-    /// The interpreter evaluates `per_unit * frame[slot]` at runtime. `slot`
-    /// holds the runtime quantity (e.g. the number of bytes to copy).
-    fn charge_variable(per_unit: u64, slot: Self::Slot) -> Self;
+    /// In practice, `cost` will be the pre-summed static cost of every
+    /// instruction in a basic block, computed at instrumentation time.
+    fn charge(cost: u64) -> Self;
 }
 
 /// Rewrites branch-target instruction indices inside an instruction.
 ///
-/// Implemented alongside [`HasCfgInfo`]. [`GasInstrumentation::run`] calls
+/// Implemented alongside [`HasCfgInfo`]. [`GasInstrumentor::run`] calls
 /// this on every instruction to fix up branch targets after inserting charge
 /// ops. Non-branching instructions return `self` unchanged.
-pub trait RemapTargets: Sized {
+pub trait RemapTargets: Sized + HasCfgInfo {
     /// Return a copy of `self` with every branch target index `t` replaced
     /// by `remap(t)`.
     fn remap_targets(self, remap: impl Fn(usize) -> usize) -> Self;
 }
 
 // ---------------------------------------------------------------------------
-// GasInstrumentation
+// GasInstrumentor
 // ---------------------------------------------------------------------------
 
 /// Inserts gas charge ops into a flat instruction sequence.
@@ -65,18 +65,18 @@ pub trait RemapTargets: Sized {
 /// costs. For each `Dynamic`-cost instruction, also inserts a runtime charge
 /// immediately after it. Branch targets are remapped to account for all
 /// inserted ops.
-pub struct GasInstrumentation<S> {
+pub struct GasInstrumentor<S> {
     pub schedule: S,
 }
 
-impl<S> GasInstrumentation<S> {
+impl<S> GasInstrumentor<S> {
     pub fn new(schedule: S) -> Self {
         Self { schedule }
     }
 
     pub fn run<I>(&self, ops: Vec<I>) -> Vec<I>
     where
-        I: HasCfgInfo + RemapTargets + GasInstr<Slot = S::Slot>,
+        I: HasCfgInfo + RemapTargets + GasMeteredInstruction,
         S: GasSchedule<I>,
     {
         if ops.is_empty() {
@@ -86,17 +86,11 @@ impl<S> GasInstrumentation<S> {
         let blocks = compute_basic_blocks(&ops);
         let block_starts: Vec<usize> = blocks.iter().map(|bb| bb.start).collect();
 
-        let costs: Vec<InstrCost<S::Slot>> = ops.iter().map(|op| self.schedule.cost(op)).collect();
+        let costs: Vec<InstrCost<I>> = ops.iter().map(|op| self.schedule.cost(op)).collect();
 
         let block_costs: Vec<u64> = blocks
             .iter()
-            .map(|bb| {
-                (bb.start..bb.end)
-                    .map(|i| match &costs[i] {
-                        InstrCost::Static(c) | InstrCost::Dynamic { base: c, .. } => *c,
-                    })
-                    .sum()
-            })
+            .map(|bb| (bb.start..bb.end).map(|i| costs[i].base).sum())
             .collect();
 
         // d_before[i] = number of dynamic-cost instructions at indices < i.
@@ -105,7 +99,7 @@ impl<S> GasInstrumentation<S> {
             .iter()
             .map(|c| {
                 let d = n_dynamic;
-                if matches!(c, InstrCost::Dynamic { .. }) {
+                if c.dynamic.is_some() {
                     n_dynamic += 1;
                 }
                 d
@@ -118,12 +112,12 @@ impl<S> GasInstrumentation<S> {
         let mut bi = 0usize;
         for (i, (op, cost)) in ops.into_iter().zip(costs).enumerate() {
             if bi < block_starts.len() && block_starts[bi] == i {
-                result.push(I::charge_block(block_costs[bi]));
+                result.push(I::charge(block_costs[bi]));
                 bi += 1;
             }
             result.push(op.remap_targets(remap));
-            if let InstrCost::Dynamic { per_unit, slot, .. } = cost {
-                result.push(I::charge_variable(per_unit, slot));
+            if let Some(dynamic) = cost.dynamic {
+                result.push(dynamic);
             }
         }
 
@@ -146,19 +140,13 @@ mod tests {
         Jump(usize),
         CondJump(usize),
         Return,
-        ChargeBlock { cost: u64 },
+        Charge { cost: u64 },
         ChargeVariable { per_unit: u64 },
     }
 
-    impl GasInstr for TestOp {
-        type Slot = ();
-
-        fn charge_block(cost: u64) -> Self {
-            TestOp::ChargeBlock { cost }
-        }
-
-        fn charge_variable(per_unit: u64, _slot: ()) -> Self {
-            TestOp::ChargeVariable { per_unit }
+    impl GasMeteredInstruction for TestOp {
+        fn charge(cost: u64) -> Self {
+            TestOp::Charge { cost }
         }
     }
 
@@ -185,13 +173,11 @@ mod tests {
     fn empty() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            type Slot = ();
-
-            fn cost(&self, _: &TestOp) -> InstrCost<()> {
-                InstrCost::Static(0)
+            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
+                InstrCost::constant(0)
             }
         }
-        let r: Vec<TestOp> = GasInstrumentation::new(TestSchedule).run(vec![]);
+        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(vec![]);
         assert!(r.is_empty());
     }
 
@@ -201,7 +187,7 @@ mod tests {
     ///   2: Return — cost 2
     ///
     /// Output:
-    ///   0: ChargeBlock(6)
+    ///   0: Charge(6)
     ///   1: Nop
     ///   2: Nop
     ///   3: Return
@@ -209,16 +195,14 @@ mod tests {
     fn single_block_cost_is_sum() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            type Slot = ();
-
-            fn cost(&self, _: &TestOp) -> InstrCost<()> {
-                InstrCost::Static(2)
+            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
+                InstrCost::constant(2)
             }
         }
         let ops = vec![TestOp::Nop, TestOp::Nop, TestOp::Return];
-        let r: Vec<TestOp> = GasInstrumentation::new(TestSchedule).run(ops);
+        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::ChargeBlock { cost: 6 },
+            TestOp::Charge { cost: 6 },
             TestOp::Nop,
             TestOp::Nop,
             TestOp::Return,
@@ -231,30 +215,28 @@ mod tests {
     ///   2: Return  — cost 1
     ///
     /// Output:
-    ///   0: ChargeBlock(1)
+    ///   0: Charge(1)
     ///   1: Jump(4)
-    ///   2: ChargeBlock(1)
+    ///   2: Charge(1)
     ///   3: Nop
-    ///   4: ChargeBlock(1)
+    ///   4: Charge(1)
     ///   5: Return
     #[test]
-    fn jump_target_remapped_to_charge_block() {
+    fn jump_target_remapped_to_charge() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            type Slot = ();
-
-            fn cost(&self, _: &TestOp) -> InstrCost<()> {
-                InstrCost::Static(1)
+            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
+                InstrCost::constant(1)
             }
         }
         let ops = vec![TestOp::Jump(2), TestOp::Nop, TestOp::Return];
-        let r: Vec<TestOp> = GasInstrumentation::new(TestSchedule).run(ops);
+        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::ChargeBlock { cost: 1 },
+            TestOp::Charge { cost: 1 },
             TestOp::Jump(4),
-            TestOp::ChargeBlock { cost: 1 },
+            TestOp::Charge { cost: 1 },
             TestOp::Nop,
-            TestOp::ChargeBlock { cost: 1 },
+            TestOp::Charge { cost: 1 },
             TestOp::Return,
         ]);
     }
@@ -266,21 +248,19 @@ mod tests {
     ///   3: Return      — cost 1
     ///
     /// Output:
-    ///   0: ChargeBlock(1)
+    ///   0: Charge(1)
     ///   1: CondJump(5)
-    ///   2: ChargeBlock(2)
+    ///   2: Charge(2)
     ///   3: Nop
     ///   4: Jump(0)
-    ///   5: ChargeBlock(1)
+    ///   5: Charge(1)
     ///   6: Return
     #[test]
-    fn back_edge_remapped_to_charge_block() {
+    fn back_edge_remapped_to_charge() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            type Slot = ();
-
-            fn cost(&self, _: &TestOp) -> InstrCost<()> {
-                InstrCost::Static(1)
+            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
+                InstrCost::constant(1)
             }
         }
         let ops = vec![
@@ -289,14 +269,14 @@ mod tests {
             TestOp::Jump(0),
             TestOp::Return,
         ];
-        let r: Vec<TestOp> = GasInstrumentation::new(TestSchedule).run(ops);
+        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::ChargeBlock { cost: 1 },
+            TestOp::Charge { cost: 1 },
             TestOp::CondJump(5),
-            TestOp::ChargeBlock { cost: 2 },
+            TestOp::Charge { cost: 2 },
             TestOp::Nop,
             TestOp::Jump(0),
-            TestOp::ChargeBlock { cost: 1 },
+            TestOp::Charge { cost: 1 },
             TestOp::Return,
         ]);
     }
@@ -308,25 +288,23 @@ mod tests {
     ///   3: Return      — cost 3
     ///
     /// Output:
-    ///   0: ChargeBlock(3)
+    ///   0: Charge(3)
     ///   1: Nop
     ///   2: CondJump(3)
-    ///   3: ChargeBlock(4)
+    ///   3: Charge(4)
     ///   4: Nop
     ///   5: Return
     #[test]
     fn blocks_have_correct_costs() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            type Slot = ();
-
-            fn cost(&self, i: &TestOp) -> InstrCost<()> {
-                match i {
-                    TestOp::Nop => InstrCost::Static(1),
-                    TestOp::Jump(_) | TestOp::CondJump(_) => InstrCost::Static(2),
-                    TestOp::Return => InstrCost::Static(3),
-                    _ => InstrCost::Static(0),
-                }
+            fn cost(&self, i: &TestOp) -> InstrCost<TestOp> {
+                InstrCost::constant(match i {
+                    TestOp::Nop => 1,
+                    TestOp::Jump(_) | TestOp::CondJump(_) => 2,
+                    TestOp::Return => 3,
+                    _ => 0,
+                })
             }
         }
         let ops = vec![
@@ -335,12 +313,12 @@ mod tests {
             TestOp::Nop,
             TestOp::Return,
         ];
-        let r: Vec<TestOp> = GasInstrumentation::new(TestSchedule).run(ops);
+        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::ChargeBlock { cost: 3 },
+            TestOp::Charge { cost: 3 },
             TestOp::Nop,
             TestOp::CondJump(3),
-            TestOp::ChargeBlock { cost: 4 },
+            TestOp::Charge { cost: 4 },
             TestOp::Nop,
             TestOp::Return,
         ]);
@@ -351,7 +329,7 @@ mod tests {
     ///   1: Return — Static(5)
     ///
     /// Output:
-    ///   0: ChargeBlock(10)
+    ///   0: Charge(10)
     ///   1: Nop
     ///   2: ChargeVariable(3)
     ///   3: Return
@@ -359,25 +337,56 @@ mod tests {
     fn dynamic_charges_inserted_after_instruction() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            type Slot = ();
-
-            fn cost(&self, op: &TestOp) -> InstrCost<()> {
+            fn cost(&self, op: &TestOp) -> InstrCost<TestOp> {
                 match op {
-                    TestOp::Nop => InstrCost::Dynamic {
+                    TestOp::Nop => InstrCost {
                         base: 5,
-                        per_unit: 3,
-                        slot: (),
+                        dynamic: Some(TestOp::ChargeVariable { per_unit: 3 }),
                     },
-                    _ => InstrCost::Static(5),
+                    _ => InstrCost::constant(5),
                 }
             }
         }
         let ops = vec![TestOp::Nop, TestOp::Return];
-        let r: Vec<TestOp> = GasInstrumentation::new(TestSchedule).run(ops);
+        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
         assert_eq!(r, vec![
-            TestOp::ChargeBlock { cost: 10 },
+            TestOp::Charge { cost: 10 },
             TestOp::Nop,
             TestOp::ChargeVariable { per_unit: 3 },
+            TestOp::Return,
+        ]);
+    }
+
+    /// Dead code: Nop at index 1 is unreachable but still gets a Charge op.
+    ///
+    /// Input:
+    ///   0: Jump(2) — cost 1
+    ///   1: Nop     — cost 1 (dead)
+    ///   2: Return  — cost 1
+    ///
+    /// Output:
+    ///   0: Charge(1)
+    ///   1: Jump(4)
+    ///   2: Charge(1)
+    ///   3: Nop
+    ///   4: Charge(1)
+    ///   5: Return
+    #[test]
+    fn dead_code_block_still_instrumented() {
+        struct TestSchedule;
+        impl GasSchedule<TestOp> for TestSchedule {
+            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
+                InstrCost::constant(1)
+            }
+        }
+        let ops = vec![TestOp::Jump(2), TestOp::Nop, TestOp::Return];
+        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
+        assert_eq!(r, vec![
+            TestOp::Charge { cost: 1 },
+            TestOp::Jump(4),
+            TestOp::Charge { cost: 1 },
+            TestOp::Nop,
+            TestOp::Charge { cost: 1 },
             TestOp::Return,
         ]);
     }

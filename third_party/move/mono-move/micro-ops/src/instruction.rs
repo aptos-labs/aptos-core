@@ -461,7 +461,7 @@ pub enum MicroOp {
     //======================================================================
     /// Charge a pre-computed static gas cost for the current basic block.
     /// The interpreter must call the gas meter and abort on exhaustion.
-    ChargeBlock { cost: u64 },
+    Charge { cost: u64 },
 
     /// Charge a runtime-variable gas cost: `per_unit * frame[slot]`.
     /// The interpreter must call the gas meter and abort on exhaustion.
