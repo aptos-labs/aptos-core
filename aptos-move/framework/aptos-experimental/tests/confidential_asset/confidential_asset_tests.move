@@ -581,7 +581,7 @@ module aptos_experimental::confidential_asset_tests {
     }
 
     #[test(confidential_asset = @aptos_experimental, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
-    #[expected_failure(abort_code = 65542, location = aptos_experimental::sigma_protocol_transfer)]
+    #[expected_failure(abort_code = 65538, location = aptos_experimental::sigma_protocol_transfer)]
     fun fail_audit_transfer_if_wrong_auditor_count(
         confidential_asset: signer,
         aptos_fx: signer,

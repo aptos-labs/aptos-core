@@ -135,7 +135,9 @@ module aptos_experimental::sigma_protocol_key_rotation {
     //
 
     /// The key rotation proof was invalid
-    const E_INVALID_KEY_ROTATION_PROOF: u64 = 5;
+    const E_INVALID_KEY_ROTATION_PROOF: u64 = 1;
+    /// The homomorphism or transformation function implementation is not inserting points at the expected positions.
+    const E_STATEMENT_BUILDER_INCONSISTENCY: u64 = 2;
 
     //
     // Structs
@@ -201,12 +203,13 @@ module aptos_experimental::sigma_protocol_key_rotation {
         compressed_old_R: &vector<CompressedRistretto>,
         compressed_new_R: &vector<CompressedRistretto>,
     ): Statement<KeyRotation> {
+        let err = error::internal(E_STATEMENT_BUILDER_INCONSISTENCY);
         let b = new_builder();
-        b.add_point(get_encryption_key_basepoint_compressed());  // H
-        b.add_point(compressed_ek);                               // ek
-        b.add_point(compressed_new_ek);                           // new_ek
-        b.add_points(compressed_old_R);                           // old_R
-        b.add_points(compressed_new_R);                           // new_R
+        assert!(b.add_point(get_encryption_key_basepoint_compressed()) == IDX_H, err);                  // H
+        assert!(b.add_point(compressed_ek) == IDX_EK, err);                                                // ek
+        assert!(b.add_point(compressed_new_ek) == IDX_EK_NEW, err);                                        // new_ek
+        assert!(b.add_points(compressed_old_R) == START_IDX_OLD_R, err);                                   // old_R
+        assert!(b.add_points(compressed_new_R) == START_IDX_OLD_R + get_num_available_chunks(), err);      // new_R
         let stmt = b.build();
         assert_key_rotation_statement_is_well_formed(&stmt);
         stmt

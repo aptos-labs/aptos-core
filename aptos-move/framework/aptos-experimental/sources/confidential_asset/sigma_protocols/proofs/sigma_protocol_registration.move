@@ -92,7 +92,9 @@ module aptos_experimental::sigma_protocol_registration {
     //
 
     /// The registration proof was invalid
-    const E_INVALID_REGISTRATION_PROOF: u64 = 5;
+    const E_INVALID_REGISTRATION_PROOF: u64 = 1;
+    /// The homomorphism or transformation function implementation is not inserting points at the expected positions.
+    const E_STATEMENT_BUILDER_INCONSISTENCY: u64 = 2;
 
     //
     // Structs
@@ -136,8 +138,8 @@ module aptos_experimental::sigma_protocol_registration {
         compressed_ek: CompressedRistretto,
     ): Statement<Registration> {
         let b = new_builder();
-        b.add_point(get_encryption_key_basepoint_compressed());  // H
-        b.add_point(compressed_ek);                               // ek
+        assert!(b.add_point(get_encryption_key_basepoint_compressed()) == IDX_H, error::internal(E_STATEMENT_BUILDER_INCONSISTENCY)); // H
+        assert!(b.add_point(compressed_ek) == IDX_EK, error::internal(E_STATEMENT_BUILDER_INCONSISTENCY)); // ek
         let stmt = b.build();
         assert_registration_statement_is_well_formed(&stmt);
         stmt

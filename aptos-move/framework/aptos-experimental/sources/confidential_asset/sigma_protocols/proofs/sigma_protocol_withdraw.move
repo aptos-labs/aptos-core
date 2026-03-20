@@ -124,15 +124,17 @@ module aptos_experimental::sigma_protocol_withdraw {
     // Statement point indices (common prefix — auditor components appended at end)
     //
 
-    /// Index of $G$ (the Ristretto255 basepoint) in the statement.
+    /// Index of $G$ (the Ristretto255 basepoint) in the statement's points.
     const IDX_G: u64 = 0;
-    /// Index of $H$ (the encryption key basepoint) in the statement.
+    /// Index of $H$ (the encryption key basepoint) in the statement's points.
     const IDX_H: u64 = 1;
-    /// Index of $\mathsf{ek}$ (the sender's encryption key) in the statement.
+    /// Index of $\mathsf{ek}$ (the sender's encryption key) in the statement's points.
     const IDX_EK: u64 = 2;
     /// old_P values start at index 3. old_R starts at 3 + ℓ. new_P at 3 + 2ℓ. new_R at 3 + 3ℓ.
     /// If auditor present: ek_aud at 3 + 4ℓ, then new_R_aud at 3 + 4ℓ + 1.
     const START_IDX_OLD_P: u64 = 3;
+    /// Index of $v$ (the withdrawn value) in the statement's scalars.
+    const IDX_V: u64 = 0;
 
     //
     // Witness scalar indices
@@ -147,9 +149,11 @@ module aptos_experimental::sigma_protocol_withdraw {
     //
 
     /// The withdrawal proof was invalid.
-    const E_INVALID_PROOF: u64 = 5;
+    const E_INVALID_PROOF: u64 = 1;
     /// The number of auditor R components does not match the expected auditor count.
-    const E_AUDITOR_COUNT_MISMATCH: u64 = 6;
+    const E_AUDITOR_COUNT_MISMATCH: u64 = 2;
+    /// The homomorphism or transformation function implementation is not inserting points (or scalars) at the expected positions.
+    const E_STATEMENT_BUILDER_INCONSISTENCY: u64 = 3;
 
     /// An error occurred in one of our tests.
     const E_TEST_INTERNAL: u64 = 1_000;
@@ -220,21 +224,25 @@ module aptos_experimental::sigma_protocol_withdraw {
             error::invalid_argument(E_AUDITOR_COUNT_MISMATCH)
         );
 
+        let ell = get_num_chunks();
+        let err = error::internal(E_STATEMENT_BUILDER_INCONSISTENCY);
         let b = new_builder();
-        b.add_point(ristretto255::basepoint_compressed());                                                 // G
-        b.add_point(get_encryption_key_basepoint_compressed());                                            // H
-        b.add_point(compressed_ek);                                                                           // ek
-        b.add_points(compressed_old_balance.get_compressed_P());                                           // old_P
-        b.add_points(compressed_old_balance.get_compressed_R());                                           // old_R
-        let (_, new_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
-        b.add_points(compressed_new_balance.get_compressed_R());                                           // new_R
+
+        assert!(b.add_point(ristretto255::basepoint_compressed()) == IDX_G, err);                                  // G
+        assert!(b.add_point(get_encryption_key_basepoint_compressed()) == IDX_H, err);                             // H
+        assert!(b.add_point(compressed_ek) == IDX_EK, err);                                                           // ek
+        assert!(b.add_points(compressed_old_balance.get_compressed_P()) == START_IDX_OLD_P, err);                  // old_P
+        assert!(b.add_points(compressed_old_balance.get_compressed_R()) == START_IDX_OLD_P + ell, err);            // old_R
+        let (idx, new_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
+        assert!(idx == START_IDX_OLD_P + 2 * ell, err);
+        assert!(b.add_points(compressed_new_balance.get_compressed_R()) == START_IDX_OLD_P + 3 * ell, err);        // new_R
 
         if (compressed_ek_aud.is_some()) {
-            b.add_point(*compressed_ek_aud.borrow());                                                      // ek_aud
-            b.add_points(compressed_new_balance.get_compressed_R_aud());                                   // new_R_aud
+            assert!(b.add_point(*compressed_ek_aud.borrow()) == START_IDX_OLD_P + 4 * ell, err);                        // ek_aud
+            assert!(b.add_points(compressed_new_balance.get_compressed_R_aud()) == START_IDX_OLD_P + 4 * ell + 1, err); // new_R_aud
         };
 
-        b.add_scalar(v);
+        assert!(b.add_scalar(v) == IDX_V, err);
         let stmt = b.build();
         assert_withdraw_statement_is_well_formed(&stmt, compressed_ek_aud.is_some());
         (stmt, new_P)
