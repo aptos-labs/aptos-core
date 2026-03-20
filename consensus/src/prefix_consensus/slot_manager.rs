@@ -9,6 +9,7 @@
 //! updates ranking, and advances.
 
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     payload_client::PayloadClient,
     pipeline::{buffer_manager::OrderedBlocks, pipeline_builder::PipelineBuilder},
     prefix_consensus::counters::{
@@ -1064,6 +1065,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 self.parent_block_info.id(),
                 vec![], // validator_txns
             );
+
+            // Emit Jolteon-compatible tracing: "ordered" = consensus decided, block
+            // about to enter execution pipeline.  "committed" fires automatically in
+            // post_commit_ledger via update_counters_for_block using the same timestamp.
+            observe_block(timestamp, BlockStage::ORDERED);
 
             let pipelined = Arc::new(PipelinedBlock::new(
                 block,
