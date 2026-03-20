@@ -450,10 +450,17 @@ impl<'env> SpecTranslator<'env> {
         &self,
         node_id: NodeId,
         ranges: &[(Pattern, Exp)],
+        triggers: &[Vec<Exp>],
         condition: &Option<Exp>,
         body: &Exp,
     ) -> bool {
-        if ranges.len() != 1 {
+        if ranges.len() != 1 || !triggers.is_empty() {
+            return false;
+        }
+        if !matches!(
+            self.get_node_type(ranges[0].1.node_id()).skip_reference(),
+            Type::Primitive(PrimitiveType::Range)
+        ) {
             return false;
         }
         let combined_condition = if let Some(cond) = condition {
@@ -461,6 +468,18 @@ impl<'env> SpecTranslator<'env> {
         } else {
             body.clone()
         };
+        let mut contains_behavior = false;
+        combined_condition.visit_pre_order(&mut |exp: &ExpData| {
+            if matches!(exp, ExpData::Call(_, Operation::Behavior(..), _)) {
+                contains_behavior = true;
+                false
+            } else {
+                true
+            }
+        });
+        if !contains_behavior {
+            return false;
+        }
         let result_type = self.get_node_type(ranges[0].0.node_id());
         let (id, free_vars, used_temps, used_memory) = self.get_or_create_lifted_exists(
             node_id,
@@ -2493,7 +2512,7 @@ impl SpecTranslator<'_> {
             return;
         }
         if kind == QuantKind::Exists
-            && self.try_translate_lifted_exists(node_id, ranges, condition, body)
+            && self.try_translate_lifted_exists(node_id, ranges, triggers, condition, body)
         {
             return;
         }
