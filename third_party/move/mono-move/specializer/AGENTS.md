@@ -21,8 +21,8 @@ Tests use `datatest-stable` (a data-driven test harness) with `harness = false` 
 
 Two runners are registered, one per input format:
 
-- **`masm_runner`** — Takes `.masm` files (Move assembly), assembles them via `move-asm`, then runs `run_pipeline`.
-- **`move_runner`** — Takes `.move` files, compiles them with `move-compiler-v2`, then runs `run_pipeline`. Move test output additionally includes the disassembled masm for reference.
+- **`masm_runner`** — Takes `.masm` files (Move assembly), assembles them via `move-asm`, then runs `destack`.
+- **`move_runner`** — Takes `.move` files, compiles them with `move-compiler-v2`, then runs `destack`. Move test output additionally includes the disassembled masm for reference.
 
 ## Test Cases
 

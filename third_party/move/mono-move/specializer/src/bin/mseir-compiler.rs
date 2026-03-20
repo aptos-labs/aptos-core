@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use move_binary_format::{access::ModuleAccess, file_format::CompiledModule};
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
-use specializer::{ir::Instr, run_pipeline, PipelineConfig};
+use specializer::{destack, ir::Instr};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -20,10 +20,6 @@ struct Args {
     /// Path to the input .mv file.
     #[clap(value_name = "FILE")]
     input: PathBuf,
-
-    /// Skip bytecode verification (trust the input).
-    #[clap(long)]
-    no_verify: bool,
 
     /// Print per-function statistics comparing bytecode and IR.
     #[clap(long, short)]
@@ -43,11 +39,7 @@ fn main() -> Result<()> {
         .map(|i| StructNameIndex::new(i as u32))
         .collect();
 
-    let config = PipelineConfig {
-        verify_bytecode: !args.no_verify,
-    };
-
-    let module_ir = run_pipeline(module, &config, &struct_name_table)?;
+    let module_ir = destack(module, &struct_name_table)?;
 
     if args.verbose {
         print_stats(&module_ir);

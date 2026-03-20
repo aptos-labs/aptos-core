@@ -12,7 +12,7 @@ use stackless_exec_ir_v1::{
     lower::lower_function,
     lowering_context::{build_func_id_map, try_build_context},
     micro_ops_display::MicroOpsFunctionDisplay,
-    run_pipeline, PipelineConfig,
+    run_pipeline,
 };
 use std::path::Path;
 
@@ -90,10 +90,7 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
     let module = result.left().ok_or("expected module, got script")?;
     let table = make_struct_name_table(&module);
 
-    let config = PipelineConfig {
-        ..PipelineConfig::default()
-    };
-    let ir = run_pipeline(module, &config, &table).map_err(|e| format!("{:#}", e))?;
+    let ir = run_pipeline(module, &table).map_err(|e| format!("{:#}", e))?;
     let mut output = format!("{}", ir.display());
     output.push_str("\n=== micro-ops ===\n");
     output.push_str(&format_micro_ops(&ir));
@@ -145,9 +142,6 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         })
         .collect();
 
-    let config = PipelineConfig {
-        verify_bytecode: false,
-    };
     let mut output = String::new();
     for module in &modules {
         let table = make_struct_name_table(module);
@@ -155,7 +149,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
             move_asm::disassembler::disassemble_module(String::new(), module)
                 .map_err(|e| format!("disassembly failed: {:#}", e))?;
         let module_ir =
-            run_pipeline(module.clone(), &config, &table).map_err(|e| format!("{:#}", e))?;
+            run_pipeline(module.clone(), &table).map_err(|e| format!("{:#}", e))?;
         let ir_output = format!("{}", module_ir.display());
         output.push_str("=== masm ===\n");
         output.push_str(&masm_output);

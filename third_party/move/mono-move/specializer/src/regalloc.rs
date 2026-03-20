@@ -10,39 +10,44 @@ use anyhow::{bail, Context, Result};
 use crate::analysis::analyze_block;
 use crate::instr_utils::{get_defs_uses, rename_instr, split_into_blocks};
 use crate::ir::{Instr, Reg};
+use crate::translate::SSAFunction;
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::BTreeMap;
 
+/// Output of register allocation for a single function.
+pub(crate) struct AllocatedFunction {
+    pub instrs: Vec<Instr>,
+    pub num_regs: u16,
+    pub num_arg_regs: u16,
+    pub reg_types: Vec<Type>,
+}
+
 /// Map SSA VIDs to physical registers across all blocks.
 ///
-/// Pre: SSA instruction stream after Pass 1.5; vid_types maps each temp VID
+/// Pre: SSA instruction stream after fusion passes; vid_types maps each temp VID
 ///      (Home(num_pinned + i)) to its type at index i.
 /// Post: all temp VIDs replaced with physical Home/Arg registers.
-pub(crate) fn allocate_registers(
-    instrs: &[Instr],
-    num_pinned: u16,
-    local_types: &[Type],
-    vid_types: &[Type],
-) -> Result<(Vec<Instr>, u16, u16, Vec<Type>)> {
-    let blocks = split_into_blocks(instrs);
-    let mut result = Vec::with_capacity(instrs.len());
+pub(crate) fn allocate_registers(ssa: &SSAFunction) -> Result<AllocatedFunction> {
+    let num_pinned = ssa.local_types.len() as u16;
+    let blocks = split_into_blocks(&ssa.instrs);
+    let mut result = Vec::with_capacity(ssa.instrs.len());
     let mut global_next_reg = num_pinned;
     let mut global_num_arg_regs: u16 = 0;
     let mut free_pool: BTreeMap<Type, Vec<Reg>> = BTreeMap::new();
     let mut phys_reg_types: BTreeMap<Reg, Type> = BTreeMap::new();
-    for (i, ty) in local_types.iter().enumerate() {
+    for (i, ty) in ssa.local_types.iter().enumerate() {
         phys_reg_types.insert(Reg::Home(i as u16), ty.clone());
     }
 
     for (start, end) in blocks {
-        let block_instrs = &instrs[start..end];
+        let block_instrs = &ssa.instrs[start..end];
         let analysis = analyze_block(block_instrs, num_pinned);
         let (allocated, block_max, block_arg_regs, returned_pool) = allocate_block(
             block_instrs,
             num_pinned,
             global_next_reg,
             free_pool,
-            vid_types,
+            &ssa.vid_types,
             &mut phys_reg_types,
             &analysis,
         )?;
@@ -66,7 +71,12 @@ pub(crate) fn allocate_registers(
         );
     }
 
-    Ok((result, global_next_reg, global_num_arg_regs, reg_types))
+    Ok(AllocatedFunction {
+        instrs: result,
+        num_regs: global_next_reg,
+        num_arg_regs: global_num_arg_regs,
+        reg_types,
+    })
 }
 
 fn vid_type(vid: Reg, num_pinned: u16, vid_types: &[Type]) -> Result<Type> {
