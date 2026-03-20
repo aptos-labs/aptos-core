@@ -3,7 +3,7 @@
 
 //! Block analysis phase for the slot allocator.
 //!
-//! Pure analysis producing immutable data consumed by `slotalloc`.
+//! Pure analysis producing immutable data consumed by `slot_alloc`.
 
 use crate::{
     instr_utils::get_defs_uses,
@@ -33,7 +33,7 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
 
 /// Analyze a basic block to produce data for named slot allocation.
 ///
-/// Pre: `instrs` is an intra-block SSA slice (after Pass 1 + 1.5).
+/// Pre: `instrs` is an intra-block SSA slice.
 ///      Temp VIDs are defined exactly once.
 /// Post: all tables are conservative — every entry is safe to use.
 ///       stloc_targets and coalesce_to_local are disjoint from xfer_precolor.

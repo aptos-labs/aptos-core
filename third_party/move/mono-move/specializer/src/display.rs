@@ -134,24 +134,14 @@ fn slot_names(ss: &[Slot]) -> String {
     format!("[{}]", parts.join(", "))
 }
 
-/// Format a destination: single slot bare, multiple in brackets.
-fn dst(s: Slot) -> String {
-    slot_name(s)
-}
-
-/// Format multiple destinations in brackets.
-fn dsts(ss: &[Slot]) -> String {
-    slot_names(ss)
-}
-
 /// Write `dest := ` prefix for a single destination slot.
 fn write_dst(f: &mut fmt::Formatter<'_>, d: Slot) -> fmt::Result {
-    write!(f, "{} := ", dst(d))
+    write!(f, "{} := ", slot_name(d))
 }
 
 /// Write `[dests] := ` prefix for multiple destination slots.
 fn write_dsts(f: &mut fmt::Formatter<'_>, ds: &[Slot]) -> fmt::Result {
-    write!(f, "{} := ", dsts(ds))
+    write!(f, "{} := ", slot_names(ds))
 }
 
 fn struct_name(module: &CompiledModule, idx: StructDefinitionIndex) -> String {
