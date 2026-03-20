@@ -4,7 +4,7 @@
 use crate::{
     chunky::{
         agg_subtrx_producer,
-        missing_transcript_fetcher::MissingTranscriptFetcher,
+        missing_transcript_fetcher::TranscriptFetcher,
         subtrx_cert_producer,
         types::{
             AggregatedSubtranscriptWithHashes, CertifiedAggregatedSubtranscript,
@@ -808,7 +808,7 @@ impl ChunkyDKGManager {
         // Only the requester knows which transcripts they used — we can't fan out to
         // other peers due to equivocation.
         if !mismatched_dealers.is_empty() {
-            let fetcher = MissingTranscriptFetcher::new(
+            let fetcher = TranscriptFetcher::new(
                 sender,
                 req.dealer_epoch,
                 mismatched_dealers,
