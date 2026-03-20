@@ -396,7 +396,7 @@ impl BufferManager {
         );
 
         // Record BlockProposed (with batch inclusion type) and BlockOrdered tracing stages
-        {
+        if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
             use aptos_consensus_types::{
                 common::Payload,
                 payload::OptQuorumStorePayload,
@@ -566,7 +566,7 @@ impl BufferManager {
                     .block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // Record Certified tracing stage (2f+1 commit votes aggregated)
-                {
+                if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
                     use aptos_consensus_types::{
                         common::Payload,
                         payload::OptQuorumStorePayload,

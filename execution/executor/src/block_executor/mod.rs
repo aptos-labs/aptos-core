@@ -237,11 +237,13 @@ where
                 {
                     let store =
                         aptos_transaction_tracing::store::TransactionTraceStore::global();
-                    for txn in transactions.txns() {
-                        store.record_stage(
-                            &txn.hash(),
-                            aptos_transaction_tracing::types::TransactionStage::ExecutionStart,
-                        );
+                    if store.is_enabled() {
+                        for txn in transactions.txns() {
+                            store.record_stage(
+                                &txn.hash(),
+                                aptos_transaction_tracing::types::TransactionStage::ExecutionStart,
+                            );
+                        }
                     }
                 }
                 fail_point!("executor::block_executor_execute_block", |_| {

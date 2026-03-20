@@ -1138,7 +1138,13 @@ impl PipelineBuilder {
         }
 
         tracker.start_working();
-        let batch_digests = Self::extract_batch_digests(&block);
+        let batch_digests = if aptos_transaction_tracing::store::TransactionTraceStore::global()
+            .is_enabled()
+        {
+            Self::extract_batch_digests(&block)
+        } else {
+            Vec::new()
+        };
         tokio::task::spawn_blocking(move || {
             executor
                 .pre_commit_block(block.id())
@@ -1146,14 +1152,11 @@ impl PipelineBuilder {
         })
         .await
         .expect("spawn blocking failed")?;
-        {
-            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-            for d in &batch_digests {
-                store.record_batch_stage(
-                    d,
-                    aptos_transaction_tracing::types::TransactionStage::PreCommit,
-                );
-            }
+        for d in &batch_digests {
+            aptos_transaction_tracing::store::TransactionTraceStore::global().record_batch_stage(
+                d,
+                aptos_transaction_tracing::types::TransactionStage::PreCommit,
+            );
         }
         Ok(compute_result)
     }
@@ -1178,7 +1181,13 @@ impl PipelineBuilder {
         }
 
         tracker.start_working();
-        let batch_digests = Self::extract_batch_digests(&block);
+        let batch_digests = if aptos_transaction_tracing::store::TransactionTraceStore::global()
+            .is_enabled()
+        {
+            Self::extract_batch_digests(&block)
+        } else {
+            Vec::new()
+        };
         let ledger_info_with_sigs_clone = ledger_info_with_sigs.clone();
         tokio::task::spawn_blocking(move || {
             executor
@@ -1187,14 +1196,11 @@ impl PipelineBuilder {
         })
         .await
         .expect("spawn blocking failed")?;
-        {
-            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-            for d in &batch_digests {
-                store.record_batch_stage(
-                    d,
-                    aptos_transaction_tracing::types::TransactionStage::Committed,
-                );
-            }
+        for d in &batch_digests {
+            aptos_transaction_tracing::store::TransactionTraceStore::global().record_batch_stage(
+                d,
+                aptos_transaction_tracing::types::TransactionStage::Committed,
+            );
         }
         Ok(Some(ledger_info_with_sigs))
     }

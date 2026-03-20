@@ -27,12 +27,15 @@ impl TransactionFilter {
         }
     }
 
+    /// Returns true if tracing is active (enabled with a non-empty allowlist).
+    pub fn is_active(&self) -> bool {
+        self.enabled && !self.sender_allowlist.is_empty()
+    }
+
     /// Returns true if the sender should be traced.
-    /// If enabled and the allowlist is empty, all senders are traced.
+    /// Requires both enabled=true and the sender to be in a non-empty allowlist.
     pub fn should_trace(&self, sender: &AccountAddress) -> bool {
-        self.enabled
-            && (self.sender_allowlist.is_empty()
-                || self.sender_allowlist.contains(sender))
+        self.enabled && self.sender_allowlist.contains(sender)
     }
 }
 

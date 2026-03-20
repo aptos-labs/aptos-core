@@ -58,6 +58,13 @@ impl TransactionTraceStore {
         &GLOBAL_STORE
     }
 
+    /// Fast check: is tracing active (enabled with non-empty allowlist)?
+    /// Uses a single lock-free ArcSwap load (~ns). Use this as a gate before
+    /// doing any per-txn tracing work in hot paths.
+    pub fn is_enabled(&self) -> bool {
+        self.filter.load().is_active()
+    }
+
     /// Called at mempool insertion. Checks if sender is in allowlist, creates
     /// trace if matched. Returns true if trace was started.
     pub fn maybe_start_trace(
@@ -299,13 +306,22 @@ impl TransactionTraceStore {
             evicted += 1;
             false
         });
-        // Clean up batch mappings that no longer reference any active traces
-        let batch_before = self.batch_txns.len();
-        self.batch_txns.retain(|_, hashes| {
-            hashes.retain(|h| self.traces.contains_key(h));
-            !hashes.is_empty()
-        });
-        let batch_evicted = batch_before - self.batch_txns.len();
+        // Clean up batch mappings that no longer reference any active traces.
+        // Two-pass approach avoids holding batch_txns shard locks while probing
+        // traces, which would invert the lock order used in record_batch_stage_impl.
+        //
+        // Pass 1: snapshot which batch digests have zero live txn hashes.
+        let stale_batches: Vec<HashValue> = self
+            .batch_txns
+            .iter()
+            .filter(|entry| entry.value().iter().all(|h| !self.traces.contains_key(h)))
+            .map(|entry| *entry.key())
+            .collect();
+        // Pass 2: remove fully-stale batches (no shard lock held on traces).
+        let batch_evicted = stale_batches.len();
+        for digest in &stale_batches {
+            self.batch_txns.remove(digest);
+        }
         if evicted > 0 || batch_evicted > 0 {
             info!(
                 "TxnTrace GC: evicted {} orphaned traces, {} stale batch mappings. \

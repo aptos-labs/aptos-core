@@ -383,30 +383,32 @@ impl Parser {
                 types::{ExecutionStatus, StageMetadata, TransactionStage},
             };
             let store = TransactionTraceStore::global();
-            // to_commit (Keep) — transactions remaining in `transactions` after extraction
-            for txn in &transactions {
-                store.record_stage_with_metadata(
-                    &txn.committed_hash(),
-                    TransactionStage::Executed,
-                    StageMetadata::Execution(ExecutionStatus::Keep),
-                );
-            }
-            // to_retry
-            for txn in &to_retry.transactions {
-                store.record_stage_with_metadata(
-                    &txn.committed_hash(),
-                    TransactionStage::Executed,
-                    StageMetadata::Execution(ExecutionStatus::Retry),
-                );
-                store.mark_retry(&txn.committed_hash());
-            }
-            // to_discard
-            for txn in &to_discard.transactions {
-                store.record_stage_with_metadata(
-                    &txn.committed_hash(),
-                    TransactionStage::Executed,
-                    StageMetadata::Execution(ExecutionStatus::Discard),
-                );
+            if store.is_enabled() {
+                // to_commit (Keep)
+                for txn in &transactions {
+                    store.record_stage_with_metadata(
+                        &txn.committed_hash(),
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Keep),
+                    );
+                }
+                // to_retry
+                for txn in &to_retry.transactions {
+                    store.record_stage_with_metadata(
+                        &txn.committed_hash(),
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Retry),
+                    );
+                    store.mark_retry(&txn.committed_hash());
+                }
+                // to_discard
+                for txn in &to_discard.transactions {
+                    store.record_stage_with_metadata(
+                        &txn.committed_hash(),
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Discard),
+                    );
+                }
             }
         }
 

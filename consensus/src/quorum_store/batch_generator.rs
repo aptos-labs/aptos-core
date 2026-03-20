@@ -259,8 +259,13 @@ impl BatchGenerator {
         counters::CREATED_BATCHES_COUNT.inc();
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
 
-        // Collect hashes for tracing before txns are consumed
-        let txn_hashes: Vec<_> = txns.iter().map(|t| t.committed_hash()).collect();
+        // Collect hashes before txns are consumed, only when tracing is active.
+        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+        let txn_hashes: Option<Vec<_>> = if store.is_enabled() {
+            Some(txns.iter().map(|t| t.committed_hash()).collect())
+        } else {
+            None
+        };
 
         let batch = if self.config.enable_batch_v2_tx {
             Batch::new_v2(
@@ -283,13 +288,13 @@ impl BatchGenerator {
             )
         };
 
-        // Register batch → txn mapping and record QsBatchCreated
-        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-        store.register_batch(*batch.digest(), &txn_hashes);
-        store.record_batch_stage(
-            batch.digest(),
-            aptos_transaction_tracing::types::TransactionStage::QsBatchCreated,
-        );
+        if let Some(hashes) = &txn_hashes {
+            store.register_batch(*batch.digest(), hashes);
+            store.record_batch_stage(
+                batch.digest(),
+                aptos_transaction_tracing::types::TransactionStage::QsBatchCreated,
+            );
+        }
 
         batch
     }
@@ -478,35 +483,40 @@ impl BatchGenerator {
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
         // Record QsBatchPull with context for traced transactions.
-        // Lazy-construct BatchPullInfo only when at least one traced txn exists
-        // to avoid allocating Vecs on every pull round when tracing is inactive.
+        // Gate behind is_enabled() so the entire block is skipped when tracing is
+        // off — zero overhead on the hot path (single lock-free ArcSwap load).
         {
-            use std::sync::Arc;
             let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-            let mut pull_info: Option<Arc<aptos_transaction_tracing::types::BatchPullInfo>> = None;
-            for txn in &pulled_txns {
-                let hash = txn.committed_hash();
-                if !store.is_traced(&hash) {
-                    continue;
+            if store.is_enabled() {
+                use std::sync::Arc;
+                let mut pull_info: Option<Arc<aptos_transaction_tracing::types::BatchPullInfo>> =
+                    None;
+                for txn in &pulled_txns {
+                    let hash = txn.committed_hash();
+                    if !store.is_traced(&hash) {
+                        continue;
+                    }
+                    let info = pull_info.get_or_insert_with(|| {
+                        Arc::new(aptos_transaction_tracing::types::BatchPullInfo {
+                            pull_round: self.pull_round,
+                            total_batches_created: self.total_batches_created,
+                            pulled_txn_count: pulled_txns.len() as u64,
+                            pull_max_txn: max_count,
+                            excluded_txn_count: excluded_count as u64,
+                            bp_txn_count: self.back_pressure.txn_count,
+                            bp_proof_count: self.back_pressure.proof_count,
+                            recent_batches: self.recent_batch_records.iter().cloned().collect(),
+                        })
+                    });
+                    store.set_gas_unit_price(&hash, txn.gas_unit_price());
+                    store.record_stage_with_metadata(
+                        &hash,
+                        aptos_transaction_tracing::types::TransactionStage::QsBatchPull,
+                        aptos_transaction_tracing::types::StageMetadata::BatchPull(Arc::clone(
+                            info,
+                        )),
+                    );
                 }
-                let info = pull_info.get_or_insert_with(|| {
-                    Arc::new(aptos_transaction_tracing::types::BatchPullInfo {
-                        pull_round: self.pull_round,
-                        total_batches_created: self.total_batches_created,
-                        pulled_txn_count: pulled_txns.len() as u64,
-                        pull_max_txn: max_count,
-                        excluded_txn_count: excluded_count as u64,
-                        bp_txn_count: self.back_pressure.txn_count,
-                        bp_proof_count: self.back_pressure.proof_count,
-                        recent_batches: self.recent_batch_records.iter().cloned().collect(),
-                    })
-                });
-                store.set_gas_unit_price(&hash, txn.gas_unit_price());
-                store.record_stage_with_metadata(
-                    &hash,
-                    aptos_transaction_tracing::types::TransactionStage::QsBatchPull,
-                    aptos_transaction_tracing::types::StageMetadata::BatchPull(Arc::clone(info)),
-                );
             }
         }
 
@@ -528,25 +538,29 @@ impl BatchGenerator {
         }
         counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
 
-        // Capture count before bucket_into_batches drains pulled_txns.
+        // Compute gas bucket breakdown and record batch creation for tracing.
+        // Only runs when tracing is active — zero cost otherwise.
+        let tracing_active = aptos_transaction_tracing::store::TransactionTraceStore::global()
+            .is_enabled();
         let pulled_count = pulled_txns.len() as u64;
-        // Compute gas bucket breakdown for tracing before txns are consumed by bucketing.
-        let gas_bucket_txn_counts: Vec<(u64, u64)> = {
+        let gas_bucket_txn_counts: Option<Vec<(u64, u64)>> = if tracing_active {
             let buckets = &self.config.batch_buckets;
             let mut counts = vec![0u64; buckets.len()];
             for txn in pulled_txns.iter() {
-                // Find the highest bucket whose start ≤ gas_unit_price
                 let gas = txn.gas_unit_price();
                 let idx = buckets.partition_point(|&b| b <= gas).saturating_sub(1);
                 counts[idx] += 1;
             }
-            // Only keep non-empty buckets: (bucket_start, count)
-            buckets
-                .iter()
-                .zip(counts.iter())
-                .filter(|(_, c)| **c > 0)
-                .map(|(b, c)| (*b, *c))
-                .collect()
+            Some(
+                buckets
+                    .iter()
+                    .zip(counts.iter())
+                    .filter(|(_, c)| **c > 0)
+                    .map(|(b, c)| (*b, *c))
+                    .collect(),
+            )
+        } else {
+            None
         };
 
         let bucket_compute_start = Instant::now();
@@ -554,8 +568,7 @@ impl BatchGenerator {
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
         self.total_batches_created += batches.len() as u64;
-        // Record one entry per pull round with full context for tracing diagnostics.
-        if !batches.is_empty() {
+        if tracing_active && !batches.is_empty() {
             let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
             self.recent_batch_records
                 .push_back(aptos_transaction_tracing::types::BatchCreationRecord {
@@ -565,9 +578,8 @@ impl BatchGenerator {
                     pull_max_txn: max_count,
                     bp_txn: self.back_pressure.txn_count,
                     bp_proof: self.back_pressure.proof_count,
-                    gas_bucket_txn_counts,
+                    gas_bucket_txn_counts: gas_bucket_txn_counts.unwrap_or_default(),
                 });
-            // Cap at 500 entries (~37s at 75ms/round)
             while self.recent_batch_records.len() > 500 {
                 self.recent_batch_records.pop_front();
             }
