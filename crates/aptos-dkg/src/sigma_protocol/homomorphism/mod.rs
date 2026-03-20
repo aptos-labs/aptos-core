@@ -1,10 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use anyhow::Result;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
-use std::fmt::Debug;
+use std::{convert::Infallible, fmt::Debug};
 
 pub mod fixed_base_msms;
 pub mod tuple;
@@ -17,13 +18,29 @@ pub mod tuple;
 /// In the context of sigma protocols, homomorphisms are the key building blocks:
 /// they capture the algebraic relations that proofs are designed to demonstrate.
 ///
-/// CanonicalSerialize is added here so its parameters (which will be MSM bases)
-/// can be used for Fiat-Shamir challenges.
+/// The `Codomain` type represents the output of the homomorphism, which may admit
+/// multiple equivalent representations (e.g. projective vs. affine group elements).
+///
+/// The associated type `CodomainNormalized` represents a *canonical* or
+/// *normalized* form of the codomain element. This form is intended to be:
+///
+/// - uniquely determined,
+/// - suitable for deterministic serialization, and
+/// - stable for use as input to Fiat–Shamir transcripts and challenge
+///   derivation.
+///
+/// The `normalize` method converts a `Codomain` value into this canonical
+/// representation.
+///
+/// CanonicalSerialize is added here so the parameters of the homomorphism (which will
+/// be MSM bases) can be used for Fiat-Shamir challenges.
 pub trait Trait: CanonicalSerialize {
     type Domain;
     type Codomain;
+    type CodomainNormalized;
 
-    fn apply(&self, element: &Self::Domain) -> Self::Codomain;
+    fn apply(&self, element: &Self::Domain) -> Result<Self::Codomain>;
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized;
 }
 
 /// `LiftHomomorphism` adapts a homomorphism `H` defined on some `Domain`
@@ -84,11 +101,16 @@ where
     H: Trait,
 {
     type Codomain = H::Codomain;
+    type CodomainNormalized = H::CodomainNormalized;
     type Domain = LargerDomain;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
         let projected = (self.projection)(input);
         self.hom.apply(&projected)
+    }
+
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
+        H::normalize(&self.hom, value)
     }
 }
 
@@ -96,13 +118,23 @@ where
 ///
 /// Given a value of this type, you can apply a function to each "entry" independently,
 /// producing a new value of the same shape but possibly with a different inner type.
-pub trait EntrywiseMap<T> {
+pub trait EntrywiseMap<T>: Sized {
     /// The resulting type after mapping the inner elements to type `U`.
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
+    /// Map each entry with `f`. Default implementation delegates to `try_map` with `Infallible`.
+    fn map<U, F>(self, mut f: F) -> Self::Output<U>
     where
         F: FnMut(T) -> U,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        self.try_map::<U, Infallible, _>(|x| Ok(f(x))).unwrap()
+    }
+
+    /// Like `map`, but the closure returns a `Result`; short-circuits on first error.
+    fn try_map<U, E, F>(self, f: F) -> Result<Self::Output<U>, E>
+    where
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 }
 
@@ -121,12 +153,12 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TrivialShape<U>;
 
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
+    fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
     where
-        F: FnMut(T) -> U,
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
-        TrivialShape(f(self.0))
+        Ok(TrivialShape(f(self.0)?))
     }
 }
 
@@ -146,43 +178,15 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIter
 // ============================= END: TRIVIAL SHAPE ==============================
 // ===============================================================================
 
-// ==============================================================================
-// ============================= BEGIN: VECTOR SHAPE ============================
-// ==============================================================================
-// Not in use at the moment, can be removed
-
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct VectorShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>(
-    pub Vec<T>,
-);
-
-/// Implements `EntrywiseMap` for `VectorShape`, mapping each element of the vector.
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
-    for VectorShape<T>
-{
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> = VectorShape<U>;
-
-    fn map<U, F>(self, f: F) -> Self::Output<U>
-    where
-        F: FnMut(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
-    {
-        VectorShape(self.0.into_iter().map(f).collect())
+/// Builds a domain-separation tag for a composite homomorphism by prefixing each
+/// sub-DST with its length (big-endian), so e.g. `[a|b]` and `[ab|]` do not collide.
+#[inline]
+pub fn domain_separate_dsts(prefix: &[u8], parts: &[Vec<u8>], suffix: &[u8]) -> Vec<u8> {
+    let mut out = Vec::from(prefix);
+    for p in parts {
+        out.extend_from_slice(&(p.len() as u32).to_be_bytes());
+        out.extend_from_slice(p);
     }
+    out.extend_from_slice(suffix);
+    out
 }
-
-/// Implements `IntoIterator` for `VectorShape`, producing an iterator over T.
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIterator
-    for VectorShape<T>
-{
-    type IntoIter = std::vec::IntoIter<T>;
-    type Item = T;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-// ==============================================================================
-// ============================= END: VECTOR SHAPE ==============================
-// ==============================================================================

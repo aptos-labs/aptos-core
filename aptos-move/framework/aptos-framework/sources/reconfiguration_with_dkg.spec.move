@@ -12,10 +12,14 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires chain_status::is_operating();
         include stake::ResourceRequirement;
         include stake::GetReconfigStartTimeRequirement;
-        include features::spec_periodical_reward_rate_decrease_enabled(
-        ) ==> staking_config::StakingRewardsConfigEnabledRequirement;
+        include features::spec_periodical_reward_rate_decrease_enabled() ==>
+            staking_config::StakingRewardsConfigEnabledRequirement;
         aborts_if false;
         pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved).
+    }
+
+    spec try_start_with_chunky_dkg() {
+        pragma verify = false;
     }
 
     spec finish(framework: &signer) {
@@ -59,13 +63,19 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<keyless_account::Groth16VerificationKey>;
     }
 
+    spec maybe_finish_reconfig_with_chunky_dkg(account: &signer) {
+        pragma verify = false;
+    }
+
     spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
         use aptos_framework::dkg;
         pragma verify_duration_estimate = 1500;
-        include FinishRequirement {
-            framework: account
-        };
+        include FinishRequirement { framework: account };
         requires dkg::has_incomplete_session();
         aborts_if false;
+    }
+
+    spec finish_with_chunky_dkg_result(account: &signer, chunky_dkg_result: vector<u8>, encryption_key: vector<u8>) {
+        pragma verify = false;
     }
 }

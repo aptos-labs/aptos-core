@@ -22,9 +22,9 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
-        MemberCount, SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle,
-        VariantIndex,
+        Bytecode, CodeOffset, FunctionAttribute, FunctionDefinitionIndex, FunctionHandle,
+        IdentifierIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinition,
+        StructVariantHandle, VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
@@ -61,7 +61,6 @@ pub(crate) fn verify<'a>(
     meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
     let initial_state = AbstractState::new(function_view);
-
     let mut verifier = ReferenceSafetyAnalysis::new(resolver, function_view, name_def_map);
     verifier.analyze_function(initial_state, function_view, meter)
 }
@@ -115,6 +114,42 @@ fn clos_pack(
         safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value())
     }
     verifier.stack.push(AbstractValue::NonReference);
+    Ok(())
+}
+
+fn call_or_specialize_borrow_field_mut(
+    verifier: &mut ReferenceSafetyAnalysis,
+    function_handle: &FunctionHandle,
+    state: &mut AbstractState,
+    code_offset: u16,
+    meter: &mut impl Meter,
+) -> Result<(), PartialVMError> {
+    let mut is_borrow_field_mutable = false;
+    for attr in function_handle.attributes.iter() {
+        // Special handling for mutable borrow field functions:
+        // When we see a BorrowFieldMutable attribute, we skip the normal function call and
+        // directly perform borrow_field here instead. This is necessary because mutable
+        // references have move semantics when passed as function arguments, which would
+        // invalidate the original reference. By handling the borrow inline, we preserve
+        // correct reference tracking.
+        //
+        // This approach relies on assumptions enforced by struct_api_checker:
+        // 1. The function has only one struct-API attribute (BorrowFieldMutable)
+        // 2. The function implementation matches: it only borrows the specified field
+        //
+        // Note: Immutable references don't need this special case since they can be copied.
+        // The same special handling is done in call_generic below.
+        if let FunctionAttribute::BorrowFieldMutable(field_offset) = attr {
+            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+            let value = state.borrow_field(code_offset, true, id, *field_offset)?;
+            verifier.stack.push(value);
+            is_borrow_field_mutable = true;
+            break;
+        }
+    }
+    if !is_borrow_field_mutable {
+        call(verifier, state, code_offset, function_handle, meter)?;
+    }
     Ok(())
 }
 
@@ -443,12 +478,12 @@ fn execute_inner(
 
         Bytecode::Call(idx) => {
             let function_handle = verifier.resolver.function_handle_at(*idx);
-            call(verifier, state, offset, function_handle, meter)?
+            call_or_specialize_borrow_field_mut(verifier, function_handle, state, offset, meter)?;
         },
         Bytecode::CallGeneric(idx) => {
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
-            call(verifier, state, offset, function_handle, meter)?
+            call_or_specialize_borrow_field_mut(verifier, function_handle, state, offset, meter)?;
         },
 
         Bytecode::Ret => {

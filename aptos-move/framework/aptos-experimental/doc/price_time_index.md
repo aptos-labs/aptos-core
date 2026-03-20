@@ -35,8 +35,8 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
-<b>use</b> <a href="order_match_types.md#0x7_order_match_types">0x7::order_match_types</a>;
+<b>use</b> <a href="">0x5::order_book_types</a>;
+<b>use</b> <a href="">0x5::order_match_types</a>;
 </code></pre>
 
 
@@ -64,7 +64,7 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 
 </dd>
 <dt>
-<code>tie_breaker: <a href="order_book_types.md#0x7_order_book_types_IncreasingIdx">order_book_types::IncreasingIdx</a></code>
+<code>tie_breaker: <a href="_IncreasingIdx">order_book_types::IncreasingIdx</a></code>
 </dt>
 <dd>
 
@@ -97,7 +97,7 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 
 </dd>
 <dt>
-<code>tie_breaker: <a href="order_book_types.md#0x7_order_book_types_DecreasingIdx">order_book_types::DecreasingIdx</a></code>
+<code>tie_breaker: <a href="_DecreasingIdx">order_book_types::DecreasingIdx</a></code>
 </dt>
 <dd>
 
@@ -124,13 +124,13 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 
 <dl>
 <dt>
-<code>order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a></code>
+<code>order_id: <a href="_OrderId">order_book_types::OrderId</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a></code>
+<code>order_book_type: <a href="_OrderType">order_book_types::OrderType</a></code>
 </dt>
 <dd>
 
@@ -416,7 +416,10 @@ there are o buys / sells, returns None.
     self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, is_bid: bool, slippage_bps: u64
 ): Option&lt;u64&gt; {
     <b>if</b> (!is_bid) {
-        <b>assert</b>!(slippage_bps &lt;= <a href="price_time_index.md#0x7_price_time_index_get_slippage_pct_precision">get_slippage_pct_precision</a>() * 100, <a href="price_time_index.md#0x7_price_time_index_EINVALID_SLIPPAGE_BPS">EINVALID_SLIPPAGE_BPS</a>);
+        <b>assert</b>!(
+            slippage_bps &lt;= <a href="price_time_index.md#0x7_price_time_index_get_slippage_pct_precision">get_slippage_pct_precision</a>() * 100,
+            <a href="price_time_index.md#0x7_price_time_index_EINVALID_SLIPPAGE_BPS">EINVALID_SLIPPAGE_BPS</a>
+        );
     };
     <b>let</b> mid_price = self.<a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>();
     <b>if</b> (mid_price.is_none()) {
@@ -444,7 +447,7 @@ there are o buys / sells, returns None.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_cancel_active_order">cancel_active_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_IncreasingIdx">order_book_types::IncreasingIdx</a>, is_bid: bool): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_cancel_active_order">cancel_active_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="_IncreasingIdx">order_book_types::IncreasingIdx</a>, is_bid: bool): u64
 </code></pre>
 
 
@@ -460,7 +463,10 @@ there are o buys / sells, returns None.
     is_bid: bool
 ): u64 {
     <b>if</b> (is_bid) {
-        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> {
+            price,
+            tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+        };
         self.buys.remove(&key).size
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };
@@ -512,7 +518,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_single_match_with_current_active_order">single_match_with_current_active_order</a>&lt;K: <b>copy</b>, drop, store&gt;(remaining_size: u64, cur_key: K, cur_value: <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>, orders: &<b>mut</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>&gt;): <a href="order_match_types.md#0x7_order_match_types_ActiveMatchedOrder">order_match_types::ActiveMatchedOrder</a>
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_single_match_with_current_active_order">single_match_with_current_active_order</a>&lt;K: <b>copy</b>, drop, store&gt;(remaining_size: u64, cur_key: K, cur_value: <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>, orders: &<b>mut</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>&gt;): <a href="_ActiveMatchedOrder">order_match_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -535,7 +541,9 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
             cur_value.size
         } <b>else</b> {
             <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-                orders, &cur_key, |order_data| {
+                orders,
+                &cur_key,
+                |order_data| {
                     order_data.size -= remaining_size;
                 }
             );
@@ -561,7 +569,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64): <a href="order_match_types.md#0x7_order_match_types_ActiveMatchedOrder">order_match_types::ActiveMatchedOrder</a>
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64): <a href="_ActiveMatchedOrder">order_match_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -594,7 +602,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64): <a href="order_match_types.md#0x7_order_match_types_ActiveMatchedOrder">order_match_types::ActiveMatchedOrder</a>
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64): <a href="_ActiveMatchedOrder">order_match_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -637,7 +645,9 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code>inline <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>&lt;K: drop + <b>copy</b> + store&gt;(
-    orders: &<b>mut</b> BigOrderedMap&lt;K, <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>&gt;, key: &K, modify_fn: |&<b>mut</b>  <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>|
+    orders: &<b>mut</b> BigOrderedMap&lt;K, <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>&gt;,
+    key: &K,
+    modify_fn: |&<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>|
 ) {
     <b>let</b> order = orders.borrow_mut(key);
     modify_fn(order);
@@ -654,7 +664,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_result">get_single_match_result</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64, is_bid: bool): <a href="order_match_types.md#0x7_order_match_types_ActiveMatchedOrder">order_match_types::ActiveMatchedOrder</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_result">get_single_match_result</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64, is_bid: bool): <a href="_ActiveMatchedOrder">order_match_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -688,7 +698,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 Increase the size of the order in the orderbook without altering its position in the price-time priority.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_increase_order_size">increase_order_size</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_IncreasingIdx">order_book_types::IncreasingIdx</a>, size_delta: u64, is_bid: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_increase_order_size">increase_order_size</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="_IncreasingIdx">order_book_types::IncreasingIdx</a>, size_delta: u64, is_bid: bool)
 </code></pre>
 
 
@@ -705,16 +715,23 @@ Increase the size of the order in the orderbook without altering its position in
     is_bid: bool
 ) {
     <b>if</b> (is_bid) {
-        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> {
+            price,
+            tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+        };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.buys, &key, |order_data| {
+            &<b>mut</b> self.buys,
+            &key,
+            |order_data| {
                 order_data.size += size_delta;
             }
         );
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.sells, &key, |order_data| {
+            &<b>mut</b> self.sells,
+            &key,
+            |order_data| {
                 order_data.size += size_delta;
             }
         );
@@ -733,7 +750,7 @@ Increase the size of the order in the orderbook without altering its position in
 Decrease the size of the order in the order book without altering its position in the price-time priority.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_decrease_order_size">decrease_order_size</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_IncreasingIdx">order_book_types::IncreasingIdx</a>, size_delta: u64, is_bid: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_decrease_order_size">decrease_order_size</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="_IncreasingIdx">order_book_types::IncreasingIdx</a>, size_delta: u64, is_bid: bool)
 </code></pre>
 
 
@@ -750,16 +767,23 @@ Decrease the size of the order in the order book without altering its position i
     is_bid: bool
 ) {
     <b>if</b> (is_bid) {
-        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> {
+            price,
+            tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+        };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.buys, &key, |order_data| {
+            &<b>mut</b> self.buys,
+            &key,
+            |order_data| {
                 order_data.size -= size_delta;
             }
         );
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };
         <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
-            &<b>mut</b> self.sells, &key, |order_data| {
+            &<b>mut</b> self.sells,
+            &key,
+            |order_data| {
                 order_data.size -= size_delta;
             }
         );
@@ -777,7 +801,7 @@ Decrease the size of the order in the order book without altering its position i
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_place_maker_order">place_maker_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_IncreasingIdx">order_book_types::IncreasingIdx</a>, size: u64, is_bid: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_place_maker_order">place_maker_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_id: <a href="_OrderId">order_book_types::OrderId</a>, order_book_type: <a href="_OrderType">order_book_types::OrderType</a>, price: u64, unique_priority_idx: <a href="_IncreasingIdx">order_book_types::IncreasingIdx</a>, size: u64, is_bid: bool)
 </code></pre>
 
 
@@ -799,7 +823,10 @@ Decrease the size of the order in the order book without altering its position i
     // Assert that this is not a taker order
     <b>assert</b>!(!self.<a href="price_time_index.md#0x7_price_time_index_is_taker_order">is_taker_order</a>(price, is_bid), <a href="price_time_index.md#0x7_price_time_index_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>);
     <b>if</b> (is_bid) {
-        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> { price, tie_breaker: unique_priority_idx.into_decreasing_idx_type() };
+        <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceDescTime">PriceDescTime</a> {
+            price,
+            tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+        };
         self.buys.add(key, value);
     } <b>else</b> {
         <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceAscTime">PriceAscTime</a> { price, tie_breaker: unique_priority_idx };

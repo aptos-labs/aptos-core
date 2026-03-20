@@ -14,6 +14,7 @@ use aptos_types::{
     on_chain_config::FeatureFlag,
     transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
 };
+use aptos_vm_environment::prod_configs::set_async_runtime_checks;
 use claims::assert_ok;
 use move_core_types::{
     identifier::Identifier,
@@ -24,7 +25,6 @@ use move_core_types::{
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-
 // Note: this module uses parameterized tests via the
 // [`rstest` crate](https://crates.io/crates/rstest)
 // to test for multiple feature combinations.
@@ -611,4 +611,72 @@ fn test_init_module_should_not_publish_modules() {
     let output = h.run_block_get_output(vec![txn]).pop().unwrap();
     // The abort code corresponds to EALREADY_REQUESTED.
     assert_move_abort(output.status().clone(), 0x03_0000);
+}
+
+// This test verifies that trace replay uses the correct module snapshot during post-commit
+// processing. It creates a scenario where:
+//   1. Transaction 1 executes a function from module version 1 (records execution trace)
+//   2. Transaction 2 republishes the module as version 2, with new code.
+// When transaction 1 trace is replayed during post-commit, it should resolve modules from
+// the execution-time snapshot (version 1), not from the current global cache (version 2).
+#[test]
+fn test_trace_replay_with_module_republishing() {
+    set_async_runtime_checks(true);
+    let mut executor = FakeExecutor::from_head_genesis().set_parallel();
+    executor.disable_block_executor_fallback();
+
+    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let mut h = MoveHarness::new_with_executor(executor);
+    let acc = h.new_account_at(addr);
+
+    assert_success!(
+        h.publish_package_cache_building(&acc, &common::test_dir_path("tracing.data/p1"))
+    );
+    assert_success!(
+        h.publish_package_cache_building(&acc, &common::test_dir_path("tracing.data/p2"))
+    );
+
+    let mut txns = vec![];
+
+    // Transaction 1: call the entry function to execute and record trace.
+    let sender = h.new_account_at(AccountAddress::random());
+    txns.push(h.create_entry_function(
+        &sender,
+        MemberId::from_str(&format!("{}::m2::entrypoint", addr)).unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    // Transaction 2: publish new code that multiplies instead and does more iterations.
+    let txn = h.create_publish_package_cache_building(
+        &acc,
+        &common::test_dir_path("tracing.data/p1_v2"),
+        |_| {},
+    );
+    txns.push(txn);
+
+    // Transfer transactions to provide spacing so that post-commit processing runs later.
+    for _ in 0..8 {
+        let random_account = h.new_account_at(AccountAddress::random());
+        let transfer_txn = h.create_entry_function(
+            &random_account,
+            MemberId::from_str("0x1::aptos_account::transfer").unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(random_account.address()).unwrap(),
+                bcs::to_bytes(&1u64).unwrap(),
+            ],
+        );
+        txns.push(transfer_txn);
+    }
+
+    // Run the block - all transactions should succeed without fallback.
+    let outputs = h.run_block_get_output(txns);
+    for (idx, output) in outputs.iter().enumerate() {
+        assert_success!(
+            output.status().clone(),
+            "Transaction {} should succeed",
+            idx
+        );
+    }
 }

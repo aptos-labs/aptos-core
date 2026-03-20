@@ -47,7 +47,10 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
+    on_chain_config::{
+        OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainRandomnessConfig,
+    },
     secret_sharing::SecretShareConfig,
     validator_signer::ValidatorSigner,
 };
@@ -65,6 +68,7 @@ use std::{
 };
 use tokio::select;
 
+#[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
 pub trait TExecutionClient: Send + Sync {
     /// Initialize the execution phase for a new epoch.
@@ -77,8 +81,9 @@ pub trait TExecutionClient: Send + Sync {
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
+        onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
         rand_config: Option<RandConfig>,
-        fast_rand_config: Option<RandConfig>,
+        secret_share_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
@@ -219,7 +224,6 @@ impl ExecutionProxyClient {
     fn make_rand_manager(
         &self,
         epoch_state: &Arc<EpochState>,
-        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: u64,
         network_sender: &Arc<NetworkSender>,
@@ -242,7 +246,6 @@ impl ExecutionProxyClient {
             epoch_state.clone(),
             signer,
             rand_config,
-            fast_rand_config,
             rand_ready_block_tx,
             network_sender.clone(),
             self.rand_storage.clone(),
@@ -290,7 +293,8 @@ impl ExecutionProxyClient {
             secret_ready_block_tx,
             network_sender.clone(),
             self.bounded_executor.clone(),
-            &self.consensus_config.rand_rb_config,
+            &self.consensus_config.secret_share_rb_config,
+            self.consensus_config.secret_share_request_delay_ms,
         );
 
         tokio::spawn(secret_share_manager.start(
@@ -335,20 +339,27 @@ impl ExecutionProxyClient {
                         let _ = rand_manager_input_tx.send(ordered_blocks.clone()).await;
                         let _ = secret_share_manager_input_tx.send(ordered_blocks.clone()).await;
                         let first_block_id = ordered_blocks.ordered_blocks.first().expect("Cannot be empty").id();
+                        debug!("Coordinator: sent to managers: {}", first_block_id);
                         inflight_block_tracker.insert(first_block_id, (ordered_blocks, false, false));
                         inflight_block_tracker.entry(first_block_id)
                     },
                     Some(rand_ready_block) = rand_ready_block_rx.next() => {
                         let first_block_id = rand_ready_block.ordered_blocks.first().expect("Cannot be empty").id();
+                        debug!("Coordinator: rand_ready: {}", first_block_id);
                         inflight_block_tracker.entry(first_block_id).and_modify(|result| {
                             result.1 = true;
                         })
                     },
                     Some(secret_ready_block) = secret_ready_block_rx.next() => {
                         let first_block_id = secret_ready_block.ordered_blocks.first().expect("Cannot be empty").id();
+                        debug!("Coordinator: secret_ready: {}", first_block_id);
                         inflight_block_tracker.entry(first_block_id).and_modify(|result| {
                             result.2 = true;
                         })
+                    },
+                    else => {
+                        info!("Randomness/Secret Sharing Coordinator loop exitting");
+                        break
                     },
                 };
                 let Entry::Occupied(o) = entry else {
@@ -371,8 +382,7 @@ impl ExecutionProxyClient {
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
-        fast_rand_config: Option<RandConfig>,
-        secret_sharing_config: Option<SecretShareConfig>,
+        secret_share_config: Option<SecretShareConfig>,
         onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
@@ -396,12 +406,11 @@ impl ExecutionProxyClient {
             execution_ready_block_rx,
             maybe_reset_tx_to_rand_manager,
             maybe_reset_tx_to_secret_share_manager,
-        ) = match (rand_config, secret_sharing_config) {
-            (Some(rand_config), Some(secret_sharing_config)) => {
+        ) = match (rand_config, secret_share_config) {
+            (Some(rand_config), Some(secret_share_config)) => {
                 let (rand_manager_input_tx, rand_ready_block_rx, reset_tx_to_rand_manager) = self
                     .make_rand_manager(
                         &epoch_state,
-                        fast_rand_config,
                         rand_msg_rx,
                         highest_committed_round,
                         &network_sender,
@@ -415,7 +424,7 @@ impl ExecutionProxyClient {
                     reset_tx_to_secret_share_manager,
                 ) = self.make_secret_sharing_manager(
                     &epoch_state,
-                    secret_sharing_config,
+                    secret_share_config,
                     secret_sharing_msg_rx,
                     highest_committed_round,
                     &network_sender,
@@ -439,7 +448,6 @@ impl ExecutionProxyClient {
                 let (ordered_block_tx, rand_ready_block_rx, reset_tx_to_rand_manager) = self
                     .make_rand_manager(
                         &epoch_state,
-                        fast_rand_config,
                         rand_msg_rx,
                         highest_committed_round,
                         &network_sender,
@@ -528,8 +536,9 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
+        onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
         rand_config: Option<RandConfig>,
-        fast_rand_config: Option<RandConfig>,
+        secret_share_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
@@ -545,8 +554,7 @@ impl TExecutionClient for ExecutionProxyClient {
             commit_signer_provider,
             epoch_state.clone(),
             rand_config,
-            fast_rand_config,
-            None,
+            secret_share_config.clone(),
             onchain_consensus_config,
             rand_msg_rx,
             secret_sharing_msg_rx,
@@ -565,6 +573,8 @@ impl TExecutionClient for ExecutionProxyClient {
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled();
+        let decryption_enabled = onchain_consensus_config.is_vtxn_enabled()
+            && onchain_chunky_dkg_config.chunky_dkg_enabled();
 
         let aux_version = onchain_execution_config.persisted_auxiliary_info_version();
 
@@ -575,9 +585,13 @@ impl TExecutionClient for ExecutionProxyClient {
             block_executor_onchain_config,
             transaction_deduper,
             randomness_enabled,
+            decryption_enabled,
             onchain_consensus_config.clone(),
             aux_version,
             network_sender,
+            secret_share_config,
+            self.consensus_publisher.clone(),
+            self.consensus_observer_config.enable_v2_message_sending,
         );
 
         maybe_rand_msg_tx
@@ -604,9 +618,9 @@ impl TExecutionClient for ExecutionProxyClient {
         for block in &blocks {
             block.set_insertion_time();
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                tx.order_proof_tx
+                tx.ordered_blocks_and_proof_fut
                     .take()
-                    .map(|tx| tx.send(ordered_proof.clone()));
+                    .map(|tx| tx.send((blocks.clone(), ordered_proof.clone())));
             }
         }
 
@@ -672,15 +686,32 @@ impl TExecutionClient for ExecutionProxyClient {
     }
 
     async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()> {
-        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
+        let (
+            reset_tx_to_rand_manager,
+            reset_tx_to_secret_share_manager,
+            reset_tx_to_buffer_manager,
+        ) = {
             let handle = self.handle.read();
             (
                 handle.reset_tx_to_rand_manager.clone(),
+                handle.reset_tx_to_secret_share_manager.clone(),
                 handle.reset_tx_to_buffer_manager.clone(),
             )
         };
 
         if let Some(mut reset_tx) = reset_tx_to_rand_manager {
+            let (ack_tx, ack_rx) = oneshot::channel::<ResetAck>();
+            reset_tx
+                .send(ResetRequest {
+                    tx: ack_tx,
+                    signal: ResetSignal::TargetRound(target.commit_info().round()),
+                })
+                .await
+                .map_err(|_| Error::RandResetDropped)?;
+            ack_rx.await.map_err(|_| Error::RandResetDropped)?;
+        }
+
+        if let Some(mut reset_tx) = reset_tx_to_secret_share_manager {
             let (ack_tx, ack_rx) = oneshot::channel::<ResetAck>();
             reset_tx
                 .send(ResetRequest {
@@ -777,8 +808,9 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
+        _onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
         _rand_config: Option<RandConfig>,
-        _fast_rand_config: Option<RandConfig>,
+        _secret_share_config: Option<SecretShareConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         _highest_committed_round: Round,

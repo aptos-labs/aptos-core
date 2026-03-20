@@ -388,7 +388,7 @@ pub static GLOBAL_MODULE_CACHE_MISS_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
+pub static GLOBAL_LAYOUT_CACHE_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "global_layout_cache_num_entries",
         "Number of struct/enum layouts cached in global cache"

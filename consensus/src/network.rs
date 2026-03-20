@@ -14,10 +14,7 @@ use crate::{
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::{
-        rand_gen::{
-            network_messages::{RandGenMessage, RandMessage},
-            types::{AugmentedData, FastShare, Share},
-        },
+        rand_gen::network_messages::RandGenMessage,
         secret_sharing::network_messages::SecretShareNetworkMessage,
     },
 };
@@ -499,16 +496,6 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_fast_share(&self, share: FastShare<Share>) {
-        fail_point!("consensus::send::broadcast_share", |_| ());
-        let msg = tokio::task::spawn_blocking(|| {
-            RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message()
-        })
-        .await
-        .expect("task cannot fail to execute");
-        self.broadcast(msg).await
-    }
-
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
     /// we believe could serve as proposers in the next round). The recipients on the receiving
     /// end are going to be notified about a new vote in the vote queue.
@@ -575,10 +562,17 @@ impl QuorumStoreSender for NetworkSender {
                 Ok(BatchResponse::Batch(*batch))
             },
             ConsensusMsg::BatchResponseV2(maybe_batch) => {
-                if let BatchResponse::Batch(batch) = maybe_batch.as_ref() {
-                    batch.verify_with_digest(request_digest)?;
+                match maybe_batch.as_ref() {
+                    BatchResponse::Batch(batch) => {
+                        batch.verify_with_digest(request_digest)?;
+                    },
+                    BatchResponse::BatchV2(batch) => {
+                        batch.verify_with_digest(request_digest)?;
+                    },
+                    BatchResponse::NotFound(_) => {
+                        // Note: NotFound(ledger_info) is verified later with a ValidatorVerifier
+                    },
                 }
-                // Note BatchResponse::NotFound(ledger_info) is verified later with a ValidatorVerifier
                 Ok(*maybe_batch)
             },
             _ => Err(anyhow!("Invalid batch response")),
@@ -821,8 +815,11 @@ impl NetworkTask {
                         .inc();
                     match msg {
                         quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
+                        | ConsensusMsg::SignedBatchInfoMsgV2(_)
                         | ConsensusMsg::BatchMsg(_)
-                        | ConsensusMsg::ProofOfStoreMsg(_)) => {
+                        | ConsensusMsg::BatchMsgV2(_)
+                        | ConsensusMsg::ProofOfStoreMsg(_)
+                        | ConsensusMsg::ProofOfStoreMsgV2(_)) => {
                             Self::push_msg(
                                 peer_id,
                                 quorum_store_msg,
@@ -889,7 +886,7 @@ impl NetworkTask {
                                     proposal.timestamp_usecs(),
                                     BlockStage::NETWORK_RECEIVED_OPT_PROPOSAL,
                                 );
-                                info!(
+                                debug!(
                                     LogSchema::new(LogEvent::NetworkReceiveOptProposal)
                                         .remote_peer(peer_id),
                                     block_author = proposal.proposer(),

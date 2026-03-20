@@ -39,6 +39,7 @@
 //!   [ "#[" attribute "]"
 //!   [ "entry" ]
 //!   [ "public" | "friend" ]
+//!   [ "native" ]
 //!
 //! attribute := ID
 //!
@@ -172,6 +173,7 @@ pub struct Fun {
     pub name: Identifier,
     pub visibility: Visibility,
     pub is_entry: bool,
+    pub is_native: bool,
     pub attributes: Vec<FunctionAttribute>,
     pub type_params: Vec<(Identifier, AbilitySet)>,
     pub params: Vec<Decl>,
@@ -583,17 +585,44 @@ impl AsmParser {
             self.advance()?;
             let attrs = self.list(
                 |parser| {
-                    let attr = if parser.is_soft_kw("persistent") {
-                        FunctionAttribute::Persistent
-                    } else if parser.is_soft_kw("module_lock") {
-                        FunctionAttribute::ModuleLock
-                    } else {
-                        return Err(error(
-                            parser.next_loc,
-                            "expected function attribute `persistent` or `module_lock`",
-                        ));
+                    // Helper to parse a u16 parameter after the attribute name (expects "(<num>)")
+                    let parse_u16_param = |parser: &mut AsmParser| -> AsmResult<u16> {
+                        parser.expect_special("(")?;
+                        let result = if let Token::Number(num) = &parser.next {
+                            let r = num.repr().as_u16();
+                            parser.advance()?;
+                            r
+                        } else {
+                            return Err(error(parser.next_loc, "expected number"));
+                        };
+                        parser.expect_special(")")?;
+                        Ok(result)
                     };
-                    parser.advance()?;
+
+                    let attr_name = parser.ident()?;
+                    let attr = match attr_name.as_str() {
+                        "persistent" => FunctionAttribute::Persistent,
+                        "module_lock" => FunctionAttribute::ModuleLock,
+                        "pack" => FunctionAttribute::Pack,
+                        "unpack" => FunctionAttribute::Unpack,
+                        "pack_variant" => FunctionAttribute::PackVariant(parse_u16_param(parser)?),
+                        "unpack_variant" => {
+                            FunctionAttribute::UnpackVariant(parse_u16_param(parser)?)
+                        },
+                        "test_variant" => FunctionAttribute::TestVariant(parse_u16_param(parser)?),
+                        "borrow" => {
+                            FunctionAttribute::BorrowFieldImmutable(parse_u16_param(parser)?)
+                        },
+                        "borrow_mut" => {
+                            FunctionAttribute::BorrowFieldMutable(parse_u16_param(parser)?)
+                        },
+                        _ => {
+                            return Err(error(
+                                parser.next_loc,
+                                format!("unknown function attribute '{}'", attr_name),
+                            ))
+                        },
+                    };
                     Ok(attr)
                 },
                 ",",
@@ -776,6 +805,7 @@ impl AsmParser {
             || self.is_soft_kw("entry")
             || self.is_soft_kw("public")
             || self.is_soft_kw("friend")
+            || self.is_soft_kw("native")
             || self.is_special("#") && self.lookahead_special("[")
     }
 
@@ -788,6 +818,12 @@ impl AsmParser {
             false
         };
         let visibility = self.visibility()?;
+        let is_native = if self.is_soft_kw("native") {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
         self.expect_soft_kw("fun")?;
         let loc = self.next_loc;
         let name = self.ident()?;
@@ -837,11 +873,18 @@ impl AsmParser {
             }
             self.expect_newline()?
         }
+        if is_native && (!locals.is_empty() || !instrs.is_empty()) {
+            return Err(error(loc, "native function cannot have a body or locals"));
+        }
+        if !is_native && instrs.is_empty() {
+            return Err(error(loc, "non-native function must have a body"));
+        }
         Ok(Fun {
             loc,
             name,
             visibility,
             is_entry,
+            is_native,
             attributes,
             type_params,
             params,

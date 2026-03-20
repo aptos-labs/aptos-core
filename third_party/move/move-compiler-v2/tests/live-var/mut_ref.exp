@@ -1,6 +1,12 @@
 ============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
+fun m::some($t0: &mut 0x42::m::R) {
+  0: return ()
+}
+
+
+[variant baseline]
 fun m::f1_ok() {
      var $t0: 0x42::m::R
      var $t1: u64
@@ -126,17 +132,18 @@ fun m::id($t0: &mut 0x42::m::R): &mut 0x42::m::R {
 
 
 [variant baseline]
-fun m::some($t0: &mut 0x42::m::R) {
-  0: return ()
-}
-
-
-[variant baseline]
 fun m::some2($t0: &mut 0x42::m::R, $t1: &mut 0x42::m::R) {
   0: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::some($t0: &mut 0x42::m::R) {
+     # live vars: $t0
+  0: return ()
+}
+
 
 [variant baseline]
 fun m::f1_ok() {
@@ -321,19 +328,19 @@ fun m::id($t0: &mut 0x42::m::R): &mut 0x42::m::R {
 
 
 [variant baseline]
-fun m::some($t0: &mut 0x42::m::R) {
-     # live vars: $t0
-  0: return ()
-}
-
-
-[variant baseline]
 fun m::some2($t0: &mut 0x42::m::R, $t1: &mut 0x42::m::R) {
      # live vars: $t0, $t1
   0: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::some($t0: &mut 0x42::m::R) {
+     # live vars: $t0
+  0: return ()
+}
+
 
 [variant baseline]
 fun m::f1_ok() {
@@ -514,13 +521,6 @@ fun m::id($t0: &mut 0x42::m::R): &mut 0x42::m::R {
   0: $t1 := infer($t0)
      # live vars: $t1
   1: return $t1
-}
-
-
-[variant baseline]
-fun m::some($t0: &mut 0x42::m::R) {
-     # live vars: $t0
-  0: return ()
 }
 
 

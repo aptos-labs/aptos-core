@@ -1,0 +1,14 @@
+processed 4 tasks
+task 0 lines 1-8:  publish [module 0x22::test]
+task 1 lines 10-17:  publish [module 0x23::test]
+task 2 lines 19-19:  run --verbose 0x22::test::constant_below_limit
+task 3 lines 21-21:  run --verbose 0x23::test::constant_above_limit
+Error: Function execution failed with VMError: {
+    message: Type depth is larger than maximum 20,
+    major_status: VM_MAX_TYPE_DEPTH_REACHED,
+    sub_status: None,
+    location: 0x23::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 0)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

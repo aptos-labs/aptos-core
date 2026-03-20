@@ -282,6 +282,9 @@ pub enum BehaviorKind {
     EnsuresOf,
     /// `modifies_of<f>(args)` - the modify clauses of function `f`
     ModifiesOf,
+    /// `result_of<f>(args)` - deterministic result selector based on `ensures_of`
+    /// Semantics: `result_of<f>(x) == choose y where ensures_of<f>(x, y)`
+    ResultOf,
 }
 
 impl fmt::Display for BehaviorKind {
@@ -292,24 +295,7 @@ impl fmt::Display for BehaviorKind {
             AbortsOf => write!(f, "aborts_of"),
             EnsuresOf => write!(f, "ensures_of"),
             ModifiesOf => write!(f, "modifies_of"),
-        }
-    }
-}
-
-/// The target of a behavior predicate - either a function parameter or a known function.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum BehaviorTarget {
-    /// A parameter of function type, identified by its symbol.
-    Parameter(Symbol),
-    /// A known Move function.
-    Function(QualifiedInstId<FunId>),
-}
-
-impl fmt::Display for BehaviorTarget {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BehaviorTarget::Parameter(sym) => write!(f, "param#{:?}", sym),
-            BehaviorTarget::Function(qid) => write!(f, "{:?}", qid),
+            ResultOf => write!(f, "result_of"),
         }
     }
 }
@@ -324,6 +310,19 @@ pub struct Condition {
 }
 
 impl Condition {
+    /// Compares two conditions for structural equality, ignoring NodeIds in expressions.
+    pub fn structural_eq(&self, other: &Condition) -> bool {
+        self.kind == other.kind
+            && self.properties == other.properties
+            && self.exp.structural_eq(&other.exp)
+            && self.additional_exps.len() == other.additional_exps.len()
+            && self
+                .additional_exps
+                .iter()
+                .zip(other.additional_exps.iter())
+                .all(|(e1, e2)| e1.structural_eq(e2))
+    }
+
     /// Return all expressions in the condition, the primary one and the additional ones.
     pub fn all_exps(&self) -> impl Iterator<Item = &Exp> {
         std::iter::once(&self.exp).chain(self.additional_exps.iter())
@@ -366,6 +365,37 @@ pub struct Spec {
 }
 
 impl Spec {
+    /// Compares two specs for structural equality, ignoring NodeIds in expressions.
+    pub fn structural_eq(&self, other: &Spec) -> bool {
+        self.conditions.len() == other.conditions.len()
+            && self
+                .conditions
+                .iter()
+                .zip(other.conditions.iter())
+                .all(|(c1, c2)| c1.structural_eq(c2))
+            && self.properties == other.properties
+            && self.on_impl.len() == other.on_impl.len()
+            && self
+                .on_impl
+                .iter()
+                .zip(other.on_impl.iter())
+                .all(|((off1, s1), (off2, s2))| off1 == off2 && s1.structural_eq(s2))
+            && self.update_map.len() == other.update_map.len()
+            && {
+                // `NodeId` keys are intentionally ignored in structural comparison, so pair
+                // conditions by structure rather than by `BTreeMap` key order.
+                let mut unmatched = other.update_map.values().collect_vec();
+                self.update_map.values().all(|c1| {
+                    if let Some(pos) = unmatched.iter().position(|c2| c1.structural_eq(c2)) {
+                        unmatched.swap_remove(pos);
+                        true
+                    } else {
+                        false
+                    }
+                })
+            }
+    }
+
     pub fn has_conditions(&self) -> bool {
         !self.conditions.is_empty()
     }
@@ -904,6 +934,108 @@ impl ExpData {
         e1 == e2
     }
 
+    /// Compares two expressions for structural equality, ignoring NodeIds.
+    /// This is useful when expressions are logically equivalent but were created
+    /// with different NodeIds.
+    pub fn structural_eq(&self, other: &Exp) -> bool {
+        use ExpData::*;
+        match (self, other.as_ref()) {
+            (Invalid(_), Invalid(_)) => true,
+            (Value(_, v1), Value(_, v2)) => v1 == v2,
+            (LocalVar(_, s1), LocalVar(_, s2)) => s1 == s2,
+            (Temporary(_, t1), Temporary(_, t2)) => t1 == t2,
+            (Call(_, op1, args1), Call(_, op2, args2)) => {
+                op1 == op2
+                    && args1.len() == args2.len()
+                    && args1
+                        .iter()
+                        .zip(args2.iter())
+                        .all(|(a1, a2)| a1.structural_eq(a2))
+            },
+            (Invoke(_, f1, args1), Invoke(_, f2, args2)) => {
+                f1.structural_eq(f2)
+                    && args1.len() == args2.len()
+                    && args1
+                        .iter()
+                        .zip(args2.iter())
+                        .all(|(a1, a2)| a1.structural_eq(a2))
+            },
+            (Lambda(_, p1, body1, cap1, spec1), Lambda(_, p2, body2, cap2, spec2)) => {
+                p1.structural_eq(p2)
+                    && body1.structural_eq(body2)
+                    && cap1 == cap2
+                    && match (spec1, spec2) {
+                        (Some(s1), Some(s2)) => s1.structural_eq(s2),
+                        (None, None) => true,
+                        _ => false,
+                    }
+            },
+            (Quant(_, k1, r1, t1, c1, b1), Quant(_, k2, r2, t2, c2, b2)) => {
+                k1 == k2
+                    && r1.len() == r2.len()
+                    && r1
+                        .iter()
+                        .zip(r2.iter())
+                        .all(|((p1, e1), (p2, e2))| p1.structural_eq(p2) && e1.structural_eq(e2))
+                    && t1.len() == t2.len()
+                    && t1.iter().zip(t2.iter()).all(|(ts1, ts2)| {
+                        ts1.len() == ts2.len()
+                            && ts1
+                                .iter()
+                                .zip(ts2.iter())
+                                .all(|(e1, e2)| e1.structural_eq(e2))
+                    })
+                    && match (c1, c2) {
+                        (Some(c1), Some(c2)) => c1.structural_eq(c2),
+                        (None, None) => true,
+                        _ => false,
+                    }
+                    && b1.structural_eq(b2)
+            },
+            (Block(_, pat1, opt1, body1), Block(_, pat2, opt2, body2)) => {
+                pat1.structural_eq(pat2)
+                    && match (opt1, opt2) {
+                        (Some(e1), Some(e2)) => e1.structural_eq(e2),
+                        (None, None) => true,
+                        _ => false,
+                    }
+                    && body1.structural_eq(body2)
+            },
+            (IfElse(_, c1, t1, e1), IfElse(_, c2, t2, e2)) => {
+                c1.structural_eq(c2) && t1.structural_eq(t2) && e1.structural_eq(e2)
+            },
+            (Match(_, d1, arms1), Match(_, d2, arms2)) => {
+                d1.structural_eq(d2)
+                    && arms1.len() == arms2.len()
+                    && arms1.iter().zip(arms2.iter()).all(|(a1, a2)| {
+                        a1.pattern.structural_eq(&a2.pattern)
+                            && match (&a1.condition, &a2.condition) {
+                                (Some(c1), Some(c2)) => c1.structural_eq(c2),
+                                (None, None) => true,
+                                _ => false,
+                            }
+                            && a1.body.structural_eq(&a2.body)
+                    })
+            },
+            (Sequence(_, items1), Sequence(_, items2)) => {
+                items1.len() == items2.len()
+                    && items1
+                        .iter()
+                        .zip(items2.iter())
+                        .all(|(i1, i2)| i1.structural_eq(i2))
+            },
+            (Loop(_, body1), Loop(_, body2)) => body1.structural_eq(body2),
+            (LoopCont(_, nest1, cont1), LoopCont(_, nest2, cont2)) => {
+                nest1 == nest2 && cont1 == cont2
+            },
+            (Return(_, val1), Return(_, val2)) => val1.structural_eq(val2),
+            (Mutate(_, l1, r1), Mutate(_, l2, r2)) => l1.structural_eq(l2) && r1.structural_eq(r2),
+            (Assign(_, l1, r1), Assign(_, l2, r2)) => l1.structural_eq(l2) && r1.structural_eq(r2),
+            (SpecBlock(_, spec1), SpecBlock(_, spec2)) => spec1.structural_eq(spec2),
+            _ => false,
+        }
+    }
+
     pub fn node_id(&self) -> NodeId {
         use ExpData::*;
         match self {
@@ -1145,6 +1277,8 @@ impl ExpData {
 
     /// Returns the temporaries used in this expression, with types. Result is ordered by occurrence.
     pub fn used_temporaries_with_types(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
+        // Temporaries in behavior predicates (args[0]) are captured by the standard visitor
+        // since they are now represented as regular Temporary expressions.
         self.used_temporaries_with_ids()
             .into_iter()
             .map(|(t, i)| (t, env.get_node_type(i)))
@@ -1864,60 +1998,121 @@ impl ExpData {
     fn collect_struct_pattern(pat: &Pattern, usage: &mut BTreeSet<QualifiedId<StructId>>) {
         if let Pattern::Struct(_, qid, _, pats) = pat {
             usage.insert(qid.to_qualified_id());
+            // Collect struct types from the type instantiation (e.g., Inner in Outer<Inner>)
+            for ty in &qid.inst {
+                ty.visit(&mut |t| {
+                    if let Type::Struct(mid, sid, _) = t {
+                        usage.insert(mid.qualified(*sid));
+                    }
+                });
+            }
             for p in pats {
                 Self::collect_struct_pattern(p, usage);
             }
         }
     }
 
-    /// Collect struct-related operations including unpacking
-    pub fn struct_usage(&self, env: &GlobalEnv, usage: &mut BTreeSet<QualifiedId<StructId>>) {
-        self.visit_post_order(&mut |e| {
-            if let ExpData::Call(_, oper, _) = e {
-                use Operation::*;
-                match oper {
-                    SelectVariants(mid, sid, ..)
-                    | TestVariants(mid, sid, ..)
-                    | Select(mid, sid, ..)
-                    | UpdateField(mid, sid, ..)
-                    | Pack(mid, sid, _) => {
-                        usage.insert(mid.qualified(*sid));
-                    },
-                    _ => {},
-                }
-            } else {
-                match e {
-                    ExpData::Assign(_, pat, _) | ExpData::Block(_, pat, _, _) => {
-                        Self::collect_struct_pattern(pat, usage);
-                    },
-                    ExpData::Lambda(id, pat, _, _, _) => {
-                        let fun_ty = env.get_node_type(*id);
-                        if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
-                            usage.insert(wrapper_struct.get_qualified_id());
-                        }
-                        Self::collect_struct_pattern(pat, usage);
-                    },
-                    ExpData::Quant(_, _, pattern_tuple, _, _, _) => {
-                        for (pat, _) in pattern_tuple {
-                            Self::collect_struct_pattern(pat, usage);
-                        }
-                    },
-                    ExpData::Match(_, _, arms) => {
-                        for arm in arms.iter() {
-                            Self::collect_struct_pattern(&arm.pattern, usage);
-                        }
-                    },
-                    ExpData::Invoke(_, exp, _) => {
-                        let fun_ty = env.get_node_type(exp.node_id());
-                        if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
-                            usage.insert(wrapper_struct.get_qualified_id());
-                        }
-                    },
-                    _ => {},
-                }
+    /// Collect struct-related operations including unpacking.
+    /// If `include_specs` is false, spec blocks are skipped.
+    pub fn struct_usage(
+        &self,
+        env: &GlobalEnv,
+        include_specs: bool,
+    ) -> BTreeSet<QualifiedId<StructId>> {
+        let mut usage = BTreeSet::new();
+        let mut spec_depth = 0usize;
+        self.visit_pre_post(&mut |post, e| {
+            // Skip spec blocks when not including specs
+            if !include_specs && matches!(e, ExpData::SpecBlock(..)) {
+                spec_depth = if post {
+                    spec_depth.saturating_sub(1)
+                } else {
+                    spec_depth + 1
+                };
             }
-            true // keep going.
+
+            // We skip `post` since the exp has been visited during `pre`
+            // Also, `spec_depth > 0` implies inside a spec block and `!include_specs`
+            if post || spec_depth > 0 {
+                return true;
+            }
+
+            match e {
+                ExpData::Call(node_id, oper, _) => {
+                    use Operation::*;
+                    match oper {
+                        SelectVariants(mid, sid, ..)
+                        | TestVariants(mid, sid, ..)
+                        | Select(mid, sid, ..)
+                        | UpdateField(mid, sid, ..)
+                        | Pack(mid, sid, _) => {
+                            usage.insert(mid.qualified(*sid));
+                        },
+                        MoveFunction(..) | Closure(..) | Tuple | SpecFunction(..)
+                        | Behavior(..) | Result(..) | Index | Slice | Range | Implies | Iff
+                        | Identical | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl
+                        | Shr | And | Or | Eq | Neq | Lt | Gt | Le | Ge | Copy | Move | Not
+                        | Cast | Negate | Exists(..) | BorrowGlobal(..) | Borrow(..) | Deref
+                        | MoveTo | MoveFrom | Freeze(..) | Abort(..) | Vector | Len | TypeValue
+                        | TypeDomain | ResourceDomain | Global(..) | CanModify | Old
+                        | Trace(..) | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
+                        | ContainsVec | InRangeRange | InRangeVec | RangeVec | MaxU8 | MaxU16
+                        | MaxU32 | MaxU64 | MaxU128 | MaxU256 | Bv2Int | Int2Bv | AbortFlag
+                        | AbortCode | WellFormed | BoxValue | UnboxValue | EmptyEventStore
+                        | ExtendEventStore | EventStoreIncludes | EventStoreIncludedIn | NoOp => {},
+                    }
+                    // Collect struct types from type instantiations (e.g., borrow_global<MyStruct>)
+                    if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
+                        for ty in inst {
+                            ty.visit(&mut |t| {
+                                if let Type::Struct(mid, sid, _) = t {
+                                    usage.insert(mid.qualified(*sid));
+                                }
+                            });
+                        }
+                    }
+                },
+                ExpData::Assign(_, pat, _) | ExpData::Block(_, pat, _, _) => {
+                    Self::collect_struct_pattern(pat, &mut usage);
+                },
+                ExpData::Lambda(id, pat, _, _, _) => {
+                    let fun_ty = env.get_node_type(*id);
+                    if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
+                        usage.insert(wrapper_struct.get_qualified_id());
+                    }
+                    Self::collect_struct_pattern(pat, &mut usage);
+                },
+                ExpData::Quant(_, _, pattern_tuple, _, _, _) => {
+                    for (pat, _) in pattern_tuple {
+                        Self::collect_struct_pattern(pat, &mut usage);
+                    }
+                },
+                ExpData::Match(_, _, arms) => {
+                    for arm in arms.iter() {
+                        Self::collect_struct_pattern(&arm.pattern, &mut usage);
+                    }
+                },
+                ExpData::Invoke(_, exp, _) => {
+                    let fun_ty = env.get_node_type(exp.node_id());
+                    if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
+                        usage.insert(wrapper_struct.get_qualified_id());
+                    }
+                },
+                ExpData::Invalid(..)
+                | ExpData::Value(..)
+                | ExpData::LocalVar(..)
+                | ExpData::Temporary(..)
+                | ExpData::IfElse(..)
+                | ExpData::Return(..)
+                | ExpData::Sequence(..)
+                | ExpData::Loop(..)
+                | ExpData::LoopCont(..)
+                | ExpData::Mutate(..)
+                | ExpData::SpecBlock(..) => {},
+            }
+            true // continue visiting
         });
+        usage
     }
 
     /// Collect field-related operations
@@ -2039,14 +2234,12 @@ pub enum Operation {
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     UpdateField(ModuleId, StructId, FieldId),
     /// Behavior predicate for function values (requires_of, aborts_of, ensures_of, modifies_of).
-    /// Arguments: kind of predicate, pre-state label, target function/parameter, post-state label.
-    /// Labels are currently ignored but reserved for future state-binding functionality.
-    Behavior(
-        BehaviorKind,
-        Option<MemoryLabel>,
-        BehaviorTarget,
-        Option<MemoryLabel>,
-    ),
+    /// args[0] is the function expression (Closure for global functions, Temporary for
+    /// function parameters, LocalVar for spec function parameters).
+    /// args[1..] are the predicate arguments.
+    /// The BehaviorState contains optional pre/post state labels for reasoning about
+    /// state at different program points.
+    Behavior(BehaviorKind, BehaviorState),
     Result(usize),
     Index,
     Slice,
@@ -2143,8 +2336,29 @@ pub enum Operation {
 /// A label used for referring to a specific memory in Global and Exists expressions.
 pub type MemoryLabel = GlobalId;
 
-/// A pattern, either a variable, a tuple, or a struct instantiation applied to a sequence of patterns.
-/// Carries a node_id which has (at least) a type and location.
+/// State labels for behavior predicates.
+/// Pre-label refers to state before an operation, post-label refers to state after.
+/// Label names are stored in GlobalEnv and can be looked up via `get_memory_label_name`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct BehaviorState {
+    /// Pre-state label - references another predicate's post-state
+    pub pre: Option<MemoryLabel>,
+    /// Post-state label - defines this predicate's post-state
+    pub post: Option<MemoryLabel>,
+}
+
+impl BehaviorState {
+    pub fn new(pre: Option<MemoryLabel>, post: Option<MemoryLabel>) -> Self {
+        Self { pre, post }
+    }
+
+    pub fn has_labels(&self) -> bool {
+        self.pre.is_some() || self.post.is_some()
+    }
+}
+
+/// A pattern, either a variable, a wildcard, a literal value, a tuple, or a struct instantiation
+/// applied to a sequence of patterns. Carries a node_id which has (at least) a type and location.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
     Var(NodeId, Symbol),
@@ -2157,6 +2371,8 @@ pub enum Pattern {
         Option<Symbol>,
         Vec<Pattern>,
     ),
+    /// A literal value pattern (for matching literal constants)
+    LiteralValue(NodeId, Value),
     Error(NodeId),
 }
 
@@ -2168,7 +2384,35 @@ impl Pattern {
             | Pattern::Wildcard(id)
             | Pattern::Tuple(id, _)
             | Pattern::Struct(id, _, _, _)
+            | Pattern::LiteralValue(id, _)
             | Pattern::Error(id) => *id,
+        }
+    }
+
+    /// Compares two patterns for structural equality, ignoring NodeIds.
+    pub fn structural_eq(&self, other: &Pattern) -> bool {
+        match (self, other) {
+            (Pattern::Var(_, s1), Pattern::Var(_, s2)) => s1 == s2,
+            (Pattern::Wildcard(_), Pattern::Wildcard(_)) => true,
+            (Pattern::Tuple(_, pats1), Pattern::Tuple(_, pats2)) => {
+                pats1.len() == pats2.len()
+                    && pats1
+                        .iter()
+                        .zip(pats2.iter())
+                        .all(|(p1, p2)| p1.structural_eq(p2))
+            },
+            (Pattern::Struct(_, qid1, v1, pats1), Pattern::Struct(_, qid2, v2, pats2)) => {
+                qid1 == qid2
+                    && v1 == v2
+                    && pats1.len() == pats2.len()
+                    && pats1
+                        .iter()
+                        .zip(pats2.iter())
+                        .all(|(p1, p2)| p1.structural_eq(p2))
+            },
+            (Pattern::LiteralValue(_, v1), Pattern::LiteralValue(_, v2)) => v1 == v2,
+            (Pattern::Error(_), Pattern::Error(_)) => true,
+            _ => false,
         }
     }
 
@@ -2202,7 +2446,7 @@ impl Pattern {
     pub fn has_no_struct(&self) -> bool {
         use Pattern::*;
         match self {
-            Var(..) | Wildcard(..) | Error(..) => true,
+            Var(..) | Wildcard(..) | LiteralValue(..) | Error(..) => true,
             Tuple(_, pats) => pats.iter().all(|p| p.has_no_struct()),
             Struct(..) => false,
         }
@@ -2429,7 +2673,7 @@ impl Pattern {
                     .map(|pat| pat.remove_vars(vars))
                     .collect(),
             ),
-            Pattern::Error(..) | Pattern::Wildcard(..) => self,
+            Pattern::Error(..) | Pattern::Wildcard(..) | Pattern::LiteralValue(..) => self,
         }
     }
 
@@ -2476,7 +2720,7 @@ impl Pattern {
                     None
                 }
             },
-            Pattern::Error(..) | Pattern::Wildcard(..) => None,
+            Pattern::Error(..) | Pattern::Wildcard(..) | Pattern::LiteralValue(..) => None,
         }
     }
 
@@ -2490,7 +2734,7 @@ impl Pattern {
         use Pattern::*;
         visitor(false, self);
         match self {
-            Var(..) | Wildcard(..) | Error(..) => {},
+            Var(..) | Wildcard(..) | LiteralValue(..) | Error(..) => {},
             Tuple(_, patvec) => {
                 for pat in patvec {
                     pat.visit_pre_post(visitor);
@@ -2639,6 +2883,9 @@ impl PatDisplay<'_> {
                     args_str
                 )?;
                 showed_type = true
+            },
+            LiteralValue(_, val) => {
+                write!(f, "{}", self.env.display(val))?;
             },
             Error(_) => write!(f, "Pattern::Error")?,
         }
@@ -2800,6 +3047,38 @@ impl fmt::Display for EnvDisplay<'_, Value> {
             Value::Vector(array) => write!(f, "{:?}", array),
             Value::Tuple(array) => write!(f, "({:?})", array),
         }
+    }
+}
+
+// enables `env.display(&property_value)`
+impl fmt::Display for EnvDisplay<'_, PropertyValue> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self.val {
+            PropertyValue::Value(v) => write!(f, "{}", self.env.display(v)),
+            PropertyValue::Symbol(s) => write!(f, "{}", s.display(self.env.symbol_pool())),
+            PropertyValue::QualifiedSymbol(qs) => write!(f, "{}", qs.display(self.env)),
+        }
+    }
+}
+
+// enables `env.display(&property_bag)`
+impl fmt::Display for EnvDisplay<'_, PropertyBag> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "[")?;
+        let mut first = true;
+        for (key, value) in self.val {
+            if !first {
+                write!(f, ", ")?;
+            }
+            first = false;
+            write!(
+                f,
+                "{}={}",
+                key.display(self.env.symbol_pool()),
+                self.env.display(value)
+            )?;
+        }
+        write!(f, "]")
     }
 }
 
@@ -3823,27 +4102,13 @@ impl fmt::Display for OperationDisplay<'_> {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
             Result(t) => write!(f, "result{}", t),
-            Behavior(kind, pre_label, target, post_label) => {
-                if let Some(label) = pre_label {
-                    write!(f, "@{}", label)?;
+            Behavior(kind, state) => {
+                if let Some(pre) = &state.pre {
+                    write!(f, "{}@", pre.as_usize())?;
                 }
                 write!(f, "{}", kind)?;
-                write!(f, "<")?;
-                match target {
-                    BehaviorTarget::Parameter(sym) => {
-                        write!(f, "{}", sym.display(self.env.symbol_pool()))?
-                    },
-                    BehaviorTarget::Function(qid) => write!(
-                        f,
-                        "{}",
-                        self.env
-                            .get_function(qid.to_qualified_id())
-                            .get_full_name_str()
-                    )?,
-                }
-                write!(f, ">")?;
-                if let Some(label) = post_label {
-                    write!(f, "@{}", label)?;
+                if let Some(post) = &state.post {
+                    write!(f, "@{}", post.as_usize())?;
                 }
                 Ok(())
             },
@@ -3949,7 +4214,13 @@ impl fmt::Display for EnvDisplay<'_, Condition> {
                 self.val.additional_exps[0].display(self.env),
                 self.val.exp.display(self.env)
             )?,
-            _ => write!(f, "{} {};", self.val.kind, self.val.exp.display(self.env))?,
+            _ => {
+                write!(f, "{}", self.val.kind)?;
+                if !self.val.properties.is_empty() {
+                    write!(f, " {}", self.env.display(&self.val.properties))?;
+                }
+                write!(f, " {};", self.val.exp.display(self.env))?
+            },
         }
         Ok(())
     }
@@ -3990,11 +4261,24 @@ impl fmt::Display for AccessSpecifierKind {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ast::{Address, Value},
+        ast::{Address, Condition, ConditionKind, ExpData, Spec, Value},
+        model::{Loc, NodeId},
         symbol::Symbol,
         AccountAddress,
     };
     use num::BigInt;
+    use std::collections::BTreeMap;
+
+    fn update_condition(exp_node_id: usize, val: bool) -> Condition {
+        Condition {
+            loc: Loc::default(),
+            kind: ConditionKind::Update,
+            properties: BTreeMap::new(),
+            exp: ExpData::Value(NodeId::new(exp_node_id), Value::Bool(val)).into_exp(),
+            additional_exps: vec![],
+        }
+    }
+
     #[test]
     fn test_value_equivalence() {
         // Some test values
@@ -4182,5 +4466,32 @@ mod tests {
         for val1 in &symbolic_examples {
             assert!(val1.equivalent(&((*val1).clone())) == Some(true));
         }
+    }
+
+    #[test]
+    fn test_spec_structural_eq_update_map_ignores_node_id_keys() {
+        let spec1 = Spec {
+            loc: None,
+            conditions: vec![],
+            properties: BTreeMap::new(),
+            on_impl: BTreeMap::new(),
+            update_map: BTreeMap::from([
+                (NodeId::new(1), update_condition(11, true)),
+                (NodeId::new(2), update_condition(22, false)),
+            ]),
+        };
+        let spec2 = Spec {
+            loc: None,
+            conditions: vec![],
+            properties: BTreeMap::new(),
+            on_impl: BTreeMap::new(),
+            update_map: BTreeMap::from([
+                (NodeId::new(100), update_condition(33, false)),
+                (NodeId::new(200), update_condition(44, true)),
+            ]),
+        };
+
+        assert!(spec1.structural_eq(&spec2));
+        assert!(spec2.structural_eq(&spec1));
     }
 }

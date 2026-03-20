@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_batch_encryption::{
-    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare,
+    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare, tests::decrypt_all,
     traits::BatchThresholdEncryption,
 };
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
@@ -264,7 +264,7 @@ pub fn decrypt(c: &mut Criterion) {
             BenchmarkId::from_parameter(batch_size),
             &(dk, prepared_cts),
             |b, input| {
-                b.iter(|| FPTX::decrypt::<String>(&input.0, &input.1).unwrap());
+                b.iter(|| decrypt_all::<FPTX, String>(&input.0, &input.1).unwrap());
             },
         );
     }

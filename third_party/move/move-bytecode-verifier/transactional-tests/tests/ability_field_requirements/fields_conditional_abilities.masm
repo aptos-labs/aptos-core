@@ -1,0 +1,81 @@
+//# publish
+module 0x1::m1_good
+struct Bar has drop
+  x: bool
+
+struct Foo has drop
+  x: Bar
+
+
+
+//# publish
+module 0x1::m1_bad
+struct Bar
+  x: bool
+
+struct Foo has drop
+  x: Bar
+
+
+
+//# publish
+module 0x1::m2
+struct Foo<T0> has drop
+  x: T0
+
+
+
+//# publish
+module 0x1::m3
+struct Bar<T0> has drop
+  x: T0
+
+struct Foo<T0> has drop
+  x: Bar<Bar<T0>>
+
+
+
+//# publish
+module 0x1::m4
+struct Bar<T0> has drop
+  x: T0
+
+struct Baz
+  x: bool
+
+struct Foo<T0> has drop
+  x: Bar<Bar<Baz>>
+
+
+
+//# publish
+module 0x1::m5_good
+struct Bar has store
+  x: u64
+
+struct Foo has key
+  x: Bar
+
+
+
+//# publish
+module 0x1::m5_bad
+struct Bar has key
+  x: u64
+
+struct Foo has key
+  x: Bar
+
+
+
+//# publish
+module 0x1::m6
+struct Bar<T0, T1> has copy
+  x: T0
+  y: T1
+
+struct Baz
+  x: bool
+
+struct Foo has copy
+  x: Bar<u64, Baz>

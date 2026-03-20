@@ -7,14 +7,9 @@ use crate::suites::{
         PROGRESS_THRESHOLD_20_6, RELIABLE_PROGRESS_THRESHOLD, SYSTEM_12_CORES_10GB_THRESHOLD,
     },
 };
-use aptos_forge::{
-    success_criteria::SuccessCriteria, EmitJobMode, EmitJobRequest, ForgeConfig, NetworkTest,
-};
+use aptos_forge::{success_criteria::SuccessCriteria, EmitJobMode, EmitJobRequest, ForgeConfig};
 use aptos_testcases::{
     modifiers::{ExecutionDelayConfig, ExecutionDelayTest},
-    multi_region_network_test::{
-        MultiRegionNetworkEmulationConfig, MultiRegionNetworkEmulationTest,
-    },
     performance_test::PerformanceBenchmark,
     three_region_simulation_test::ThreeRegionSameCloudSimulationTest,
     CompositeNetworkTest,
@@ -102,13 +97,4 @@ pub(crate) fn three_region_simulation() -> ForgeConfig {
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(PROGRESS_THRESHOLD_20_6.clone()),
         )
-}
-
-pub fn wrap_with_two_region_env<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
-    CompositeNetworkTest::new(
-        MultiRegionNetworkEmulationTest::new_with_config(
-            MultiRegionNetworkEmulationConfig::two_region(),
-        ),
-        test,
-    )
 }

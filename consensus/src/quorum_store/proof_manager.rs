@@ -7,7 +7,7 @@ use crate::{
     quorum_store::{batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters},
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
+    common::{Payload, PayloadFilter, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
@@ -34,7 +34,6 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
-    enable_payload_v2: bool,
 }
 
 impl ProofManager {
@@ -44,7 +43,6 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
-        enable_payload_v2: bool,
         batch_expiry_gap_when_init_usecs: u64,
     ) -> Self {
         Self {
@@ -58,7 +56,6 @@ impl ProofManager {
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
-            enable_payload_v2,
         }
     }
 
@@ -111,27 +108,40 @@ impl ProofManager {
             PayloadFilter::InQuorumStore(batches) => batches,
         };
 
-        let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
-            self.batch_proof_queue.pull_proofs(
-                &excluded_batches,
-                request.max_txns,
-                request.max_txns_after_filtering,
-                request.soft_max_txns_after_filtering,
-                request.return_non_full,
-                request.block_timestamp,
-            );
+        let per_kind_txn_limits = request
+            .maybe_optqs_payload_pull_params
+            .as_ref()
+            .map(|p| p.per_kind_txn_limits.clone())
+            .unwrap_or_default();
+
+        let (
+            proof_block,
+            txns_with_proof_size,
+            cur_unique_txns,
+            proof_queue_fully_utilized,
+            proof_txns_per_kind,
+        ) = self.batch_proof_queue.pull_proofs(
+            &excluded_batches,
+            request.max_txns,
+            request.max_txns_after_filtering,
+            request.soft_max_txns_after_filtering,
+            request.return_non_full,
+            request.block_timestamp,
+            &per_kind_txn_limits,
+        );
 
         counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
             .observe(self.batch_proof_queue.num_batches_without_proof() as f64);
         counters::PROOF_QUEUE_FULLY_UTILIZED
             .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-        let (opt_batches, opt_batch_txns_size) =
+        let (opt_batches, opt_batch_txns_size, opt_batch_txns_per_kind) =
             // TODO(ibalajiarun): Support unique txn calculation
             if let Some(ref params) = request.maybe_optqs_payload_pull_params {
                 let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
                 let max_opt_batch_txns_after_filtering = request.max_txns_after_filtering - cur_unique_txns;
-                let (opt_batches, opt_payload_size, _) =
+                let remaining_per_kind = per_kind_txn_limits.remaining(&proof_txns_per_kind);
+                let (opt_batches, opt_payload_size, _, opt_txns_per_kind) =
                     self.batch_proof_queue.pull_batches(
                         &excluded_batches
                             .iter()
@@ -145,10 +155,11 @@ impl ProofManager {
                         request.return_non_full,
                         request.block_timestamp,
                         Some(params.minimum_batch_age_usecs),
+                        &remaining_per_kind,
                     );
-                (opt_batches, opt_payload_size)
+                (opt_batches, opt_payload_size, opt_txns_per_kind)
             } else {
-                (Vec::new(), PayloadTxnsSize::zero())
+                (Vec::new(), PayloadTxnsSize::zero(), Default::default())
             };
 
         let cur_txns = txns_with_proof_size + opt_batch_txns_size;
@@ -164,6 +175,12 @@ impl ProofManager {
                         .max_txns_after_filtering
                         .saturating_sub(cur_unique_txns),
                 ));
+                // Combine proof + opt batch per-kind counters for inline limits
+                let mut combined_per_kind = proof_txns_per_kind.clone();
+                for (kind, count) in &opt_batch_txns_per_kind {
+                    *combined_per_kind.entry(*kind).or_insert(0) += count;
+                }
+                let remaining_per_kind = per_kind_txn_limits.remaining(&combined_per_kind);
                 let (inline_batches, inline_payload_size, _) =
                     self.batch_proof_queue.pull_batches_with_transactions(
                         &excluded_batches
@@ -177,6 +194,7 @@ impl ProofManager {
                         request.soft_max_txns_after_filtering,
                         request.return_non_full,
                         request.block_timestamp,
+                        &remaining_per_kind,
                     );
                 (inline_batches, inline_payload_size)
             } else {
@@ -185,42 +203,19 @@ impl ProofManager {
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
-        let response = if let Some(ref params) = request.maybe_optqs_payload_pull_params {
-            // Determine whether to use V2 payload based on the flag
-            if params.use_batch_v2 {
-                // Keep BatchInfoExt for V2
-                Payload::OptQuorumStore(OptQuorumStorePayload::new_v2(
-                    inline_block.into(),
-                    opt_batches.into(),
-                    proof_block.into(),
-                    PayloadExecutionLimit::None,
-                ))
-            } else {
-                // Convert to BatchInfo for V1
-                let inline_block_v1: Vec<_> = inline_block
-                    .into_iter()
-                    .map(|(info, txns)| (info.info().clone(), txns))
-                    .collect();
-                let opt_batches_v1: Vec<_> = opt_batches
-                    .into_iter()
-                    .map(|info| info.info().clone())
-                    .collect();
-                let proof_block_v1: Vec<_> = proof_block
-                    .into_iter()
-                    .map(|proof| {
-                        let (info, sig) = proof.unpack();
-                        ProofOfStore::new(info.info().clone(), sig)
-                    })
-                    .collect();
-                Payload::OptQuorumStore(OptQuorumStorePayload::new(
-                    inline_block_v1.into(),
-                    opt_batches_v1.into(),
-                    proof_block_v1.into(),
-                    PayloadExecutionLimit::None,
-                ))
-            }
-        } else if proof_block.is_empty() && inline_block.is_empty() {
-            Payload::empty(true, self.allow_batches_without_pos_in_proposal)
+        let enable_optqs_v2 = request
+            .maybe_optqs_payload_pull_params
+            .as_ref()
+            .is_some_and(|p| p.enable_opt_qs_v2_payload);
+
+        let response = if enable_optqs_v2 {
+            // V2: keep BatchInfoExt as-is
+            Payload::OptQuorumStore(OptQuorumStorePayload::new_v2(
+                inline_block.into(),
+                opt_batches.into(),
+                proof_block.into(),
+                PayloadExecutionLimit::None,
+            ))
         } else {
             trace!(
                 "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",
@@ -228,33 +223,34 @@ impl ProofManager {
                 proof_block.len(),
                 inline_block.len()
             );
-            // Both QuorumStoreInlineHybrid and QuorumStoreInlineHybridV2 use BatchInfo
-            // So we need to convert BatchInfoExt to BatchInfo
+            // V1: downgrade to BatchInfo, filtering out V2 batches
             let inline_block_v1: Vec<_> = inline_block
                 .into_iter()
+                .filter(|(info, _)| !info.is_v2())
                 .map(|(info, txns)| (info.info().clone(), txns))
+                .collect();
+            let opt_batches_v1: Vec<_> = opt_batches
+                .into_iter()
+                .filter(|info| !info.is_v2())
+                .map(|info| info.info().clone())
                 .collect();
             let proof_block_v1: Vec<_> = proof_block
                 .into_iter()
-                .map(|proof| {
-                    let (info, sig) = proof.unpack();
-                    ProofOfStore::new(info.info().clone(), sig)
+                .filter_map(|proof| {
+                    if !proof.is_v2() {
+                        let (info, sig) = proof.unpack();
+                        Some(ProofOfStore::new(info.info().clone(), sig))
+                    } else {
+                        None
+                    }
                 })
                 .collect();
-
-            if self.enable_payload_v2 {
-                Payload::QuorumStoreInlineHybridV2(
-                    inline_block_v1,
-                    ProofWithData::new(proof_block_v1),
-                    PayloadExecutionLimit::None,
-                )
-            } else {
-                Payload::QuorumStoreInlineHybrid(
-                    inline_block_v1,
-                    ProofWithData::new(proof_block_v1),
-                    None,
-                )
-            }
+            Payload::OptQuorumStore(OptQuorumStorePayload::new(
+                inline_block_v1.into(),
+                opt_batches_v1.into(),
+                proof_block_v1.into(),
+                PayloadExecutionLimit::None,
+            ))
         };
 
         let res = GetPayloadResponse::GetPayloadResponse(response);

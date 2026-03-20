@@ -1,0 +1,34 @@
+//# run
+script
+entry public fun main()
+    local l0: u64
+    local l1: &u64
+    ld_u64 5
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    ld_u64 5
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: move_loc l1
+    read_ref
+    ld_u64 5
+    eq
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: mut_borrow_loc l0
+    read_ref
+    ld_u64 5
+    eq
+    not
+    br_false l2
+    ld_u64 42
+    abort
+l2: ret

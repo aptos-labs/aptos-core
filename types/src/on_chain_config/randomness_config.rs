@@ -42,27 +42,15 @@ impl AsMoveAny for ConfigV1 {
     const MOVE_TYPE_NAME: &'static str = "0x1::randomness_config::ConfigV1";
 }
 
+/// ConfigV2 was used for randomness fast path. The fast path has been removed,
+/// but we keep ConfigV2 for backward compatibility (replay of historical DKG
+/// transactions that used V2). It is treated as equivalent to V1 (the
+/// `fast_path_secrecy_threshold` field is ignored).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConfigV2 {
     pub secrecy_threshold: FixedPoint64MoveStruct,
     pub reconstruction_threshold: FixedPoint64MoveStruct,
     pub fast_path_secrecy_threshold: FixedPoint64MoveStruct,
-}
-
-impl Default for ConfigV2 {
-    fn default() -> Self {
-        Self {
-            secrecy_threshold: FixedPoint64MoveStruct::from_u64f64(
-                U64F64::from_num(1) / U64F64::from_num(2),
-            ),
-            reconstruction_threshold: FixedPoint64MoveStruct::from_u64f64(
-                U64F64::from_num(2) / U64F64::from_num(3),
-            ),
-            fast_path_secrecy_threshold: FixedPoint64MoveStruct::from_u64f64(
-                U64F64::from_num(2) / U64F64::from_num(3),
-            ),
-        }
-    }
 }
 
 impl AsMoveAny for ConfigV2 {
@@ -90,10 +78,11 @@ pub struct RandomnessConfigMoveStruct {
     variant: MoveAny,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum OnChainRandomnessConfig {
     Off,
     V1(ConfigV1),
+    /// Kept for backward compatibility. Treated as V1 (fast path threshold is ignored).
     V2(ConfigV2),
 }
 
@@ -158,16 +147,16 @@ impl TryFrom<RandomnessConfigMoveStruct> for OnChainRandomnessConfig {
         let RandomnessConfigMoveStruct { variant } = value;
         let variant_type_name = variant.type_name.as_str();
         match variant_type_name {
-            ConfigOff::MOVE_TYPE_NAME => Ok(OnChainRandomnessConfig::Off),
+            ConfigOff::MOVE_TYPE_NAME => Ok(Self::Off),
             ConfigV1::MOVE_TYPE_NAME => {
                 let v1 = MoveAny::unpack(ConfigV1::MOVE_TYPE_NAME, variant)
                     .map_err(|e| anyhow!("unpack as v1 failed: {e}"))?;
-                Ok(OnChainRandomnessConfig::V1(v1))
+                Ok(Self::V1(v1))
             },
             ConfigV2::MOVE_TYPE_NAME => {
                 let v2 = MoveAny::unpack(ConfigV2::MOVE_TYPE_NAME, variant)
                     .map_err(|e| anyhow!("unpack as v2 failed: {e}"))?;
-                Ok(OnChainRandomnessConfig::V2(v2))
+                Ok(Self::V2(v2))
             },
             _ => Err(anyhow!("unknown variant type")),
         }
@@ -181,64 +170,54 @@ impl From<OnChainRandomnessConfig> for RandomnessConfigMoveStruct {
             OnChainRandomnessConfig::V1(v1) => MoveAny::pack(ConfigV1::MOVE_TYPE_NAME, v1),
             OnChainRandomnessConfig::V2(v2) => MoveAny::pack(ConfigV2::MOVE_TYPE_NAME, v2),
         };
-        RandomnessConfigMoveStruct { variant }
+        Self { variant }
     }
 }
 
 impl OnChainRandomnessConfig {
     pub fn default_enabled() -> Self {
-        OnChainRandomnessConfig::V2(ConfigV2::default())
+        Self::V1(ConfigV1::default())
     }
 
     pub fn default_disabled() -> Self {
-        OnChainRandomnessConfig::Off
+        Self::Off
     }
 
     pub fn default_if_missing() -> Self {
-        OnChainRandomnessConfig::Off
+        Self::Off
     }
 
     pub fn default_for_genesis() -> Self {
-        OnChainRandomnessConfig::V2(ConfigV2::default())
+        Self::V1(ConfigV1::default())
     }
 
     pub fn randomness_enabled(&self) -> bool {
         match self {
-            OnChainRandomnessConfig::Off => false,
-            OnChainRandomnessConfig::V1(_) => true,
-            OnChainRandomnessConfig::V2(_) => true,
-        }
-    }
-
-    pub fn fast_randomness_enabled(&self) -> bool {
-        match self {
-            OnChainRandomnessConfig::Off => false,
-            OnChainRandomnessConfig::V1(_) => false,
-            OnChainRandomnessConfig::V2(_) => true,
+            Self::Off => false,
+            Self::V1(_) | Self::V2(_) => true,
         }
     }
 
     pub fn secrecy_threshold(&self) -> Option<U64F64> {
         match self {
-            OnChainRandomnessConfig::Off => None,
-            OnChainRandomnessConfig::V1(v1) => Some(v1.secrecy_threshold.as_u64f64()),
-            OnChainRandomnessConfig::V2(v2) => Some(v2.secrecy_threshold.as_u64f64()),
+            Self::Off => None,
+            Self::V1(v1) => Some(v1.secrecy_threshold.as_u64f64()),
+            Self::V2(v2) => Some(v2.secrecy_threshold.as_u64f64()),
         }
     }
 
     pub fn reconstruct_threshold(&self) -> Option<U64F64> {
         match self {
-            OnChainRandomnessConfig::Off => None,
-            OnChainRandomnessConfig::V1(v1) => Some(v1.reconstruction_threshold.as_u64f64()),
-            OnChainRandomnessConfig::V2(v2) => Some(v2.reconstruction_threshold.as_u64f64()),
+            Self::Off => None,
+            Self::V1(v1) => Some(v1.reconstruction_threshold.as_u64f64()),
+            Self::V2(v2) => Some(v2.reconstruction_threshold.as_u64f64()),
         }
     }
 
     pub fn fast_path_secrecy_threshold(&self) -> Option<U64F64> {
         match self {
-            OnChainRandomnessConfig::Off => None,
-            OnChainRandomnessConfig::V1(_) => None,
-            OnChainRandomnessConfig::V2(v2) => Some(v2.fast_path_secrecy_threshold.as_u64f64()),
+            Self::Off | Self::V1(_) => None,
+            Self::V2(v2) => Some(v2.fast_path_secrecy_threshold.as_u64f64()),
         }
     }
 }

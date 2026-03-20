@@ -5,14 +5,16 @@ use crate::{
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        write_set::WriteSetSchema,
+        write_set::{encode_write_set, WriteSetSchema},
+        WRITE_SET_CF_NAME,
     },
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
     batch::{SchemaBatch, WriteBatch},
-    DB,
+    schema::KeyCodec,
+    ReadOptions, DB,
 };
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
@@ -25,11 +27,15 @@ use std::{path::Path, sync::Arc};
 #[derive(Debug)]
 pub(crate) struct WriteSetDb {
     db: Arc<DB>,
+    persist_hotness: bool,
 }
 
 impl WriteSetDb {
-    pub(super) fn new(db: Arc<DB>) -> Self {
-        Self { db }
+    pub(super) fn new(db: Arc<DB>, persist_hotness: bool) -> Self {
+        Self {
+            db,
+            persist_hotness,
+        }
     }
 
     pub(super) fn create_checkpoint(&self, path: impl AsRef<Path>) -> Result<()> {
@@ -66,7 +72,17 @@ impl WriteSetDb {
         start_version: Version,
         num_transactions: usize,
     ) -> Result<impl Iterator<Item = Result<WriteSet>> + '_> {
-        let mut iter = self.db.iter::<WriteSetSchema>()?;
+        self.get_write_set_iter_with_opts(start_version, num_transactions, ReadOptions::default())
+    }
+
+    /// Same as `get_write_set_iter`, but with custom `ReadOptions`.
+    pub(crate) fn get_write_set_iter_with_opts(
+        &self,
+        start_version: Version,
+        num_transactions: usize,
+        opts: ReadOptions,
+    ) -> Result<impl Iterator<Item = Result<WriteSet>> + '_> {
+        let mut iter = self.db.iter_with_opts::<WriteSetSchema>(opts)?;
         iter.seek(&start_version)?;
         iter.expect_continuous_versions(start_version, num_transactions)
     }
@@ -117,6 +133,7 @@ impl WriteSetDb {
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets"]);
 
+        let persist_hotness = self.persist_hotness;
         let chunk_size = transaction_outputs.len() / 4 + 1;
         let batches = transaction_outputs
             .par_chunks(chunk_size)
@@ -130,6 +147,7 @@ impl WriteSetDb {
                         chunk_first_version + i as Version,
                         txn_out.write_set(),
                         &mut batch,
+                        persist_hotness,
                     )
                 })?;
                 Ok(batch)
@@ -150,8 +168,20 @@ impl WriteSetDb {
         version: Version,
         write_set: &WriteSet,
         batch: &mut impl WriteBatch,
+        persist_hotness: bool,
     ) -> Result<()> {
-        batch.put::<WriteSetSchema>(&version, write_set)
+        if persist_hotness {
+            // Bypass `ValueCodec::encode_value` (whose signature doesn't allow passing the
+            // flag) and encode via `encode_write_set` + `raw_put` instead.
+            let key_bytes = <Version as KeyCodec<WriteSetSchema>>::encode_key(&version)?;
+            let value_bytes = encode_write_set(write_set, /*persist_hotness=*/ true)?;
+            batch
+                .stats()
+                .put(WRITE_SET_CF_NAME, key_bytes.len() + value_bytes.len());
+            batch.raw_put(WRITE_SET_CF_NAME, key_bytes, value_bytes)
+        } else {
+            batch.put::<WriteSetSchema>(&version, write_set)
+        }
     }
 
     /// Deletes the write sets between a range of version in [begin, end).

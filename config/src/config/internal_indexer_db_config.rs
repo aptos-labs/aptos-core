@@ -16,6 +16,7 @@ pub struct InternalIndexerDBConfig {
     pub event_v2_translation_ignores_below_version: u64,
     pub enable_statekeys: bool,
     pub batch_size: usize,
+    pub runtime_threads: Option<usize>,
 }
 
 impl InternalIndexerDBConfig {
@@ -34,6 +35,7 @@ impl InternalIndexerDBConfig {
             event_v2_translation_ignores_below_version,
             enable_statekeys,
             batch_size,
+            runtime_threads: Some(2),
         }
     }
 
@@ -75,29 +77,17 @@ impl Default for InternalIndexerDBConfig {
             event_v2_translation_ignores_below_version: 0,
             enable_statekeys: false,
             batch_size: 10_000,
+            runtime_threads: Some(2),
         }
     }
 }
 
 impl ConfigSanitizer for InternalIndexerDBConfig {
     fn sanitize(
-        node_config: &NodeConfig,
+        _node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
-        let sanitizer_name = Self::get_sanitizer_name();
-        let config = node_config.indexer_db_config;
-
-        // Shouldn't turn on internal indexer for db without sharding
-        if !node_config.storage.rocksdb_configs.enable_storage_sharding
-            && config.is_internal_indexer_db_enabled()
-        {
-            return Err(Error::ConfigSanitizerFailed(
-                sanitizer_name,
-                "Don't turn on internal indexer db if DB sharding is off".into(),
-            ));
-        }
-
         Ok(())
     }
 }

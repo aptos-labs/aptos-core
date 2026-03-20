@@ -1,3 +1,3 @@
 processed 2 tasks
-task 0 lines 1-46:  publish [module 0x42.M {]
-task 1 lines 48-74:  run [import 0x42.M;]
+task 0 lines 1-62:  publish [module 0x42::M]
+task 1 lines 66-98:  run [script]

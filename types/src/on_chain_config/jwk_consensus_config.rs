@@ -68,15 +68,15 @@ impl OnChainJWKConsensusConfig {
 
     pub fn jwk_consensus_enabled(&self) -> bool {
         match self {
-            OnChainJWKConsensusConfig::Off => false,
-            OnChainJWKConsensusConfig::V1 { .. } => true,
+            Self::Off => false,
+            Self::V1 { .. } => true,
         }
     }
 
     pub fn oidc_providers_cloned(&self) -> Vec<OIDCProvider> {
         match self {
-            OnChainJWKConsensusConfig::Off => vec![],
-            OnChainJWKConsensusConfig::V1(v1) => v1.oidc_providers.clone(),
+            Self::Off => vec![],
+            Self::V1(v1) => v1.oidc_providers.clone(),
         }
     }
 }
@@ -88,10 +88,10 @@ impl OnChainConfig for OnChainJWKConsensusConfig {
     fn deserialize_into_config(bytes: &[u8]) -> anyhow::Result<Self> {
         let variant = bcs::from_bytes::<MoveAny>(bytes)?;
         match variant.type_name.as_str() {
-            ConfigOff::MOVE_TYPE_NAME => Ok(OnChainJWKConsensusConfig::Off),
+            ConfigOff::MOVE_TYPE_NAME => Ok(Self::Off),
             ConfigV1::MOVE_TYPE_NAME => {
                 let config_v1 = Any::unpack::<ConfigV1>(ConfigV1::MOVE_TYPE_NAME, variant).map_err(|e|anyhow!("OnChainJWKConsensusConfig deserialization failed with ConfigV1 unpack error: {e}"))?;
-                Ok(OnChainJWKConsensusConfig::V1(config_v1))
+                Ok(Self::V1(config_v1))
             },
             _ => Err(anyhow!("unknown variant type")),
         }
@@ -101,8 +101,8 @@ impl OnChainConfig for OnChainJWKConsensusConfig {
 impl AsMoveValue for OnChainJWKConsensusConfig {
     fn as_move_value(&self) -> MoveValue {
         let packed_variant = match self {
-            OnChainJWKConsensusConfig::Off => ConfigOff {}.as_move_any(),
-            OnChainJWKConsensusConfig::V1(v1) => v1.as_move_any(),
+            Self::Off => ConfigOff {}.as_move_any(),
+            Self::V1(v1) => v1.as_move_any(),
         };
         MoveValue::Struct(MoveStruct::Runtime(vec![packed_variant.as_move_value()]))
     }
@@ -121,12 +121,12 @@ impl From<(Option<Features>, Option<SupportedOIDCProviders>)> for OnChainJWKCons
                     .into_iter()
                     .filter_map(|deprecated| OIDCProvider::try_from(deprecated).ok())
                     .collect();
-                OnChainJWKConsensusConfig::V1(ConfigV1 { oidc_providers })
+                Self::V1(ConfigV1 { oidc_providers })
             } else {
-                OnChainJWKConsensusConfig::Off
+                Self::Off
             }
         } else {
-            OnChainJWKConsensusConfig::Off
+            Self::Off
         }
     }
 }

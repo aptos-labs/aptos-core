@@ -1,0 +1,11781 @@
+module 0xcafe::BootstrapCore
+entry public fun calibrate_empty_fun()
+    ret
+
+entry public fun calibrate_ldu64_and_pop_x10()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+public fun entry_ldu64_and_pop_x50()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_ldu64_and_pop_x100()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_ldu64_and_pop_x300()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_ldu64_and_pop_x600()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_sub_and_ldu64_10()
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ret
+
+entry public fun calibrate_sub_and_ldu64_50()
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ret
+
+entry public fun calibrate_sub_and_ldu64_100()
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ret
+
+entry public fun calibrate_sub_and_ldu64_300()
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ret
+
+entry public fun calibrate_sub_and_ldu64_600()
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ret
+
+entry public fun calibrate_ldu64_10_should_error()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 0
+    ld_u64 1
+    sub
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_ldu64_50_should_error()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 0
+    ld_u64 1
+    sub
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_ldu64_100_should_error()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 0
+    ld_u64 1
+    sub
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_ldu64_300_should_error()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 0
+    ld_u64 1
+    sub
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_ldu64_600_should_error()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 0
+    ld_u64 1
+    sub
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret
+
+entry public fun calibrate_tuning_many_of_all_instr()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    ld_u64 10000
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    ld_u64 1
+    sub
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    ret

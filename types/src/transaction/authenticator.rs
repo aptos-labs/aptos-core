@@ -39,6 +39,8 @@ pub const MAX_NUM_OF_SIGS: usize = 32;
 pub enum AuthenticationError {
     /// The number of signatures exceeds the maximum supported.
     MaxSignaturesExceeded,
+    /// Encrypted transactions are not supported with this authenticator type.
+    EncryptedTxnUnsupportedAuthenticator,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -167,11 +169,24 @@ impl TransactionAuthenticator {
         if num_sigs > MAX_NUM_OF_SIGS {
             return Err(Error::new(AuthenticationError::MaxSignaturesExceeded));
         }
+        // TODO(ibalajiarun): Support all authenticators for encrypted transactions.
+        if raw_txn.payload.is_encrypted_variant() && !matches!(self, Self::Ed25519 { .. }) {
+            return Err(Error::new(
+                AuthenticationError::EncryptedTxnUnsupportedAuthenticator,
+            ));
+        }
         match self {
             Self::Ed25519 {
                 public_key,
                 signature,
-            } => signature.verify(raw_txn, public_key),
+            } => {
+                if raw_txn.payload.is_encrypted_variant() {
+                    let raw_txn = raw_txn.clone().into_encrypted_variant();
+                    signature.verify(&raw_txn, public_key)
+                } else {
+                    signature.verify(raw_txn, public_key)
+                }
+            },
             Self::FeePayer {
                 sender,
                 secondary_signer_addresses,

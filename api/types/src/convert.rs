@@ -3,8 +3,11 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData, DeleteModule,
-        DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
+        BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData,
+        DecryptedPayload as ApiDecryptedPayload, DeleteModule, DeleteResource, DeleteTableItem,
+        DeletedTableData, EncryptedPayload as ApiEncryptedPayload,
+        EncryptedTransactionInnerPayload, EncryptedTransactionPayload,
+        FailedDecryptionPayload as ApiFailedDecryptionPayload, MultisigPayload,
         MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
         WriteModule, WriteResource, WriteTableItem,
     },
@@ -13,7 +16,7 @@ use crate::{
     HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
     MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
     SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
+    TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload, U64,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -25,14 +28,15 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
     indexer::indexer_db_reader::IndexerReader,
+    secret_sharing::Ciphertext,
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
         StateView,
     },
     transaction::{
-        BlockEndInfo, EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script,
-        SignedTransaction, TransactionAuxiliaryData,
+        encrypted_payload::EncryptedPayload, BlockEndInfo, EntryFunction, ExecutionStatus,
+        Multisig, RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
     },
     vm::module_metadata::get_metadata,
     vm_status::AbortLocation,
@@ -58,6 +62,50 @@ use std::{
 
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
 const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
+
+/// Recursively substitute generic type parameters in a MoveType with actual type arguments.
+fn substitute_type_in_move_type(
+    move_type: &crate::move_types::MoveType,
+    type_args: &[crate::move_types::MoveType],
+) -> Result<crate::move_types::MoveType> {
+    use crate::move_types::MoveType;
+
+    match move_type {
+        MoveType::GenericTypeParam { index } => {
+            let idx = *index as usize;
+            ensure!(
+                idx < type_args.len(),
+                "Generic type parameter index {} out of bounds (have {} type args)",
+                idx,
+                type_args.len()
+            );
+            Ok(type_args[idx].clone())
+        },
+        MoveType::Reference { mutable, to } => Ok(MoveType::Reference {
+            mutable: *mutable,
+            to: Box::new(substitute_type_in_move_type(to, type_args)?),
+        }),
+        MoveType::Vector { items } => Ok(MoveType::Vector {
+            items: Box::new(substitute_type_in_move_type(items, type_args)?),
+        }),
+        MoveType::Struct(struct_tag) => {
+            // Recursively substitute in struct generic_type_params
+            if struct_tag.generic_type_params.is_empty() {
+                Ok(move_type.clone())
+            } else {
+                let mut new_struct_tag = struct_tag.clone();
+                new_struct_tag.generic_type_params = struct_tag
+                    .generic_type_params
+                    .iter()
+                    .map(|ty| substitute_type_in_move_type(ty, type_args))
+                    .collect::<Result<_>>()?;
+                Ok(MoveType::Struct(new_struct_tag))
+            }
+        },
+        // For non-generic types, return as is
+        _ => Ok(move_type.clone()),
+    }
+}
 
 /// The Move converter for converting Move types to JSON
 ///
@@ -371,9 +419,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                     ),
                                 ),
                             }),
-                            aptos_types::transaction::TransactionExecutable::Script(_) => {
+                            aptos_types::transaction::TransactionExecutable::Script(_)
+                            | aptos_types::transaction::TransactionExecutable::Encrypted => {
                                 bail!(
-                                    "Script executable is not supported for multisig transactions"
+                                    "Script/encrypted executable is not supported for multisig transactions"
                                 )
                             },
                             aptos_types::transaction::TransactionExecutable::Empty => {
@@ -393,8 +442,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             aptos_types::transaction::TransactionExecutable::Script(script) => {
                                 TransactionPayload::ScriptPayload(try_into_script_payload(script)?)
                             },
-                            aptos_types::transaction::TransactionExecutable::Empty => {
-                                bail!("Empty executable is not supported for non-multisig transactions")
+                            aptos_types::transaction::TransactionExecutable::Empty
+                            | aptos_types::transaction::TransactionExecutable::Encrypted => {
+                                bail!("Empty/encrypted executable is not supported for non-multisig transactions")
                             },
                         }
                     }
@@ -402,8 +452,78 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
-            EncryptedPayload(_) => {
-                bail!("Encrypted payload isn't supported yet")
+            EncryptedPayload(encrypted) => {
+                use aptos_types::transaction::encrypted_payload::EncryptedPayload as EP;
+
+                let extra_config = encrypted.extra_config();
+                let multisig_address = extra_config.multisig_address().map(Address::from);
+
+                let ciphertext = HexEncodedBytes::from(bcs::to_bytes(encrypted.ciphertext())?);
+
+                match encrypted {
+                    EP::Encrypted { payload_hash, .. } => {
+                        TransactionPayload::EncryptedTransactionPayload(
+                            EncryptedTransactionPayload::Encrypted(ApiEncryptedPayload {
+                                payload_hash: crate::HashValue::from(payload_hash),
+                                ciphertext: ciphertext.clone(),
+                            }),
+                        )
+                    },
+                    EP::FailedDecryption { payload_hash, .. } => {
+                        TransactionPayload::EncryptedTransactionPayload(
+                            EncryptedTransactionPayload::FailedDecryption(
+                                ApiFailedDecryptionPayload {
+                                    payload_hash: crate::HashValue::from(payload_hash),
+                                    ciphertext: ciphertext.clone(),
+                                },
+                            ),
+                        )
+                    },
+                    EP::Decrypted {
+                        payload_hash,
+                        executable,
+                        decryption_nonce,
+                        ..
+                    } => {
+                        let inner = match executable {
+                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                                entry_function,
+                            ) if multisig_address.is_some() => {
+                                EncryptedTransactionInnerPayload::MultisigPayload(MultisigPayload {
+                                    multisig_address: multisig_address.unwrap(),
+                                    transaction_payload: Some(
+                                        MultisigTransactionPayload::EntryFunctionPayload(
+                                            try_into_entry_function_payload(
+                                                entry_function.clone(),
+                                            )?,
+                                        ),
+                                    ),
+                                })
+                            },
+                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                                entry_function,
+                            ) => EncryptedTransactionInnerPayload::EntryFunctionPayload(
+                                try_into_entry_function_payload(entry_function.clone())?,
+                            ),
+                            aptos_types::transaction::TransactionExecutable::Script(script) => {
+                                EncryptedTransactionInnerPayload::ScriptPayload(
+                                    try_into_script_payload(script.clone())?,
+                                )
+                            },
+                            _ => {
+                                bail!("Unsupported executable type in decrypted encrypted payload")
+                            },
+                        };
+                        TransactionPayload::EncryptedTransactionPayload(
+                            EncryptedTransactionPayload::Decrypted(ApiDecryptedPayload {
+                                payload_hash: crate::HashValue::from(payload_hash),
+                                ciphertext,
+                                decrypted_payload: inner,
+                                decryption_nonce: U64::from(decryption_nonce),
+                            }),
+                        )
+                    },
+                }
             },
         };
         Ok(ret)
@@ -708,8 +828,17 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     function,
                     type_arguments.len()
                 );
-                let args = self
-                    .try_into_vm_values(&func, arguments.as_slice())?
+
+                // For generic entry functions, substitute type parameters before parsing arguments.
+                let args = if !type_arguments.is_empty() {
+                    let instantiated_func =
+                        self.instantiate_function_params(&func, &type_arguments)?;
+                    self.try_into_vm_values(&instantiated_func, arguments.as_slice())?
+                } else {
+                    self.try_into_vm_values(&func, arguments.as_slice())?
+                };
+
+                let args = args
                     .iter()
                     .map(bcs::to_bytes)
                     .collect::<Result<_, bcs::Error>>()?;
@@ -827,12 +956,58 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     })
                 }
             },
+            TransactionPayload::EncryptedTransactionPayload(encrypted) => {
+                // Only the Encrypted variant can be submitted; VerifyInput enforces this.
+                let (payload_hash, ciphertext_bytes) = match encrypted {
+                    EncryptedTransactionPayload::Encrypted(p) => (p.payload_hash, p.ciphertext),
+                    _ => bail!("Only encrypted state payloads can be submitted"),
+                };
+                let ciphertext: Ciphertext = bcs::from_bytes(&ciphertext_bytes.0)
+                    .context("Failed to BCS-deserialize ciphertext")?;
+                let extra_config = ExtraConfig::V1 {
+                    multisig_address: None,
+                    replay_protection_nonce: nonce,
+                };
+                Target::EncryptedPayload(EncryptedPayload::Encrypted {
+                    ciphertext,
+                    extra_config,
+                    payload_hash: payload_hash.into(),
+                })
+            },
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
                 bail!("Module bundle payload has been removed")
             },
         };
         Ok(ret)
+    }
+
+    /// Substitute generic type parameters in function parameters with actual type arguments.
+    /// This is necessary when parsing arguments for generic entry functions.
+    fn instantiate_function_params(
+        &self,
+        func: &MoveFunction,
+        type_args: &[MoveType],
+    ) -> Result<MoveFunction> {
+        // Substitute in all parameters
+        let new_params = func
+            .params
+            .iter()
+            .map(|param| substitute_type_in_move_type(param, type_args))
+            .collect::<Result<Vec<_>>>()?;
+
+        // Create new function with substituted parameters
+        // After instantiation with concrete type arguments, the function is no longer generic,
+        // so generic_type_params should be empty
+        Ok(MoveFunction {
+            name: func.name.clone(),
+            visibility: func.visibility.clone(),
+            is_entry: func.is_entry,
+            is_view: func.is_view,
+            generic_type_params: vec![],
+            params: new_params,
+            return_: func.return_.clone(),
+        })
     }
 
     pub fn try_into_vm_values(
@@ -929,7 +1104,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 self.try_into_vm_value_vector(item_layout.as_ref(), val)?
             },
             MoveTypeLayout::Struct(struct_layout) => {
-                self.try_into_vm_value_struct(struct_layout, val)?
+                self.try_into_vm_value_struct(struct_layout.as_ref(), val)?
             },
             MoveTypeLayout::Function => {
                 // TODO(#15664): do we actually need this? It appears the code here is dead and
@@ -970,12 +1145,78 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         layout: &MoveStructLayout,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
+        // Handle enums with variants
+        if let MoveStructLayout::WithVariants { variants, .. } = layout {
+            // Expecting JSON format: { "variant_name": { "field1": value1, ... } }
+            let obj = if let Value::Object(obj_fields) = val {
+                obj_fields
+            } else {
+                bail!("Expecting a JSON Map for enum.");
+            };
+
+            if obj.len() != 1 {
+                bail!("Enum value must have exactly one variant specified.");
+            }
+
+            let (variant_name, variant_value) = obj
+                .into_iter()
+                .next()
+                .ok_or_else(|| format_err!("Empty enum value."))?;
+
+            // Find the matching variant
+            let (variant_index, variant_layout) = variants
+                .iter()
+                .enumerate()
+                .find(|(_, v)| v.name.as_str() == variant_name)
+                .ok_or_else(|| format_err!("Variant {} not found.", variant_name))?;
+
+            // Validate that variant index fits in u16
+            if variant_index > u16::MAX as usize {
+                bail!(
+                    "Variant index {} exceeds maximum value {}",
+                    variant_index,
+                    u16::MAX
+                );
+            }
+
+            // Parse variant fields
+            let mut field_values = if let Value::Object(variant_fields) = variant_value {
+                variant_fields
+            } else {
+                bail!("Expecting a JSON Map for variant fields.");
+            };
+
+            let fields = variant_layout
+                .fields
+                .iter()
+                .map(|field_layout| {
+                    let name = field_layout.name.as_str();
+                    let value = field_values.remove(name).ok_or_else(|| {
+                        format_err!("field {} not found in variant {}.", name, variant_name)
+                    })?;
+                    self.try_into_vm_value_from_layout(&field_layout.layout, value)
+                })
+                .collect::<Result<_>>()?;
+
+            if !field_values.is_empty() {
+                bail!(
+                    "Unknown fields {:?} in variant {}.",
+                    field_values.keys().collect::<Vec<_>>(),
+                    variant_name
+                );
+            }
+
+            return Ok(move_core_types::value::MoveValue::Struct(
+                move_core_types::value::MoveStruct::RuntimeVariant(variant_index as u16, fields),
+            ));
+        }
+
         let (struct_tag, field_layouts) =
             if let MoveStructLayout::WithTypes { type_, fields } = layout {
                 (type_, fields)
             } else {
                 bail!(
-                    "Expecting `MoveStructLayout::WithTypes`, getting {:?}",
+                    "Expecting `MoveStructLayout::WithTypes` or `WithVariants`, getting {:?}",
                     layout
                 );
             };

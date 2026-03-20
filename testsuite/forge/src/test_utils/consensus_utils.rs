@@ -74,8 +74,7 @@ pub async fn test_consensus_fault_tolerance(
         join_all(
             validator_clients
                 .iter()
-                .cloned()
-                .map(move |(_, v)| async move { get_node_state(&v).await }),
+                .map(move |(_, v)| async move { get_node_state(v).await }),
         )
         .await
     }
@@ -161,20 +160,19 @@ pub async fn test_consensus_fault_tolerance(
         .await
         .context("catchup failed")?;
 
-    let transactions: Vec<_> =
-        join_all(validator_clients.iter().cloned().map(move |v| async move {
-            let mut txns =
-                v.1.get_transactions_bcs(
-                    Some(target_v.saturating_sub(DEFAULT_MAX_PAGE_SIZE as u64)),
-                    Some(DEFAULT_MAX_PAGE_SIZE),
-                )
-                .await
-                .unwrap()
-                .into_inner();
-            txns.retain(|t| t.version <= target_v);
-            <Result<Vec<_>>>::Ok(txns)
-        }))
-        .await;
+    let transactions: Vec<_> = join_all(validator_clients.iter().map(move |v| async move {
+        let mut txns =
+            v.1.get_transactions_bcs(
+                Some(target_v.saturating_sub(DEFAULT_MAX_PAGE_SIZE as u64)),
+                Some(DEFAULT_MAX_PAGE_SIZE),
+            )
+            .await
+            .unwrap()
+            .into_inner();
+        txns.retain(|t| t.version <= target_v);
+        <Result<Vec<_>>>::Ok(txns)
+    }))
+    .await;
 
     let txns_a = transactions.first().unwrap().as_ref().unwrap();
 

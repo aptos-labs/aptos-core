@@ -1,0 +1,11 @@
+//# publish
+module 0x1::m
+struct Foo<T0>
+  x: T0
+
+fun f(l0: &signer)
+    move_loc l0
+    ld_true
+    pack Foo<bool>
+    move_to Foo<bool>
+    ret

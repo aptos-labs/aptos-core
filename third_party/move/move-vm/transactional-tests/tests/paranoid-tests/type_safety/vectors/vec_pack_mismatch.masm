@@ -1,0 +1,58 @@
+//# publish
+module 0x22::A
+struct Password has key
+  x: u64
+
+public fun store(l0: Password, l1: &signer)
+    move_loc l1
+    move_loc l0
+    move_to Password
+    ret
+
+
+
+//# publish
+module 0x22::Math
+use 0x22::A
+struct R
+  v: u64
+
+public fun test(): A::Password
+    local l0: vector<A::Password>
+    ld_u64 0
+    pack R
+    vec_pack <A::Password>, 1
+    st_loc l0
+    move_loc l0
+    vec_unpack <A::Password>, 1
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::Math
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::Password
+    call Math::test
+    st_loc l1
+    move_loc l1
+    borrow_loc l0
+    call A::store
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::Math
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::Password
+    call Math::test
+    st_loc l1
+    move_loc l1
+    borrow_loc l0
+    call A::store
+    ret

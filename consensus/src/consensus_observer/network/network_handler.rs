@@ -329,6 +329,7 @@ mod test {
                 LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                 AggregateSignature::empty(),
             ),
+            false,
         );
 
         // Send the message to the network handler
@@ -409,6 +410,7 @@ mod test {
                 LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                 AggregateSignature::empty(),
             ),
+            false,
         );
 
         // Send the message to the network handler

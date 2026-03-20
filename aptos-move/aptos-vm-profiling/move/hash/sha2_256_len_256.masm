@@ -1,0 +1,36 @@
+module 0x1::M
+use 0x1::hash
+fun run()
+    local l0: u64
+    local l1: vector<u8>
+    vec_pack <u8>, 0
+    st_loc l1
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 256
+    lt
+    br_false l0
+    mut_borrow_loc l1
+    ld_u8 77
+    vec_push_back <u8>
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    branch l1
+l0: ld_u64 0
+    st_loc l0
+l3: copy_loc l0
+    ld_u64 1000
+    lt
+    br_false l2
+    copy_loc l1
+    call hash::sha2_256
+    pop
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    branch l3
+l2: ret

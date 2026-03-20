@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_consensus_types::{block::Block, common::Round, opt_block_data::OptBlockData};
 use aptos_crypto::HashValue;
-use aptos_logger::{info, warn};
+use aptos_logger::{debug, info, warn};
 use aptos_short_hex_str::AsShortHexStr;
 use futures_channel::oneshot;
 use std::collections::{BTreeMap, HashMap};
@@ -32,7 +32,7 @@ impl PendingBlocks {
     }
 
     pub fn insert_block(&mut self, block: Block) {
-        info!("Pending block inserted: {}", block.id());
+        debug!("Pending block inserted: {}", block.id());
         self.blocks_by_hash.insert(block.id(), block.clone());
         self.blocks_by_round.insert(block.round(), block.clone());
         if let Some((target_block_retrieval_payload, tx)) = self.pending_request.take() {
@@ -57,7 +57,7 @@ impl PendingBlocks {
     }
 
     pub fn insert_opt_block(&mut self, opt_block_data: OptBlockData) {
-        info!(
+        debug!(
             "Pending opt block inserted: ({}, {})",
             opt_block_data.author().short_str(),
             opt_block_data.round()

@@ -3,6 +3,7 @@
 
 use crate::{
     emitter::{
+        metrics::{record_commit_stats, record_latency_ms, record_submission_stats},
         stats::{DynamicStatsTracking, StatsAccumulator},
         wait_for_accounts_sequence, wait_for_orderless_txns,
     },
@@ -10,32 +11,58 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{sample, sample::SampleRate};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{error::RestError, Client as RestClient, State};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
+    transaction_builder::EncryptionKeyState,
     types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
 };
 use aptos_transaction_generator_lib::TransactionGenerator;
-use aptos_types::transaction::ReplayProtector;
+use aptos_types::{secret_sharing::EncryptionKey, transaction::ReplayProtector};
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use futures::future::join_all;
+use futures::{future::join_all, join};
 use itertools::Itertools;
 use log::{debug, error, info, warn};
 use rand::seq::IteratorRandom;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
-    sync::{atomic::AtomicU64, Arc},
+    sync::{atomic::AtomicU64, Arc, RwLock},
     time::Instant,
 };
 use tokio::time::{sleep, sleep_until};
 
 const ALLOWED_EARLY: Duration = Duration::from_micros(500);
+
+pub struct EncryptionKeyRotator {
+    state: Arc<RwLock<EncryptionKeyState>>,
+}
+
+impl EncryptionKeyRotator {
+    pub fn new(state: Arc<RwLock<EncryptionKeyState>>) -> Self {
+        Self { state }
+    }
+
+    pub fn observe_state(&self, state: &State) {
+        let epoch = state.epoch;
+        let mut guard = self.state.write().unwrap();
+        if epoch <= guard.epoch {
+            return;
+        }
+        guard.epoch = epoch;
+        if let Some(ref key_bytes) = state.encryption_key {
+            if let Ok(key) = bcs::from_bytes::<EncryptionKey>(key_bytes) {
+                guard.key = Some(key);
+                info!("Rotated encryption key for epoch {}", epoch);
+            }
+        }
+    }
+}
 
 pub struct SubmissionWorker {
     pub(crate) accounts: Vec<Arc<LocalAccount>>,
@@ -49,6 +76,7 @@ pub struct SubmissionWorker {
     start_sleep_duration: Duration,
     skip_latency_stats: bool,
     rng: ::rand::rngs::StdRng,
+    rotator: Option<Arc<EncryptionKeyRotator>>,
 }
 
 impl SubmissionWorker {
@@ -63,6 +91,7 @@ impl SubmissionWorker {
         start_sleep_duration: Duration,
         skip_latency_stats: bool,
         rng: ::rand::rngs::StdRng,
+        rotator: Option<Arc<EncryptionKeyRotator>>,
     ) -> Self {
         let accounts = accounts.into_iter().map(Arc::new).collect();
         Self {
@@ -76,6 +105,7 @@ impl SubmissionWorker {
             start_sleep_duration,
             skip_latency_stats,
             rng,
+            rotator,
         }
     }
 
@@ -147,6 +177,7 @@ impl SubmissionWorker {
 
                 let txn_offset_time = Arc::new(AtomicU64::new(0));
 
+                let rotator = self.rotator.clone();
                 join_all(
                     requests
                         .chunks(self.params.max_submit_batch_size)
@@ -157,6 +188,7 @@ impl SubmissionWorker {
                                 loop_start_time,
                                 txn_offset_time.clone(),
                                 loop_stats,
+                                rotator.as_deref(),
                             )
                         }),
                 )
@@ -300,23 +332,25 @@ impl SubmissionWorker {
         check_account_sleep_duration: Duration,
         loop_stats: &StatsAccumulator,
     ) {
-        let (latest_fetched_counts, sum_of_completion_timestamps_millis) =
+        let (
+            (latest_fetched_counts, sum_of_completion_timestamps_millis_seq_nums),
+            (failed_orderless_txns, sum_of_completion_timestamps_millis_orderless),
+        ) = join!(
             wait_for_accounts_sequence(
                 start_time,
                 self.client(),
                 &account_to_start_and_end_seq_num,
                 txn_expiration_ts_secs,
                 check_account_sleep_duration,
+            ),
+            wait_for_orderless_txns(
+                start_time,
+                self.client(),
+                &account_to_orderless_txns,
+                txn_expiration_ts_secs,
+                check_account_sleep_duration,
             )
-            .await;
-
-        let failed_orderless_txns = wait_for_orderless_txns(
-            self.client(),
-            &account_to_orderless_txns,
-            txn_expiration_ts_secs,
-            check_account_sleep_duration,
-        )
-        .await;
+        );
 
         for account in self.accounts.iter_mut() {
             update_account_seq_num(
@@ -331,6 +365,9 @@ impl SubmissionWorker {
             account_to_orderless_txns,
             failed_orderless_txns,
         );
+
+        // Record Prometheus metrics for commit stats
+        record_commit_stats(num_committed as u64, num_expired as u64);
 
         if num_expired > 0 {
             loop_stats
@@ -356,7 +393,8 @@ impl SubmissionWorker {
                 .fetch_add(num_committed as u64, Ordering::Relaxed);
 
             if !skip_latency_stats {
-                let sum_latency = sum_of_completion_timestamps_millis
+                let sum_latency = sum_of_completion_timestamps_millis_seq_nums
+                    .saturating_add(sum_of_completion_timestamps_millis_orderless)
                     .saturating_sub(avg_txn_offset_time as u128 * num_committed as u128);
                 let avg_latency = (sum_latency / num_committed as u128) as u64;
                 loop_stats
@@ -368,6 +406,9 @@ impl SubmissionWorker {
                 loop_stats
                     .latencies
                     .record_data_point(avg_latency, num_committed as u64);
+
+                // Record Prometheus latency metric (once per committed txn for accurate percentiles)
+                record_latency_ms(avg_latency, num_committed as u64);
             }
         }
     }
@@ -483,12 +524,13 @@ fn count_committed_expired_stats(
     )
 }
 
-pub async fn submit_transactions(
+pub(crate) async fn submit_transactions(
     client: &RestClient,
     txns: &[SignedTransaction],
     loop_start_time: Instant,
     txn_offset_time: Arc<AtomicU64>,
     stats: &StatsAccumulator,
+    rotator: Option<&EncryptionKeyRotator>,
 ) {
     let cur_time = Instant::now();
     let offset = cur_time - loop_start_time;
@@ -496,15 +538,26 @@ pub async fn submit_transactions(
         txns.len() as u64 * offset.as_millis() as u64,
         Ordering::Relaxed,
     );
+    let submitted_count = txns.len() as u64;
     stats
         .submitted
-        .fetch_add(txns.len() as u64, Ordering::Relaxed);
+        .fetch_add(submitted_count, Ordering::Relaxed);
 
     match client.submit_batch_bcs(txns).await {
         Err(e) => {
+            let failed_count = txns.len() as u64;
             stats
                 .failed_submission
-                .fetch_add(txns.len() as u64, Ordering::Relaxed);
+                .fetch_add(failed_count, Ordering::Relaxed);
+            // Record Prometheus metrics
+            record_submission_stats(submitted_count, failed_count);
+            if let Some(rotator) = rotator {
+                if let RestError::Api(ref api_err) = e {
+                    if let Some(ref state) = api_err.state {
+                        rotator.observe_state(state);
+                    }
+                }
+            }
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),
                 warn!(
@@ -515,11 +568,18 @@ pub async fn submit_transactions(
             );
         },
         Ok(v) => {
+            if let Some(rotator) = rotator {
+                rotator.observe_state(v.state());
+            }
             let failures = v.into_inner().transaction_failures;
+            let failed_count = failures.len() as u64;
 
             stats
                 .failed_submission
-                .fetch_add(failures.len() as u64, Ordering::Relaxed);
+                .fetch_add(failed_count, Ordering::Relaxed);
+
+            // Record Prometheus metrics
+            record_submission_stats(submitted_count, failed_count);
 
             let by_error = failures
                 .iter()
@@ -577,5 +637,5 @@ pub async fn submit_transactions(
                 });
             }
         },
-    };
+    }
 }

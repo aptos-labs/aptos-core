@@ -1,0 +1,31 @@
+//# publish
+module 0x22::A
+struct C has drop
+  x: u64
+
+public fun make(): C
+    ld_u64 0
+    pack C
+    ret
+
+
+
+//# publish
+module 0x22::B
+use 0x22::A
+public fun drop()
+    local l0: A::C
+    call A::make
+    st_loc l0
+    call A::make
+    st_loc l0
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::B
+entry public fun main(l0: signer)
+    call B::drop
+    ret

@@ -1,0 +1,12 @@
+//# publish
+module 0x42::M
+struct S<T0> has copy
+  s: T0
+
+fun t(l0: signer): S<signer>
+    local l1: S<signer>
+    move_loc l0
+    pack S<signer>
+    st_loc l1
+    copy_loc l1
+    ret

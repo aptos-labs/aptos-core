@@ -20,7 +20,6 @@ smallvec = { workspace = true }
 triomphe = { workspace = true }
 
 [dev-dependencies]
-move-cli = { workspace = true }
 move-package = { workspace = true }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-unit-test = { workspace = true, features = ["table-extension"] }

@@ -107,6 +107,7 @@ fn configure_logger(level: Option<LevelFilter>) -> Option<Logger> {
             Logger::with(spec)
                 .format(format_record_file)
                 .log_to_file(FileSpec::try_from(fname).expect("file name"))
+                .append()
         } else {
             Logger::with(spec).format(format_record_colored)
         },

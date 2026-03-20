@@ -5,7 +5,7 @@ title: Aptos Automated Gas Calibration
 
 ## Aptos Automated Gas Calibration
 
-The Aptos Automated Gas Calibration is a tool that lets anyone write Move Samples (or also Move IR) to calibrate the gas parameters for Native Functions (and also Move bytecode instructions). 
+The Aptos Automated Gas Calibration is a tool that lets anyone write Move Samples (or also Move assembly) to calibrate the gas parameters for Native Functions (and also Move bytecode instructions).
 
 ### Terminology:
 
@@ -88,7 +88,7 @@ Options:
 
 ## Examples
 
-There are examples of how to write Calibration Functions under `/samples_ir` and `/samples`. There will be more examples in the future as more Users write Move Samples and add it to the calibration set. 
+There are examples of how to write Calibration Functions under `/samples_masm` and `/samples`. There will be more examples in the future as more Users write Move Samples and add it to the calibration set.
 
 Here is an example written in the Move source language:
 ```Move
@@ -133,7 +133,7 @@ In order for the system to find deterministic values for the gas parameters, the
 
 ### How do I write "good" Calibration Functions?
 
-A good Calibration Function should run for many iterations (i.e., see `/samples_ir/ld/ldu8.mvir`). This allows the system to record a good representation of the gas usage. Furthermore, the idea is that we are sampling different data points at different "lengths" to approximate a line of best fit. In the `ldu8.mvir` example, we have the data points at 100, 500, and 1000 iterations. 
+A good Calibration Function should run for many iterations (i.e., see `/samples_masm/ld/ldu8.masm`). This allows the system to record a good representation of the gas usage. Furthermore, the idea is that we are sampling different data points at different "lengths" to approximate a line of best fit. In the `ldu8.masm` example, we have the data points at 100, 500, and 1000 iterations.
 
 ### How are the gas parameters calculated?
 

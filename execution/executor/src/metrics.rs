@@ -436,6 +436,7 @@ pub fn update_counters_for_processed_chunk<T>(
                     Ok(TransactionExecutableRef::Script(_)) => "script",
                     Ok(TransactionExecutableRef::EntryFunction(_)) => "function",
                     Ok(TransactionExecutableRef::Empty) => "empty",
+                    Ok(TransactionExecutableRef::Encrypted) => "encrypted",
                     Err(_) => "deprecated_payload",
                 }
             };

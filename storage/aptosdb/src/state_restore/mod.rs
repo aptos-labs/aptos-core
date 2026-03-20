@@ -46,20 +46,15 @@ pub trait StateValueWriter<K, V>: Send + Sync {
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>>;
 }
 
-#[derive(Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub enum StateSnapshotRestoreMode {
     /// Restore both KV and Tree by default
+    #[default]
     Default,
     /// Only restore the state KV
     KvOnly,
     /// Only restore the state tree
     TreeOnly,
-}
-
-impl Default for StateSnapshotRestoreMode {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl FromStr for StateSnapshotRestoreMode {

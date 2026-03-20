@@ -13,7 +13,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_db_indexer_schemas::schema::{
     event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
 };
-use aptos_schemadb::{batch::SchemaBatch, schema::ValueCodec, DB};
+use aptos_schemadb::{batch::SchemaBatch, schema::ValueCodec, ReadOptions, DB};
 use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
@@ -323,7 +323,11 @@ impl EventStore {
         end: Version,
         db_batch: &mut SchemaBatch,
     ) -> anyhow::Result<()> {
-        let mut iter = self.event_db.iter::<EventAccumulatorSchema>()?;
+        let mut read_opts = ReadOptions::default();
+        read_opts.fill_cache(false);
+        let mut iter = self
+            .event_db
+            .iter_with_opts::<EventAccumulatorSchema>(read_opts)?;
         iter.seek(&(begin, Position::from_inorder_index(0)))?;
         while let Some(((version, position), _)) = iter.next().transpose()? {
             if version >= end {

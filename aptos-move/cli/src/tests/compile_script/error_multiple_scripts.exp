@@ -1,0 +1,4 @@
+BUILDING multi_script
+{
+  "Error": "Move compilation failed: Script function name `main` duplicated in the following files:\n\t`<TEMPDIR>/script_b.move`\nPlease rename script functions to remove duplication"
+}

@@ -8,12 +8,13 @@ use crate::{
     schema::transaction_summaries_by_account::TransactionSummariesByAccountSchema,
     utils::iterators::AccountTransactionSummariesIter,
 };
-use aptos_db_indexer_schemas::{
-    schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema,
-    utils::AccountOrderedTransactionsIter,
-};
+use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
+#[cfg(test)]
+use aptos_db_indexer_schemas::utils::AccountOrderedTransactionsIter;
 use aptos_schemadb::{batch::SchemaBatch, iterator::ScanDirection};
-use aptos_storage_interface::{AptosDbError, Result};
+#[cfg(test)]
+use aptos_storage_interface::AptosDbError;
+use aptos_storage_interface::Result;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ReplayProtector, Transaction, Version},
@@ -33,6 +34,7 @@ impl TransactionStore {
     }
 
     /// Gets the version of a transaction by the sender `address` and `sequence_number`.
+    #[cfg(test)]
     pub fn get_account_ordered_transaction_version(
         &self,
         address: AccountAddress,
@@ -57,6 +59,7 @@ impl TransactionStore {
     /// `version <= ledger_version`.
     /// Guarantees that the returned sequence numbers are sequential, i.e.,
     /// `seq_num_{i} + 1 = seq_num_{i+1}`.
+    #[cfg(test)]
     pub fn get_account_ordered_transactions_iter(
         &self,
         address: AccountAddress,
@@ -91,12 +94,12 @@ impl TransactionStore {
         // Question[Orderless]: When start version is specified, we are current scanning forward from start version.
         // When start version is not specified we are scanning backward, so as to return the most recent transactions.
         // This doesn't seem to be a good design. Should we instead let the API take scan direction as input?
-        if start_version.is_some() {
+        if let Some(sv) = start_version {
             let mut iter = self
                 .ledger_db
                 .transaction_db_raw()
                 .iter::<TransactionSummariesByAccountSchema>()?;
-            iter.seek(&(address, start_version.unwrap()))?;
+            iter.seek(&(address, sv))?;
             Ok(AccountTransactionSummariesIter::new(
                 iter,
                 address,
@@ -106,12 +109,12 @@ impl TransactionStore {
                 ScanDirection::Forward,
                 ledger_version,
             ))
-        } else if end_version.is_some() {
+        } else if let Some(ev) = end_version {
             let mut iter = self
                 .ledger_db
                 .transaction_db_raw()
                 .rev_iter::<TransactionSummariesByAccountSchema>()?;
-            iter.seek_for_prev(&(address, end_version.unwrap()))?;
+            iter.seek_for_prev(&(address, ev))?;
             Ok(AccountTransactionSummariesIter::new(
                 iter,
                 address,

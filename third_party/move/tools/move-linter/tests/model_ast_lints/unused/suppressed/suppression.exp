@@ -1,0 +1,7 @@
+
+Diagnostics:
+warning: unknown attribute
+   ┌─ tests/model_ast_lints/unused/suppressed/suppression.move:53:7
+   │
+53 │     #[persistent]
+   │       ^^^^^^^^^^ Attribute name 'persistent' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"resource_group", "resource_group_member", "view"}'.

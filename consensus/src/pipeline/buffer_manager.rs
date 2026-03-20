@@ -225,6 +225,7 @@ impl BufferManager {
             signing_phase_rx,
 
             reliable_broadcast: ReliableBroadcast::new(
+                "buffer_manager",
                 author,
                 epoch_state.verifier.get_ordered_account_addresses(),
                 commit_msg_tx.clone(),
@@ -397,13 +398,6 @@ impl BufferManager {
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: ordered_blocks.clone(),
         });
-        if let Some(consensus_publisher) = &self.consensus_publisher {
-            let message = ConsensusObserverMessage::new_ordered_block_message(
-                ordered_blocks.clone(),
-                ordered_proof.clone(),
-            );
-            consensus_publisher.publish_message(message);
-        }
         self.execution_schedule_phase_tx
             .send(request)
             .await
@@ -921,7 +915,7 @@ impl BufferManager {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
                 bounded_executor
-                    .spawn(async move {
+                    .spawn_blocking(move || {
                         match commit_msg.req.verify(sender, &epoch_state_clone.verifier) {
                             Ok(_) => {
                                 let _ = tx.unbounded_send(commit_msg);

@@ -12,7 +12,7 @@ Keys point to values, and each key in the map must be unique.
 Currently, one implementation is provided - BPlusTreeMap, backed by a B+Tree,
 with each node being a separate resource, internally containing OrderedMap.
 
-BPlusTreeMap is chosen since the biggest (performance and gast)
+BPlusTreeMap is chosen since the biggest (performance and gas)
 costs are reading resources, and it:
 * reduces number of resource accesses
 * reduces number of rebalancing operations, and makes each rebalancing
@@ -124,6 +124,8 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
 -  [Function `add_at`](#0x1_big_ordered_map_add_at)
 -  [Function `update_key`](#0x1_big_ordered_map_update_key)
 -  [Function `remove_at`](#0x1_big_ordered_map_remove_at)
+-  [Function `remove_at_with_iter_hint`](#0x1_big_ordered_map_remove_at_with_iter_hint)
+-  [Function `process_rebalance_after_child_removal`](#0x1_big_ordered_map_process_rebalance_after_child_removal)
 -  [Specification](#@Specification_1)
     -  [Enum `BigOrderedMap`](#@Specification_1_BigOrderedMap)
     -  [Function `new`](#@Specification_1_new)
@@ -165,7 +167,7 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
     -  [Function `validate_static_size_and_init_max_degrees`](#@Specification_1_validate_static_size_and_init_max_degrees)
     -  [Function `validate_size_and_init_max_degrees`](#@Specification_1_validate_size_and_init_max_degrees)
     -  [Function `add_at`](#@Specification_1_add_at)
-    -  [Function `remove_at`](#@Specification_1_remove_at)
+    -  [Function `remove_at_with_iter_hint`](#@Specification_1_remove_at_with_iter_hint)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -828,7 +830,7 @@ Returns a new BigOrderedMap, configured based on passed key and value serialized
 
     <b>let</b> leaf_max_degree_from_avg = max(<b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / avg_entry_size), <a href="big_ordered_map.md#0x1_big_ordered_map_LEAF_MIN_DEGREE">LEAF_MIN_DEGREE</a> <b>as</b> u64);
     <b>let</b> leaf_max_degree_from_max = <a href="big_ordered_map.md#0x1_big_ordered_map_HINT_MAX_NODE_BYTES">HINT_MAX_NODE_BYTES</a> / max_entry_size;
-    <b>assert</b>!(leaf_max_degree_from_max &gt;= (<a href="big_ordered_map.md#0x1_big_ordered_map_INNER_MIN_DEGREE">INNER_MIN_DEGREE</a> <b>as</b> u64), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>));
+    <b>assert</b>!(leaf_max_degree_from_max &gt;= (<a href="big_ordered_map.md#0x1_big_ordered_map_LEAF_MIN_DEGREE">LEAF_MIN_DEGREE</a> <b>as</b> u64), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>));
 
     <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">new_with_config</a>(
         <b>min</b>(inner_max_degree_from_avg, inner_max_degree_from_max) <b>as</b> u16,
@@ -1132,9 +1134,11 @@ Aborts if there is no entry for <code>key</code>.
 
     <b>assert</b>!(!path_to_leaf.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
 
+    <b>let</b> old_leaf = self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_leaf, key);
+    <b>assert</b>!(old_leaf.is_some(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
     <b>let</b> Child::Leaf {
         value,
-    } = self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_leaf, key);
+    } = old_leaf.destroy_some();
     value
 }
 </code></pre>
@@ -1177,14 +1181,16 @@ Returns none if there is no entry for <code>key</code>.
     };
 
     <b>let</b> path_to_leaf = self.<a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf_path">find_leaf_path</a>(key);
-
     <b>if</b> (path_to_leaf.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
-        <b>let</b> Child::Leaf {
-            value,
-        } = self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_leaf, key);
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(value)
+        <b>let</b> old_leaf = self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_leaf, key);
+        old_leaf.map(|child| {
+            <b>let</b> Child::Leaf {
+                value,
+            } = child;
+            value
+        })
     }
 }
 </code></pre>
@@ -2458,10 +2464,12 @@ Aborts if there is no entry for <code>key</code>.
     };
 
     <b>assert</b>!(!path_to_leaf.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
+    <b>let</b> old_leaf = map.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at_with_iter_hint">remove_at_with_iter_hint</a>(path_to_leaf, &key, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(child_iter));
+    <b>assert</b>!(old_leaf.is_some(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
 
     <b>let</b> Child::Leaf {
         value,
-    } = map.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_leaf, &key);
+    } = old_leaf.destroy_some();
     value
 }
 </code></pre>
@@ -3515,7 +3523,7 @@ Given a path to node (excluding the node itself), which is currently stored unde
 
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;&gt;
 </code></pre>
 
 
@@ -3524,7 +3532,31 @@ Given a path to node (excluding the node itself), which is currently stored unde
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt; {
+<pre><code>inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K): Option&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;&gt; {
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at_with_iter_hint">remove_at_with_iter_hint</a>(path_to_node, key, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_remove_at_with_iter_hint"></a>
+
+## Function `remove_at_with_iter_hint`
+
+
+
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at_with_iter_hint">remove_at_with_iter_hint</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K, iter_hint: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at_with_iter_hint">remove_at_with_iter_hint</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K, iter_hint: Option&lt;<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>&gt;): Option&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;&gt; {
     // Last node in the path is one <b>where</b> we need <b>to</b> remove the child from.
     <b>let</b> node_index = path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_pop_back">pop_back</a>();
     <b>let</b> old_child = {
@@ -3536,7 +3568,22 @@ Given a path to node (excluding the node itself), which is currently stored unde
         <b>let</b> children = &<b>mut</b> node.children;
         <b>let</b> is_leaf = node.is_leaf;
 
-        <b>let</b> old_child = children.<a href="big_ordered_map.md#0x1_big_ordered_map_remove">remove</a>(key);
+        <b>let</b> old_child = <b>if</b> (iter_hint.is_some()) {
+            <b>let</b> iter_hint = iter_hint.destroy_some();
+            <b>if</b> (iter_hint.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(children)) {
+                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+            } <b>else</b> {
+                <b>assert</b>!(iter_hint.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>(children) == key, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(iter_hint.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_remove">iter_remove</a>(children))
+            }
+        } <b>else</b> {
+            children.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_or_none">remove_or_none</a>(key)
+        };
+        <b>if</b> (old_child.is_none()) {
+            // key not found, no need <b>to</b> rebalance
+            <b>return</b> old_child;
+        };
+
         <b>if</b> (node_index == <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>) {
             // If current node is root, lower limit of max_degree/2 nodes doesn't <b>apply</b>.
             // So we can adjust internally
@@ -3591,9 +3638,32 @@ Given a path to node (excluding the node itself), which is currently stored unde
 
         old_child
     };
-
     // Children size is below threshold, we need <b>to</b> rebalance <b>with</b> a neighbor on the same level.
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_process_rebalance_after_child_removal">process_rebalance_after_child_removal</a>(node_index, path_to_node);
+    old_child
+}
+</code></pre>
 
+
+
+</details>
+
+<a id="0x1_big_ordered_map_process_rebalance_after_child_removal"></a>
+
+## Function `process_rebalance_after_child_removal`
+
+
+
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_process_rebalance_after_child_removal">process_rebalance_after_child_removal</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, node_index: u64, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_process_rebalance_after_child_removal">process_rebalance_after_child_removal</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, node_index: u64, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
     // In order <b>to</b> work on multiple nodes at the same time, we cannot borrow_mut, and need <b>to</b> be
     // remove_and_reserve existing node.
     <b>let</b> (node_slot, node) = self.nodes.remove_and_reserve(node_index);
@@ -3650,7 +3720,7 @@ Given a path to node (excluding the node itself), which is currently stored unde
 
         self.nodes.fill_reserved_slot(node_slot, node);
         self.nodes.fill_reserved_slot(sibling_slot, sibling_node);
-        <b>return</b> old_child;
+        <b>return</b>;
     };
 
     // The sibling node doesn't have enough elements <b>to</b> borrow, merge <b>with</b> the sibling node.
@@ -3708,10 +3778,9 @@ Given a path to node (excluding the node itself), which is currently stored unde
     };
 
     <b>assert</b>!(!path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
-    <b>let</b> slot_to_remove = self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_node, &key_to_remove).<a href="big_ordered_map.md#0x1_big_ordered_map_destroy_inner_child">destroy_inner_child</a>();
+    // we can destory_some() here, because inner node should always be present.
+    <b>let</b> slot_to_remove = self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_node, &key_to_remove).destroy_some().<a href="big_ordered_map.md#0x1_big_ordered_map_destroy_inner_child">destroy_inner_child</a>();
     self.nodes.free_reserved_slot(reserved_slot_to_remove, slot_to_remove);
-
-    old_child
 }
 </code></pre>
 
@@ -4570,12 +4639,12 @@ std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
 
 
 
-<a id="@Specification_1_remove_at"></a>
+<a id="@Specification_1_remove_at_with_iter_hint"></a>
 
-### Function `remove_at`
+### Function `remove_at_with_iter_hint`
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at_with_iter_hint">remove_at_with_iter_hint</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K, iter_hint: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;&gt;
 </code></pre>
 
 

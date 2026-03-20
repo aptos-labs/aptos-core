@@ -521,6 +521,9 @@ pub enum Bind_ {
     // T<t1, ... , tn>(e1, ..., en)
     // where each e_i is an expression or a ".."
     PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotDot>),
+    // Literal value pattern (for primitive pattern matching)
+    // true, false, 0, 1, byte strings, etc.
+    Literal(Value),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
@@ -651,6 +654,8 @@ pub enum BehaviorKind {
     EnsuresOf,
     /// `modifies_of<f>(x)` - the modify clauses of function `f`
     ModifiesOf,
+    /// `result_of<f>(x)` - deterministic result selector based on `ensures_of`
+    ResultOf,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -757,6 +762,20 @@ pub enum Exp_ {
         Option<Vec<Type>>, // optional type instantiation
         Spanned<Vec<Exp>>, // arguments
         Option<Label>,     // post-state label
+    ), // spec only
+    // Labeled resource access in specifications:
+    // label@global<R>(addr) or label@exists<R>(addr)
+    LabeledCall(
+        Label,             // memory state label
+        NameAccessChain,   // "global" or "exists"
+        Option<Vec<Type>>, // type arguments
+        Spanned<Vec<Exp>>, // call arguments
+    ), // spec only
+    // label@R[addr] — labeled resource index access
+    LabeledIndex(
+        Label,    // memory state label
+        Box<Exp>, // target (resource name expression)
+        Box<Exp>, // index (address expression)
     ), // spec only
     // (e1, ..., en)
     ExpList(Vec<Exp>),
@@ -2105,6 +2124,7 @@ impl AstDebug for Exp_ {
                     BehaviorKind::AbortsOf => "aborts_of",
                     BehaviorKind::EnsuresOf => "ensures_of",
                     BehaviorKind::ModifiesOf => "modifies_of",
+                    BehaviorKind::ResultOf => "result_of",
                 };
                 w.write(kind_str);
                 w.write("<");
@@ -2120,6 +2140,25 @@ impl AstDebug for Exp_ {
                 if let Some(label) = post_label {
                     w.write(format!("@{}", label.value().as_str()));
                 }
+            },
+            E::LabeledCall(label, name, type_args, sp!(_, args)) => {
+                w.write(format!("{}@", label.value().as_str()));
+                name.ast_debug(w);
+                if let Some(tys) = type_args {
+                    w.write("<");
+                    w.comma(tys, |w, ty| ty.ast_debug(w));
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(args, |w, e| e.ast_debug(w));
+                w.write(")");
+            },
+            E::LabeledIndex(label, target, index) => {
+                w.write(format!("{}@", label.value().as_str()));
+                target.ast_debug(w);
+                w.write("[");
+                index.ast_debug(w);
+                w.write("]");
             },
             E::UnresolvedError => w.write("_|_"),
         }
@@ -2257,6 +2296,9 @@ impl AstDebug for Bind_ {
                 w.write("(");
                 w.comma(args, |w, b| b.ast_debug(w));
                 w.write(")");
+            },
+            B::Literal(val) => {
+                val.value.ast_debug(w);
             },
         }
     }

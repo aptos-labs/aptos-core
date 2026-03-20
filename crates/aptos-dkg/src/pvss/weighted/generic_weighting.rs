@@ -7,14 +7,13 @@
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
     traits::{
-        transcript::{AggregatableTranscript, MalleableTranscript},
-        Transcript,
+        transcript::{Aggregatable, AggregatableTranscript, Aggregated, MalleableTranscript},
+        Transcript, TranscriptCore,
     },
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
-use crate::traits::transcript::Aggregatable;
 use aptos_crypto::{
-    traits::SecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
+    traits::TSecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
     ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -66,7 +65,7 @@ impl<T: Transcript> GenericWeighting<T> {
     }
 }
 
-impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
+impl<T: Transcript + TranscriptCore<SecretSharingConfig = ThresholdConfigBlstrs>> TranscriptCore
     for GenericWeighting<T>
 {
     type DealtPubKey = T::DealtPubKey;
@@ -77,10 +76,67 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
     type DealtSecretKeyShare = Vec<T::DealtSecretKeyShare>;
     type DecryptPrivKey = T::DecryptPrivKey;
     type EncryptPubKey = T::EncryptPubKey;
-    type InputSecret = T::InputSecret;
     type PublicParameters = T::PublicParameters;
     type SecretSharingConfig = WeightedConfigBlstrs;
-    // Can probably change this to T::SecretSharingConfig, after editing Reconstructable... but not worth the effort atm
+
+    fn get_public_key_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        let weight = sc.get_player_weight(player);
+
+        let mut dpk_share = Vec::with_capacity(weight);
+
+        for i in 0..weight {
+            let virtual_player = sc.get_virtual_player(player, i);
+            dpk_share.push(T::get_public_key_share(
+                &self.trx,
+                sc.get_threshold_config(),
+                &virtual_player,
+            ));
+        }
+
+        dpk_share
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        T::get_dealt_public_key(&self.trx)
+    }
+
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        let weight = sc.get_player_weight(player);
+
+        let mut weighted_dsk_share = Vec::with_capacity(weight);
+        let mut weighted_dpk_share = Vec::with_capacity(weight);
+
+        for i in 0..weight {
+            let virtual_player = sc.get_virtual_player(player, i);
+            let (dsk_share, dpk_share) = T::decrypt_own_share(
+                &self.trx,
+                sc.get_threshold_config(),
+                &virtual_player,
+                dk,
+                pp,
+            );
+            weighted_dsk_share.push(dsk_share);
+            weighted_dpk_share.push(dpk_share);
+        }
+
+        (weighted_dsk_share, weighted_dpk_share)
+    }
+}
+
+impl<T: Transcript + TranscriptCore<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
+    for GenericWeighting<T>
+{
+    type InputSecret = T::InputSecret;
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
 
@@ -127,61 +183,6 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         T::get_dealers(&self.trx)
     }
 
-    fn get_public_key_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        let weight = sc.get_player_weight(player);
-
-        let mut dpk_share = Vec::with_capacity(weight);
-
-        for i in 0..weight {
-            // println!("Decrypting share {i} for player {player} with DK {:?}", dk);
-            let virtual_player = sc.get_virtual_player(player, i);
-            dpk_share.push(T::get_public_key_share(
-                &self.trx,
-                sc.get_threshold_config(),
-                &virtual_player,
-            ));
-        }
-
-        dpk_share
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        T::get_dealt_public_key(&self.trx)
-    }
-
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let weight = sc.get_player_weight(player);
-
-        let mut weighted_dsk_share = Vec::with_capacity(weight);
-        let mut weighted_dpk_share = Vec::with_capacity(weight);
-
-        for i in 0..weight {
-            // println!("Decrypting share {i} for player {player} with DK {:?}", dk);
-            let virtual_player = sc.get_virtual_player(player, i);
-            let (dsk_share, dpk_share) = T::decrypt_own_share(
-                &self.trx,
-                sc.get_threshold_config(),
-                &virtual_player,
-                dk,
-                pp,
-            );
-            weighted_dsk_share.push(dsk_share);
-            weighted_dpk_share.push(dpk_share);
-        }
-
-        (weighted_dsk_share, weighted_dpk_share)
-    }
-
     fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
     where
         R: RngCore + CryptoRng,
@@ -199,7 +200,7 @@ where
 {
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &<Self as Transcript>::SecretSharingConfig,
+        sc: &<Self as TranscriptCore>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spk: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
@@ -222,22 +223,50 @@ impl<T> Aggregatable for GenericWeighting<T>
 where
     T: AggregatableTranscript
         + Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>
-        + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
+        + Transcript
+        + TranscriptCore<SecretSharingConfig = ThresholdConfigBlstrs>,
+    T::Aggregated: Aggregated<T>,
 {
+    type Aggregated = GenericWeighting<T::Aggregated>;
     type SecretSharingConfig = WeightedConfig<ThresholdConfigBlstrs>;
 
-    fn aggregate_with(
-        &mut self,
-        sc: &WeightedConfig<ThresholdConfigBlstrs>,
-        other: &Self,
-    ) -> anyhow::Result<()> {
-        T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)?;
-        Ok(())
+    fn to_aggregated(&self) -> Self::Aggregated {
+        GenericWeighting {
+            trx: self.trx.to_aggregated(),
+        }
     }
 }
 
-impl<T: MalleableTranscript<SecretSharingConfig = ThresholdConfigBlstrs>> MalleableTranscript
-    for GenericWeighting<T>
+impl<T> Aggregated<GenericWeighting<T>> for GenericWeighting<T::Aggregated>
+where
+    T: AggregatableTranscript
+        + Aggregatable<SecretSharingConfig = ThresholdConfigBlstrs>
+        + Transcript
+        + TranscriptCore<SecretSharingConfig = ThresholdConfigBlstrs>,
+    T::Aggregated: Aggregated<T>,
+{
+    fn aggregate_with(
+        &mut self,
+        sc: &WeightedConfig<ThresholdConfigBlstrs>,
+        other: &GenericWeighting<T>,
+    ) -> anyhow::Result<()> {
+        // self.trx is T::Aggregated, other.trx is T
+        // Aggregate other.trx into self.trx
+        self.trx
+            .aggregate_with(sc.get_threshold_config(), &other.trx)?;
+        Ok(())
+    }
+
+    fn normalize(self) -> GenericWeighting<T> {
+        // Convert T::Aggregated back to T
+        GenericWeighting {
+            trx: self.trx.normalize(),
+        }
+    }
+}
+
+impl<T: MalleableTranscript + TranscriptCore<SecretSharingConfig = ThresholdConfigBlstrs>>
+    MalleableTranscript for GenericWeighting<T>
 {
     fn maul_signature<A: Serialize + Clone>(
         &mut self,

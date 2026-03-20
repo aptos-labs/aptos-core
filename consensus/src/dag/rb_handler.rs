@@ -24,7 +24,10 @@ use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig},
+    on_chain_config::{
+        OnChainChunkyDKGConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        ValidatorTxnConfig,
+    },
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
 };
@@ -48,6 +51,7 @@ pub(crate) struct NodeBroadcastHandler {
     vtxn_config: ValidatorTxnConfig,
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
+    chunky_dkg_config: OnChainChunkyDKGConfig,
     health_backoff: HealthBackoff,
 }
 
@@ -81,6 +85,7 @@ impl NodeBroadcastHandler {
             vtxn_config,
             randomness_config,
             jwk_consensus_config,
+            chunky_dkg_config: OnChainChunkyDKGConfig::Off,
             health_backoff,
         }
     }
@@ -122,7 +127,12 @@ impl NodeBroadcastHandler {
         for vtxn in node.validator_txns() {
             let vtxn_type_name = vtxn.type_name();
             ensure!(
-                is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
+                is_vtxn_expected(
+                    &self.randomness_config,
+                    &self.jwk_consensus_config,
+                    &self.chunky_dkg_config,
+                    vtxn
+                ),
                 "unexpected validator transaction: {:?}",
                 vtxn_type_name
             );

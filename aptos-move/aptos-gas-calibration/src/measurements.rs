@@ -4,8 +4,8 @@ use crate::measurements_helpers::{get_dir_paths, list_entrypoints, record_gas_us
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas_algebra::DynamicExpression;
 use aptos_language_e2e_tests::executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType};
+use move_asm::assembler;
 use move_binary_format::CompiledModule;
-use move_ir_compiler::Compiler;
 use std::{
     fs::{read_dir, read_to_string},
     path::PathBuf,
@@ -18,7 +18,7 @@ pub struct GasMeasurements {
     pub equation_names: Vec<String>,
 }
 
-/// Compile and run both samples and samples_ir directories
+/// Compile and run both samples and samples_masm directories
 pub fn compile_and_run(iterations: u64, pattern: &String) -> GasMeasurements {
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
@@ -30,7 +30,7 @@ pub fn compile_and_run(iterations: u64, pattern: &String) -> GasMeasurements {
     };
 
     compile_and_run_samples(iterations, pattern, &mut gas_measurement, &mut executor);
-    compile_and_run_samples_ir(iterations, pattern, &mut gas_measurement, &mut executor);
+    compile_and_run_samples_asm(iterations, pattern, &mut gas_measurement, &mut executor);
 
     gas_measurement
 }
@@ -104,16 +104,16 @@ fn compile_and_run_samples(
     }
 }
 
-/// Compile every MVIR and run each sample with two different measuring methods.
+/// Compile every MASM and run each sample with two different measuring methods.
 /// The first is with the Regular Gas Meter (used in production) to record the running time.
 /// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
-fn compile_and_run_samples_ir(
+fn compile_and_run_samples_asm(
     iterations: u64,
     pattern: &String,
     gas_measurement: &mut GasMeasurements,
     executor: &mut FakeExecutor,
 ) {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples_ir");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples_masm");
 
     // Walk through all subdirectories and files in the root directory
     for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
@@ -121,10 +121,10 @@ fn compile_and_run_samples_ir(
 
         // Check if the entry is a file
         if path_entry.is_file() {
-            // ignore all non .mvir files
+            // ignore all non .masm files
             if let Some(file_ext) = path_entry.extension() {
                 if let Some(ext) = file_ext.to_str() {
-                    if ext != "mvir" {
+                    if ext != "masm" {
                         continue;
                     }
                 }
@@ -133,11 +133,21 @@ fn compile_and_run_samples_ir(
             if let Some(file_name) = path_entry.file_name() {
                 // Convert the file_name to a string slice
                 if let Some(_file_name_str) = file_name.to_str() {
-                    // compile module
+                    // assemble module
                     let code = read_to_string(path_entry).expect("Failed to read file contents");
-                    let module = Compiler::new(vec![])
-                        .into_compiled_module(&code)
-                        .expect("should compile mvir");
+                    let options = assembler::Options::default();
+                    let result = assembler::assemble(&options, &code, std::iter::empty())
+                        .unwrap_or_else(|diags| {
+                            panic!(
+                                "should assemble masm: {}",
+                                assembler::diag_to_string(
+                                    &path_entry.display().to_string(),
+                                    &code,
+                                    diags
+                                )
+                            )
+                        });
+                    let module = result.left().expect("expected module, got script");
 
                     // get relevant module metadata
                     let module_id = module.self_id();

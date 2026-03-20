@@ -11,7 +11,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 1i8 + 127i8;
+        let _v0 = 1i8 + MAX_I8;
     }
 }
 
@@ -19,7 +19,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -1i8 + -128i8;
+        let _v0 = -1i8 + MIN_I8;
     }
 }
 
@@ -35,7 +35,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -2i8 - 127i8;
+        let _v0 = -2i8 - MAX_I8;
     }
 }
 
@@ -115,7 +115,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -128i8 / -1i8;
+        let _v0 = MIN_I8 / -1i8;
     }
 }
 
@@ -155,7 +155,7 @@ module 0xff::negate_i8 {
         assert!(_v0 == _v1, 14566554180833181696);
     }
     public fun test2() {
-        let _v0 = negate(-128i8);
+        let _v0 = negate(MIN_I8);
     }
 }
 

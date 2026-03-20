@@ -19,6 +19,7 @@ aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-move-cli = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-interface = { workspace = true }
@@ -26,6 +27,7 @@ aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
+async-trait = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }

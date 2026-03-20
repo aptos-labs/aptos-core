@@ -1,0 +1,9 @@
+//# publish
+module 0x1::M
+fun f<T0, T1>()
+    call g<T1, T0>
+    ret
+
+fun g<T0, T1>()
+    call f<T0, T1>
+    ret

@@ -13,24 +13,18 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:22: simple_incorrect (spec)
    =         `TRACE(choose x: u64 where x >= 4 && x <= 5)` = <redacted>
 
-error: post-condition does not hold
-   ┌─ tests/sources/functional/choice.move:56:9
+error: choice expression requires a witness to exist
+   ┌─ tests/sources/functional/choice.move:55:9
    │
-56 │         ensures choice == signer::address_of(s2);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+55 │         let choice = choose a: address where exists<R>(a) && global<R>(a).x == 2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/choice.move:46: populate_R
    =     at tests/sources/functional/choice.move:51: populate_R (spec)
    =     at tests/sources/functional/choice.move:52: populate_R (spec)
    =     at tests/sources/functional/choice.move:55: populate_R (spec)
    =     at tests/sources/functional/choice.move:54: populate_R (spec)
-   =     at tests/sources/functional/choice.move:46: populate_R
-   =         s1 = <redacted>
-   =         s2 = <redacted>
-   =     at tests/sources/functional/choice.move:47: populate_R
-   =     at tests/sources/functional/choice.move:48: populate_R
-   =     at tests/sources/functional/choice.move:49: populate_R
-   =     at tests/sources/functional/choice.move:56: populate_R (spec)
+   =     at tests/sources/functional/choice.move:55: populate_R (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/choice.move:87:9

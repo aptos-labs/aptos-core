@@ -32,9 +32,17 @@ impl AptosVM {
                 session_id,
                 jwk_update,
             ),
+            ValidatorTransaction::ChunkyDKGResult(dkg_output) => self.process_chunky_dkg_result(
+                resolver,
+                module_storage,
+                log_context,
+                session_id,
+                dkg_output,
+            ),
         }
     }
 }
 
+mod chunky_dkg;
 mod dkg;
 mod jwk;

@@ -10,6 +10,7 @@ edition = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 codespan = { workspace = true }
 codespan-reporting = { workspace = true }
 futures = { workspace = true }

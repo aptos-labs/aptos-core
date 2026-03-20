@@ -4,6 +4,10 @@
 use crate::{
     block_preparer::BlockPreparer,
     block_storage::tracing::{observe_block, BlockStage},
+    consensus_observer::{
+        network::observer_message::ConsensusObserverMessage,
+        publisher::consensus_publisher::ConsensusPublisher,
+    },
     counters::{self, update_counters_for_block, update_counters_for_compute_result},
     monitor,
     network::NetworkSender,
@@ -116,11 +120,25 @@ impl PreCommitStatus {
 /// Each phase is represented as a shared future, takes in other futures as pre-condition.
 /// Future returns a TaskResult<T>, which error can be either a user error or task error (e.g. cancellation).
 ///
-/// Currently, the critical path is the following, more details can be found in the comments of each phase.
-/// prepare -> execute -> ledger update -> pre-commit -> commit ledger
-///    rand ->
-///                         order proof ->
-///                                      commit proof ->
+/// Currently, the pipeline phases and their dependencies are:
+///
+///   External inputs (via PipelineInputTx channels):
+///     qc, rand, order_vote, order_proof, commit_proof, secret_shared_key
+///
+///   Critical path:
+///     qc -> materialize -> decrypt -> prepare -> has_rand_txns -> rand_check -> execute -> ledger_update -> pre_commit -> commit_ledger
+///
+///   Side/parallel paths:
+///     decrypt + secret_shared_key       -> (internal: produces secret_sharing_derive_self)
+///     has_rand_txns + rand              -> rand_check
+///     parent observer_publish + decrypt + order_proof -> observer_publish
+///     prepare + ledger_update           -> post_ledger_update
+///     ledger_update + order_vote + order_proof + commit_proof -> commit_vote
+///     ledger_update + order_proof                             -> pre_commit
+///     pre_commit + commit_proof                               -> commit_ledger
+///     pre_commit + commit_ledger                              -> notify_state_sync
+///     pre_commit + order_proof + commit_ledger + notify_state_sync -> post_commit
+///
 #[derive(Clone)]
 pub struct PipelineBuilder {
     block_preparer: Arc<BlockPreparer>,
@@ -128,6 +146,7 @@ pub struct PipelineBuilder {
     validators: Arc<[AccountAddress]>,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     is_randomness_enabled: bool,
+    is_decryption_enabled: bool,
     signer: Arc<ValidatorSigner>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     payload_manager: Arc<dyn TPayloadManager>,
@@ -139,6 +158,8 @@ pub struct PipelineBuilder {
     module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
     network_sender: Arc<NetworkSender>,
     secret_share_config: Option<SecretShareConfig>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    enable_v2_observer_messages: bool,
 }
 
 fn spawn_shared_fut<
@@ -248,12 +269,14 @@ impl Drop for Tracker {
 }
 
 impl PipelineBuilder {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         block_preparer: Arc<BlockPreparer>,
         executor: Arc<dyn BlockExecutorTrait>,
         validators: Arc<[AccountAddress]>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         is_randomness_enabled: bool,
+        is_decryption_enabled: bool,
         signer: Arc<ValidatorSigner>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -263,6 +286,8 @@ impl PipelineBuilder {
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
         secret_share_config: Option<SecretShareConfig>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        enable_v2_observer_messages: bool,
     ) -> Self {
         let module_cache = Arc::new(Mutex::new(None));
         Self {
@@ -271,6 +296,7 @@ impl PipelineBuilder {
             validators,
             block_executor_onchain_config,
             is_randomness_enabled,
+            is_decryption_enabled,
             signer,
             state_sync_notifier,
             payload_manager,
@@ -282,11 +308,19 @@ impl PipelineBuilder {
             module_cache,
             network_sender,
             secret_share_config,
+            consensus_publisher,
+            enable_v2_observer_messages,
         }
     }
 
     pub fn pre_commit_status(&self) -> Arc<Mutex<PreCommitStatus>> {
         self.pre_commit_status.clone()
+    }
+
+    /// Drops the cached module view and releases the state view inside it. Must be called when the
+    /// pipeline is being torn down.
+    pub fn clear_module_cache(&self) {
+        *self.module_cache.lock() = None;
     }
 
     fn channel(abort_handles: &mut Vec<AbortHandle>) -> (PipelineInputTx, PipelineInputRx) {
@@ -317,7 +351,7 @@ impl PipelineBuilder {
                 qc_tx: Some(qc_tx),
                 rand_tx: Some(rand_tx),
                 order_vote_tx: Some(order_vote_tx),
-                order_proof_tx: Some(order_proof_tx),
+                ordered_blocks_and_proof_fut: Some(order_proof_tx),
                 commit_proof_tx: Some(commit_proof_tx),
                 secret_shared_key_tx: Some(secret_shared_key_tx),
             },
@@ -325,7 +359,7 @@ impl PipelineBuilder {
                 qc_rx,
                 rand_rx,
                 order_vote_rx,
-                order_proof_fut,
+                ordered_blocks_and_proof_fut: order_proof_fut,
                 commit_proof_fut,
                 secret_shared_key_rx,
             },
@@ -337,11 +371,19 @@ impl PipelineBuilder {
         compute_result: StateComputeResult,
         commit_proof: LedgerInfoWithSignatures,
     ) -> PipelineFutures {
-        let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None));
+        let decryption_fut = spawn_ready_fut(DecryptionResult {
+            decrypted_txns: Vec::new(),
+            regular_txns: Vec::new(),
+            max_txns_from_block_to_execute: None,
+            block_gas_limit: None,
+            decryption_key: None,
+        });
+        let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None, None));
         let rand_check_fut = spawn_ready_fut((None, false));
         let execute_fut = spawn_ready_fut(Duration::from_millis(0));
         let ledger_update_fut =
             spawn_ready_fut((compute_result.clone(), Duration::from_millis(0), None));
+        let observer_publish_fut = spawn_ready_fut(());
         let commit_vote_fut = spawn_ready_fut(CommitVote::new_with_signature(
             self.signer.author(),
             commit_proof.ledger_info().clone(),
@@ -355,11 +397,15 @@ impl PipelineBuilder {
         let notify_state_sync_fut = spawn_ready_fut(());
         let post_commit_fut = spawn_ready_fut(());
         let secret_sharing_derive_self_fut = spawn_ready_fut(None);
+        let has_rand_txns_fut = spawn_ready_fut(false);
         PipelineFutures {
+            decryption_fut,
             prepare_fut,
+            has_rand_txns_fut,
             rand_check_fut,
             execute_fut,
             ledger_update_fut,
+            observer_publish_fut,
             post_ledger_update_fut,
             commit_vote_fut,
             pre_commit_fut,
@@ -418,6 +464,7 @@ impl PipelineBuilder {
             Arc::new(pipelined_block.block().clone()),
             block_store_callback,
             observer_enabled,
+            pipelined_block,
         );
         pipelined_block.set_pipeline_futs(futs);
         pipelined_block.set_pipeline_tx(tx);
@@ -432,6 +479,7 @@ impl PipelineBuilder {
             dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
         >,
         observer_enabled: bool,
+        pipelined_block: &PipelinedBlock,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
         let (tx, rx) = Self::channel(&mut abort_handles);
@@ -439,7 +487,7 @@ impl PipelineBuilder {
             qc_rx,
             rand_rx,
             order_vote_rx,
-            order_proof_fut,
+            ordered_blocks_and_proof_fut: order_proof_fut,
             commit_proof_fut,
             secret_shared_key_rx,
         } = rx;
@@ -449,7 +497,7 @@ impl PipelineBuilder {
             async move {
                 derived_self_key_share_rx
                     .await
-                    .map_err(|_| TaskError::from(anyhow!("commit proof tx cancelled")))
+                    .map_err(|_| TaskError::from(anyhow!("derived self key share tx cancelled")))
             },
             Some(&mut abort_handles),
         );
@@ -463,21 +511,27 @@ impl PipelineBuilder {
                 materialize_fut,
                 block.clone(),
                 self.signer.author(),
+                self.is_decryption_enabled,
                 self.secret_share_config.clone(),
                 derived_self_key_share_tx,
                 secret_shared_key_rx,
+                observer_enabled,
+                pipelined_block.decrypted_txns(),
             ),
             Some(&mut abort_handles),
         );
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(decryption_fut, self.block_preparer.clone(), block.clone()),
+            Self::prepare(
+                decryption_fut.clone(),
+                self.block_preparer.clone(),
+                block.clone(),
+            ),
             Some(&mut abort_handles),
         );
-        let rand_check_fut = spawn_shared_fut(
-            Self::rand_check(
+        let has_rand_txns_fut = spawn_shared_fut(
+            Self::rand_txns_check(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
-                rand_rx,
                 self.executor.clone(),
                 block.clone(),
                 self.is_randomness_enabled,
@@ -486,6 +540,14 @@ impl PipelineBuilder {
             ),
             Some(&mut abort_handles),
         );
+        let rand_check_fut = if self.is_randomness_enabled {
+            spawn_shared_fut(
+                Self::wait_for_rand(has_rand_txns_fut.clone(), rand_rx, block.clone()),
+                Some(&mut abort_handles),
+            )
+        } else {
+            spawn_ready_fut((None, false))
+        };
         let execute_fut = spawn_shared_fut(
             Self::execute(
                 prepare_fut.clone(),
@@ -499,6 +561,23 @@ impl PipelineBuilder {
             ),
             None,
         );
+        let observer_publish_fut = if self.consensus_publisher.is_some() {
+            spawn_shared_fut(
+                Self::observer_publish(
+                    parent.observer_publish_fut.clone(),
+                    decryption_fut.clone(),
+                    order_proof_fut.clone(),
+                    rand_check_fut.clone(),
+                    block.clone(),
+                    observer_enabled,
+                    self.consensus_publisher.clone(),
+                    self.enable_v2_observer_messages,
+                ),
+                None,
+            )
+        } else {
+            spawn_ready_fut(())
+        };
         let ledger_update_fut = spawn_shared_fut(
             Self::ledger_update(
                 rand_check_fut.clone(),
@@ -589,9 +668,12 @@ impl PipelineBuilder {
         );
 
         let all_fut = PipelineFutures {
+            decryption_fut,
             prepare_fut,
+            has_rand_txns_fut,
             rand_check_fut,
             execute_fut,
+            observer_publish_fut,
             ledger_update_fut,
             post_ledger_update_fut,
             commit_vote_fut,
@@ -653,7 +735,15 @@ impl PipelineBuilder {
         block: Arc<Block>,
     ) -> TaskResult<PrepareResult> {
         let mut tracker = Tracker::start_waiting("prepare", &block);
-        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = decryption_fut.await?;
+        let DecryptionResult {
+            decrypted_txns,
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key,
+        } = decryption_fut.await?;
+        // TODO(ibalajiarun): make sure decrypted_txns are in front of regular_txns
+        let input_txns = [decrypted_txns, regular_txns].concat();
 
         tracker.start_working();
 
@@ -677,35 +767,39 @@ impl PipelineBuilder {
         });
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
             .observe_duration(sig_verification_start.elapsed());
-        Ok((Arc::new(sig_verified_txns), block_gas_limit))
+        Ok((Arc::new(sig_verified_txns), block_gas_limit, decryption_key))
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's execution phase finishes
-    /// What it does: decides if the block requires a randomness seed and return the value
-    async fn rand_check(
+    /// What it does: scans block transactions to determine if any require randomness
+    async fn rand_txns_check(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
-        rand_rx: oneshot::Receiver<Option<Randomness>>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
         is_randomness_enabled: bool,
         rand_check_enabled: bool,
         module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
-    ) -> TaskResult<RandResult> {
+    ) -> TaskResult<bool> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
         parent_block_execute_fut.await?;
-        let (user_txns, _) = prepare_fut.await?;
+        let (user_txns, _, _) = prepare_fut.await?;
 
         tracker.start_working();
         if !is_randomness_enabled {
-            return Ok((None, false));
+            return Ok(false);
+        }
+        // When rand_check is disabled (e.g. rolling deployment), report all blocks as
+        // needing randomness so aggregation always runs and produces real randomness.
+        if !rand_check_enabled {
+            return Ok(true);
         }
         let grand_parent_id = block.quorum_cert().parent_block().id();
         let parent_state_view = executor
             .state_view(block.parent_id())
             .map_err(anyhow::Error::from)?;
 
-        let mut has_randomness = false;
+        let mut need_randomness = false;
         // scope to drop the lock, compiler seems not able to figure out manual drop with async point
         {
             let mut cache_guard = module_cache.lock();
@@ -746,7 +840,7 @@ impl PipelineBuilder {
                             )
                             .is_some()
                             {
-                                has_randomness = true;
+                                need_randomness = true;
                                 break;
                             }
                         }
@@ -754,13 +848,13 @@ impl PipelineBuilder {
                 }
             }
         }
-        let label = if has_randomness {
+        let label = if need_randomness {
             "has_rand"
         } else {
             "no_rand"
         };
         counters::RAND_BLOCK.with_label_values(&[label]).inc();
-        if has_randomness {
+        if need_randomness {
             info!(
                 "[Pipeline] Block {} {} {} has randomness txn",
                 block.id(),
@@ -768,18 +862,27 @@ impl PipelineBuilder {
                 block.round()
             );
         }
-        drop(tracker);
-        // if rand check is enabled and no txn requires randomness, we skip waiting for randomness
+        Ok(need_randomness)
+    }
+
+    /// Precondition: rand_txns_check finishes
+    /// What it does: waits for randomness if the block requires it
+    async fn wait_for_rand(
+        has_rand_txns_fut: TaskFuture<bool>,
+        rand_rx: oneshot::Receiver<Option<Randomness>>,
+        block: Arc<Block>,
+    ) -> TaskResult<RandResult> {
+        let need_randomness = has_rand_txns_fut.await?;
         let mut tracker = Tracker::start_waiting("rand_gen", &block);
         tracker.start_working();
-        let maybe_rand = if rand_check_enabled && !has_randomness {
+        let maybe_rand = if !need_randomness {
             None
         } else {
             rand_rx
                 .await
                 .map_err(|_| anyhow!("randomness tx cancelled"))?
         };
-        Ok((Some(maybe_rand), has_randomness))
+        Ok((Some(maybe_rand), need_randomness))
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available
@@ -796,18 +899,25 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
-        let (user_txns, block_gas_limit) = prepare_fut.await?;
+        let (user_txns, block_gas_limit, decryption_result) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
-        let (rand_result, _has_randomness) = rand_check.await?;
+        let (rand_result, _need_randomness) = rand_check.await?;
 
         tracker.start_working();
-        // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
-        let metadata_txn = if let Some(maybe_rand) = rand_result {
-            block.new_metadata_with_randomness(&validator, maybe_rand)
-        } else {
-            block.new_block_metadata(&validator).into()
+        let metadata_txn = match (rand_result, decryption_result) {
+            (Some(maybe_rand), Some(maybe_dec_key)) => {
+                block.new_metadata_with_rand_and_dec_key(&validator, maybe_rand, maybe_dec_key)
+            },
+            (Some(maybe_rand), None) => block.new_metadata_with_randomness(&validator, maybe_rand),
+            (None, Some(_decryption_key)) => {
+                Err(anyhow!("Disabling only randomness is not supported yet"))?
+            },
+            (None, None) => {
+                // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
+                block.new_block_metadata(&validator).into()
+            },
         };
         let txns = [
             vec![SignatureVerifiedTransaction::from(Transaction::from(
@@ -868,6 +978,58 @@ impl PipelineBuilder {
         Ok(start.elapsed())
     }
 
+    async fn observer_publish(
+        parent_observer_publish_fut: TaskFuture<()>,
+        decryption_fut: TaskFuture<DecryptionResult>,
+        order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
+        rand_check: TaskFuture<RandResult>,
+        block: Arc<Block>,
+        observer_enabled: bool,
+        publisher: Option<Arc<ConsensusPublisher>>,
+        enable_v2_observer_messages: bool,
+    ) -> TaskResult<()> {
+        let mut tracker = Tracker::start_waiting("observer_publish", &block);
+        parent_observer_publish_fut.await?;
+        let DecryptionResult { decrypted_txns, .. } = decryption_fut.await?;
+        let (ordered_blocks, order_proof) = order_proof_fut.await?;
+        rand_check.await?;
+
+        tracker.start_working();
+
+        if ordered_blocks
+            .iter()
+            .find(|ordered_block| ordered_block.id() == block.id())
+            .map(|block| {
+                if !observer_enabled {
+                    block.set_decrypted_txns(decrypted_txns);
+                }
+            })
+            .is_none()
+        {
+            return Err(TaskError::InternalError(Arc::new(anyhow!(
+                "Could not find the block {} in the ordered blocks, {:?}",
+                block.id(),
+                ordered_blocks
+                    .iter()
+                    .map(|block| block.id())
+                    .collect::<Vec<_>>()
+            ))));
+        }
+        if let Some(publisher) = publisher
+            && let Some(last_block) = ordered_blocks.last()
+            && last_block.id() == block.id()
+        {
+            // Only send if this block is the last block in the blocks
+            let message = ConsensusObserverMessage::new_ordered_block_message(
+                ordered_blocks,
+                order_proof.ledger_info().clone(),
+                enable_v2_observer_messages,
+            );
+            publisher.publish_message(message);
+        }
+        Ok(())
+    }
+
     /// Precondition: 1. execute finishes, 2. parent block's phase finishes
     /// What it does: Generate state compute result from the execution, it's split from execution for more parallelism
     /// It carries block timestamp from epoch-ending block to all suffix block
@@ -900,13 +1062,13 @@ impl PipelineBuilder {
                 prev_epoch_end_timestamp
             };
         // check for randomness consistency
-        let (_, has_randomness) = rand_check.await?;
-        if !has_randomness {
+        let (_, need_randomness) = rand_check.await?;
+        if !need_randomness {
             let mut label = "consistent";
             for event in result.execution_output.subscribable_events.get(None) {
                 if event.type_tag() == RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG.deref() {
                     error!(
-                            "[Pipeline] Block {} {} {} generated randomness event without has_randomness being true!",
+                            "[Pipeline] Block {} {} {} generated randomness event without need_randomness being true!",
                             block.id(),
                             block.epoch(),
                             block.round()
@@ -930,7 +1092,7 @@ impl PipelineBuilder {
         block: Arc<Block>,
     ) -> TaskResult<PostLedgerUpdateResult> {
         let mut tracker = Tracker::start_waiting("post_ledger_update", &block);
-        let (user_txns, _) = prepare_fut.await?;
+        let (user_txns, _, _) = prepare_fut.await?;
         let (compute_result, _, _) = ledger_update_fut.await?;
 
         tracker.start_working();
@@ -978,7 +1140,7 @@ impl PipelineBuilder {
     async fn sign_and_broadcast_commit_vote(
         ledger_update_fut: TaskFuture<LedgerUpdateResult>,
         order_vote_rx: oneshot::Receiver<()>,
-        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
+        order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         signer: Arc<ValidatorSigner>,
         block: Arc<Block>,
@@ -991,7 +1153,7 @@ impl PipelineBuilder {
             Ok(_) = order_vote_rx => {
                 HashValue::zero()
             }
-            Ok(li) = order_proof_fut => {
+            Ok((_, li)) = order_proof_fut => {
                 li.ledger_info().ledger_info().consensus_data_hash()
             }
             Ok(li) = commit_proof_fut => {
@@ -1035,7 +1197,7 @@ impl PipelineBuilder {
     async fn pre_commit(
         ledger_update_fut: TaskFuture<LedgerUpdateResult>,
         parent_block_pre_commit_fut: TaskFuture<PreCommitResult>,
-        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
+        order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
@@ -1109,7 +1271,7 @@ impl PipelineBuilder {
     /// What it does: Update counters for the block, and notify block tree about the commit
     async fn post_commit_ledger(
         pre_commit_fut: TaskFuture<PreCommitResult>,
-        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
+        order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
         commit_ledger_fut: TaskFuture<CommitLedgerResult>,
         notify_state_sync_fut: TaskFuture<NotifyStateSyncResult>,
         parent_post_commit: TaskFuture<PostCommitResult>,
@@ -1135,7 +1297,7 @@ impl PipelineBuilder {
         payload_manager.notify_commit(timestamp, payload_vec);
 
         if let Some(ledger_info_with_sigs) = maybe_ledger_info_with_sigs {
-            let order_proof = order_proof_fut.await?;
+            let (_, order_proof) = order_proof_fut.await?;
             block_store_callback(order_proof, ledger_info_with_sigs);
         }
         Ok(())
@@ -1178,9 +1340,12 @@ impl PipelineBuilder {
 
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
         let PipelineFutures {
+            decryption_fut: _,
             prepare_fut,
+            has_rand_txns_fut: _,
             rand_check_fut: _,
             execute_fut,
+            observer_publish_fut: _,
             ledger_update_fut,
             post_ledger_update_fut: _,
             commit_vote_fut: _,

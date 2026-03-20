@@ -260,10 +260,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
                         MoveValue::Vector(vec![MoveValue::try_from(v)?]).json()?,
                     );
                 } else {
-                    return Err(anyhow::anyhow!(
-                        "Invalid option variant: {}",
-                        name.to_string()
-                    ));
+                    return Err(anyhow::anyhow!("Invalid option variant: {}", name));
                 }
                 return Ok(Self(map));
             }
@@ -1014,14 +1011,19 @@ impl From<CompiledModule> for MoveModule {
             exposed_functions: m
                 .function_defs
                 .iter()
-                // Return all entry or public functions.
-                // Private entry functions are still callable by entry function transactions so
-                // they should be included.
+                // Return all entry, view, or public functions.
+                // Private entry functions are still callable by entry function
+                // transactions so they should be included. Similarly, private view
+                // functions can be called via the view function API endpoint.
                 .filter(|def| {
                     def.is_entry
                         || match def.visibility {
                             Visibility::Public | Visibility::Friend => true,
-                            Visibility::Private => false,
+                            Visibility::Private => {
+                                let fhandle = Bytecode::function_handle_at(&m, def.function);
+                                let name = Bytecode::identifier_at(&m, fhandle.name);
+                                m.function_is_view(name)
+                            },
                         }
                 })
                 .map(|def| m.new_move_function(def))
@@ -1106,6 +1108,10 @@ impl<'de> Deserialize<'de> for MoveModuleId {
 }
 
 /// A move struct
+//
+// Note: In a perfect world is_enum would not be necessary and instead we would use an
+// enum to represent regular struct vs enum. But for backwards compatibility we instead
+// have separate fields, `fields` for a regular struct and `variants` for an enum.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveStruct {
     pub name: IdentifierWrapper,
@@ -1120,6 +1126,16 @@ pub struct MoveStruct {
     /// Generic types associated with the struct
     pub generic_type_params: Vec<MoveStructGenericTypeParam>,
     /// Fields associated with the struct
+    pub fields: Vec<MoveStructField>,
+    /// Variants of the enum. Only populated when `is_enum` is true.
+    pub variants: Vec<MoveStructVariant>,
+}
+
+/// A single variant of a Move enum.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct MoveStructVariant {
+    pub name: IdentifierWrapper,
+    /// Fields associated with the variant, if any.
     pub fields: Vec<MoveStructField>,
 }
 

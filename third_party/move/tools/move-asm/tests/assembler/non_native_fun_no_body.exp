@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-4:  publish [module 0x66::test]
+Error: error: non-native function must have a body
+  ┌─ test:3:5
+  │
+3 │ fun f(l0: u64): u64
+  │     ^
+
+

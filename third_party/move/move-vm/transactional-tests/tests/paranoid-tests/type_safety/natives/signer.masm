@@ -1,0 +1,9 @@
+//# run --signers 0x1
+script
+use 0x1::signer
+entry public fun main(l0: signer)
+    local l1: &address
+    borrow_loc l0
+    call signer::address_of
+    st_loc l1
+    ret

@@ -5,12 +5,13 @@ use crate::{aptos_framework_path, components::ProposalMetadata, ExecutionMode, R
 use anyhow::Result;
 use aptos::{
     common::types::CliCommand,
+    create_move_env,
     governance::{ExecuteProposal, SubmitProposal, SubmitVote},
-    move_tool::{RunFunction, RunScript},
     stake::IncreaseLockup,
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_genesis::keys::PrivateIdentity;
+use aptos_move_cli::{RunFunction, RunScript, WithMoveEnv};
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
@@ -176,7 +177,10 @@ impl NetworkConfig {
             args.push(framework_path.as_os_str().to_str().unwrap());
         };
 
-        RunScript::try_parse_from(args)?.execute().await?;
+        RunScript::try_parse_from(args)?
+            .attach_env(create_move_env())
+            .execute()
+            .await?;
         Ok(())
     }
 
@@ -307,7 +311,10 @@ impl NetworkConfig {
             args.push(api_key.as_str());
         }
 
-        RunFunction::try_parse_from(args)?.execute().await?;
+        RunFunction::try_parse_from(args)?
+            .attach_env(create_move_env())
+            .execute()
+            .await?;
         Ok(())
     }
 
@@ -333,6 +340,9 @@ impl NetworkConfig {
             "bcs",
             "--url",
             self.endpoint.as_str(),
+            // Use the max gas unit for now. The simulate API sometimes cannot get the right gas estimate for proposals.
+            "--max-gas",
+            "2000000",
         ];
 
         if let Some(api_key) = node_api_key.as_ref() {
@@ -340,7 +350,10 @@ impl NetworkConfig {
             args.push(api_key.as_str());
         }
 
-        RunFunction::try_parse_from(args)?.execute().await?;
+        RunFunction::try_parse_from(args)?
+            .attach_env(create_move_env())
+            .execute()
+            .await?;
         Ok(())
     }
 
@@ -510,7 +523,9 @@ async fn execute_release(
                         args.push(framework_path.as_os_str().to_str().unwrap());
                     };
 
-                    RunScript::try_parse_from(args)?.execute().await?;
+                    let mut cmd = RunScript::try_parse_from(args)?;
+                    cmd.env = create_move_env();
+                    cmd.execute().await?;
                 }
             },
         };

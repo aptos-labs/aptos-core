@@ -1,0 +1,68 @@
+//# run
+script
+entry public fun main()
+    ld_true
+    ld_true
+    ld_false
+    and
+    or
+    not
+    br_false l0
+    ld_u64 99
+    abort
+l0: ld_true
+    ld_false
+    neq
+    ld_false
+    ld_true
+    neq
+    and
+    not
+    br_false l1
+    ld_u64 100
+    abort
+l1: ld_u64 1
+    ld_u64 3
+    ld_u64 1
+    xor
+    bit_or
+    ld_u64 3
+    eq
+    not
+    br_false l2
+    ld_u64 101
+    abort
+l2: ld_u64 2
+    ld_u64 3
+    ld_u64 1
+    bit_and
+    xor
+    ld_u64 3
+    eq
+    not
+    br_false l3
+    ld_u64 102
+    abort
+l3: ld_u64 3
+    ld_u64 3
+    ld_u64 1
+    add
+    bit_and
+    ld_u64 0
+    eq
+    not
+    br_false l4
+    ld_u64 103
+    abort
+l4: ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    mul
+    add
+    ld_u64 7
+    eq
+    not
+    br_false l5
+    ld_u64 104
+    abort
+l5: ret

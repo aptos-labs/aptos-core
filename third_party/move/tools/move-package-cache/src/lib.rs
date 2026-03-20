@@ -40,7 +40,7 @@
 //! that the tool is still actively progressing.
 
 mod canonical;
-mod file_lock;
+pub mod file_lock;
 mod listener;
 mod package_cache;
 

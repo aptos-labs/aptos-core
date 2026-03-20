@@ -193,7 +193,7 @@ async fn test_merkle_leaves_with_nft_transfer(
 
     let token_txn = creator.sign_with_transaction_builder(token_builder);
 
-    ctx.commit_block(&vec![txn1, txn2, collection_txn, token_txn])
+    ctx.commit_block(&[txn1, txn2, collection_txn, token_txn])
         .await;
 
     let num_leaves_at_beginning = ctx
@@ -218,7 +218,7 @@ async fn test_merkle_leaves_with_nft_transfer(
                 use_orderless_transactions,
             ),
     );
-    ctx.commit_block(&vec![transfer_to_owner_txn]).await;
+    ctx.commit_block(&[transfer_to_owner_txn]).await;
     let num_leaves_after_transfer_nft = ctx
         .db
         .get_state_item_count(ctx.db.get_latest_ledger_info_version().unwrap())
@@ -245,7 +245,7 @@ async fn test_merkle_leaves_with_nft_transfer(
                 use_orderless_transactions,
             ),
     );
-    ctx.commit_block(&vec![transfer_to_creator_txn]).await;
+    ctx.commit_block(&[transfer_to_creator_txn]).await;
     let num_leaves_after_return_nft = ctx
         .db
         .get_state_item_count(ctx.db.get_latest_ledger_info_version().unwrap())

@@ -56,6 +56,25 @@ pub struct VMConfig {
     /// Whether this VM should support debugging. If set, environment variables
     /// `MOVE_VM_TRACE` and `MOVE_VM_STEP` will be recognized.
     pub enable_debugging: bool,
+    /// When enabled, checks the depth of captured values when packing closures.
+    /// This prevents deeply nested closure chains that could cause stack overflow.
+    /// Also controls whether error messages format values (which could cause stack
+    /// overflow during Display formatting).
+    pub enable_closure_depth_check: bool,
+    /// If true, the layout converter caches struct layouts within a single layout
+    /// construction pass, sharing `Arc<MoveStructLayout>` on cache hits and skipping
+    /// duplicate node-count charges. This avoids spurious `TOO_MANY_TYPE_NODES` errors
+    /// when the same struct appears in multiple positions (e.g., enum variants).
+    pub enable_struct_layout_local_cache: bool,
+    /// When enabled, checks the depth of types during gas charging for type node counting.
+    /// This prevents types from being created at depths exceeding maximum allowed depth during
+    /// execution when types are not created (e.g., local types when there are no runtime type
+    /// checks).
+    pub check_depth_on_type_counts: bool,
+    /// Whether this VM should support public copy structs/enums as transaction arguments.
+    /// When enabled, non-private structs and enums with the copy ability can be used as
+    /// transaction arguments if they have public pack functions with the Pack attribute.
+    pub enable_public_struct_args: bool,
 }
 
 impl Default for VMConfig {
@@ -72,7 +91,7 @@ impl Default for VMConfig {
             type_base_cost: 0,
             type_byte_cost: 0,
             delayed_field_optimization_enabled: false,
-            ty_builder: TypeBuilder::with_limits(128, 20),
+            ty_builder: TypeBuilder::with_limits(128, 20, true),
             enable_function_caches: true,
             enable_lazy_loading: true,
             enable_depth_checks: true,
@@ -85,6 +104,10 @@ impl Default for VMConfig {
             enable_framework_for_option: true,
             enable_function_caches_for_native_dynamic_dispatch: true,
             enable_debugging: false,
+            enable_closure_depth_check: true,
+            enable_struct_layout_local_cache: true,
+            check_depth_on_type_counts: true,
+            enable_public_struct_args: true,
         }
     }
 }

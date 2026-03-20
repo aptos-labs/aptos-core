@@ -1,0 +1,41 @@
+//# publish
+module 0x42::Option
+use 0x1::vector
+struct T<T0> has copy + drop + store
+  v: vector<T0>
+
+public fun none<T0: store>(): T<T0>
+    call vector::empty<T0>
+    pack T<T0>
+    ret
+
+public fun some<T0: store>(l0: T0): T<T0>
+    local l1: vector<T0>
+    call vector::empty<T0>
+    st_loc l1
+    mut_borrow_loc l1
+    move_loc l0
+    call vector::push_back<T0>
+    move_loc l1
+    pack T<T0>
+    ret
+
+public fun unwrap_or<T0: copy + drop + store>(l0: T<T0>, l1: T0): T0
+    local l2: vector<T0>
+    move_loc l0
+    unpack T<T0>
+    st_loc l2
+    borrow_loc l2
+    call vector::is_empty<T0>
+    br_true l0
+    mut_borrow_loc l2
+    call vector::pop_back<T0>
+    ret
+l0: move_loc l1
+    ret
+
+public fun really_none<T0: copy + drop + store>(): T<T0>
+    call none<T<T0>>
+    call none<T0>
+    call unwrap_or<T<T0>>
+    ret

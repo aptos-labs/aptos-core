@@ -158,6 +158,9 @@ third_party/move/tools/move-package-resolver/cache
 # ignore batch encryption benchmark results
 crates/aptos-batch-encryption/benchmark_results
 
+# ignore batch encryption pnpm lockfile
+crates/aptos-batch-encryption/ts-batch-encrypt/.pnpm-install.lock
+
 # Telemetry service E2E test generated files
 # Test data directory (created at runtime)
 test-data/

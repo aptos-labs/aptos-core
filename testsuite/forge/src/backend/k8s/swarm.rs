@@ -5,12 +5,12 @@ use crate::{
     chaos_schema::{
         Chaos, ChaosConditionType, ChaosStatus, ConditionStatus, NetworkChaos, StressChaos,
     },
-    check_for_container_restart, create_k8s_client, delete_all_chaos, get_default_pfn_node_config,
-    get_free_port, get_stateful_set_image, install_public_fullnode,
+    check_for_container_restart, create_k8s_client, delete_all_chaos, get_free_port,
+    get_stateful_set_image,
     node::K8sNode,
     prometheus::{self, query_range_with_metadata, query_with_metadata},
     query_sequence_number, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
-    FullNode, K8sApi, Node, Result, Swarm, SwarmChaos, Validator, Version, HAPROXY_SERVICE_SUFFIX,
+    FullNode, Node, Result, Swarm, SwarmChaos, Validator, Version, HAPROXY_SERVICE_SUFFIX,
     REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
 use anyhow::{anyhow, bail, format_err};
@@ -21,10 +21,7 @@ use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{chain_id::ChainId, AccountKey, LocalAccount, PeerId},
 };
-use k8s_openapi::api::{
-    apps::v1::StatefulSet,
-    core::v1::{ConfigMap, PersistentVolumeClaim, Service},
-};
+use k8s_openapi::api::apps::v1::StatefulSet;
 use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
@@ -58,7 +55,9 @@ pub struct K8sSwarm {
     keep: bool,
     chaoses: HashSet<SwarmChaos>,
     prom_client: Option<PrometheusClient>,
+    #[allow(dead_code)]
     era: Option<String>,
+    #[allow(dead_code)]
     use_port_forward: bool,
     chaos_experiment_ops: Box<dyn ChaosExperimentOps + Send + Sync>,
     has_indexer: bool,
@@ -160,50 +159,6 @@ impl K8sSwarm {
     fn get_kube_client(&self) -> K8sClient {
         self.kube_client.clone()
     }
-
-    /// Installs a PFN with the given version and node config
-    async fn install_public_fullnode_resources<'a>(
-        &mut self,
-        version: &'a Version,
-        node_config: &'a OverrideNodeConfig,
-    ) -> Result<(PeerId, K8sNode)> {
-        // create APIs
-        let stateful_set_api: Arc<K8sApi<_>> = Arc::new(K8sApi::<StatefulSet>::from_client(
-            self.get_kube_client(),
-            Some(self.kube_namespace.clone()),
-        ));
-        let configmap_api: Arc<K8sApi<_>> = Arc::new(K8sApi::<ConfigMap>::from_client(
-            self.get_kube_client(),
-            Some(self.kube_namespace.clone()),
-        ));
-        let persistent_volume_claim_api: Arc<K8sApi<_>> =
-            Arc::new(K8sApi::<PersistentVolumeClaim>::from_client(
-                self.get_kube_client(),
-                Some(self.kube_namespace.clone()),
-            ));
-        let service_api: Arc<K8sApi<_>> = Arc::new(K8sApi::<Service>::from_client(
-            self.get_kube_client(),
-            Some(self.kube_namespace.clone()),
-        ));
-        let (peer_id, k8snode) = install_public_fullnode(
-            stateful_set_api,
-            configmap_api,
-            persistent_volume_claim_api,
-            service_api,
-            version,
-            node_config,
-            self.era
-                .as_ref()
-                .expect("Installing PFN requires acquiring the current chain era")
-                .clone(),
-            self.kube_namespace.clone(),
-            self.use_port_forward,
-            self.fullnodes.len(),
-        )
-        .await?;
-        k8snode.start().await?; // actually start the node. if port-forward is enabled, this is when it gets its ephemeral port
-        Ok((peer_id, k8snode))
-    }
 }
 
 #[async_trait::async_trait]
@@ -295,15 +250,10 @@ impl Swarm for K8sSwarm {
 
     async fn add_full_node(
         &mut self,
-        version: &Version,
-        config: OverrideNodeConfig,
+        _version: &Version,
+        _config: OverrideNodeConfig,
     ) -> Result<PeerId> {
-        self.install_public_fullnode_resources(version, &config)
-            .await
-            .map(|(peer_id, node)| {
-                self.fullnodes.insert(peer_id, node);
-                peer_id
-            })
+        todo!("PFNs are now deployed via the forge PFN deployer, not individual K8s resources")
     }
 
     fn remove_full_node(&mut self, _id: PeerId) -> Result<()> {
@@ -446,7 +396,7 @@ impl Swarm for K8sSwarm {
     }
 
     fn get_default_pfn_node_config(&self) -> NodeConfig {
-        get_default_pfn_node_config()
+        todo!("PFNs are now deployed via the forge PFN deployer, not individual K8s resources")
     }
 
     fn has_indexer(&self) -> bool {

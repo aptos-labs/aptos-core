@@ -37,6 +37,7 @@ pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 
 pub const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
 pub const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
+pub const BLOCK_PROLOGUE_EXT_V2: &IdentStr = ident_str!("block_prologue_ext_v2");
 pub const BLOCK_EPILOGUE: &IdentStr = ident_str!("block_epilogue");
 
 pub static RECONFIGURATION_WITH_DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
@@ -47,6 +48,7 @@ pub static RECONFIGURATION_WITH_DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 });
 
 pub const FINISH_WITH_DKG_RESULT: &IdentStr = ident_str!("finish_with_dkg_result");
+pub const FINISH_WITH_CHUNKY_DKG_RESULT: &IdentStr = ident_str!("finish_with_chunky_dkg_result");
 
 pub static JWKS_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(

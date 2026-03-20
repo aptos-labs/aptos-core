@@ -1,15 +1,19 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::file_format::{
-    Bytecode, CodeOffset, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
-    FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex, SignatureIndex,
-    StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
-    StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    file_format::{
+        Bytecode, CodeOffset, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
+        FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
+        StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+    },
 };
 use move_core_types::{
     function::ClosureMask,
     int256::{I256, U256},
+    vm_status::StatusCode,
 };
 
 /// The VM's internal representation of instructions.
@@ -94,7 +98,7 @@ pub enum Instruction {
     MoveToGeneric(StructDefInstantiationIndex),
     Shl,
     Shr,
-    VecPack(SignatureIndex, u64),
+    VecPack(SignatureIndex, u16),
     VecLen(SignatureIndex),
     VecImmBorrow(SignatureIndex),
     VecMutBorrow(SignatureIndex),
@@ -238,12 +242,14 @@ impl Instruction {
     }
 }
 
-impl From<Bytecode> for Instruction {
-    fn from(bytecode: Bytecode) -> Self {
+impl TryFrom<Bytecode> for Instruction {
+    type Error = PartialVMError;
+
+    fn try_from(bytecode: Bytecode) -> PartialVMResult<Self> {
         use Bytecode as B;
         use Instruction as O;
 
-        match bytecode {
+        Ok(match bytecode {
             B::Pop => O::Pop,
             B::Ret => O::Ret,
             B::BrTrue(offset) => O::BrTrue(offset),
@@ -318,7 +324,15 @@ impl From<Bytecode> for Instruction {
             B::MoveToGeneric(idx) => O::MoveToGeneric(idx),
             B::Shl => O::Shl,
             B::Shr => O::Shr,
-            B::VecPack(idx, n) => O::VecPack(idx, n),
+            B::VecPack(idx, n) => {
+                let n = u16::try_from(n).map_err(|_| {
+                    // The bytecode verifier guarantees n <= u16::MAX; reaching here
+                    // means the verifier was bypassed.
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("VecPack count {} exceeds u16::MAX", n))
+                })?;
+                O::VecPack(idx, n)
+            },
             B::VecLen(idx) => O::VecLen(idx),
             B::VecImmBorrow(idx) => O::VecImmBorrow(idx),
             B::VecMutBorrow(idx) => O::VecMutBorrow(idx),
@@ -348,7 +362,7 @@ impl From<Bytecode> for Instruction {
             B::CastI128 => O::CastI128,
             B::CastI256 => O::CastI256,
             B::Negate => O::Negate,
-        }
+        })
     }
 }
 

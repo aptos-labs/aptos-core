@@ -1,0 +1,13 @@
+//# publish
+module 0x22::test
+
+public fun abort_instr(a: u64)
+    move_loc a
+    ld_const<vector<u8>> [128]
+    abort_msg
+    nop
+    nop
+    nop
+    ret
+
+//# run --verbose 0x22::test::abort_instr --args 404u64

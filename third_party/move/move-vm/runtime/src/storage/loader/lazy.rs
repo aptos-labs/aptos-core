@@ -18,6 +18,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
+    account_address::AccountAddress,
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
@@ -184,6 +185,15 @@ where
         true
     }
 
+    fn unmetered_get_module_hash(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<[u8; 32]> {
+        self.module_storage
+            .unmetered_get_existing_module_hash(address, module_name)
+    }
+
     fn load_struct_definition(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
@@ -208,7 +218,33 @@ where
     ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
         let entry = self.module_storage.get_struct_layout(key)?;
         let (layout, modules) = entry.unpack();
-        for module_id in modules.iter() {
+        for (module_id, stored_hash) in modules.iter() {
+            // If failed to get the module, treat as a cache miss.
+            let current_module_hash = self
+                .unmetered_get_module_hash(module_id.address(), module_id.name())
+                .ok()?;
+
+            // Validate that the module has not been republished since this layout was cached.
+            if &current_module_hash != stored_hash {
+                // Evict the stale entry so that subsequent readers can insert the correct one.
+                // Treat as cache miss; caller will recompute with the current module version.
+                //
+                // Note that this check goes both ways: if the cached layout is new but the
+                // reader's modules are still old, the entry will be evicted and the stale
+                // layout will be re-inserted. This is no longer a correctness issue (each worker
+                // always uses a layout consistent with its own module view) but transactions with
+                // old vs new module versions will keep evicting each other's entries until one
+                // side finishes. Since module publishing is rare and this only lasts for one
+                // validation cycle, the temporary cache slowdown is acceptable.
+                self.module_storage.remove_struct_layout(key);
+                return None;
+            }
+        }
+
+        // Gas-charge all defining modules. This is done in a separate loop after hash
+        // validation above, so that we never charge gas for a stale cache hit that
+        // will be discarded.
+        for (module_id, _) in modules.iter() {
             // Re-read all modules for this layout, so that transaction gets invalidated
             // on module publish. Also, we re-read them in exactly the same way as they
             // were traversed during layout construction, so gas charging should be exactly

@@ -47,9 +47,6 @@ jobs:
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Login to Docker Hub
@@ -68,7 +65,6 @@ jobs:
         env:
           FORCE_COLOR: 3 # Force color output as per https://github.com/google/zx#using-github-actions
           GIT_SHA: ${{ inputs.GIT_SHA || github.sha }} # If GIT_SHA is not provided, use the sha of the triggering branch
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
         run: ./docker/release-images.mjs --wait-for-image-seconds=3600 ${{ inputs.dry_run && '--dry-run' || '' }}

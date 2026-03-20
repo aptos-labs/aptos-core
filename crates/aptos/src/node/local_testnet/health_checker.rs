@@ -64,7 +64,7 @@ impl HealthChecker {
                 backoff::future::retry(backoff, || async {
                     let transaction_stream_config = TransactionStreamConfig {
                         indexer_grpc_data_service_address: url.clone(),
-                        auth_token: "notused".to_string(),
+                        auth_token: Some("notused".to_string()),
                         starting_version: Some(0),
                         request_ending_version: None,
                         request_name_header: "notused".to_string(),
@@ -72,9 +72,9 @@ impl HealthChecker {
                         indexer_grpc_http2_ping_interval_secs: Default::default(),
                         indexer_grpc_http2_ping_timeout_secs: 60,
                         indexer_grpc_response_item_timeout_secs: 60,
-                        indexer_grpc_reconnection_timeout_secs: 60,
-                        indexer_grpc_reconnection_max_retries: Default::default(),
+                        reconnection_config: Default::default(),
                         transaction_filter: None,
+                        backup_endpoints: Default::default(),
                     };
                     get_chain_id(transaction_stream_config)
                         .await

@@ -129,7 +129,10 @@ impl Dependency {
 #[derive(Debug, Clone)]
 pub struct ExecutionAndIOCosts {
     pub gas_scaling_factor: GasScalingFactor,
-    pub total: InternalGas,
+    /// Execution gas - corresponds to FeeStatement::execution_gas_units.
+    pub execution_gas: InternalGas,
+    /// IO gas - corresponds to FeeStatement::io_gas_units.
+    pub io_gas: InternalGas,
 
     pub intrinsic_cost: InternalGas,
     pub keyless_cost: InternalGas,
@@ -253,6 +256,11 @@ impl StorageFees {
 }
 
 impl ExecutionAndIOCosts {
+    /// Returns the total execution + IO gas.
+    pub fn total(&self) -> InternalGas {
+        self.execution_gas + self.io_gas
+    }
+
     #[allow(clippy::needless_lifetimes)]
     pub fn gas_events<'a>(&'a self) -> GasEventIter<'a> {
         GasEventIter {
@@ -295,10 +303,10 @@ impl ExecutionAndIOCosts {
             total += write.cost;
         }
 
-        if total != self.total {
+        if total != self.total() {
             panic!(
                 "Execution & IO costs do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
-                self.total, total
+                self.total(), total
             );
         }
     }

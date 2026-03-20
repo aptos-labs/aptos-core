@@ -227,9 +227,15 @@ impl Decompiler {
         module_id: ModuleId,
         targets: &mut FunctionTargetsHolder,
     ) {
-        // Create FunctionTargetsHolder with stackless bytecode for all functions in the module,
+        // Create FunctionTargetsHolder with stackless bytecode for all functions in the module.
+        // Skip auto-generated struct API wrappers (pack$S, unpack$S, …) – they are
+        // reconstructed by the compiler for public structs and must not appear as regular
+        // function bodies in the decompiled output.
         let module_env = self.env.get_module(module_id);
         for func_env in module_env.get_functions() {
+            if func_env.is_struct_api() {
+                continue;
+            }
             targets.add_target(&func_env)
         }
     }

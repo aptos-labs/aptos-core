@@ -118,8 +118,15 @@ pub fn verify_state_kvs(
 ) -> Result<()> {
     println!("Validating db statekeys");
     let storage_dir = StorageDirPaths::from_path(db_root_path);
-    let state_kv_db =
-        StateKvDb::open_sharded(&storage_dir, RocksdbConfig::default(), None, None, false)?;
+    let state_kv_db = StateKvDb::open_sharded(
+        &storage_dir,
+        RocksdbConfig::default(),
+        None,
+        None,
+        /* readonly = */ false,
+        /* is_hot = */ false,
+        /* delete_on_restart = */ false,
+    )?;
 
     //read all statekeys from internal db and store them in mem
     let mut all_internal_keys = HashSet::new();
@@ -179,7 +186,7 @@ fn verify_state_kv(
             );
         }
         counter += 1;
-        if counter as usize % SAMPLE_RATE == 0 {
+        if (counter as usize).is_multiple_of(SAMPLE_RATE) {
             println!(
                 "Processed {} keys, the current sample is {} at version {}",
                 counter, state_key_hash, version
@@ -241,7 +248,7 @@ fn verify_event_by_key(
         },
         Ok(Some((version, idx))) => {
             assert!(idx as usize == expected_idx && version == expected_version);
-            if version as usize % SAMPLE_RATE == 0 {
+            if (version as usize).is_multiple_of(SAMPLE_RATE) {
                 println!(
                     "Processed {} at {:?}, {:?}",
                     version, event_key, expected_idx

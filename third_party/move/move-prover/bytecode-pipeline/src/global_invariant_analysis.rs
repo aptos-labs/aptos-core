@@ -538,6 +538,11 @@ fn get_callee_memory_usage_for_invariant_instrumentation(
         .expect("Verification analysis not performed");
 
     let callee_env = env.get_function(callee_fid);
+    if callee_env.is_struct_api() {
+        // Compiler-generated struct API wrappers are excluded from FunctionTargetsHolder.
+        // They don't access any global memory, so return empty sets.
+        return (BTreeSet::new(), BTreeSet::new());
+    }
     let callee_target = targets.get_target(&callee_env, &FunctionVariant::Baseline);
     let callee_usage = usage_analysis::get_memory_usage(&callee_target);
 

@@ -1,0 +1,23 @@
+processed 5 tasks
+task 0 lines 3-43:  publish [module 0xc0ffee::m {]
+warning: Unused value of parameter `p1`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p1`), or binding to `_`
+   ┌─ TEMPFILE:13:34
+   │
+13 │     fun mixed_no_leak(p0: &Data, p1: u64, p2: u64): u64 {
+   │                                  ^^
+
+warning: Unused value of parameter `p1`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p1`), or binding to `_`
+   ┌─ TEMPFILE:18:40
+   │
+18 │     fun mixed_no_leak_multi(p0: &Data, p1: u64, p2: u64): u64 {
+   │                                        ^^
+
+
+task 1 lines 46-46:  run 0xc0ffee::m::test_v1_fallthrough
+return values: 20
+task 2 lines 48-48:  run 0xc0ffee::m::test_v2_fallthrough
+return values: 20
+task 3 lines 50-50:  run 0xc0ffee::m::test_multi_v1
+return values: 20
+task 4 lines 52-52:  run 0xc0ffee::m::test_multi_v2
+return values: 23

@@ -1,0 +1,5 @@
+//# run
+script
+entry public fun main()
+    ld_u64 0
+    abort

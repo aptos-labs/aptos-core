@@ -1,0 +1,24 @@
+processed 4 tasks
+task 0 lines 1-34:  publish [module 0x3::trusted]
+task 1 lines 36-36:  run --verbose 0x3::trusted::call_closure_returns_1
+Error: Function execution failed with VMError: {
+    message: Closure signature mismatch for 0x0000000000000000000000000000000000000000000000000000000000000003::trusted::returns_1: expected (0 parameters, 2 results), got (0 parameters, 1 results),
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: 0x3::trusted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 3)],
+    exec_state: None,
+}
+task 2 lines 38-38:  run --verbose 0x3::trusted::call_closure_returns_2
+return values: 1, 2
+task 3 lines 40-40:  run --verbose 0x3::trusted::call_closure_returns_3
+Error: Function execution failed with VMError: {
+    message: Closure signature mismatch for 0x0000000000000000000000000000000000000000000000000000000000000003::trusted::returns_3: expected (0 parameters, 2 results), got (0 parameters, 3 results),
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: 0x3::trusted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 1)],
+    exec_state: None,
+}

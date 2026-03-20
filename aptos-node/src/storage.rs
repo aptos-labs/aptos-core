@@ -67,8 +67,11 @@ pub(crate) fn bootstrap_db(
     )? {
         Either::Left(db) => {
             let (db_arc, db_rw) = DbReaderWriter::wrap(db);
-            let db_backup_service =
-                start_backup_service(node_config.storage.backup_service_address, db_arc.clone());
+            let db_backup_service = start_backup_service(
+                node_config.storage.backup_service_address,
+                db_arc.clone(),
+                node_config.storage.backup_service_runtime_threads,
+            );
             maybe_apply_genesis(&db_rw, node_config)?;
             (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
         },
@@ -92,8 +95,11 @@ pub(crate) fn bootstrap_db(
                 // commit the genesis ledger info to the DB.
                 fast_sync_db.commit_genesis_ledger_info(&ledger_info)?;
             }
-            let db_backup_service =
-                start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
+            let db_backup_service = start_backup_service(
+                node_config.storage.backup_service_address,
+                fast_sync_db,
+                node_config.storage.backup_service_runtime_threads,
+            );
             (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
         },
     };
@@ -119,9 +125,10 @@ pub(crate) fn bootstrap_db(
         false, /* readonly */
         node_config.storage.storage_pruner_config,
         node_config.storage.rocksdb_configs,
-        node_config.storage.enable_indexer,
         node_config.storage.buffered_state_target_items,
         node_config.storage.max_num_nodes_per_lru_cache_shard,
+        None,
+        node_config.storage.hot_state_config,
     )
     .map_err(|err| anyhow!("DB failed to open {}", err))?;
     let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
@@ -147,12 +154,8 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
     fs::create_dir_all(&checkpoint_dir).unwrap();
 
     // Open the database and create a checkpoint
-    AptosDB::create_checkpoint(
-        &source_dir,
-        &checkpoint_dir,
-        node_config.storage.rocksdb_configs.enable_storage_sharding,
-    )
-    .expect("AptosDB checkpoint creation failed.");
+    AptosDB::create_checkpoint(&source_dir, &checkpoint_dir)
+        .expect("AptosDB checkpoint creation failed.");
 
     // Create a consensus db checkpoint
     aptos_consensus::create_checkpoint(&source_dir, &checkpoint_dir)

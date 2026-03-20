@@ -64,11 +64,11 @@ async fn test_multi_slh_dsa_sha2_128s(
     let mut account = LocalAccount::new(address, ed25519_private_key, 0);
 
     let txn0 = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn0]).await;
+    context.commit_block(&[txn0]).await;
     let txn1 = context.mint_user_account(&account).await;
-    context.commit_block(&vec![txn1]).await;
+    context.commit_block(&[txn1]).await;
     let txn2 = context.create_user_account(&other).await;
-    context.commit_block(&vec![txn2]).await;
+    context.commit_block(&[txn2]).await;
 
     let current_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let ed22519_txn = context.account_transfer(&mut account, &other, 5);
@@ -147,11 +147,11 @@ async fn test_slh_dsa_sha2_128s(
     let mut account = LocalAccount::new(address, ed25519_private_key, 0);
 
     let txn0 = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn0]).await;
+    context.commit_block(&[txn0]).await;
     let txn1 = context.mint_user_account(&account).await;
-    context.commit_block(&vec![txn1]).await;
+    context.commit_block(&[txn1]).await;
     let txn2 = context.create_user_account(&other).await;
-    context.commit_block(&vec![txn2]).await;
+    context.commit_block(&[txn2]).await;
 
     let current_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let ed22519_txn = context.account_transfer(&mut account, &other, 5);

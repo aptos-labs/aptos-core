@@ -1,0 +1,50 @@
+//# publish
+module 0x3::trusted
+
+fun takes_1_param(x: u64): u64
+    move_loc x
+    ret
+
+fun takes_2_params(x: u64, y: u64): u64
+    move_loc x
+    ret
+
+fun takes_3_params(x: u64, y: u64, z: u64): u64
+    move_loc x
+    ret
+
+public fun call_closure_1_param(): u64
+    ld_u64 10
+    ld_u64 20
+    pack_closure takes_1_param, 0
+    call_closure<|u64,u64|u64>
+    ret
+
+public fun call_closure_2_params(): u64
+    ld_u64 10
+    ld_u64 20
+    pack_closure takes_2_params, 0
+    call_closure<|u64,u64|u64>
+    ret
+
+public fun call_closure_2_params_and_mask(): u64
+    ld_u64 10
+    ld_u64 20
+    pack_closure takes_2_params, 1
+    call_closure<|u64,u64|u64>
+    ret
+
+public fun call_closure_3_params(): u64
+    ld_u64 10
+    ld_u64 20
+    pack_closure takes_3_params, 0
+    call_closure<|u64,u64|u64>
+    ret
+
+//# run --verbose 0x3::trusted::call_closure_1_param
+
+//# run --verbose 0x3::trusted::call_closure_2_params
+
+//# run --verbose 0x3::trusted::call_closure_2_params_and_mask
+
+//# run --verbose 0x3::trusted::call_closure_3_params

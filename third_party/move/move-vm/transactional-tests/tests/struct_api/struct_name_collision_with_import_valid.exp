@@ -1,0 +1,22 @@
+processed 2 tasks
+task 0 lines 1-6:  publish [// First module defines a struct S]
+task 1 lines 8-29:  publish --print-bytecode [// Second module references external S (creating a struct handle for it)]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x67::local_module
+use 0x66::external_module
+struct Container has drop
+  imported: external_module::S
+
+struct S has drop
+  local_field: u64
+
+// Function definition at index 0
+#[pack] public fun pack$S(l0: u64): S
+    move_loc l0
+    pack S
+    ret
+
+
+== END Bytecode ==

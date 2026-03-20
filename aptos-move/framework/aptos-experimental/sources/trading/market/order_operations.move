@@ -6,15 +6,10 @@ module aptos_experimental::order_operations {
 
     use std::option;
     use std::string::String;
-    use aptos_trading::order_book_types::{
-        OrderId,
-        single_order_type
-    };
+    use aptos_trading::order_book_types::{OrderId, single_order_type};
     use aptos_trading::single_order_types::SingleOrder;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
-    use aptos_experimental::pre_cancellation_tracker::{
-        pre_cancel_order_for_tracker
-    };
+    use aptos_experimental::pre_cancellation_tracker::{pre_cancel_order_for_tracker};
     use aptos_experimental::order_placement::cleanup_order_internal;
     use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
 
@@ -49,12 +44,19 @@ module aptos_experimental::order_operations {
             );
         if (order.is_some()) {
             // Order is already placed in the order book, so we can cancel it
-            return cancel_single_order_helper(market, order.destroy_some(), true, cancellation_reason, cancel_reason, callbacks);
+            return cancel_single_order_helper(
+                market,
+                order.destroy_some(),
+                true,
+                cancellation_reason,
+                cancel_reason,
+                callbacks
+            );
         };
         pre_cancel_order_for_tracker(
             market.get_pre_cancellation_tracker_mut(),
             user,
-            client_order_id,
+            client_order_id
         );
     }
 
@@ -80,7 +82,14 @@ module aptos_experimental::order_operations {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): SingleOrder<M> {
         let order = market.get_order_book_mut().cancel_single_order(account, order_id);
-        cancel_single_order_helper(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
+        cancel_single_order_helper(
+            market,
+            order,
+            emit_event,
+            cancellation_reason,
+            cancel_reason,
+            callbacks
+        );
         order
     }
 
@@ -96,10 +105,18 @@ module aptos_experimental::order_operations {
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): option::Option<SingleOrder<M>> {
-        let maybe_order = market.get_order_book_mut().try_cancel_single_order(account, order_id);
+        let maybe_order =
+            market.get_order_book_mut().try_cancel_single_order(account, order_id);
         if (maybe_order.is_some()) {
             let order = maybe_order.destroy_some();
-            cancel_single_order_helper(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
+            cancel_single_order_helper(
+                market,
+                order,
+                emit_event,
+                cancellation_reason,
+                cancel_reason,
+                callbacks
+            );
             option::some(order)
         } else {
             option::none()
@@ -126,9 +143,22 @@ module aptos_experimental::order_operations {
     ) {
         let order_book = market.get_order_book_mut();
         order_book.decrease_single_order_size(account, order_id, size_delta);
-        let (order, _) = order_book.get_single_order(order_id).destroy_some().destroy_order_from_state();
+        let (order, _) =
+            order_book.get_single_order(order_id).destroy_some().destroy_order_from_state();
         let (order_request, _unique_priority_idx) = order.destroy_single_order();
-        let (user, order_id, client_order_id, price, orig_size, remaining_size, is_bid, trigger_condition, time_in_force, _creation_time_micros, metadata) = order_request.destroy_single_order_request();
+        let (
+            user,
+            order_id,
+            client_order_id,
+            price,
+            orig_size,
+            remaining_size,
+            is_bid,
+            trigger_condition,
+            time_in_force,
+            _creation_time_micros,
+            metadata
+        ) = order_request.destroy_single_order_request();
         callbacks.decrease_order_size(
             new_clearinghouse_order_info(
                 user,
@@ -183,9 +213,32 @@ module aptos_experimental::order_operations {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let (order_request, _unique_priority_idx) = order.destroy_single_order();
-        let (account, order_id, client_order_id, price, orig_size, remaining_size, is_bid, trigger_condition, time_in_force, _creation_time_micros, metadata) = order_request.destroy_single_order_request();
+        let (
+            account,
+            order_id,
+            client_order_id,
+            price,
+            orig_size,
+            remaining_size,
+            is_bid,
+            trigger_condition,
+            time_in_force,
+            _creation_time_micros,
+            metadata
+        ) = order_request.destroy_single_order_request();
         cleanup_order_internal(
-            account, order_id, client_order_id, single_order_type(), is_bid, time_in_force, remaining_size, price, trigger_condition, metadata, callbacks, false
+            account,
+            order_id,
+            client_order_id,
+            single_order_type(),
+            is_bid,
+            time_in_force,
+            remaining_size,
+            price,
+            trigger_condition,
+            metadata,
+            callbacks,
+            false
         );
         if (emit_event) {
             market.emit_event_for_order(
@@ -208,5 +261,4 @@ module aptos_experimental::order_operations {
             );
         }
     }
-
 }

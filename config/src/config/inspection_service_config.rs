@@ -21,6 +21,7 @@ pub struct InspectionServiceConfig {
     pub expose_identity_information: bool,
     pub expose_peer_information: bool,
     pub expose_system_information: bool,
+    pub num_threads: Option<usize>,
 }
 
 impl Default for InspectionServiceConfig {
@@ -32,6 +33,7 @@ impl Default for InspectionServiceConfig {
             expose_identity_information: true,
             expose_peer_information: true,
             expose_system_information: true,
+            num_threads: Some(2),
         }
     }
 }

@@ -28,7 +28,7 @@ use aptos_api_types::{
     Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
     TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_crypto::{hash::CryptoHash, signing_message};
+use aptos_crypto::signing_message;
 use aptos_logger::error;
 use aptos_types::{
     account_address::AccountAddress,
@@ -1319,6 +1319,13 @@ impl TransactionsApi {
                         ));
                     }
                 },
+                TransactionExecutable::Encrypted => {
+                    return Err(SubmitTransactionError::bad_request_with_code(
+                        "Encrypted executable is not supported in PayloadV1",
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    ));
+                },
             },
             TransactionPayload::EncryptedPayload(payload) => {
                 if !self.context.node_config.api.allow_encrypted_txns_submission {
@@ -1708,7 +1715,7 @@ impl TransactionsApi {
         let txn = aptos_types::transaction::Transaction::UserTransaction(txn);
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(
-            txn.hash(),
+            txn.committed_hash(),
             zero_hash,
             zero_hash,
             None,

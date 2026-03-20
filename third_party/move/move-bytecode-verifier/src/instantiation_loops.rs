@@ -23,7 +23,7 @@ use move_binary_format::{
 };
 use move_core_types::vm_status::StatusCode;
 use petgraph::{
-    algo::tarjan_scc,
+    algo::kosaraju_scc,
     graph::{EdgeIndex, NodeIndex},
     visit::EdgeRef,
     Graph,
@@ -97,7 +97,7 @@ impl<'a> InstantiationLoopChecker<'a> {
         match components.pop() {
             None => Ok(()),
             Some((nodes, edges)) => {
-                let msg_edges = edges
+                let mut msg_edges = edges
                     .into_iter()
                     .filter_map(
                         |edge_idx| match checker.graph.edge_weight(edge_idx).unwrap() {
@@ -105,13 +105,15 @@ impl<'a> InstantiationLoopChecker<'a> {
                             _ => None,
                         },
                     )
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let msg_nodes = nodes
+                    .collect::<Vec<_>>();
+                msg_edges.sort();
+                let msg_edges = msg_edges.join(", ");
+                let mut msg_nodes = nodes
                     .into_iter()
                     .map(|node_idx| checker.format_node(node_idx))
-                    .collect::<Vec<_>>()
-                    .join(", ");
+                    .collect::<Vec<_>>();
+                msg_nodes.sort();
+                let msg_nodes = msg_nodes.join(", ");
                 let msg = format!(
                     "edges with constructors: [{}], nodes: [{}]",
                     msg_edges, msg_nodes
@@ -137,37 +139,15 @@ impl<'a> InstantiationLoopChecker<'a> {
     /// Helper function that extracts type parameters from a given type.
     /// Duplicated entries are removed.
     fn extract_type_parameters(&self, ty: &SignatureToken) -> HashSet<TypeParameterIndex> {
-        use SignatureToken::*;
-
-        let mut type_params = HashSet::new();
-
-        fn rec(type_params: &mut HashSet<TypeParameterIndex>, ty: &SignatureToken) {
-            match ty {
-                Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64
-                | I128 | I256 | Signer | Struct(_) => (),
-                TypeParameter(idx) => {
-                    type_params.insert(*idx);
-                },
-                Vector(ty) => rec(type_params, ty),
-                Function(args, result, _) => {
-                    for ty in args {
-                        rec(type_params, ty);
-                    }
-                    for ty in result {
-                        rec(type_params, ty);
-                    }
-                },
-                Reference(ty) | MutableReference(ty) => rec(type_params, ty),
-                StructInstantiation(_, tys) => {
-                    for ty in tys {
-                        rec(type_params, ty);
-                    }
-                },
-            }
-        }
-
-        rec(&mut type_params, ty);
-        type_params
+        ty.preorder_traversal()
+            .filter_map(|tok| {
+                if let SignatureToken::TypeParameter(idx) = tok {
+                    Some(*idx)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Helper function that creates an edge from one given node to the other.
@@ -359,7 +339,7 @@ impl<'a> InstantiationLoopChecker<'a> {
     /// that an input type can get "bigger" infinitely many times along the loop, also creating
     /// infinitely many types. This is precisely the kind of constructs we want to forbid.
     fn find_non_trivial_components(&self) -> Vec<(Vec<NodeIndex>, Vec<EdgeIndex>)> {
-        tarjan_scc(&self.graph)
+        kosaraju_scc(&self.graph)
             .into_iter()
             .filter_map(move |nodes| {
                 let node_set: HashSet<_> = nodes.iter().cloned().collect();

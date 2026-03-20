@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-6:  publish [module 0x66::test]
+Error: error: native function cannot have a body or locals
+  ┌─ test:3:12
+  │
+3 │ native fun f(l0: u64): u64
+  │            ^
+
+

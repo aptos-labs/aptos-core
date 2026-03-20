@@ -1,0 +1,15 @@
+//# publish --print-bytecode
+module 0x66::test_struct_api_key_ability
+
+// Invalid: struct with key ability cannot have struct APIs.
+// The key ability marks a struct as a global storage resource,
+// which is incompatible with being passed as a transaction argument.
+struct S has key
+    x: u64
+
+// This pack function is otherwise valid in signature and bytecode, but must be
+// rejected because S has the key ability.
+#[pack] public fun pack$S(l0: u64): S
+    move_loc l0
+    pack S
+    ret

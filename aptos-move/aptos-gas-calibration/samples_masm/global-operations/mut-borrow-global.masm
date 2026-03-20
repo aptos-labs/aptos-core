@@ -1,0 +1,345 @@
+module 0xcafe::MutBorrowGlobal
+struct S1 has drop + key
+  x: u64
+
+struct S2 has drop + key
+  x: u64
+
+struct S3 has drop + key
+  x: u64
+
+struct S4 has drop + key
+  x: u64
+
+struct S5 has drop + key
+  x: u64
+
+struct S6 has drop + key
+  x: u64
+
+struct S7 has drop + key
+  x: u64
+
+struct S8 has drop + key
+  x: u64
+
+struct S9 has drop + key
+  x: u64
+
+struct S10 has drop + key
+  x: u64
+
+struct S11 has drop + key
+  x: u64
+
+struct S12 has drop + key
+  x: u64
+
+struct S13 has drop + key
+  x: u64
+
+struct S14 has drop + key
+  x: u64
+
+struct S15 has drop + key
+  x: u64
+
+struct S16 has drop + key
+  x: u64
+
+struct S17 has drop + key
+  x: u64
+
+struct S18 has drop + key
+  x: u64
+
+struct S19 has drop + key
+  x: u64
+
+struct S20 has drop + key
+  x: u64
+
+struct S21 has drop + key
+  x: u64
+
+struct S22 has drop + key
+  x: u64
+
+struct S23 has drop + key
+  x: u64
+
+struct S24 has drop + key
+  x: u64
+
+struct S25 has drop + key
+  x: u64
+
+struct S26 has drop + key
+  x: u64
+
+struct S27 has drop + key
+  x: u64
+
+struct S28 has drop + key
+  x: u64
+
+struct S29 has drop + key
+  x: u64
+
+struct S30 has drop + key
+  x: u64
+
+entry public fun calibrate_mut_borrow_global_x100(l0: signer) acquires S1, S2, S3, S4, S5, S6, S7, S8, S9, S10
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    ld_u64 0
+    pack S1
+    move_to S1
+    borrow_loc l0
+    ld_u64 0
+    pack S2
+    move_to S2
+    borrow_loc l0
+    ld_u64 0
+    pack S3
+    move_to S3
+    borrow_loc l0
+    ld_u64 0
+    pack S4
+    move_to S4
+    borrow_loc l0
+    ld_u64 0
+    pack S5
+    move_to S5
+    borrow_loc l0
+    ld_u64 0
+    pack S6
+    move_to S6
+    borrow_loc l0
+    ld_u64 0
+    pack S7
+    move_to S7
+    borrow_loc l0
+    ld_u64 0
+    pack S8
+    move_to S8
+    borrow_loc l0
+    ld_u64 0
+    pack S9
+    move_to S9
+    borrow_loc l0
+    ld_u64 0
+    pack S10
+    move_to S10
+l1: copy_loc l1
+    ld_u64 100
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_const<address> 51966
+    mut_borrow_global S1
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S2
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S3
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S4
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S5
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S6
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S7
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S8
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S9
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S10
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_mut_borrow_global_x500(l0: signer) acquires S11, S12, S13, S14, S15, S16, S17, S18, S19, S20
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    ld_u64 0
+    pack S11
+    move_to S11
+    borrow_loc l0
+    ld_u64 0
+    pack S12
+    move_to S12
+    borrow_loc l0
+    ld_u64 0
+    pack S13
+    move_to S13
+    borrow_loc l0
+    ld_u64 0
+    pack S14
+    move_to S14
+    borrow_loc l0
+    ld_u64 0
+    pack S15
+    move_to S15
+    borrow_loc l0
+    ld_u64 0
+    pack S16
+    move_to S16
+    borrow_loc l0
+    ld_u64 0
+    pack S17
+    move_to S17
+    borrow_loc l0
+    ld_u64 0
+    pack S18
+    move_to S18
+    borrow_loc l0
+    ld_u64 0
+    pack S19
+    move_to S19
+    borrow_loc l0
+    ld_u64 0
+    pack S20
+    move_to S20
+l1: copy_loc l1
+    ld_u64 500
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_const<address> 51966
+    mut_borrow_global S11
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S12
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S13
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S14
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S15
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S16
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S17
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S18
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S19
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S20
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_mut_borrow_global_x1500(l0: signer) acquires S21, S22, S23, S24, S25, S26, S27, S28, S29, S30
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    ld_u64 0
+    pack S21
+    move_to S21
+    borrow_loc l0
+    ld_u64 0
+    pack S22
+    move_to S22
+    borrow_loc l0
+    ld_u64 0
+    pack S23
+    move_to S23
+    borrow_loc l0
+    ld_u64 0
+    pack S24
+    move_to S24
+    borrow_loc l0
+    ld_u64 0
+    pack S25
+    move_to S25
+    borrow_loc l0
+    ld_u64 0
+    pack S26
+    move_to S26
+    borrow_loc l0
+    ld_u64 0
+    pack S27
+    move_to S27
+    borrow_loc l0
+    ld_u64 0
+    pack S28
+    move_to S28
+    borrow_loc l0
+    ld_u64 0
+    pack S29
+    move_to S29
+    borrow_loc l0
+    ld_u64 0
+    pack S30
+    move_to S30
+l1: copy_loc l1
+    ld_u64 1500
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_const<address> 51966
+    mut_borrow_global S21
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S22
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S23
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S24
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S25
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S26
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S27
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S28
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S29
+    pop
+    ld_const<address> 51966
+    mut_borrow_global S30
+    pop
+    branch l1
+l0: ret

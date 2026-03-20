@@ -1,8 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-/// The maximum content length to accept in the http body.
+/// The maximum content length to accept in the http body (compressed).
 pub const MAX_CONTENT_LENGTH: u64 = 1024 * 1024;
+
+/// The maximum decompressed content length to accept (10x compressed limit).
+/// Protects against decompression bomb attacks.
+pub const MAX_DECOMPRESSED_LENGTH: usize = 10 * 1024 * 1024;
 
 /// GCP Header field for the current request's trace ID.
 pub const GCP_CLOUD_TRACE_CONTEXT_HEADER: &str = "X-Cloud-Trace-Context";

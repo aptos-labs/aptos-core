@@ -1,0 +1,33 @@
+//# publish
+module 0x1::M1
+struct S1<phantom T0>
+  a: u64
+
+struct S2<phantom T0>
+  a: S1<T0>
+  b: vector<S1<T0>>
+
+struct S3<T0>
+  a: u64
+
+struct S4<phantom T0, T1, phantom T2, T3>
+  a: T1
+  b: T3
+
+
+
+//# publish
+module 0x1::M2
+use 0x1::M1
+struct S<phantom T0>
+  a: M1::S2<M1::S1<T0>>
+
+
+
+//# publish
+module 0x1::M3
+struct S1<phantom T0: copy>
+  a: u64
+
+struct S2<phantom T0: copy + drop + store>
+  a: S1<T0>

@@ -1,0 +1,10 @@
+//# publish --print-bytecode
+module 0x66::test_unpack_wrong_param_count
+
+struct S
+    x: u64
+
+// Invalid: unpack$S must have exactly one parameter (the struct to unpack)
+#[unpack] public fun unpack$S(): u64
+    ld_u64 0
+    ret

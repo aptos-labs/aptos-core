@@ -47,7 +47,8 @@ spec aptos_framework::reconfiguration {
         pragma aborts_if_is_strict;
 
         // After genesis, `Configuration` exists.
-        invariant [suspendable] chain_status::is_operating() ==> exists<Configuration>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==>
+            exists<Configuration>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==>
             (timestamp::spec_now_microseconds() >= last_reconfiguration_time());
     }
@@ -79,15 +80,13 @@ spec aptos_framework::reconfiguration {
         /// [high-level-req-1]
         ensures exists<Configuration>(@aptos_framework);
         ensures config.epoch == 0 && config.last_reconfiguration_time == 0;
-        ensures config.events == event::EventHandle<NewEpochEvent> {
-            counter: 0,
-            guid: guid::GUID {
-                id: guid::ID {
-                    creation_num: 2,
-                    addr: @aptos_framework
+        ensures config.events
+            == event::EventHandle<NewEpochEvent> {
+                counter: 0,
+                guid: guid::GUID {
+                    id: guid::ID { creation_num: 2, addr: @aptos_framework }
                 }
-            }
-        };
+            };
     }
 
     spec current_epoch(): u64 {
@@ -122,35 +121,49 @@ spec aptos_framework::reconfiguration {
 
     spec last_reconfiguration_time {
         aborts_if !exists<Configuration>(@aptos_framework);
-        ensures result == global<Configuration>(@aptos_framework).last_reconfiguration_time;
+        ensures result
+            == global<Configuration>(@aptos_framework).last_reconfiguration_time;
     }
 
     spec reconfigure {
         use aptos_framework::aptos_coin;
         use aptos_framework::staking_config;
+        use std::features;
 
         // TODO: set because of timeout (property proved)
         pragma verify = true;
         pragma verify_duration_estimate = 600;
 
-        let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
-            && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
-        include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
+        let success = !(
+            chain_status::is_genesis()
+                || timestamp::spec_now_microseconds() == 0
+                || !reconfiguration_enabled()
+        )
+            && timestamp::spec_now_microseconds()
+                != global<Configuration>(@aptos_framework).last_reconfiguration_time;
+        include features::spec_periodical_reward_rate_decrease_enabled() ==>
+            staking_config::StakingRewardsConfigEnabledRequirement;
         include success ==> aptos_coin::ExistsAptosCoin;
         aborts_if false;
         // The ensure conditions of the reconfigure function are not fully written, because there is a new cycle in it,
         // but its existing ensure conditions satisfy hp.
         // The property below is not proved within 500s and still cause an timeout
         // property 3: Synchronization of NewEpochEvent counter with configuration epoch.
-        ensures success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch) + 1;
-        ensures success ==> global<Configuration>(@aptos_framework).last_reconfiguration_time == timestamp::spec_now_microseconds();
+        ensures success ==>
+            global<Configuration>(@aptos_framework).epoch
+                == old(global<Configuration>(@aptos_framework).epoch) + 1;
+        ensures success ==>
+            global<Configuration>(@aptos_framework).last_reconfiguration_time
+                == timestamp::spec_now_microseconds();
         // We remove the ensures of event increment due to inconsisency
         // TODO: property 4: Only performs reconfiguration if genesis has started and reconfiguration is enabled.
         // Also, the last reconfiguration must not be the current time, returning early without further actions otherwise.
         // property 5: Consecutive reconfigurations without the passage of time are not permitted.
         /// [high-level-req-4]
         /// [high-level-req-5]
-        ensures !success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch);
+        ensures !success ==>
+            global<Configuration>(@aptos_framework).epoch
+                == old(global<Configuration>(@aptos_framework).epoch);
     }
 
     spec reconfiguration_enabled {

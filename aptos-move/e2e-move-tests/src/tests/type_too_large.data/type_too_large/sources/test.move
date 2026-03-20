@@ -1,73 +1,82 @@
+/// This module defines a chain of unique structs where each struct contains the previous one
+/// plus 7 primitive fields. Since every struct is unique, the DAG-based StructLayoutCache
+/// never gets a cache hit, so the total type node count grows linearly.
+///
+/// Each struct contributes 8 nodes (1 struct node + 7 primitive fields).
+/// S64 has 8 * 65 = 520 nodes, which exceeds the 512-node limit.
+/// The limit is enforced at runtime when constructing the type layout for bcs::to_bytes.
 module 0xbeef::test {
 
-    struct A0 has drop { a: u64 }
-    struct A1 has drop { a: A0, b: A0 }
-    struct A2 has drop { a: A1, b: A1 }
-    struct A3 has drop { a: A2, b: A2 }
-    struct A4 has drop { a: A3, b: A3 }
-    struct A5 has drop { a: A4, b: A4 }
-    struct A6 has drop { a: A5, b: A5 }
-    struct A7 has drop { a: A6, b: A6 }
-    struct A8 has drop { a: A7, b: A7 }
-    struct A9 has drop { a: A8, b: A8 }
-    struct A10 has drop { a: A9, b: A9 }
-    struct A11 has drop { a: A10, b: A10 }
-    struct A12 has drop { a: A11, b: A11 }
-    struct A13 has drop { a: A12, b: A12 }
-    struct A14 has drop { a: A13, b: A13 }
-    struct A15 has drop { a: A14, b: A14 }
-    struct A16 has drop { a: A15, b: A15 }
-    struct A17 has drop { a: A16, b: A16 }
-    struct A18 has drop { a: A17, b: A17 }
-    struct A19 has drop { a: A18, b: A18 }
-    struct A20 has drop { a: A19, b: A19 }
-    struct A21 has drop { a: A20, b: A20 }
-    struct A22 has drop { a: A21, b: A21 }
-    struct A23 has drop { a: A22, b: A22 }
-    struct A24 has drop { a: A23, b: A23 }
-    struct A25 has drop { a: A24, b: A24 }
-    struct A26 has drop { a: A25, b: A25 }
-    struct A27 has drop { a: A26, b: A26 }
-    struct A28 has drop { a: A27, b: A27 }
-    struct A29 has drop { a: A28, b: A28 }
-    struct A30 has drop { a: A29, b: A29 }
-    struct A31 has drop { a: A30, b: A30 }
-    struct A32 has drop { a: A31, b: A31 }
-    struct A33 has drop { a: A32, b: A32 }
-    struct A34 has drop { a: A33, b: A33 }
-    struct A35 has drop { a: A34, b: A34 }
-    struct A36 has drop { a: A35, b: A35 }
-    struct A37 has drop { a: A36, b: A36 }
-    struct A38 has drop { a: A37, b: A37 }
-    struct A39 has drop { a: A38, b: A38 }
-    struct A40 has drop { a: A39, b: A39 }
-    struct A41 has drop { a: A40, b: A40 }
-    struct A42 has drop { a: A41, b: A41 }
-    struct A43 has drop { a: A42, b: A42 }
-    struct A44 has drop { a: A43, b: A43 }
-    struct A45 has drop { a: A44, b: A44 }
-    struct A46 has drop { a: A45, b: A45 }
-    struct A47 has drop { a: A46, b: A46 }
-    struct A48 has drop { a: A47, b: A47 }
-    struct A49 has drop { a: A48, b: A48 }
-    struct A50 has drop { a: A49, b: A49 }
-    struct A51 has drop { a: A50, b: A50 }
-    struct A52 has drop { a: A51, b: A51 }
-    struct A53 has drop { a: A52, b: A52 }
-    struct A54 has drop { a: A53, b: A53 }
-    struct A55 has drop { a: A54, b: A54 }
-    struct A56 has drop { a: A55, b: A55 }
-    struct A57 has drop { a: A56, b: A56 }
-    struct A58 has drop { a: A57, b: A57 }
-    struct A59 has drop { a: A58, b: A58 }
-    struct A60 has drop { a: A59, b: A59 }
-    struct A61 has drop { a: A60, b: A60 }
-    struct A62 has drop { a: A61, b: A61 }
-    struct A63 has drop { a: A62, b: A62 }
+    struct S0 has drop { f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S1 has drop { inner: S0, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S2 has drop { inner: S1, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S3 has drop { inner: S2, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S4 has drop { inner: S3, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S5 has drop { inner: S4, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S6 has drop { inner: S5, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S7 has drop { inner: S6, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S8 has drop { inner: S7, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S9 has drop { inner: S8, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S10 has drop { inner: S9, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S11 has drop { inner: S10, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S12 has drop { inner: S11, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S13 has drop { inner: S12, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S14 has drop { inner: S13, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S15 has drop { inner: S14, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S16 has drop { inner: S15, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S17 has drop { inner: S16, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S18 has drop { inner: S17, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S19 has drop { inner: S18, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S20 has drop { inner: S19, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S21 has drop { inner: S20, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S22 has drop { inner: S21, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S23 has drop { inner: S22, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S24 has drop { inner: S23, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S25 has drop { inner: S24, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S26 has drop { inner: S25, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S27 has drop { inner: S26, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S28 has drop { inner: S27, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S29 has drop { inner: S28, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S30 has drop { inner: S29, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S31 has drop { inner: S30, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S32 has drop { inner: S31, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S33 has drop { inner: S32, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S34 has drop { inner: S33, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S35 has drop { inner: S34, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S36 has drop { inner: S35, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S37 has drop { inner: S36, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S38 has drop { inner: S37, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S39 has drop { inner: S38, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S40 has drop { inner: S39, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S41 has drop { inner: S40, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S42 has drop { inner: S41, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S43 has drop { inner: S42, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S44 has drop { inner: S43, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S45 has drop { inner: S44, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S46 has drop { inner: S45, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S47 has drop { inner: S46, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S48 has drop { inner: S47, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S49 has drop { inner: S48, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S50 has drop { inner: S49, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S51 has drop { inner: S50, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S52 has drop { inner: S51, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S53 has drop { inner: S52, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S54 has drop { inner: S53, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S55 has drop { inner: S54, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S56 has drop { inner: S55, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S57 has drop { inner: S56, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S58 has drop { inner: S57, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S59 has drop { inner: S58, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S60 has drop { inner: S59, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S61 has drop { inner: S60, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S62 has drop { inner: S61, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S63 has drop { inner: S62, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
+    struct S64 has drop { inner: S63, f0: u8, f1: u16, f2: u32, f3: u64, f4: u128, f5: bool, f6: address }
 
-    use std::bcs; use std::vector;
+    use std::bcs;
+    use std::vector;
 
     public entry fun run() {
-      bcs::to_bytes<vector<A63>>(&vector::empty());
+        bcs::to_bytes<vector<S64>>(&vector::empty());
     }
 }

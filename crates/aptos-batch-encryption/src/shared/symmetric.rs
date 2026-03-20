@@ -2,21 +2,17 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     errors::BatchEncryptionError,
-    group::{Fq, G1Affine, G2Affine},
+    group::{G1Affine, G1Config, G1Projective, G2Affine},
     traits::Plaintext,
 };
 use aes_gcm::{aead::Aead as _, aes::Aes128, AeadCore, Aes128Gcm, AesGcm, Key, KeySizeUser, Nonce};
 use anyhow::Result;
-use ark_ec::{short_weierstrass::SWCurveConfig, AffineRepr};
-use ark_ff::{
-    field_hashers::{DefaultFieldHasher, HashToField},
-    Field,
+use ark_ec::hashing::{
+    curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurveBasedHasher, HashToCurve,
 };
+use ark_ff::field_hashers::DefaultFieldHasher;
 use ark_serialize::CanonicalSerialize as _;
-use ark_std::{
-    rand::{CryptoRng, RngCore},
-    Zero,
-};
+use ark_std::rand::{CryptoRng, RngCore};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{
@@ -42,11 +38,29 @@ pub struct OneTimePad(GenericArray<u8, KeySize>);
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct OneTimePaddedKey(GenericArray<u8, KeySize>);
 
+impl OneTimePaddedKey {
+    #[cfg(test)]
+    pub(crate) fn blank_for_testing() -> Self {
+        let blank = vec![0; 16];
+        Self(GenericArray::clone_from_slice(blank.as_slice()))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct SymmetricCiphertext {
     nonce: SymmetricNonce,
     #[serde(with = "serde_bytes")]
     ct_body: Vec<u8>,
+}
+
+impl SymmetricCiphertext {
+    #[cfg(test)]
+    pub(crate) fn blank_for_testing() -> Self {
+        Self {
+            nonce: SymmetricNonce::default(),
+            ct_body: vec![],
+        }
+    }
 }
 
 impl OneTimePad {
@@ -74,7 +88,6 @@ impl SymmetricKey {
         use aes_gcm::KeyInit as _; // putting this in the global scope causes Hmac<Sha256> to be
                                    // ambiguous for some reason
 
-        // unwrap is safe here b/c the above array is of the correct size
         Self(Aes128Gcm::generate_key(rng))
     }
 
@@ -123,57 +136,55 @@ impl SymmetricKey {
     }
 }
 
+/// Domain separation salt for the OTP KDF.
+/// This must be identical between Rust and TypeScript implementations.
+const HKDF_SALT: &[u8] = b"APTOS_BATCH_ENCRYPTION_OTP";
+
+/// Derives a 32-byte key from high-entropy source bytes using HKDF (RFC 5869).
+///
+/// This is a manual implementation of HKDF-SHA256 to avoid dependency version conflicts.
+/// HKDF consists of two steps:
+/// 1. Extract: PRK = HMAC-Hash(salt, IKM)
+/// 2. Expand: OKM = HMAC-Hash(PRK, info || 0x01)
+///
+/// For 32-byte output with SHA256, only one expand iteration is needed.
 pub fn hmac_kdf(
     otp_source: impl AsRef<[u8]>,
 ) -> GenericArray<u8, <Sha256 as OutputSizeUser>::OutputSize> {
-    // TODO should we use this instead? https://docs.rs/hkdf/latest/hkdf/
-    let mut mac: Hmac<Sha256> = Hmac::new_from_slice(b"") // TODO should I put a key here?
-        .expect("HMAC can take key of any size");
-    // TODO should this be an option or result?
-    mac.update(otp_source.as_ref());
-    mac.finalize().into_bytes()
+    // HKDF-Extract: PRK = HMAC-Hash(salt, IKM)
+    let mut extract_mac: Hmac<Sha256> =
+        Hmac::new_from_slice(HKDF_SALT).expect("HMAC can take key of any size");
+    extract_mac.update(otp_source.as_ref());
+    let prk = extract_mac.finalize().into_bytes();
+
+    // HKDF-Expand: OKM = HMAC-Hash(PRK, info || 0x01)
+    // info is empty, so we just append 0x01
+    let mut expand_mac: Hmac<Sha256> =
+        Hmac::new_from_slice(&prk).expect("HMAC can take key of any size");
+    expand_mac.update(&[0x01]);
+    expand_mac.finalize().into_bytes()
 }
 
-/// hash-2-curve for bn254. Taken from p. 23 of
-/// https://wahby.net/bls-hash-ches19-talk.pdf
-///
-/// On the number of iterations: In bn254, the order of G1 is
-/// approximately the same as the size of the field Fq. Every
-/// x coordinate either maps to exactly two curve points (x, y)
-/// and (x, -y), or to exactly zero curve points. So there are
-/// |G2|/2 \approx |F_q|/2 possible x coordinates for the points
-/// on G2. This means that each iteration of the below algorithm
-/// has approximately probability 1/2 of succeeding on a random
-/// input (modeling the hash as a random oracle), and thus the
-/// probability of failure of this fn is 1/2^256 on a random
-/// input.
+/// Domain separation tag for hash-to-curve.
+/// This must be identical between Rust and TypeScript implementations.
+const HASH_G2_ELEMENT_DST: &[u8] = b"APTOS_BATCH_ENCRYPTION_HASH_G2_ELEMENT";
+
+/// Type alias for the hash-to-curve hasher for BLS12-381 G1.
+type G1Hasher = MapToCurveBasedHasher<G1Projective, DefaultFieldHasher<Sha256>, WBMap<G1Config>>;
+
+/// Hash a G2 element to a G1 element using the standard hash-to-curve algorithm (RFC 9380).
+/// This uses the WB (Wahby-Boneh) map.
 pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
-    for ctr in 0..=u8::MAX {
-        let mut hash_source_bytes = Vec::new();
-        g2_element
-            .serialize_compressed(&mut hash_source_bytes)
-            .unwrap();
-        let mut ctr_bytes = Vec::from([ctr]);
-        hash_source_bytes.append(&mut ctr_bytes);
-        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fq>>::new(&[]);
-        let [x]: [Fq; 1] = field_hasher.hash_to_field::<1>(&hash_source_bytes);
+    let mut bytes = Vec::new();
+    g2_element.serialize_compressed(&mut bytes)?;
 
-        // Rust does not optimise away addition with zero
-        use crate::group::G1Config;
-        let mut x3b = G1Config::add_b(x.square() * x);
-        if !G1Config::COEFF_A.is_zero() {
-            x3b += G1Config::mul_by_a(x);
-        };
+    let hasher =
+        G1Hasher::new(HASH_G2_ELEMENT_DST).map_err(|_| BatchEncryptionError::Hash2CurveFailure)?;
+    let point: G1Affine = hasher
+        .hash(&bytes)
+        .map_err(|_| BatchEncryptionError::Hash2CurveFailure)?;
 
-        // TODO vary the sign of y??
-        if let Some(x3b_sqrt) = x3b.sqrt() {
-            let p = G1Affine::new_unchecked(x, x3b_sqrt).mul_by_cofactor();
-            assert!(p.is_in_correct_subgroup_assuming_on_curve());
-            return Ok(p);
-        }
-    }
-
-    Err(BatchEncryptionError::Hash2CurveFailure)?
+    Ok(point)
 }
 
 #[cfg(test)]

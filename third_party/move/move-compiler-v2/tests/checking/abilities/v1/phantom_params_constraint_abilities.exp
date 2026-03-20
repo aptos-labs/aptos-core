@@ -92,6 +92,6 @@ module 0x42::M {
     fun f3<T1: drop, T2: copy, T3: store, T4: key>() {
     }
     fun f4() {
-        f3<HasDrop<NoAbilities, u64>,HasCopy<NoAbilities, u64>,HasStore<NoAbilities, u64>,HasKey<NoAbilities, u64>>();
+        f3<HasDrop<NoAbilities, u64>, HasCopy<NoAbilities, u64>, HasStore<NoAbilities, u64>, HasKey<NoAbilities, u64>>();
     }
 }

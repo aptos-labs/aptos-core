@@ -112,7 +112,7 @@ module 0x42::m {
         greater(&0x1::vector::borrow<S>(&v, 0).t.w, w)
     }
     fun boo_greater_(v: vector<S>, w: W): bool {
-        greater(/*freeze*/&mut 0x1::vector::borrow_mut<S>(&mut v, 0).t.w, w)
+        greater(&mut 0x1::vector::borrow_mut<S>(&mut v, 0).t.w, w)
     }
     fun boo_greater_2(v: vector<W>, w: W): bool {
         greater(0x1::vector::borrow<W>(&v, 0), w)
@@ -153,7 +153,7 @@ module 0x42::m {
     fun foo_greater_(account: address, w: W): bool
         acquires S
     {
-        greater(/*freeze*/&mut borrow_global_mut<S>(account).t.w, w)
+        greater(&mut borrow_global_mut<S>(account).t.w, w)
     }
     fun foo_greater_2(account: address, w: W): bool
         acquires W

@@ -2577,7 +2577,7 @@ mod test {
     }
 
     fn create_struct_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![inner]))
+        MoveTypeLayout::new_struct(MoveStructLayout::new(vec![inner]))
     }
 
     fn create_vector_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
@@ -2585,14 +2585,14 @@ mod test {
     }
 
     fn create_aggregator_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+        MoveTypeLayout::new_struct(MoveStructLayout::new(vec![
             MoveTypeLayout::Native(IdentifierMappingKind::Aggregator, Box::new(inner.clone())),
             inner,
         ]))
     }
 
     fn create_aggregator_storage_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![inner.clone(), inner.clone()]))
+        MoveTypeLayout::new_struct(MoveStructLayout::new(vec![inner.clone(), inner.clone()]))
     }
 
     fn create_aggregator_layout_u64() -> MoveTypeLayout {
@@ -2600,11 +2600,11 @@ mod test {
     }
 
     fn create_snapshot_storage_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![inner]))
+        MoveTypeLayout::new_struct(MoveStructLayout::new(vec![inner]))
     }
 
     fn create_snapshot_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Native(
+        MoveTypeLayout::new_struct(MoveStructLayout::new(vec![MoveTypeLayout::Native(
             IdentifierMappingKind::Snapshot,
             Box::new(inner),
         )]))
@@ -2613,7 +2613,7 @@ mod test {
     fn create_derived_string_layout() -> MoveTypeLayout {
         MoveTypeLayout::Native(
             IdentifierMappingKind::DerivedString,
-            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+            Box::new(MoveTypeLayout::new_struct(MoveStructLayout::new(vec![
                 create_string_layout(),
                 create_vector_layout(MoveTypeLayout::U8),
             ]))),
@@ -2621,14 +2621,14 @@ mod test {
     }
 
     fn create_derived_string_storage_layout() -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+        MoveTypeLayout::new_struct(MoveStructLayout::new(vec![
             create_string_layout(),
             create_vector_layout(MoveTypeLayout::U8),
         ]))
     }
 
     fn create_string_layout() -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![MoveTypeLayout::Vector(
+        MoveTypeLayout::new_struct(MoveStructLayout::Runtime(vec![MoveTypeLayout::Vector(
             Box::new(MoveTypeLayout::U8),
         )]))
     }
@@ -2677,7 +2677,7 @@ mod test {
         );
 
         // Test id -- value exchange for a value that does not contain delayed fields
-        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+        let layout = MoveTypeLayout::new_struct(MoveStructLayout::new(vec![
             MoveTypeLayout::U64,
             MoveTypeLayout::U64,
             MoveTypeLayout::U64,

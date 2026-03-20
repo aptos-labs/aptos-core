@@ -13,7 +13,7 @@ use k8s_openapi::api::{
     rbac::v1::RoleBinding,
 };
 use kube::{
-    api::{ObjectMeta, PostParams},
+    api::{DeleteParams, ObjectMeta, PostParams},
     ResourceExt,
 };
 use log::info;
@@ -162,11 +162,13 @@ impl ForgeDeployerManager {
     }
 
     /**
-     * Start the deployer job in the cluster. Ensures the namespace is prepared and then creates the configmap and job.
-     * This will fail if the job or configmap already exists in the namespace.
+     * Start the deployer job in the cluster. Ensures the namespace is prepared, cleans up any
+     * pre-existing deployer resources (from interrupted previous runs), then creates the
+     * configmap and job.
      */
     pub async fn start(&self, config: serde_json::Value) -> Result<()> {
         self.ensure_namespace_prepared().await?;
+        self.cleanup_deployer_resources().await;
         let config_map = self.build_forge_deployer_k8s_config_map(config)?;
         let job = self.build_forge_deployer_k8s_job(config_map.name())?;
         info!("Creating forge deployer configmap: {}", config_map.name());
@@ -176,6 +178,46 @@ impl ForgeDeployerManager {
         info!("Creating forge deployer job: {}", job.name());
         self.jobs_api.create(&PostParams::default(), &job).await?;
         Ok(())
+    }
+
+    /// Clean up any pre-existing deployer resources (configmap and job) from a previous run.
+    /// This handles the case where a CI run was interrupted before cleanup could happen,
+    /// leaving behind resources that would cause 409 AlreadyExists errors.
+    /// Errors are logged and ignored since the resources may not exist.
+    async fn cleanup_deployer_resources(&self) {
+        let name = self.get_name();
+        info!("Cleaning up pre-existing deployer resources for: {}", &name);
+
+        // Delete the job first, then the configmap (reverse order of creation)
+        match self.jobs_api.delete(&name, &DeleteParams::default()).await {
+            Ok(_) => info!("Deleted pre-existing deployer job: {}", &name),
+            Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
+                info!("No pre-existing deployer job found: {}", &name);
+            },
+            Err(e) => {
+                info!(
+                    "Failed to delete pre-existing deployer job {}: {:?}. Continuing anyway.",
+                    &name, e
+                );
+            },
+        }
+
+        match self
+            .config_maps_api
+            .delete(&name, &DeleteParams::default())
+            .await
+        {
+            Ok(_) => info!("Deleted pre-existing deployer configmap: {}", &name),
+            Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
+                info!("No pre-existing deployer configmap found: {}", &name);
+            },
+            Err(e) => {
+                info!(
+                    "Failed to delete pre-existing deployer configmap {}: {:?}. Continuing anyway.",
+                    &name, e
+                );
+            },
+        }
     }
 
     fn build_namespace(&self) -> Namespace {
@@ -301,8 +343,8 @@ mod tests {
             .unwrap_or_else(|_| panic!("Expected configmap {} to exist", indexer_deployer_name));
     }
 
-    /// Test starting a deployer with an existing job in the namespace. This should fail as the job already exists
-    /// and we cannot override/mutate it.
+    /// Test starting a deployer with an existing job in the namespace. The deployer should
+    /// clean up the pre-existing resources and succeed.
     #[tokio::test]
     async fn test_start_deployer_existing_job() {
         let mut manager = get_mock_forge_deployer_manager();
@@ -322,8 +364,41 @@ mod tests {
             },
             ..Default::default()
         }));
-        let result = manager.start(config).await;
-        assert!(result.is_err());
+        // Should succeed because start() cleans up pre-existing resources
+        manager.start(config).await.unwrap();
+    }
+
+    /// Test starting a deployer with both an existing job and configmap. The deployer should
+    /// clean up both pre-existing resources and succeed.
+    #[tokio::test]
+    async fn test_start_deployer_existing_job_and_configmap() {
+        let mut manager = get_mock_forge_deployer_manager();
+        let config = serde_json::from_value(json!(
+            {
+                "profile": "large-banana",
+                "era": "1",
+                "namespace": manager.namespace.clone(),
+            }
+        ))
+        .expect("Issue creating Forge deployer config");
+        manager.jobs_api = Arc::new(MockK8sResourceApi::from_resource(Job {
+            metadata: ObjectMeta {
+                name: Some(manager.get_name()),
+                namespace: Some(manager.namespace.clone()),
+                ..Default::default()
+            },
+            ..Default::default()
+        }));
+        manager.config_maps_api = Arc::new(MockK8sResourceApi::from_resource(ConfigMap {
+            metadata: ObjectMeta {
+                name: Some(manager.get_name()),
+                namespace: Some(manager.namespace.clone()),
+                ..Default::default()
+            },
+            ..Default::default()
+        }));
+        // Should succeed because start() cleans up pre-existing resources
+        manager.start(config).await.unwrap();
     }
 
     /// Test ensure_namespace_prepared creates the namespace, serviceaccount, and rolebinding

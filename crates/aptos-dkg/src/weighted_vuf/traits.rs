@@ -82,5 +82,6 @@ pub trait WeightedVUF {
         apks: &[Option<Self::AugmentedPubKeyShare>],
         msg: &[u8],
         proof: &Self::Proof,
+        thread_pool: &ThreadPool,
     ) -> anyhow::Result<()>;
 }

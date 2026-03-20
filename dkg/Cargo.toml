@@ -20,6 +20,7 @@ aptos-config = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-dkg = { workspace = true }
 aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -29,9 +30,11 @@ aptos-network = { workspace = true }
 aptos-reliable-broadcast = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-safety-rules = { workspace = true }
+aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }
+ark-std = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -43,6 +46,7 @@ move-core-types = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+serde_bytes = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
 
@@ -51,3 +55,6 @@ aptos-types = { workspace = true, features = ["testing"] }
 
 [features]
 smoke-test = []
+
+[package.metadata.cargo-machete]
+ignored = ["ark-std", "serde_bytes"]

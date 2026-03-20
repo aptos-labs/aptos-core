@@ -12,7 +12,7 @@ proptest! {
         txns in vec(any::<EntryFunctionCall>(), 0..10),
     ) {
         let executor = FakeExecutor::from_head_genesis();
-        let accounts = vec![
+        let accounts = [
             (Account::new_aptos_root(), 0),
         ];
         let num_accounts = accounts.len();

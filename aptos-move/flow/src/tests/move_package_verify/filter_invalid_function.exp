@@ -1,0 +1,1 @@
+rpc_error: Mcp error: -32602: no function matching `hello::nonexistent` found in target modules

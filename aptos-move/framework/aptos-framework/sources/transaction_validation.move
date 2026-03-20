@@ -7,9 +7,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::account;
     use aptos_framework::aptos_account;
     use aptos_framework::account_abstraction;
-    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
-    use aptos_framework::coin;
     use aptos_framework::create_signer;
     use aptos_framework::permissioned_signer;
     use aptos_framework::system_addresses;
@@ -196,17 +194,10 @@ module aptos_framework::transaction_validation {
                 ),
                 error::permission_denied(PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT)
             );
-            if (features::operations_default_to_fa_apt_store_enabled()) {
-                assert!(
-                    aptos_account::is_fungible_balance_at_least(gas_payer_address, max_transaction_fee),
-                    error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
-                );
-            } else {
-                assert!(
-                    coin::is_balance_at_least<AptosCoin>(gas_payer_address, max_transaction_fee),
-                    error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
-                );
-            }
+            assert!(
+                aptos_account::is_fungible_balance_at_least(gas_payer_address, max_transaction_fee),
+                error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
+            );
         };
     }
 
@@ -603,17 +594,10 @@ module aptos_framework::transaction_validation {
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
         if (!skip_gas_payment(is_simulation, gas_payer)) {
-            if (features::operations_default_to_fa_apt_store_enabled()) {
-                assert!(
-                    aptos_account::is_fungible_balance_at_least(gas_payer, transaction_fee_amount),
-                    error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-                );
-            } else {
-                assert!(
-                    coin::is_balance_at_least<AptosCoin>(gas_payer, transaction_fee_amount),
-                    error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-                );
-            };
+            assert!(
+                aptos_account::is_fungible_balance_at_least(gas_payer, transaction_fee_amount),
+                error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+            );
 
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
@@ -823,17 +807,10 @@ module aptos_framework::transaction_validation {
             is_simulation,
             gas_payer_address
         )) {
-            if (features::operations_default_to_fa_apt_store_enabled()) {
-                assert!(
-                    aptos_account::is_fungible_balance_at_least(gas_payer_address, transaction_fee_amount),
-                    error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-                );
-            } else {
-                assert!(
-                    coin::is_balance_at_least<AptosCoin>(gas_payer_address, transaction_fee_amount),
-                    error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-                );
-            };
+            assert!(
+                aptos_account::is_fungible_balance_at_least(gas_payer_address, transaction_fee_amount),
+                error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+            );
 
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;

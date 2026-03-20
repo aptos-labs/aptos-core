@@ -37,15 +37,13 @@ use aptos_peer_monitoring_service_types::{
     },
     PeerMonitoringMetadata, PeerMonitoringServiceError, PeerMonitoringServiceMessage,
 };
-use aptos_storage_interface::{DbReader, LedgerSummary, Order};
+use aptos_storage_interface::{DbReader, LedgerSummary};
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
-    contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
-    event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     network_address::NetworkAddress,
     proof::{AccumulatorConsistencyProof, SparseMerkleProof, TransactionAccumulatorSummary},
@@ -55,8 +53,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, TransactionListWithProofV2,
-        TransactionOutputListWithProofV2, TransactionWithProof, Version,
+        TransactionListWithProofV2, TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
     PeerId,
 };
@@ -94,13 +91,17 @@ async fn test_get_server_protocol_version() {
 
 #[tokio::test]
 async fn test_get_network_information_fullnode() {
-    // Create the peer monitoring client and server
+    // Create the peer monitoring client and server (with sanitization disabled)
     let base_config = BaseConfig {
         role: RoleType::FullNode, // The server is a fullnode
         ..Default::default()
     };
+    let peer_monitoring_config = PeerMonitoringServiceConfig {
+        enable_metadata_sanitization: false,
+        ..Default::default()
+    };
     let (mut mock_client, service, _, peers_and_metadata) =
-        MockClient::new(Some(base_config), None, None);
+        MockClient::new(Some(base_config), Some(peer_monitoring_config), None);
     tokio::spawn(service.start());
 
     // Process a client request to fetch the network information and verify an empty response
@@ -215,13 +216,17 @@ async fn test_get_network_information_fullnode() {
 
 #[tokio::test]
 async fn test_get_network_information_validator() {
-    // Create the peer monitoring client and server
+    // Create the peer monitoring client and server (with sanitization disabled)
     let base_config = BaseConfig {
         role: RoleType::Validator, // The server is a validator
         ..Default::default()
     };
+    let peer_monitoring_config = PeerMonitoringServiceConfig {
+        enable_metadata_sanitization: false,
+        ..Default::default()
+    };
     let (mut mock_client, service, _, peers_and_metadata) =
-        MockClient::new(Some(base_config), None, None);
+        MockClient::new(Some(base_config), Some(peer_monitoring_config), None);
     tokio::spawn(service.start());
 
     // Process a client request to fetch the network information and verify
@@ -328,10 +333,14 @@ async fn test_get_node_information() {
         .expect_get_first_txn_version()
         .returning(move || Ok(Some(lowest_available_version)));
 
-    // Create the peer monitoring client and server
+    // Create the peer monitoring client and server (with sanitization disabled)
     let storage_reader = StorageReader::new(Arc::new(mock_db_reader));
+    let peer_monitoring_config = PeerMonitoringServiceConfig {
+        enable_metadata_sanitization: false,
+        ..Default::default()
+    };
     let (mut mock_client, service, time_service, _) =
-        MockClient::new(None, None, Some(storage_reader));
+        MockClient::new(None, Some(peer_monitoring_config), Some(storage_reader));
     tokio::spawn(service.start());
 
     // Process a client request to fetch the node information and verify the response
@@ -383,6 +392,105 @@ async fn test_latency_ping_request() {
             },
             _ => panic!("Expected latency ping response but got: {:?}", response),
         }
+    }
+}
+
+#[tokio::test]
+async fn test_get_network_information_sanitization() {
+    // Create the peer monitoring client and server (with sanitization enabled)
+    let base_config = BaseConfig {
+        role: RoleType::FullNode,
+        ..Default::default()
+    };
+    let (mut mock_client, service, _, peers_and_metadata) =
+        MockClient::new(Some(base_config), None, None);
+    tokio::spawn(service.start());
+
+    // Connect a new peer to the fullnode
+    let peer_id_1 = PeerId::random();
+    let peer_network_id_1 = PeerNetworkId::new(NetworkId::Public, peer_id_1);
+    let connection_metadata_1 = create_connection_metadata(peer_id_1, PeerRole::Unknown);
+    peers_and_metadata
+        .insert_connection_metadata(peer_network_id_1, connection_metadata_1)
+        .unwrap();
+
+    // Send a request to fetch the network information
+    let request = PeerMonitoringServiceRequest::GetNetworkInformation;
+    let response = mock_client.send_request(request).await.unwrap();
+
+    // Verify connected peers is empty, but the distance is correct
+    match response {
+        PeerMonitoringServiceResponse::NetworkInformation(network_info) => {
+            assert!(
+                network_info.connected_peers.is_empty(),
+                "Expected connected peers to be empty when sanitization is enabled!"
+            );
+            assert_eq!(
+                network_info.distance_from_validators,
+                MAX_DISTANCE_FROM_VALIDATORS
+            );
+        },
+        _ => panic!(
+            "Expected network information response but got: {:?}",
+            response
+        ),
+    }
+}
+
+#[tokio::test]
+async fn test_get_node_information_sanitization() {
+    // Setup the mock data
+    let highest_synced_epoch = 5;
+    let highest_synced_version = 1000;
+    let ledger_timestamp_usecs = 9734834;
+    let block_info = BlockInfo::new(
+        highest_synced_epoch,
+        0,
+        HashValue::zero(),
+        HashValue::zero(),
+        highest_synced_version,
+        ledger_timestamp_usecs,
+        None,
+    );
+    let latest_ledger_info = LedgerInfoWithSignatures::new(
+        LedgerInfo::new(block_info, HashValue::zero()),
+        AggregateSignature::empty(),
+    );
+    let lowest_available_version = 19;
+
+    // Create the mock storage reader
+    let mut mock_db_reader = create_mock_db_reader();
+
+    // Setup the mock expectations
+    mock_db_reader
+        .expect_get_latest_ledger_info()
+        .returning(move || Ok(latest_ledger_info.clone()));
+    mock_db_reader
+        .expect_get_first_txn_version()
+        .returning(move || Ok(Some(lowest_available_version)));
+
+    // Create the peer monitoring client and server (with sanitization enabled)
+    let storage_reader = StorageReader::new(Arc::new(mock_db_reader));
+    let (mut mock_client, service, _, _) = MockClient::new(None, None, Some(storage_reader));
+    tokio::spawn(service.start());
+
+    // Send a request to fetch the node information
+    let request = PeerMonitoringServiceRequest::GetNodeInformation;
+    let response = mock_client.send_request(request).await.unwrap();
+
+    // Verify build information is empty, but other fields are correct
+    match response {
+        PeerMonitoringServiceResponse::NodeInformation(node_info) => {
+            assert!(
+                node_info.build_information.is_empty(),
+                "Expected build information to be empty when sanitization is enabled!"
+            );
+            assert_eq!(node_info.highest_synced_epoch, highest_synced_epoch);
+            assert_eq!(node_info.highest_synced_version, highest_synced_version);
+            assert_eq!(node_info.ledger_timestamp_usecs, ledger_timestamp_usecs);
+            assert_eq!(node_info.lowest_available_version, lowest_available_version);
+        },
+        _ => panic!("Expected node information response but got: {:?}", response),
     }
 }
 
@@ -660,15 +768,6 @@ mod database_mock {
                 ledger_version: Version,
             ) -> Result<TransactionOutputListWithProofV2>;
 
-            fn get_events(
-                &self,
-                event_key: &EventKey,
-                start: u64,
-                order: Order,
-                limit: u64,
-                ledger_version: Version,
-            ) -> Result<Vec<EventWithVersion>>;
-
             fn get_block_timestamp(&self, version: u64) -> Result<u64>;
 
             fn get_last_version_before_timestamp(
@@ -686,23 +785,6 @@ mod database_mock {
             fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
             fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
-
-            fn get_account_ordered_transaction(
-                &self,
-                address: AccountAddress,
-                seq_num: u64,
-                include_events: bool,
-                ledger_version: Version,
-            ) -> Result<Option<TransactionWithProof>>;
-
-            fn get_account_ordered_transactions(
-                &self,
-                address: AccountAddress,
-                seq_num: u64,
-                limit: u64,
-                include_events: bool,
-                ledger_version: Version,
-            ) -> Result<AccountOrderedTransactionsWithProof>;
 
             fn get_state_proof_with_ledger_info(
                 &self,

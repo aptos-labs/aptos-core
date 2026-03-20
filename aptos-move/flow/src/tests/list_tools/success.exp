@@ -1,0 +1,252 @@
+[
+  {
+    "name": "move_package_coverage",
+    "description": "Get uncovered source lines for a package, optionally scoped to a function. Uses existing coverage map if available, otherwise runs tests first. Use this to identify which code paths need test coverage.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageCoverageParams",
+      "description": "Parameters for `move_package_coverage` tool.",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        },
+        "function": {
+          "description": "Optional function to scope coverage to, in the format \"module_name::function_name\".\nIf omitted, returns uncovered lines for all functions.",
+          "type": "string",
+          "nullable": true
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_package_manifest",
+    "description": "Get information about the current Move package",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageManifestParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_package_query",
+    "description": "Query structural information about a Move package.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageQueryParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_path"
+      ],
+      "oneOf": [
+        {
+          "description": "Returns a map from each module to the modules it depends on.",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "const": "dep_graph"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        {
+          "description": "Returns a summary of each module's constants, structs, and functions.",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "const": "module_summary"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        {
+          "description": "Returns a function-level call graph as a map from each function to the functions it calls.",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "const": "call_graph"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        {
+          "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
+          "type": "object",
+          "properties": {
+            "function": {
+              "description": "Function to query, in the form \"module_name::function_name\".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string",
+              "const": "function_usage"
+            }
+          },
+          "required": [
+            "query",
+            "function"
+          ]
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_package_spec_infer",
+    "description": "Low-level WP inference tool — not for direct use. Requires multi-phase workflow context (loop-invariant synthesis, simplification, verification) that is only available through subagent delegation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageSpecInferParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are inferred.",
+          "type": "string",
+          "nullable": true
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "move_package_status",
+    "description": "Check a Move package for compilation errors and warnings",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageStatusParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_package_test",
+    "description": "Run Move unit tests for a package. Set establish_baseline=true to save current coverage as baseline (use before generating new tests). Without establish_baseline, returns lines newly covered since baseline. Returns newly_covered=null if no baseline exists — call with establish_baseline first.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageTestParams",
+      "description": "Parameters for `move_package_test` tool.",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        },
+        "establish_baseline": {
+          "description": "If true, save current coverage as baseline for future comparisons.\nUse this in the first test run before generating new tests.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_package_verify",
+    "description": "Low-level prover tool — not for direct use. Requires phased verification workflow context (timeout handling, diagnostic interpretation) that is only available through subagent delegation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageVerifyParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are verified.",
+          "type": "string",
+          "nullable": true
+        },
+        "exclude": {
+          "description": "Optional list of targets to exclude from verification.\nEach entry follows the same format as `filter`: `module_name` or\n`module_name::function_name`. Exclusions take precedence over the filter scope.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true
+        },
+        "timeout": {
+          "description": "Solver timeout per verification condition, in seconds. Default: 10. Maximum: 10.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "nullable": true
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  }
+]

@@ -42,7 +42,7 @@ module 0xc0ffee1::n {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
-    struct Lazy has drop {
+    friend struct Lazy has drop {
         0: || has drop,
     }
     public fun make_lazy(): Lazy {
@@ -52,7 +52,7 @@ module 0xc0ffee::m {
     }
 }
 module 0xc0ffee::m_friend {
-    struct Lazy has drop {
+    friend struct Lazy has drop {
         0: || has drop,
     }
     public fun make_lazy(): Lazy {

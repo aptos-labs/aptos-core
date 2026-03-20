@@ -70,26 +70,6 @@ impl<'a> ExpBuilder<'a> {
         ExpData::Value(id, Value::Bool(val)).into_exp()
     }
 
-    /// Creates an n-ary conjunction (AND) of the given expressions.
-    /// Returns true if the list is empty.
-    pub fn and_n(&self, loc: &Loc, exprs: Vec<Exp>) -> Exp {
-        if exprs.is_empty() {
-            self.bool_const(loc, true)
-        } else {
-            exprs.into_iter().reduce(|a, b| self.and(a, b)).unwrap()
-        }
-    }
-
-    /// Creates an n-ary disjunction (OR) of the given expressions.
-    /// Returns false if the list is empty.
-    pub fn or_n(&self, loc: &Loc, exprs: Vec<Exp>) -> Exp {
-        if exprs.is_empty() {
-            self.bool_const(loc, false)
-        } else {
-            exprs.into_iter().reduce(|a, b| self.or(a, b)).unwrap()
-        }
-    }
-
     pub fn if_else(&self, cond: Exp, if_true: Exp, if_false: Exp) -> Exp {
         if if_false.is_unit_exp() {
             self.if_(cond, if_true)

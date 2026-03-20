@@ -26,9 +26,10 @@ aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 
+either = { workspace = true }
+move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
-move-ir-compiler = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }

@@ -1,0 +1,11 @@
+//# publish
+module 0x1::M
+struct S<T0: copy + drop>
+  b: bool
+
+struct R
+  b: bool
+
+fun foo()
+    local l0: S<R>
+    ret

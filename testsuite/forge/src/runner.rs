@@ -4,6 +4,7 @@
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::{
     config::ForgeConfig,
+    metrics::record_test_failures,
     observer::junit::JunitTestObserver,
     result::{TestResult, TestSummary},
     success_criteria::SuccessCriteriaErrors,
@@ -13,6 +14,7 @@ use crate::{
 };
 use anyhow::{format_err, Error, Result};
 use aptos_config::config::NodeConfig;
+use aptos_push_metrics::MetricsPusher;
 use clap::{Parser, ValueEnum};
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
@@ -266,6 +268,30 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         summary.write_starting_msg()?;
 
         if test_count > 0 {
+            // Start metrics pusher if PUSH_METRICS_ENDPOINT is set
+            // The pusher will run in the background and push metrics periodically.
+            // If pushing fails (e.g., invalid URL), it logs a warning but does not block.
+            let suite_name = self
+                .tests
+                .get_suite_name()
+                .unwrap_or_else(|| "forge".to_string());
+            let namespace =
+                std::env::var("FORGE_NAMESPACE").unwrap_or_else(|_| "unknown".to_string());
+            let pod_name =
+                std::env::var("KUBERNETES_POD_NAME").unwrap_or_else(|_| "unknown".to_string());
+            let chain_name =
+                std::env::var("FORGE_CHAIN_NAME").unwrap_or_else(|_| "unknown".to_string());
+            let run_id = format!("{:x}", rand::random::<u64>());
+
+            let _metrics_pusher = MetricsPusher::start(vec![
+                "role=forge".to_string(),
+                format!("suite={}", suite_name),
+                format!("namespace={}", namespace),
+                format!("kubernetes_pod_name={}", pod_name),
+                format!("chain_name={}", chain_name),
+                format!("run_id={}", run_id),
+            ]);
+
             println!(
                 "Starting Swarm with supported versions: {:?}",
                 self.factory
@@ -348,6 +374,20 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 println!();
                 println!("Swarm logs can be found here: {}", logs_location);
             }
+
+            // Record test failure metric at the end of the run.
+            // Use GITHUB_HEAD_REF (for PRs) or GITHUB_REF_NAME (for branches) to identify the branch.
+            // Note: GITHUB_HEAD_REF may be set but empty for non-PR runs, so we filter empty strings.
+            let branch = std::env::var("GITHUB_HEAD_REF")
+                .ok()
+                .filter(|s| !s.is_empty())
+                .or_else(|| {
+                    std::env::var("GITHUB_REF_NAME")
+                        .ok()
+                        .filter(|s| !s.is_empty())
+                })
+                .unwrap_or_else(|| "unknown".to_string());
+            record_test_failures(&suite_name, &branch, summary.failed_count());
         }
 
         summary.write_summary()?;

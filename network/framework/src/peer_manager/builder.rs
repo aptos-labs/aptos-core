@@ -17,7 +17,10 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::HANDSHAKE_VERSION, network_id::NetworkContext};
+use aptos_config::{
+    config::{AccessControlPolicy, HANDSHAKE_VERSION},
+    network_id::NetworkContext,
+};
 use aptos_crypto::x25519;
 use aptos_logger::prelude::*;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
@@ -77,6 +80,8 @@ struct PeerManagerContext {
     max_message_size: usize,
     inbound_connection_limit: usize,
     tcp_buffer_cfg: TCPBufferCfg,
+    access_control_policy: Option<Arc<AccessControlPolicy>>,
+    priority_inbound_peers: Vec<PeerId>,
 }
 
 impl PeerManagerContext {
@@ -99,6 +104,8 @@ impl PeerManagerContext {
         max_message_size: usize,
         inbound_connection_limit: usize,
         tcp_buffer_cfg: TCPBufferCfg,
+        access_control_policy: Option<Arc<AccessControlPolicy>>,
+        priority_inbound_peers: Vec<PeerId>,
     ) -> Self {
         Self {
             pm_reqs_tx,
@@ -115,6 +122,8 @@ impl PeerManagerContext {
             max_message_size,
             inbound_connection_limit,
             tcp_buffer_cfg,
+            access_control_policy,
+            priority_inbound_peers,
         }
     }
 
@@ -172,6 +181,8 @@ impl PeerManagerBuilder {
         enable_proxy_protocol: bool,
         inbound_connection_limit: usize,
         tcp_buffer_cfg: TCPBufferCfg,
+        access_control_policy: Option<Arc<AccessControlPolicy>>,
+        priority_inbound_peers: Vec<PeerId>,
     ) -> Self {
         // Setup channel to send requests to peer manager.
         let (pm_reqs_tx, pm_reqs_rx) = aptos_channel::new(
@@ -206,6 +217,8 @@ impl PeerManagerBuilder {
                 max_message_size,
                 inbound_connection_limit,
                 tcp_buffer_cfg,
+                access_control_policy,
+                priority_inbound_peers,
             )),
             peer_manager: None,
             listen_address,
@@ -339,6 +352,8 @@ impl PeerManagerBuilder {
             pm_context.max_frame_size,
             pm_context.max_message_size,
             pm_context.inbound_connection_limit,
+            pm_context.access_control_policy,
+            pm_context.priority_inbound_peers,
         );
 
         // PeerManager constructor appends a public key to the listen_address.

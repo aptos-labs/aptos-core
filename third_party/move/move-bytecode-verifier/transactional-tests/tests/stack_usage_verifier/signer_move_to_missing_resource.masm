@@ -1,0 +1,21 @@
+//# publish
+module 0x42::M
+struct R
+  f: bool
+
+fun t0(l0: &signer)
+    copy_loc l0
+    move_to R
+    ret
+
+
+
+//# publish
+module 0x42::N
+struct R<T0>
+  f: T0
+
+fun t0(l0: &signer)
+    copy_loc l0
+    move_to R<bool>
+    ret

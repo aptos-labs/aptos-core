@@ -8,12 +8,14 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-stackless-bytecode = { workspace = true }
+num = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]

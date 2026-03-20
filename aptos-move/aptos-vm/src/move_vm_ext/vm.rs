@@ -37,7 +37,7 @@ impl GenesisRuntimeBuilder {
             LATEST_GAS_FEATURE_VERSION,
             &features,
             &timed_features,
-            aptos_default_ty_builder(),
+            aptos_default_ty_builder(true),
         );
 
         // All genesis sessions run with unmetered gas meter, and here we set

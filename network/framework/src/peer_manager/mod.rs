@@ -14,7 +14,7 @@ use crate::{
     constants,
     counters::{self},
     logging::*,
-    peer::{Peer, PeerRequest},
+    peer::{DisconnectReason, Peer, PeerRequest},
     transport::{
         Connection, ConnectionId, ConnectionMetadata, TSocket as TransportTSocket,
         TRANSPORT_TIMEOUT,
@@ -22,7 +22,10 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_config::{
+    config::AccessControlPolicy,
+    network_id::{NetworkContext, PeerNetworkId},
+};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
@@ -34,6 +37,7 @@ use futures::{
     sink::SinkExt,
     stream::StreamExt,
 };
+use rand::{rngs::OsRng, seq::SliceRandom};
 use std::{
     collections::{hash_map::Entry, HashMap},
     marker::PhantomData,
@@ -116,6 +120,11 @@ where
     max_message_size: usize,
     /// Inbound connection limit separate of outbound connections
     inbound_connection_limit: usize,
+    /// Access control policy for peer connections
+    access_control_policy: Option<Arc<AccessControlPolicy>>,
+    /// Priority inbound peers that can bypass inbound connection
+    /// limits (by evicting lower-priority connections).
+    priority_inbound_peers: Vec<PeerId>,
 }
 
 impl<TTransport, TSocket> PeerManager<TTransport, TSocket>
@@ -143,6 +152,8 @@ where
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
+        access_control_policy: Option<Arc<AccessControlPolicy>>,
+        priority_inbound_peers: Vec<PeerId>,
     ) -> Self {
         let (transport_notifs_tx, transport_notifs_rx) = aptos_channels::new(
             channel_size,
@@ -184,6 +195,8 @@ where
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
+            access_control_policy,
+            priority_inbound_peers,
         }
     }
 
@@ -226,6 +239,128 @@ where
     /// Get the [`NetworkAddress`] we're listening for incoming connections on
     pub fn listen_addr(&self) -> &NetworkAddress {
         &self.listen_addr
+    }
+
+    /// Checks if a peer connection should be allowed based on the access control policy.
+    /// Returns successfully if the peer is allowed, otherwise returns an error with the reason.
+    fn check_peer_access_lists(&self, peer_id: &PeerId) -> Result<(), String> {
+        // Check if the peer is allowed based on the access control policy
+        if let Some(access_control_policy) = &self.access_control_policy {
+            if !access_control_policy.is_peer_allowed(peer_id) {
+                // Determine the error based on the policy type
+                let error = match access_control_policy.as_ref() {
+                    AccessControlPolicy::AllowList(_) => {
+                        format!(
+                            "Peer {} is not in the network allow list!",
+                            peer_id.short_str()
+                        )
+                    },
+                    AccessControlPolicy::BlockList(_) => {
+                        format!("Peer {} is in the network block list!", peer_id.short_str())
+                    },
+                };
+                return Err(error);
+            }
+        }
+
+        // Otherwise, allow all peers by default
+        Ok(())
+    }
+
+    /// Checks if a peer is in the priority inbound peers set
+    fn is_priority_inbound_peer(&self, peer_id: &PeerId) -> bool {
+        self.priority_inbound_peers.contains(peer_id)
+    }
+
+    /// Attempts to find a peer that can be evicted to make room for a priority peer.
+    /// Returns the peer ID of the peer to evict, or none (if no suitable candidate exists).
+    fn try_evict_peer_for_priority(&self) -> Option<PeerId> {
+        // Find evictable peers (i.e., inbound connection, unknown role, non-priority)
+        let evictable_peers: Vec<PeerId> = self
+            .active_peers
+            .iter()
+            .filter(|(peer_id, (metadata, _))| {
+                metadata.origin == ConnectionOrigin::Inbound
+                    && metadata.role == PeerRole::Unknown
+                    && !self.is_priority_inbound_peer(peer_id)
+            })
+            .map(|(peer_id, _)| *peer_id)
+            .collect();
+
+        // Randomly select one of the candidates
+        evictable_peers.choose(&mut OsRng).copied()
+    }
+
+    /// Internal method to disconnect a peer by ID. This is the unified
+    /// disconnect implementation used by both explicit disconnect requests
+    /// and internal priority eviction logic.
+    fn disconnect_peer_internal(
+        &mut self,
+        peer_id: PeerId,
+        disconnect_reason: DisconnectReason,
+        resp_tx: Option<oneshot::Sender<Result<(), PeerManagerError>>>,
+    ) {
+        // Update the connection disconnect metrics
+        counters::update_network_connection_operation_metrics(
+            &self.network_context,
+            counters::DISCONNECT_LABEL.into(),
+            disconnect_reason.get_label(),
+        );
+
+        // Send a close connection request to the peer, and drop the send
+        // end of the peer request channel.
+        if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
+            let connection_id = conn_metadata.connection_id;
+            self.remove_peer_from_metadata(conn_metadata.remote_peer_id, connection_id);
+
+            // This triggers a disconnect
+            drop(sender);
+
+            // Add to outstanding disconnect requests if response tracking is needed
+            if let Some(resp_tx) = resp_tx {
+                self.outstanding_disconnect_requests
+                    .insert(connection_id, resp_tx);
+            }
+
+            // Update metrics
+            self.update_connected_peers_metrics();
+        } else {
+            info!(
+                NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                "{} Connection with peer: {} was already closed",
+                self.network_context,
+                peer_id.short_str(),
+            );
+
+            // Send error response if tracking is enabled
+            if let Some(resp_tx) = resp_tx {
+                if let Err(err) = resp_tx.send(Err(PeerManagerError::NotConnected(peer_id))) {
+                    info!(
+                        NetworkSchema::new(&self.network_context),
+                        error = ?err,
+                        "{} Failed to notify that connection was already closed for peer {}: {:?}",
+                        self.network_context,
+                        peer_id,
+                        err
+                    );
+                }
+            }
+        }
+    }
+
+    /// Disconnects a peer by ID for priority eviction
+    fn disconnect_peer_for_priority_connection(&mut self, peer_id: PeerId) {
+        // Use the internal disconnect method (but don't await any response)
+        self.disconnect_peer_internal(peer_id, DisconnectReason::RequestedByPeerManager, None);
+
+        info!(
+            NetworkSchema::new(&self.network_context),
+            peer_id = peer_id,
+            "Disconnected peer for priority eviction"
+        );
+
+        // Update priority eviction metrics
+        counters::update_priority_peer_evictions(&self.network_context);
     }
 
     /// Start listening on the set address and return a future which runs PeerManager
@@ -348,6 +483,18 @@ where
             },
         };
 
+        // Check the allow/block lists
+        if let Err(error) = self.check_peer_access_lists(&conn.metadata.remote_peer_id) {
+            warn!(
+                NetworkSchema::new(&self.network_context)
+                    .connection_metadata_with_address(&conn.metadata),
+                "{} Connection rejected by allow/block list: {}", self.network_context, error
+            );
+            counters::connections_rejected(&self.network_context, conn.metadata.origin).inc();
+            self.disconnect(conn);
+            return;
+        }
+
         // Verify that we have not reached the max connection limit for unknown inbound peers
         if conn.metadata.origin == ConnectionOrigin::Inbound {
             // Everything below here is meant for unknown peers only. The role comes from
@@ -374,17 +521,52 @@ where
                     .contains_key(&conn.metadata.remote_peer_id)
                     && unknown_inbound_conns + 1 > self.inbound_connection_limit
                 {
-                    info!(
-                        NetworkSchema::new(&self.network_context)
-                            .connection_metadata_with_address(&conn.metadata),
-                        "{} Connection rejected due to connection limit: {}",
-                        self.network_context,
-                        conn.metadata
-                    );
-                    counters::connections_rejected(&self.network_context, conn.metadata.origin)
-                        .inc();
-                    self.disconnect(conn);
-                    return;
+                    // Check if incoming peer is a priority peer
+                    if self.is_priority_inbound_peer(&conn.metadata.remote_peer_id) {
+                        // Try to evict a non-priority unknown peer
+                        if let Some(peer_id_to_evict) = self.try_evict_peer_for_priority() {
+                            info!(
+                                NetworkSchema::new(&self.network_context)
+                                    .connection_metadata_with_address(&conn.metadata),
+                                "{} Evicting peer: {}, to make room for priority peer: {}!",
+                                self.network_context,
+                                peer_id_to_evict.short_str(),
+                                conn.metadata.remote_peer_id.short_str(),
+                            );
+
+                            // Disconnect the peer
+                            self.disconnect_peer_for_priority_connection(peer_id_to_evict);
+                        } else {
+                            // All slots taken by other priority peers
+                            warn!(
+                                NetworkSchema::new(&self.network_context)
+                                    .connection_metadata_with_address(&conn.metadata),
+                                "{} Cannot accept priority peer: {}. All slots occupied by priority peers!",
+                                self.network_context,
+                                conn.metadata.remote_peer_id.short_str()
+                            );
+                            counters::connections_rejected(
+                                &self.network_context,
+                                conn.metadata.origin,
+                            )
+                            .inc();
+                            self.disconnect(conn);
+                            return;
+                        }
+                    } else {
+                        // Non-priority peer (reject the connection)
+                        info!(
+                            NetworkSchema::new(&self.network_context)
+                                .connection_metadata_with_address(&conn.metadata),
+                            "{} Connection rejected due to connection limit: {}",
+                            self.network_context,
+                            conn.metadata
+                        );
+                        counters::connections_rejected(&self.network_context, conn.metadata.origin)
+                            .inc();
+                        self.disconnect(conn);
+                        return;
+                    }
                 }
             }
         }
@@ -466,42 +648,7 @@ where
                 };
             },
             ConnectionRequest::DisconnectPeer(peer_id, disconnect_reason, resp_tx) => {
-                // Update the connection disconnect metrics
-                counters::update_network_connection_operation_metrics(
-                    &self.network_context,
-                    counters::DISCONNECT_LABEL.into(),
-                    disconnect_reason.get_label(),
-                );
-
-                // Send a CloseConnection request to Peer and drop the send end of the
-                // PeerRequest channel.
-                if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
-                    let connection_id = conn_metadata.connection_id;
-                    self.remove_peer_from_metadata(conn_metadata.remote_peer_id, connection_id);
-
-                    // This triggers a disconnect.
-                    drop(sender);
-                    // Add to outstanding disconnect requests.
-                    self.outstanding_disconnect_requests
-                        .insert(connection_id, resp_tx);
-                } else {
-                    info!(
-                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                        "{} Connection with peer: {} was already closed",
-                        self.network_context,
-                        peer_id.short_str(),
-                    );
-                    if let Err(err) = resp_tx.send(Err(PeerManagerError::NotConnected(peer_id))) {
-                        info!(
-                            NetworkSchema::new(&self.network_context),
-                            error = ?err,
-                            "{} Failed to notify that connection was already closed for Peer {}: {:?}",
-                            self.network_context,
-                            peer_id,
-                            err
-                        );
-                    }
-                }
+                self.disconnect_peer_internal(peer_id, disconnect_reason, Some(resp_tx));
             },
         }
     }

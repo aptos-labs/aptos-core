@@ -11,9 +11,6 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use log::{log_enabled, Level};
-use move_abigen::Abigen;
-use move_docgen::Docgen;
-use move_errmapgen::ErrmapGen;
 use move_model::{
     code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
 };
@@ -26,11 +23,13 @@ use move_prover_bytecode_pipeline::{
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::Path,
     time::{Duration, Instant},
 };
 
 pub mod cli;
+pub mod inference;
+pub mod package_prove;
 
 // =================================================================================================
 // Prover API
@@ -47,7 +46,23 @@ pub fn run_move_prover_v2<W: WriteColor>(
 ) -> anyhow::Result<()> {
     let now = Instant::now();
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
-    run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+    if options.inference.inference {
+        inference::run_spec_inference_with_model(&mut env, error_writer, options, now)
+    } else {
+        run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+    }
+}
+
+/// Like `run_move_prover_v2` for inference, but also returns a bytecode dump
+/// with WP annotations for debugging test baselines.
+pub fn run_inference_with_bytecode_dump<W: WriteColor>(
+    error_writer: &mut W,
+    options: Options,
+    experiments: Vec<String>,
+) -> anyhow::Result<String> {
+    let now = Instant::now();
+    let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
+    inference::run_spec_inference_with_model_and_dump(&mut env, error_writer, options, now)
 }
 
 pub fn create_move_prover_v2_model<W: WriteColor>(
@@ -70,7 +85,6 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         sources_deps: vec![],
         warn_deprecated: false,
         warn_of_deprecation_use_in_aptos_libs: false,
-        warn_unused: false,
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
@@ -89,7 +103,7 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
             global_state.create_initial_struct_oper_state(&struct_env);
         }
         for fun_env in module_env.get_functions() {
-            if !fun_env.is_inline() {
+            if !fun_env.is_not_prover_target() {
                 global_state.create_initial_func_oper_state(&fun_env);
             }
         }
@@ -117,22 +131,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
 
     // Populate initial number operation state for each function and struct based on the pragma
     create_init_num_operation_state(env);
-
-    // Until this point, prover and docgen have same code. Here we part ways.
-    if options.run_docgen {
-        return run_docgen(env, &options, error_writer, start_time);
-    }
-    // Same for ABI generator.
-    if options.run_abigen {
-        return run_abigen(env, &options, start_time);
-    }
-    // Same for the error map generator
-    if options.run_errmapgen {
-        return {
-            run_errmapgen(env, &options, start_time);
-            Ok(())
-        };
-    }
 
     // Check correct backend versions.
     options.backend.check_tool_versions()?;
@@ -279,6 +277,11 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             }
         }
         for func_env in module_env.get_functions() {
+            if func_env.is_struct_api() {
+                // Struct API wrappers have no user-written specs; skip them to avoid
+                // spurious invariant failures from DataInvariantInstrumentationProcessor.
+                continue;
+            }
             targets.add_target(&func_env)
         }
     }
@@ -309,71 +312,4 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
     }
 
     targets
-}
-
-// Tools using the Move prover top-level driver
-// ============================================
-
-// TODO: make those tools independent. Need to first address the todo to
-// move the model builder into the move-model crate.
-
-fn run_docgen<W: WriteColor>(
-    env: &GlobalEnv,
-    options: &Options,
-    error_writer: &mut W,
-    now: Instant,
-) -> anyhow::Result<()> {
-    let generator = Docgen::new(env, &options.docgen);
-    let checking_elapsed = now.elapsed();
-    info!("generating documentation");
-    for (file, content) in generator.r#gen() {
-        let path = PathBuf::from(&file);
-        fs::create_dir_all(path.parent().unwrap())?;
-        fs::write(path.as_path(), content)?;
-    }
-    let generating_elapsed = now.elapsed();
-    info!(
-        "{:.3}s checking, {:.3}s generating",
-        checking_elapsed.as_secs_f64(),
-        (generating_elapsed - checking_elapsed).as_secs_f64()
-    );
-    if env.has_errors() {
-        env.report_diag(error_writer, options.prover.report_severity);
-        Err(anyhow!("exiting with documentation generation errors"))
-    } else {
-        Ok(())
-    }
-}
-
-fn run_abigen(env: &GlobalEnv, options: &Options, now: Instant) -> anyhow::Result<()> {
-    let mut generator = Abigen::new(env, &options.abigen);
-    let checking_elapsed = now.elapsed();
-    info!("generating ABI files");
-    generator.r#gen();
-    for (file, content) in generator.into_result() {
-        let path = PathBuf::from(&file);
-        fs::create_dir_all(path.parent().unwrap())?;
-        fs::write(path.as_path(), content)?;
-    }
-    let generating_elapsed = now.elapsed();
-    info!(
-        "{:.3}s checking, {:.3}s generating",
-        checking_elapsed.as_secs_f64(),
-        (generating_elapsed - checking_elapsed).as_secs_f64()
-    );
-    Ok(())
-}
-
-fn run_errmapgen(env: &GlobalEnv, options: &Options, now: Instant) {
-    let mut generator = ErrmapGen::new(env, &options.errmapgen);
-    let checking_elapsed = now.elapsed();
-    info!("generating error map");
-    generator.r#gen();
-    generator.save_result();
-    let generating_elapsed = now.elapsed();
-    info!(
-        "{:.3}s checking, {:.3}s generating",
-        checking_elapsed.as_secs_f64(),
-        (generating_elapsed - checking_elapsed).as_secs_f64()
-    );
 }

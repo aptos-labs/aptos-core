@@ -47,7 +47,19 @@ module 0x42::M {
     fun test_borrow(c: S): u64 {
         c.value
     }
+
+    spec test_borrow(c: S): u64 {
+        let s_ref = borrow(c);
+        ensures result == s_ref.value;
+    }
+
     fun test_borrow_get_value(data: &S): u64 {
         data.value
     }
+
+    spec test_borrow_get_value(data: &S): u64 {
+        let data_value = get_value(borrow(data));
+        ensures result == data_value;
+    }
+
 }

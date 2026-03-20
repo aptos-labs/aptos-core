@@ -2,13 +2,15 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_core_types::{account_address::AccountAddress, effects::ChangeSet};
 use move_stdlib::{
     natives::{all_natives, nursery_natives, GasParameters, NurseryGasParameters},
     path_in_crate,
 };
-use move_unit_test::UnitTestingConfig;
+use move_unit_test::{
+    package_test::{run_move_unit_tests, UnitTestResult},
+    UnitTestingConfig,
+};
 use tempfile::tempdir;
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>, include_nursery_natives: bool) {

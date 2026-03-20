@@ -251,7 +251,7 @@ where
         // u128 is used to protect against overflow and preserve as much precision as
         // possible in the extreme cases.
         fn div_ceil(n: u128, d: u128) -> u128 {
-            if n % d == 0 {
+            if n.is_multiple_of(d) {
                 n / d
             } else {
                 n / d + 1

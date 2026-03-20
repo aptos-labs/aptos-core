@@ -1423,6 +1423,26 @@ pub static DEC_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static RAND_PRE_AGGREGATE_VERIFY_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_rand_pre_aggregate_verify_seconds",
+            "Time spent in pre-aggregation share verification",
+        )
+        .unwrap(),
+    )
+});
+
+pub static RAND_AGGREGATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_rand_aggregation_seconds",
+            "Time spent in randomness aggregation (derive_eval)",
+        )
+        .unwrap(),
+    )
+});
+
 pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_proposal_payload_availability_count",
@@ -1466,4 +1486,13 @@ pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| 
         "aptos_optqs_last_consecutive_successes",
         "The number of last consecutive successes capped at window length",
     )
+});
+
+pub static DECRYPTION_PIPELINE_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_decryption_pipeline_txns_count",
+        "Count of transactions processed by the decryption pipeline by category.",
+        &["category"]
+    )
+    .unwrap()
 });

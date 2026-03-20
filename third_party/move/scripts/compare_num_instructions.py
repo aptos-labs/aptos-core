@@ -13,7 +13,6 @@ import argparse
 import glob
 import subprocess
 import sys
-import re
 import os
 
 
@@ -38,8 +37,8 @@ def main():
     original_working_dir = os.getcwd()
     script_dir = os.path.dirname(__file__)
     os.chdir(script_dir)
-    # Build the move-disassembler in release mode.
-    subprocess.run(["cargo", "build", "--release", "-p", "move-disassembler"])
+    # Build move-bytecode-stats in release mode.
+    subprocess.run(["cargo", "build", "--release", "-p", "move-asm", "--bin", "move-bytecode-stats"])
     (total_1, total_2) = (0, 0)  # Total number of instructions.
     tally = []  # List of tuples containing the net increase and the file name.
     common_path = os.path.commonpath([dir1, dir2])
@@ -73,31 +72,19 @@ def percentage_change(i1, i2):
     return 0
 
 
-# Regex pattern to match the total number of instructions in the disassembler output.
-INSTRUCTION_COUNT_RE = re.compile(r"// Total number of instructions: (\d+)")
-
-
 def count_instructions(file_name):
     """
     Count the number of bytecode instructions in the given file.
-    This requires disassembling the move bytecode.
+    Uses move-bytecode-stats to deserialize the module and sum instruction counts.
     """
     result = subprocess.run(
         [
-            "../../../target/release/move-disassembler",
-            "--skip-code",
-            "--skip-locals",
-            "--print-bytecode-stats",
-            "--bytecode",
+            "../../../target/release/move-bytecode-stats",
             file_name,
         ],
         stdout=subprocess.PIPE,
     )
-    result = result.stdout.decode("utf-8")
-    # Get the second last line, which contains the instruction count.
-    result = result.splitlines()[-2]
-    instructions = re.match(INSTRUCTION_COUNT_RE, result).group(1)
-    return int(instructions)
+    return int(result.stdout.decode("utf-8").strip())
 
 
 if __name__ == "__main__":

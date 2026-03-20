@@ -9,9 +9,8 @@ use crate::{
 use anyhow::Result;
 use itertools::Itertools;
 use legacy_move_compiler::shared::PackagePaths;
-use move_compiler_v2::Options;
+use move_compiler_v2::{run_checker_and_rewriters, run_move_compiler_to_model, Options};
 use move_model::model::GlobalEnv;
-use termcolor::{ColorChoice, StandardStream};
 
 #[derive(Debug, Clone)]
 pub struct ModelBuilder {
@@ -32,8 +31,25 @@ impl ModelBuilder {
     // across all packages and build the Move model from that.
     // TODO: In the future we will need a better way to do this to support renaming in packages
     // where we want to support building a Move model.
+
+    /// Build the Move model for the resolved package.
+    ///
+    /// Only fails on I/O errors; all compilation errors and warnings are stored
+    /// in the returned `GlobalEnv`. Use `env.check_errors(msg)?` at call sites
+    /// where compilation errors should be fatal.
+    ///
+    /// See [`ModelConfig::with_bytecode`] for the effect of that flag.
     pub fn build_model(&self) -> Result<GlobalEnv> {
-        // Targets are all files in the root package
+        let options = self.build_compiler_options()?;
+        if self.model_config.with_bytecode {
+            run_move_compiler_to_model(options)
+        } else {
+            run_checker_and_rewriters(options)
+        }
+    }
+
+    /// Build the compiler `Options` from the resolved package graph and model config.
+    fn build_compiler_options(&self) -> Result<Options> {
         let root_name = &self.resolution_graph.root_package.package.name;
         let root_package = self.resolution_graph.get_package(root_name).clone();
         let deps_source_info = self
@@ -130,7 +146,8 @@ impl ModelBuilder {
                 options.compiler_version = Some(self.model_config.compiler_version);
                 options.known_attributes.clone_from(known_attributes);
                 options.skip_attribute_checks = skip_attribute_checks;
-                options.compile_verify_code = true;
+                options.compile_test_code = self.resolution_graph.build_options.test_mode;
+                options.compile_verify_code = self.resolution_graph.build_options.verify_mode;
                 options.experiments.clone_from(
                     &self
                         .resolution_graph
@@ -138,8 +155,7 @@ impl ModelBuilder {
                         .compiler_config
                         .experiments,
                 );
-                let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-                move_compiler_v2::run_move_compiler_for_analysis(&mut error_writer, options)
+                Ok(options)
             },
         }
     }

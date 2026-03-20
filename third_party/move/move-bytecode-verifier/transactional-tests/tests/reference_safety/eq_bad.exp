@@ -1,5 +1,5 @@
 processed 4 tasks
-task 0 lines 1-13:  publish [module 0x1.Tester {]
+task 0 lines 1-14:  publish [module 0x1::Tester]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::Tester'. Got VMError: {
     major_status: READREF_EXISTS_MUTABLE_BORROW_ERROR,
     sub_status: None,
@@ -7,7 +7,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 6)],
 }
-task 1 lines 15-27:  publish [module 0x1.Tester2 {]
+task 1 lines 18-31:  publish [module 0x1::Tester2]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::Tester2'. Got VMError: {
     major_status: READREF_EXISTS_MUTABLE_BORROW_ERROR,
     sub_status: None,
@@ -15,7 +15,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 6)],
 }
-task 2 lines 29-41:  publish [module 0x1.Tester3 {]
+task 2 lines 35-48:  publish [module 0x1::Tester3]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::Tester3'. Got VMError: {
     major_status: READREF_EXISTS_MUTABLE_BORROW_ERROR,
     sub_status: None,
@@ -23,7 +23,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 6)],
 }
-task 3 lines 43-55:  publish [module 0x1.Tester4 {]
+task 3 lines 52-65:  publish [module 0x1::Tester4]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::Tester4'. Got VMError: {
     major_status: READREF_EXISTS_MUTABLE_BORROW_ERROR,
     sub_status: None,

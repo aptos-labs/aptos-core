@@ -1,0 +1,22 @@
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: bool
+    ld_true
+    st_loc l1
+    move_loc l1
+    br_true l0
+l0: branch l1
+l1: ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: bool
+    ld_false
+    st_loc l1
+    move_loc l1
+    br_true l0
+l0: ret

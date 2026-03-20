@@ -1,0 +1,11 @@
+//# publish --print-bytecode
+module 0x66::test_test_variant_wrong_param_count
+
+enum Color has drop
+  Red
+    value: u64
+
+// Invalid: test_variant$Color$Red must have exactly one parameter
+#[test_variant(0)] public fun test_variant$Color$Red(): bool
+    ld_u64 0
+    ret

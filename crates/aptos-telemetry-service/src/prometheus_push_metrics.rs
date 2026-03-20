@@ -45,6 +45,26 @@ pub async fn handle_metrics_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling prometheus metrics ingest");
 
+    // Apply rate limiting for unknown/untrusted nodes
+    let is_unknown = matches!(
+        claims.node_type,
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
+    );
+    if is_unknown
+        && !context
+            .unknown_metrics_rate_limiter()
+            .check_rate_limit()
+            .await
+    {
+        debug!(
+            "rate limit exceeded for unknown node metrics: peer_id={}",
+            claims.peer_id
+        );
+        return Err(reject::custom(ServiceError::too_many_requests(
+            MetricsIngestError::RateLimitExceeded.into(),
+        )));
+    }
+
     let enable_location_labels = env::var("FEATURE_LOCATION_LABELS_ENABLED")
         .map(|val| val.parse::<bool>().unwrap_or(false))
         .unwrap_or(false);
@@ -77,11 +97,20 @@ pub async fn handle_metrics_ingest(
         extra_labels.clone()
     };
 
+    // Standard metrics ingestion requires metrics_endpoints_config to be configured
+    let metrics_clients = context.metrics_client().ok_or_else(|| {
+        error!("Standard metrics ingestion not configured - rejecting request");
+        reject::custom(ServiceError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            MetricsIngestError::IngestionError.into(),
+        ))
+    })?;
+
     let client = match claims.node_type {
         NodeType::UnknownValidator | NodeType::UnknownFullNode => {
-            &context.metrics_client().untrusted_ingest_metrics_clients
+            &metrics_clients.untrusted_ingest_metrics_clients
         },
-        _ => &context.metrics_client().ingest_metrics_client,
+        _ => &metrics_clients.ingest_metrics_client,
     };
 
     let start_timer = Instant::now();
@@ -283,7 +312,7 @@ mod test {
             then.status(200);
         });
 
-        let clients = test_context.inner.metrics_client_mut();
+        let clients = test_context.inner.metrics_client_mut().unwrap();
         clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(
@@ -325,7 +354,7 @@ mod test {
             then.status(500);
         });
 
-        let clients = test_context.inner.metrics_client_mut();
+        let clients = test_context.inner.metrics_client_mut().unwrap();
         clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(
@@ -367,7 +396,7 @@ mod test {
             then.status(401);
         });
 
-        let clients = test_context.inner.metrics_client_mut();
+        let clients = test_context.inner.metrics_client_mut().unwrap();
         clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsIngestClient::VictoriaMetrics(VictoriaMetricsClient::new(

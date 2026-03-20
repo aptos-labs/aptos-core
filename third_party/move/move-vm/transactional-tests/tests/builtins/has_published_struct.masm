@@ -1,0 +1,64 @@
+//# publish
+module 0x1::Token
+struct T has key
+  b: bool
+
+public fun new(): T
+    ld_true
+    pack T
+    ret
+
+public fun has(l0: address): bool
+    local l1: bool
+    move_loc l0
+    exists T
+    st_loc l1
+    move_loc l1
+    ret
+
+public fun publish(l0: &signer, l1: T)
+    move_loc l0
+    move_loc l1
+    move_to T
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::signer
+use 0x1::Token
+entry public fun main(l0: signer)
+    local l1: Token::T
+    local l2: address
+    local l3: bool
+    local l4: address
+    local l5: bool
+    call Token::new
+    st_loc l1
+    borrow_loc l0
+    move_loc l1
+    call Token::publish
+    borrow_loc l0
+    call signer::address_of
+    st_loc l2
+    copy_loc l2
+    call Token::has
+    st_loc l3
+    copy_loc l3
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: ld_const<address> 5281877500950955839569596688
+    st_loc l4
+    copy_loc l4
+    call Token::has
+    st_loc l5
+    copy_loc l5
+    not
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: ret

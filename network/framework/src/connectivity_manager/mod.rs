@@ -35,7 +35,7 @@ use crate::{
     transport::ConnectionMetadata,
 };
 use aptos_config::{
-    config::{Peer, PeerRole, PeerSet},
+    config::{AccessControlPolicy, Peer, PeerRole, PeerSet},
     network_id::NetworkContext,
 };
 use aptos_crypto::x25519;
@@ -130,6 +130,8 @@ pub struct ConnectivityManager<TBackoff> {
     mutual_authentication: bool,
     /// Whether or not to enable latency aware peer dialing
     enable_latency_aware_dialing: bool,
+    /// Access control policy for peer connections
+    access_control_policy: Option<Arc<AccessControlPolicy>>,
 }
 
 /// Different sources for peer addresses, ordered by priority (Onchain=highest,
@@ -359,6 +361,7 @@ where
         outbound_connection_limit: Option<usize>,
         mutual_authentication: bool,
         enable_latency_aware_dialing: bool,
+        access_control_policy: Option<Arc<AccessControlPolicy>>,
     ) -> Self {
         // Verify that the trusted peers set exists and that it is empty
         let trusted_peers = peers_and_metadata
@@ -395,11 +398,20 @@ where
             outbound_connection_limit,
             mutual_authentication,
             enable_latency_aware_dialing,
+            access_control_policy,
         };
 
         // Set the initial seed config addresses and public keys
         connmgr.handle_update_discovered_peers(DiscoverySource::Config, seeds);
         connmgr
+    }
+
+    /// Checks if a peer is allowed based on the access control policy
+    fn is_peer_allowed(&self, peer_id: &PeerId) -> bool {
+        match &self.access_control_policy {
+            Some(access_control_policy) => access_control_policy.is_peer_allowed(peer_id),
+            None => true, // Allow all peers by default
+        }
     }
 
     /// Starts the [`ConnectivityManager`] actor.
@@ -582,6 +594,7 @@ where
                     && !self.connected.contains_key(peer_id) // The node is not already connected
                     && !self.dial_queue.contains_key(peer_id) // There is no pending dial to this node
                     && roles_to_dial.contains(&peer.role) // We can dial this role
+                    && self.is_peer_allowed(peer_id) // Check allow/block lists
             })
             .collect();
 

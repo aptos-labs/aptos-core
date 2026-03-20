@@ -1,0 +1,45 @@
+//# publish
+module 0x1::M
+struct NoAbilities
+  a: bool
+
+struct HasDrop<phantom T0, T1> has drop
+  a: bool
+
+struct HasCopy<phantom T0, T1> has copy
+  a: bool
+
+struct HasStore<phantom T0, T1> has store
+  a: bool
+
+struct HasKey<phantom T0, T1> has key
+  a: bool
+
+struct HasAbilities<phantom T0, T1> has copy + drop + store + key
+  a: bool
+
+struct S1<T0: copy + drop + store + key>
+  a: bool
+
+struct S2
+  a: S1<HasAbilities<NoAbilities, u64>>
+
+struct S3<T0: drop, T1: copy, T2: store, T3: key>
+  a: bool
+
+struct S4
+  a: S3<HasDrop<NoAbilities, u64>, HasCopy<NoAbilities, u64>, HasStore<NoAbilities, u64>, HasKey<NoAbilities, u64>>
+
+fun f1<T0: copy + drop + store + key>()
+    ret
+
+fun f2()
+    call f1<HasAbilities<NoAbilities, u64>>
+    ret
+
+fun f3<T0: drop, T1: copy, T2: store, T3: key>()
+    ret
+
+fun f4()
+    call f3<HasDrop<NoAbilities, u64>, HasCopy<NoAbilities, u64>, HasStore<NoAbilities, u64>, HasKey<NoAbilities, u64>>
+    ret

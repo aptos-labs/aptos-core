@@ -1,0 +1,41 @@
+//# publish
+module 0x1::M
+struct R has key
+  f: bool
+
+public fun foo<T0>(l0: T0)
+    ld_u64 0
+    abort
+
+public fun bar<T0, T1: key, T2: copy + drop>(l0: T2, l1: T1, l2: T0)
+    ld_u64 0
+    abort
+
+public fun r(): R
+    ld_false
+    pack R
+    ret
+
+
+
+//# run
+script
+use 0x1::M
+entry public fun main()
+    ld_u64 0
+    call M::foo<u64>
+    ld_u64 0
+    abort
+
+
+
+//# run
+script
+use 0x1::M
+entry public fun main()
+    ld_false
+    call M::r
+    ld_u64 0
+    call M::bar<u64, M::R, bool>
+    ld_u64 0
+    abort

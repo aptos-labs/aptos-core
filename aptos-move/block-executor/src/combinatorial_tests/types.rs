@@ -419,6 +419,9 @@ pub(crate) enum MockTransaction<K, E> {
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
         /// If we are testing with deltas, are we testing delayed_fields? (or AggregatorV1).
         delta_test_kind: DeltaTestKind,
+        /// Keys and values that pre_write_values() should return. Used for testing pre-write
+        /// optimization where the executor pre-populates MVHashMap before execution.
+        pre_writes: Vec<(K, ValueType)>,
     },
     /// Skip the execution of trailing transactions.
     SkipRest(u64),
@@ -433,6 +436,7 @@ impl<K, E> MockTransaction<K, E> {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
             delta_test_kind: DeltaTestKind::None,
+            pre_writes: vec![],
         }
     }
 
@@ -441,6 +445,7 @@ impl<K, E> MockTransaction<K, E> {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
             delta_test_kind: DeltaTestKind::None,
+            pre_writes: vec![],
         }
     }
 
@@ -460,6 +465,13 @@ impl<K, E> MockTransaction<K, E> {
         } = &mut self
         {
             *delta_test_kind = DeltaTestKind::AggregatorV1;
+        }
+        self
+    }
+
+    pub(crate) fn with_pre_writes(mut self, new_pre_writes: Vec<(K, ValueType)>) -> Self {
+        if let Self::Write { pre_writes, .. } = &mut self {
+            *pre_writes = new_pre_writes;
         }
         self
     }
@@ -498,6 +510,13 @@ impl<
 
     fn state_checkpoint(_block_id: HashValue) -> Self {
         Self::StateCheckpoint
+    }
+
+    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
+        match self {
+            MockTransaction::Write { pre_writes, .. } => pre_writes.clone(),
+            _ => vec![],
+        }
     }
 }
 
@@ -575,7 +594,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 .unwrap();
 
             // Not all values become deltas - some remain as normal writes
-            if val_u128 % 10 != 0 {
+            if !val_u128.is_multiple_of(10) {
                 let delta = if val_u128 % 10 < 5 {
                     delta_sub(val_u128 % 100, u128::MAX)
                 } else {
@@ -590,7 +609,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             .as_u128()
             .unwrap()
             .unwrap();
-        let is_deletion = allow_deletes && val_u128 % 23 == 0;
+        let is_deletion = allow_deletes && val_u128.is_multiple_of(23);
         let mut write_value = ValueType::from_value(value.clone(), !is_deletion);
         write_value.metadata = raw_metadata((val_u128 >> 64) as u64);
 

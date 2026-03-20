@@ -16,21 +16,21 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
     // Helper function to setup market with dead man's switch enabled
     fun setup_market_with_dms(
-        admin: &signer,
-        market_signer: &signer
+        admin: &signer, market_signer: &signer
     ): Market<clearinghouse_test::TestOrderMetadata> {
         timestamp::set_time_has_started_for_testing(admin);
-        let market = new_market(
-            admin,
-            market_signer,
-            new_market_config(
-                false, // allow_self_matching
-                true,  // allow_events_emission
-                1,     // pre_cancellation_window_secs
-                true,  // enable_dead_mans_switch
-                MIN_KEEP_ALIVE_TIME_SECS
-            )
-        );
+        let market =
+            new_market(
+                admin,
+                market_signer,
+                new_market_config(
+                    false, // allow_self_matching
+                    true, // allow_events_emission
+                    1, // pre_cancellation_window_secs
+                    true, // enable_dead_mans_switch
+                    MIN_KEEP_ALIVE_TIME_SECS
+                )
+            );
         clearinghouse_test::initialize(admin);
         market
     }
@@ -41,22 +41,23 @@ module aptos_experimental::dead_mans_switch_operations_test {
         user: &signer,
         price: u64,
         size: u64,
-        is_bid: bool,
+        is_bid: bool
     ): aptos_trading::order_book_types::OrderId {
-        let result = order_placement::place_limit_order(
-            market,
-            user,
-            price,
-            size,
-            is_bid,
-            good_till_cancelled(),
-            option::none(), // trigger_condition
-            clearinghouse_test::new_test_order_metadata(1),
-            option::none(), // client_order_id
-            100, // max_match_limit
-            false, // cancel_on_match_limit
-            &clearinghouse_test::test_market_callbacks()
-        );
+        let result =
+            order_placement::place_limit_order(
+                market,
+                user,
+                price,
+                size,
+                is_bid,
+                good_till_cancelled(),
+                option::none(), // trigger_condition
+                clearinghouse_test::new_test_order_metadata(1),
+                option::none(), // client_order_id
+                100, // max_match_limit
+                false, // cancel_on_match_limit
+                &clearinghouse_test::test_market_callbacks()
+            );
         result.get_order_id()
     }
 
@@ -171,17 +172,22 @@ module aptos_experimental::dead_mans_switch_operations_test {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0, location = aptos_experimental::dead_mans_switch_operations)]
+    #[
+        expected_failure(
+            abort_code = 0, location = aptos_experimental::dead_mans_switch_operations
+        )
+    ]
     fun test_cleanup_fails_when_dms_not_enabled() {
         // Setup market WITHOUT dead man's switch
         let admin = account::create_signer_for_test(@0x1);
         let market_signer = account::create_signer_for_test(@0x2);
         timestamp::set_time_has_started_for_testing(&admin);
-        let market = new_market(
-            &admin,
-            &mut market_signer,
-            new_market_config(false, true, 1, false, 0) // DMS disabled
-        );
+        let market =
+            new_market(
+                &admin,
+                &mut market_signer,
+                new_market_config(false, true, 1, false, 0) // DMS disabled
+            );
         clearinghouse_test::initialize(&admin);
 
         // Try to cleanup - should abort with E_DEAD_MANS_SWITCH_NOT_ENABLED
@@ -426,20 +432,21 @@ module aptos_experimental::dead_mans_switch_operations_test {
         assert!(clearinghouse_test::order_exists(maker_order_id));
 
         // Taker comes and tries to match with an ask order (sell @ 100)
-        let taker_result = order_placement::place_limit_order(
-            &mut market,
-            &taker,
-            100, // price
-            50,  // size
-            false, // is_bid = false (ask/sell)
-            good_till_cancelled(),
-            option::none(),
-            clearinghouse_test::new_test_order_metadata(2),
-            option::none(),
-            100,
-            false,
-            &clearinghouse_test::test_market_callbacks()
-        );
+        let taker_result =
+            order_placement::place_limit_order(
+                &mut market,
+                &taker,
+                100, // price
+                50, // size
+                false, // is_bid = false (ask/sell)
+                good_till_cancelled(),
+                option::none(),
+                clearinghouse_test::new_test_order_metadata(2),
+                option::none(),
+                100,
+                false,
+                &clearinghouse_test::test_market_callbacks()
+            );
 
         assert!(taker_result.total_fill_size() == 0); // No fill since maker order is expired
 
@@ -488,25 +495,28 @@ module aptos_experimental::dead_mans_switch_operations_test {
         timestamp::fast_forward_seconds(KEEP_ALIVE_TIMEOUT_SECS + 10);
 
         // Taker tries to place an order that would normally match
-        let taker_result = order_placement::place_limit_order(
-            &mut market,
-            &taker,
-            100, // price
-            50,  // size
-            false, // is_bid = false (ask/sell)
-            good_till_cancelled(),
-            option::none(),
-            clearinghouse_test::new_test_order_metadata(2),
-            option::none(),
-            100,
-            false,
-            &clearinghouse_test::test_market_callbacks()
-        );
+        let taker_result =
+            order_placement::place_limit_order(
+                &mut market,
+                &taker,
+                100, // price
+                50, // size
+                false, // is_bid = false (ask/sell)
+                good_till_cancelled(),
+                option::none(),
+                clearinghouse_test::new_test_order_metadata(2),
+                option::none(),
+                100,
+                false,
+                &clearinghouse_test::test_market_callbacks()
+            );
 
         // The taker order should be cancelled due to expired session
         let cancel_reason = taker_result.get_cancel_reason();
         assert!(cancel_reason.is_some());
-        assert!(order_placement::is_dead_mans_switch_expired(cancel_reason.destroy_some()));
+        assert!(
+            order_placement::is_dead_mans_switch_expired(cancel_reason.destroy_some())
+        );
 
         // Maker order should still exist (not affected)
         assert!(clearinghouse_test::order_exists(maker_order_id));
@@ -549,20 +559,21 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Taker places matching order shortly after (within timeout)
         timestamp::fast_forward_seconds(10);
-        let taker_result = order_placement::place_limit_order(
-            &mut market,
-            &taker,
-            100, // price
-            30,  // size - partial fill
-            false, // is_bid = false (ask/sell)
-            good_till_cancelled(),
-            option::none(),
-            clearinghouse_test::new_test_order_metadata(2),
-            option::none(),
-            100,
-            false,
-            &clearinghouse_test::test_market_callbacks()
-        );
+        let taker_result =
+            order_placement::place_limit_order(
+                &mut market,
+                &taker,
+                100, // price
+                30, // size - partial fill
+                false, // is_bid = false (ask/sell)
+                good_till_cancelled(),
+                option::none(),
+                clearinghouse_test::new_test_order_metadata(2),
+                option::none(),
+                100,
+                false,
+                &clearinghouse_test::test_market_callbacks()
+            );
 
         // Both orders should have valid sessions, so matching should succeed
         let cancel_reason = taker_result.get_cancel_reason();
@@ -580,7 +591,11 @@ module aptos_experimental::dead_mans_switch_operations_test {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0, location = aptos_experimental::dead_mans_switch_operations)]
+    #[
+        expected_failure(
+            abort_code = 0, location = aptos_experimental::dead_mans_switch_operations
+        )
+    ]
     fun test_keep_alive_fails_when_dms_not_enabled() {
         // Setup market WITHOUT dead man's switch
         let admin = account::create_signer_for_test(@0x1);
@@ -589,11 +604,12 @@ module aptos_experimental::dead_mans_switch_operations_test {
         let trader_addr = signer::address_of(&trader);
 
         timestamp::set_time_has_started_for_testing(&admin);
-        let market: Market<clearinghouse_test::TestOrderMetadata> = new_market(
-            &admin,
-            &mut market_signer,
-            new_market_config(false, true, 1, false, 0) // DMS disabled
-        );
+        let market: Market<clearinghouse_test::TestOrderMetadata> =
+            new_market(
+                &admin,
+                &mut market_signer,
+                new_market_config(false, true, 1, false, 0) // DMS disabled
+            );
         clearinghouse_test::initialize(&admin);
 
         // Try to update keep-alive - should abort with E_DEAD_MANS_SWITCH_NOT_ENABLED

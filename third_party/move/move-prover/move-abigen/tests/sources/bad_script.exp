@@ -1,6 +1,0 @@
-Move prover abigen returns: exiting with context checking errors
-error: invalid argument to `abort`: unsupported type `bool`
-  ┌─ tests/sources/bad_script.move:3:15
-  │
-3 │         abort true  // type error, abort code must be a u64
-  │               ^^^^

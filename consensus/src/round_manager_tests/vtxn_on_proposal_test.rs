@@ -54,7 +54,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
 
     let invalid_block = Block::new_proposal_ext(
         vec![ValidatorTransaction::dummy(vec![0xFF]); 5],
-        Payload::empty(false, true),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -64,7 +64,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
     .unwrap();
 
     let valid_block = Block::new_proposal(
-        Payload::empty(false, true),
+        Payload::empty(false),
         1,
         1,
         genesis_qc,
@@ -125,16 +125,6 @@ fn no_vote_on_proposal_with_uncertified_dkg_result() {
 }
 
 #[test]
-fn no_vote_on_proposal_with_inconsistent_secret_dkg_result() {
-    test_dkg_result_handling(
-        &[10_000_000, 70_000_000, 10_000_000, 10_000_000],
-        1,
-        RealDKG::generate_transcript_for_inconsistent_secrets,
-        false,
-    );
-}
-
-#[test]
 fn no_vote_on_proposal_with_dup_dealers_in_dkg_transcript() {
     test_dkg_result_handling(
         &[10_000_000, 40_000_000, 10_000_000, 40_000_000],
@@ -168,6 +158,30 @@ fn test_dkg_result_handling<F>(
         &<RealDKG as DKGTrait>::DealerPublicKey,
     ) -> <RealDKG as DKGTrait>::Transcript,
 {
+    test_dkg_result_handling_with_config(
+        voting_powers,
+        dealer_idx,
+        trx_gen_func,
+        should_accept,
+        OnChainRandomnessConfig::default_enabled(),
+    );
+}
+
+fn test_dkg_result_handling_with_config<F>(
+    voting_powers: &[u64],
+    dealer_idx: usize,
+    trx_gen_func: F,
+    should_accept: bool,
+    randomness_config: OnChainRandomnessConfig,
+) where
+    F: Fn(
+        &mut ThreadRng,
+        &<RealDKG as DKGTrait>::PublicParams,
+        u64,
+        &<RealDKG as DKGTrait>::DealerPrivateKey,
+        &<RealDKG as DKGTrait>::DealerPublicKey,
+    ) -> <RealDKG as DKGTrait>::Transcript,
+{
     let mut rng = thread_rng();
     let epoch = 123;
     let num_validators = voting_powers.len();
@@ -182,9 +196,7 @@ fn test_dkg_result_handling<F>(
 
     let dkg_session_metadata = DKGSessionMetadata {
         dealer_epoch: epoch,
-        randomness_config: RandomnessConfigMoveStruct::from(
-            OnChainRandomnessConfig::default_enabled(),
-        ),
+        randomness_config: RandomnessConfigMoveStruct::from(randomness_config.clone()),
         dealer_validator_set: validator_set.clone(),
         target_validator_set: validator_set,
     };
@@ -205,7 +217,7 @@ fn test_dkg_result_handling<F>(
 
     assert_process_proposal_result(
         Some((signers, verifier)),
-        Some(OnChainRandomnessConfig::default_enabled()),
+        Some(randomness_config),
         Some(OnChainJWKConsensusConfig::default_enabled()),
         vtxns.clone(),
         should_accept,
@@ -242,7 +254,7 @@ fn assert_process_proposal_result(
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal_ext(
         vtxns,
-        Payload::empty(false, true),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -344,7 +356,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
 
     let block_vtxns_too_large = Block::new_proposal_ext(
         vec![ValidatorTransaction::dummy(vec![0xFF; 200]); 5], // total_bytes >= 200 * 5 = 1000
-        Payload::empty(false, true),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),

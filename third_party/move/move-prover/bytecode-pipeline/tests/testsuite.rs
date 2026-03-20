@@ -158,7 +158,13 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         .and_then(|p| p.to_str())
         .ok_or_else(|| anyhow!("bad file name"))?;
     let pipeline_opt = get_tested_transformation_pipeline(dir_name)?;
-    move_stackless_bytecode_test_utils::test_runner(path, pipeline_opt)?;
+    move_stackless_bytecode_test_utils::test_runner_with_annotations(
+        path,
+        pipeline_opt,
+        |target| {
+            target.register_annotation_formatters_for_test();
+        },
+    )?;
     Ok(())
 }
 

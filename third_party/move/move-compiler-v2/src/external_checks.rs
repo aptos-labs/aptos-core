@@ -7,7 +7,7 @@
 use legacy_move_compiler::shared::known_attributes::LintAttribute;
 use move_model::{
     ast::ExpData,
-    model::{FunctionEnv, GlobalEnv, Loc},
+    model::{FunctionEnv, GlobalEnv, Loc, NamedConstantEnv, StructEnv},
 };
 use move_stackless_bytecode::function_target::FunctionTarget;
 use std::{collections::BTreeSet, fmt, sync::Arc};
@@ -22,6 +22,15 @@ pub trait ExternalChecks {
 
     /// Get all the stackless bytecode checkers.
     fn get_stackless_bytecode_checkers(&self) -> Vec<Box<dyn StacklessBytecodeChecker>>;
+
+    /// Get all the constant checkers.
+    fn get_constant_checkers(&self) -> Vec<Box<dyn ConstantChecker>>;
+
+    /// Get all the struct checkers.
+    fn get_struct_checkers(&self) -> Vec<Box<dyn StructChecker>>;
+
+    /// Get all the function checkers.
+    fn get_function_checkers(&self) -> Vec<Box<dyn FunctionChecker>>;
 }
 
 impl fmt::Debug for dyn ExternalChecks {
@@ -38,10 +47,28 @@ impl fmt::Debug for dyn ExternalChecks {
             .map(|c| c.get_name())
             .collect::<Vec<_>>()
             .join(", ");
+        let constant_checkers = self
+            .get_constant_checkers()
+            .into_iter()
+            .map(|c| c.get_name())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let struct_checkers = self
+            .get_struct_checkers()
+            .into_iter()
+            .map(|c| c.get_name())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let function_checkers = self
+            .get_function_checkers()
+            .into_iter()
+            .map(|c| c.get_name())
+            .collect::<Vec<_>>()
+            .join(", ");
         write!(
             f,
-            "dyn ExternalChecks {{ exp_checkers: [{}], stackless_bytecode_checkers: [{}] }}",
-            exp_checkers, stackless_bytecode_checkers
+            "dyn ExternalChecks {{ exp_checkers: [{}], stackless_bytecode_checkers: [{}], constant_checkers: [{}], struct_checkers: [{}], function_checkers: [{}] }}",
+            exp_checkers, stackless_bytecode_checkers, constant_checkers, struct_checkers, function_checkers
         )
     }
 }
@@ -60,6 +87,48 @@ pub trait ExpChecker {
     /// Examine `expr` after all its children have been visited.
     /// Potentially emit reports using `self.report()`.
     fn visit_expr_post(&mut self, _function: &FunctionEnv, _expr: &ExpData) {}
+
+    /// Report the `msg` highlighting the `loc`.
+    fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
+        report(env, loc, msg, self.get_name().as_str());
+    }
+}
+
+/// Implement this trait for checks on individual constants.
+pub trait ConstantChecker {
+    /// Name of this checker.
+    fn get_name(&self) -> String;
+
+    /// Examine `const_env` and potentially emit reports via `self.report()`.
+    fn check_constant(&self, const_env: &NamedConstantEnv);
+
+    /// Report the `msg` highlighting the `loc`.
+    fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
+        report(env, loc, msg, self.get_name().as_str());
+    }
+}
+
+/// Implement this trait for checks on individual structs/enums.
+pub trait StructChecker {
+    /// Name of this checker.
+    fn get_name(&self) -> String;
+
+    /// Examine `struct_env` and potentially emit reports via `self.report()`.
+    fn check_struct(&self, struct_env: &StructEnv);
+
+    /// Report the `msg` highlighting the `loc`.
+    fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
+        report(env, loc, msg, self.get_name().as_str());
+    }
+}
+
+/// Implement this trait for checks on individual functions.
+pub trait FunctionChecker {
+    /// Name of this checker.
+    fn get_name(&self) -> String;
+
+    /// Examine `func_env` and potentially emit reports via `self.report()`.
+    fn check_function(&self, func_env: &FunctionEnv);
 
     /// Report the `msg` highlighting the `loc`.
     fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
@@ -89,6 +158,15 @@ pub fn known_checker_names(external_checkers: &Vec<Arc<dyn ExternalChecks>>) -> 
             names.insert(checker.get_name());
         }
         for checker in checkers.get_stackless_bytecode_checkers() {
+            names.insert(checker.get_name());
+        }
+        for checker in checkers.get_constant_checkers() {
+            names.insert(checker.get_name());
+        }
+        for checker in checkers.get_struct_checkers() {
+            names.insert(checker.get_name());
+        }
+        for checker in checkers.get_function_checkers() {
             names.insert(checker.get_name());
         }
     }

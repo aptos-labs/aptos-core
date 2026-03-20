@@ -19,6 +19,7 @@ pub struct BaseConfig {
     pub working_dir: Option<PathBuf>,
     pub role: RoleType,
     pub waypoint: WaypointConfig,
+    pub enable_validator_pfn_connections: bool,
 }
 
 impl Default for BaseConfig {
@@ -28,6 +29,7 @@ impl Default for BaseConfig {
             working_dir: None,
             role: RoleType::Validator,
             waypoint: WaypointConfig::None,
+            enable_validator_pfn_connections: false, // Whether to allow direct connections between validators and PFNs
         }
     }
 }

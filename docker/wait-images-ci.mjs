@@ -1,8 +1,9 @@
 #!/usr/bin/env -S node
 
 // This script waits for the images to be available in the GCP artifact registry that are needed for a CI job.
+// Only GCP is used; we do not wait for AWS/ECR images.
 // These images are typically built on push to the main branch or on a PR, from the "docker-build-test.yaml" workflow.
-
+//
 // Try it out:
 // GCP_DOCKER_ARTIFACT_REPO=us-docker.pkg.dev/aptos-registry/docker GIT_SHA=$(git fetch && git rev-parse origin/main) ./docker/wait-images-ci.mjs --wait-for-image-seconds=3600
 import {

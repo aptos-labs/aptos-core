@@ -66,8 +66,8 @@ impl Processor {
         ensure!(metadata.chain_id == chain_id, "Chain ID mismatch.");
         let num_transactions_per_folder = metadata.num_transactions_per_folder;
         ensure!(
-            starting_version % num_transactions_per_folder == 0
-                && ending_version % num_transactions_per_folder == 0,
+            starting_version.is_multiple_of(num_transactions_per_folder)
+                && ending_version.is_multiple_of(num_transactions_per_folder),
             "starting_version and ending_version must be multiply of num_transactions_per_folder ({num_transactions_per_folder})."
         );
 
@@ -91,7 +91,7 @@ impl Processor {
         };
 
         ensure!(
-            progress_file.version % num_transactions_per_folder == 0,
+            progress_file.version.is_multiple_of(num_transactions_per_folder),
             "version in the progress file must be the multiply of num_transactions_per_folder ({num_transactions_per_folder})."
         );
 

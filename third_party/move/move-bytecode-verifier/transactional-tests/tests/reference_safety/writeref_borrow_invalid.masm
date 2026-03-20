@@ -1,0 +1,23 @@
+//# publish
+module 0x1::M
+struct G has drop
+  v: u64
+
+struct S has drop
+  g: G
+
+fun t1(l0: &mut S, l1: bool)
+    local l2: &mut u64
+    local l3: &mut G
+    copy_loc l0
+    mut_borrow_field S, g
+    mut_borrow_field G, v
+    st_loc l2
+    copy_loc l0
+    mut_borrow_field S, g
+    st_loc l3
+    ld_u64 0
+    pack G
+    move_loc l3
+    write_ref
+    ret

@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: duplicate declaration of `a`
+  ┌─ tests/match-checks/tuple_duplicate_vars.move:5:17
+  │
+5 │             (a, a) => a,
+  │              -  ^
+  │              │
+  │              previous declaration of `a`

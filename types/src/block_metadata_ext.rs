@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{block_metadata::BlockMetadata, randomness::Randomness};
+use crate::{
+    block_metadata::BlockMetadata, decryption::BlockTxnDecryptionKey, randomness::Randomness,
+};
 use aptos_crypto::HashValue;
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -18,6 +20,7 @@ use serde::{Deserialize, Serialize};
 pub enum BlockMetadataExt {
     V0(BlockMetadata),
     V1(BlockMetadataWithRandomness),
+    V2(BlockMetadataWithRandAndDecKey),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,6 +34,20 @@ pub struct BlockMetadataWithRandomness {
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp_usecs: u64,
     pub randomness: Option<Randomness>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlockMetadataWithRandAndDecKey {
+    pub id: HashValue,
+    pub epoch: u64,
+    pub round: u64,
+    pub proposer: AccountAddress,
+    #[serde(with = "serde_bytes")]
+    pub previous_block_votes_bitvec: Vec<u8>,
+    pub failed_proposer_indices: Vec<u32>,
+    pub timestamp_usecs: u64,
+    pub randomness: Option<Randomness>,
+    pub decryption_key: Option<BlockTxnDecryptionKey>,
 }
 
 impl BlockMetadataExt {
@@ -56,10 +73,35 @@ impl BlockMetadataExt {
         })
     }
 
+    pub fn new_v2(
+        id: HashValue,
+        epoch: u64,
+        round: u64,
+        proposer: AccountAddress,
+        previous_block_votes_bitvec: Vec<u8>,
+        failed_proposer_indices: Vec<u32>,
+        timestamp_usecs: u64,
+        randomness: Option<Randomness>,
+        decryption_key: Option<BlockTxnDecryptionKey>,
+    ) -> Self {
+        Self::V2(BlockMetadataWithRandAndDecKey {
+            id,
+            epoch,
+            round,
+            proposer,
+            previous_block_votes_bitvec,
+            failed_proposer_indices,
+            timestamp_usecs,
+            randomness,
+            decryption_key,
+        })
+    }
+
     pub fn id(&self) -> HashValue {
         match self {
             BlockMetadataExt::V0(obj) => obj.id(),
             BlockMetadataExt::V1(obj) => obj.id,
+            BlockMetadataExt::V2(obj) => obj.id,
         }
     }
 
@@ -67,6 +109,7 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(obj) => obj.timestamp_usecs(),
             BlockMetadataExt::V1(obj) => obj.timestamp_usecs,
+            BlockMetadataExt::V2(obj) => obj.timestamp_usecs,
         }
     }
 
@@ -74,6 +117,7 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(obj) => obj.proposer(),
             BlockMetadataExt::V1(obj) => obj.proposer,
+            BlockMetadataExt::V2(obj) => obj.proposer,
         }
     }
 
@@ -81,6 +125,7 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(obj) => obj.previous_block_votes_bitvec(),
             BlockMetadataExt::V1(obj) => &obj.previous_block_votes_bitvec,
+            BlockMetadataExt::V2(obj) => &obj.previous_block_votes_bitvec,
         }
     }
 
@@ -88,6 +133,7 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(obj) => obj.failed_proposer_indices(),
             BlockMetadataExt::V1(obj) => &obj.failed_proposer_indices,
+            BlockMetadataExt::V2(obj) => &obj.failed_proposer_indices,
         }
     }
 
@@ -95,6 +141,7 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(obj) => obj.epoch(),
             BlockMetadataExt::V1(obj) => obj.epoch,
+            BlockMetadataExt::V2(obj) => obj.epoch,
         }
     }
 
@@ -102,6 +149,7 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(obj) => obj.round(),
             BlockMetadataExt::V1(obj) => obj.round,
+            BlockMetadataExt::V2(obj) => obj.round,
         }
     }
 
@@ -109,6 +157,7 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(_) => "block_metadata_ext_transaction__v0",
             BlockMetadataExt::V1(_) => "block_metadata_ext_transaction__v1",
+            BlockMetadataExt::V2(_) => "block_metadata_ext_transaction__v2",
         }
     }
 }

@@ -57,7 +57,7 @@ impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
         // at runtime, due to speculation in parallel execution, it is possible to access something
         // outside the read-set. This is ok, but we preload framework to avoid unexpected logs and
         // issues in the VM where prologue cannot find modules like 0x1::error.
-        for package in &aptos_framework::testnet_release_bundle().packages {
+        for package in &aptos_cached_packages::head_release_bundle().packages {
             for (_, module) in package.sorted_code_and_modules() {
                 let state_key = StateKey::module(module.self_addr(), module.self_name());
                 if let Some(state_value) =

@@ -2,6 +2,12 @@
 
 //# publish
 module 0x42::m {
+    enum Option<T0> has drop {
+        None,
+        Some {
+            value: T0,
+        }
+    }
     struct Box has drop {
         x: u64,
     }
@@ -24,12 +30,6 @@ module 0x42::m {
             y: u64,
         }
     }
-    enum Option<T0> has drop {
-        None,
-        Some {
-            value: T0,
-        }
-    }
     enum Outer has drop {
         None,
         One {
@@ -39,6 +39,16 @@ module 0x42::m {
             i: Inner,
             b: Box,
         }
+    }
+    public fun is_some<T0>(p0: &Option<T0>): bool {
+        loop {
+            if (!(p0 is None)) {
+                if (p0 is Some) break;
+                abort 14566554180833181697
+            };
+            return false
+        };
+        true
     }
     public fun inner_value(p0: Inner): u64 {
         let _v0 = &p0;
@@ -55,16 +65,6 @@ module 0x42::m {
     }
     public fun is_inner1(p0: &Inner): bool {
         p0 is Inner1
-    }
-    public fun is_some<T0>(p0: &Option<T0>): bool {
-        loop {
-            if (!(p0 is None)) {
-                if (p0 is Some) break;
-                abort 14566554180833181697
-            };
-            return false
-        };
-        true
     }
     public fun is_some_dropped<T0: drop>(p0: Option<T0>): bool {
         if (&p0 is None) {
@@ -188,17 +188,17 @@ module 0x42::m {
         let _v0;
         let _v1;
         let _v2 = &p0;
-        if (_v2 is Bar) _v0 = &_v2.x else _v0 = &_v2.x;
-        let _v3 = *_v0;
+        if (_v2 is Bar) _v1 = &_v2.x else _v1 = &_v2.x;
+        let _v3 = *_v1;
         let _v4 = &p0;
         if (_v4 is Foo) {
             let CommonFields::Foo{x: _v5, y: _v6} = p0;
-            _v1 = _v6
+            _v0 = _v6
         } else if (_v4 is Bar) {
             let CommonFields::Bar{z: _v7, x: _v8} = p0;
-            _v1 = _v7
+            _v0 = _v7
         } else abort 14566554180833181697;
-        _v3 + _v1
+        _v3 + _v0
     }
     fun t1_inner_value(): u64 {
         inner_value(Inner::Inner2{x: 2, y: 5})

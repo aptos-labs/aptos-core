@@ -34,8 +34,6 @@ impl AptosDB {
             false,
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            false, /* indexer */
-            false,
         )
     }
 
@@ -44,16 +42,11 @@ impl AptosDB {
         db_root_path: P,
         max_node_cache: usize,
     ) -> Self {
-        let db_config = RocksdbConfigs {
-            enable_storage_sharding: true,
-            ..Default::default()
-        };
         Self::open(
             StorageDirPaths::from_path(db_root_path),
             false,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            db_config,
-            false, /* indexer */
+            RocksdbConfigs::default(),
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             max_node_cache,
             None,
@@ -64,29 +57,7 @@ impl AptosDB {
 
     /// This opens db in non-readonly mode, without the pruner and cache.
     pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(
-            db_root_path,
-            false,
-            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-            0,
-            false,
-            false,
-        )
-    }
-
-    /// This opens db in non-readonly mode, without the pruner, and with the indexer
-    pub fn new_for_test_with_indexer<P: AsRef<Path> + Clone>(
-        db_root_path: P,
-        enable_sharding: bool,
-    ) -> Self {
-        Self::new_without_pruner(
-            db_root_path,
-            false,
-            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            true, /* indexer */
-            enable_sharding,
-        )
+        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, 0)
     }
 
     /// This opens db in non-readonly mode, without the pruner.
@@ -99,8 +70,6 @@ impl AptosDB {
             false,
             buffered_state_target_items,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            false, /* indexer */
-            false,
         )
     }
 
@@ -111,8 +80,6 @@ impl AptosDB {
             true,
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            false, /* indexer */
-            false,
         )
     }
 

@@ -34,6 +34,15 @@ data:
     {{- with .Values.chain.jwk_consensus_config_override }}
     jwk_consensus_config_override: {{ . | toJson }}
     {{- end}}
+    {{- with .Values.chain.randomness_config_override }}
+    randomness_config_override: {{ . | toJson }}
+    {{- end}}
+    {{- with .Values.chain.chunky_dkg_config_override }}
+    chunky_dkg_config_override: {{ . | toJson }}
+    {{- end}}
+    {{- with .Values.chain.initial_features_override }}
+    initial_features_override: {{ . | toJson }}
+    {{- end}}
 ---
 
 apiVersion: v1

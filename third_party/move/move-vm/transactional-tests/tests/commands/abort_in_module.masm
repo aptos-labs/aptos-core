@@ -1,0 +1,14 @@
+//# publish
+module 0x1::M
+public fun foo()
+    ld_u64 22
+    abort
+
+
+
+//# run
+script
+use 0x1::M
+entry public fun main()
+    call M::foo
+    ret

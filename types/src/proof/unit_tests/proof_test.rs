@@ -427,8 +427,12 @@ fn test_transaction_list_with_proof() {
         .unwrap_err();
 
     // Verify transaction hashes match but info root hash verification fails (ledger info expected zero root hash)
-    let transaction_list_proof =
-        create_single_transaction_info_proof(Some(transactions[0].hash()), None, None, None);
+    let transaction_list_proof = create_single_transaction_info_proof(
+        Some(transactions[0].committed_hash()),
+        None,
+        None,
+        None,
+    );
     let transaction_list_with_proof = TransactionListWithProof::new(
         transactions.clone(),
         Some(vec![vec![event.clone()]]),
@@ -449,7 +453,7 @@ fn test_transaction_list_with_proof() {
 
     // Construct a new transaction list with proof where the transaction info and event hashes match
     let transaction_list_proof = create_single_transaction_info_proof(
-        Some(transactions[0].hash()),
+        Some(transactions[0].committed_hash()),
         Some(event.hash()),
         None,
         None,
@@ -482,7 +486,7 @@ fn test_transaction_and_output_list_with_proof() {
         vec![],
         0,
     ));
-    let txn_hash = transaction.hash();
+    let txn_hash = transaction.committed_hash();
     let event = create_event();
     let event_root_hash = event.hash();
     let write_set = WriteSet::default();
@@ -619,4 +623,29 @@ fn create_transaction_info(
 fn create_event() -> ContractEvent {
     let event_key = EventKey::new(0, AccountAddress::random());
     ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap()).unwrap()
+}
+
+mod hash_two_children_tests {
+    use super::super::super::SparseMerkleLeafNodeHasher;
+    use aptos_crypto::{hash::CryptoHasher, HashValue};
+    use proptest::prelude::*;
+
+    fn hash_two_children_reference<H: CryptoHasher>(h1: &HashValue, h2: &HashValue) -> HashValue {
+        let mut state = H::default();
+        state.update(h1.as_ref());
+        state.update(h2.as_ref());
+        state.finish()
+    }
+
+    proptest! {
+        #[test]
+        fn matches_reference_sparse_merkle_leaf_node(
+            h1 in any::<HashValue>(),
+            h2 in any::<HashValue>(),
+        ) {
+            let optimized = SparseMerkleLeafNodeHasher::hash_two_children(&h1, &h2);
+            let reference = hash_two_children_reference::<SparseMerkleLeafNodeHasher>(&h1, &h2);
+            prop_assert_eq!(optimized, reference);
+        }
+    }
 }

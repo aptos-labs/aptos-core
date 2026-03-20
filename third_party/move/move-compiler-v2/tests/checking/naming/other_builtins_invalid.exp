@@ -12,7 +12,7 @@ error: expected 1 type argument but 0 were provided
 4 │         freeze<>(x);
   │         ^^^^^^^^^^^
 
-error: assert macro must have one or two arguments
+error: Macro `assert!` must have at least one argument
   ┌─ tests/checking/naming/other_builtins_invalid.move:5:16
   │
 5 │         assert!();

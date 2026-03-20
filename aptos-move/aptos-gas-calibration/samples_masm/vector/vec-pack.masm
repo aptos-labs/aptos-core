@@ -1,0 +1,680 @@
+module 0xcafe::VecPack
+public fun calibrate_vecpack_0_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    vec_pack <u64>, 0
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_vecpack_0_x100()
+    ld_u64 10
+    call calibrate_vecpack_0_impl
+    ret
+
+entry public fun calibrate_vecpack_0_x500()
+    ld_u64 50
+    call calibrate_vecpack_0_impl
+    ret
+
+entry public fun calibrate_vecpack_0_x1000()
+    ld_u64 100
+    call calibrate_vecpack_0_impl
+    ret
+
+public fun calibrate_vecpack_1_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    ld_u64 42
+    vec_pack <u64>, 1
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_vecpack_1_x100()
+    ld_u64 10
+    call calibrate_vecpack_1_impl
+    ret
+
+entry public fun calibrate_vecpack_1_x500()
+    ld_u64 50
+    call calibrate_vecpack_1_impl
+    ret
+
+entry public fun calibrate_vecpack_1_x1000()
+    ld_u64 100
+    call calibrate_vecpack_1_impl
+    ret
+
+public fun calibrate_vecpack_2_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_vecpack_2_x100()
+    ld_u64 10
+    call calibrate_vecpack_2_impl
+    ret
+
+entry public fun calibrate_vecpack_2_x500()
+    ld_u64 50
+    call calibrate_vecpack_2_impl
+    ret
+
+entry public fun calibrate_vecpack_2_x1000()
+    ld_u64 100
+    call calibrate_vecpack_2_impl
+    ret
+
+public fun calibrate_vecpack_8_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    ld_u64 40
+    ld_u64 41
+    ld_u64 42
+    ld_u64 43
+    ld_u64 44
+    ld_u64 45
+    ld_u64 46
+    ld_u64 47
+    vec_pack <u64>, 8
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_vecpack_8_x100()
+    ld_u64 10
+    call calibrate_vecpack_8_impl
+    ret
+
+entry public fun calibrate_vecpack_8_x500()
+    ld_u64 50
+    call calibrate_vecpack_8_impl
+    ret
+
+entry public fun calibrate_vecpack_8_x1000()
+    ld_u64 100
+    call calibrate_vecpack_8_impl
+    ret
+
+public fun calibrate_vecpack_32_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    ld_u64 0
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    ld_u64 6
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    ld_u64 10
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    ld_u64 14
+    ld_u64 15
+    ld_u64 16
+    ld_u64 17
+    ld_u64 18
+    ld_u64 19
+    ld_u64 20
+    ld_u64 21
+    ld_u64 22
+    ld_u64 23
+    ld_u64 24
+    ld_u64 25
+    ld_u64 26
+    ld_u64 27
+    ld_u64 28
+    ld_u64 29
+    ld_u64 30
+    ld_u64 31
+    vec_pack <u64>, 32
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_vecpack_32_x100()
+    ld_u64 10
+    call calibrate_vecpack_32_impl
+    ret
+
+entry public fun calibrate_vecpack_32_x500()
+    ld_u64 50
+    call calibrate_vecpack_32_impl
+    ret
+
+entry public fun calibrate_vecpack_32_x1000()
+    ld_u64 100
+    call calibrate_vecpack_32_impl
+    ret

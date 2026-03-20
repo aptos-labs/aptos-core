@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: Macro `assert_eq!` must have at least two arguments
+   ┌─ tests/macros/assert_eq_invalid.move:24:19
+   │
+24 │         assert_eq!()
+   │                   ^^
+
+error: Macro `assert_eq!` must have at least two arguments
+   ┌─ tests/macros/assert_eq_invalid.move:28:19
+   │
+28 │         assert_eq!(x)
+   │                   ^^^
+
+error: Macro `assert_eq!` cannot take more than 7 arguments
+   ┌─ tests/macros/assert_eq_invalid.move:32:19
+   │
+32 │         assert_eq!(left, right, b"a = {}, b = {}, c = {}, d = {}, e = {}", a, b, c, d, e)
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Expected a string literal
+   ┌─ tests/macros/assert_eq_invalid.move:37:33
+   │
+37 │         assert_eq!(left, right, fmt, a)
+   │                                 ^^^

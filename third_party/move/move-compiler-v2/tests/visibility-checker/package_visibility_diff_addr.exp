@@ -1,28 +1,28 @@
 
 Diagnostics:
-error: public(package) function `0x42::A::bar` cannot be called from function `0x43::B::foo` because they are from different addresses
+error: package function `0x42::A::bar` cannot be called from a different address
    ┌─ tests/visibility-checker/package_visibility_diff_addr.move:3:25
    │
  3 │     public(package) fun bar() {}
-   │                         ^^^ callee
+   │                         ^^^ called from function `0x43::B::foo`
    ·
 10 │         A::bar()
    │         -------- called here
 
-error: public(package) function `0x42::A::bar` cannot be called from function `0x43::B::bar` because they are from different addresses
+error: package function `0x42::A::bar` cannot be called from a different address
    ┌─ tests/visibility-checker/package_visibility_diff_addr.move:3:25
    │
  3 │     public(package) fun bar() {}
-   │                         ^^^ callee
+   │                         ^^^ called from function `0x43::B::bar`
    ·
 14 │         A::bar()
    │         -------- called here
 
-error: public(package) function `0x42::A::bar` cannot be called from function `0x43::B::baz` because they are from different addresses
+error: package function `0x42::A::bar` cannot be called from a different address
    ┌─ tests/visibility-checker/package_visibility_diff_addr.move:3:25
    │
  3 │     public(package) fun bar() {}
-   │                         ^^^ callee
+   │                         ^^^ called from function `0x43::B::baz`
    ·
 18 │         A::bar()
    │         -------- called here

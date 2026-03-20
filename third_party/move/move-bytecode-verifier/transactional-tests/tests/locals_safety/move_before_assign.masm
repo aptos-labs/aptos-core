@@ -1,0 +1,8 @@
+//# run
+script
+entry public fun main()
+    local l0: u64
+    local l1: u64
+    move_loc l0
+    st_loc l1
+    ret

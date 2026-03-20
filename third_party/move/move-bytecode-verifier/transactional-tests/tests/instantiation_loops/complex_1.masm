@@ -1,0 +1,86 @@
+//# publish
+module 0x1::M
+struct S<T0>
+  b: bool
+
+fun a<T0>()
+    call b<S<T0>, u64>
+    ret
+
+fun b<T0, T1>()
+    call f<T0>
+    call c<S<T1>, bool>
+    ret
+
+fun c<T0, T1>()
+    call c<u64, T0>
+    call d<T1>
+    call e<T1>
+    ret
+
+fun d<T0>()
+    call b<u64, T0>
+    ret
+
+fun e<T0>()
+    ret
+
+fun f<T0>()
+    call g<T0>
+    ret
+
+fun g<T0>()
+    call f<S<T0>>
+    ret
+
+
+
+//# publish
+module 0x1::M2
+struct S<T0>
+  b: bool
+
+fun f<T0>()
+    call g<T0>
+    ret
+
+fun g<T0>()
+    call f<S<T0>>
+    ret
+
+
+
+//# publish
+module 0x1::M3
+struct S<T0>
+  b: bool
+
+fun a<T0>()
+    call b<S<T0>, u64>
+    ret
+
+fun b<T0, T1>()
+    call f<T0>
+    call c<S<T1>, bool>
+    ret
+
+fun c<T0, T1>()
+    call c<u64, T0>
+    call d<T1>
+    call e<T1>
+    ret
+
+fun d<T0>()
+    call b<u64, T0>
+    ret
+
+fun e<T0>()
+    ret
+
+fun f<T0>()
+    call g<T0>
+    ret
+
+fun g<T0>()
+    call f<T0>
+    ret

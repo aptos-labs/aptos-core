@@ -40,7 +40,7 @@ fn get_link_stats_table(csv: &[u8]) -> BTreeMap<String, BTreeMap<String, (u64, f
 }
 
 fn div_ceil(dividend: usize, divisor: usize) -> usize {
-    if dividend % divisor == 0 {
+    if dividend.is_multiple_of(divisor) {
         dividend / divisor
     } else {
         dividend / divisor + 1

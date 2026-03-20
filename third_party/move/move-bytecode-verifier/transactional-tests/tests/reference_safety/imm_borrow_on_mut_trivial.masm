@@ -1,0 +1,35 @@
+//# publish
+module 0x1::Tester
+struct X
+  f: u64
+
+fun bump_and_give(l0: &mut X): &u64
+    copy_loc l0
+    mut_borrow_field X, f
+    read_ref
+    ld_u64 1
+    add
+    copy_loc l0
+    mut_borrow_field X, f
+    write_ref
+    move_loc l0
+    borrow_field X, f
+    ret
+
+fun contrived_example(l0: &mut X): &u64
+    local l1: &u64
+    copy_loc l0
+    call bump_and_give
+    st_loc l1
+    copy_loc l1
+    read_ref
+    move_loc l0
+    borrow_field X, f
+    read_ref
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: move_loc l1
+    ret

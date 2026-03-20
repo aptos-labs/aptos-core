@@ -58,6 +58,18 @@ use std::{
  *
  * Finally, ColdValidationRequirements allows to cheaply check if a txn has
  * unfulfilled requirements, needed by the scheduler to avoid committing such txns.
+ *
+ * ***IMPORTANT***: The current implementation stores at most one pending requirement
+ * (Option instead of Vec). This simplification relies on the fact that requirements
+ * are recorded exclusively during the sequential commit hook (record_requirements
+ * is called from prepare_and_queue_commit_ready_txn). After recording, the
+ * min_idx_with_unprocessed_validation_requirement is lowered to block the next
+ * commit via is_commit_blocked, preventing a second record_requirements call
+ * before the first pending requirement is activated and processed. If requirements
+ * were ever to be added outside the commit path (e.g. from execution or another
+ * concurrent source), this assumption would break, and pending_requirements would
+ * need to be changed back to a Vec (see commit 0e134ddb6b on main for the prior
+ * Vec-based implementation).
  **/
 
 // The requirements are active for the txns with indices keyed in the versions map,
@@ -141,7 +153,9 @@ pub(crate) struct ColdValidationRequirements<R: Clone + Ord> {
     ///
     /// This variable is updated in three scenarios:
     /// 1. When new requirements are recorded (decreased to calling_txn_idx + 1)
-    /// 2. When requirements are processed by the dedicated worker (increased to txn_idx + 1)
+    /// 2. When requirements are processed by the dedicated worker (advanced to the
+    ///    minimum index of remaining active requirements, skipping gap indices that
+    ///    have no requirements)
     /// 3. When all requirements are processed (reset to u32::MAX)
     ///
     /// Note: This alone is not sufficient to determine if a transaction can be committed.
@@ -169,9 +183,13 @@ pub(crate) struct ColdValidationRequirements<R: Clone + Ord> {
     /// When a txn committed with published modules, they are stored here with from_idx =
     /// txn's index, and to_idx being the upper bound on which txns may need to be validated.
     /// If dedicated worker is not yet assigned, the caller takes on the responsibility.
-    /// Pending requirements are processsed by the dedicated worker and transformed into
+    /// Pending requirements are processed by the dedicated worker and transformed into
     /// active requirements (but this is done later and off the commit sequential path).
-    pending_requirements: CachePadded<Mutex<Vec<PendingRequirement<R>>>>,
+    ///
+    /// At most one pending requirement can exist at a time: after record_requirements sets
+    /// min = from_idx, is_commit_blocked(from_idx) blocks the next txn from committing,
+    /// preventing a second record until the first is fully processed and activated.
+    pending_requirements: CachePadded<Mutex<Option<PendingRequirement<R>>>>,
 
     /// No cache padding since these are accessed less frequently and by the designated
     /// worker. Note: It is important to make sure there are no dangling references.
@@ -189,7 +207,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
             deferred_requirements_status: (0..num_txns)
                 .map(|_| CachePadded::new(AtomicU32::new(0)))
                 .collect(),
-            pending_requirements: CachePadded::new(Mutex::new(Vec::new())),
+            pending_requirements: CachePadded::new(Mutex::new(None)),
             active_requirements: ExplicitSyncWrapper::new(ActiveRequirements {
                 requirements: BTreeSet::new(),
                 versions: BTreeMap::new(),
@@ -197,8 +215,16 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
         }
     }
 
-    /// Record is called during the sequential portion of txn commit (at calling_txn_idx),
-    /// and schedules validation for specificed requirements starting at calling_txn_idx + 1
+    /// ***IMPORTANT***: This method must only be called during the sequential commit hook
+    /// (i.e. while holding the queueing_commits_lock), as the at-most-one pending requirement
+    /// invariant depends on it. After this call lowers min_idx_with_unprocessed_validation_requirement,
+    /// is_commit_blocked prevents any further commit (and thus any further call to this method)
+    /// until the pending requirement is fully activated and processed. If this method were ever
+    /// called outside the commit path, the Option<PendingRequirement> would need to revert to
+    /// Vec<PendingRequirement>, and the start_idx invariant check in activate_pending_requirements
+    /// would need to be removed or relaxed (see the prior Vec-based implementation on main).
+    ///
+    /// Records validation for the specified requirements starting at calling_txn_idx + 1
     /// until min_never_scheduled_idx, i.e. for all txns that might be affected: record is
     /// called after a txn publishes the modules (in requirements parameter) during commit.
     /// Since indices greater or equal to min_never_scheduled_idx were previously never
@@ -232,7 +258,13 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
         }
 
         let mut pending_reqs = self.pending_requirements.lock();
-        pending_reqs.push(PendingRequirement {
+        if pending_reqs.is_some() {
+            return Err(code_invariant_error(format!(
+                "Pending requirement already exists when recording for calling_txn_idx = {}",
+                calling_txn_idx
+            )));
+        }
+        *pending_reqs = Some(PendingRequirement {
             requirements,
             from_idx: calling_txn_idx + 1,
             to_idx: min_never_scheduled_idx,
@@ -288,9 +320,14 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
             return Ok(None);
         }
 
-        if self.activate_pending_requirements(statuses)? {
-            self.dedicated_worker_id.store(u32::MAX, Ordering::Relaxed);
-            // If the worker id was reset, the worker can early return (no longer assigned).
+        self.activate_pending_requirements(statuses)?;
+
+        // activate_pending_requirements may have cleared all requirements and reset the
+        // dedicated worker (when no txns in the range needed validation). Re-check.
+        // Note: even if a concurrent record_requirements re-assigned a dedicated worker
+        // after the reset, it cannot be this worker (it is executing here), so the
+        // check below reliably detects the reset.
+        if !self.is_dedicated_worker(worker_id) {
             return Ok(None);
         }
 
@@ -380,28 +417,9 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
                 .fetch_max(blocked_incarnation_status(incarnation), Ordering::Relaxed);
         }
 
-        let active_reqs_is_empty = active_reqs.versions.is_empty();
-        let pending_reqs = self.pending_requirements.lock();
-        if pending_reqs.is_empty() {
-            // Expected to be empty most of the time as publishes are rare and the requirements
-            // are drained by the caller when getting the requirement. The check ensures that
-            // the min_idx_with_unprocessed_validation_requirement is not incorrectly increased
-            // if pending requirements exist for validated_idx. It also allows us to hold the
-            // lock while updating the atomic variables.
-            if active_reqs_is_empty {
-                active_reqs.requirements.clear();
-                self.min_idx_with_unprocessed_validation_requirement
-                    .store(u32::MAX, Ordering::Relaxed);
-                // Since we are holding the lock and pending requirements is empty, it
-                // is safe to reset the dedicated worker id.
-                self.dedicated_worker_id.store(u32::MAX, Ordering::Relaxed);
-            } else {
-                self.min_idx_with_unprocessed_validation_requirement
-                    .store(txn_idx + 1, Ordering::Relaxed);
-            }
-        }
+        self.advance_min_unprocessed_idx(active_reqs);
 
-        Ok(active_reqs_is_empty)
+        Ok(active_reqs.versions.is_empty())
     }
 
     pub(crate) fn deferred_requirements_completed(
@@ -441,38 +459,52 @@ fn unblocked_incarnation_status(incarnation: Incarnation) -> u32 {
 
 // Private utilities / interfaces.
 impl<R: Clone + Ord> ColdValidationRequirements<R> {
-    // Drain and activate any pending requirements. May reset the dedicated worker id and
-    // min_idx_with_unprocessed_validation_requirement if there are no requirements left.
-    //
-    // If the return value is true, then the caller must reset the dedicated worker id.
-    // This is required in a specific corner case where all activated pending requirements
-    // were processed but the active requirements remained empty (i.e. none of the txns
-    // actually needed validation, which can happen based on status, e.g. PendingScheduling
-    // or Aborted). In this case, we can't rely on validation_requirement_processed to
-    // reset the dedicated worker id, and require the caller to do so.
+    /// Syncs min_idx_with_unprocessed_validation_requirement to the minimum of active
+    /// versions (or u32::MAX if empty, also clearing requirements and resetting the
+    /// dedicated worker). Only updates when pending is empty — if pending is non-empty,
+    /// a concurrent record_requirements may have lowered min, and we must not overwrite it.
+    ///
+    /// Returns Some(prev_min) when an update was performed (pending was empty at the
+    /// time of the swap), None when skipped (pending was non-empty).
+    fn advance_min_unprocessed_idx(&self, active_reqs: &mut ActiveRequirements<R>) -> Option<u32> {
+        let new_min = active_reqs
+            .versions
+            .keys()
+            .min()
+            .copied()
+            .unwrap_or(u32::MAX);
+        let pending_reqs = self.pending_requirements.lock();
+        if pending_reqs.is_some() {
+            return None;
+        }
+        let prev_min = self
+            .min_idx_with_unprocessed_validation_requirement
+            .swap(new_min, Ordering::Relaxed);
+        if new_min == u32::MAX {
+            active_reqs.requirements.clear();
+            self.dedicated_worker_id.store(u32::MAX, Ordering::Relaxed);
+        }
+        Some(prev_min)
+    }
+
+    // Drain and activate any pending requirements. After activation, advances
+    // min_idx_with_unprocessed_validation_requirement to the first active version
+    // (skipping gap indices that have no requirements), or resets it to u32::MAX
+    // if no active requirements exist.
     fn activate_pending_requirements(
         &self,
         statuses: &ExecutionStatuses,
-    ) -> Result<bool, PanicError> {
-        let pending_reqs = {
+    ) -> Result<(), PanicError> {
+        let pending_req = {
             let mut guard = self.pending_requirements.lock();
-            if guard.is_empty() {
-                // No requirements to drain.
-                return Ok(false);
+            match guard.take() {
+                Some(req) => req,
+                None => return Ok(()),
             }
-            std::mem::take(&mut *guard)
         };
 
-        let starting_idx = pending_reqs
-            .iter()
-            .map(|req| req.from_idx)
-            .min()
-            .expect("Expected at least one requirement");
-        let ending_idx = pending_reqs
-            .iter()
-            .map(|req| req.to_idx)
-            .max()
-            .expect("Expected at least one requirement");
+        let starting_idx = pending_req.from_idx;
+        let ending_idx = pending_req.to_idx;
         if starting_idx >= ending_idx || ending_idx > self.num_txns {
             return Err(code_invariant_error(format!(
                 "Invariant broken, starting idx {} >= ending idx {} or ending idx > num_txns {}",
@@ -487,32 +519,41 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
                     .map(|(incarnation, is_executing)| (txn_idx, (incarnation, is_executing)))
             })
             .collect();
-        let new_requirements = pending_reqs
-            .into_iter()
-            .fold(BTreeSet::new(), |mut acc, req| {
-                acc.extend(req.requirements);
-                acc
-            });
 
         let active_reqs = self.active_requirements.dereference_mut();
-        active_reqs.requirements.extend(new_requirements);
+        active_reqs.requirements.extend(pending_req.requirements);
         active_reqs.versions.extend(new_versions);
 
-        if active_reqs.versions.is_empty() {
-            // It is possible that the active versions map was empty, and no pending
-            // requirements needed to be activated (i.e. not executing or executed).
-            // In this case, we may update min_idx_with_unprocessed_validation_requirement
-            // as validation_requirement_processed does so only when the pending
-            // requirements are empty.
-            let pending_reqs_guard = self.pending_requirements.lock();
-            if pending_reqs_guard.is_empty() {
-                self.min_idx_with_unprocessed_validation_requirement
-                    .store(u32::MAX, Ordering::Relaxed);
-                return Ok(true);
+        // Advance min_unprocessed to the first active version (or u32::MAX if empty).
+        // This is critical to skip gap indices (txns that were PendingScheduling/Aborted
+        // at activation and are not in active versions) — without this, min stays at
+        // starting_idx which unnecessarily blocks gap txns from committing.
+        //
+        // ***IMPORTANT***: Invariant check (when pending is empty, i.e. no concurrent
+        // record happened): prev_min must equal starting_idx. This holds because:
+        // (1) record_requirements set min to from_idx via swap. With at most one pending
+        //     entry (a second record is blocked by is_commit_blocked until the first is
+        //     resolved), starting_idx = from_idx.
+        // (2) No other writer can change min between record and this swap: the dedicated
+        //     worker is here (not in validation_requirement_processed), and pending is
+        //     empty (no concurrent record_requirements).
+        //
+        // Note: this invariant would still hold even if multiple requirements existed,
+        // as long as new from_idx values are monotonically non-decreasing (which follows
+        // from the sequential commit order). However, if requirements could ever arrive
+        // with non-monotonic from_idx (e.g. from a concurrent, non-commit source),
+        // prev_min could be lower than starting_idx and this check would need to be
+        // removed or relaxed to prev_min <= starting_idx.
+        if let Some(prev_min) = self.advance_min_unprocessed_idx(active_reqs) {
+            if prev_min != starting_idx {
+                return Err(code_invariant_error(format!(
+                    "activate_pending_requirements: prev min_unprocessed {} != starting_idx {}",
+                    prev_min, starting_idx
+                )));
             }
         }
 
-        Ok(false)
+        Ok(())
     }
 }
 
@@ -661,7 +702,7 @@ mod tests {
             assert!(result.is_ok());
             assert!(requirements.is_dedicated_worker(worker_id));
             // Must be recorded as pending.
-            assert_eq!(requirements.pending_requirements.lock().len(), 1);
+            assert!(requirements.pending_requirements.lock().is_some());
             test_active_requirements_empty(&requirements);
 
             // Must not be dedicated.
@@ -692,7 +733,7 @@ mod tests {
             let result = requirements.record_requirements(0, 9, 10, BTreeSet::from([100]));
             assert!(result.is_ok());
 
-            assert!(requirements.pending_requirements.lock().is_empty());
+            assert!(requirements.pending_requirements.lock().is_none());
             test_active_requirements_empty(&requirements);
 
             // Dedicated worker should not be assigned.
@@ -712,12 +753,12 @@ mod tests {
             assert_err!(requirements.record_requirements(0, 5, 4, BTreeSet::from([100])));
 
             assert_ok!(requirements.record_requirements(0, 1, 5, BTreeSet::from([100])));
-            assert_ok!(requirements.record_requirements(0, 1, 5, BTreeSet::from([100])));
-            // test that calling_txn_idx > min_not_scheduled_idx is checked.
-            assert_err!(requirements.record_requirements(0, 2, 5, BTreeSet::from([100])));
+            // Second record while first is pending must fail.
+            assert_err!(requirements.record_requirements(0, 1, 5, BTreeSet::from([100])));
 
-            // Empty requirements should be rejected.
-            assert_err!(requirements.record_requirements(0, 1, 5, BTreeSet::new()));
+            // Empty requirements should be rejected (use a fresh instance).
+            let requirements2 = ColdValidationRequirements::<TestRequirement>::new(10);
+            assert_err!(requirements2.record_requirements(0, 1, 5, BTreeSet::new()));
         }
     }
 
@@ -737,8 +778,8 @@ mod tests {
             assert!(requirements.is_dedicated_worker(5));
             assert!(!requirements.is_dedicated_worker(3));
 
-            // Second worker cannot become dedicated
-            assert_ok!(requirements.record_requirements(3, 1, 9, BTreeSet::from([200])));
+            // Second record while first is pending must fail.
+            assert_err!(requirements.record_requirements(3, 1, 9, BTreeSet::from([200])));
             assert!(requirements.is_dedicated_worker(5)); // Still worker 5
             assert!(!requirements.is_dedicated_worker(3));
         }
@@ -952,60 +993,19 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_multiple_pending_requirements() {
+        fn test_second_record_while_pending_fails() {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(20);
 
-            // Record multiple requirements from different transactions
-            assert_eq!(
-                requirements
-                    .min_idx_with_unprocessed_validation_requirement
-                    .load(Ordering::Relaxed),
-                u32::MAX
-            );
-            assert_eq!(requirements.pending_requirements.lock().len(), 0);
-
+            assert!(requirements.pending_requirements.lock().is_none());
             assert_ok!(requirements.record_requirements(1, 10, 15, BTreeSet::from([500])));
-            assert_eq!(
-                requirements
-                    .min_idx_with_unprocessed_validation_requirement
-                    .load(Ordering::Relaxed),
-                11
-            );
-            assert_eq!(requirements.pending_requirements.lock().len(), 1);
+            assert!(requirements.pending_requirements.lock().is_some());
 
-            assert_ok!(requirements.record_requirements(2, 5, 12, BTreeSet::from([300, 400])));
-            assert_eq!(
-                requirements
-                    .min_idx_with_unprocessed_validation_requirement
-                    .load(Ordering::Relaxed),
-                6
-            );
-            assert_eq!(requirements.pending_requirements.lock().len(), 2);
-
-            assert_ok!(requirements.record_requirements(3, 2, 8, BTreeSet::from([100, 200])));
-            assert_eq!(
-                requirements
-                    .min_idx_with_unprocessed_validation_requirement
-                    .load(Ordering::Relaxed),
-                3
-            );
-            assert_eq!(requirements.pending_requirements.lock().len(), 3);
-            test_active_requirements_empty(&requirements);
-
-            // First worker should remain dedicated
-            assert!(requirements.is_dedicated_worker(1));
-            assert!(!requirements.is_dedicated_worker(2));
-            assert!(!requirements.is_dedicated_worker(3));
-
-            // All affected ranges should be blocked
-            assert!(!requirements.is_commit_blocked(2, 0));
-            for i in 3..20 {
-                assert!(requirements.is_commit_blocked(i, 0));
-            }
+            // Second record while first is still pending must fail.
+            assert_err!(requirements.record_requirements(2, 5, 12, BTreeSet::from([300])));
         }
 
         #[test]
-        fn test_merged_requirements() {
+        fn test_sequential_record_activate_cycles() {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(15);
             let statuses = create_execution_statuses_with_txns(
                 15,
@@ -1017,19 +1017,17 @@ mod tests {
                 .collect(),
             );
 
-            // Record overlapping requirements
-            assert_ok!(requirements.record_requirements(1, 6, 10, BTreeSet::from([100, 200])));
-            assert_ok!(requirements.record_requirements(2, 5, 8, BTreeSet::from([300, 400])));
+            // First record + activate + process cycle.
+            assert_ok!(requirements.record_requirements(1, 5, 10, BTreeSet::from([100, 200])));
+            assert!(requirements.is_dedicated_worker(1));
 
-            let btree_reqs = BTreeSet::from([100, 200, 300, 400]);
-
-            // Get validation requirement - should contain merged requirements
+            // Get and process the two active versions (6 and 9).
             assert_some_eq!(
                 requirements
                     .get_validation_requirement_to_process(1, 20, &statuses)
                     .unwrap(),
                 (6, 1, ValidationRequirement {
-                    requirements: &btree_reqs,
+                    requirements: &BTreeSet::from([100, 200]),
                     is_deferred: false
                 })
             );
@@ -1040,12 +1038,19 @@ mod tests {
                     .get_validation_requirement_to_process(1, 20, &statuses)
                     .unwrap(),
                 (9, 2, ValidationRequirement {
-                    requirements: &btree_reqs,
+                    requirements: &BTreeSet::from([100, 200]),
                     is_deferred: true
                 })
             );
             assert_ok!(requirements.validation_requirement_processed(1, 9, 2, true));
             test_active_requirements_empty(&requirements);
+
+            // After all requirements processed, dedicated worker is reset.
+            assert!(!requirements.is_dedicated_worker(1));
+
+            // Second record works now (pending was cleared).
+            assert_ok!(requirements.record_requirements(2, 10, 15, BTreeSet::from([300])));
+            assert!(requirements.is_dedicated_worker(2));
         }
     }
 }

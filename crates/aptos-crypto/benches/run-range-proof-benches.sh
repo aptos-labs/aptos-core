@@ -19,22 +19,26 @@ if [ "$ANS" == "y" ]; then
     echo "Cleaning previous DeKART criterion benchmark results..."
     rm -rf $repo_root/target/criterion/dekart*
 
-    echo "Benchmarking DeKART..."
     cd $repo_root/crates/aptos-dkg/
+    echo "Benchmarking univariate DeKART..."
     RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-rs/bls12-381
-#    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-multivar/bn254
+#    echo "Benchmarking multivariate DeKART..."
 #    RAYON_NUM_THREADS=1 cargo bench --bench range_proof -- dekart-multivar/bls12-381
     cd - &>/dev/null
 fi
 
 cd $repo_root
 csv_data=`cargo criterion-means | grep -E '^(bulletproofs|dekart-rs|Group)'`
+#csv_data=`cargo criterion-means | grep -E '^(bulletproofs|dekart-rs|dekart-multivar|Group)'`
 
 csv_file=`mktemp`
 echo "$csv_data" >$csv_file
 echo "Wrote CSV file to $csv_file..."
 
+# Change to criterion directory so Python script can find benchmark folders (for proof_size from benchmark.json)
+cd $repo_root/target/criterion
 md_tables=`$scriptdir/print-range-proof-markdown-table.py $csv_file`
+cd - &>/dev/null
 
 echo "$md_tables"
 

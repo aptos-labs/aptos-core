@@ -24,20 +24,6 @@ options provided to the prover.
 {% include "custom-natives" %}
 {%- endif %}
 
-
-// Uninterpreted function for all types
-
-{% for instance in uninterpreted_instances %}
-
-{%- set S = "'" ~ instance.suffix ~ "'" -%}
-{%- set T = instance.name -%}
-
-{%-if S != "'$1_cmp_Ordering'" %}
-function $Arbitrary_value_of{{S}}(): {{T}};
-{% endif %}
-
-{% endfor %}
-
 // ============================================================================================
 // Integer Types
 
@@ -418,6 +404,8 @@ function $InRange(r: $Range, i: int): bool {
    r->lb <= i && i < r->ub
 }
 
+axiom (forall r: $Range, i:int:: r->lb <= i && i < r->ub ==> $InRange(r, i));
+
 function {:inline} $IsEqual'num'(x: int, y: int): bool {
     x == y
 }
@@ -491,7 +479,7 @@ datatype $Tuple8<T1, T2, T3, T4, T5, T6, T7, T8> {
 
 {%- for tuple in tuple_instances %}
 
-function {:inline} $IsValid'$tup{{tuple.arity}}'{{tuple.suffix}}''(t: $Tuple{{tuple.arity}}{% for e in tuple.elements %} {{e.name}}{% endfor %}): bool {
+function {:inline} $IsValid'$tup{{tuple.arity}}'{{tuple.suffix}}''(t: $Tuple{{tuple.arity}}{% for e in tuple.elements %} ({{e.name}}){% endfor %}): bool {
     {% for e in tuple.elements %}$IsValid'{{e.suffix}}'(t->${{loop.index0}}){% if not loop.last %} && {% endif %}{% endfor %}
 
 }
@@ -672,24 +660,6 @@ procedure {:inline 1} $CastBv{{instance}}to{{impl.base}}(src: bv{{instance}}) re
     dst := 0bv{{base_diff}} ++ src;
     {%- endif %}
 }
-
-{% if impl.base in bv_in_all_types and instance in  bv_in_all_types %}
-function $castBv{{instance}}to{{impl.base}}(src: bv{{instance}}) returns (bv{{impl.base}})
-{
-    {%- if base_diff < 0 %}
-    if ($Gt'Bv{{instance}}'(src, {{impl.max}}bv{{instance}})) then
-        $Arbitrary_value_of'bv{{impl.base}}'()
-    {%- endif %}
-    {%- if base_diff < 0 %}
-    else
-    src[{{impl.base}}:0]
-    {%- elif base_diff == 0 %}
-    src
-    {%- else %}
-    0bv{{base_diff}} ++ src
-    {%- endif %}
-}
-{% endif %}
 
 function $shlBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{instance}}) returns (bv{{impl.base}})
 {

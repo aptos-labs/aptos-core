@@ -1,0 +1,11 @@
+//# publish
+module 0x1::M
+struct Foo<T0>
+  x: T0
+
+fun baz<T0>(l0: Foo<T0>)
+    local l1: T0
+    move_loc l0
+    unpack Foo<T0>
+    st_loc l1
+    ret

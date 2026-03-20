@@ -563,6 +563,7 @@ where
                     incarnation_counter,
                     incarnation_behaviors,
                     delta_test_kind,
+                    ..
                 } => {
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during

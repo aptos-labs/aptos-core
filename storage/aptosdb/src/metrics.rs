@@ -3,9 +3,10 @@
 
 use aptos_metrics_core::{
     exponential_buckets, make_thread_local_histogram_vec, make_thread_local_int_counter_vec,
-    register_histogram_vec, register_int_counter, register_int_gauge, register_int_gauge_vec,
-    HistogramVec, IntCounter, IntGauge, IntGaugeVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
+use aptos_types::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 
 pub static LEDGER_COUNTER: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -137,7 +138,7 @@ make_thread_local_histogram_vec!(
     // metric description
     "Latency of node cache.",
     // metric labels (dimensions)
-    &["tag", "name"],
+    &["tag", "name", "db_type"],
     exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
 );
 
@@ -163,6 +164,18 @@ pub static ROCKSDB_SHARD_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
         "sharded rocksdb integer properties",
         // metric labels (dimensions)
         &["shard_id", "cf_name", "property_name",]
+    )
+    .unwrap()
+});
+
+/// Rocksdb ticker metrics (per-DB cumulative counters).
+/// Unlike properties (which are per-CF), tickers are per-DB-instance.
+/// The db_name already encodes shard info for sharded DBs (e.g. "state_kv_db_shard_0").
+pub static ROCKSDB_TICKERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_rocksdb_tickers",
+        "rocksdb cumulative ticker counters",
+        &["db_name", "ticker_name"]
     )
     .unwrap()
 });
@@ -228,6 +241,24 @@ pub static BACKUP_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static STALE_NODE_CLEANUP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_storage_stale_node_cleanup",
+        "Stale node cleanup status.",
+        &["db_name", "tag"]
+    )
+    .unwrap()
+});
+
+pub static STALE_NODE_CLEANUP_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_stale_node_cleanup_count",
+        "Number of stale nodes cleaned up.",
+        &["label"]
+    )
+    .unwrap()
+});
+
 pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_storage_api_concurrency",
@@ -240,6 +271,19 @@ pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!("aptos_storage_gauge", "Various gauges", &["name"]).unwrap()
 });
+
+pub(crate) static HOT_STATE_SHARD_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_hot_state_shard_gauge",
+        "Per-shard gauges for the hot state cache.",
+        &["shard_id", "name"]
+    )
+    .unwrap()
+});
+
+pub(crate) const SHARD_NAME_BY_ID: [&str; NUM_STATE_SHARDS] = [
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
+];
 
 make_thread_local_int_counter_vec!(
     pub,

@@ -1,0 +1,67 @@
+//# run
+script
+entry public fun main()
+    local l0: address
+    local l1: address
+    local l2: address
+    local l3: address
+    local l4: address
+    local l5: address
+    local l6: address
+    ld_const<address> 1
+    st_loc l0
+    ld_const<address> 1
+    st_loc l1
+    ld_const<address> 1
+    st_loc l2
+    ld_const<address> 1
+    st_loc l3
+    ld_const<address> 1
+    st_loc l4
+    ld_const<address> 1
+    st_loc l5
+    ld_const<address> 1
+    st_loc l6
+    copy_loc l0
+    copy_loc l1
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: copy_loc l1
+    copy_loc l2
+    eq
+    not
+    br_false l1
+    ld_u64 43
+    abort
+l1: copy_loc l2
+    copy_loc l3
+    eq
+    not
+    br_false l2
+    ld_u64 44
+    abort
+l2: copy_loc l3
+    copy_loc l4
+    eq
+    not
+    br_false l3
+    ld_u64 45
+    abort
+l3: copy_loc l4
+    copy_loc l5
+    eq
+    not
+    br_false l4
+    ld_u64 46
+    abort
+l4: copy_loc l5
+    copy_loc l6
+    eq
+    not
+    br_false l5
+    ld_u64 47
+    abort
+l5: ret

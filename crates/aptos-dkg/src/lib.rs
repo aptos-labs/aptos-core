@@ -26,7 +26,7 @@ pub use aptos_crypto::{
     blstrs as algebra,
     blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
 };
-use ark_ff::{Fp, FpConfig};
+use ark_ff::{Fp, FpConfig, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use more_asserts::{assert_ge, assert_le};
 use rand::Rng;
@@ -38,12 +38,12 @@ pub mod pcs;
 pub mod pvss;
 pub mod range_proofs;
 pub mod sigma_protocol;
-//pub mod sumcheck;
 pub mod utils;
 pub mod weighted_vuf;
-use ark_ff::PrimeField;
 
 /// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
+/// (Can be avoided by directly implementing traits on `Fp<P,N>`, which we
+/// sometimes do.)
 ///
 /// Without this wrapper, implementing a trait both for `blstrs::Scalar` and for
 /// `E::ScalarField` would cause conflicts. For example, Rust would reject:
@@ -58,7 +58,7 @@ use ark_ff::PrimeField;
 /// `E::ScalarField`.
 #[repr(transparent)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Scalar<F: PrimeField>(pub F); // TODO: Maybe this should be Scalar<F: PrimeField> ?? (PrimeField is needed for ThresholdConfig below)
+pub struct Scalar<F: PrimeField>(pub F);
 
 impl<F: PrimeField> Scalar<F> {
     /// Converts a `&[Scalar<E>]` into a `&[E::ScalarField]`; could do this without copying

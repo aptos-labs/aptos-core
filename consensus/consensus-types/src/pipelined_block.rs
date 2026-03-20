@@ -20,6 +20,7 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    decryption::BlockTxnDecryptionKey,
     ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness,
     secret_sharing::{SecretShare, SecretSharedKey},
@@ -69,8 +70,38 @@ pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
 pub type MaterializeResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
-pub type DecryptionResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
-pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
+
+#[derive(Clone, Debug)]
+pub struct DecryptionResult {
+    pub decrypted_txns: Vec<SignedTransaction>,
+    pub regular_txns: Vec<SignedTransaction>,
+    pub max_txns_from_block_to_execute: Option<u64>,
+    pub block_gas_limit: Option<u64>,
+    pub decryption_key: Option<Option<BlockTxnDecryptionKey>>,
+}
+
+impl DecryptionResult {
+    pub fn passthrough(
+        regular_txns: Vec<SignedTransaction>,
+        max_txns_from_block_to_execute: Option<u64>,
+        block_gas_limit: Option<u64>,
+        decryption_key: Option<Option<BlockTxnDecryptionKey>>,
+    ) -> Self {
+        Self {
+            decrypted_txns: Vec::new(),
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key,
+        }
+    }
+}
+
+pub type PrepareResult = (
+    Arc<Vec<SignatureVerifiedTransaction>>,
+    Option<u64>,
+    Option<Option<BlockTxnDecryptionKey>>,
+);
 // First Option is whether randomness is enabled
 // Second Option is whether randomness is skipped
 pub type RandResult = (Option<Option<Randomness>>, bool);
@@ -86,10 +117,13 @@ pub type SecretShareResult = Option<SecretShare>;
 
 #[derive(Clone)]
 pub struct PipelineFutures {
+    pub decryption_fut: TaskFuture<DecryptionResult>,
     pub prepare_fut: TaskFuture<PrepareResult>,
+    pub has_rand_txns_fut: TaskFuture<bool>,
     pub rand_check_fut: TaskFuture<RandResult>,
     pub execute_fut: TaskFuture<ExecuteResult>,
     pub ledger_update_fut: TaskFuture<LedgerUpdateResult>,
+    pub observer_publish_fut: TaskFuture<()>,
     pub post_ledger_update_fut: TaskFuture<PostLedgerUpdateResult>,
     pub commit_vote_fut: TaskFuture<CommitVoteResult>,
     pub pre_commit_fut: TaskFuture<PreCommitResult>,
@@ -117,7 +151,8 @@ pub struct PipelineInputTx {
     pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
-    pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
+    pub ordered_blocks_and_proof_fut:
+        Option<oneshot::Sender<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
     pub secret_shared_key_tx: Option<oneshot::Sender<Option<SecretSharedKey>>>,
 }
@@ -126,7 +161,7 @@ pub struct PipelineInputRx {
     pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
-    pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
+    pub ordered_blocks_and_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
     pub secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
 }
@@ -207,8 +242,11 @@ pub struct PipelinedBlock {
     /// pending blocks upon restart.
     state_compute_result: Mutex<StateComputeResult>,
     randomness: OnceCell<Randomness>,
+    secret_shared_key: OnceCell<SecretSharedKey>,
     pipeline_insertion_time: OnceCell<Instant>,
     execution_summary: OnceCell<ExecutionSummary>,
+    /// Decrypted transactions that were originally encrypted, for observer publishing.
+    decrypted_txns: OnceCell<Vec<SignedTransaction>>,
     /// pipeline related fields
     pipeline_futs: Mutex<Option<PipelineFutures>>,
     pipeline_tx: Mutex<Option<PipelineInputTx>>,
@@ -221,6 +259,7 @@ impl PartialEq for PipelinedBlock {
         self.block == other.block
             && self.input_transactions == other.input_transactions
             && self.randomness.get() == other.randomness.get()
+            && self.secret_shared_key.get() == other.secret_shared_key.get()
     }
 }
 impl Eq for PipelinedBlock {}
@@ -333,6 +372,20 @@ impl PipelinedBlock {
         assert!(self.randomness.set(randomness.clone()).is_ok());
     }
 
+    /// Stores the decryption key on the block and eagerly sends it via the pipeline channel
+    /// to unblock the decryption phase as early as possible. The execution_schedule_phase also
+    /// sends via this channel as a fallback (using take(), so only one send actually occurs).
+    pub fn set_decryption_key(&self, key: SecretSharedKey) {
+        assert!(self.secret_shared_key.set(key.clone()).is_ok());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            tx.secret_shared_key_tx.take().map(|tx| tx.send(Some(key)));
+        }
+    }
+
+    pub fn secret_shared_key(&self) -> Option<&SecretSharedKey> {
+        self.secret_shared_key.get()
+    }
+
     pub fn set_insertion_time(&self) {
         assert!(self.pipeline_insertion_time.set(Instant::now()).is_ok());
     }
@@ -376,8 +429,10 @@ impl PipelinedBlock {
             input_transactions,
             state_compute_result: Mutex::new(state_compute_result),
             randomness: OnceCell::new(),
+            secret_shared_key: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: OnceCell::new(),
+            decrypted_txns: OnceCell::new(),
             pipeline_futs: Mutex::new(None),
             pipeline_tx: Mutex::new(None),
             pipeline_abort_handle: Mutex::new(None),
@@ -500,6 +555,16 @@ impl PipelinedBlock {
 
     pub fn qc(&self) -> Option<Arc<QuorumCert>> {
         self.block_qc.lock().clone()
+    }
+
+    pub fn decrypted_txns(&self) -> Option<Vec<SignedTransaction>> {
+        self.decrypted_txns.get().cloned()
+    }
+
+    pub fn set_decrypted_txns(&self, txns: Vec<SignedTransaction>) {
+        self.decrypted_txns
+            .set(txns)
+            .expect("decrypted_txns already set");
     }
 }
 

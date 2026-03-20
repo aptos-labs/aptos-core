@@ -1,2 +1,2 @@
 processed 1 task
-task 0 lines 1-86:  publish [module 0x1.A {]
+task 0 lines 1-112:  publish [module 0x1::A]

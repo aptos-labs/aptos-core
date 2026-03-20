@@ -48,7 +48,7 @@ async fn test_simple_view(use_txn_payload_v2_format: bool, use_orderless_transac
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
 
     let resp = context
         .post("/view", build_coin_balance_request(&owner.address()))
@@ -79,7 +79,7 @@ async fn test_view_gas_used_header(
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
     context.wait_for_internal_indexer_caught_up().await;
 
     let req = warp::test::request()
@@ -133,7 +133,7 @@ async fn test_view_allowlist(use_txn_payload_v2_format: bool, use_orderless_tran
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
 
     // See that an allowed function works.
     let resp1 = context
@@ -180,7 +180,7 @@ async fn test_view_blocklist(use_txn_payload_v2_format: bool, use_orderless_tran
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
 
     // See that a blocked function is rejected.
     let resp1 = context
@@ -219,7 +219,7 @@ async fn test_view_error_move_abort(
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
 
     let resp = context
         .expect_status_code(400)
@@ -257,7 +257,7 @@ async fn test_view_error_type_resolution_error(
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
 
     let resp = context
         .expect_status_code(400)
@@ -281,7 +281,7 @@ async fn test_view_does_not_exist() {
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
 
     let resp = context
         .expect_status_code(400)
@@ -320,7 +320,7 @@ async fn test_simple_view_invalid(
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&[txn1, txn2]).await;
 
     let resp = context
         .expect_status_code(400)
@@ -361,7 +361,7 @@ async fn test_versioned_simple_view(
     let txn2 = context.account_transfer(creator, owner, 100_000);
     let txn3 = context.account_transfer(creator, owner, 100_000);
 
-    context.commit_block(&vec![txn1, txn2, txn3]).await;
+    context.commit_block(&[txn1, txn2, txn3]).await;
 
     let resp = context
         .post(
@@ -416,7 +416,7 @@ async fn test_view_tuple(use_txn_payload_v2_format: bool, use_orderless_transact
             ),
     );
 
-    context.commit_block(&vec![module_txn]).await;
+    context.commit_block(&[module_txn]).await;
 
     let resp = context
         .post(
@@ -461,7 +461,7 @@ async fn test_view_aggregator(use_txn_payload_v2_format: bool, use_orderless_tra
                 context.use_orderless_transactions,
             ),
     );
-    context.commit_block(&vec![txn]).await;
+    context.commit_block(&[txn]).await;
 
     let function = format!("{}::counter::add_and_get_counter_value", account.address());
     let resp = context

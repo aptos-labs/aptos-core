@@ -7,10 +7,10 @@ use move_binary_format::{
     deserializer::DeserializerConfig,
     file_format::{
         empty_module, empty_script, AccessKind, AccessSpecifier, AddressIdentifierIndex,
-        AddressSpecifier, CompiledModule, CompiledScript, FunctionHandle, IdentifierIndex,
-        ResourceSpecifier, Signature, SignatureIndex, SignatureToken, TableIndex,
+        AddressSpecifier, CompiledModule, CompiledScript, FunctionAttribute, FunctionHandle,
+        IdentifierIndex, ResourceSpecifier, Signature, SignatureIndex, SignatureToken, TableIndex,
     },
-    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_7, VERSION_MAX},
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_10, VERSION_7, VERSION_MAX},
 };
 use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
@@ -136,4 +136,115 @@ fn simple_script_round_trip_version_failure() {
     assert!(err
         .to_string()
         .contains("Access specifiers on scripts not supported"));
+}
+
+#[test]
+fn test_borrow_field_attributes_round_trip() {
+    // Create a module with BorrowFieldImmutable and BorrowFieldMutable attributes
+    let mut module = empty_module();
+
+    // Add signatures for function parameters and return values
+    let sig_unit_idx = SignatureIndex::new(module.signatures.len() as u16);
+    module.signatures.push(Signature(vec![]));
+
+    // Add function names
+    let func1_name_idx = IdentifierIndex::new(module.identifiers.len() as u16);
+    module
+        .identifiers
+        .push(Identifier::new("borrow_immut").unwrap());
+
+    let func2_name_idx = IdentifierIndex::new(module.identifiers.len() as u16);
+    module
+        .identifiers
+        .push(Identifier::new("borrow_mut").unwrap());
+
+    // Add function with BorrowFieldImmutable attribute
+    let func_handle_idx = module.function_handles.len();
+    module.function_handles.push(FunctionHandle {
+        module: module.self_handle_idx(),
+        name: func1_name_idx,
+        parameters: sig_unit_idx,
+        return_: sig_unit_idx,
+        type_parameters: vec![],
+        access_specifiers: None,
+        attributes: vec![FunctionAttribute::BorrowFieldImmutable(5)],
+    });
+
+    // Add function with BorrowFieldMutable attribute
+    module.function_handles.push(FunctionHandle {
+        module: module.self_handle_idx(),
+        name: func2_name_idx,
+        parameters: sig_unit_idx,
+        return_: sig_unit_idx,
+        type_parameters: vec![],
+        access_specifiers: None,
+        attributes: vec![FunctionAttribute::BorrowFieldMutable(3)],
+    });
+
+    // Serialize with VERSION_10 (attributes supported from VERSION_8+)
+    let mut serialized = Vec::new();
+    module
+        .serialize_for_version(Some(VERSION_10), &mut serialized)
+        .expect("serialization should work");
+
+    // Deserialize and verify
+    let deserialized = CompiledModule::deserialize_with_config(
+        &serialized,
+        &DeserializerConfig::new(VERSION_10, IDENTIFIER_SIZE_MAX),
+    )
+    .expect("deserialization should work");
+
+    // Verify attributes preserved
+    assert_eq!(
+        module.function_handles.len(),
+        deserialized.function_handles.len()
+    );
+    assert_eq!(
+        module.function_handles[func_handle_idx].attributes,
+        deserialized.function_handles[func_handle_idx].attributes
+    );
+    assert_eq!(
+        module.function_handles[func_handle_idx + 1].attributes,
+        deserialized.function_handles[func_handle_idx + 1].attributes
+    );
+
+    // Verify the full module matches
+    assert_eq!(module, deserialized);
+}
+
+#[test]
+fn test_borrow_field_attributes_version_gating() {
+    // Verify that serializing to VERSION_7 rejects attributes
+    let mut module = empty_module();
+
+    // Add signatures
+    let sig_unit_idx = SignatureIndex::new(module.signatures.len() as u16);
+    module.signatures.push(Signature(vec![]));
+
+    // Add function name
+    let func_name_idx = IdentifierIndex::new(module.identifiers.len() as u16);
+    module
+        .identifiers
+        .push(Identifier::new("borrow_field").unwrap());
+
+    // Add function with BorrowFieldImmutable attribute
+    module.function_handles.push(FunctionHandle {
+        module: module.self_handle_idx(),
+        name: func_name_idx,
+        parameters: sig_unit_idx,
+        return_: sig_unit_idx,
+        type_parameters: vec![],
+        access_specifiers: None,
+        attributes: vec![FunctionAttribute::BorrowFieldImmutable(2)],
+    });
+
+    // Attempt to serialize with VERSION_7 (should fail)
+    let mut serialized = Vec::new();
+    let err = module
+        .serialize_for_version(Some(VERSION_7), &mut serialized)
+        .expect_err("should fail for VERSION_7");
+
+    assert!(err
+        .to_string()
+        .contains("not supported in bytecode version"));
 }

@@ -4,6 +4,7 @@
 use crate::consensus_observer::common::error::Error;
 use anyhow::bail;
 use aptos_consensus_types::{
+    block::Block,
     common::{BatchPayload, Payload},
     payload::{InlineBatches, OptQuorumStorePayload},
     pipelined_block::PipelinedBlock,
@@ -15,6 +16,8 @@ use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
+    randomness::Randomness,
+    secret_sharing::SecretSharedKey,
     transaction::SignedTransaction,
 };
 use rayon::{
@@ -29,7 +32,7 @@ use std::{
 };
 
 /// Types of messages that can be sent between the consensus publisher and observer
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ConsensusObserverMessage {
     Request(ConsensusObserverRequest),
     Response(ConsensusObserverResponse),
@@ -37,13 +40,20 @@ pub enum ConsensusObserverMessage {
 }
 
 impl ConsensusObserverMessage {
-    /// Creates and returns a new ordered block message using the given blocks and ordered proof
+    /// Creates and returns a new ordered block message using the given blocks and ordered proof.
+    /// When `use_v2` is true, the message uses the V2 format which includes secret_shared_key.
     pub fn new_ordered_block_message(
         blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: LedgerInfoWithSignatures,
+        use_v2: bool,
     ) -> ConsensusObserverDirectSend {
-        let ordered_block = OrderedBlock::new(blocks, ordered_proof);
-        ConsensusObserverDirectSend::OrderedBlock(ordered_block)
+        if use_v2 {
+            let ordered_block_v2 = OrderedBlockV2::new(blocks, ordered_proof);
+            ConsensusObserverDirectSend::OrderedBlockV2(ordered_block_v2)
+        } else {
+            let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+            ConsensusObserverDirectSend::OrderedBlock(ordered_block)
+        }
     }
 
     /// Creates and returns a new commit decision message using the given commit decision
@@ -127,12 +137,13 @@ impl Display for ConsensusObserverResponse {
 }
 
 /// Types of direct sends that can be sent between the consensus publisher and observer
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ConsensusObserverDirectSend {
     OrderedBlock(OrderedBlock),
     CommitDecision(CommitDecision),
     BlockPayload(BlockPayload),
     OrderedBlockWithWindow(OrderedBlockWithWindow),
+    OrderedBlockV2(OrderedBlockV2),
 }
 
 impl ConsensusObserverDirectSend {
@@ -143,6 +154,7 @@ impl ConsensusObserverDirectSend {
             ConsensusObserverDirectSend::CommitDecision(_) => "commit_decision",
             ConsensusObserverDirectSend::BlockPayload(_) => "block_payload",
             ConsensusObserverDirectSend::OrderedBlockWithWindow(_) => "ordered_block_with_window",
+            ConsensusObserverDirectSend::OrderedBlockV2(_) => "ordered_block_v2",
         }
     }
 }
@@ -171,6 +183,13 @@ impl Display for ConsensusObserverDirectSend {
                     f,
                     "OrderedBlockWithWindow: {}",
                     ordered_block_with_window.ordered_block.proof_block_info(),
+                )
+            },
+            ConsensusObserverDirectSend::OrderedBlockV2(ordered_block_v2) => {
+                write!(
+                    f,
+                    "OrderedBlockV2: {}",
+                    ordered_block_v2.ordered_proof.commit_info(),
                 )
             },
         }
@@ -330,6 +349,117 @@ impl ExecutionPoolWindow {
     /// Verifies the execution pool window contents and returns an error if the data is invalid
     pub fn verify_window_contents(&self, _expected_window_size: u64) -> Result<(), Error> {
         Ok(()) // TODO: Implement this method!
+    }
+}
+
+/// Borrowed V2 wire format for serialization (avoids cloning PipelinedBlock fields).
+#[derive(Serialize)]
+struct PipelinedBlockV2Ref<'a> {
+    block: &'a Block,
+    randomness: Option<&'a Randomness>,
+    secret_shared_key: Option<&'a SecretSharedKey>,
+    decrypted_txns: Vec<SignedTransaction>,
+}
+
+/// Owned V2 wire format for deserialization.
+#[derive(Deserialize)]
+struct PipelinedBlockV2Owned {
+    block: Block,
+    randomness: Option<Randomness>,
+    secret_shared_key: Option<SecretSharedKey>,
+    decrypted_txns: Vec<SignedTransaction>,
+}
+
+impl PipelinedBlockV2Owned {
+    fn into_pipelined_block(self) -> Arc<PipelinedBlock> {
+        let block = PipelinedBlock::new(
+            self.block,
+            Vec::new(),
+            aptos_executor_types::state_compute_result::StateComputeResult::new_dummy(),
+        );
+        if let Some(r) = self.randomness {
+            block.set_randomness(r);
+        }
+        if let Some(key) = self.secret_shared_key {
+            block.set_decryption_key(key);
+            // Note: Decryption key must be Some if decrypted transactions are available.
+            block.set_decrypted_txns(self.decrypted_txns);
+        }
+        Arc::new(block)
+    }
+}
+
+/// OrderedBlockV2 carries PipelinedBlocks with secret_shared_key on the wire.
+/// Uses custom Serialize/Deserialize to borrow during serialization (zero-copy)
+/// and own during deserialization.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrderedBlockV2 {
+    blocks: Vec<Arc<PipelinedBlock>>,
+    ordered_proof: LedgerInfoWithSignatures,
+}
+
+impl OrderedBlockV2 {
+    pub fn new(blocks: Vec<Arc<PipelinedBlock>>, ordered_proof: LedgerInfoWithSignatures) -> Self {
+        Self {
+            blocks,
+            ordered_proof,
+        }
+    }
+
+    /// Converts the V2 ordered block into a V1 OrderedBlock
+    pub fn into_ordered_block(self) -> OrderedBlock {
+        OrderedBlock::new(self.blocks, self.ordered_proof)
+    }
+}
+
+impl Serialize for OrderedBlockV2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct Wire<'a> {
+            blocks: Vec<PipelinedBlockV2Ref<'a>>,
+            ordered_proof: &'a LedgerInfoWithSignatures,
+        }
+
+        let wire = Wire {
+            blocks: self
+                .blocks
+                .iter()
+                .map(|pb| PipelinedBlockV2Ref {
+                    block: pb.block(),
+                    randomness: pb.randomness(),
+                    secret_shared_key: pb.secret_shared_key(),
+                    decrypted_txns: pb.decrypted_txns().unwrap_or_default(),
+                })
+                .collect(),
+            ordered_proof: &self.ordered_proof,
+        };
+        wire.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for OrderedBlockV2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Wire {
+            blocks: Vec<PipelinedBlockV2Owned>,
+            ordered_proof: LedgerInfoWithSignatures,
+        }
+
+        let wire = Wire::deserialize(deserializer)?;
+        Ok(Self {
+            blocks: wire
+                .blocks
+                .into_iter()
+                .map(|w| w.into_pipelined_block())
+                .collect(),
+            ordered_proof: wire.ordered_proof,
+        })
     }
 }
 
@@ -684,46 +814,13 @@ impl BlockTransactionPayload {
                     "Direct mempool payloads are not supported for consensus observer!".into(),
                 ));
             },
-            Payload::InQuorumStore(proof_with_data) => {
-                // Verify the batches in the requested block
-                self.verify_batches(&proof_with_data.proofs)?;
-            },
-            Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                // Verify the batches in the requested block
-                self.verify_batches(&proof_with_data.proof_with_data.proofs)?;
-
-                // Verify the transaction limit
-                self.verify_transaction_limit(proof_with_data.max_txns_to_execute)?;
-            },
-            Payload::QuorumStoreInlineHybrid(
-                inline_batches,
-                proof_with_data,
-                max_txns_to_execute,
-            ) => {
-                // Verify the batches in the requested block
-                self.verify_batches(&proof_with_data.proofs)?;
-
-                // Verify the inline batches
-                self.verify_inline_batches(inline_batches)?;
-
-                // Verify the transaction limit
-                self.verify_transaction_limit(*max_txns_to_execute)?;
-            },
-            Payload::QuorumStoreInlineHybridV2(
-                inline_batches,
-                proof_with_data,
-                execution_limits,
-            ) => {
-                // Verify the batches in the requested block
-                self.verify_batches(&proof_with_data.proofs)?;
-
-                // Verify the inline batches
-                self.verify_inline_batches(inline_batches)?;
-
-                // Verify the transaction limit
-                self.verify_transaction_limit(execution_limits.max_txns_to_execute())?;
-
-                // TODO: verify the block gas limit?
+            Payload::DeprecatedInQuorumStore(_)
+            | Payload::DeprecatedInQuorumStoreWithLimit(_)
+            | Payload::DeprecatedQuorumStoreInlineHybrid(..)
+            | Payload::DeprecatedQuorumStoreInlineHybridV2(..) => {
+                return Err(Error::InvalidMessageError(
+                    "Deprecated payload variants are not supported!".into(),
+                ));
             },
             Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
                 // Verify the batches in the requested block
@@ -1168,7 +1265,7 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        common::{Author, ProofWithData, ProofWithDataWithTxnLimit},
+        common::Author,
         payload::{
             BatchPointer, InlineBatch, OptBatches, OptQuorumStorePayload, PayloadExecutionLimit,
             ProofBatches,
@@ -1213,28 +1310,14 @@ mod test {
         let transaction_payload =
             BlockTransactionPayload::new_in_quorum_store(vec![], proofs.clone());
 
-        // Create a quorum store payload with a single proof
-        let batch_info = create_batch_info();
-        let proof_with_data = ProofWithData::new(vec![ProofOfStore::new(
-            batch_info,
-            AggregateSignature::empty(),
-        )]);
-        let ordered_payload = Payload::InQuorumStore(proof_with_data);
+        // Create a deprecated quorum store payload
+        let ordered_payload = Payload::DeprecatedInQuorumStore(());
 
-        // Verify the transaction payload and ensure it fails (the batch infos don't match)
+        // Verify the transaction payload and ensure it fails (deprecated payloads are not supported)
         let error = transaction_payload
             .verify_against_ordered_payload(&ordered_payload)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with no proofs
-        let proof_with_data = ProofWithData::new(proofs);
-        let ordered_payload = Payload::InQuorumStore(proof_with_data);
-
-        // Verify the transaction payload and ensure it passes
-        transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap();
     }
 
     #[test]
@@ -1248,43 +1331,14 @@ mod test {
             transaction_limit,
         );
 
-        // Create a quorum store payload with a single proof
-        let batch_info = create_batch_info();
-        let proof_with_data = ProofWithDataWithTxnLimit::new(
-            ProofWithData::new(vec![ProofOfStore::new(
-                batch_info,
-                AggregateSignature::empty(),
-            )]),
-            transaction_limit,
-        );
-        let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
+        // Create a deprecated quorum store payload
+        let ordered_payload = Payload::DeprecatedInQuorumStoreWithLimit(());
 
-        // Verify the transaction payload and ensure it fails (the batch infos don't match)
+        // Verify the transaction payload and ensure it fails (deprecated payloads are not supported)
         let error = transaction_payload
             .verify_against_ordered_payload(&ordered_payload)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with no proofs and no transaction limit
-        let proof_with_data =
-            ProofWithDataWithTxnLimit::new(ProofWithData::new(proofs.clone()), None);
-        let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
-
-        // Verify the transaction payload and ensure it fails (the transaction limit doesn't match)
-        let error = transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap_err();
-        assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with no proofs and the correct limit
-        let proof_with_data =
-            ProofWithDataWithTxnLimit::new(ProofWithData::new(proofs), transaction_limit);
-        let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
-
-        // Verify the transaction payload and ensure it passes
-        transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap();
     }
 
     #[test]
@@ -1303,59 +1357,14 @@ mod test {
             true,
         );
 
-        // Create a quorum store payload with a single proof
-        let inline_batches = vec![];
-        let batch_info = create_batch_info();
-        let proof_with_data = ProofWithData::new(vec![ProofOfStore::new(
-            batch_info,
-            AggregateSignature::empty(),
-        )]);
-        let ordered_payload = Payload::QuorumStoreInlineHybrid(
-            inline_batches.clone(),
-            proof_with_data,
-            transaction_limit,
-        );
+        // Create a deprecated quorum store payload
+        let ordered_payload = Payload::DeprecatedQuorumStoreInlineHybrid(());
 
-        // Verify the transaction payload and ensure it fails (the batch infos don't match)
+        // Verify the transaction payload and ensure it fails (deprecated payloads are not supported)
         let error = transaction_payload
             .verify_against_ordered_payload(&ordered_payload)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with no transaction limit
-        let proof_with_data = ProofWithData::new(vec![]);
-        let ordered_payload =
-            Payload::QuorumStoreInlineHybrid(inline_batches.clone(), proof_with_data, None);
-
-        // Verify the transaction payload and ensure it fails (the transaction limit doesn't match)
-        let error = transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap_err();
-        assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create a quorum store payload with a single inline batch
-        let proof_with_data = ProofWithData::new(vec![]);
-        let ordered_payload = Payload::QuorumStoreInlineHybrid(
-            vec![(create_batch_info(), vec![])],
-            proof_with_data,
-            transaction_limit,
-        );
-
-        // Verify the transaction payload and ensure it fails (the inline batches don't match)
-        let error = transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap_err();
-        assert_matches!(error, Error::InvalidMessageError(_));
-
-        // Create an empty quorum store payload
-        let proof_with_data = ProofWithData::new(vec![]);
-        let ordered_payload =
-            Payload::QuorumStoreInlineHybrid(vec![], proof_with_data, transaction_limit);
-
-        // Verify the transaction payload and ensure it passes
-        transaction_payload
-            .verify_against_ordered_payload(&ordered_payload)
-            .unwrap();
     }
 
     #[test]

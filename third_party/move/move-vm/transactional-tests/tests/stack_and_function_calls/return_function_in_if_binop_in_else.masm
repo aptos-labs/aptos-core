@@ -1,0 +1,70 @@
+//# publish
+module 0x1::A
+public fun foo(l0: u64): (u64, u64)
+    copy_loc l0
+    ld_u64 2
+    move_loc l0
+    mul
+    ret
+
+public fun bar(l0: u64): (u64, u64)
+    copy_loc l0
+    ld_u64 1
+    neq
+    br_true l0
+    ld_u64 3
+    move_loc l0
+    call foo
+    mul
+    ret
+l0: copy_loc l0
+    call foo
+    ret
+
+
+
+//# run
+script
+use 0x1::A
+entry public fun main()
+    local l0: u64
+    local l1: u64
+    local l2: u64
+    local l3: u64
+    ld_u64 10
+    call A::bar
+    st_loc l1
+    st_loc l0
+    ld_u64 1
+    call A::bar
+    st_loc l3
+    st_loc l2
+    move_loc l0
+    ld_u64 10
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: move_loc l1
+    ld_u64 20
+    eq
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: move_loc l2
+    ld_u64 3
+    eq
+    not
+    br_false l2
+    ld_u64 42
+    abort
+l2: move_loc l3
+    ld_u64 2
+    eq
+    not
+    br_false l3
+    ld_u64 42
+    abort
+l3: ret

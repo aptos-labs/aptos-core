@@ -90,17 +90,14 @@ impl Collector for LinuxCpuMetricsCollector {
 
         let mut mfs = Vec::with_capacity(LINUX_CPU_METRICS_COUNT);
 
-        let kernel_stats = KernelStats::new();
-        if kernel_stats.is_err() {
-            warn!(
-                "unable to collect cpu metrics for linux: {}",
-                kernel_stats.unwrap_err()
-            );
-            return mfs;
-        }
-
-        let kernal_stats = kernel_stats.unwrap();
-        let cpu_time = kernal_stats.total;
+        let kernel_stats = match KernelStats::new() {
+            Ok(stats) => stats,
+            Err(err) => {
+                warn!("unable to collect cpu metrics for linux: {}", err);
+                return mfs;
+            },
+        };
+        let cpu_time = kernel_stats.total;
 
         cpu_time_counter!(mfs, cpu_time.user_ms(), "user_ms");
         cpu_time_counter!(mfs, cpu_time.nice_ms(), "nice_ms");
@@ -112,7 +109,7 @@ impl Collector for LinuxCpuMetricsCollector {
         cpu_time_counter_opt!(mfs, cpu_time.steal_ms(), "steal_ms");
         cpu_time_counter_opt!(mfs, cpu_time.guest_ms(), "guest_ms");
         cpu_time_counter_opt!(mfs, cpu_time.guest_nice_ms(), "guest_nice_ms");
-        cpu_time_counter!(mfs, kernal_stats.ctxt, "context_switches");
+        cpu_time_counter!(mfs, kernel_stats.ctxt, "context_switches");
 
         mfs
     }

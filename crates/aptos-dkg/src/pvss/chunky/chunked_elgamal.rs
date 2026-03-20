@@ -6,21 +6,19 @@ use crate::{
     dlog::bsgs,
     pvss::chunky::chunks,
     sigma_protocol,
-    sigma_protocol::homomorphism::{self, fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
+    sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
     Scalar,
 };
-use aptos_crypto::arkworks::{
-    msm::{IsMsmInput, MsmInput},
-    random::sample_field_element,
-};
+use anyhow::{anyhow, ensure, Result};
+use aptos_crypto::arkworks::{self, msm::MsmInput, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
-use std::collections::HashMap;
+use std::ops::Sub;
 
 pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used for the sigma protocol Fiat-Shamir challenges
 
@@ -42,13 +40,13 @@ pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used f
 /// and `R_j` carry the corresponding randomness contributions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
-pub struct WeightedHomomorphism<'a, C: CurveGroup> {
+pub struct Homomorphism<'a, C: CurveGroup> {
     pub pp: &'a PublicParameters<C>, // These are small so no harm in copying them here
     pub eks: &'a [C::Affine],        // TODO: capitalize to EKs ?
 }
 
 // Need to manually implement `CanonicalSerialize` because `Homomorphism` has references instead of owned values
-impl<'a, C: CurveGroup> CanonicalSerialize for WeightedHomomorphism<'a, C> {
+impl<'a, C: CurveGroup> CanonicalSerialize for Homomorphism<'a, C> {
     fn serialize_with_mode<W: Write>(
         &self,
         mut writer: W,
@@ -75,7 +73,7 @@ impl<'a, C: CurveGroup> CanonicalSerialize for WeightedHomomorphism<'a, C> {
 
 /// This struct is used as `CodomainShape<T>`, but the same layout also applies to the `Witness` type.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct WeightedCodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
     pub chunks: Vec<Vec<Vec<T>>>, // Depending on T these can be chunked ciphertexts, or their MSM representations
     pub randomness: Vec<Vec<T>>,  // Same story, depending on T
 }
@@ -86,29 +84,103 @@ pub struct WeightedCodomainShape<T: CanonicalSerialize + CanonicalDeserialize + 
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct WeightedWitness<F: PrimeField> {
+pub struct Witness<F: PrimeField> {
     pub plaintext_chunks: Vec<Vec<Vec<Scalar<F>>>>,
     pub plaintext_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, there needs to be a vector of randomness to encrypt a vector of chunks
 }
 
-impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
-    type Codomain = WeightedCodomainShape<C>;
-    type Domain = WeightedWitness<C::ScalarField>;
+#[allow(non_snake_case)]
+impl<C: CurveGroup> homomorphism::Trait for Homomorphism<'_, C> {
+    type Codomain = CodomainShape<C>;
+    type CodomainNormalized = CodomainShape<C::Affine>;
+    type Domain = Witness<C::ScalarField>;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        self.apply_msm(self.msm_terms(input)) // TODO: use the batch mul stuff here...
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
+        // Get the batch multiplication tables
+        let G_table = &*self.pp.G_table;
+        let H_table = &*self.pp.H_table;
+
+        // 1. Compute C_{i,j,k} = z_{i,j,k} * G + r_{j,k} * ek_i
+        //    where i is player, j is share index (which corresponds to weight level), k is chunk
+
+        // 1a. Batch multiply all z_{i,j,k} values with G
+        let all_z_chunks: Vec<C::ScalarField> = input
+            .plaintext_chunks
+            .iter()
+            .flatten()
+            .flatten()
+            .map(|scalar| scalar.0)
+            .collect();
+        let G_mults = arkworks::batch_mul(G_table, &all_z_chunks);
+
+        // 1b. For each player i and share j, compute r_{j,k} * ek_i for all chunks k // TODO: might be worthwhile to have tables for each ek_i as well
+        //     Share index j directly corresponds to the weight level index in plaintext_randomness
+        let mut chunks_result = Vec::new();
+        let mut G_idx = 0;
+
+        for (player_idx, player_chunks) in input.plaintext_chunks.iter().enumerate() {
+            let mut player_Cs = Vec::new();
+            let ek: C = self.eks[player_idx].into();
+            for (share_idx, share_chunks) in player_chunks.iter().enumerate() {
+                // share_idx corresponds to weight level index in plaintext_randomness
+                let r_chunks = &input.plaintext_randomness[share_idx];
+
+                // Compute r_{j,k} * ek_i for each chunk k
+                // Since we have one base (ek_i) with multiple scalars, we compute each separately
+
+                // Combine: C_{i,j,k} = z_{i,j,k} * G + r_{j,k} * ek_i
+                let mut share_Cs = Vec::new();
+                for k in 0..share_chunks.len() {
+                    let ek_mult = ek * r_chunks[k].0;
+                    share_Cs.push(G_mults[G_idx] + ek_mult);
+                    G_idx += 1;
+                }
+                player_Cs.push(share_Cs);
+            }
+            chunks_result.push(player_Cs);
+        }
+
+        // 2. Compute R_{j,k} = r_{j,k} * H for all weight levels j and chunks k
+        let all_r_chunks: Vec<C::ScalarField> = input
+            .plaintext_randomness
+            .iter()
+            .flatten()
+            .map(|scalar| scalar.0)
+            .collect();
+        let H_mults = arkworks::batch_mul(H_table, &all_r_chunks);
+
+        // 3. Gather R results into nested structure matching plaintext_randomness
+        let mut randomness_result = Vec::new();
+        let mut H_idx = 0;
+        for r_row in &input.plaintext_randomness {
+            let mut R_row = Vec::new();
+            for _ in r_row {
+                R_row.push(H_mults[H_idx]);
+                H_idx += 1;
+            }
+            randomness_result.push(R_row);
+        }
+
+        Ok(CodomainShape {
+            chunks: chunks_result,
+            randomness: randomness_result,
+        })
+    }
+
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
+        <Homomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
 
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
-    for WeightedCodomainShape<T>
+    for CodomainShape<T>
 {
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
-        WeightedCodomainShape<U>;
+        CodomainShape<U>;
 
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
+    fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
     where
-        F: FnMut(T) -> U,
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         let chunks = self
@@ -116,24 +188,32 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
             .into_iter()
             .map(|row| {
                 row.into_iter()
-                    .map(|inner_row| inner_row.into_iter().map(&mut f).collect::<Vec<_>>())
-                    .collect::<Vec<_>>()
+                    .map(|inner_row| {
+                        inner_row
+                            .into_iter()
+                            .map(&mut f)
+                            .collect::<Result<Vec<_>, _>>()
+                    })
+                    .collect::<Result<Vec<_>, _>>()
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         let randomness = self
             .randomness
             .into_iter()
-            .map(|inner_vec| inner_vec.into_iter().map(&mut f).collect::<Vec<_>>())
-            .collect();
+            .map(|inner_vec| {
+                inner_vec
+                    .into_iter()
+                    .map(&mut f)
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        WeightedCodomainShape { chunks, randomness }
+        Ok(CodomainShape { chunks, randomness })
     }
 }
 
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
-    for WeightedCodomainShape<T>
-{
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
     type IntoIter = std::vec::IntoIter<T>;
     type Item = T;
 
@@ -151,15 +231,21 @@ fn chunks_msm_terms<C: CurveGroup>(
     ek: C::Affine,
     chunks: &[Scalar<C::ScalarField>],
     correlated_randomness: &[Scalar<C::ScalarField>],
-) -> Vec<MsmInput<C::Affine, C::ScalarField>> {
-    chunks
+) -> Result<Vec<MsmInput<C::Affine, C::ScalarField>>> {
+    ensure!(
+        chunks.len() == correlated_randomness.len(),
+        "chunks length {} does not match correlated_randomness length {}",
+        chunks.len(),
+        correlated_randomness.len()
+    );
+    Ok(chunks
         .iter()
         .zip(correlated_randomness.iter())
         .map(|(&z_ij, &r_j)| MsmInput {
             bases: vec![pp.G, ek],
             scalars: vec![z_ij.0, r_j.0],
         })
-        .collect()
+        .collect())
 }
 
 // Given a vector of chunked scalar [[z_j]] and vector of randomness [[r_j]], returns a vector of
@@ -169,7 +255,13 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
     ek: C::Affine,
     chunks_vec: &[Vec<Scalar<C::ScalarField>>],
     correlated_randomness_vec: &[Vec<Scalar<C::ScalarField>>],
-) -> Vec<Vec<MsmInput<C::Affine, C::ScalarField>>> {
+) -> Result<Vec<Vec<MsmInput<C::Affine, C::ScalarField>>>> {
+    ensure!(
+        chunks_vec.len() == correlated_randomness_vec.len(),
+        "chunks_vec length {} does not match correlated_randomness_vec length {}",
+        chunks_vec.len(),
+        correlated_randomness_vec.len()
+    );
     chunks_vec
         .iter()
         .zip(correlated_randomness_vec.iter())
@@ -180,26 +272,45 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
 }
 
 #[allow(non_snake_case)]
-impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
+impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
+    type Base = C::Affine;
     type CodomainShape<T>
-        = WeightedCodomainShape<T>
+        = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<C::Affine, C::ScalarField>;
     type MsmOutput = C;
     type Scalar = C::ScalarField;
 
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
+        ensure!(
+            input.plaintext_chunks.len() <= self.eks.len(),
+            "plaintext_chunks length {} exceeds encryption keys length {}",
+            input.plaintext_chunks.len(),
+            self.eks.len()
+        );
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
+        // For each player i, z_i has length = that player's weight; use only the first z_i.len()
+        // rows of plaintext_randomness (row j is used for that player's j-th share in apply()).
         let Cs = input
             .plaintext_chunks
             .iter()
             .enumerate()
             .map(|(i, z_i)| {
-                // here `i` is the player's id
-                chunks_vec_msm_terms::<C>(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
+                // here `i` is the player's id; bounds check above ensures self.eks[i] is valid
+                ensure!(
+                    input.plaintext_randomness.len() >= z_i.len(),
+                    "plaintext_randomness has {} rows but need {} for player {}",
+                    input.plaintext_randomness.len(),
+                    z_i.len(),
+                    i
+                );
+                let randomness_slice = &input.plaintext_randomness[0..z_i.len()];
+                chunks_vec_msm_terms::<C>(self.pp, self.eks[i], z_i, randomness_slice)
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         // R_j = r_j * H_1
         let Rs = input
@@ -216,18 +327,25 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
             })
             .collect();
 
-        WeightedCodomainShape {
+        Ok(CodomainShape {
             chunks: Cs,
             randomness: Rs,
-        }
+        })
     }
 
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        C::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
+    }
+
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
+        C::normalize_batch(&msm_output)
     }
 }
 
-impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for WeightedHomomorphism<'a, C> {
+impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for Homomorphism<'a, C> {
+    type Group = C;
+
     fn dst(&self) -> Vec<u8> {
         let mut result = b"WEIGHTED_".to_vec();
         result.extend(DST);
@@ -278,11 +396,12 @@ pub fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> u32 {
 /// - Vec of decrypted scalars.
 #[allow(non_snake_case)]
 pub fn decrypt_chunked_scalars<C: CurveGroup>(
-    Cs_rows: &[Vec<C>],
-    Rs_rows: &[Vec<C>],
+    Cs_rows: &[Vec<C::Affine>],
+    Rs_rows: &[Vec<C::Affine>],
     dk: &C::ScalarField,
-    pp: &PublicParameters<C>,
-    table: &HashMap<Vec<u8>, u64>,
+    _pp: &PublicParameters<C>,
+    table: &crate::dlog::table::BabyStepTable<C::Affine>,
+    table_dlog_range_bound: u64,
     radix_exponent: u8,
 ) -> Vec<C::ScalarField> {
     let mut decrypted_scalars = Vec::with_capacity(Cs_rows.len());
@@ -296,12 +415,11 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
             .collect();
 
         // Recover plaintext chunks
-        let chunk_values: Vec<_> =
-            bsgs::dlog_vec(pp.G.into_group(), &exp_chunks, &table, 1 << radix_exponent)
-                .expect("dlog_vec failed")
-                .into_iter()
-                .map(|x| C::ScalarField::from(x))
-                .collect();
+        let chunk_values: Vec<_> = bsgs::dlog_vec(table, &exp_chunks, table_dlog_range_bound)
+            .expect("dlog_vec failed")
+            .into_iter()
+            .map(|x| C::ScalarField::from(x))
+            .collect();
 
         // Convert chunks back to scalar
         let recovered = chunks::le_chunks_to_scalar(radix_exponent, &chunk_values);
@@ -348,7 +466,7 @@ mod tests {
     fn prepare_chunked_witness<F: PrimeField>(
         sc: WeightedConfig<ShamirThresholdConfig<F>>,
         ell: u8,
-    ) -> (Vec<F>, WeightedWitness<F>, u8, u32) {
+    ) -> (Vec<F>, Witness<F>, u8, u32) {
         let mut rng = thread_rng();
 
         // 1. Generate random values
@@ -369,7 +487,7 @@ mod tests {
             .collect();
 
         // 5. Build witness
-        let witness = WeightedWitness {
+        let witness = Witness {
             plaintext_chunks: sc.group_by_player(&Scalar::vecvec_from_inner(chunked_values)),
             plaintext_randomness: Scalar::vecvec_from_inner(rs),
         };
@@ -390,30 +508,49 @@ mod tests {
         let pp: PublicParameters<C> = PublicParameters::new(3);
         let dks: Vec<C::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
-        let hom = WeightedHomomorphism::<C> {
+        let hom = Homomorphism::<C> {
             pp: &pp,
             eks: &C::normalize_batch(&[pp.H * dks[0], pp.H * dks[1]]), // 2 players
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
-        let WeightedCodomainShape::<C> {
+        let CodomainShape::<C> {
             chunks: Cs,
             randomness: Rs,
-        } = hom.apply(&witness);
+        } = hom.apply(&witness).expect("apply");
 
         // 8. Build a baby-step giant-step table for computing discrete logs
-        let table = dlog::table::build::<C>(pp.G.into(), 1u64 << (radix_exponent / 2));
+        let table = dlog::table::BabyStepTable::new(pp.G, (1u64 << (radix_exponent / 2)) as u32);
 
         // 9. Perform decryption of each ciphertext and reconstruct plaintexts
         // TODO: call some built-in function for this instead
         let mut decrypted_scalars = Vec::new();
         for player_id in 0..Cs.len() {
+            // Convert projective Cs[player_id] to affine
+            let Cs_player_affine: Vec<Vec<C::Affine>> = Cs[player_id]
+                .iter()
+                .map(|row| {
+                    let proj_vec: Vec<C> = row.to_vec();
+                    C::normalize_batch(&proj_vec)
+                })
+                .collect();
+
+            // Convert projective Rs to affine
+            let Rs_affine: Vec<Vec<C::Affine>> = Rs
+                .iter()
+                .map(|row| {
+                    let proj_vec: Vec<C> = row.to_vec();
+                    C::normalize_batch(&proj_vec)
+                })
+                .collect();
+
             let decrypted_for_player = decrypt_chunked_scalars(
-                &Cs[player_id],
-                &Rs,
+                &Cs_player_affine,
+                &Rs_affine,
                 &dks[player_id],
                 &pp,
                 &table,
+                1 << radix_exponent, // we're not aggregating anything in this test. TODO: aggregating-and-decrypting should be tested somewhere in this crate, though currently it's happening in some fptx_smoke test I think
                 radix_exponent,
             );
 

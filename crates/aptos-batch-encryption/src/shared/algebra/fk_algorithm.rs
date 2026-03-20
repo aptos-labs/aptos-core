@@ -18,9 +18,6 @@ use serde::{
 };
 use std::{fmt, marker::PhantomData, ops::Mul};
 
-// TODO have a better error-handling story. Currently there are a lot of assert_eq! which
-// should be replaced with either compile-time guarantees on array sizes or with Results.
-
 /// To efficiently evaluate a Circulant matrix of size `n x n` over an input,
 /// a FFT-friendly subset of a field of size `n` is required. This struct
 /// represents that subset. Following the terminology in Arkworks, we call this
@@ -68,21 +65,27 @@ impl<F: FftField> CirculantDomain<F> {
     ///
     /// A circulant matrix
     /// ```txt
-    /// [       ]
-    /// [ a c b ]
-    /// [ b a c ]
-    /// [ c b a ]
-    /// [       ]
+    /// ┌       ┐
+    /// │ a c b │
+    /// │ b a c │
+    /// │ c b a │
+    /// └       ┘
     /// ```
     /// is represented by a vector
     /// ```txt
-    /// [       ]
-    /// [ a b c ]
-    /// [       ]
+    /// ┌       ┐
+    /// │ a b c │
+    /// └       ┘
     /// ```
     ///
-    /// and the logic for efficient evaluation is explained here:
-    /// https://alinush.github.io/2020/03/19/multiplying-a-vector-by-a-toeplitz-matrix.html#multiplying-a-circulant-matrix-by-a-vector
+    /// The circulant matrix `C` can be thought of as a polynomial `C(X) = a + bX + cX^2`. Consider
+    /// some input vector `v = [v_0, v_1, v_2]^T`, which can also be thought of as representing
+    /// a polynomial $v(X) = v_0 + v_1 X + v_2 X^2`. The evaluation `Cx` of `C` on input `x` is the
+    /// same as computing the convolution (i.e. multiplication in $F[X]/(X^n - 1)$) of the two
+    /// polynomials `C(X)` and `v(X)`. Convolution of two polynomials can be computed by
+    /// elementwise multiplication in the evaluation domain. Thus, we can compute `Cx` by moving
+    /// `C` and `x` to the eval domain via FFT, multiplying elementwise, and then using iFFT to
+    /// move back to the coefficient domain.
     pub fn eval<T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>(
         &self,
         circulant: &[F],

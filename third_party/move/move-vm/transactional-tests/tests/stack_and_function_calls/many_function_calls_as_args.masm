@@ -1,0 +1,82 @@
+//# publish
+module 0x1::A
+struct T has drop
+  value: u64
+  even: bool
+
+public fun new(): T
+    ld_u64 0
+    ld_true
+    pack T
+    ret
+
+public fun get_value(l0: &mut T): u64
+    local l1: &u64
+    move_loc l0
+    borrow_field T, value
+    st_loc l1
+    move_loc l1
+    read_ref
+    ret
+
+public fun get_parity(l0: &mut T): bool
+    local l1: &bool
+    move_loc l0
+    borrow_field T, even
+    st_loc l1
+    move_loc l1
+    read_ref
+    ret
+
+public fun change_parity(l0: u64, l1: bool): (u64, bool)
+    local l2: u64
+    local l3: bool
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l2
+    move_loc l1
+    br_true l0
+    ld_true
+    st_loc l3
+    branch l1
+l0: ld_false
+    st_loc l3
+    branch l1
+l1: move_loc l2
+    move_loc l3
+    ret
+
+
+
+//# run
+script
+use 0x1::A
+entry public fun main()
+    local l0: A::T
+    local l1: u64
+    local l2: bool
+    call A::new
+    st_loc l0
+    mut_borrow_loc l0
+    call A::get_value
+    mut_borrow_loc l0
+    call A::get_parity
+    call A::change_parity
+    st_loc l2
+    st_loc l1
+    move_loc l1
+    ld_u64 1
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: move_loc l2
+    ld_false
+    eq
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: ret

@@ -15,13 +15,13 @@ It includes functions for cleaning up expired orders based on keep-alive timeout
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="bulk_order_types.md#0x7_bulk_order_types">0x7::bulk_order_types</a>;
+<b>use</b> <a href="">0x5::bulk_order_types</a>;
+<b>use</b> <a href="">0x5::order_book_types</a>;
+<b>use</b> <a href="">0x5::single_order_types</a>;
 <b>use</b> <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker">0x7::dead_mans_switch_tracker</a>;
 <b>use</b> <a href="market_types.md#0x7_market_types">0x7::market_types</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
-<b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 <b>use</b> <a href="order_operations.md#0x7_order_operations">0x7::order_operations</a>;
-<b>use</b> <a href="single_order_types.md#0x7_single_order_types">0x7::single_order_types</a>;
 </code></pre>
 
 
@@ -87,7 +87,7 @@ Aborts:
 - E_TOO_MANY_ORDERS: If more than MAX_ORDERS_CLEANED_PER_CALL order IDs are provided
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_cleanup_expired_orders">cleanup_expired_orders</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_ids: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderId">order_book_types::OrderId</a>&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_cleanup_expired_orders">cleanup_expired_orders</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_ids: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="_OrderId">order_book_types::OrderId</a>&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -127,13 +127,15 @@ Aborts:
             <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = order.get_order_request().get_account();
 
             // Get creation <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">timestamp</a> in microseconds and convert <b>to</b> seconds
-            <b>let</b> creation_time_micros = order.get_order_request().get_creation_time_micros();
+            <b>let</b> creation_time_micros =
+                order.get_order_request().get_creation_time_micros();
             <b>let</b> creation_time_secs = creation_time_micros / <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_MICROS_PER_SECOND">MICROS_PER_SECOND</a>;
 
             // Check <b>if</b> order is valid according <b>to</b> dead man's switch
             // We get tracker each time <b>to</b> avoid borrowing conflicts
             <b>let</b> tracker = market.get_dead_mans_switch_tracker();
-            <b>let</b> is_valid = is_order_valid(tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_secs));
+            <b>let</b> is_valid =
+                is_order_valid(tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_secs));
 
             <b>if</b> (!is_valid) {
                 // Cancel the order
@@ -202,7 +204,9 @@ Aborts:
 
     // Check <b>if</b> order is valid according <b>to</b> dead man's switch
     <b>let</b> tracker = market.get_dead_mans_switch_tracker();
-    <b>let</b> is_valid = is_order_valid(tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_secs));
+    <b>let</b> is_valid = is_order_valid(
+        tracker, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(creation_time_secs)
+    );
 
     <b>if</b> (!is_valid) {
         // Cancel the bulk order
@@ -259,9 +263,7 @@ Aborts:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_keep_alive">keep_alive</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    market: &<b>mut</b> Market&lt;M&gt;,
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    timeout_seconds: u64
+    market: &<b>mut</b> Market&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, timeout_seconds: u64
 ) {
     // Check <b>if</b> dead man's switch is enabled
     <b>assert</b>!(market.is_dead_mans_switch_enabled(), <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_DEAD_MANS_SWITCH_NOT_ENABLED">E_DEAD_MANS_SWITCH_NOT_ENABLED</a>);
@@ -269,7 +271,13 @@ Aborts:
     <b>let</b> parent = market.get_parent();
     <b>let</b> market_addr = market.get_market();
     <b>let</b> tracker = market.get_dead_mans_switch_tracker_mut();
-    <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">dead_mans_switch_tracker::keep_alive</a>(tracker, parent, market_addr, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, timeout_seconds);
+    <a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker_keep_alive">dead_mans_switch_tracker::keep_alive</a>(
+        tracker,
+        parent,
+        market_addr,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        timeout_seconds
+    );
 }
 </code></pre>
 

@@ -1,0 +1,13 @@
+//# publish
+module 0x42::M
+fun consume(l0: signer)
+    move_loc l0
+    call consume
+    ret
+
+fun t(l0: bool, l1: signer)
+    move_loc l0
+    br_false l0
+    move_loc l1
+    call consume
+l0: ret

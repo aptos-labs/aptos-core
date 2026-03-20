@@ -1,0 +1,51 @@
+//# publish
+module 0x1::M1
+struct S1<phantom T0>
+  a: T0
+
+
+
+//# publish
+module 0x1::M2
+struct S2<phantom T0>
+  a: vector<T0>
+
+
+
+//# publish
+module 0x1::M3
+struct S1<T0>
+  f: bool
+
+struct S2<phantom T0>
+  a: S1<T0>
+
+
+
+//# publish
+module 0x1::M4
+struct S1<T0>
+  a: T0
+
+struct S2<T0>
+  a: T0
+
+struct S3<phantom T0>
+  a: S1<S2<T0>>
+
+
+
+//# publish
+module 0x1::M5
+struct S<T0, phantom T1, T2>
+  a: T1
+
+
+
+//# publish
+module 0x1::M6
+struct S1<phantom T0: copy>
+  a: bool
+
+struct S2<phantom T0>
+  a: S1<T0>

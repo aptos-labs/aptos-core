@@ -1,0 +1,45 @@
+//# publish
+// Test that struct names containing '$' are accepted; the parser handles them
+// via greedy struct-name matching so no ambiguity arises.
+module 0x1::M0
+struct Color$Red
+  value: u8
+
+public fun test(): Color$Red
+    ld_u8 42
+    pack Color$Red
+    ret
+
+//# publish
+// Test multiple '$' characters in struct name are also accepted.
+module 0x1::M1
+struct A$B$C
+  x: u8
+
+public fun test(): A$B$C
+    ld_u8 1
+    pack A$B$C
+    ret
+
+//# publish
+// Test that variant names containing '$' are also accepted.
+module 0x1::M2
+enum Color
+  Red$Variant
+    value: u8
+
+public fun test(): Color
+    ld_u8 42
+    pack_variant Color, Red$Variant
+    ret
+
+//# publish
+// Test that valid struct names (without '$') are still accepted
+module 0x1::M3
+struct ValidName
+  value: u8
+
+public fun test(): ValidName
+    ld_u8 42
+    pack ValidName
+    ret

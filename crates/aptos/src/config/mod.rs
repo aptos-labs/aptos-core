@@ -418,19 +418,14 @@ const WORKSPACE: &str = "workspace";
 ///
 /// Workspace allows for multiple configs based on location, where
 /// Global allows for one config for every part of the code
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, ValueEnum)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, ValueEnum)]
 pub enum ConfigType {
     /// Per system user configuration put in `<HOME>/.aptos`
     Global,
     /// Per directory configuration put in `<CURRENT_DIR>/.aptos`
+    // TODO: When we version up, we can change this to global
+    #[default]
     Workspace,
-}
-
-impl Default for ConfigType {
-    fn default() -> Self {
-        // TODO: When we version up, we can change this to global
-        Self::Workspace
-    }
 }
 
 impl std::fmt::Display for ConfigType {
@@ -464,20 +459,15 @@ const ASSUME_NO: &str = "no";
 ///
 /// Option can be one of ["yes", "no", "prompt"], "yes" runs cli with "--assume-yes", where
 /// "no" runs cli with "--assume-no", default: "prompt"
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, ValueEnum)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, ValueEnum)]
 pub enum PromptResponseType {
     /// normal prompt
+    #[default]
     Prompt,
     /// `--assume-yes`
     Yes,
     /// `--assume-no`
     No,
-}
-
-impl Default for PromptResponseType {
-    fn default() -> Self {
-        Self::Prompt
-    }
 }
 
 impl std::fmt::Display for PromptResponseType {

@@ -25,7 +25,14 @@ repos:
           - --comment-style
           - //
       - id: insert-license
-        files: ^(?=third_party/).*\.rs$
+        files: ^third_party/move/mono-move/.*\.rs$
+        args:
+          - --license-filepath
+          - devtools/assets/innovation_license_header.txt
+          - --comment-style
+          - //
+      - id: insert-license
+        files: ^(?=third_party/)(?!third_party/move/mono-move/).*\.rs$
         args:
           - --license-filepath
           - devtools/assets/license_header.txt

@@ -1,0 +1,105 @@
+//# publish
+module 0x1::Tester
+use 0x1::signer
+struct Initializer has key
+  x: u64
+  y: u64
+
+struct Point
+  x: u64
+  y: u64
+
+fun set_and_pick(l0: &signer, l1: &mut Point): &mut u64 acquires Initializer
+    local l2: address
+    local l3: &mut Initializer
+    move_loc l0
+    call signer::address_of
+    st_loc l2
+    move_loc l2
+    mut_borrow_global Initializer
+    st_loc l3
+    copy_loc l3
+    borrow_field Initializer, x
+    read_ref
+    copy_loc l1
+    mut_borrow_field Point, x
+    write_ref
+    move_loc l3
+    borrow_field Initializer, y
+    read_ref
+    copy_loc l1
+    mut_borrow_field Point, y
+    write_ref
+    copy_loc l1
+    borrow_field Point, x
+    read_ref
+    copy_loc l1
+    borrow_field Point, y
+    read_ref
+    ge
+    br_true l0
+    move_loc l1
+    mut_borrow_field Point, y
+    ret
+l0: move_loc l1
+    mut_borrow_field Point, x
+    ret
+
+fun bump_and_give(l0: &mut u64): &u64
+    copy_loc l0
+    read_ref
+    ld_u64 1
+    add
+    copy_loc l0
+    write_ref
+    move_loc l0
+    freeze_ref
+    ret
+
+fun larger_field(l0: &signer, l1: &mut Point): &u64 acquires Initializer
+    local l2: &mut u64
+    local l3: &u64
+    copy_loc l1
+    borrow_field Point, x
+    read_ref
+    ld_u64 0
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: copy_loc l1
+    borrow_field Point, y
+    read_ref
+    ld_u64 0
+    eq
+    not
+    br_false l1
+    ld_u64 42
+    abort
+l1: move_loc l0
+    copy_loc l1
+    call set_and_pick
+    st_loc l2
+    move_loc l2
+    call bump_and_give
+    st_loc l3
+    copy_loc l3
+    read_ref
+    copy_loc l1
+    borrow_field Point, x
+    read_ref
+    eq
+    copy_loc l3
+    read_ref
+    move_loc l1
+    borrow_field Point, y
+    read_ref
+    neq
+    and
+    not
+    br_false l2
+    ld_u64 42
+    abort
+l2: move_loc l3
+    ret

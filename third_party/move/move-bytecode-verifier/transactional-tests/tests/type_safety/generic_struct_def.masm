@@ -1,0 +1,10 @@
+//# publish
+module 0x1::M
+struct Foo<T0>
+  x: T0
+
+struct Bar<T0, T1, T2: key, T3: copy + drop>
+  x1: T1
+  x2: T2
+  x3: T3
+  x4: T0

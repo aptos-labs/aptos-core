@@ -1,0 +1,89 @@
+//# publish --print-bytecode
+// Test struct with '$' in name: Foo$Bar has pack/unpack/borrow/borrow_mut APIs
+module 0x66::test_dollar_struct_valid
+
+struct Foo$Bar
+    x: u64
+
+// Valid: pack$Foo$Bar with #[pack]
+#[pack] public fun pack$Foo$Bar(l0: u64): Foo$Bar
+    move_loc l0
+    pack Foo$Bar
+    ret
+
+// Valid: unpack$Foo$Bar with #[unpack]
+#[unpack] public fun unpack$Foo$Bar(l0: Foo$Bar): u64
+    move_loc l0
+    unpack Foo$Bar
+    ret
+
+// Valid: borrow$Foo$Bar$0 borrows field x (u64 at offset 0)
+#[borrow(0)] public fun borrow$Foo$Bar$0(l0: &Foo$Bar): &u64
+    move_loc l0
+    borrow_field Foo$Bar, x
+    ret
+
+// Valid: borrow_mut$Foo$Bar$0 mutably borrows field x
+#[borrow_mut(0)] public fun borrow_mut$Foo$Bar$0(l0: &mut Foo$Bar): &mut u64
+    move_loc l0
+    mut_borrow_field Foo$Bar, x
+    ret
+
+//# publish --print-bytecode
+// Test enum with '$' in name and variant name: Color$Ext with Red$A and Blue variants
+module 0x66::test_dollar_enum_valid
+
+enum Color$Ext has drop
+  Red$A
+    r: u8
+  Blue
+    b: u8
+
+// Valid: pack$Color$Ext$Red$A packs Red$A variant (index 0)
+#[pack_variant(0)] public fun pack$Color$Ext$Red$A(l0: u8): Color$Ext
+    move_loc l0
+    pack_variant Color$Ext, Red$A
+    ret
+
+// Valid: pack$Color$Ext$Blue packs Blue variant (index 1)
+#[pack_variant(1)] public fun pack$Color$Ext$Blue(l0: u8): Color$Ext
+    move_loc l0
+    pack_variant Color$Ext, Blue
+    ret
+
+// Valid: unpack$Color$Ext$Red$A unpacks Red$A variant (index 0)
+#[unpack_variant(0)] public fun unpack$Color$Ext$Red$A(l0: Color$Ext): u8
+    move_loc l0
+    unpack_variant Color$Ext, Red$A
+    ret
+
+// Valid: unpack$Color$Ext$Blue unpacks Blue variant (index 1)
+#[unpack_variant(1)] public fun unpack$Color$Ext$Blue(l0: Color$Ext): u8
+    move_loc l0
+    unpack_variant Color$Ext, Blue
+    ret
+
+// Valid: test_variant$Color$Ext$Red$A tests Red$A variant (index 0)
+#[test_variant(0)] public fun test_variant$Color$Ext$Red$A(l0: &Color$Ext): bool
+    move_loc l0
+    test_variant Color$Ext, Red$A
+    ret
+
+// Valid: test_variant$Color$Ext$Blue tests Blue variant (index 1)
+#[test_variant(1)] public fun test_variant$Color$Ext$Blue(l0: &Color$Ext): bool
+    move_loc l0
+    test_variant Color$Ext, Blue
+    ret
+
+// Both Red$A.r and Blue.b are u8 at offset 0 => same type_order 0
+// Valid: borrow$Color$Ext$0$0 borrows u8 field at offset 0
+#[borrow(0)] public fun borrow$Color$Ext$0$0(l0: &Color$Ext): &u8
+    move_loc l0
+    borrow_variant_field Color$Ext, Red$A::r, Blue::b
+    ret
+
+// Valid: borrow_mut$Color$Ext$0$0 mutably borrows u8 field at offset 0
+#[borrow_mut(0)] public fun borrow_mut$Color$Ext$0$0(l0: &mut Color$Ext): &mut u8
+    move_loc l0
+    mut_borrow_variant_field Color$Ext, Red$A::r, Blue::b
+    ret

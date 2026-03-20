@@ -13,7 +13,7 @@ use crate::{
         },
         LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
-    traits::transcript::Aggregatable,
+    traits::transcript::{Aggregatable, Aggregated},
     utils::{
         g1_multi_exp, g2_multi_exp,
         random::{
@@ -26,7 +26,7 @@ use anyhow::bail;
 use aptos_crypto::{
     bls12381,
     blstrs::{multi_pairing, random_scalar},
-    traits::SecretSharingConfig as _,
+    traits::TSecretSharingConfig as _,
     CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -80,16 +80,49 @@ impl TryFrom<&[u8]> for Transcript {
     }
 }
 
-impl traits::Transcript for Transcript {
+impl traits::TranscriptCore for Transcript {
     type DealtPubKey = pvss::dealt_pub_key::g2::DealtPubKey;
     type DealtPubKeyShare = pvss::dealt_pub_key_share::g2::DealtPubKeyShare;
     type DealtSecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
     type DealtSecretKeyShare = pvss::dealt_secret_key_share::g1::DealtSecretKeyShare;
     type DecryptPrivKey = encryption_dlog::g1::DecryptPrivKey;
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
-    type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
     type SecretSharingConfig = ThresholdConfigBlstrs;
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(*self.V.last().unwrap())
+    }
+
+    fn decrypt_own_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        let ctxt = self.C[player.id]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
+        let ephemeral_key = self.C_0.mul(dk.dk); // (g_1^r)^{sk_i} = ek_i^r
+        let dealt_secret_key_share = ctxt.sub(ephemeral_key);
+        let dealt_pub_key_share = self.V[player.id]; // g_2^{f(\omega^i})
+
+        (
+            Self::DealtSecretKeyShare::new(Self::DealtSecretKey::new(dealt_secret_key_share)),
+            Self::DealtPubKeyShare::new(Self::DealtPubKey::new(dealt_pub_key_share)),
+        )
+    }
+}
+
+impl traits::Transcript for Transcript {
+    type InputSecret = pvss::input_secret::InputSecret;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
@@ -162,36 +195,6 @@ impl traits::Transcript for Transcript {
             .collect::<Vec<Player>>()
     }
 
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(*self.V.last().unwrap())
-    }
-
-    fn decrypt_own_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        _pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let ctxt = self.C[player.id]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
-        let ephemeral_key = self.C_0.mul(dk.dk); // (g_1^r)^{sk_i} = ek_i^r
-        let dealt_secret_key_share = ctxt.sub(ephemeral_key);
-        let dealt_pub_key_share = self.V[player.id]; // g_2^{f(\omega^i})
-
-        (
-            Self::DealtSecretKeyShare::new(Self::DealtSecretKey::new(dealt_secret_key_share)),
-            Self::DealtPubKeyShare::new(Self::DealtPubKey::new(dealt_pub_key_share)),
-        )
-    }
-
     #[allow(non_snake_case)]
     fn generate<R>(
         sc: &Self::SecretSharingConfig,
@@ -225,7 +228,7 @@ impl traits::Transcript for Transcript {
 impl AggregatableTranscript for Transcript {
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &<Self as traits::Transcript>::SecretSharingConfig,
+        sc: &<Self as traits::TranscriptCore>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
@@ -300,9 +303,9 @@ impl AggregatableTranscript for Transcript {
         let g_1_inverse = pp.get_encryption_public_params().pubkey_base().neg();
 
         // The vector of left-hand-side ($\mathbb{G}_1$) inputs to each pairing in the multi-pairing.
-        let lhs = vec![h_1, ek.add(g_1_inverse), self.C_0.add(c.neg())];
+        let lhs = [h_1, ek.add(g_1_inverse), self.C_0.add(c.neg())];
         // The vector of right-hand-side ($\mathbb{G}_2$) inputs to each pairing in the multi-pairing.
-        let rhs = vec![v, self.hat_w, g_2];
+        let rhs = [v, self.hat_w, g_2];
 
         let res = multi_pairing(lhs.iter(), rhs.iter());
         if res != Gt::identity() {
@@ -314,8 +317,15 @@ impl AggregatableTranscript for Transcript {
 }
 
 impl Aggregatable for Transcript {
+    type Aggregated = Self;
     type SecretSharingConfig = ThresholdConfigBlstrs;
 
+    fn to_aggregated(&self) -> Self::Aggregated {
+        self.clone()
+    }
+}
+
+impl Aggregated<Transcript> for Transcript {
     fn aggregate_with(
         &mut self,
         sc: &ThresholdConfigBlstrs,
@@ -341,6 +351,10 @@ impl Aggregatable for Transcript {
         debug_assert_eq!(self.V.len(), other.V.len());
 
         Ok(())
+    }
+
+    fn normalize(self) -> Transcript {
+        self
     }
 }
 

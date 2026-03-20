@@ -39,8 +39,8 @@ module 0x8675309::M {
     }
     fun t0(cond: bool, s: &S, s_mut: &mut S) {
         (if (cond) s else s).f;
-        (if (cond) /*freeze*/s_mut else s).f;
-        (if (cond) s else /*freeze*/s_mut).f;
+        (if (cond) s_mut else s).f;
+        (if (cond) s else s_mut).f;
         (if (cond) s_mut else s_mut).f;
         {
             let s = S{f: 0};

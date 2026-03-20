@@ -100,8 +100,9 @@ impl Drop for QuorumCertProcessGuard {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum ConsensusState<T: Debug + Clone + Eq + PartialEq> {
+    #[default]
     NotStarted,
     InProgress {
         my_proposal: T,
@@ -161,11 +162,5 @@ impl<T: Debug + Clone + Eq + PartialEq> ConsensusState<T> {
             | ConsensusState::Finished { my_proposal, .. } => my_proposal.clone(),
             _ => panic!("my_proposal unavailable"),
         }
-    }
-}
-
-impl<T: Debug + Clone + Eq + PartialEq> Default for ConsensusState<T> {
-    fn default() -> Self {
-        Self::NotStarted
     }
 }

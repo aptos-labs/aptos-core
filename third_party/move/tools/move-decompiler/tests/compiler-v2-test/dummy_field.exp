@@ -24,7 +24,7 @@ module 0x42::test {
 }
 
 --- unable to recompile the decompiled code:
-exiting with context checking errors
+exiting with compilation errors
 error: empty struct `test::R` cannot access the field `dummy_field`
    ┌─ dummy_field.move:13:11
    │

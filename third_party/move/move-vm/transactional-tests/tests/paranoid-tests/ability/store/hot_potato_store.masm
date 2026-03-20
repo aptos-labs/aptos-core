@@ -1,0 +1,35 @@
+//# publish
+module 0x22::A
+struct HotPotato has store
+
+struct X has store
+  h: HotPotato
+
+struct G has key
+  x: X
+
+public fun make_g(): G
+    pack HotPotato
+    pack X
+    pack G
+    ret
+
+public fun store(l0: &signer, l1: G)
+    move_loc l0
+    move_loc l1
+    move_to G
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    local l1: A::G
+    call A::make_g
+    st_loc l1
+    borrow_loc l0
+    move_loc l1
+    call A::store
+    ret

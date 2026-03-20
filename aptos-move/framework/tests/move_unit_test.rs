@@ -7,17 +7,16 @@ use aptos_types::on_chain_config::{
     aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder,
 };
 use aptos_vm::natives;
-use move_cli::base::{
-    test::{run_move_unit_tests, UnitTestResult},
-    test_validation,
-};
 use move_model::model::GlobalEnv;
 use move_package::CompilerConfig;
-use move_unit_test::UnitTestingConfig;
+use move_unit_test::{
+    package_test::{run_move_unit_tests, UnitTestResult},
+    test_validation, UnitTestingConfig,
+};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use tempfile::tempdir;
 
-/// Configures the move-cli unit test validation hook to run the extended checker.
+/// Configures the unit test validation hook to run the extended checker.
 fn configure_extended_checks_for_unit_test() {
     fn validate(env: &GlobalEnv) {
         extended_checks::run_extended_checks(env);
@@ -29,6 +28,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
     let pkg_path = path_in_crate(path_to_pkg);
     let compiler_config = CompilerConfig {
         known_attributes: extended_checks::get_all_attribute_names().clone(),
+        print_errors: true,
         ..Default::default()
     };
     let mut build_config = move_package::BuildConfig {
@@ -63,8 +63,10 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
         &mut std::io::stdout(),
         true,
     );
-    if ok.is_err() || ok.is_ok_and(|r| r == UnitTestResult::Failure) {
-        panic!("move unit tests failed")
+    match ok {
+        Err(e) => panic!("move unit tests failed:\n{:#}", e),
+        Ok(UnitTestResult::Failure) => panic!("move unit tests failed"),
+        Ok(UnitTestResult::Success) => {},
     }
 }
 
@@ -111,6 +113,11 @@ fn move_token_unit_tests() {
 #[test]
 fn move_token_objects_unit_tests() {
     run_tests_for_pkg("aptos-token-objects", false);
+}
+
+#[test]
+fn move_trading_unit_tests() {
+    run_tests_for_pkg("aptos-trading", false);
 }
 
 #[test]

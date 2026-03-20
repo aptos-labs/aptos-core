@@ -42,9 +42,10 @@ fn test_transcript_aggregation_state() {
         .map(ValidatorConsensusInfoMoveStruct::from)
         .collect::<Vec<_>>();
     let verifier = ValidatorVerifier::new(validator_infos.clone());
+    let randomness_config = OnChainRandomnessConfig::default_enabled();
     let pub_params = RealDKG::new_public_params(&DKGSessionMetadata {
         dealer_epoch: 999,
-        randomness_config: OnChainRandomnessConfig::default_enabled().into(),
+        randomness_config: randomness_config.into(),
         dealer_validator_set: validator_consensus_info_move_structs.clone(),
         target_validator_set: validator_consensus_info_move_structs.clone(),
     });
@@ -114,23 +115,6 @@ fn test_transcript_aggregation_state() {
             author: addrs[0],
         },
         transcript_bytes: bad_trx_0_bytes,
-    });
-    assert!(result.is_err());
-
-    // Transcript where fast-path secret and main-path secret do not match should be rejected.
-    let bad_trx_2 = RealDKG::generate_transcript_for_inconsistent_secrets(
-        &mut rng,
-        &pub_params,
-        2,
-        &private_keys[2],
-        &public_keys[2],
-    );
-    let result = trx_agg_state.add(addrs[2], DKGTranscript {
-        metadata: DKGTranscriptMetadata {
-            epoch: 999,
-            author: addrs[2],
-        },
-        transcript_bytes: bcs::to_bytes(&bad_trx_2).unwrap(),
     });
     assert!(result.is_err());
 

@@ -151,7 +151,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             sources: "./tests/legacy-move-stdlib",
             sources_deps: vec![],
             dependencies: vec!["./tests/legacy-move-stdlib"],
-            exclude: vec![],
+            exclude: vec!["vector.move"],
             test_level: TestLevel::Recompile,
             ..config()
                 .lang(LanguageVersion::latest())
@@ -188,6 +188,19 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             name: "compiler-v2-test",
             runner: |p| run_test(p, get_config_by_name("compiler-v2-test")),
             sources: "./tests/compiler-v2-test",
+            sources_deps: vec![],
+            dependencies: vec!["./tests/legacy-move-stdlib"],
+            exclude: vec![],
+            test_level: TestLevel::Recompile,
+            ..config()
+                .lang(LanguageVersion::latest())
+                .no_cfg_opt(false)
+                .no_assign_opt(false)
+        },
+        TestConfig {
+            name: "public-struct",
+            runner: |p| run_test(p, get_config_by_name("public-struct")),
+            sources: "./tests/public-struct",
             sources_deps: vec![],
             dependencies: vec!["./tests/legacy-move-stdlib"],
             exclude: vec![],

@@ -126,7 +126,7 @@ impl NodeKey {
             num_nibbles,
             nibble_bytes
         );
-        let nibble_path = if num_nibbles % 2 == 0 {
+        let nibble_path = if num_nibbles.is_multiple_of(2) {
             NibblePath::new_even(nibble_bytes)
         } else {
             let padding = nibble_bytes.last().unwrap() & 0x0F;
@@ -367,10 +367,10 @@ impl InternalNode {
     }
 
     pub fn serialize(&self, binary: &mut Vec<u8>) -> Result<()> {
-        let (mut existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
+        let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
         binary.write_u16::<LittleEndian>(existence_bitmap)?;
         binary.write_u16::<LittleEndian>(leaf_bitmap)?;
-        for (next_child, child) in self.children.iter() {
+        for (_, child) in self.children.iter() {
             serialize_u64_varint(child.version, binary);
             binary.extend(child.hash.to_vec());
             match child.node_type {
@@ -380,7 +380,6 @@ impl InternalNode {
                 },
                 NodeType::Null => unreachable!("Child cannot be Null"),
             };
-            existence_bitmap &= !(1 << next_child.as_usize());
         }
         Ok(())
     }
@@ -465,7 +464,7 @@ impl InternalNode {
 
     /// Given a range [start, start + width), returns the sub-bitmap of that range.
     fn range_bitmaps(start: u8, width: u8, bitmaps: (u16, u16)) -> (u16, u16) {
-        assert!(start < 16 && width.count_ones() == 1 && start % width == 0);
+        assert!(start < 16 && width.count_ones() == 1 && start.is_multiple_of(width));
         assert!(width <= 16 && (start + width) <= 16);
         // A range with `start == 8` and `width == 4` will generate a mask 0b0000111100000000.
         // use as converting to smaller integer types when 'width == 16'

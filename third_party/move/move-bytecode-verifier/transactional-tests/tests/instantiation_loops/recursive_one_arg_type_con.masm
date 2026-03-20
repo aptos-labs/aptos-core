@@ -1,0 +1,10 @@
+//# publish
+module 0x1::M
+struct S<T0>
+  b: bool
+
+fun f<T0>(l0: T0)
+    ld_true
+    pack S<T0>
+    call f<S<T0>>
+    ret

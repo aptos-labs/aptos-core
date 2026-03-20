@@ -222,6 +222,13 @@ pub enum SerializedNativeStructFlag {
 pub enum SerializedFunctionAttribute {
     PERSISTENT   = 0x1,
     MODULE_LOCK  = 0x2,
+    PACK         = 0x3,
+    PACK_VARIANT = 0x4,
+    UNPACK       = 0x5,
+    UNPACK_VARIANT = 0x6,
+    TEST_VARIANT = 0x7,
+    BORROW_FIELD_IMMUTABLE = 0x8,
+    BORROW_FIELD_MUTABLE = 0x9,
 }
 
 /// List of opcodes constants.
@@ -345,7 +352,7 @@ pub const BINARY_SIZE_LIMIT: usize = usize::MAX;
 
 /// A wrapper for the binary vector
 #[derive(Default, Debug)]
-pub(crate) struct BinaryData {
+pub struct BinaryData {
     _binary: Vec<u8>,
 }
 
@@ -414,7 +421,7 @@ impl From<Vec<u8>> for BinaryData {
     }
 }
 
-pub(crate) fn write_u64_as_uleb128(binary: &mut BinaryData, mut val: u64) -> Result<()> {
+pub fn write_u64_as_uleb128(binary: &mut BinaryData, mut val: u64) -> Result<()> {
     loop {
         let cur = val & 0x7F;
         if cur != val {
@@ -556,6 +563,7 @@ pub const VERSION_9: u32 = 9;
 
 /// Version 10: changes compared to version 9
 /// + abort with message instruction
+/// + new attributes for structs api
 pub const VERSION_10: u32 = 10;
 
 /// Mark which oldest version is supported.
@@ -573,6 +581,10 @@ pub const VERSION_DEFAULT: u32 = VERSION_9;
 /// Mark which bytecode version is the default if compiling with language version 2.4 -
 /// In general, these are used to set up the default bytecode version for language versions higher than the default.
 pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_10;
+
+/// Mark which version is the default version if compiling with language version 2.5
+/// temporarily set to VERSION_10
+pub const VERSION_DEFAULT_LANG_V2_5: u32 = VERSION_10;
 
 pub(crate) mod versioned_data {
     use crate::{errors::*, file_format_common::*};

@@ -8,7 +8,7 @@ use crate::{
         traits::{self, transcript::MalleableTranscript, AggregatableTranscript, Convert},
         Player, ThresholdConfigBlstrs,
     },
-    traits::transcript::Aggregatable,
+    traits::transcript::{Aggregatable, Aggregated},
     utils::{
         random::{insecure_random_g2_points, random_scalars},
         HasMultiExp,
@@ -16,7 +16,7 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_crypto::{
-    bls12381, traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial,
+    bls12381, traits::TSecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G2Projective, Scalar};
@@ -56,16 +56,41 @@ impl Convert<Scalar, das::PublicParameters> for pvss::input_secret::InputSecret 
     }
 }
 
-impl traits::Transcript for Transcript {
+impl traits::TranscriptCore for Transcript {
     type DealtPubKey = pvss::dealt_pub_key::g2::DealtPubKey;
     type DealtPubKeyShare = pvss::dealt_pub_key_share::g2::DealtPubKeyShare;
     type DealtSecretKey = Scalar;
     type DealtSecretKeyShare = Scalar;
     type DecryptPrivKey = encryption_dlog::g1::DecryptPrivKey;
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
-    type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
     type SecretSharingConfig = ThresholdConfigBlstrs;
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(*self.V.last().unwrap())
+    }
+
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        _dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        (self.C[player.id], self.get_public_key_share(sc, player))
+    }
+}
+
+impl traits::Transcript for Transcript {
+    type InputSecret = pvss::input_secret::InputSecret;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
@@ -114,28 +139,6 @@ impl traits::Transcript for Transcript {
         self.dealers.clone()
     }
 
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(*self.V.last().unwrap())
-    }
-
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        _dk: &Self::DecryptPrivKey,
-        _pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        (self.C[player.id], self.get_public_key_share(sc, player))
-    }
-
     #[allow(non_snake_case)]
     fn generate<R>(
         sc: &Self::SecretSharingConfig,
@@ -156,7 +159,7 @@ impl traits::Transcript for Transcript {
 impl AggregatableTranscript for Transcript {
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &<Self as traits::Transcript>::SecretSharingConfig,
+        sc: &<Self as traits::TranscriptCore>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
@@ -199,8 +202,15 @@ impl AggregatableTranscript for Transcript {
 }
 
 impl Aggregatable for Transcript {
+    type Aggregated = Self;
     type SecretSharingConfig = ThresholdConfigBlstrs;
 
+    fn to_aggregated(&self) -> Self::Aggregated {
+        self.clone()
+    }
+}
+
+impl Aggregated<Transcript> for Transcript {
     fn aggregate_with(
         &mut self,
         sc: &ThresholdConfigBlstrs,
@@ -220,6 +230,10 @@ impl Aggregatable for Transcript {
         debug_assert_eq!(self.V.len(), other.V.len());
 
         Ok(())
+    }
+
+    fn normalize(self) -> Transcript {
+        self
     }
 }
 

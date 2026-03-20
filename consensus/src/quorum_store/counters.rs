@@ -54,6 +54,12 @@ const QUORUM_STORE_LATENCY_BUCKETS: &[f64] = &[
     0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 5.0, 10.0,
 ];
 
+// Same as QUORUM_STORE_LATENCY_BUCKETS but in milliseconds
+const QUORUM_STORE_LATENCY_BUCKETS_IN_MS: &[f64] = &[
+    5.0, 10.0, 25.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 450.0, 500.0, 550.0,
+    650.0, 700.0, 750.0, 1000.0, 1250.0, 1500.0, 2000.0, 2500.0, 5000.0, 10000.0,
+];
+
 /// Counter for tracking latency of quorum store processing requests from consensus
 /// A 'fail' result means the quorum store's callback response to consensus failed.
 static QUORUM_STORE_SERVICE_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
@@ -225,15 +231,15 @@ static NUM_TXN_PER_BATCH: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_num_txn_per_batch",
         "Histogram for the number of transanctions per batch.",
-        &["bucket"],
+        &["bucket", "batch_version"],
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub fn num_txn_per_batch(bucket_start: &str, num: usize) {
+pub fn num_txn_per_batch(bucket_start: &str, num: usize, batch_version: &str) {
     NUM_TXN_PER_BATCH
-        .with_label_values(&[bucket_start])
+        .with_label_values(&[bucket_start, batch_version])
         .observe(num as f64)
 }
 
@@ -390,6 +396,14 @@ pub static BATCH_IN_PROGRESS_TIMEOUT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_batch_in_progress_timeout",
         "Number of batches that are removed from in progress by a proof collection timeout."
+    )
+    .unwrap()
+});
+
+pub static BATCH_GENERATOR_SKIPPED_OVERSIZED_TXN: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_generator_skipped_oversized_txn",
+        "Number of transactions skipped because they exceed sender_max_batch_bytes."
     )
     .unwrap()
 });
@@ -614,11 +628,22 @@ pub static BATCH_PULL_EXCLUDED_TXNS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the created batches since last restart.
-pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+/// Count of the created batches since last restart, by version and kind.
+pub static CREATED_BATCHES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "quorum_store_created_batch_count",
-        "Count of the created batches since last restart."
+        "Count of the created batches since last restart.",
+        &["batch_version", "batch_kind"]
+    )
+    .unwrap()
+});
+
+/// Count of total transactions created, by version and kind.
+pub static CREATED_TXNS_BY_KIND: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_created_txns_by_kind",
+        "Count of total transactions created, split by batch version and kind.",
+        &["batch_version", "batch_kind"]
     )
     .unwrap()
 });
@@ -637,14 +662,14 @@ static LOCAL_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "quorum_store_local_PoS_count",
         "Count of the locally created PoS since last restart.",
-        &["bucket"]
+        &["bucket", "batch_version"]
     )
     .unwrap()
 });
 
-pub fn inc_local_pos_count(bucket: u64) {
+pub fn inc_local_pos_count(bucket: u64, batch_version: &str) {
     LOCAL_POS_COUNT
-        .with_label_values(&[bucket.to_string().as_str()])
+        .with_label_values(&[bucket.to_string().as_str(), batch_version])
         .inc()
 }
 
@@ -653,14 +678,14 @@ static REMOTE_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "quorum_store_remote_PoS_count",
         "Count of the received PoS since last restart.",
-        &["bucket"]
+        &["bucket", "batch_version"]
     )
     .unwrap()
 });
 
-pub fn inc_remote_pos_count(bucket: u64) {
+pub fn inc_remote_pos_count(bucket: u64, batch_version: &str) {
     REMOTE_POS_COUNT
-        .with_label_values(&[bucket.to_string().as_str()])
+        .with_label_values(&[bucket.to_string().as_str(), batch_version])
         .inc()
 }
 
@@ -1041,7 +1066,7 @@ pub static BATCH_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_batch_tracing",
         "Histogram for different stages of a QS batch",
-        &["author", "stage"],
+        &["author", "stage", "batch_version"],
         BATCH_TRACING_BUCKETS.to_vec()
     )
     .unwrap()
@@ -1051,8 +1076,61 @@ pub static BATCH_VOTE_PROGRESS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_batch_vote_progress",
         "Histogram for vote collection of a QS batch",
-        &["author", "vote_pct"],
+        &["author", "vote_pct", "batch_version"],
         BATCH_TRACING_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Counter for batches pulled by author and pull_kind (proof, optbatch, inline).
+pub static BATCH_PULLED_BY_AUTHOR: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_batch_pulled_by_author",
+        "Number of batches pulled by author and pull kind",
+        &["author", "pull_kind"]
+    )
+    .unwrap()
+});
+
+/// Histogram for batch age when pulled (in ms), by author and pull_kind.
+pub static BATCH_AGE_WHEN_PULLED: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_batch_age_when_pulled_ms",
+        "Batch age in ms when pulled into a block, by author and pull kind",
+        &["author", "pull_kind"],
+        QUORUM_STORE_LATENCY_BUCKETS_IN_MS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for batch queue wait time in ms by author (time from insertion to pull).
+pub static BATCH_QUEUE_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_batch_queue_duration_ms",
+        "Time in ms a batch spent in the queue before being pulled, by author",
+        &["author"],
+        QUORUM_STORE_LATENCY_BUCKETS_IN_MS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for proof arrival delay in ms relative to batch insertion, by author.
+pub static PROOF_DELAY_AFTER_BATCH: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_proof_delay_after_batch_ms",
+        "Delay in ms between batch insertion and proof insertion, by author",
+        &["author"],
+        QUORUM_STORE_LATENCY_BUCKETS_IN_MS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Counter for batches skipped by min_batch_age filter, by author.
+pub static BATCH_SKIPPED_TOO_YOUNG: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_batch_skipped_too_young",
+        "Number of batches skipped because they were too young (min_batch_age filter)",
+        &["author"]
     )
     .unwrap()
 });

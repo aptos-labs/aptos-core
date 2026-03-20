@@ -1,0 +1,21 @@
+processed 4 tasks
+task 0 lines 1-8:  publish [module 0x22::test]
+task 1 lines 10-17:  publish [module 0x23::test]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000023::test'. Got VMError: {
+    major_status: TOO_MANY_TYPE_NODES,
+    sub_status: None,
+    location: 0x23::test,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 19-19:  run --verbose 0x22::test::constant_below_limit
+task 3 lines 21-21:  run --verbose 0x23::test::constant_above_limit
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000023::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

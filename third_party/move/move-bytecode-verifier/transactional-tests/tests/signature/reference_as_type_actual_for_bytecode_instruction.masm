@@ -1,0 +1,14 @@
+//# publish
+module 0x1::M
+fun id<T0>(l0: T0)
+    move_loc l0
+    ret
+
+fun foo()
+    local l0: u64
+    local l1: &u64
+    borrow_loc l0
+    st_loc l1
+    move_loc l1
+    call id<&u64>
+    ret

@@ -59,7 +59,7 @@ impl DigestKey {
     pub fn new(rng: &mut impl RngCore, batch_size: usize, num_rounds: usize) -> Result<Self> {
         let mut i = batch_size;
         while i > 1 {
-            (i % 2 == 0)
+            i.is_multiple_of(2)
                 .then_some(())
                 .ok_or(BatchEncryptionError::DigestInitError(
                     DigestKeyInitError::BatchSizeMustBePowerOfTwo,
@@ -111,8 +111,12 @@ impl DigestKey {
         })
     }
 
-    pub fn capacity(&self) -> usize {
+    pub fn max_batch_size(&self) -> usize {
         self.tau_powers_g1[0].len() - 1
+    }
+
+    pub fn num_rounds(&self) -> usize {
+        self.tau_powers_g1.len()
     }
 
     pub fn digest(
@@ -138,7 +142,7 @@ impl DigestKey {
 
             let digest = Digest {
                 digest_g1: G1Projective::msm(&self.tau_powers_g1[round], &coeffs)
-                    .unwrap()
+                    .expect("Sizes should always match up b/c of check above")
                     .into(),
                 round,
             };
@@ -148,7 +152,6 @@ impl DigestKey {
     }
 
     fn verify_pf(&self, digest: &Digest, id: Id, pf: G1Affine) -> Result<()> {
-        // TODO use multipairing here?
         Ok((PairingSetting::pairing(
             pf,
             self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x()),
@@ -169,7 +172,7 @@ impl DigestKey {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EvalProofsPromise {
     pub digest: Digest,
     pub ids: IdSet<ComputedCoeffs>,
@@ -188,7 +191,7 @@ impl EvalProofsPromise {
         }
     }
 
-    pub fn compute_all_vgzz_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs {
+    pub fn compute_all_vzgg_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs {
         EvalProofs {
             computed_proofs: self
                 .ids
@@ -200,7 +203,7 @@ impl EvalProofsPromise {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EvalProofs {
     pub computed_proofs: HashMap<Id, G1Affine>,
 }
@@ -250,10 +253,10 @@ pub(crate) mod tests {
 
     #[allow(unused)]
     pub(crate) fn digest_and_pfs_for_testing(dk: &DigestKey) -> (Digest, EvalProofsPromise) {
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.max_batch_size());
         let mut counter = Fr::zero();
 
-        for _ in 0..dk.capacity() {
+        for _ in 0..dk.max_batch_size() {
             ids.add(&Id::new(counter));
             counter += Fr::one();
         }
@@ -270,7 +273,7 @@ pub(crate) mod tests {
         let setup = DigestKey::new(&mut rng, batch_capacity, num_rounds * batch_capacity).unwrap();
 
         for current_batch_size in 1..=batch_capacity {
-            let mut ids = IdSet::with_capacity(batch_capacity).unwrap();
+            let mut ids = IdSet::with_capacity(batch_capacity);
             let mut counter = Fr::zero();
 
             for _ in 0..current_batch_size {
@@ -292,6 +295,6 @@ pub(crate) mod tests {
     fn test_digest_key_capacity() {
         let mut rng = thread_rng();
         let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
-        assert_eq!(dk.capacity(), 8);
+        assert_eq!(dk.max_batch_size(), 8);
     }
 }

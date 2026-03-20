@@ -1,0 +1,9 @@
+//# publish
+module 0x42::Test
+struct T
+  fint: u64
+
+public fun t1(): T
+    ld_false
+    pack T
+    ret

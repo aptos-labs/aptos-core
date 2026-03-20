@@ -1,5 +1,5 @@
 processed 6 tasks
-task 0 lines 1-6:  run [main() {]
+task 0 lines 1-5:  run [script]
 Error: Script execution failed with VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,
@@ -7,7 +7,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-task 1 lines 8-13:  run [main() {]
+task 1 lines 9-13:  run [script]
 Error: Script execution failed with VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,
@@ -15,7 +15,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-task 2 lines 15-20:  run [main() {]
+task 2 lines 17-21:  run [script]
 Error: Script execution failed with VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,
@@ -23,7 +23,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-task 3 lines 22-27:  run [main() {]
+task 3 lines 25-29:  run [script]
 Error: Script execution failed with VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,
@@ -31,7 +31,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-task 4 lines 29-34:  run [main() {]
+task 4 lines 33-37:  run [script]
 Error: Script execution failed with VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,
@@ -39,7 +39,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-task 5 lines 36-41:  run [main() {]
+task 5 lines 41-45:  run [script]
 Error: Script execution failed with VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,

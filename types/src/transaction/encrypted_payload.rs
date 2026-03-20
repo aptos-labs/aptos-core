@@ -8,16 +8,26 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
 use aptos_crypto::HashValue;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+)]
 pub struct DecryptedPayload {
     executable: TransactionExecutable,
     decryption_nonce: u64,
 }
 
 impl DecryptedPayload {
+    pub fn new(executable: TransactionExecutable, decryption_nonce: u64) -> Self {
+        Self {
+            executable,
+            decryption_nonce,
+        }
+    }
+
     pub fn unwrap(self) -> (TransactionExecutable, u64) {
         (self.executable, self.decryption_nonce)
     }
@@ -31,12 +41,25 @@ pub struct PayloadAssociatedData {
 }
 
 impl PayloadAssociatedData {
-    fn new(sender: AccountAddress) -> Self {
+    pub fn new(sender: AccountAddress) -> Self {
         Self { sender }
     }
 }
 
 impl AssociatedData for PayloadAssociatedData {}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum DecryptionFailureReason {
+    /// Cryptographic decryption failed (e.g., invalid ciphertext, key mismatch).
+    CryptoFailure,
+    /// Transaction exceeded the per-block encrypted transaction batch limit.
+    /// Should be retried in a subsequent block.
+    BatchLimitReached,
+    /// The decryption key is not available.
+    ConfigUnavailable,
+    /// The decryption key is not available.
+    DecryptionKeyUnavailable,
+}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptedPayload {
@@ -49,7 +72,8 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
-        eval_proof: EvalProof,
+        eval_proof: Option<EvalProof>,
+        reason: DecryptionFailureReason,
     },
     Decrypted {
         ciphertext: Ciphertext,
@@ -73,17 +97,28 @@ impl EncryptedPayload {
     }
 
     pub fn executable(&self) -> Result<TransactionExecutable> {
-        let Self::Decrypted { executable, .. } = self else {
-            bail!("Transaction is encrypted");
-        };
-        Ok(executable.clone())
+        Ok(match self {
+            EncryptedPayload::Encrypted { .. } | EncryptedPayload::FailedDecryption { .. } => {
+                TransactionExecutable::Encrypted
+            },
+            EncryptedPayload::Decrypted { executable, .. } => executable.clone(),
+        })
     }
 
     pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
-        let Self::Decrypted { executable, .. } = self else {
-            bail!("Transaction is encrypted");
-        };
-        Ok(executable.as_ref())
+        Ok(match self {
+            EncryptedPayload::Encrypted { .. } | EncryptedPayload::FailedDecryption { .. } => {
+                TransactionExecutableRef::Encrypted
+            },
+            EncryptedPayload::Decrypted { executable, .. } => executable.as_ref(),
+        })
+    }
+
+    pub fn decryption_failure_reason(&self) -> Option<&DecryptionFailureReason> {
+        match self {
+            EncryptedPayload::FailedDecryption { reason, .. } => Some(reason),
+            _ => None,
+        }
     }
 
     pub fn extra_config(&self) -> &TransactionExtraConfig {
@@ -124,7 +159,11 @@ impl EncryptedPayload {
         Ok(())
     }
 
-    pub fn into_failed_decryption(&mut self, eval_proof: EvalProof) -> anyhow::Result<()> {
+    pub fn into_failed_decryption_with_reason(
+        &mut self,
+        eval_proof: Option<EvalProof>,
+        reason: DecryptionFailureReason,
+    ) -> anyhow::Result<()> {
         let Self::Encrypted {
             ciphertext,
             extra_config,
@@ -140,6 +179,7 @@ impl EncryptedPayload {
             extra_config: extra_config.clone(),
             payload_hash: *payload_hash,
             eval_proof,
+            reason,
         };
         Ok(())
     }

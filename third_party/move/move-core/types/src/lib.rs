@@ -7,6 +7,7 @@
 pub mod abi;
 pub mod ability;
 pub mod account_address;
+pub mod diag_writer;
 pub mod effects;
 pub mod errmap;
 pub mod function;

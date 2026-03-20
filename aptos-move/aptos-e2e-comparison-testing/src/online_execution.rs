@@ -126,8 +126,8 @@ impl OnlineExecutor {
                 base_experiments,
                 compared_experiments,
             );
-            if res.is_err() {
-                eprintln!("{} at:{}", res.unwrap_err(), version);
+            if let Err(err) = res {
+                eprintln!("{} at:{}", err, version);
                 return None;
             }
         }
@@ -187,13 +187,11 @@ impl OnlineExecutor {
                 )
                 .await;
             // if error happens when collecting txns, log the version range
-            if res_txns.is_err() {
-                index_writer.lock().unwrap().write_err(&format!(
-                    "{}:{}:{:?}",
-                    cur_version,
-                    batch,
-                    res_txns.unwrap_err()
-                ));
+            if let Err(err) = &res_txns {
+                index_writer
+                    .lock()
+                    .unwrap()
+                    .write_err(&format!("{}:{}:{:?}", cur_version, batch, err));
                 cur_version += batch;
                 continue;
             }

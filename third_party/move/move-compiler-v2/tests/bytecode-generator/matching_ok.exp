@@ -1,5 +1,11 @@
 // -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
+    enum Option<A> {
+        None,
+        Some {
+            value: A,
+        }
+    }
     struct Box {
         x: u64,
     }
@@ -39,12 +45,6 @@ module 0xc0ffee::m {
             y: u64,
         }
     }
-    enum Option<A> {
-        None,
-        Some {
-            value: A,
-        }
-    }
     enum Outer {
         None,
         One {
@@ -54,6 +54,17 @@ module 0xc0ffee::m {
             i: Inner,
             b: Box,
         }
+    }
+    public fun is_some<A>(x: &Option<A>): bool {
+        match (x) {
+          m::Option::None<A> => {
+            false
+          }
+          m::Option::Some<A>{ value: _ } => {
+            true
+          }
+        }
+
     }
     public fun inner_value(self: Inner): u64 {
         match (self) {
@@ -73,17 +84,6 @@ module 0xc0ffee::m {
           }
           _: &Inner => {
             false
-          }
-        }
-
-    }
-    public fun is_some<A>(x: &Option<A>): bool {
-        match (x) {
-          m::Option::None<A> => {
-            false
-          }
-          m::Option::Some<A>{ value: _ } => {
-            true
           }
         }
 
@@ -202,6 +202,12 @@ module 0xc0ffee::m {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
+    enum Option<A> has drop {
+        None,
+        Some {
+            value: A,
+        }
+    }
     struct Box has drop {
         x: u64,
     }
@@ -241,12 +247,6 @@ module 0xc0ffee::m {
             y: u64,
         }
     }
-    enum Option<A> has drop {
-        None,
-        Some {
-            value: A,
-        }
-    }
     enum Outer {
         None,
         One {
@@ -255,6 +255,12 @@ module 0xc0ffee::m {
         Two {
             i: Inner,
             b: Box,
+        }
+    }
+    public fun is_some<A>(x: &Option<A>): bool {
+        match (x) {
+            Option::None<A>{} => false,
+            Option::Some<A>{value: _} => true,
         }
     }
     public fun inner_value(self: Inner): u64 {
@@ -267,12 +273,6 @@ module 0xc0ffee::m {
         match (self) {
             Inner::Inner1{x: _} => true,
             _ => false,
-        }
-    }
-    public fun is_some<A>(x: &Option<A>): bool {
-        match (x) {
-            Option::None<A>{} => false,
-            Option::Some<A>{value: _} => true,
         }
     }
     public fun is_some_dropped<A: drop>(x: Option<A>): bool {
@@ -339,6 +339,30 @@ module 0xc0ffee::m {
 ============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
+public fun m::is_some<#0>($t0: &0xc0ffee::m::Option<#0>): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: u64
+  0: $t2 := test_variant 0xc0ffee::m::Option<#0>::None($t0)
+  1: if ($t2) goto 2 else goto 5
+  2: label L2
+  3: $t1 := false
+  4: goto 14
+  5: label L1
+  6: $t2 := test_variant 0xc0ffee::m::Option<#0>::Some($t0)
+  7: if ($t2) goto 8 else goto 11
+  8: label L4
+  9: $t1 := true
+ 10: goto 14
+ 11: label L3
+ 12: $t3 := 14566554180833181697
+ 13: abort($t3)
+ 14: label L0
+ 15: return $t1
+}
+
+
+[variant baseline]
 public fun m::inner_value($t0: 0xc0ffee::m::Inner): u64 {
      var $t1: u64
      var $t2: &0xc0ffee::m::Inner
@@ -391,30 +415,6 @@ public fun m::is_inner1($t0: &0xc0ffee::m::Inner): bool {
  11: abort($t4)
  12: label L0
  13: return $t1
-}
-
-
-[variant baseline]
-public fun m::is_some<#0>($t0: &0xc0ffee::m::Option<#0>): bool {
-     var $t1: bool
-     var $t2: bool
-     var $t3: u64
-  0: $t2 := test_variant 0xc0ffee::m::Option<#0>::None($t0)
-  1: if ($t2) goto 2 else goto 5
-  2: label L2
-  3: $t1 := false
-  4: goto 14
-  5: label L1
-  6: $t2 := test_variant 0xc0ffee::m::Option<#0>::Some($t0)
-  7: if ($t2) goto 8 else goto 11
-  8: label L4
-  9: $t1 := true
- 10: goto 14
- 11: label L3
- 12: $t3 := 14566554180833181697
- 13: abort($t3)
- 14: label L0
- 15: return $t1
 }
 
 

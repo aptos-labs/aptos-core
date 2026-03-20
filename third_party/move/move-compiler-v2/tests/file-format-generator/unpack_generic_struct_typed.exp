@@ -3,11 +3,11 @@
 // Bytecode version v10
 module 0x42::m
 use 0x1::vector
-struct E<T0> has copy + drop + store
-  key: T0
-
 struct Option<T0> has copy + drop + store
   vec: vector<T0>
+
+struct E<T0> has copy + drop + store
+  key: T0
 
 // Function definition at index 0
 #[persistent] public fun destroy_none<T0>(l0: Option<T0>)
@@ -24,6 +24,13 @@ l1: move_loc l0
     ret
 
 // Function definition at index 1
+#[persistent] public fun is_none<T0>(l0: &Option<T0>): bool
+    move_loc l0
+    borrow_field Option<T0>, vec
+    call vector::is_empty<T0>
+    ret
+
+// Function definition at index 2
 #[persistent] public fun foo<T0: drop + store>(l0: E<T0>, l1: &mut T0)
     local l2: T0
     move_loc l0
@@ -38,13 +45,6 @@ l1: move_loc l0
     move_loc l1
     write_ref
     // @10
-    ret
-
-// Function definition at index 2
-#[persistent] public fun is_none<T0>(l0: &Option<T0>): bool
-    move_loc l0
-    borrow_field Option<T0>, vec
-    call vector::is_empty<T0>
     ret
 
 

@@ -17,17 +17,12 @@ use either::Either;
 use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
 use move_asm::assembler;
 use move_binary_format::{
-    binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
     file_format_common::VERSION_MAX,
 };
-use move_bytecode_source_map::mapping::SourceMapping;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{
-        DECOMPILED_EXTENSION, DISASSEMBLED_EXTENSION, MOVE_ASM_EXTENSION, MOVE_EXTENSION,
-        MOVE_IR_EXTENSION,
-    },
+    files::{DECOMPILED_EXTENSION, DISASSEMBLED_EXTENSION, MOVE_ASM_EXTENSION, MOVE_EXTENSION},
     testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
@@ -39,8 +34,6 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     value::MoveTypeLayout,
 };
-use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
-use move_ir_types::location::Spanned;
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::move_vm::SerializedReturnValues;
@@ -269,10 +262,6 @@ pub trait MoveTestAdapter<'a>: Sized {
                 };
                 (named_addr_opt, module, opt_model, warnings_opt)
             },
-            SyntaxChoice::IR => {
-                let module = compile_ir_module(state.dep_modules(), data_path)?;
-                (None, module, None, None)
-            },
             SyntaxChoice::ASM => {
                 let module = compile_asm_module(state.dep_modules(), data_path)?;
                 (None, module, None, None)
@@ -336,10 +325,6 @@ pub trait MoveTestAdapter<'a>: Sized {
                     ),
                 }
             },
-            SyntaxChoice::IR => {
-                let script = compile_ir_script(state.dep_modules(), data_path)?;
-                (script, None, None)
-            },
             SyntaxChoice::ASM => {
                 let script = compile_asm_script(state.dep_modules(), data_path)?;
                 (script, None, None)
@@ -387,12 +372,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.cross_compile_task(&source);
                         self.cross_compile_script(&script)
                             .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
-                        if self.run_config().using_masm() {
-                            move_asm::disassembler::disassemble_script(String::new(), &script)?
-                        } else {
-                            disassembler_for_view(BinaryIndexedView::Script(&script))
-                                .disassemble()?
-                        }
+                        move_asm::disassembler::disassemble_script(String::new(), &script)?
                     },
                     PrintBytecodeInputChoice::Module => {
                         let (_data, _named_addr_opt, module, _warnings_opt) =
@@ -400,16 +380,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.cross_compile_task(&source);
                         self.cross_compile_module(&module)
                             .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
-                        if self.run_config().using_masm() {
-                            move_asm::disassembler::disassemble_module(
-                                String::new(),
-                                &module,
-                                false,
-                            )?
-                        } else {
-                            disassembler_for_view(BinaryIndexedView::Module(&module))
-                                .disassemble()?
-                        }
+                        move_asm::disassembler::disassemble_module(String::new(), &module)?
                     },
                 };
                 Ok(Some(result))
@@ -428,11 +399,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 self.register_temp_filename(&data);
                 // If bytecode printing is enabled, call the disassembler.
                 let printed = if print_bytecode {
-                    let out = if self.run_config().using_masm() {
-                        move_asm::disassembler::disassemble_module(String::new(), &module, false)?
-                    } else {
-                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
-                    };
+                    let out = move_asm::disassembler::disassemble_module(String::new(), &module)?;
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
                         out
@@ -453,15 +420,11 @@ pub trait MoveTestAdapter<'a>: Sized {
                     output = merge_output(output, printed);
                 }
                 let data_path = data.path().to_str().unwrap();
-                match syntax {
-                    SyntaxChoice::Source | SyntaxChoice::ASM => self
-                        .compiled_state()
-                        .add_with_source_file(named_addr_opt, module, (data_path.to_owned(), data)),
-                    SyntaxChoice::IR => {
-                        self.compiled_state()
-                            .add_and_generate_interface_file(module);
-                    },
-                };
+                self.compiled_state().add_with_source_file(
+                    named_addr_opt,
+                    module,
+                    (data_path.to_owned(), data),
+                );
                 Ok(merge_output(warnings_opt, output))
             },
             TaskCommand::Run(
@@ -481,11 +444,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let (script, warning_opt) =
                     self.compile_script(syntax, data, start_line, command_lines_stop)?;
                 let printed = if print_bytecode {
-                    let out = if self.run_config().using_masm() {
-                        move_asm::disassembler::disassemble_script(String::new(), &script)?
-                    } else {
-                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
-                    };
+                    let out = move_asm::disassembler::disassemble_script(String::new(), &script)?;
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
                         out
@@ -584,7 +543,6 @@ pub trait MoveTestAdapter<'a>: Sized {
                 source.trim()
             };
             let cleaned_source = cleaned_source
-                .replace("--syntax=mvir", "")
                 .replace("--syntax=move", "")
                 .replace("--syntax=masm", "");
 
@@ -618,11 +576,8 @@ pub trait MoveTestAdapter<'a>: Sized {
                 },
                 SyntaxChoice::ASM => {
                     let mut out = String::new();
-                    move_asm::disassembler::disassemble_module(&mut out, module, false)?;
+                    move_asm::disassembler::disassemble_module(&mut out, module)?;
                     out
-                },
-                SyntaxChoice::IR => {
-                    bail!("cross compilation into MVIR not supported")
                 },
             };
             self.compiled_state()
@@ -654,9 +609,6 @@ pub trait MoveTestAdapter<'a>: Sized {
                     let mut out = String::new();
                     move_asm::disassembler::disassemble_script(&mut out, script)?;
                     out
-                },
-                SyntaxChoice::IR => {
-                    bail!("cross compilation into MVIR not supported")
                 },
             };
             self.compiled_state()
@@ -744,11 +696,6 @@ pub trait MoveTestAdapter<'a>: Sized {
             Some(output.join("\n"))
         }
     }
-}
-fn disassembler_for_view(view: BinaryIndexedView) -> Disassembler {
-    let source_mapping =
-        SourceMapping::new_from_view(view, Spanned::unsafe_no_loc(()).loc).expect("source mapping");
-    Disassembler::new(source_mapping, DisassemblerOptions::new())
 }
 
 impl<'a> CompiledState<'a> {
@@ -964,25 +911,6 @@ fn remove_sub_dirs(dirs: &mut BTreeSet<String>) {
     }
 }
 
-fn compile_ir_module<'a>(
-    deps: impl Iterator<Item = &'a CompiledModule>,
-    file_name: &str,
-) -> Result<CompiledModule> {
-    use move_ir_compiler::Compiler as IRCompiler;
-    let code = std::fs::read_to_string(file_name).unwrap();
-    IRCompiler::new(deps.collect()).into_compiled_module(&code)
-}
-
-fn compile_ir_script<'a>(
-    deps: impl Iterator<Item = &'a CompiledModule>,
-    file_name: &str,
-) -> Result<CompiledScript> {
-    use move_ir_compiler::Compiler as IRCompiler;
-    let code = std::fs::read_to_string(file_name).unwrap();
-    let (script, _) = IRCompiler::new(deps.collect()).into_compiled_script_and_source_map(&code)?;
-    Ok(script)
-}
-
 fn compile_asm_module<'a>(
     deps: impl Iterator<Item = &'a CompiledModule>,
     path: &str,
@@ -1032,7 +960,6 @@ where
     let extension = path.extension().unwrap().to_str().unwrap();
     let default_syntax = match extension {
         MOVE_EXTENSION | DECOMPILED_EXTENSION => SyntaxChoice::Source,
-        MOVE_IR_EXTENSION => SyntaxChoice::IR,
         MOVE_ASM_EXTENSION | DISASSEMBLED_EXTENSION => SyntaxChoice::ASM,
         _ => {
             panic!("unexpected extensions `{}`", extension)
@@ -1174,9 +1101,6 @@ fn handle_cross_compiled_output(
     let ending = match target.syntax {
         SyntaxChoice::Source => DECOMPILED_EXTENSION,
         SyntaxChoice::ASM => DISASSEMBLED_EXTENSION,
-        SyntaxChoice::IR => {
-            unreachable!()
-        },
     };
     let file_name = test_path
         .with_extension(ending)
@@ -1235,12 +1159,12 @@ fn handle_expected_output(
 }
 
 fn add_exp_suffix(path: &Path, suffix: &Option<String>) -> PathBuf {
-    // Only replace move, masm, or mvir extension, otherwise add suffix.
+    // Only replace move or masm extension, otherwise add suffix.
     // So for paths resulting from cross-compilation, like `foo.decompiled`,
     // we won't generate `foo.exp` but `foo.decompiled.exp`.
     let suffix = suffix.as_ref().map(|s| s.as_str()).unwrap_or(EXP_EXT);
     let path_str = path.display().to_string();
-    if path_str.ends_with(".move") || path_str.ends_with(".mvir") || path_str.ends_with(".masm") {
+    if path_str.ends_with(".move") || path_str.ends_with(".masm") {
         path.with_extension(suffix)
     } else {
         PathBuf::from(format!("{}.{}", path.display(), suffix))

@@ -1,44 +1,44 @@
 
 Diagnostics:
-warning: unpack of `m::W` can only be done within the defining module `0xc0ffee::m`, but `m::destroy1` could be called (and expanded) outside the module
+warning: unpack on `m::W` can only be done within module `0xc0ffee::m`, but `m::destroy1` could be called (and expanded) outside
   ┌─ tests/visibility-checker/inline_with_warning_07.move:4:23
   │
 4 │     public inline fun destroy1(w: W) {
   │                       ^^^^^^^^
 5 │         let W(_) = w;
-  │             ---- unpacked here
+  │             ---- unpack here
 
-warning: unpack of `m::W` can only be done within the defining module `0xc0ffee::m`, but `m::destroy2` could be called (and expanded) outside the module
+warning: unpack on `m::W` can only be done within module `0xc0ffee::m`, but `m::destroy2` could be called (and expanded) outside
   ┌─ tests/visibility-checker/inline_with_warning_07.move:8:24
   │
 8 │     package inline fun destroy2(w: W) {
   │                        ^^^^^^^^
 9 │         let W(_) = w;
-  │             ---- unpacked here
+  │             ---- unpack here
 
-warning: access of the field `0` on type `m::W` can only be done within the defining module `0xc0ffee::m`, but `m::get_field` could be called (and expanded) outside the module
+warning: field access on `m::W` can only be done within module `0xc0ffee::m`, but `m::get_field` could be called (and expanded) outside
    ┌─ tests/visibility-checker/inline_with_warning_07.move:12:23
    │
 12 │     public inline fun get_field(w: W): u64 {
    │                       ^^^^^^^^^
 13 │         w.0
-   │         --- accessed here
+   │         --- field access here
 
-warning: match on enum type `n::E` can only be done within the defining module `0xc0ffee::n`, but `n::fetch` could be called (and expanded) outside the module
+warning: unpack on `n::E` can only be done within module `0xc0ffee::n`, but `n::fetch` could be called (and expanded) outside
    ┌─ tests/visibility-checker/inline_with_warning_07.move:23:31
    │
 23 │     public(friend) inline fun fetch(e: E): u64 {
    │                               ^^^^^
 24 │         match (e) {
-   │                - matched here
+   │                - unpack here
 
-warning: storage operation on type `o::R` can only be done within the defining module `0xc0ffee::o`, but `o::my_borrow` could be called (and expanded) outside the module
+warning: storage operation on `o::R` can only be done within module `0xc0ffee::o`, but `o::my_borrow` could be called (and expanded) outside
    ┌─ tests/visibility-checker/inline_with_warning_07.move:38:23
    │
 38 │     public inline fun my_borrow(): &R {
    │                       ^^^^^^^^^
 39 │         borrow_global<R>(@0xc0ffee)
-   │         --------------------------- called here
+   │         --------------------------- storage operation here
 
 // -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {

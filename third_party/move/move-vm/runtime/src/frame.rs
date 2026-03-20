@@ -195,8 +195,17 @@ impl Frame {
                 let local_tys = function.local_tys();
                 let mut local_ty_counts = Vec::with_capacity(local_tys.len());
                 for ty in local_tys {
-                    let cnt = NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64);
+                    let (num_nodes, depth) = ty.num_nodes_in_subst(ty_args)?;
+                    let cnt = NumTypeNodes::new(num_nodes as u64);
                     gas_meter.charge_create_ty(cnt)?;
+
+                    // We must check depth here because async runtime checks will create
+                    // types (which may fail because types are too deep). This check ensures
+                    // runtime checks never fail because of limits.
+                    if vm_config.check_depth_on_type_counts {
+                        ty_builder.check_final_size_and_depth(num_nodes as u64, depth as u64)?;
+                    }
+
                     local_ty_counts.push(cnt);
                 }
                 cache_borrow.instantiated_local_ty_counts = Some(Rc::from(local_ty_counts));
@@ -457,7 +466,8 @@ impl Frame {
             .collect::<PartialVMResult<Vec<_>>>()
     }
 
-    fn single_type_at(&self, idx: SignatureIndex) -> &Type {
+    /// Returns possibly non-instantiated signature type.
+    pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
             Module(module) => module.single_type_at(idx),
@@ -573,8 +583,11 @@ impl Frame {
         let ty_args = self.function.ty_args();
         if let Some(gas_meter) = gas_meter {
             for ty in instantiation {
-                gas_meter
-                    .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
+                // Note: no need to check depth here: construction of types below will
+                // bound types to maximum depth in any case; this saves us some unnecessary
+                // feature-gating.
+                let (num_nodes, _depth) = ty.num_nodes_in_subst(ty_args)?;
+                gas_meter.charge_create_ty(NumTypeNodes::new(num_nodes as u64))?;
             }
         }
 

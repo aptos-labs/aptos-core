@@ -13,7 +13,7 @@ use move_stackless_bytecode::{
     function_target_pipeline::{
         FunctionTargetPipeline, FunctionTargetsHolder, ProcessorResultDisplay,
     },
-    print_targets_for_test,
+    print_targets_with_annotations_for_test,
 };
 use std::path::Path;
 
@@ -26,6 +26,19 @@ use std::path::Path;
 pub fn test_runner(
     path: &Path,
     pipeline_opt: Option<FunctionTargetPipeline>,
+) -> anyhow::Result<()> {
+    test_runner_with_annotations(path, pipeline_opt, |target| {
+        target.register_annotation_formatters_for_test();
+    })
+}
+
+/// Like `test_runner`, but allows custom annotation registration.
+/// The `register_annotations` closure is called for each function target to register
+/// annotation formatters before printing.
+pub fn test_runner_with_annotations(
+    path: &Path,
+    pipeline_opt: Option<FunctionTargetPipeline>,
+    register_annotations: impl Fn(&move_stackless_bytecode::function_target::FunctionTarget),
 ) -> anyhow::Result<()> {
     let options = Options {
         sources_deps: extract_test_directives(path, "// dep:")?,
@@ -59,17 +72,24 @@ pub fn test_runner(
                 targets.add_target(&func_env);
             }
         }
-        text += &print_targets_for_test(&env, "initial translation from Move", &targets, false);
+        text += &print_targets_with_annotations_for_test(
+            &env,
+            "initial translation from Move",
+            &targets,
+            &register_annotations,
+            false,
+        );
 
         // Run pipeline if any
         if let Some(pipeline) = pipeline_opt {
             pipeline.run(&env, &mut targets);
             let processor = pipeline.last_processor();
             if !processor.is_single_run() {
-                text += &print_targets_for_test(
+                text += &print_targets_with_annotations_for_test(
                     &env,
                     &format!("after pipeline `{}`", dir_name),
                     &targets,
+                    &register_annotations,
                     false,
                 );
             }

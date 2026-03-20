@@ -13,16 +13,20 @@ mod hkzg_chunked_elgamal_commit;
 mod input_secret;
 mod keys;
 pub mod public_parameters;
+mod subtranscript;
+mod verify_common;
 mod weighted_transcript;
-mod weighted_transcriptv2;
+mod weighted_transcript_v2;
 
-pub use public_parameters::DEFAULT_ELL_FOR_TESTING;
-pub use weighted_transcript::{
-    Subtranscript as WeightedSubtranscript, Transcript as UnsignedWeightedTranscript,
+pub use input_secret::InputSecret;
+pub use keys::{DecryptPrivKey, EncryptPubKey};
+pub use public_parameters::{
+    PublicParameters, DEFAULT_ELL_FOR_DEPLOYMENT, DEFAULT_ELL_FOR_TESTING,
 };
-pub use weighted_transcriptv2::{
-    Subtranscript as WeightedSubtranscriptv2, Transcript as UnsignedWeightedTranscriptv2,
-};
+pub use subtranscript::Subtranscript as WeightedSubtranscript;
+pub use verify_common::SokContext;
+pub use weighted_transcript::Transcript as UnsignedWeightedTranscript;
+pub use weighted_transcript_v2::Transcript as UnsignedWeightedTranscriptv2;
 #[allow(type_alias_bounds)]
 pub type SignedWeightedTranscript<E: Pairing> = GenericSigning<UnsignedWeightedTranscript<E>>;
 #[allow(type_alias_bounds)]

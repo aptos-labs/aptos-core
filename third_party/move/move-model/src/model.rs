@@ -18,9 +18,9 @@
 use crate::{
     ast::{
         AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
-        Exp, ExpData, FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue,
-        ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
-        Value,
+        Exp, ExpData, FriendDecl, GlobalInvariant, MemoryLabel, ModuleName, PropertyBag,
+        PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl,
+        SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -487,13 +487,22 @@ impl QualifiedInstId<StructId> {
     }
 }
 
+/// Represents different types of users for a struct or constant.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum UserId {
+    Function(QualifiedId<FunId>),
+    Struct(QualifiedId<StructId>),
+    Constant(QualifiedId<NamedConstantId>),
+}
+
 // =================================================================================================
 /// # Verification Scope
 
 /// Defines what functions to verify.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationScope {
     /// Verify only public functions.
+    #[default]
     Public,
     /// Verify all functions.
     All,
@@ -503,12 +512,6 @@ pub enum VerificationScope {
     OnlyModule(String),
     /// Verify no functions
     None,
-}
-
-impl Default for VerificationScope {
-    fn default() -> Self {
-        Self::Public
-    }
 }
 
 impl VerificationScope {
@@ -607,6 +610,8 @@ pub struct GlobalEnv {
     pub cmp_types: RefCell<BTreeSet<Type>>,
     /// An estimate of each target Move function's size.
     pub function_size_estimate: RefCell<BTreeMap<QualifiedId<FunId>, FunctionSize>>,
+    /// Names associated with memory labels (state labels for behavior predicates).
+    pub(crate) memory_label_names: RefCell<BTreeMap<MemoryLabel, Symbol>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -670,6 +675,7 @@ impl GlobalEnv {
             generated_by_v2: false,
             cmp_types: RefCell::new(Default::default()),
             function_size_estimate: RefCell::new(Default::default()),
+            memory_label_names: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -802,6 +808,16 @@ impl GlobalEnv {
         let id = GlobalId::new(*counter);
         *counter += 1;
         id
+    }
+
+    /// Set the name for a memory label.
+    pub fn set_memory_label_name(&self, label: MemoryLabel, name: Symbol) {
+        self.memory_label_names.borrow_mut().insert(label, name);
+    }
+
+    /// Get the name for a memory label, if one exists.
+    pub fn get_memory_label_name(&self, label: MemoryLabel) -> Option<Symbol> {
+        self.memory_label_names.borrow().get(&label).copied()
     }
 
     /// Returns a reference to the symbol pool owned by this environment.
@@ -1227,6 +1243,25 @@ impl GlobalEnv {
     /// Returns true if diagnostics have error severity or worse.
     pub fn has_errors(&self) -> bool {
         self.error_count() > 0
+    }
+
+    /// Returns `Err` if the environment contains any error diagnostics.
+    ///
+    /// Use this at call sites where compilation errors should be fatal, rather
+    /// than having the compiler pipeline bail internally. The diagnostics
+    /// remain stored in the `GlobalEnv` for later retrieval/rendering.
+    pub fn check_errors(&self, msg: &str) -> anyhow::Result<()> {
+        let n = self.error_count();
+        if n > 0 {
+            anyhow::bail!(
+                "exiting with {} {} {}",
+                n,
+                if n == 1 { "error" } else { "errors" },
+                msg
+            )
+        } else {
+            Ok(())
+        }
     }
 
     /// Returns the number of diagnostics.
@@ -1741,6 +1776,7 @@ impl GlobalEnv {
                     .or_insert_with(|| FunctionData::new(name, loc));
                 entry.visibility = definition_view.visibility();
                 entry.is_native = definition_view.is_native();
+                entry.is_struct_api = true;
                 entry.kind = if definition_view.is_entry() {
                     FunctionKind::Entry
                 } else {
@@ -1994,6 +2030,7 @@ impl GlobalEnv {
             visibility: Visibility::Private,
             has_package_visibility: false,
             is_empty_struct: false,
+            users: BTreeSet::new(),
         }
     }
 
@@ -2140,6 +2177,15 @@ impl GlobalEnv {
         data.acquired_structs = Some(acquires)
     }
 
+    /// Adds a user to a struct's user set.
+    pub fn add_struct_user(&mut self, struct_id: QualifiedId<StructId>, user_id: UserId) {
+        if let Some(module_data) = self.module_data.get_mut(struct_id.module_id.to_usize()) {
+            if let Some(struct_data) = module_data.struct_data.get_mut(&struct_id.id) {
+                struct_data.users.insert(user_id);
+            }
+        }
+    }
+
     /// Adds a new function definition.
     pub fn add_function_def(
         &mut self,
@@ -2168,6 +2214,7 @@ impl GlobalEnv {
             visibility,
             has_package_visibility,
             is_native: false,
+            is_struct_api: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
             type_params,
@@ -2235,6 +2282,7 @@ impl GlobalEnv {
             visibility,
             has_package_visibility,
             is_native: false,
+            is_struct_api: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
             type_params,
@@ -2458,6 +2506,15 @@ impl GlobalEnv {
         let sym = &self.symbol_pool().make(name);
         if let Some(PropertyValue::Value(Value::Number(n))) = properties.get(sym) {
             return n.to_usize();
+        }
+        None
+    }
+
+    /// Returns the value of a symbol property.
+    pub fn get_symbol_property(&self, properties: &PropertyBag, name: &str) -> Option<Symbol> {
+        let sym = &self.symbol_pool().make(name);
+        if let Some(PropertyValue::Symbol(s)) = properties.get(sym) {
+            return Some(*s);
         }
         None
     }
@@ -3717,7 +3774,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn disassemble(&self) -> Option<String> {
         let module = self.get_verified_module()?;
         Some(
-            move_asm::disassembler::disassemble_module(String::new(), module, false)
+            move_asm::disassembler::disassemble_module(String::new(), module)
                 .expect("disassemble succeeds"),
         )
     }
@@ -3835,9 +3892,11 @@ pub struct StructData {
     /// Invariant: when true, visibility is always friend.
     pub(crate) has_package_visibility: bool,
 
-    /// Whether this struct is empty when defined by the user
-    /// Note: by default set to false when created from compiled module since the info is not available
+    /// Whether this struct is empty (has no fields) when defined by the user
     pub is_empty_struct: bool,
+
+    /// All users of this struct
+    pub(crate) users: BTreeSet<UserId>,
 }
 
 impl StructData {
@@ -3857,6 +3916,7 @@ impl StructData {
             visibility: Visibility::Private,
             has_package_visibility: false,
             is_empty_struct: false,
+            users: BTreeSet::new(),
         }
     }
 }
@@ -3883,7 +3943,7 @@ impl<'env> StructEnv<'env> {
         self.module_env.env
     }
 
-    /// Returns true if struct is empty when defined by the user
+    /// Returns whether the struct is empty (has no fields)
     pub fn is_empty_struct(&self) -> bool {
         self.data.is_empty_struct
     }
@@ -3957,7 +4017,7 @@ impl<'env> StructEnv<'env> {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
             well_known::is_test_only_attribute_name(s.as_str())
-        })
+        }) || self.module_env.is_test_only()
     }
 
     /// Checks whether this item is only used in verification.
@@ -3965,7 +4025,12 @@ impl<'env> StructEnv<'env> {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
             well_known::is_verify_only_attribute_name(s.as_str())
-        })
+        }) || self.module_env.is_verify_only()
+    }
+
+    /// Checks whether this struct or its module is test-only or verify-only.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
     }
 
     /// Get documentation associated with this struct.
@@ -4232,6 +4297,11 @@ impl<'env> StructEnv<'env> {
     pub fn has_package_visibility(&self) -> bool {
         self.data.has_package_visibility
     }
+
+    /// Returns all users of this struct
+    pub fn get_users(&self) -> &BTreeSet<UserId> {
+        &self.data.users
+    }
 }
 
 // =================================================================================================
@@ -4359,6 +4429,12 @@ pub struct NamedConstantData {
 
     /// The value of this constant, if known.
     pub(crate) value: Value,
+
+    /// Attributes attached to this constant.
+    pub(crate) attributes: Vec<Attribute>,
+
+    /// All users of this constant
+    pub(crate) users: BTreeSet<UserId>,
 }
 
 #[derive(Debug)]
@@ -4407,6 +4483,47 @@ impl NamedConstantEnv<'_> {
             used_modules: self.module_env.get_used_modules(false),
             ..TypeDisplayContext::new(self.module_env.env)
         }
+    }
+
+    /// Returns the users that reference this constant.
+    pub fn get_users(&self) -> &BTreeSet<UserId> {
+        &self.data.users
+    }
+
+    /// Returns the attributes of this constant.
+    pub fn get_attributes(&self) -> &[Attribute] {
+        &self.data.attributes
+    }
+
+    /// Checks whether the constant has an attribute.
+    pub fn has_attribute(&self, pred: impl Fn(&Attribute) -> bool) -> bool {
+        Attribute::has(&self.data.attributes, pred)
+    }
+
+    /// Returns the symbol pool.
+    pub fn symbol_pool(&self) -> &SymbolPool {
+        self.module_env.symbol_pool()
+    }
+
+    /// Checks whether this item is only used in tests.
+    pub fn is_test_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_test_only_attribute_name(s.as_str())
+        }) || self.module_env.is_test_only()
+    }
+
+    /// Checks whether this item is only used in verification.
+    pub fn is_verify_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_verify_only_attribute_name(s.as_str())
+        }) || self.module_env.is_verify_only()
+    }
+
+    /// Checks whether this struct or its module is test-only or verify-only.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
     }
 }
 
@@ -4568,6 +4685,9 @@ pub struct FunctionData {
     /// Whether this is a native function
     pub(crate) is_native: bool,
 
+    /// Whether this is a compiler-generated struct API wrapper. Set from `FunctionAttribute` tags.
+    pub(crate) is_struct_api: bool,
+
     /// The kind of the function.
     pub(crate) kind: FunctionKind,
 
@@ -4631,6 +4751,7 @@ impl FunctionData {
             visibility: Default::default(),
             has_package_visibility: false,
             is_native: false,
+            is_struct_api: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
             type_params: vec![],
@@ -4766,7 +4887,7 @@ impl<'env> FunctionEnv<'env> {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
             well_known::is_test_only_attribute_name(s.as_str())
-        })
+        }) || self.module_env.is_test_only()
     }
 
     /// Checks whether this item is only used in verification.
@@ -4774,7 +4895,42 @@ impl<'env> FunctionEnv<'env> {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
             well_known::is_verify_only_attribute_name(s.as_str())
-        })
+        }) || self.module_env.is_verify_only()
+    }
+
+    /// Checks whether this function or its module is test-only or verify-only.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
+    }
+
+    /// Returns `true` if this is a compiler-generated struct API wrapper (`pack$S`, `unpack$S`,
+    /// `borrow$S$N`, `borrow_mut$S$N`, `test_variant$S$V`, `pack_variant$S$V`,
+    /// `unpack_variant$S$V`). These are synthetic wrappers with no user-written body or spec.
+    pub fn is_struct_api(&self) -> bool {
+        self.data.is_struct_api
+    }
+
+    /// Returns `true` for functions that have no independently-processed bytecode target in the
+    /// prover pipeline and should be skipped when iterating over functions for analysis:
+    /// - inline functions: their bodies are inlined at every call site
+    /// - struct API wrappers: their call sites are replaced by native operations
+    ///   (Pack, BorrowField, etc.) in stackless_bytecode_generator before any processor runs
+    pub fn is_not_prover_target(&self) -> bool {
+        self.is_inline() || self.is_struct_api()
+    }
+
+    /// If this is a struct API wrapper, returns `(ModuleId, StructId)` of the struct it
+    /// operates on (parsed from the `op$StructName$...` naming convention). Returns `None`
+    /// for non-struct-API functions.
+    pub fn get_struct_api_struct(&self) -> Option<(ModuleId, StructId)> {
+        if !self.is_struct_api() {
+            return None;
+        }
+        let name = self.get_simple_name_string();
+        let struct_name = name.split('$').nth(1)?;
+        let sym = self.module_env.env.symbol_pool().make(struct_name);
+        let struct_env = self.module_env.find_struct(sym)?;
+        Some((self.module_env.get_id(), struct_env.get_id()))
     }
 
     /// Returns the location of the specification block of this function. If the function has
@@ -4845,6 +5001,19 @@ impl<'env> FunctionEnv<'env> {
         }
         if let Some(n) = env.get_num_property(&self.module_env.get_spec().properties, name) {
             return Some(n);
+        }
+        None
+    }
+
+    /// Returns the value of a symbol pragma for this function. This first looks up a pragma in
+    /// this function, then the enclosing module.
+    pub fn get_symbol_pragma(&self, name: &str) -> Option<Symbol> {
+        let env = self.module_env.env;
+        if let Some(s) = env.get_symbol_property(&self.get_spec().properties, name) {
+            return Some(s);
+        }
+        if let Some(s) = env.get_symbol_property(&self.module_env.get_spec().properties, name) {
+            return Some(s);
         }
         None
     }
@@ -5365,7 +5534,7 @@ impl<'env> FunctionEnv<'env> {
 
         while let Some(fnc) = reachable_funcs.pop_front() {
             if let Some(def) = fnc.get_def() {
-                def.struct_usage(self.module_env.env, &mut set);
+                set.extend(def.struct_usage(self.module_env.env, true));
             }
             for callee in fnc.get_used_functions().expect("call info available") {
                 let f = self.module_env.env.get_function(*callee);

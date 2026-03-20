@@ -189,7 +189,7 @@ mod tests {
 
         let opt_block_data = OptBlockData::new(
             vec![],
-            Payload::empty(false, true),
+            Payload::empty(false),
             signer.author(),
             epoch,
             round,
@@ -243,7 +243,7 @@ mod tests {
         let block_data = msg.take_block_data();
         let epoch_2_block_data = OptBlockData::new(
             vec![],
-            Payload::empty(false, true),
+            Payload::empty(false),
             signer.author(),
             2, // Different epoch
             block_data.round(),

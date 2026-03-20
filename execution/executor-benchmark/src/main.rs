@@ -43,20 +43,13 @@ use aptos_vm_environment::prod_configs::{
 use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
 use std::{
-    ffi::c_char,
     net::SocketAddr,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 #[cfg(unix)]
-#[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
-#[cfg(unix)]
-#[used]
-#[unsafe(no_mangle)]
-pub static mut malloc_conf: *const c_char = c"prof:true,lg_prof_sample:23".as_ptr().cast();
+aptos_jemalloc::setup_jemalloc!();
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.
@@ -112,6 +105,7 @@ impl PrunerOpt {
                 batch_size: self.ledger_pruning_batch_size,
                 user_pruning_window_offset: 0,
             },
+            ..Default::default()
         }
     }
 }
@@ -122,9 +116,6 @@ struct StorageOpt {
     pruner_opt: PrunerOpt,
 
     #[clap(long)]
-    enable_storage_sharding: bool,
-
-    #[clap(long)]
     enable_indexer_grpc: bool,
 }
 
@@ -132,7 +123,6 @@ impl StorageOpt {
     fn storage_test_config(&self) -> StorageTestConfig {
         StorageTestConfig {
             pruner_config: self.pruner_opt.pruner_config(),
-            enable_storage_sharding: self.enable_storage_sharding,
             enable_indexer_grpc: self.enable_indexer_grpc,
         }
     }
@@ -654,6 +644,7 @@ fn main() {
     set_layout_caches(true);
     if opt.skip_paranoid_checks {
         set_paranoid_type_checks(false);
+        set_async_runtime_checks(false);
     } else {
         // If we do paranoid checks, then they are allowed to run async in post-commit hook.
         set_paranoid_type_checks(true);

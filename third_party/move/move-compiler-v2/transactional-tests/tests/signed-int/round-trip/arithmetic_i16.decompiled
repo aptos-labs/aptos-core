@@ -11,7 +11,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 1i16 + 32767i16;
+        let _v0 = 1i16 + MAX_I16;
     }
 }
 
@@ -19,7 +19,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -1i16 + -32768i16;
+        let _v0 = -1i16 + MIN_I16;
     }
 }
 
@@ -35,7 +35,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -2i16 - 32767i16;
+        let _v0 = -2i16 - MAX_I16;
     }
 }
 
@@ -115,7 +115,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -32768i16 / -1i16;
+        let _v0 = MIN_I16 / -1i16;
     }
 }
 
@@ -155,7 +155,7 @@ module 0xff::negate_i16 {
         assert!(_v0 == _v1, 14566554180833181696);
     }
     public fun test2() {
-        let _v0 = negate(-32768i16);
+        let _v0 = negate(MIN_I16);
     }
 }
 

@@ -1,0 +1,75 @@
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    local l1: &u64
+    local l2: &mut u64
+    vec_pack <u64>, 0
+    st_loc l0
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_push_back <u64>
+    mut_borrow_loc l0
+    ld_u64 1
+    vec_push_back <u64>
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <u64>
+    st_loc l1
+    mut_borrow_loc l0
+    ld_u64 1
+    vec_mut_borrow <u64>
+    st_loc l2
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    local l1: &mut u64
+    local l2: &u64
+    vec_pack <u64>, 0
+    st_loc l0
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_push_back <u64>
+    mut_borrow_loc l0
+    ld_u64 1
+    vec_push_back <u64>
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_mut_borrow <u64>
+    st_loc l1
+    borrow_loc l0
+    ld_u64 1
+    vec_borrow <u64>
+    st_loc l2
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    local l1: &mut u64
+    local l2: &mut u64
+    vec_pack <u64>, 0
+    st_loc l0
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_push_back <u64>
+    mut_borrow_loc l0
+    ld_u64 1
+    vec_push_back <u64>
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_mut_borrow <u64>
+    st_loc l1
+    mut_borrow_loc l0
+    ld_u64 1
+    vec_mut_borrow <u64>
+    st_loc l2
+    ret

@@ -1,0 +1,61 @@
+//# publish
+module 0x1::M
+struct NoAbilities
+  a: bool
+
+struct HasDrop<phantom T0, T1> has drop
+  a: bool
+
+struct HasCopy<phantom T0, T1> has copy
+  a: bool
+
+struct HasStore<phantom T0, T1> has store
+  a: bool
+
+struct HasKey<phantom T0, T1> has key
+  a: bool
+
+struct RequireStore<T0: store>
+  a: bool
+
+fun f1(l0: &mut HasDrop<NoAbilities, u64>)
+    ld_true
+    pack HasDrop<NoAbilities, u64>
+    move_loc l0
+    write_ref
+    ret
+
+fun f2()
+    ld_true
+    pack HasDrop<NoAbilities, u64>
+    pop
+    ret
+
+fun f3(l0: HasDrop<NoAbilities, u64>)
+    ret
+
+fun f4(l0: HasCopy<NoAbilities, u64>): (HasCopy<NoAbilities, u64>, HasCopy<NoAbilities, u64>)
+    copy_loc l0
+    move_loc l0
+    ret
+
+fun f5(l0: &signer, l1: HasKey<NoAbilities, u64>)
+    move_loc l0
+    move_loc l1
+    move_to HasKey<NoAbilities, u64>
+    ret
+
+fun f6(): HasKey<NoAbilities, u64> acquires HasKey
+    ld_const<address> 0
+    move_from HasKey<NoAbilities, u64>
+    ret
+
+fun f7(): bool
+    ld_const<address> 0
+    exists HasKey<NoAbilities, u64>
+    ret
+
+fun f8(): RequireStore<HasStore<NoAbilities, u64>>
+    ld_true
+    pack RequireStore<HasStore<NoAbilities, u64>>
+    ret

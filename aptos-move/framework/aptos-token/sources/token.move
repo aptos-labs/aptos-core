@@ -657,15 +657,7 @@ module aptos_token::token {
 
         // Burn the tokens.
         let Token { id: _, amount: burned_amount, token_properties: _ } = withdraw_with_event_internal(owner, token_id, amount);
-        let token_store = &mut TokenStore[owner];
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Burn { account: owner, id: token_id, amount: burned_amount });
-        } else {
-            event::emit_event<BurnTokenEvent>(
-                &mut token_store.burn_events,
-                BurnTokenEvent { id: token_id, amount: burned_amount }
-            );
-        };
+        event::emit(Burn { account: owner, id: token_id, amount: burned_amount });
 
         if (token_data.maximum > 0) {
             token_data.supply -= burned_amount;
@@ -721,15 +713,7 @@ module aptos_token::token {
 
         // Burn the tokens.
         let Token { id: _, amount: burned_amount, token_properties: _ } = withdraw_token(owner, token_id, amount);
-        let token_store = &mut TokenStore[signer::address_of(owner)];
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Burn { account: signer::address_of(owner), id: token_id, amount: burned_amount });
-        } else {
-            event::emit_event<BurnTokenEvent>(
-                &mut token_store.burn_events,
-                BurnTokenEvent { id: token_id, amount: burned_amount }
-            );
-        };
+        event::emit(Burn { account: signer::address_of(owner), id: token_id, amount: burned_amount });
 
         // Decrease the supply correspondingly by the amount of tokens burned.
         let token_data = collections.token_data.borrow_mut(token_id.token_data_id);
@@ -944,27 +928,14 @@ module aptos_token::token {
             };
             direct_deposit(token_owner, new_token);
             update_token_property_internal(token_owner, new_token_id, keys, values, types);
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(MutatePropertyMap {
-                    account: token_owner,
-                    old_id: token_id,
-                    new_id: new_token_id,
-                    keys,
-                    values,
-                    types
-                });
-            } else {
-                event::emit_event<MutateTokenPropertyMapEvent>(
-                    &mut TokenStore[token_owner].mutate_token_property_events,
-                    MutateTokenPropertyMapEvent {
-                        old_id: token_id,
-                        new_id: new_token_id,
-                        keys,
-                        values,
-                        types
-                    },
-                );
-            };
+            event::emit(MutatePropertyMap {
+                account: token_owner,
+                old_id: token_id,
+                new_id: new_token_id,
+                keys,
+                values,
+                types
+            });
 
             token_data.largest_property_version = cur_property_version;
             // burn the orignial property_version 0 token after mutation
@@ -973,27 +944,14 @@ module aptos_token::token {
         } else {
             // only 1 copy for the token with property verion bigger than 0
             update_token_property_internal(token_owner, token_id, keys, values, types);
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(MutatePropertyMap {
-                    account: token_owner,
-                    old_id: token_id,
-                    new_id: token_id,
-                    keys,
-                    values,
-                    types
-                });
-            } else {
-                event::emit_event<MutateTokenPropertyMapEvent>(
-                    &mut TokenStore[token_owner].mutate_token_property_events,
-                    MutateTokenPropertyMapEvent {
-                        old_id: token_id,
-                        new_id: token_id,
-                        keys,
-                        values,
-                        types
-                    },
-                );
-            };
+            event::emit(MutatePropertyMap {
+                account: token_owner,
+                old_id: token_id,
+                new_id: token_id,
+                keys,
+                values,
+                types
+            });
             token_id
         }
     }
@@ -1200,29 +1158,15 @@ module aptos_token::token {
         };
 
         collection_data.add(name, collection);
-        let collection_handle = &mut Collections[account_addr];
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                CreateCollection {
-                    creator: account_addr,
-                    collection_name: name,
-                    uri,
-                    description,
-                    maximum,
-                }
-            );
-        } else {
-            event::emit_event<CreateCollectionEvent>(
-                &mut collection_handle.create_collection_events,
-                CreateCollectionEvent {
-                    creator: account_addr,
-                    collection_name: name,
-                    uri,
-                    description,
-                    maximum,
-                }
-            );
-        };
+        event::emit(
+            CreateCollection {
+                creator: account_addr,
+                collection_name: name,
+                uri,
+                description,
+                maximum,
+            }
+        );
     }
 
     public fun check_collection_exists(creator: address, name: String): bool acquires Collections {
@@ -1309,43 +1253,23 @@ module aptos_token::token {
         };
 
         collections.token_data.add(token_data_id, token_data);
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                TokenDataCreation {
-                    creator: account_addr,
-                    id: token_data_id,
-                    description,
-                    maximum,
-                    uri,
-                    royalty_payee_address,
-                    royalty_points_denominator,
-                    royalty_points_numerator,
-                    name,
-                    mutability_config: token_mutate_config,
-                    property_keys,
-                    property_values,
-                    property_types,
-                }
-            );
-        } else {
-            event::emit_event<CreateTokenDataEvent>(
-                &mut collections.create_token_data_events,
-                CreateTokenDataEvent {
-                    id: token_data_id,
-                    description,
-                    maximum,
-                    uri,
-                    royalty_payee_address,
-                    royalty_points_denominator,
-                    royalty_points_numerator,
-                    name,
-                    mutability_config: token_mutate_config,
-                    property_keys,
-                    property_values,
-                    property_types,
-                },
-            );
-        };
+        event::emit(
+            TokenDataCreation {
+                creator: account_addr,
+                id: token_data_id,
+                description,
+                maximum,
+                uri,
+                royalty_payee_address,
+                royalty_points_denominator,
+                royalty_points_numerator,
+                name,
+                mutability_config: token_mutate_config,
+                property_keys,
+                property_values,
+                property_types,
+            }
+        );
 
         token_data_id
     }
@@ -1459,17 +1383,7 @@ module aptos_token::token {
 
         // we add more tokens with property_version 0
         let token_id = create_token_id(token_data_id, 0);
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Mint { creator: creator_addr, id: token_data_id, amount })
-        } else {
-            event::emit_event<MintTokenEvent>(
-                &mut Collections[creator_addr].mint_token_events,
-                MintTokenEvent {
-                    id: token_data_id,
-                    amount,
-                }
-            );
-        };
+        event::emit(Mint { creator: creator_addr, id: token_data_id, amount });
 
         deposit_token(account,
             Token {
@@ -1507,17 +1421,7 @@ module aptos_token::token {
         // we add more tokens with property_version 0
         let token_id = create_token_id(token_data_id, 0);
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Mint { creator: creator_addr, id: token_data_id, amount })
-        } else {
-            event::emit_event<MintTokenEvent>(
-                &mut Collections[creator_addr].mint_token_events,
-                MintTokenEvent {
-                    id: token_data_id,
-                    amount,
-                }
-            );
-        };
+        event::emit(Mint { creator: creator_addr, id: token_data_id, amount });
 
         direct_deposit(receiver,
             Token {
@@ -1777,15 +1681,7 @@ module aptos_token::token {
             error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
         );
 
-        let token_store = &mut TokenStore[account_addr];
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(TokenWithdraw { account: account_addr, id, amount })
-        } else {
-            event::emit_event<WithdrawEvent>(
-                &mut token_store.withdraw_events,
-                WithdrawEvent { id, amount }
-            );
-        };
+        event::emit(TokenWithdraw { account: account_addr, id, amount });
 
         let tokens = &mut TokenStore[account_addr].tokens;
         assert!(
@@ -1822,14 +1718,7 @@ module aptos_token::token {
         assert!(token.amount > 0, error::invalid_argument(ETOKEN_CANNOT_HAVE_ZERO_AMOUNT));
         let token_store = &mut TokenStore[account_addr];
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(TokenDeposit { account: account_addr, id: token.id, amount: token.amount });
-        } else {
-            event::emit_event<DepositEvent>(
-                &mut token_store.deposit_events,
-                DepositEvent { id: token.id, amount: token.amount },
-            );
-        };
+        event::emit(TokenDeposit { account: account_addr, id: token.id, amount: token.amount });
 
         assert!(
             exists<TokenStore>(account_addr),

@@ -30,7 +30,6 @@
 !crates/aptos-faucet/doc/
 !crates/transaction-emitter-lib/src/emitter/test_proofs_for_localnet_txn_emitter.txt
 !api/doc/
-!crates/indexer/migrations/**/*.sql
 !ecosystem/indexer-grpc/indexer-grpc-parser/migrations/**/*.sql
 !ecosystem/nft-metadata-crawler/migrations/**/*.sql
 !rust-toolchain.toml
@@ -42,4 +41,4 @@
 !testsuite/testcases/src/data/
 !types/src/jwks/rsa/insecure_test_jwk.json
 !types/src/jwks/rsa/secure_test_jwk.json
-!types/src/jwks/rsa/insecure_test_jwk_private_key.pem
+!types/src/jwks/rsa/insecure_test_jwk_private_key.txt

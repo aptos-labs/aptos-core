@@ -9,17 +9,20 @@ module aptos_experimental::pre_cancellation_tests {
     use aptos_experimental::market_types;
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
-        new_test_order_metadata,
+        new_test_order_metadata
     };
     use aptos_experimental::market_test_utils::{
-        place_order_and_verify, verify_cancel_event,
+        place_order_and_verify,
+        verify_cancel_event
     };
     use aptos_experimental::event_utils;
     use aptos_experimental::market_types::{new_market, new_market_config};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
 
-    #[test(aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456)]
+    #[test(
+        aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456
+    )]
     public fun test_pre_cancellation_success(
         aptos_framework: &signer,
         admin: &signer,
@@ -28,14 +31,22 @@ module aptos_experimental::pre_cancellation_tests {
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         // Setup accounts
-        let market = new_market(
-            admin,
-            market_signer,
-            new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
-        );
+        let market =
+            new_market(
+                admin,
+                market_signer,
+                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
+            );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
-        cancel_order_with_client_id(&mut market, signer::address_of(maker1), std::string::utf8(b"1000"), market_types::order_cancellation_reason_cancelled_by_user(), std::string::utf8(b"User cancelled"), &test_market_callbacks());
+        cancel_order_with_client_id(
+            &mut market,
+            signer::address_of(maker1),
+            std::string::utf8(b"1000"),
+            market_types::order_cancellation_reason_cancelled_by_user(),
+            std::string::utf8(b"User cancelled"),
+            &test_market_callbacks()
+        );
         let _ =
             place_order_and_verify(
                 &mut market,
@@ -87,7 +98,9 @@ module aptos_experimental::pre_cancellation_tests {
         market.destroy_market()
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456)]
+    #[test(
+        aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456
+    )]
     public fun test_pre_cancellation_after_order_placement(
         aptos_framework: &signer,
         admin: &signer,
@@ -96,11 +109,12 @@ module aptos_experimental::pre_cancellation_tests {
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         // Setup accounts
-        let market = new_market(
-            admin,
-            market_signer,
-            new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
-        );
+        let market =
+            new_market(
+                admin,
+                market_signer,
+                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
+            );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let order_id =
@@ -120,7 +134,14 @@ module aptos_experimental::pre_cancellation_tests {
             );
         assert!(market.get_remaining_size(order_id) == 2000000);
         // Pre-cancel the order after it has been placed
-        cancel_order_with_client_id(&mut market, signer::address_of(maker1), std::string::utf8(b"1000"), market_types::order_cancellation_reason_cancelled_by_user(), std::string::utf8(b"User cancelled"), &test_market_callbacks());
+        cancel_order_with_client_id(
+            &mut market,
+            signer::address_of(maker1),
+            std::string::utf8(b"1000"),
+            market_types::order_cancellation_reason_cancelled_by_user(),
+            std::string::utf8(b"User cancelled"),
+            &test_market_callbacks()
+        );
         verify_cancel_event(
             &mut market,
             maker1,
@@ -133,13 +154,15 @@ module aptos_experimental::pre_cancellation_tests {
             2000000,
             true, // Order is cancelled
             &mut event_store,
-            false,
+            false
         );
         assert!(market.get_remaining_size(order_id) == 0);
         market.destroy_market();
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456)]
+    #[test(
+        aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456
+    )]
     public fun test_pre_cancellation_after_expiration(
         aptos_framework: &signer,
         admin: &signer,
@@ -148,14 +171,22 @@ module aptos_experimental::pre_cancellation_tests {
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         // Setup accounts
-        let market = new_market(
-            admin,
-            market_signer,
-            new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
-        );
+        let market =
+            new_market(
+                admin,
+                market_signer,
+                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
+            );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
-        cancel_order_with_client_id(&mut market, signer::address_of(maker1), std::string::utf8(b"1000"), market_types::order_cancellation_reason_cancelled_by_user(), std::string::utf8(b"User cancelled"), &test_market_callbacks());
+        cancel_order_with_client_id(
+            &mut market,
+            signer::address_of(maker1),
+            std::string::utf8(b"1000"),
+            market_types::order_cancellation_reason_cancelled_by_user(),
+            std::string::utf8(b"User cancelled"),
+            &test_market_callbacks()
+        );
         let _ =
             place_order_and_verify(
                 &mut market,

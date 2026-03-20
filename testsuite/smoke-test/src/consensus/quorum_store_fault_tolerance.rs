@@ -316,6 +316,8 @@ async fn test_swarm_with_bad_non_qs_node() {
                     20,
                 ),
             ]],
+            false,
+            None,
         ),
     )
     .await;

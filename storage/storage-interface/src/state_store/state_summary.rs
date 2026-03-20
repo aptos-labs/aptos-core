@@ -10,12 +10,13 @@ use crate::{
     },
     DbReader,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL},
     HashValue,
 };
+use aptos_logger::warn;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
@@ -93,9 +94,23 @@ impl StateSummary {
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
-        assert!(persisted.next_version() <= self.next_version());
+        if persisted.next_version() > self.next_version() {
+            let msg = format!(
+                "Persisted version ({}) is ahead of current version ({}), possibly due to a fork.",
+                persisted.next_version(),
+                self.next_version(),
+            );
+            warn!("{}", msg);
+            bail!("{}", msg);
+        }
         // Updates must start at exactly my version.
-        assert_eq!(updates.first_version(), self.next_version());
+        assert_eq!(
+            updates.first_version(),
+            self.next_version(),
+            "updates first version: {}, self next version: {}",
+            updates.first_version(),
+            self.next_version(),
+        );
 
         let (hot_smt_result, smt_result) = rayon::join(
             || self.update_hot_state_summary(persisted, hot_updates),
@@ -301,7 +316,7 @@ impl<'db> ProvableStateSummary<'db> {
         // fetch and construct the corresponding `HotStateValue` for `key` at `version`, including
         // `hot_since_version`. However, the current in-memory hot state does not support this
         // query, and we might need persist hot state KV to db first.
-        if !use_hot_state && rand::random::<usize>() % 10000 == 0 {
+        if !use_hot_state && rand::random::<usize>().is_multiple_of(10000) {
             // 1 out of 10000 times, verify the proof.
             let (val_opt, proof) = self
                 .db

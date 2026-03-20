@@ -5,12 +5,13 @@
 use crate::{
     ast::{
         AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, BehaviorKind,
-        BehaviorTarget, Exp, ExpData, LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern,
+        BehaviorState, Exp, ExpData, LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern,
         QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{
-            AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry, StructLayout,
+            AnyFunEntry, BuiltinReceiverType, ConstEntry, EntryVisibility, LocalVarEntry,
+            StructEntry, StructLayout,
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
@@ -19,8 +20,9 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
+        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter,
+        TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -28,11 +30,7 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{
-        BORROW_MUT_NAME, BORROW_NAME, UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS,
-        VECTOR_MODULE,
-    },
-    FunId,
+    well_known::{UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -45,6 +43,7 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     function::ClosureMask,
+    language_storage::{BORROW, BORROW_MUT},
 };
 use move_ir_types::{
     location::{sp, Spanned},
@@ -73,6 +72,9 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub local_table: LinkedList<BTreeMap<Symbol, LocalVarEntry>>,
     /// The name of the function this expression is associated with, if there is one.
     pub fun_name: Option<QualifiedSymbol>,
+    /// Context for tracking constant usage. When set, user of the constant
+    /// being translated will be recorded in it.
+    pub constant_use_context: Option<UserId>,
     /// Whether we are translating an inline function body.
     pub fun_is_inline: bool,
     /// The result type of the function this expression is associated with.
@@ -110,6 +112,9 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub insert_freeze: bool,
     /// A stack of open loops and their optional label
     pub loop_stack: Vec<Option<PA::Label>>,
+    /// Map from state label names to their GlobalId, ensuring the same label name
+    /// always resolves to the same MemoryLabel across behavior predicates.
+    pub state_label_map: BTreeMap<Symbol, GlobalId>,
 }
 
 #[derive(Debug)]
@@ -165,6 +170,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             fun_ptrs_table: BTreeMap::new(),
             local_table: LinkedList::new(),
             fun_name: None,
+            constant_use_context: None,
             fun_is_inline: false,
             result_type: None,
             lambda_result_type_stack: vec![],
@@ -181,6 +187,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             placeholder_map: BTreeMap::new(),
             insert_freeze: true,
             loop_stack: vec![],
+            state_label_map: BTreeMap::new(),
         }
     }
 
@@ -234,6 +241,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|e| e.kind == FunctionKind::Inline)
             .unwrap_or_default();
         self.fun_name = Some(name)
+    }
+
+    pub fn set_constant_use_context(&mut self, context: UserId) {
+        self.constant_use_context = Some(context)
     }
 
     pub fn set_result_type(&mut self, ty: Type) {
@@ -2040,16 +2051,23 @@ impl ExpTranslator<'_, '_, '_> {
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
-            EA::Exp_::Behavior(kind, _pre_label, fn_name, type_args, sp!(_, args), _post_label) => {
+            EA::Exp_::Behavior(kind, pre_label, fn_name, type_args, sp!(_, args), post_label) => {
                 self.translate_behavior_predicate(
                     &loc,
                     *kind,
+                    pre_label,
+                    post_label,
                     fn_name,
                     type_args,
                     args,
                     expected_type,
                     context,
                 )
+            },
+            EA::Exp_::LabeledCall(label, name, type_args, sp!(_, args)) => self
+                .translate_labeled_call(&loc, label, name, type_args, args, expected_type, context),
+            EA::Exp_::LabeledIndex(label, target, index) => {
+                self.translate_labeled_index(&loc, label, target, index, expected_type, context)
             },
             EA::Exp_::UnresolvedError => {
                 // Error reported
@@ -2888,6 +2906,16 @@ impl ExpTranslator<'_, '_, '_> {
                     false,
                     context,
                 )
+            },
+            EA::LValue_::Literal(val) => {
+                // Translate literal value pattern (for primitive pattern matching)
+                if let Some((value, ty)) = self.translate_value(val, expected_type, context) {
+                    let id = self.new_node_id_with_type_loc(&ty, loc);
+                    self.check_type_with_order(expected_order, loc, &ty, expected_type, context);
+                    Pattern::LiteralValue(id, value)
+                } else {
+                    self.new_error_pat(loc)
+                }
             },
         }
     }
@@ -4000,10 +4028,31 @@ impl ExpTranslator<'_, '_, '_> {
             );
             self.new_error_exp()
         } else {
+            // Record constant usage.
+            // Why tracking constants on the fly:
+            // - they are replaced by values after translation!
+            if let Some(user_id) = &self.constant_use_context {
+                self.track_constant_usage(loc, sym, user_id.clone());
+            }
             let ConstEntry { ty, value, .. } = entry;
             let ty = self.check_type(loc, &ty, expected_type, context);
             let id = self.new_node_id_with_type_loc(&ty, loc);
             ExpData::Value(id, value)
+        }
+    }
+
+    fn track_constant_usage(&mut self, loc: &Loc, const_sym: &QualifiedSymbol, user_id: UserId) {
+        if let Some(const_entry) = self.parent.parent.const_table.get_mut(const_sym) {
+            const_entry.users.insert(user_id);
+        } else {
+            self.parent.parent.env.diag(
+                Severity::Bug,
+                loc,
+                &format!(
+                    "constant `{}` not found in const_table while tracking usage",
+                    const_sym.display(self.parent.parent.env)
+                ),
+            );
         }
     }
 
@@ -4159,16 +4208,13 @@ impl ExpTranslator<'_, '_, '_> {
             return call;
         } else {
             // To use index notation in vector module
-            let borrow_fun_name = if mutable {
-                BORROW_MUT_NAME
-            } else {
-                BORROW_NAME
-            };
+            let borrow_fun_name = if mutable { BORROW_MUT } else { BORROW };
             if let Some(borrow_symbol) = self
                 .parent
                 .parent
-                .vector_receiver_functions
-                .get(&self.env().symbol_pool.make(borrow_fun_name))
+                .builtin_receiver_functions
+                .get(&BuiltinReceiverType::Vector)
+                .and_then(|fns| fns.get(&self.env().symbol_pool.make(borrow_fun_name)))
             {
                 if let Some(borrow_fun_entry) = self.parent.parent.fun_table.get(borrow_symbol) {
                     let mid = borrow_fun_entry.module_id;
@@ -4440,11 +4486,12 @@ impl ExpTranslator<'_, '_, '_> {
                     .parent
                     .parent
                     .lookup_struct_field_decl(&mid.qualified_inst(sid, inst), field_name);
-                let expected_field_type = if let Some((_, ty)) = field_decls.into_iter().next() {
-                    ty
-                } else {
-                    Type::Error // this error is reported via type unification
-                };
+                let (variant, expected_field_type) =
+                    if let Some((variant, ty)) = field_decls.into_iter().next() {
+                        (variant, ty)
+                    } else {
+                        (None, Type::Error) // this error is reported via type unification
+                    };
                 let constraint = Constraint::SomeStruct(
                     [(field_name, expected_field_type.clone())]
                         .into_iter()
@@ -4466,11 +4513,20 @@ impl ExpTranslator<'_, '_, '_> {
                 let value_exp = self.translate_exp(args[2], &expected_field_type);
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 self.set_node_instantiation(id, vec![expected_type.clone()]);
-                ExpData::Call(
-                    id,
-                    Operation::UpdateField(mid, sid, FieldId::new(field_name)),
-                    vec![struct_exp.into_exp(), value_exp.into_exp()],
-                )
+                // For enum types, use variant-qualified FieldId (like Select does)
+                let field_id = if let Some(v) = variant {
+                    let pool = self.symbol_pool();
+                    FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                        pool.string(v).as_str(),
+                        pool.string(field_name).as_str(),
+                    )))
+                } else {
+                    FieldId::new(field_name)
+                };
+                ExpData::Call(id, Operation::UpdateField(mid, sid, field_id), vec![
+                    struct_exp.into_exp(),
+                    value_exp.into_exp(),
+                ])
             } else {
                 // Error reported
                 self.new_error_exp()
@@ -5746,6 +5802,8 @@ impl ExpTranslator<'_, '_, '_> {
         &mut self,
         loc: &Loc,
         kind: PA::BehaviorKind,
+        pre_label: &Option<PA::Label>,
+        post_label: &Option<PA::Label>,
         fn_name: &EA::ModuleAccess,
         type_args: &Option<Vec<EA::Type>>,
         args: &[EA::Exp],
@@ -5758,10 +5816,15 @@ impl ExpTranslator<'_, '_, '_> {
             PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
             PA::BehaviorKind::EnsuresOf => BehaviorKind::EnsuresOf,
             PA::BehaviorKind::ModifiesOf => BehaviorKind::ModifiesOf,
+            PA::BehaviorKind::ResultOf => BehaviorKind::ResultOf,
         };
 
-        // Resolve the function name to a behavior target
-        let Some((target, expected_arg_types)) =
+        // Validate and translate state labels
+        let behavior_state =
+            self.translate_behavior_state_labels(loc, &model_kind, pre_label, post_label);
+
+        // Resolve the function name to a function expression (Closure or Temporary)
+        let Some((fun_exp, expected_arg_types)) =
             self.resolve_behavior_target(loc, fn_name, type_args, &model_kind)
         else {
             return self.new_error_exp();
@@ -5771,39 +5834,168 @@ impl ExpTranslator<'_, '_, '_> {
         let translated_args =
             self.translate_and_check_behavior_args(loc, args, &expected_arg_types, &model_kind);
 
-        // The result type of behavior predicates is bool
-        let result_ty = self.check_type(loc, &BOOL_TYPE, expected_type, context);
+        // Determine the result type based on the behavior kind
+        let fun_type = self.env().get_node_type(fun_exp.node_id());
+        let Some(computed_result_ty) =
+            self.compute_behavior_result_type(loc, &model_kind, &fun_type)
+        else {
+            return self.new_error_exp();
+        };
+        let result_ty = self.check_type(loc, &computed_result_ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&result_ty, loc);
 
-        // Set the type instantiation on the node for proper type resolution during finalize_types
-        if let BehaviorTarget::Function(qid) = &target {
-            self.set_node_instantiation(id, qid.inst.clone());
-        }
+        // Build args with function expression as first argument
+        let mut all_args = vec![fun_exp];
+        all_args.extend(translated_args);
 
-        // Labels are ignored for now (None, None)
         ExpData::Call(
             id,
-            Operation::Behavior(model_kind, None, target, None),
-            translated_args,
+            Operation::Behavior(model_kind, behavior_state),
+            all_args,
         )
     }
 
-    /// Resolves the target of a behavior predicate to either a parameter or a function.
-    /// Returns the BehaviorTarget and the expected argument types.
+    /// Translates a single state label to a MemoryLabel (GlobalId), reusing existing labels
+    /// if the same name was already used. Registers the name in GlobalEnv for printing.
+    fn translate_state_label(&mut self, label: &PA::Label) -> GlobalId {
+        let sym = self.symbol_pool().make(label.value().as_str());
+        if let Some(&id) = self.state_label_map.get(&sym) {
+            id
+        } else {
+            let id = self.env().new_global_id();
+            self.state_label_map.insert(sym, id);
+            self.env().set_memory_label_name(id, sym);
+            id
+        }
+    }
+
+    /// Validates and translates state labels for behavior predicates.
+    /// Returns a BehaviorState with the translated memory labels. Names are registered
+    /// in GlobalEnv for lookup during printing.
+    fn translate_behavior_state_labels(
+        &mut self,
+        loc: &Loc,
+        kind: &BehaviorKind,
+        pre_label: &Option<PA::Label>,
+        post_label: &Option<PA::Label>,
+    ) -> BehaviorState {
+        // Validate label usage based on behavior kind
+        // Only ensures_of and result_of can have both pre and post labels
+        // Other predicates (requires_of, aborts_of, modifies_of) should not have post labels
+        if !matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf) && post_label.is_some()
+        {
+            self.error(
+                loc,
+                &format!(
+                    "only ensures_of and result_of can have a post-state label (@post), not {}",
+                    kind
+                ),
+            );
+        }
+
+        let pre = pre_label.as_ref().map(|l| self.translate_state_label(l));
+        let post = post_label.as_ref().map(|l| self.translate_state_label(l));
+        BehaviorState::new(pre, post)
+    }
+
+    /// Translates a labeled call expression (label@global<R>(addr) or label@exists<R>(addr)).
+    /// Strictly accepts only unqualified `global`/`exists`, translates the call, and injects
+    /// the memory label into the resulting operation.
+    fn translate_labeled_call(
+        &mut self,
+        loc: &Loc,
+        label: &PA::Label,
+        name: &EA::ModuleAccess,
+        type_args: &Option<Vec<EA::Type>>,
+        args: &[EA::Exp],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let mem_label = self.translate_state_label(label);
+        // Labeled calls are only valid for unqualified `global` / `exists`.
+        let builtin_name = match &name.value {
+            EA::ModuleAccess_::Name(n)
+                if n.value.as_str() == "global" || n.value.as_str() == "exists" =>
+            {
+                self.symbol_pool().make(n.value.as_str())
+            },
+            _ => {
+                self.error(
+                    &self.to_loc(&name.loc),
+                    "labeled call must use unqualified `global` or `exists`",
+                );
+                return self.new_error_exp();
+            },
+        };
+        let args_refs: Vec<&EA::Exp> = args.iter().collect();
+        let result = self.translate_call(
+            loc,
+            &self.to_loc(&name.loc),
+            CallKind::Regular,
+            &Some(self.parent.parent.builtin_module()),
+            builtin_name,
+            type_args,
+            &args_refs,
+            expected_type,
+            context,
+        );
+        // Inject the memory label into the operation
+        Self::inject_memory_label(result, mem_label)
+    }
+
+    /// Translates a labeled index expression (label@R[addr]).
+    /// Translates the index expression and injects the memory label into the
+    /// resulting Global operation.
+    fn translate_labeled_index(
+        &mut self,
+        loc: &Loc,
+        label: &PA::Label,
+        target: &EA::Exp,
+        index: &EA::Exp,
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let mem_label = self.translate_state_label(label);
+        let result = self.translate_index(loc, target, index, expected_type, context);
+        Self::inject_memory_label(result, mem_label)
+    }
+
+    /// Injects a memory label into a Global(None) or Exists(None) operation
+    /// within an ExpData::Call node.
+    // TODO(#18762): This does not handle BorrowGlobal from index ops, so `label@R[addr]`
+    // silently drops the label. Need to also match BorrowGlobal(ReferenceKind, _, None).
+    fn inject_memory_label(exp: ExpData, label: GlobalId) -> ExpData {
+        match exp {
+            ExpData::Call(id, Operation::Global(None), args) => {
+                ExpData::Call(id, Operation::Global(Some(label)), args)
+            },
+            ExpData::Call(id, Operation::Exists(None), args) => {
+                ExpData::Call(id, Operation::Exists(Some(label)), args)
+            },
+            other => other,
+        }
+    }
+
+    /// Resolves the target of a behavior predicate to either a local variable or a function.
+    /// Returns a function expression (Temporary for locals, Closure for functions) and
+    /// the expected argument types.
     fn resolve_behavior_target(
         &mut self,
         loc: &Loc,
         maccess: &EA::ModuleAccess,
         type_args: &Option<Vec<EA::Type>>,
         kind: &BehaviorKind,
-    ) -> Option<(BehaviorTarget, Vec<Type>)> {
+    ) -> Option<(Exp, Vec<Type>)> {
         match &maccess.value {
             EA::ModuleAccess_::Name(name) => {
-                // First try to resolve as a local parameter
+                // First try to resolve as a local variable/parameter
                 let sym = self.symbol_pool().make(name.value.as_str());
-                if let Some(entry) = self.lookup_local(sym, false) {
+                // Extract data from entry first to avoid borrow conflicts
+                let local_info = self
+                    .lookup_local(sym, false)
+                    .map(|entry| (entry.type_.clone(), entry.temp_index));
+                if let Some((entry_type, temp_index)) = local_info {
                     // Check if it's a function type
-                    let entry_type = entry.type_.clone();
                     let ty = self.subs.specialize(&entry_type);
                     if let Type::Fun(arg_ty, result_ty, _abilities) = &ty {
                         // Check that no type arguments are provided for function parameters
@@ -5819,7 +6011,15 @@ impl ExpTranslator<'_, '_, '_> {
                         }
                         let expected_types =
                             self.compute_behavior_arg_types(arg_ty, result_ty, kind);
-                        return Some((BehaviorTarget::Parameter(sym), expected_types));
+                        let id = self.new_node_id_with_type_loc(&ty, loc);
+                        let fun_exp = if let Some(temp_idx) = temp_index {
+                            // For function parameters with temp_index, use Temporary
+                            ExpData::Temporary(id, temp_idx).into_exp()
+                        } else {
+                            // For spec function parameters (no temp_index), use LocalVar
+                            ExpData::LocalVar(id, sym).into_exp()
+                        };
+                        return Some((fun_exp, expected_types));
                     } else {
                         self.error(
                             loc,
@@ -5844,13 +6044,14 @@ impl ExpTranslator<'_, '_, '_> {
     }
 
     /// Resolves a qualified function name for behavior predicates.
+    /// Returns a Closure expression for the function and the expected argument types.
     fn resolve_function_target(
         &mut self,
         loc: &Loc,
         global_sym: &QualifiedSymbol,
         type_args: &Option<Vec<EA::Type>>,
         kind: &BehaviorKind,
-    ) -> Option<(BehaviorTarget, Vec<Type>)> {
+    ) -> Option<(Exp, Vec<Type>)> {
         if let Some(entry) = self.parent.parent.fun_table.get(global_sym) {
             let module_id = entry.module_id;
             let fun_id = entry.fun_id;
@@ -5875,16 +6076,27 @@ impl ExpTranslator<'_, '_, '_> {
             let instantiated_result_type = result_type.instantiate(&instantiation);
 
             // Compute expected argument types based on behavior kind
-            let arg_ty = Type::tuple(param_types);
+            let arg_ty = Type::tuple(param_types.clone());
             let expected_types =
                 self.compute_behavior_arg_types(&arg_ty, &instantiated_result_type, kind);
 
-            let qid = QualifiedInstId {
-                module_id,
-                id: fun_id,
-                inst: instantiation,
-            };
-            Some((BehaviorTarget::Function(qid), expected_types))
+            // Create a function type for the closure
+            let fun_type = Type::Fun(
+                Box::new(Type::tuple(param_types)),
+                Box::new(instantiated_result_type),
+                AbilitySet::EMPTY,
+            );
+
+            // Create a Closure expression
+            let id = self.new_node_id_with_type_loc(&fun_type, loc);
+            self.set_node_instantiation(id, instantiation);
+            let fun_exp = ExpData::Call(
+                id,
+                Operation::Closure(module_id, fun_id, ClosureMask::empty()),
+                vec![],
+            )
+            .into_exp();
+            Some((fun_exp, expected_types))
         } else {
             self.error(
                 loc,
@@ -5905,14 +6117,20 @@ impl ExpTranslator<'_, '_, '_> {
         kind: &BehaviorKind,
     ) -> Vec<Type> {
         match kind {
-            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => {
-                // requires_of and aborts_of take input parameters
+            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf | BehaviorKind::ResultOf => {
+                // requires_of, aborts_of, and result_of take only input parameters
                 arg_ty.clone().flatten()
             },
             BehaviorKind::EnsuresOf => {
-                // ensures_of takes input parameters + result
+                // ensures_of takes input parameters + result + modified mut ref values
                 let mut types = arg_ty.clone().flatten();
                 types.extend(result_ty.clone().flatten());
+                // Add mutable reference parameters as outputs (their modified values)
+                for ty in arg_ty.clone().flatten() {
+                    if ty.is_mutable_reference() {
+                        types.push(ty.skip_reference().clone());
+                    }
+                }
                 types
             },
             BehaviorKind::ModifiesOf => {
@@ -5921,6 +6139,53 @@ impl ExpTranslator<'_, '_, '_> {
                 vec![]
             },
         }
+    }
+
+    /// Computes the result type for a behavior predicate based on the kind.
+    /// - `ResultOf` returns the function's result type (including modified mut ref values)
+    /// - All other behavior predicates return bool
+    /// Returns `None` if the result type cannot be computed (e.g., result_of on void function).
+    fn compute_behavior_result_type(
+        &mut self,
+        loc: &Loc,
+        kind: &BehaviorKind,
+        fun_type: &Type,
+    ) -> Option<Type> {
+        if *kind != BehaviorKind::ResultOf {
+            return Some(BOOL_TYPE);
+        }
+
+        // For ResultOf, compute result type from function type
+        let Type::Fun(params, result, _abilities) = fun_type else {
+            // Should not happen if resolve_behavior_target succeeded
+            return Some(Type::Error);
+        };
+
+        // Compute result types: explicit results + modified mut ref values
+        let result_types: Vec<_> = result
+            .clone()
+            .flatten()
+            .into_iter()
+            .chain(
+                params
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .filter(|ty| ty.is_mutable_reference())
+                    .map(|ty| ty.skip_reference().clone()),
+            )
+            .collect();
+
+        // Error only if there are NO outputs at all
+        if result_types.is_empty() {
+            self.error(
+                loc,
+                "`result_of` cannot be used with functions that have no outputs",
+            );
+            return None;
+        }
+
+        Some(Type::tuple(result_types))
     }
 
     /// Translates and type-checks behavior predicate arguments.

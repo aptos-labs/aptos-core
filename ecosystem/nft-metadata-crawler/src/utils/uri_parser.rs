@@ -30,11 +30,7 @@ impl URIParser {
             uri.to_string()
         };
 
-        let ipfs_auth_param = if ipfs_auth_key.is_some() {
-            Some(format!("?{}={}", IPFS_AUTH_KEY, ipfs_auth_key.unwrap()))
-        } else {
-            None
-        };
+        let ipfs_auth_param = ipfs_auth_key.map(|key| format!("?{}={}", IPFS_AUTH_KEY, key));
 
         // Expects the following format for provided URIs `ipfs/{CID}/{path}`
         let re = Regex::new(r"^(ipfs/)(?P<cid>[a-zA-Z0-9]+)(?P<path>/.*)?$")?;

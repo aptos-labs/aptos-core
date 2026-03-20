@@ -5,9 +5,46 @@ use crate::{
     log::{CallFrame, ExecutionAndIOCosts, ExecutionGasEvent, StorageFees},
     render::Render,
 };
-use inferno::flamegraph::TextTruncateDirection;
+use inferno::flamegraph::{color::BasicPalette, Options, Palette, TextTruncateDirection};
 use move_core_types::gas_algebra::InternalGas;
 use regex::Captures;
+
+/// Creates default flamegraph options with the given title.
+fn flamegraph_options(title: String) -> Options<'static> {
+    let mut options = Options::default();
+    options.flame_chart = true;
+    options.text_truncate_direction = TextTruncateDirection::Right;
+    options.color_diffusion = false;
+    options.colors = Palette::Basic(BasicPalette::Aqua);
+    options.title = title;
+    options
+}
+
+/// Generates a flamegraph SVG from folded stack lines, applying a regex replacement to the output.
+fn generate_flamegraph(
+    lines: Vec<String>,
+    title: String,
+    replace_samples: impl Fn(&Captures) -> String,
+) -> anyhow::Result<Option<Vec<u8>>> {
+    if lines.is_empty() {
+        return Ok(None);
+    }
+
+    let mut options = flamegraph_options(title);
+    let mut graph_content = vec![];
+    inferno::flamegraph::from_lines(
+        &mut options,
+        lines.iter().rev().map(|s| s.as_str()),
+        &mut graph_content,
+    )?;
+
+    let graph_content = String::from_utf8_lossy(&graph_content);
+    let re = regex::Regex::new("([1-9][0-9]*(,[0-9]+)*) samples")
+        .expect("should be able to build regex successfully");
+    let graph_content = re.replace_all(&graph_content, replace_samples);
+
+    Ok(Some(graph_content.as_bytes().to_vec()))
+}
 
 #[derive(Debug)]
 struct LineBuffer(Vec<String>);
@@ -56,43 +93,16 @@ impl StorageFees {
         lines.into_inner()
     }
 
-    /// Tries to generate a flamegraph from the execution log.
+    /// Tries to generate a flamegraph from the storage fee log.
     /// None will be returned if the log is empty.
     pub fn to_flamegraph(&self, title: String) -> anyhow::Result<Option<Vec<u8>>> {
-        let lines = self.to_folded_stack_lines();
-
-        if lines.is_empty() {
-            return Ok(None);
-        }
-
-        let mut options = inferno::flamegraph::Options::default();
-        options.flame_chart = true;
-        options.text_truncate_direction = TextTruncateDirection::Right;
-        options.color_diffusion = true;
-        options.title = title;
-
-        let mut graph_content = vec![];
-        inferno::flamegraph::from_lines(
-            &mut options,
-            lines.iter().rev().map(|s| s.as_str()),
-            &mut graph_content,
-        )?;
-        let graph_content = String::from_utf8_lossy(&graph_content);
-
-        // Inferno does not allow us to customize some of the text in the resulting graph,
-        // so we have to do it through regex replacement.
-        let re = regex::Regex::new("([1-9][0-9]*(,[0-9]+)*) samples")
-            .expect("should be able to build regex successfully");
-        let graph_content = re.replace_all(&graph_content, |caps: &Captures| {
+        generate_flamegraph(self.to_folded_stack_lines(), title, |caps| {
             let count: u64 = caps[1]
                 .replace(',', "")
                 .parse()
                 .expect("should be able parse count as u64");
-
             format!("{} Octa", count)
-        });
-
-        Ok(Some(graph_content.as_bytes().to_vec()))
+        })
     }
 }
 
@@ -201,38 +211,13 @@ impl ExecutionAndIOCosts {
     /// Tries to generate a flamegraph from the execution log.
     /// None will be returned if the log is empty.
     pub fn to_flamegraph(&self, title: String) -> anyhow::Result<Option<Vec<u8>>> {
-        let lines = self.to_folded_stack_lines();
-
-        if lines.is_empty() {
-            return Ok(None);
-        }
-
-        let mut options = inferno::flamegraph::Options::default();
-        options.flame_chart = true;
-        options.text_truncate_direction = TextTruncateDirection::Right;
-        options.color_diffusion = true;
-        options.title = title;
-
-        let mut graph_content = vec![];
-        inferno::flamegraph::from_lines(
-            &mut options,
-            lines.iter().rev().map(|s| s.as_str()),
-            &mut graph_content,
-        )?;
-        let graph_content = String::from_utf8_lossy(&graph_content);
-
-        // Inferno does not allow us to customize some of the text in the resulting graph,
-        // so we have to do it through regex replacement.
-        let re = regex::Regex::new("([1-9][0-9]*(,[0-9]+)*) samples")
-            .expect("should be able to build regex successfully");
-        let graph_content = re.replace_all(&graph_content, |caps: &Captures| {
+        let scaling_factor = u64::from(self.gas_scaling_factor) as f64;
+        generate_flamegraph(self.to_folded_stack_lines(), title, |caps| {
             let count: u64 = caps[1]
                 .replace(',', "")
                 .parse()
                 .expect("should be able parse count as u64");
-
-            let count_scaled = count as f64 / u64::from(self.gas_scaling_factor) as f64;
-
+            let count_scaled = count as f64 / scaling_factor;
             format!(
                 "{} gas units",
                 crate::misc::strip_trailing_zeros_and_decimal_point(&format!(
@@ -240,8 +225,6 @@ impl ExecutionAndIOCosts {
                     count_scaled
                 ))
             )
-        });
-
-        Ok(Some(graph_content.as_bytes().to_vec()))
+        })
     }
 }

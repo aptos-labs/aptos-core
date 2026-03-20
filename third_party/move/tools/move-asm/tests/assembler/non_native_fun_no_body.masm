@@ -1,0 +1,4 @@
+//# publish
+module 0x66::test
+
+fun f(l0: u64): u64

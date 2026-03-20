@@ -1,0 +1,4 @@
+//# run --type-args bool
+script
+entry public fun main<T0: key>()
+    ret

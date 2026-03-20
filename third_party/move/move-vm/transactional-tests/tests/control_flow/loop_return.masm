@@ -1,0 +1,10 @@
+//# run
+script
+entry public fun main()
+l1: ret
+    ld_false
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: branch l1

@@ -1,0 +1,66 @@
+processed 33 tasks
+task 0 lines 3-730:  publish [module 0xc0ffee::m {]
+task 1 lines 733-733:  run 0xc0ffee::m::test_positional_hit
+return values: 1
+task 2 lines 735-735:  run 0xc0ffee::m::test_positional_fallthrough
+return values: 2
+task 3 lines 737-737:  run 0xc0ffee::m::test_positional_other_variant
+return values: 3
+task 4 lines 739-739:  run 0xc0ffee::m::test_named_hit
+return values: 1
+task 5 lines 741-741:  run 0xc0ffee::m::test_named_fallthrough
+return values: 2
+task 6 lines 743-743:  run 0xc0ffee::m::test_named_other_variant
+return values: 3
+task 7 lines 745-745:  run 0xc0ffee::m::test_multi_pos_hit
+return values: 10
+task 8 lines 747-747:  run 0xc0ffee::m::test_multi_pos_partial
+return values: 20
+task 9 lines 749-749:  run 0xc0ffee::m::test_multi_named_hit
+return values: 10
+task 10 lines 751-751:  run 0xc0ffee::m::test_multi_named_partial
+return values: 20
+task 11 lines 753-753:  run 0xc0ffee::m::test_mix_pos
+return values: 105
+task 12 lines 755-755:  run 0xc0ffee::m::test_mix_pos_miss
+return values: 20
+task 13 lines 757-757:  run 0xc0ffee::m::test_mix_named
+return values: 105
+task 14 lines 759-759:  run 0xc0ffee::m::test_mix_named_miss
+return values: 20
+task 15 lines 761-761:  run 0xc0ffee::m::test_guard_pos_pass
+return values: 50
+task 16 lines 763-763:  run 0xc0ffee::m::test_guard_pos_fail
+return values: 60
+task 17 lines 765-765:  run 0xc0ffee::m::test_guard_named_pass
+return values: 50
+task 18 lines 767-767:  run 0xc0ffee::m::test_guard_named_fail
+return values: 60
+task 19 lines 769-769:  run 0xc0ffee::m::test_nested_hit
+return values: 100
+task 20 lines 771-771:  run 0xc0ffee::m::test_nested_miss
+return values: 200
+task 21 lines 773-773:  run 0xc0ffee::m::test_deep_nested_hit
+return values: 10
+task 22 lines 775-775:  run 0xc0ffee::m::test_deep_nested_inner_miss
+return values: 20
+task 23 lines 777-777:  run 0xc0ffee::m::test_deep_struct_hit
+return values: 100
+task 24 lines 779-779:  run 0xc0ffee::m::test_deep_struct_miss_inner
+return values: 200
+task 25 lines 781-781:  run 0xc0ffee::m::test_deep_struct_miss_tag
+return values: 200
+task 26 lines 783-783:  run 0xc0ffee::m::test_struct_hit
+return values: 142
+task 27 lines 785-785:  run 0xc0ffee::m::test_struct_miss
+return values: 0
+task 28 lines 787-787:  run 0xc0ffee::m::test_mixed_tuple_enum_hit
+return values: 10
+task 29 lines 789-789:  run 0xc0ffee::m::test_mixed_tuple_enum_miss_prim
+return values: 20
+task 30 lines 791-791:  run 0xc0ffee::m::test_mixed_tuple_enum_miss_slit
+return values: 20
+task 31 lines 793-793:  run 0xc0ffee::m::test_mixed_tuple_struct_hit
+return values: 105
+task 32 lines 795-795:  run 0xc0ffee::m::test_mixed_tuple_struct_miss
+return values: 0

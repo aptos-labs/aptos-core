@@ -223,8 +223,8 @@ impl FullnodeData for FullnodeDataService {
             .as_ref()
             .and_then(|r| r.get_latest_table_info_ledger_version().ok().flatten());
 
-        if known_latest_version.is_some() && table_info_version.is_some() {
-            let version = std::cmp::min(known_latest_version.unwrap(), table_info_version.unwrap());
+        if let (Some(klv), Some(tiv)) = (known_latest_version, table_info_version) {
+            let version = std::cmp::min(klv, tiv);
             if let Ok(timestamp_us) = self.service_context.context.db.get_block_timestamp(version) {
                 let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
                     - Duration::from_micros(timestamp_us);

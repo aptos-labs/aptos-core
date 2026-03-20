@@ -1,0 +1,20 @@
+//# publish --print-bytecode
+module 0x66::test_generic_instantiation_return_invalid
+
+struct Box<T>
+    value: T
+
+struct Other<T>
+    data: T
+
+// Invalid: pack$Box<T> must return Box<T> (StructInstantiation with Box's index),
+// but this function returns Other<T> (StructInstantiation with Other's index).
+// Tests the StructInstantiation branch of validate_pack_return_type, which checks
+// the struct handle index regardless of type arguments.
+// The bytecode is type-correct (packs Other<T> and returns Other<T>), but the
+// struct API checker rejects it because the function is named pack$Box yet
+// returns a different struct type.
+#[pack] public fun pack$Box<T>(l0: T): Other<T>
+    move_loc l0
+    pack Other<T>
+    ret

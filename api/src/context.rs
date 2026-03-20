@@ -10,7 +10,7 @@ use crate::{
         ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
     },
 };
-use anyhow::{anyhow, bail, ensure, format_err, Context as AnyhowContext, Result};
+use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
     transaction::ReplayProtector, AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo,
     ResourceGroup, TransactionOnChainData, TransactionSummary,
@@ -24,7 +24,7 @@ use aptos_storage_interface::{
     state_store::state_view::db_state_view::{
         DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView,
     },
-    AptosDbError, DbReader, Order, MAX_REQUEST_LIMIT,
+    AptosDbError, DbReader, Order,
 };
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -40,7 +40,6 @@ use aptos_types::{
     },
     state_store::{
         state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
-        state_value::StateValue,
         TStateView,
     },
     transaction::{
@@ -259,12 +258,18 @@ impl Context {
                 E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
             })?;
 
+        let encryption_key_hex = self
+            .get_encryption_key(ledger_info.ledger_info().version())
+            .unwrap_or(None)
+            .map(hex::encode);
+
         Ok(LedgerInfo::new(
             &self.chain_id(),
             &ledger_info,
             oldest_version,
             oldest_block_height,
             newest_block_event.height(),
+            encryption_key_hex,
         ))
     }
 
@@ -342,6 +347,12 @@ impl Context {
                         })?;
                     let (oldest_version, oldest_block_height) =
                         self.get_oldest_version_and_block_height()?;
+
+                    let encryption_key_hex = self
+                        .get_encryption_key(latest_version)
+                        .unwrap_or(None)
+                        .map(hex::encode);
+
                     return Ok(LedgerInfo::new_ledger_info(
                         &self.chain_id(),
                         new_block_event.epoch(),
@@ -350,6 +361,7 @@ impl Context {
                         oldest_block_height,
                         new_block_event.height(),
                         new_block_event.proposed_time(),
+                        encryption_key_hex,
                     ));
                 } else {
                     // Indexer doesn't have data yet as DB is boostrapping.
@@ -369,6 +381,16 @@ impl Context {
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
         Ok(self.db.get_latest_ledger_info()?)
+    }
+
+    pub fn get_encryption_key(&self, version: Version) -> Result<Option<Vec<u8>>> {
+        if !self.node_config.api.allow_encrypted_txns_submission {
+            return Ok(None);
+        }
+        use aptos_types::decryption::PerEpochEncryptionKeyResource;
+        let resource: Option<PerEpochEncryptionKeyResource> =
+            self.get_resource(AccountAddress::ONE, version)?;
+        Ok(resource.and_then(|r| r.encryption_key))
     }
 
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
@@ -435,38 +457,6 @@ impl Context {
             })
     }
 
-    pub fn get_state_values(
-        &self,
-        address: AccountAddress,
-        version: u64,
-    ) -> Result<HashMap<StateKey, StateValue>> {
-        let mut iter = if !db_sharding_enabled(&self.node_config) {
-            Box::new(
-                self.db
-                    .get_prefixed_state_value_iterator(
-                        &StateKeyPrefix::from(address),
-                        None,
-                        version,
-                    )?
-                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
-            )
-        } else {
-            self.indexer_reader
-                .as_ref()
-                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
-                .get_prefixed_state_value_iterator(&StateKeyPrefix::from(address), None, version)?
-        };
-
-        let kvs = iter
-            .by_ref()
-            .take(MAX_REQUEST_LIMIT as usize)
-            .collect::<Result<_>>()?;
-        if iter.next().transpose()?.is_some() {
-            bail!("Too many state items under account ({:?}).", address);
-        }
-        Ok(kvs)
-    }
-
     pub fn get_resources_by_pagination(
         &self,
         address: AccountAddress,
@@ -474,26 +464,15 @@ impl Context {
         version: u64,
         limit: u64,
     ) -> Result<(Vec<(StructTag, Vec<u8>)>, Option<StateKey>)> {
-        let account_iter = if !db_sharding_enabled(&self.node_config) {
-            Box::new(
-                self.db
-                    .get_prefixed_state_value_iterator(
-                        &StateKeyPrefix::from(address),
-                        prev_state_key,
-                        version,
-                    )?
-                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
-            )
-        } else {
-            self.indexer_reader
-                .as_ref()
-                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
-                .get_prefixed_state_value_iterator(
-                    &StateKeyPrefix::from(address),
-                    prev_state_key,
-                    version,
-                )?
-        };
+        let account_iter = self
+            .indexer_reader
+            .as_ref()
+            .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+            .get_prefixed_state_value_iterator(
+                &StateKeyPrefix::from(address),
+                prev_state_key,
+                version,
+            )?;
         // TODO: Consider rewriting this to consider resource groups:
         // * If a resource group is found, expand
         // * Return Option<Result<(PathType, StructTag, Vec<u8>)>>
@@ -565,26 +544,15 @@ impl Context {
         version: u64,
         limit: u64,
     ) -> Result<(Vec<(ModuleId, Vec<u8>)>, Option<StateKey>)> {
-        let account_iter = if !db_sharding_enabled(&self.node_config) {
-            Box::new(
-                self.db
-                    .get_prefixed_state_value_iterator(
-                        &StateKeyPrefix::from(address),
-                        prev_state_key,
-                        version,
-                    )?
-                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
-            )
-        } else {
-            self.indexer_reader
-                .as_ref()
-                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
-                .get_prefixed_state_value_iterator(
-                    &StateKeyPrefix::from(address),
-                    prev_state_key,
-                    version,
-                )?
-        };
+        let account_iter = self
+            .indexer_reader
+            .as_ref()
+            .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+            .get_prefixed_state_value_iterator(
+                &StateKeyPrefix::from(address),
+                prev_state_key,
+                version,
+            )?;
         let mut module_iter = account_iter
             .filter_map(|res| match res {
                 Ok((k, v)) => match k.inner() {
@@ -897,30 +865,19 @@ impl Context {
             .saturating_sub(limit as u64)
         };
 
-        let txns_res = if !db_sharding_enabled(&self.node_config) {
-            self.db.get_account_ordered_transactions(
+        let txns_res = self
+            .indexer_reader
+            .as_ref()
+            .ok_or_else(|| anyhow!("Indexer reader is None"))
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info))?
+            .get_account_ordered_transactions(
                 address,
                 start_seq_number,
                 limit as u64,
                 true,
                 ledger_version,
             )
-        } else {
-            self.indexer_reader
-                .as_ref()
-                .ok_or_else(|| anyhow!("Indexer reader is None"))
-                .map_err(|err| {
-                    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
-                })?
-                .get_account_ordered_transactions(
-                    address,
-                    start_seq_number,
-                    limit as u64,
-                    true,
-                    ledger_version,
-                )
-                .map_err(|e| AptosDbError::Other(e.to_string()))
-        };
+            .map_err(|e| AptosDbError::Other(e.to_string()));
         let txns = txns_res
             .context("Failed to retrieve account transactions")
             .map_err(|err| {
@@ -1093,15 +1050,11 @@ impl Context {
         } else {
             (u64::MAX, Order::Descending)
         };
-        let mut res = if !db_sharding_enabled(&self.node_config) {
-            self.db
-                .get_events(event_key, start, order, limit as u64, ledger_version)?
-        } else {
-            self.indexer_reader
-                .as_ref()
-                .ok_or_else(|| anyhow!("Internal indexer reader doesn't exist"))?
-                .get_events(event_key, start, order, limit as u64, ledger_version)?
-        };
+        let mut res = self
+            .indexer_reader
+            .as_ref()
+            .ok_or_else(|| anyhow!("Internal indexer reader doesn't exist"))?
+            .get_events(event_key, start, order, limit as u64, ledger_version)?;
         if order == Order::Descending {
             res.reverse();
             Ok(res)
@@ -1766,8 +1719,4 @@ impl FunctionStats {
             stats.invalidate_all();
         }
     }
-}
-
-fn db_sharding_enabled(node_config: &NodeConfig) -> bool {
-    node_config.storage.rocksdb_configs.enable_storage_sharding
 }

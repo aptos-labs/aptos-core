@@ -159,37 +159,31 @@ impl Uniform for PrivateKey {
         // Generate a random SigningKey directly using the RNG
         // The slh-dsa crate expects a type that implements CryptoRng from the signature crate
         // We create an adapter that implements the required traits
-        use slh_dsa::signature::rand_core::{CryptoRng as SlhCryptoRng, RngCore as SlhRngCore};
+        use slh_dsa::signature::rand_core::{TryCryptoRng as SlhTryCryptoRng, TryRng as SlhTryRng};
 
         struct RngAdapter<
             'a,
             R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
         >(&'a mut R);
 
-        impl<
-                'a,
-                R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
-            > SlhRngCore for RngAdapter<'a, R>
-        {
-            fn next_u32(&mut self) -> u32 {
-                self.0.next_u32()
+        impl<'a, R: ::rand::RngCore + ::rand::CryptoRng> SlhTryRng for RngAdapter<'a, R> {
+            type Error = core::convert::Infallible;
+
+            fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+                Ok(self.0.next_u32())
             }
 
-            fn next_u64(&mut self) -> u64 {
-                self.0.next_u64()
+            fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+                Ok(self.0.next_u64())
             }
 
-            fn fill_bytes(&mut self, dest: &mut [u8]) {
-                self.0.fill_bytes(dest)
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
+                self.0.fill_bytes(dest);
+                Ok(())
             }
         }
 
-        impl<
-                'a,
-                R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
-            > SlhCryptoRng for RngAdapter<'a, R>
-        {
-        }
+        impl<'a, R: ::rand::RngCore + ::rand::CryptoRng> SlhTryCryptoRng for RngAdapter<'a, R> {}
 
         let mut adapter = RngAdapter(rng);
         let signing_key = SlhDsaSigningKey::<Sha2_128s>::new(&mut adapter);

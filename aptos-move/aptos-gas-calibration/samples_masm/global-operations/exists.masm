@@ -1,0 +1,353 @@
+module 0xcafe::Exists
+struct S1 has drop + key
+  x1: u64
+
+struct S2 has drop + key
+  x1: u64
+  x2: u64
+  x3: u64
+  x4: u64
+  x5: u64
+  x6: u64
+  x7: u64
+  x8: u64
+
+struct S3 has drop + key
+  x1: u64
+  x2: u64
+  x3: u64
+  x4: u64
+  x5: u64
+  x6: u64
+  x7: u64
+  x8: u64
+  x9: u64
+  x10: u64
+  x11: u64
+  x12: u64
+  x13: u64
+  x14: u64
+  x15: u64
+  x16: u64
+  x17: u64
+  x18: u64
+  x19: u64
+  x20: u64
+  x21: u64
+  x22: u64
+  x23: u64
+  x24: u64
+  x25: u64
+  x26: u64
+  x27: u64
+  x28: u64
+  x29: u64
+  x30: u64
+  x31: u64
+  x32: u64
+
+struct S4 has drop + key
+  x1: u64
+  x2: u64
+  x3: u64
+  x4: u64
+  x5: u64
+  x6: u64
+  x7: u64
+  x8: u64
+  x9: u64
+  x10: u64
+  x11: u64
+  x12: u64
+  x13: u64
+  x14: u64
+  x15: u64
+  x16: u64
+  x17: u64
+  x18: u64
+  x19: u64
+  x20: u64
+  x21: u64
+  x22: u64
+  x23: u64
+  x24: u64
+  x25: u64
+  x26: u64
+  x27: u64
+  x28: u64
+  x29: u64
+  x30: u64
+  x31: u64
+  x32: u64
+  x33: u64
+  x34: u64
+  x35: u64
+  x36: u64
+  x37: u64
+  x38: u64
+  x39: u64
+  x40: u64
+  x41: u64
+  x42: u64
+  x43: u64
+  x44: u64
+  x45: u64
+  x46: u64
+  x47: u64
+  x48: u64
+  x49: u64
+  x50: u64
+  x51: u64
+  x52: u64
+  x53: u64
+  x54: u64
+  x55: u64
+  x56: u64
+  x57: u64
+  x58: u64
+  x59: u64
+  x60: u64
+  x61: u64
+  x62: u64
+  x63: u64
+  x64: u64
+
+public fun calibrate_exists_s1_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    ld_const<address> 51966
+    exists S1
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_exists_s1_x100()
+    ld_u64 10
+    call calibrate_exists_s1_impl
+    ret
+
+entry public fun calibrate_exists_s1_x1000()
+    ld_u64 100
+    call calibrate_exists_s1_impl
+    ret
+
+entry public fun calibrate_exists_s1_x5000()
+    ld_u64 500
+    call calibrate_exists_s1_impl
+    ret
+
+public fun calibrate_exists_s2_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    ld_const<address> 51966
+    exists S2
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_exists_s2_x100()
+    ld_u64 10
+    call calibrate_exists_s2_impl
+    ret
+
+entry public fun calibrate_exists_s2_x1000()
+    ld_u64 100
+    call calibrate_exists_s2_impl
+    ret
+
+entry public fun calibrate_exists_s2_x5000()
+    ld_u64 500
+    call calibrate_exists_s2_impl
+    ret
+
+public fun calibrate_exists_s3_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    ld_const<address> 51966
+    exists S3
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_exists_s3_x100()
+    ld_u64 10
+    call calibrate_exists_s3_impl
+    ret
+
+entry public fun calibrate_exists_s3_x1000()
+    ld_u64 100
+    call calibrate_exists_s3_impl
+    ret
+
+entry public fun calibrate_exists_s3_x5000()
+    ld_u64 500
+    call calibrate_exists_s3_impl
+    ret
+
+public fun calibrate_exists_s4_impl(l0: u64)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    ld_const<address> 51966
+    exists S4
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_exists_s4_x100()
+    ld_u64 10
+    call calibrate_exists_s4_impl
+    ret
+
+entry public fun calibrate_exists_s4_x1000()
+    ld_u64 100
+    call calibrate_exists_s4_impl
+    ret
+
+entry public fun calibrate_exists_s4_x5000()
+    ld_u64 500
+    call calibrate_exists_s4_impl
+    ret

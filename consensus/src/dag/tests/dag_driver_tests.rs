@@ -156,6 +156,7 @@ fn setup(
 
     let validators: Vec<_> = signers.iter().map(|s| s.author()).collect();
     let rb = Arc::new(ReliableBroadcast::new(
+        "dag_test",
         validators[0],
         validators,
         network_sender.clone(),
@@ -208,7 +209,6 @@ fn setup(
             NoPipelineBackpressure::new(),
         ),
         false,
-        true,
     )
 }
 

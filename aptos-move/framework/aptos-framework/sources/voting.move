@@ -223,22 +223,12 @@ module aptos_framework::voting {
             }
         };
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                RegisterForum {
-                    hosting_account: addr,
-                    proposal_type_info: type_info::type_of<ProposalType>(),
-                },
-            );
-        } else {
-            event::emit_event<RegisterForumEvent>(
-                &mut voting_forum.events.register_forum_events,
-                RegisterForumEvent {
-                    hosting_account: addr,
-                    proposal_type_info: type_info::type_of<ProposalType>(),
-                },
-            );
-        };
+        event::emit(
+            RegisterForum {
+                hosting_account: addr,
+                proposal_type_info: type_info::type_of<ProposalType>(),
+            },
+        );
 
         move_to(account, voting_forum);
     }
@@ -345,30 +335,16 @@ module aptos_framework::voting {
             resolution_time_secs: 0,
         });
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                CreateProposal {
-                    proposal_id,
-                    early_resolution_vote_threshold,
-                    execution_hash,
-                    expiration_secs,
-                    metadata,
-                    min_vote_threshold,
-                },
-            );
-        } else {
-            event::emit_event<CreateProposalEvent>(
-                &mut voting_forum.events.create_proposal_events,
-                CreateProposalEvent {
-                    proposal_id,
-                    early_resolution_vote_threshold,
-                    execution_hash,
-                    expiration_secs,
-                    metadata,
-                    min_vote_threshold,
-                },
-            );
-        };
+        event::emit(
+            CreateProposal {
+                proposal_id,
+                early_resolution_vote_threshold,
+                execution_hash,
+                expiration_secs,
+                metadata,
+                min_vote_threshold,
+            },
+        );
         proposal_id
     }
 
@@ -418,14 +394,7 @@ module aptos_framework::voting {
             proposal.metadata.add(key, timestamp_secs_bytes);
         };
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Vote { proposal_id, num_votes });
-        } else {
-            event::emit_event<VoteEvent>(
-                &mut voting_forum.events.vote_events,
-                VoteEvent { proposal_id, num_votes },
-            );
-        };
+        event::emit(Vote { proposal_id, num_votes });
     }
 
     /// Common checks on if a proposal is resolvable, regardless if the proposal is single-step or multi-step.
@@ -480,26 +449,14 @@ module aptos_framework::voting {
         proposal.is_resolved = true;
         proposal.resolution_time_secs = timestamp::now_seconds();
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                ResolveProposal {
-                    proposal_id,
-                    yes_votes: proposal.yes_votes,
-                    no_votes: proposal.no_votes,
-                    resolved_early,
-                },
-            );
-        } else {
-            event::emit_event<ResolveProposal>(
-                &mut voting_forum.events.resolve_proposal_events,
-                ResolveProposal {
-                    proposal_id,
-                    yes_votes: proposal.yes_votes,
-                    no_votes: proposal.no_votes,
-                    resolved_early,
-                },
-            );
-        };
+        event::emit(
+            ResolveProposal {
+                proposal_id,
+                yes_votes: proposal.yes_votes,
+                no_votes: proposal.no_votes,
+                resolved_early,
+            },
+        );
 
         proposal.execution_content.extract()
     }
@@ -564,26 +521,14 @@ module aptos_framework::voting {
         // For multi-step proposals, we emit one `ResolveProposal` event per step in the multi-step proposal. This means
         // that we emit multiple `ResolveProposal` events for the same multi-step proposal.
         let resolved_early = can_be_resolved_early(proposal);
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                ResolveProposal {
-                    proposal_id,
-                    yes_votes: proposal.yes_votes,
-                    no_votes: proposal.no_votes,
-                    resolved_early,
-                },
-            );
-        } else {
-            event::emit_event(
-                &mut voting_forum.events.resolve_proposal_events,
-                ResolveProposal {
-                    proposal_id,
-                    yes_votes: proposal.yes_votes,
-                    no_votes: proposal.no_votes,
-                    resolved_early,
-                },
-            );
-        };
+        event::emit(
+            ResolveProposal {
+                proposal_id,
+                yes_votes: proposal.yes_votes,
+                no_votes: proposal.no_votes,
+                resolved_early,
+            },
+        );
     }
 
     #[view]

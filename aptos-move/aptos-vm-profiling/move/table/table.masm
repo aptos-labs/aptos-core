@@ -1,0 +1,41 @@
+module 0x1::M
+use 0x1::table
+struct Foo has drop + store
+  x: u64
+
+fun run()
+    local l0: u64
+    local l1: table::Table<u64, Foo>
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 1000
+    lt
+    br_false l0
+    call table::new<u64, Foo>
+    st_loc l1
+    mut_borrow_loc l1
+    ld_u64 100
+    ld_u64 0
+    pack Foo
+    call table::add<u64, Foo>
+    borrow_loc l1
+    ld_u64 100
+    call table::contains<u64, Foo>
+    pop
+    borrow_loc l1
+    ld_u64 100
+    call table::borrow<u64, Foo>
+    pop
+    mut_borrow_loc l1
+    ld_u64 100
+    call table::remove<u64, Foo>
+    pop
+    move_loc l1
+    call table::destroy_empty<u64, Foo>
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    branch l1
+l0: ret

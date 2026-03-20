@@ -4,7 +4,8 @@
 use crate::{
     common::{
         types::{
-            CliCommand, CliError, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
+            CliCommand, CliError, CliResult, CliTypedResult, TransactionOptions,
+            TransactionOptionsExt, TransactionSummary,
         },
         utils::prompt_yes_with_override,
     },

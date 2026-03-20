@@ -1,0 +1,10 @@
+//# publish
+module 0x1::M
+struct R has store
+  b: bool
+
+fun f()
+    local l0: vector<R>
+    vec_pack <R>, 0
+    st_loc l0
+    ret

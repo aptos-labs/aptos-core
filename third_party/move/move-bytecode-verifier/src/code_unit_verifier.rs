@@ -11,7 +11,7 @@ use crate::{
     meter::{BoundMeter, Meter, Scope},
     reference_safety,
     stack_usage_verifier::StackUsageVerifier,
-    type_safety,
+    struct_api_checker, type_safety,
     verifier::VerifierConfig,
 };
 use move_binary_format::{
@@ -23,6 +23,7 @@ use move_binary_format::{
         CompiledModule, CompiledScript, FunctionDefinition, FunctionDefinitionIndex,
         IdentifierIndex, TableIndex,
     },
+    file_format_common::VERSION_10,
     IndexKind,
 };
 use move_core_types::vm_status::StatusCode;
@@ -45,7 +46,7 @@ impl<'a> CodeUnitVerifier<'a> {
 
     fn verify_module_impl(
         verifier_config: &VerifierConfig,
-        module: &CompiledModule,
+        module: &'a CompiledModule,
     ) -> PartialVMResult<()> {
         let mut meter = BoundMeter::new(verifier_config);
         let mut name_def_map = HashMap::new();
@@ -53,9 +54,41 @@ impl<'a> CodeUnitVerifier<'a> {
             let fh = module.function_handle_at(func_def.function);
             name_def_map.insert(fh.name, FunctionDefinitionIndex(idx as u16));
         }
+
+        // Struct API validation is only applicable to modules compiled with bytecode version 10
+        // or later. Applying it to older modules would risk incorrectly rejecting functions
+        // whose names happen to contain '$' (the struct API delimiter), since those names are
+        // structurally valid but carry no struct API attribute.
+        let struct_api_ctx = if module.version() >= VERSION_10 {
+            Some((
+                struct_api_checker::StructApiContext::new(module)?,
+                BinaryIndexedView::Module(module),
+            ))
+        } else {
+            None
+        };
+
         let mut total_back_edges = 0;
         for (idx, function_definition) in module.function_defs().iter().enumerate() {
             let index = FunctionDefinitionIndex(idx as TableIndex);
+
+            // SECURITY: Check struct API attributes BEFORE verify_function runs.
+            // This ensures that reference_safety (which runs inside verify_function) can
+            // safely trust BorrowFieldMutable attributes, since they've been validated
+            // to accurately match the bytecode before reference_safety sees them.
+            // Only runs for VERSION_10+ modules (see guard above).
+            if let Some((ctx, resolver)) = &struct_api_ctx {
+                struct_api_checker::check_struct_api_impl(
+                    resolver,
+                    module,
+                    function_definition,
+                    ctx,
+                )
+                .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
+            }
+
+            // Now reference_safety can safely trust that BorrowFieldMutable attributes
+            // accurately describe which field is being borrowed
             let num_back_edges = Self::verify_function(
                 verifier_config,
                 index,
@@ -104,7 +137,13 @@ impl<'a> CodeUnitVerifier<'a> {
             }
         }
 
-        //verify
+        // INVARIANT: `struct_api_checker` is NOT called here for scripts, unlike for modules
+        // (see `verify_module_impl`). This is safe because `CompiledScript` has no mechanism
+        // to attach `FunctionAttribute`s to its main function: there is no `attributes` field
+        // on the main function's representation (it is stored as a bare `CodeUnit`, not as a
+        // `FunctionDefinition` with attributes). Therefore a script can never carry struct API
+        // attributes such as `BorrowFieldMutable`, and `reference_safety` (called inside
+        // `verify_common`) has no attributes to trust or mistrust.
         meter.enter_scope("script", Scope::Function);
         let code_unit_verifier = CodeUnitVerifier {
             resolver,

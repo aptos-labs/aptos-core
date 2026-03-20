@@ -1,0 +1,112 @@
+//# publish
+module 0x1::A
+use 0x1::signer
+struct T has key
+  v: u64
+
+struct U has key
+  v: u64
+
+public fun A0(l0: &signer) acquires T
+    local l1: address
+    local l2: &mut T
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    mut_borrow_global T
+    st_loc l2
+    move_loc l2
+    pop
+    copy_loc l1
+    mut_borrow_global T
+    st_loc l2
+    move_loc l2
+    pop
+    ret
+
+public fun A1(l0: &signer) acquires T, U
+    local l1: address
+    local l2: &mut T
+    local l3: &mut U
+    move_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    mut_borrow_global T
+    st_loc l2
+    copy_loc l1
+    mut_borrow_global U
+    st_loc l3
+    move_loc l2
+    pop
+    move_loc l3
+    pop
+    ret
+
+public fun A2(l0: &signer, l1: bool) acquires T
+    local l2: address
+    local l3: &mut T
+    move_loc l0
+    call signer::address_of
+    st_loc l2
+    move_loc l1
+    br_true l0
+    copy_loc l2
+    mut_borrow_global T
+    st_loc l3
+    branch l1
+l0: copy_loc l2
+    mut_borrow_global T
+    st_loc l3
+    branch l1
+l1: move_loc l3
+    pop
+    ret
+
+public fun A3(l0: &signer, l1: bool) acquires T
+    local l2: address
+    local l3: &mut T
+    move_loc l0
+    call signer::address_of
+    st_loc l2
+    move_loc l1
+    br_true l0
+    ret
+l0: copy_loc l2
+    mut_borrow_global T
+    st_loc l3
+    move_loc l3
+    pop
+    ret
+
+public fun A4(l0: &signer, l1: bool) acquires T
+    local l2: address
+    local l3: T
+    local l4: &mut T
+    copy_loc l0
+    call signer::address_of
+    st_loc l2
+    copy_loc l2
+    move_from T
+    st_loc l3
+    move_loc l2
+    mut_borrow_global T
+    st_loc l4
+    move_loc l4
+    pop
+    move_loc l0
+    move_loc l3
+    move_to T
+    ret
+
+public fun A5(l0: &signer) acquires T
+    local l1: &T
+    local l2: address
+    move_loc l0
+    call signer::address_of
+    st_loc l2
+    move_loc l2
+    borrow_global T
+    st_loc l1
+    ret

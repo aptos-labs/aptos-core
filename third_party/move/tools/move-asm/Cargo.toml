@@ -17,6 +17,7 @@ codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+move-coverage = { workspace = true }
 
 [dev-dependencies]
 itertools = { workspace = true }
@@ -30,6 +31,10 @@ default = []
 [[test]]
 name = "testsuite"
 harness = false
+
+[[bin]]
+name = "move-bytecode-stats"
+path = "src/bytecode_stats.rs"
 
 [lib]
 doctest = false

@@ -1,0 +1,47 @@
+//# publish
+module 0x22::test
+
+struct A<phantom T> has drop
+    x: u64
+
+public fun entry_below_limit()
+    local a: A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>
+    ld_u64 1
+    pack A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>
+    st_loc a
+    // Allowed, creating type of depth 20, which is the maximum allowed limit.
+    borrow_loc a
+    pop
+    ret
+
+public fun entry_at_limit()
+    local a: A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>
+    ld_u64 1
+    pack A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>
+    st_loc a
+    // Allowed, creating type of depth 21, which is 1 off the maximum allowed limit.
+    borrow_loc a
+    pop
+    ret
+
+//# publish
+module 0x23::test
+
+struct A<phantom T> has drop
+    x: u64
+
+// Can't publish this because verifier enforces limit of 20 on signature tokens
+public fun entry_above_limit()
+    local a: A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>>
+    ld_u64 1
+    pack A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>>
+    st_loc a
+    borrow_loc a
+    pop
+    ret
+
+//# run 0x22::test::entry_below_limit
+
+//# run 0x22::test::entry_at_limit
+
+//# run 0x23::test::entry_above_limit

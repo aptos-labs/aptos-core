@@ -18,9 +18,10 @@ use crate::{
     },
     DbReader,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
+use aptos_logger::warn;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
@@ -39,7 +40,7 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct HotStateMetadata {
     latest: Option<StateKey>,
     oldest: Option<StateKey>,
@@ -141,6 +142,15 @@ impl State {
         self.shards[0].is_descendant_of(&rhs.shards[0])
     }
 
+    /// Returns true if `self` can serve as the base (older) side of a `StateDelta`
+    /// with `current` as the newer side.
+    pub fn can_be_delta_base_of(&self, current: &State) -> bool {
+        self.shards
+            .iter()
+            .zip(current.shards.iter())
+            .all(|(base_shard, top_shard)| top_shard.can_view_after(base_shard))
+    }
+
     pub fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
         self.hot_state_metadata[shard_id].latest.clone()
     }
@@ -161,7 +171,7 @@ impl State {
         per_version_updates: &PerVersionStateUpdateRefs,
         all_checkpoint_versions: &[Version],
         state_cache: &ShardedStateCache,
-    ) -> (Self, [HotStateShardUpdates; NUM_STATE_SHARDS]) {
+    ) -> Result<(Self, [HotStateShardUpdates; NUM_STATE_SHARDS])> {
         let _timer = TIMER.timer_with(&["state__update"]);
 
         // 1. The update batch must begin at self.next_version().
@@ -170,12 +180,15 @@ impl State {
         // 2. The cache must be at a version equal or newer than `persisted`, otherwise
         //    updates between the cached version and the persisted version are potentially
         //    missed during the usage calculation.
-        assert!(
-            persisted.next_version() <= state_cache.next_version(),
-            "persisted: {}, cache: {}",
-            persisted.next_version(),
-            state_cache.next_version(),
-        );
+        if persisted.next_version() > state_cache.next_version() {
+            let msg = format!(
+                "Persisted version ({}) is ahead of cache version ({}), possibly due to a fork.",
+                persisted.next_version(),
+                state_cache.next_version(),
+            );
+            warn!("{}", msg);
+            bail!("{}", msg);
+        }
         // 3. `self` must be at a version equal or newer than the cache, because we assume
         //    it is overlaid on top of the cache.
         assert!(self.next_version() >= state_cache.next_version());
@@ -268,7 +281,7 @@ impl State {
             .expect("Known to be 16 shards.");
 
         // TODO(HotState): extract and pass new hot state onchain config if needed.
-        (
+        Ok((
             State::new_with_updates(
                 batched_updates.last_version(),
                 shards,
@@ -277,7 +290,7 @@ impl State {
                 self.hot_state_config,
             ),
             hot_state_updates,
-        )
+        ))
     }
 
     /// Applies the update the returns the `HotStateValue` that will later go into the hot state
@@ -395,7 +408,7 @@ pub struct LedgerState {
 
 impl LedgerState {
     pub fn new(latest: State, last_checkpoint: State) -> Self {
-        assert!(latest.is_descendant_of(&latest));
+        assert!(latest.is_descendant_of(&last_checkpoint));
 
         Self {
             latest,
@@ -428,7 +441,7 @@ impl LedgerState {
         persisted_snapshot: &State,
         updates: &StateUpdateRefs,
         reads: &ShardedStateCache,
-    ) -> (LedgerState, HotStateUpdates) {
+    ) -> Result<(LedgerState, HotStateUpdates)> {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
         let mut all_hot_state_updates = HotStateUpdates::new_empty();
@@ -443,7 +456,7 @@ impl LedgerState {
                 per_version,
                 updates.all_checkpoint_versions(),
                 reads,
-            );
+            )?;
             all_hot_state_updates.for_last_checkpoint = Some(hot_state_updates);
             new_ckpt
         } else {
@@ -466,17 +479,17 @@ impl LedgerState {
                 per_version,
                 &[],
                 reads,
-            );
+            )?;
             all_hot_state_updates.for_latest = Some(hot_state_updates);
             new_latest
         } else {
             base_of_latest.clone()
         };
 
-        (
+        Ok((
             LedgerState::new(latest, last_checkpoint),
             all_hot_state_updates,
-        )
+        ))
     }
 
     /// Old values of the updated keys are read from the DbReader at the version of the
@@ -502,7 +515,7 @@ impl LedgerState {
             persisted_snapshot,
             updates,
             state_view.memorized_reads(),
-        );
+        )?;
         let state_reads = state_view.into_memorized_reads();
         Ok((updated, state_reads, hot_state_updates))
     }

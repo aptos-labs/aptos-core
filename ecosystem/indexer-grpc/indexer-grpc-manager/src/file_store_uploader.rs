@@ -211,17 +211,18 @@ impl FileStoreUploader {
 
         let mut update_batch_metadata = false;
         let max_update_frequency = self.writer.max_update_frequency();
-        if self.last_batch_metadata_update_time.is_none()
-            || Instant::now() - self.last_batch_metadata_update_time.unwrap()
-                >= MIN_UPDATE_FREQUENCY
-        {
-            update_batch_metadata = true;
-        } else if end_batch {
-            update_batch_metadata = true;
-            tokio::time::sleep_until(
-                self.last_batch_metadata_update_time.unwrap() + max_update_frequency,
-            )
-            .await;
+        match self.last_batch_metadata_update_time {
+            None => {
+                update_batch_metadata = true;
+            },
+            Some(last_update_time) if Instant::now() - last_update_time >= MIN_UPDATE_FREQUENCY => {
+                update_batch_metadata = true;
+            },
+            Some(last_update_time) if end_batch => {
+                update_batch_metadata = true;
+                tokio::time::sleep_until(last_update_time + max_update_frequency).await;
+            },
+            _ => {},
         }
 
         if !update_batch_metadata {

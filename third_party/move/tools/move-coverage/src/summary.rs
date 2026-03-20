@@ -4,8 +4,9 @@
 
 #![forbid(unsafe_code)]
 
-use crate::coverage_map::{
-    ExecCoverageMap, ExecCoverageMapWithModules, ModuleCoverageMap, TraceMap,
+use crate::{
+    coverage_map::{ExecCoverageMap, ExecCoverageMapWithModules, ModuleCoverageMap, TraceMap},
+    coverage_percentage,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -103,24 +104,18 @@ impl ModuleSummary {
                 writeln!(
                     summary_writer,
                     "\t\t% coverage: {:.2}",
-                    fn_summary.percent_coverage()
+                    coverage_percentage(fn_summary.covered, fn_summary.total)
                 )?;
             }
         }
 
-        let covered_percentage = (all_covered as f64) / (all_total as f64) * 100f64;
+        let covered_percentage = coverage_percentage(all_covered, all_total);
         writeln!(
             summary_writer,
             ">>> % Module coverage: {:.2}",
             covered_percentage
         )?;
         Ok((all_total, all_covered))
-    }
-}
-
-impl FunctionSummary {
-    pub fn percent_coverage(&self) -> f64 {
-        (self.covered as f64) / (self.total as f64) * 100f64
     }
 }
 

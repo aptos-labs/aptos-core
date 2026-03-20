@@ -8,6 +8,16 @@ use move_bytecode_verifier::{CodeUnitVerifier, VerifierConfig};
 use move_core_types::vm_status::StatusCode;
 
 #[test]
+fn empty_function_code() {
+    let module = dummy_procedure_module(vec![]);
+    let result = CodeUnitVerifier::verify_module(&Default::default(), &module);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::EMPTY_CODE_UNIT,
+    );
+}
+
+#[test]
 fn invalid_fallthrough_br_true() {
     let module = dummy_procedure_module(vec![Bytecode::LdFalse, Bytecode::BrTrue(1)]);
     let result = CodeUnitVerifier::verify_module(&Default::default(), &module);

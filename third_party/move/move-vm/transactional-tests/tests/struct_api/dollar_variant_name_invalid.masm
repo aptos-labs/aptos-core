@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+// Test that struct API functions for enums with '$' in variant name are still
+// rejected when the required attribute is missing.
+module 0x66::test_dollar_variant_name_invalid
+
+enum Color has drop
+  Red$A
+    r: u8
+
+// Invalid: matches naming pattern for pack_variant but has NO #[pack_variant] attribute
+public fun pack$Color$Red$A(l0: u8): Color
+    move_loc l0
+    pack_variant Color, Red$A
+    ret

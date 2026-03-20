@@ -35,7 +35,7 @@ module 0x66::app {
     }
     fun increment(p0: &signer): u64 {
         let _v0: |&mut Data|u64 has copy + drop = |arg0| lambda__1__increment(arg0);
-        protected::modify<Data,u64>(p0, _v0)
+        protected::modify<Data, u64>(p0, _v0)
     }
     fun lambda__1__increment(p0: &mut Data): u64 {
         let _v0 = *&p0._0;
@@ -49,7 +49,7 @@ module 0x66::app {
     }
     fun view(p0: &signer): u64 {
         let _v0: |&Data|u64 has copy + drop = |arg0| lambda__1__view(arg0);
-        protected::read<Data,u64>(p0, _v0)
+        protected::read<Data, u64>(p0, _v0)
     }
     fun lambda__1__view(p0: &Data): u64 {
         *&p0._0

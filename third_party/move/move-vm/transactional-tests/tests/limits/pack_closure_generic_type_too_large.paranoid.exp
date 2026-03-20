@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-18:  publish [module 0x22::test]
+task 1 lines 20-20:  run --verbose 0x22::test::entry
+Error: Function execution failed with VMError: {
+    message: Type size is larger than maximum 128,
+    major_status: VERIFICATION_ERROR,
+    sub_status: None,
+    location: 0x22::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 0)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000022, name: Identifier("test") }), FunctionDefinitionIndex(2), 0)] }),
+}

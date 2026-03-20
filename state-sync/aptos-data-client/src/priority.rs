@@ -63,8 +63,7 @@ pub fn get_peer_priority(
             return PeerPriority::HighPriority;
         }
 
-        // VFNs should be prioritized over PFNs. Note: having PFNs
-        // connected to a validator is a rare (but possible) scenario.
+        // VFNs should be prioritized over PFNs
         return if peer_network_id.is_vfn_network() {
             PeerPriority::MediumPriority
         } else {
@@ -82,14 +81,12 @@ pub fn get_peer_priority(
             return PeerPriority::HighPriority;
         }
 
-        // Trusted peers should be prioritized over untrusted peers.
-        // This prioritizes other VFNs/seed peers over regular PFNs.
+        // Trusted peers should be prioritized over untrusted peers
         if is_trusted_peer(peers_and_metadata.clone(), peer) {
             return PeerPriority::MediumPriority;
         }
 
-        // Outbound connections should be prioritized over inbound connections.
-        // This prioritizes other VFNs/seed peers over regular PFNs.
+        // Outbound connections should be prioritized (medium priority) over inbound connections (low priority)
         return if let Some(metadata) = utils::get_metadata_for_peer(&peers_and_metadata, *peer) {
             if metadata.get_connection_metadata().is_outbound_connection() {
                 PeerPriority::MediumPriority
@@ -101,15 +98,13 @@ pub fn get_peer_priority(
         };
     }
 
-    // Otherwise, this node is a PFN. PFNs should highly
-    // prioritize trusted peers (i.e., VFNs and seed peers).
+    // Otherwise, this node is a PFN. PFNs should highly prioritize
+    // trusted peers (i.e., validators, VFNs, and seed peers).
     if is_trusted_peer(peers_and_metadata.clone(), peer) {
         return PeerPriority::HighPriority;
     }
 
-    // Outbound connections should be prioritized. This prioritizes
-    // other VFNs/seed peers over regular PFNs. Inbound connections
-    // are always low priority (as they are generally unreliable).
+    // Outbound connections should be prioritized (high priority) over inbound connections (low priority)
     if let Some(metadata) = utils::get_metadata_for_peer(&peers_and_metadata, *peer) {
         if metadata.get_connection_metadata().is_outbound_connection() {
             PeerPriority::HighPriority

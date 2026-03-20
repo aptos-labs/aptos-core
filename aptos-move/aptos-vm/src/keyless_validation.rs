@@ -298,8 +298,8 @@ pub fn verify_keyless_signature_without_ephemeral_signature_check(
 
                 // If an `aud` override was set for account recovery purposes, check that it is
                 // in the allow-list on-chain.
-                if zksig.override_aud_val.is_some() {
-                    config.is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())?;
+                if let Some(override_aud_val) = &zksig.override_aud_val {
+                    config.is_allowed_override_aud(override_aud_val)?;
                 }
                 match &zksig.proof {
                     ZKP::Groth16(groth16proof) => {

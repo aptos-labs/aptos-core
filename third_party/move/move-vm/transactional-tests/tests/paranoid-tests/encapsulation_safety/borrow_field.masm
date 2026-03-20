@@ -1,0 +1,42 @@
+//# publish
+module 0x22::A
+struct C
+  x: u64
+
+public fun make(): C
+    ld_u64 0
+    pack C
+    ret
+
+
+
+//# publish
+module 0x22::B
+use 0x22::A
+struct C
+  x: u64
+
+public fun mut_field()
+    local l0: A::C
+    local l1: &A::C
+    local l2: &mut u64
+    call A::make
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    move_loc l1
+    mut_borrow_field C, x
+    st_loc l2
+    ld_u64 10
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::B
+entry public fun main(l0: signer)
+    call B::mut_field
+    ret

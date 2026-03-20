@@ -153,6 +153,7 @@ def fake_context(
             forge_namespace_keep="false",
             forge_enable_haproxy="false",
             forge_enable_indexer="false",
+            forge_num_pfns="0",
             forge_deployer_profile="",
             cargo_args=["--cargo-arg"],
             forge_cli_args=["--forge-cli-arg"],

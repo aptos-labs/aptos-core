@@ -1,0 +1,10 @@
+BUILDING bad_types
+error: cannot return `bool` from a function with result type `u64`
+  ┌─ <TEMPDIR>/bad_types.move:2:31
+  │
+2 │     public fun wrong(): u64 { true }
+  │                               ^^^^
+
+{
+  "Error": "Move compilation failed: exiting with context checking errors"
+}

@@ -16,15 +16,14 @@ use tokio::sync::{oneshot::channel, Mutex};
 use tonic::{codec::CompressionEncoding, transport::Server};
 use tracing::info;
 
-const HTTP2_PING_INTERVAL_DURATION: Duration = Duration::from_secs(60);
-const HTTP2_PING_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
-
 pub(crate) struct GrpcManager {
     chain_id: u64,
     file_store_uploader: Mutex<FileStoreUploader>,
     metadata_manager: Arc<MetadataManager>,
     data_manager: Arc<DataManager>,
     is_master: bool,
+    http2_ping_interval: Duration,
+    http2_ping_timeout: Duration,
 }
 
 impl GrpcManager {
@@ -56,6 +55,7 @@ impl GrpcManager {
             } else {
                 None
             },
+            Duration::from_secs(config.service_staleness_threshold_secs),
         ));
 
         info!(
@@ -85,6 +85,8 @@ impl GrpcManager {
             metadata_manager,
             data_manager,
             is_master: config.is_master,
+            http2_ping_interval: Duration::from_secs(config.http2_ping_interval_secs),
+            http2_ping_timeout: Duration::from_secs(config.http2_ping_timeout_secs),
         }
     }
 
@@ -99,8 +101,8 @@ impl GrpcManager {
         .max_encoding_message_size(MAX_MESSAGE_SIZE)
         .max_decoding_message_size(MAX_MESSAGE_SIZE);
         let server = Server::builder()
-            .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
-            .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
+            .http2_keepalive_interval(Some(self.http2_ping_interval))
+            .http2_keepalive_timeout(Some(self.http2_ping_timeout))
             .add_service(service);
 
         let (tx, rx) = channel();

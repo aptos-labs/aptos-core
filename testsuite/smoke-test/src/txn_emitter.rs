@@ -23,6 +23,8 @@ pub async fn generate_traffic(
     duration: Duration,
     gas_price: u64,
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
+    encrypt_transactions: bool,
+    mode: Option<EmitJobMode>,
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
     let rng = SeedableRng::from_rng(OsRng)?;
@@ -35,6 +37,16 @@ pub async fn generate_traffic(
         AccountType::Local,
     )
     .await?;
+    let emit_job_request = if encrypt_transactions {
+        emit_job_request.encrypt_transactions(true)
+    } else {
+        emit_job_request
+    };
+    let emit_job_request = if let Some(mode) = mode {
+        emit_job_request.mode(mode)
+    } else {
+        emit_job_request
+    };
     let transaction_factory =
         TransactionFactory::new(swarm.chain_info().chain_id).with_gas_unit_price(gas_price);
     let rest_cli = swarm.validators().next().unwrap().rest_client();
@@ -99,8 +111,8 @@ pub async fn create_emit_job_request(
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
         .gas_price(gas_price)
-        .expected_gas_per_txn(1000000)
-        .max_gas_per_txn(2000000)
+        .expected_gas_per_txn(10000000)
+        .max_gas_per_txn(20000000)
         .coordination_delay_between_instances(Duration::from_secs(1))
         .transaction_mix_per_phase(transaction_mix_per_phase)
         .mode(EmitJobMode::ConstTps { tps: 20 })
@@ -173,6 +185,8 @@ async fn test_txn_emmitter() {
         Duration::from_secs(20),
         100,
         TRANSACTION_MIX_PER_PHASE.to_vec(),
+        false,
+        None,
     )
     .await
     .unwrap();
@@ -244,6 +258,8 @@ async fn test_txn_emmitter_with_high_pending_latency() {
             },
             1,
         )]],
+        false,
+        None,
     )
     .await
     .unwrap();
@@ -253,7 +269,7 @@ async fn test_txn_emmitter_with_high_pending_latency() {
 #[tokio::test]
 async fn test_txn_emmitter_low_funds() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
-    let account_1 = create_and_fund_account(&mut swarm, 9705100).await;
+    let account_1 = create_and_fund_account(&mut swarm, 97051000).await;
 
     let transaction_type = TransactionType::CallCustomModules {
         entry_point: Box::new(EntryPoints::Nop),
@@ -274,10 +290,10 @@ async fn test_txn_emmitter_low_funds() {
         .rest_clients(validator_clients)
         .gas_price(100)
         .expected_max_txns(2000)
-        .expected_gas_per_txn(5)
+        .expected_gas_per_txn(50)
         .init_gas_price_multiplier(1)
-        .init_max_gas_per_txn(20000)
-        .max_gas_per_txn(1000)
+        .init_max_gas_per_txn(200000)
+        .max_gas_per_txn(10000)
         .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(5))
         .transaction_type(transaction_type)
         .mode(EmitJobMode::MaxLoad {

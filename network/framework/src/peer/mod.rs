@@ -76,6 +76,7 @@ pub enum DisconnectReason {
     ConnectionClosed, // The connection was gracefully closed (e.g., by the peer)
     InputOutputError, // An I/O error occurred on the connection (e.g., when reading messages)
     NetworkHealthCheckFailure, // The connection failed the network health check (e.g., pings)
+    PeerMonitoringPingFailure, // The connection failed the peer monitoring ping check
     RequestedByPeerManager, // The peer manager requested the connection to be closed
     StaleConnection,  // The connection is stale (e.g., when a validator leaves the validator set)
 }
@@ -87,6 +88,7 @@ impl DisconnectReason {
             DisconnectReason::ConnectionClosed => "ConnectionClosed",
             DisconnectReason::InputOutputError => "InputOutputError",
             DisconnectReason::NetworkHealthCheckFailure => "NetworkHealthCheckFailure",
+            DisconnectReason::PeerMonitoringPingFailure => "PeerMonitoringPingFailure",
             DisconnectReason::RequestedByPeerManager => "RequestedByPeerManager",
             DisconnectReason::StaleConnection => "StaleConnection",
         };

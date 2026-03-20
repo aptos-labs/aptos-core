@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{aptos::AptosUpdateTool, revela::RevelaUpdateTool};
+use super::aptos::AptosUpdateTool;
 use crate::{
     common::types::{CliCommand, CliResult},
     update::{
@@ -15,7 +15,6 @@ use clap::Subcommand;
 #[derive(Subcommand)]
 pub enum UpdateTool {
     Aptos(AptosUpdateTool),
-    Revela(RevelaUpdateTool),
     Movefmt(FormatterUpdateTool),
     MoveMutationTest(MutationTestUpdaterTool),
     ProverDependencies(ProverDependencyInstaller),
@@ -25,7 +24,6 @@ impl UpdateTool {
     pub async fn execute(self) -> CliResult {
         match self {
             UpdateTool::Aptos(tool) => tool.execute_serialized().await,
-            UpdateTool::Revela(tool) => tool.execute_serialized().await,
             UpdateTool::Movefmt(tool) => tool.execute_serialized().await,
             UpdateTool::MoveMutationTest(tool) => tool.execute_serialized().await,
             UpdateTool::ProverDependencies(tool) => tool.execute_serialized().await,

@@ -13,7 +13,7 @@ use aptos_types::{
     },
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
-    dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
+    dkg::{chunky_dkg::CHUNKY_DKG_START_EVENT_MOVE_TYPE_TAG, DKG_START_EVENT_MOVE_TYPE_TAG},
     jwks::OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_key::StateKey,
@@ -279,6 +279,7 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
         || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
         || type_tag == NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.deref()
         || type_tag == RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG.deref()
+        || type_tag == CHUNKY_DKG_START_EVENT_MOVE_TYPE_TAG.deref()
 }
 
 #[cfg(feature = "bench")]

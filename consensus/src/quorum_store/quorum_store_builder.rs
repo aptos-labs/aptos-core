@@ -253,7 +253,7 @@ impl InnerBuilder {
             self.network_sender.clone(),
             self.verifier.clone(),
         );
-        let batch_store = Arc::new(BatchStore::new(
+        let batch_store = BatchStore::new(
             self.epoch,
             is_new_epoch,
             last_committed_timestamp,
@@ -263,7 +263,7 @@ impl InnerBuilder {
             self.config.batch_quota,
             signer,
             Duration::from_secs(60).as_micros() as u64,
-        ));
+        );
         self.batch_store = Some(batch_store.clone());
         let batch_reader = Arc::new(BatchReaderImpl::new(batch_store.clone(), batch_requester));
         self.batch_reader = Some(batch_reader.clone());
@@ -371,7 +371,6 @@ impl InnerBuilder {
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
-            self.config.enable_payload_v2,
             self.config.batch_expiry_gap_when_init_usecs,
         );
         spawn_named!(
@@ -409,10 +408,14 @@ impl InnerBuilder {
                     batch_store.get_batch_from_local(&rpc_request.req.digest())
                 {
                     let batch: Batch<BatchInfoExt> = value.try_into().unwrap();
-                    let batch: Batch<BatchInfo> = batch
-                        .try_into()
-                        .expect("Batch retieval requests must be for V1 batch");
-                    BatchResponse::Batch(batch)
+                    if batch.is_v2() {
+                        BatchResponse::BatchV2(batch)
+                    } else {
+                        let batch: Batch<BatchInfo> = batch
+                            .try_into()
+                            .expect("Batch retrieval requests must be for V1 batch");
+                        BatchResponse::Batch(batch)
+                    }
                 } else {
                     match aptos_db_clone.get_latest_ledger_info() {
                         Ok(ledger_info) => BatchResponse::NotFound(ledger_info),
@@ -457,7 +460,6 @@ impl InnerBuilder {
                 consensus_publisher,
                 self.verifier.get_ordered_account_addresses(),
                 self.verifier.address_to_validator_index().clone(),
-                self.config.enable_payload_v2,
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

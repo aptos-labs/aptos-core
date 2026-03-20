@@ -44,24 +44,33 @@ async fn test_abi(use_txn_payload_v2_format: bool, use_orderless_transactions: b
         .map(|f| f["name"].as_str().unwrap())
         .collect();
 
-    // All entry (including private entry) and public functions should be in the ABI.
-    // Private (non-entry) functions should not be included.
+    // All entry (including private entry), view (including private view), and public
+    // functions should be in the ABI. Private functions that are neither entry nor
+    // view should not be included.
     assert_eq!(exposed_function_names, [
         "private_entry_function",
+        "private_view_function",
         "public_entry_function",
         "public_function",
-        "view_function",
+        "public_view_function",
     ]);
 
-    // Confirm that the view function is reported as a view function.
-    let view_function = exposed_functions
+    // Confirm that view functions are reported as view functions with correct visibility.
+    let public_view_function = exposed_functions
         .iter()
-        .find(|f| f["name"].as_str().unwrap() == "view_function")
+        .find(|f| f["name"].as_str().unwrap() == "public_view_function")
         .unwrap();
+    assert_eq!(public_view_function["is_view"], true);
+    assert_eq!(public_view_function["visibility"], "public");
 
-    assert_eq!(view_function["is_view"], true);
+    let private_view_function = exposed_functions
+        .iter()
+        .find(|f| f["name"].as_str().unwrap() == "private_view_function")
+        .unwrap();
+    assert_eq!(private_view_function["is_view"], true);
+    assert_eq!(private_view_function["visibility"], "private");
 
-    // Confirm that the other functions are not reported as view functions.
+    // Confirm that the non-view functions are not reported as view functions.
     for name in [
         "private_entry_function",
         "public_entry_function",
@@ -96,16 +105,27 @@ async fn test_abi(use_txn_payload_v2_format: bool, use_orderless_transactions: b
 
     assert_eq!(my_struct["is_event"], false);
 
-    // Confirm that MyEnum is considered an enum.
+    // Confirm that MyEnum is considered an enum with correct variants.
     let my_enum = structs
         .iter()
         .find(|s| s["name"].as_str().unwrap() == "MyEnum")
         .unwrap();
 
     assert_eq!(my_enum["is_enum"], true);
+    assert_eq!(my_enum["fields"].as_array().unwrap().len(), 0);
 
-    // Confirm that State is not considered an enum.
+    let variants = my_enum["variants"].as_array().unwrap();
+    assert_eq!(variants.len(), 2);
+    assert_eq!(variants[0]["name"], "This");
+    assert_eq!(variants[0]["fields"].as_array().unwrap().len(), 0);
+    assert_eq!(variants[1]["name"], "That");
+    assert_eq!(variants[1]["fields"].as_array().unwrap().len(), 1);
+    assert_eq!(variants[1]["fields"][0]["name"], "value");
+    assert_eq!(variants[1]["fields"][0]["type"], "u64");
+
+    // Confirm that State is not considered an enum and has no variants.
     assert_eq!(my_struct["is_enum"], false);
+    assert_eq!(my_struct["variants"].as_array().unwrap().len(), 0);
 
     let test_option = structs
         .iter()
@@ -121,4 +141,5 @@ async fn test_abi(use_txn_payload_v2_format: bool, use_orderless_transactions: b
     assert_eq!(option_structs[0]["fields"][0]["name"], "vec");
     assert_eq!(option_structs[0]["is_enum"], false);
     assert_eq!(option_structs[0]["fields"][0]["type"], "vector<T0>");
+    assert_eq!(option_structs[0]["variants"].as_array().unwrap().len(), 0);
 }

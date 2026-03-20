@@ -4,6 +4,7 @@
 use crate::{log::TransactionGasLog, render::Render};
 use anyhow::Result;
 use aptos_gas_algebra::{Fee, InternalGas};
+use chrono::Local;
 use handlebars::Handlebars;
 use serde_json::{json, Map, Value};
 use std::{
@@ -13,6 +14,26 @@ use std::{
 };
 
 const TEMPLATE: &str = include_str!("../templates/index.html");
+const TRACE_TEMPLATE: &str = include_str!("../templates/trace.html");
+const STYLE_CSS: &str = include_str!("../templates/style.css");
+
+/// Default threshold: traces with more lines than this will require a button click to load
+const DEFAULT_TRACE_LAZY_LOAD_THRESHOLD: usize = 1000;
+
+/// Options for HTML report generation
+#[derive(Debug, Clone)]
+pub struct HtmlReportOptions {
+    /// Traces with more lines than this threshold will require a button click to load
+    pub trace_lazy_load_threshold: usize,
+}
+
+impl Default for HtmlReportOptions {
+    fn default() -> Self {
+        Self {
+            trace_lazy_load_threshold: DEFAULT_TRACE_LAZY_LOAD_THRESHOLD,
+        }
+    }
+}
 
 fn ensure_dirs_exist(path: impl AsRef<Path>) -> Result<()> {
     if let Err(err) = fs::create_dir_all(&path) {
@@ -75,6 +96,15 @@ where
 
 impl TransactionGasLog {
     pub fn generate_html_report(&self, path: impl AsRef<Path>, header: String) -> Result<()> {
+        self.generate_html_report_with_options(path, header, HtmlReportOptions::default())
+    }
+
+    pub fn generate_html_report_with_options(
+        &self,
+        path: impl AsRef<Path>,
+        header: String,
+        options: HtmlReportOptions,
+    ) -> Result<()> {
         let mut data = Map::new();
         data.insert(
             "title".to_string(),
@@ -90,6 +120,22 @@ impl TransactionGasLog {
             ),
         );
 
+        // Timestamp (local timezone)
+        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S %Z").to_string();
+        data.insert("generated-at".to_string(), Value::String(timestamp));
+
+        // Git revision
+        let git_hash = aptos_build_info::get_git_hash();
+        if !git_hash.is_empty() {
+            // Show short hash (first 7 characters)
+            let short_hash = if git_hash.len() > 7 {
+                &git_hash[..7]
+            } else {
+                &git_hash
+            };
+            data.insert("git-rev".to_string(), Value::String(short_hash.to_string()));
+        }
+
         // Flamegraphs
         let graph_exec_io = self.exec_io.to_flamegraph("Execution & IO".to_string())?;
         let graph_storage = self.storage.to_flamegraph("Storage".to_string())?;
@@ -103,55 +149,96 @@ impl TransactionGasLog {
             Value::Bool(graph_storage.is_some()),
         );
 
-        // Intrinsic cost
         let scaling_factor = u64::from(self.exec_io.gas_scaling_factor) as f64;
-        let total_exec_io = u64::from(self.exec_io.total) as f64;
 
-        let cost_scaled = format!(
-            "{:.8}",
-            (u64::from(self.exec_io.intrinsic_cost) as f64 / scaling_factor)
+        // Helper to format gas in external units
+        let fmt_gas = |gas: InternalGas| -> String {
+            let scaled = format!("{:.8}", u64::from(gas) as f64 / scaling_factor);
+            crate::misc::strip_trailing_zeros_and_decimal_point(&scaled).to_string()
+        };
+
+        // Helper to format fees in APT
+        let fmt_apt = |fee: Fee| -> String {
+            let scaled = format!("{:.8}", u64::from(fee) as f64 / 1_0000_0000f64);
+            crate::misc::strip_trailing_zeros_and_decimal_point(&scaled).to_string()
+        };
+
+        data.insert(
+            "summary-execution-gas".to_string(),
+            Value::String(fmt_gas(self.exec_io.execution_gas)),
         );
-        let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
-        let percentage = format!(
-            "{:.2}%",
-            u64::from(self.exec_io.intrinsic_cost) as f64 / total_exec_io * 100.0
+        data.insert(
+            "summary-io-gas".to_string(),
+            Value::String(fmt_gas(self.exec_io.io_gas)),
         );
-        data.insert("intrinsic".to_string(), json!(cost_scaled));
-        if !self.exec_io.total.is_zero() {
-            data.insert("intrinsic-percentage".to_string(), json!(percentage));
+        data.insert(
+            "summary-storage-fee".to_string(),
+            Value::String(fmt_apt(self.storage.total)),
+        );
+        data.insert(
+            "summary-storage-refund".to_string(),
+            Value::String(fmt_apt(self.storage.total_refund)),
+        );
+
+        // Separate totals for execution and IO categories
+        let total_execution = u64::from(self.exec_io.execution_gas) as f64;
+        let total_io = u64::from(self.exec_io.io_gas) as f64;
+
+        // Helper to calculate percentage against execution gas
+        let exec_percentage = |cost: InternalGas| -> String {
+            if total_execution == 0.0 {
+                "/".to_string()
+            } else {
+                format!("{:.2}%", u64::from(cost) as f64 / total_execution * 100.0)
+            }
+        };
+
+        // Helper to calculate percentage against IO gas
+        let io_percentage = |cost: InternalGas| -> String {
+            if total_io == 0.0 {
+                "/".to_string()
+            } else {
+                format!("{:.2}%", u64::from(cost) as f64 / total_io * 100.0)
+            }
+        };
+
+        // Intrinsic cost (execution category)
+        data.insert(
+            "intrinsic".to_string(),
+            json!(fmt_gas(self.exec_io.intrinsic_cost)),
+        );
+        if !self.exec_io.execution_gas.is_zero() {
+            data.insert(
+                "intrinsic-percentage".to_string(),
+                json!(exec_percentage(self.exec_io.intrinsic_cost)),
+            );
         }
 
-        // Keyless cost
+        // Keyless cost (execution category)
         if !self.exec_io.keyless_cost.is_zero() {
-            let cost_scaled = format!(
-                "{:.8}",
-                (u64::from(self.exec_io.keyless_cost) as f64 / scaling_factor)
+            data.insert(
+                "keyless".to_string(),
+                json!(fmt_gas(self.exec_io.keyless_cost)),
             );
-            let percentage = format!(
-                "{:.2}%",
-                u64::from(self.exec_io.keyless_cost) as f64 / total_exec_io * 100.0
+            data.insert(
+                "keyless-percentage".to_string(),
+                json!(exec_percentage(self.exec_io.keyless_cost)),
             );
-            data.insert("keyless".to_string(), json!(cost_scaled));
-            data.insert("keyless-percentage".to_string(), json!(percentage));
         }
 
-        // SLH-DSA-SHA2-128s cost
+        // SLH-DSA-SHA2-128s cost (execution category)
         if !self.exec_io.slh_dsa_sha2_128s_cost.is_zero() {
-            let cost_scaled = format!(
-                "{:.8}",
-                (u64::from(self.exec_io.slh_dsa_sha2_128s_cost) as f64 / scaling_factor)
+            data.insert(
+                "slh_dsa_sha2_128s".to_string(),
+                json!(fmt_gas(self.exec_io.slh_dsa_sha2_128s_cost)),
             );
-            let percentage = format!(
-                "{:.2}%",
-                u64::from(self.exec_io.slh_dsa_sha2_128s_cost) as f64 / total_exec_io * 100.0
-            );
-            data.insert("slh_dsa_sha2_128s".to_string(), json!(cost_scaled));
             data.insert(
                 "slh_dsa_sha2_128s-percentage".to_string(),
-                json!(percentage),
+                json!(exec_percentage(self.exec_io.slh_dsa_sha2_128s_cost)),
             );
         }
 
+        // Dependencies (execution category - loading modules is CPU work)
         let mut deps = self.exec_io.dependencies.clone();
         deps.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
         data.insert(
@@ -159,19 +246,11 @@ impl TransactionGasLog {
             Value::Array(
                 deps.iter()
                     .map(|dep| {
-                        let name = dep.render();
-                        let cost_scaled =
-                            format!("{:.8}", (u64::from(dep.cost) as f64 / scaling_factor));
-                        let cost_scaled =
-                            crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
-                        let percentage =
-                            format!("{:.2}%", u64::from(dep.cost) as f64 / total_exec_io * 100.0);
-
                         json!({
-                            "name": name,
+                            "name": dep.render(),
                             "size": u64::from(dep.size),
-                            "cost": cost_scaled,
-                            "percentage": percentage,
+                            "cost": fmt_gas(dep.cost),
+                            "percentage": exec_percentage(dep.cost),
                         })
                     })
                     .collect(),
@@ -179,28 +258,44 @@ impl TransactionGasLog {
         );
 
         // Execution & IO (aggregated)
-        let aggregated: crate::aggregate::AggregatedExecutionGasEvents =
-            self.exec_io.aggregate_gas_events();
-        let convert_op = |(op, hits, cost): (String, usize, InternalGas)| {
-            let cost_scaled = format!("{:.8}", (u64::from(cost) as f64 / scaling_factor));
-            let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
+        let aggregated = self.exec_io.aggregate_gas_events();
 
-            let percentage = format!("{:.2}%", u64::from(cost) as f64 / total_exec_io * 100.0);
-
-            json!({
-                "name": op,
-                "hits": hits,
-                "cost": cost_scaled,
-                "percentage": percentage,
-            })
+        // Combined total for methods tables (they span both execution and IO)
+        let total_combined = total_execution + total_io;
+        let combined_percentage = |cost: InternalGas| -> String {
+            if total_combined == 0.0 {
+                "/".to_string()
+            } else {
+                format!("{:.2}%", u64::from(cost) as f64 / total_combined * 100.0)
+            }
         };
+
+        // Execution category: ops (bytecodes and natives)
         data.insert(
             "ops".to_string(),
-            Value::Array(aggregated.ops.into_iter().map(convert_op).collect()),
+            Value::Array(
+                aggregated
+                    .ops
+                    .into_iter()
+                    .map(|(name, hits, cost)| {
+                        json!({"name": name, "hits": hits, "cost": fmt_gas(cost), "percentage": exec_percentage(cost)})
+                    })
+                    .collect(),
+            ),
         );
+
+        // Methods tables use combined total (they include both execution and IO costs)
         data.insert(
             "methods".to_string(),
-            Value::Array(aggregated.methods.into_iter().map(convert_op).collect()),
+            Value::Array(
+                aggregated
+                    .methods
+                    .into_iter()
+                    .map(|(name, hits, cost)| {
+                        json!({"name": name, "hits": hits, "cost": fmt_gas(cost), "percentage": combined_percentage(cost)})
+                    })
+                    .collect(),
+            ),
         );
         data.insert(
             "methods_self".to_string(),
@@ -208,17 +303,23 @@ impl TransactionGasLog {
                 aggregated
                     .methods_self
                     .into_iter()
-                    .map(convert_op)
+                    .map(|(name, hits, cost)| {
+                        json!({"name": name, "hits": hits, "cost": fmt_gas(cost), "percentage": combined_percentage(cost)})
+                    })
                     .collect(),
             ),
         );
+
+        // IO category: reads, writes, events
         data.insert(
             "reads".to_string(),
             Value::Array(
                 aggregated
                     .storage_reads
                     .into_iter()
-                    .map(convert_op)
+                    .map(|(name, hits, cost)| {
+                        json!({"name": name, "hits": hits, "cost": fmt_gas(cost), "percentage": io_percentage(cost)})
+                    })
                     .collect(),
             ),
         );
@@ -228,17 +329,20 @@ impl TransactionGasLog {
                 aggregated
                     .storage_writes
                     .into_iter()
-                    .map(convert_op)
+                    .map(|(name, hits, cost)| {
+                        json!({"name": name, "hits": hits, "cost": fmt_gas(cost), "percentage": io_percentage(cost)})
+                    })
                     .collect(),
             ),
         );
         data.insert(
             "transaction_write".to_string(),
-            convert_op((
-                "transaction_write".to_string(),
-                1,
-                aggregated.transaction_write,
-            )),
+            json!({
+                "name": "transaction_write",
+                "hits": 1,
+                "cost": fmt_gas(aggregated.transaction_write),
+                "percentage": io_percentage(aggregated.transaction_write)
+            }),
         );
         data.insert(
             "event_writes".to_string(),
@@ -246,7 +350,9 @@ impl TransactionGasLog {
                 aggregated
                     .event_writes
                     .into_iter()
-                    .map(convert_op)
+                    .map(|(name, hits, cost)| {
+                        json!({"name": name, "hits": hits, "cost": fmt_gas(cost), "percentage": io_percentage(cost)})
+                    })
                     .collect(),
             ),
         );
@@ -255,11 +361,7 @@ impl TransactionGasLog {
         let total_storage = u64::from(self.storage.total) as f64;
         let total_refund = u64::from(self.storage.total_refund) as f64;
 
-        let fmt_storage_fee = |fee: Fee| -> String {
-            let scaled = format!("{:.8}", (u64::from(fee) as f64 / 1_0000_0000f64));
-            crate::misc::strip_trailing_zeros_and_decimal_point(&scaled).to_string()
-        };
-        let fmt_storage_fee_percentage = |fee: Fee| -> String {
+        let storage_percentage = |fee: Fee| -> String {
             if self.storage.total.is_zero() {
                 "/".to_string()
             } else {
@@ -269,12 +371,12 @@ impl TransactionGasLog {
 
         data.insert(
             "storage-txn".to_string(),
-            Value::String(fmt_storage_fee(self.storage.txn_storage)),
+            Value::String(fmt_apt(self.storage.txn_storage)),
         );
         if !self.storage.total.is_zero() {
             data.insert(
                 "storage-txn-percentage".to_string(),
-                Value::String(fmt_storage_fee_percentage(self.storage.txn_storage)),
+                Value::String(storage_percentage(self.storage.txn_storage)),
             );
         }
 
@@ -290,22 +392,17 @@ impl TransactionGasLog {
                         let (refund_scaled, refund_percentage) = if write.refund.is_zero() {
                             ("/".to_string(), "/".to_string())
                         } else {
-                            let scaled =
-                                format!("{:.8}", (u64::from(write.refund) as f64 / 1_0000_0000f64));
-                            let scaled =
-                                crate::misc::strip_trailing_zeros_and_decimal_point(&scaled);
-
                             let percentage = format!(
                                 "{:.2}%",
                                 u64::from(write.refund) as f64 / total_refund * 100.0
                             );
-                            (scaled.to_string(), percentage)
+                            (fmt_apt(write.refund), percentage)
                         };
 
                         json!({
-                            "name":  format!("{}", Render(&write.key)),
-                            "cost": fmt_storage_fee(write.cost),
-                            "cost-percentage": fmt_storage_fee_percentage(write.cost),
+                            "name": Render(&write.key).to_string(),
+                            "cost": fmt_apt(write.cost),
+                            "cost-percentage": storage_percentage(write.cost),
                             "refund": refund_scaled,
                             "refund-percentage": refund_percentage
                         })
@@ -324,9 +421,9 @@ impl TransactionGasLog {
                     .iter()
                     .map(|event| {
                         json!({
-                            "name":  format!("{}", event.ty.to_canonical_string()),
-                            "cost": fmt_storage_fee(event.cost),
-                            "cost-percentage": fmt_storage_fee_percentage(event.cost),
+                            "name": event.ty.to_canonical_string(),
+                            "cost": fmt_apt(event.cost),
+                            "cost-percentage": storage_percentage(event.cost),
                         })
                     })
                     .collect(),
@@ -335,7 +432,7 @@ impl TransactionGasLog {
         if !self.storage.event_discount.is_zero() {
             let discount_msg = format!(
                 "*This does not include a discount of {} APT which was applied to reduce the total cost for events.",
-                fmt_storage_fee(self.storage.event_discount)
+                fmt_apt(self.storage.event_discount)
             );
             data.insert(
                 "storage-event-discount".to_string(),
@@ -349,29 +446,33 @@ impl TransactionGasLog {
             Value::String(format!("{}", self.peak_memory_usage)),
         );
 
-        // Execution trace
+        // Execution trace (shows raw costs without percentages)
         let mut tree = self.exec_io.to_erased(true).tree;
         tree.include_child_costs();
 
         let mut table = vec![];
         tree.preorder_traversel(|depth, text, &cost| {
             let text_indented = format!("{}{}", " ".repeat(depth * 4), text);
-
-            if cost.is_zero() {
-                table.push([text_indented, "".to_string(), "".to_string()])
+            let cost_str = if cost.is_zero() {
+                String::new()
             } else {
-                let cost_scaled = format!("{:.8}", (u64::from(cost) as f64 / scaling_factor));
-                let cost_scaled = crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
-
-                let percentage = format!("{:.2}%", u64::from(cost) as f64 / total_exec_io * 100.0);
-
-                table.push([text_indented, cost_scaled.to_string(), percentage])
-            }
+                fmt_gas(cost)
+            };
+            table.push([text_indented, cost_str])
         });
 
         let mut trace = String::new();
         render_table(&mut trace, &table, 4)?;
-        data.insert("trace".to_string(), Value::String(trace));
+
+        // Check if trace is large enough to require lazy loading
+        let trace_line_count = trace.lines().count();
+        if trace_line_count > options.trace_lazy_load_threshold {
+            data.insert("trace-is-large".to_string(), Value::Bool(true));
+            data.insert(
+                "trace-line-count".to_string(),
+                Value::String(trace_line_count.to_string()),
+            );
+        }
 
         // Rendering the html doc
         let mut handlebars = Handlebars::new();
@@ -391,6 +492,26 @@ impl TransactionGasLog {
         if let Some(graph_bytes) = graph_storage {
             fs::write(path_assets.join("storage.svg"), graph_bytes)?;
         }
+        // Write trace to a standalone HTML file for lazy loading via iframe
+        // When in iframe: styled with hover effects
+        // When opened directly: plain text appearance
+        let trace_content: String = trace
+            .lines()
+            .map(|line| {
+                let escaped = line
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;");
+                format!("<span class=\"line\">{}</span>", escaped)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let mut trace_data = Map::new();
+        trace_data.insert("trace-content".to_string(), json!(trace_content));
+        let trace_html = handlebars.render_template(TRACE_TEMPLATE, &trace_data)?;
+        fs::write(path_assets.join("trace.html"), trace_html)?;
+        fs::write(path_assets.join("style.css"), STYLE_CSS)?;
         fs::write(path_root.join("index.html"), html)?;
 
         Ok(())

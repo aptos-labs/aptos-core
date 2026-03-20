@@ -33,7 +33,7 @@ pub fn aptos_natives_with_builder(
                 true
             }
         )
-        .chain(aptos_framework::natives::all_natives(
+        .chain(aptos_framework_natives::all_natives(
             CORE_CODE_ADDRESS,
             builder,
             inject_create_signer_for_gov_sim,

@@ -1,0 +1,11 @@
+//# publish --print-bytecode
+module 0x66::test_invalid_names
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: function has Pack attribute but wrong function name pattern
+#[pack] public fun invalid_pack(): u8
+    ld_u8 1
+    ret

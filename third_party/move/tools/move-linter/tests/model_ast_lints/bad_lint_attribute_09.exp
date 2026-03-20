@@ -7,4 +7,4 @@ error: invalid attribute
   │       ^^^^^^^^^^
   │       │
   │       Attribute 'lint::skip' is not expected with a use
-  │       Expected to be used with one of the following: module, function
+  │       Expected to be used with one of the following: module, constant, struct, function

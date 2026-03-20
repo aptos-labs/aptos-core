@@ -94,7 +94,7 @@ module 0x42::Test {
 module 0x42::Test {
     public inline fun foo(f: |u64, u64|, z: u64) {
         {
-            let (_z) = (z);
+            let _z = z;
             let x = 3;
             let q = 5;
             {
@@ -112,9 +112,9 @@ module 0x42::Test {
         let _x = 1;
         let z = 4;
         {
-            let (z) = (z);
+            let z = z;
             {
-                let (_z) = (z);
+                let _z = z;
                 let x = 3;
                 let q = 5;
                 {
@@ -130,7 +130,7 @@ module 0x42::Test {
         let _x = 1;
         let z = 4;
         {
-            let (_z) = (z);
+            let _z = z;
             let x = 3;
             let q = 5;
             {

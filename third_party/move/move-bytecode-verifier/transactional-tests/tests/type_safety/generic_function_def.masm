@@ -1,0 +1,11 @@
+//# publish
+module 0x1::M
+public fun id<T0>(l0: T0): T0
+    move_loc l0
+    ret
+
+public fun foo<T0, T1, T2: key, T3: copy + drop>(l0: T3, l1: T2)
+    local l2: T1
+    local l3: T0
+    ld_u64 0
+    abort

@@ -1,0 +1,166 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    enum E {
+        V1 {
+            0: u64,
+        }
+        V2,
+    }
+    enum Inner {
+        A {
+            0: u64,
+        }
+        B,
+    }
+    enum Outer {
+        W {
+            0: Inner,
+        }
+        X,
+    }
+    enum Pair {
+        P {
+            0: u64,
+            1: u64,
+        }
+        Q,
+    }
+    private fun literal_with_guard(e: E): u64 {
+        match (e) {
+          m::E::V1{ 0: _$nlit_0 } if And(Eq(_$nlit_0, 1), true) => {
+            50
+          }
+          m::E::V1{ 0: _ } => {
+            60
+          }
+          m::E::V2 => {
+            70
+          }
+        }
+
+    }
+    private fun mix_var_literal(p: Pair): u64 {
+        match (p) {
+          m::Pair::P{ 0: x, 1: _$nlit_0 } if Eq(_$nlit_0, 2) => {
+            Add<u64>(x, 100)
+          }
+          m::Pair::P{ 0: _, 1: _ } => {
+            20
+          }
+          m::Pair::Q => {
+            30
+          }
+        }
+
+    }
+    private fun multi_literal(p: Pair): u64 {
+        match (p) {
+          m::Pair::P{ 0: _$nlit_0, 1: _$nlit_1 } if And(Eq(_$nlit_0, 1), Eq(_$nlit_1, 2)) => {
+            10
+          }
+          m::Pair::P{ 0: _, 1: _ } => {
+            20
+          }
+          m::Pair::Q => {
+            30
+          }
+        }
+
+    }
+    private fun nested_literal(o: Outer): u64 {
+        match (o) {
+          m::Outer::W{ 0: m::Inner::A{ 0: _$nlit_0 } } if Eq(_$nlit_0, 1) => {
+            100
+          }
+          m::Outer::W{ 0: m::Inner::A{ 0: _ } } => {
+            200
+          }
+          m::Outer::W{ 0: m::Inner::B } => {
+            300
+          }
+          m::Outer::X => {
+            400
+          }
+        }
+
+    }
+    private fun single_literal(e: E): u64 {
+        match (e) {
+          m::E::V1{ 0: _$nlit_0 } if Eq(_$nlit_0, 1) => {
+            1
+          }
+          m::E::V1{ 0: _ } => {
+            2
+          }
+          m::E::V2 => {
+            3
+          }
+        }
+
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    enum E has drop {
+        V1 {
+            0: u64,
+        }
+        V2,
+    }
+    enum Inner has drop {
+        A {
+            0: u64,
+        }
+        B,
+    }
+    enum Outer has drop {
+        W {
+            0: Inner,
+        }
+        X,
+    }
+    enum Pair has drop {
+        P {
+            0: u64,
+            1: u64,
+        }
+        Q,
+    }
+    fun literal_with_guard(e: E): u64 {
+        match (e) {
+            E::V1(__nlit_0) if __nlit_0 == 1 && true => 50,
+            E::V1(_) => 60,
+            E::V2{} => 70,
+        }
+    }
+    fun mix_var_literal(p: Pair): u64 {
+        match (p) {
+            Pair::P(x, __nlit_0) if __nlit_0 == 2 => x + 100,
+            Pair::P(_, _) => 20,
+            Pair::Q{} => 30,
+        }
+    }
+    fun multi_literal(p: Pair): u64 {
+        match (p) {
+            Pair::P(__nlit_0, __nlit_1) if __nlit_0 == 1 && __nlit_1 == 2 => 10,
+            Pair::P(_, _) => 20,
+            Pair::Q{} => 30,
+        }
+    }
+    fun nested_literal(o: Outer): u64 {
+        match (o) {
+            Outer::W(Inner::A(__nlit_0)) if __nlit_0 == 1 => 100,
+            Outer::W(Inner::A(_)) => 200,
+            Outer::W(Inner::B{}) => 300,
+            Outer::X{} => 400,
+        }
+    }
+    fun single_literal(e: E): u64 {
+        match (e) {
+            E::V1(__nlit_0) if __nlit_0 == 1 => 1,
+            E::V1(_) => 2,
+            E::V2{} => 3,
+        }
+    }
+}

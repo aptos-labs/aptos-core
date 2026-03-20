@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The below is to deal with a strange problem with derive(Dearbitrary), which creates warnings
-// of unused variables in derived code which cannot be turned off by applying the attribute
-// just at the type in question. (Here, MoveStructLayout.)
-#![allow(unused_variables)]
+// of unused variables and unused assignments in derived code which cannot be turned off by
+// applying the attribute just at the type in question. (Here, MoveStructLayout.)
+#![allow(unused_variables, unused_assignments)]
 
 use crate::{
     account_address::AccountAddress,
@@ -26,7 +26,7 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
     convert::TryInto,
     fmt::{self, Debug},
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 /// The maximal number of enum variants which are supported in values. This must align with
@@ -191,7 +191,11 @@ pub enum MoveStructLayout {
         fields: Vec<MoveFieldLayout>,
     },
     /// A decorated representation of struct variants, containing variant and field names.
-    WithVariants(Vec<MoveVariantLayout>),
+    /// Like WithTypes, this carries the type tag for proper type identification.
+    WithVariants {
+        type_: StructTag,
+        variants: Vec<MoveVariantLayout>,
+    },
 }
 
 /// Used to distinguish between aggregators ans snapshots.
@@ -234,8 +238,7 @@ impl IdentifierMappingKind {
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
-    derive(arbitrary::Arbitrary),
-    derive(dearbitrary::Dearbitrary)
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
@@ -251,7 +254,7 @@ pub enum MoveTypeLayout {
     #[serde(rename(serialize = "vector", deserialize = "vector"))]
     Vector(Box<MoveTypeLayout>),
     #[serde(rename(serialize = "struct", deserialize = "struct"))]
-    Struct(MoveStructLayout),
+    Struct(Arc<MoveStructLayout>),
     #[serde(rename(serialize = "signer", deserialize = "signer"))]
     Signer,
 
@@ -288,6 +291,13 @@ pub enum MoveTypeLayout {
     I128,
     #[serde(rename(serialize = "i256", deserialize = "i256"))]
     I256,
+}
+
+impl MoveTypeLayout {
+    /// Creates a `MoveTypeLayout::Struct` wrapping the given layout in an `Arc`.
+    pub fn new_struct(layout: MoveStructLayout) -> Self {
+        Self::Struct(Arc::new(layout))
+    }
 }
 
 impl MoveValue {
@@ -409,9 +419,10 @@ impl MoveStruct {
                         .collect(),
                 }
             },
-            (MoveStruct::RuntimeVariant(tag, vals), MoveStructLayout::WithVariants(variants))
-                if (tag as usize) < variants.len() =>
-            {
+            (
+                MoveStruct::RuntimeVariant(tag, vals),
+                MoveStructLayout::WithVariants { variants, .. },
+            ) if (tag as usize) < variants.len() => {
                 let MoveVariantLayout { name, fields } = &variants[tag as usize];
                 MoveStruct::WithVariantFields(
                     name.clone(),
@@ -504,8 +515,8 @@ impl MoveStructLayout {
         Self::WithTypes { type_, fields }
     }
 
-    pub fn with_variants(variants: Vec<MoveVariantLayout>) -> Self {
-        Self::WithVariants(variants)
+    pub fn with_variants(type_: StructTag, variants: Vec<MoveVariantLayout>) -> Self {
+        Self::WithVariants { type_, variants }
     }
 
     pub fn fields(&self, variant: Option<usize>) -> &[MoveTypeLayout] {
@@ -518,7 +529,7 @@ impl MoveStructLayout {
                     &[]
                 },
             },
-            Self::WithFields(_) | Self::WithTypes { .. } | Self::WithVariants(_) => {
+            Self::WithFields(_) | Self::WithTypes { .. } | Self::WithVariants { .. } => {
                 // It's not possible to implement this without changing the return type, and some
                 // performance-critical VM serialization code uses the Runtime case of this.
                 // panicking is the best move
@@ -542,7 +553,7 @@ impl MoveStructLayout {
             Self::WithFields(fields) | Self::WithTypes { fields, .. } => {
                 fields.into_iter().map(|f| f.layout).collect()
             },
-            Self::WithVariants(mut variants) => match variant {
+            Self::WithVariants { mut variants, .. } => match variant {
                 Some(idx) if idx < variants.len() => variants
                     .remove(idx)
                     .fields
@@ -590,7 +601,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
                 AccountAddress::deserialize(deserializer).map(MoveValue::Address)
             },
             MoveTypeLayout::Signer => Err(D::Error::custom("cannot deserialize signer")),
-            MoveTypeLayout::Struct(ty) => Ok(MoveValue::Struct(ty.deserialize(deserializer)?)),
+            MoveTypeLayout::Struct(ty) => {
+                Ok(MoveValue::Struct(ty.as_ref().deserialize(deserializer)?))
+            },
             MoveTypeLayout::Function => Ok(MoveValue::Closure(Box::new(
                 deserializer.deserialize_seq(ClosureVisitor)?,
             ))),
@@ -764,7 +777,10 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
                     _fields: fields,
                 })
             },
-            MoveStructLayout::WithVariants(decorated_variants) => {
+            MoveStructLayout::WithVariants {
+                variants: decorated_variants,
+                ..
+            } => {
                 // Downgrade the decorated variants to simple layouts to deserialize the fields.
                 let variant_names = variant_name_placeholder(decorated_variants.len())
                     .map_err(|e| D::Error::custom(format!("{}", e)))?;
@@ -931,7 +947,7 @@ impl fmt::Display for MoveTypeLayout {
             I256 => write!(f, "i256"),
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
-            Struct(s) => fmt::Display::fmt(s, f),
+            Struct(s) => fmt::Display::fmt(s.as_ref(), f),
             Function => write!(f, "function"),
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
@@ -970,7 +986,7 @@ impl fmt::Display for MoveStructLayout {
                     write!(f, "{}, ", field)?
                 }
             },
-            Self::WithVariants(variants) => {
+            Self::WithVariants { variants, .. } => {
                 for v in variants {
                     write!(f, "{}{{", v.name)?;
                     for layout in &v.fields {
@@ -1005,7 +1021,7 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::I256 => TypeTag::I256,
             MoveTypeLayout::Signer => TypeTag::Signer,
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
-            MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
+            MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.as_ref().try_into()?)),
 
             // For function values, we cannot reconstruct the tag because we do not know the
             // argument and return types.
@@ -1026,10 +1042,10 @@ impl TryInto<StructTag> for &MoveStructLayout {
     fn try_into(self) -> Result<StructTag, Self::Error> {
         use MoveStructLayout::*;
         match self {
-            Runtime(..) | RuntimeVariants(..) | WithFields(..) | WithVariants(..) => bail!(
-                "Invalid MoveTypeLayout -> StructTag conversion--needed MoveLayoutType::WithTypes"
+            Runtime(..) | RuntimeVariants(..) | WithFields(..) => bail!(
+                "Invalid MoveTypeLayout -> StructTag conversion--needed MoveLayoutType::WithTypes or WithVariants"
             ),
-            WithTypes { type_, .. } => Ok(type_.clone()),
+            WithTypes { type_, .. } | WithVariants { type_, .. } => Ok(type_.clone()),
         }
     }
 }

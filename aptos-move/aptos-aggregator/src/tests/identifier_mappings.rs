@@ -7,7 +7,7 @@ use move_core_types::value::{
     IdentifierMappingKind,
     MoveStructLayout::Runtime,
     MoveTypeLayout,
-    MoveTypeLayout::{Address, Bool, Struct, Vector, U128, U64, U8},
+    MoveTypeLayout::{Address, Bool, Vector, U128, U64, U8},
 };
 use move_vm_types::{
     delayed_values::{
@@ -22,9 +22,9 @@ use DelayedFieldValue as A;
 use IdentifierMappingKind as K;
 
 static DERIVED_STRING: Lazy<MoveTypeLayout> = Lazy::new(|| {
-    Struct(Runtime(vec![
+    MoveTypeLayout::new_struct(Runtime(vec![
         // String value
-        Struct(Runtime(vec![Vector(Box::new(U8))])),
+        MoveTypeLayout::new_struct(Runtime(vec![Vector(Box::new(U8))])),
         // Vec<u8> padding
         Vector(Box::new(U8)),
     ]))

@@ -1,0 +1,25 @@
+//# publish --print-bytecode
+// Test that struct Foo$Bar and enum Foo with variant Bar cannot both have
+// pack APIs in the same module, because both would be named pack$Foo$Bar.
+// Move does not allow two functions with the same name (no overloading),
+// so the module is rejected before the struct API checker even runs.
+module 0x66::test_duplicate_pack_name
+
+struct Foo$Bar
+    x: u64
+
+enum Foo has drop
+  Bar
+    y: u64
+
+// Pack for struct Foo$Bar
+#[pack] public fun pack$Foo$Bar(l0: u64): Foo$Bar
+    move_loc l0
+    pack Foo$Bar
+    ret
+
+// Pack variant Bar of enum Foo -- same function name as above!
+#[pack_variant(0)] public fun pack$Foo$Bar(l0: u64): Foo
+    move_loc l0
+    pack_variant Foo, Bar
+    ret

@@ -178,7 +178,7 @@ public fun A::mutate_at($t0|addr: address) {
   8: write_back[0x0::A::S@]($t2)
   9: label L1
      # VC: function does not abort under this condition at tests/spec_instrumentation/modifies.move:24:9+27
- 10: assert Not(Not(exists[@0]<0x0::A::S>($t0)))
+ 10: assert exists[@0]<0x0::A::S>($t0)
      # VC: post-condition does not hold at tests/spec_instrumentation/modifies.move:23:9+31
  11: assert Eq<u64>(select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)), 2)
  12: return ()
@@ -199,7 +199,7 @@ public fun A::read_at($t0|addr: address): u64 {
   2: $t3 := get_field<0x0::A::S>.x($t1)
   3: label L1
      # VC: function does not abort under this condition at tests/spec_instrumentation/modifies.move:13:9+27
-  4: assert Not(Not(exists[@1]<0x0::A::S>($t0)))
+  4: assert exists[@1]<0x0::A::S>($t0)
      # VC: post-condition does not hold at tests/spec_instrumentation/modifies.move:14:9+36
   5: assert Eq<u64>($t3, select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)))
   6: return $t3

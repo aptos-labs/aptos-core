@@ -1,19 +1,19 @@
 
 Diagnostics:
-error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+error: Invalid operation: storage operation on `M::R` can only be done within module `0x42::M`
    ┌─ tests/checking/typing/global_builtins_script.move:14:5
    │
 14 │ fun test<Token>(account: signer) {
    │     ^^^^
 15 │     let r = M::new();
 16 │     borrow_global<M::R>(@0x1);
-   │     ------------------------- called here
+   │     ------------------------- storage operation here
 
-error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+error: Invalid operation: storage operation on `M::R` can only be done within module `0x42::M`
    ┌─ tests/checking/typing/global_builtins_script.move:14:5
    │
 14 │ fun test<Token>(account: signer) {
    │     ^^^^
    ·
 17 │     move_to(&account, r);
-   │     -------------------- called here
+   │     -------------------- storage operation here

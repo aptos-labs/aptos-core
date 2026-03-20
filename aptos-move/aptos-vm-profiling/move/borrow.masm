@@ -1,0 +1,28 @@
+script
+entry public fun main()
+    local l0: u64
+    local l1: &mut u64
+    local l2: u64
+    local l3: u64
+    ld_u64 0
+    st_loc l0
+    ld_u64 100
+    st_loc l2
+l1: copy_loc l0
+    ld_u64 1000
+    lt
+    br_false l0
+    mut_borrow_loc l2
+    st_loc l1
+    copy_loc l1
+    read_ref
+    st_loc l3
+    ld_u64 100
+    move_loc l1
+    write_ref
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    branch l1
+l0: ret

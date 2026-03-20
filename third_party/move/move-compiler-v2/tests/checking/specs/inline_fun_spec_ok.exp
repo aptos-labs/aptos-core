@@ -12,12 +12,9 @@ module 0x42::M {
 // -- Sourcified model before first bytecode pipeline
 module 0x42::M {
     public inline fun f(): u64 {
-
-        /* spec {
-          assert Eq<u256>(1, 1);
-        }
-         */
-        ;
+        spec {
+            assert 1 == 1;
+        };
         42
     }
 }

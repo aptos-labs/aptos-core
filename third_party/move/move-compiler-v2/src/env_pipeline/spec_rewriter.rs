@@ -23,30 +23,23 @@
 use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
-use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::debug;
 use move_model::{
-    ast::{
-        BehaviorKind, BehaviorTarget, ConditionKind, Exp, ExpData, GlobalInvariant, Operation,
-        RewriteResult, SpecBlockTarget, SpecFunDecl, TempIndex,
-    },
-    exp_builder::ExpBuilder,
-    exp_generator::ExpGenerator,
+    ast::{ConditionKind, Exp, ExpData, GlobalInvariant, Operation, SpecBlockTarget, SpecFunDecl},
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
     model::{
-        FunId, FunctionData, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, StructEnv,
+        FunId, FunctionData, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId, SpecFunId,
+        StructEnv,
     },
-    spec_translator::SpecTranslator,
     symbol::Symbol,
-    ty::{PrimitiveType, ReferenceKind, Type},
+    ty::ReferenceKind,
 };
 use petgraph::prelude::DiGraphMap;
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
 };
 
 pub fn run_spec_rewriter(env: &mut GlobalEnv) {
@@ -127,7 +120,7 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         let get_param_names =
             |params: &[Parameter]| params.iter().map(|Parameter(name, ..)| *name).collect_vec();
         match (&target, target.get_env_state(env)) {
-            (MoveFun(_), Def(exp)) => {
+            (MoveFun(_fun_id), Def(exp)) => {
                 let mut converter = SpecConverter::new(env, &function_mapping, false);
                 let new_exp = converter.rewrite_exp(exp.clone());
                 if !ExpData::ptr_eq(&new_exp, &exp) {
@@ -151,12 +144,6 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
                             get_param_names(&env.get_spec_fun(mid.qualified(*spec_fun_id)).params);
                         SpecConverter::new(env, &function_mapping, true)
                             .symbolized_parameters(paras)
-                    },
-                    SpecBlockTarget::Function(mid, fid)
-                    | SpecBlockTarget::FunctionCode(mid, fid, _) => {
-                        // Set enclosing function context for behavioral predicate parameter handling
-                        SpecConverter::new(env, &function_mapping, true)
-                            .with_enclosing_fun(mid.qualified(*fid))
                     },
                     _ => SpecConverter::new(env, &function_mapping, true),
                 };
@@ -352,60 +339,6 @@ fn derive_spec_fun(
 }
 
 // -------------------------------------------------------------------------------------------
-// Behavioral Predicate Reduction
-
-/// Minimal ExpGenerator implementation for behavioral predicate reduction.
-/// Provides enough context for SpecTranslator without full bytecode infrastructure.
-///
-/// Notice that `TempIndex` locals only exist artificially during translation as
-/// placeholders for actual expressions in the context of spec expressions. For historical
-/// reasons spec expressions use TempIndex for parameters exclusively, and Symbol for locals.
-struct BehaviorExpGenerator<'env> {
-    fun_env: FunctionEnv<'env>,
-    loc: Loc,
-    next_temp: TempIndex,
-    temp_types: BTreeMap<TempIndex, Type>,
-}
-
-impl<'env> BehaviorExpGenerator<'env> {
-    fn new(fun_env: FunctionEnv<'env>, loc: Loc, param_count: usize) -> Self {
-        // Start allocating temps after the function's parameters.
-        // In spec expressions, only function parameters can be TempIndex (0..param_count-1).
-        Self {
-            fun_env,
-            loc,
-            next_temp: param_count,
-            temp_types: BTreeMap::new(),
-        }
-    }
-}
-
-impl<'env> ExpGenerator<'env> for BehaviorExpGenerator<'env> {
-    fn function_env(&self) -> &FunctionEnv<'env> {
-        &self.fun_env
-    }
-
-    fn get_current_loc(&self) -> Loc {
-        self.loc.clone()
-    }
-
-    fn set_loc(&mut self, loc: Loc) {
-        self.loc = loc;
-    }
-
-    fn add_local(&mut self, ty: Type) -> TempIndex {
-        let idx = self.next_temp;
-        self.temp_types.insert(idx, ty);
-        self.next_temp += 1;
-        idx
-    }
-
-    fn get_local_type(&self, temp: TempIndex) -> Type {
-        self.temp_types.get(&temp).cloned().unwrap_or(Type::Error)
-    }
-}
-
-// -------------------------------------------------------------------------------------------
 // Expressions Conversion
 
 /// The expression converter takes a Move expression and converts it to a
@@ -427,11 +360,6 @@ struct SpecConverter<'a> {
     contains_imperative_expression: bool,
     /// Set to true when rewriting spec during inlining phase
     for_inline: bool,
-    /// The enclosing function for spec blocks (needed for parameter target handling)
-    enclosing_fun: Option<QualifiedId<FunId>>,
-    /// Cache for generated behavioral predicate spec functions:
-    /// (enclosing_fun, kind, param_sym) -> generated spec function id
-    behavior_spec_funs: HashMap<(QualifiedId<FunId>, BehaviorKind, Symbol), QualifiedId<SpecFunId>>,
 }
 
 impl<'a> SpecConverter<'a> {
@@ -448,8 +376,6 @@ impl<'a> SpecConverter<'a> {
             reference_strip_exempted: Default::default(),
             contains_imperative_expression: false,
             for_inline: false,
-            enclosing_fun: None,
-            behavior_spec_funs: HashMap::new(),
         }
     }
 
@@ -466,8 +392,6 @@ impl<'a> SpecConverter<'a> {
             reference_strip_exempted: Default::default(),
             contains_imperative_expression: false,
             for_inline: true,
-            enclosing_fun: None,
-            behavior_spec_funs: HashMap::new(),
         }
     }
 
@@ -476,275 +400,6 @@ impl<'a> SpecConverter<'a> {
             symbolized_parameters,
             ..self
         }
-    }
-
-    fn with_enclosing_fun(self, fun_id: QualifiedId<FunId>) -> Self {
-        Self {
-            enclosing_fun: Some(fun_id),
-            ..self
-        }
-    }
-
-    /// Generates an uninterpreted spec function for a behavioral predicate with a
-    /// function-typed parameter target. Returns a cached spec function if one was
-    /// already generated for this (enclosing_fun, kind, param) combination.
-    fn generate_behavior_spec_fun(
-        &mut self,
-        enclosing_fun: QualifiedId<FunId>,
-        kind: BehaviorKind,
-        param_sym: Symbol,
-        param_type: &Type,
-        loc: &Loc,
-    ) -> QualifiedId<SpecFunId> {
-        // Check cache first
-        let cache_key = (enclosing_fun, kind, param_sym);
-        if let Some(spec_fun_id) = self.behavior_spec_funs.get(&cache_key) {
-            return *spec_fun_id;
-        }
-
-        let fun_env = self.env.get_function(enclosing_fun);
-
-        // Build spec function name: $<kind>$<enclosing_fun_name>$<param_name>
-        let name = self.env.symbol_pool().make(&format!(
-            "${}${}${}",
-            kind,
-            fun_env.get_name().display(self.env.symbol_pool()),
-            param_sym.display(self.env.symbol_pool())
-        ));
-
-        // Extract argument types and result types from the function type
-        let (fn_arg_types, fn_result_types) = match param_type {
-            Type::Fun(arg, result, _) => (
-                arg.as_ref().clone().flatten(),
-                result.as_ref().clone().flatten(),
-            ),
-            _ => {
-                self.env.diag(
-                    Severity::Bug,
-                    loc,
-                    &format!(
-                        "behavioral predicate parameter `{}` has non-function type",
-                        param_sym.display(self.env.symbol_pool())
-                    ),
-                );
-                (vec![], vec![])
-            },
-        };
-
-        // Build parameters for the spec function (function's input arguments only)
-        let mut params: Vec<Parameter> = fn_arg_types
-            .iter()
-            .enumerate()
-            .map(|(i, ty)| {
-                let arg_name = self.env.symbol_pool().make(&format!("arg{}", i));
-                Parameter(arg_name, ty.clone(), loc.clone())
-            })
-            .collect();
-
-        // For EnsuresOf, add parameters for result values
-        if kind == BehaviorKind::EnsuresOf {
-            for (i, ty) in fn_result_types.iter().enumerate() {
-                let result_name = self.env.symbol_pool().make(&format!("result{}", i));
-                params.push(Parameter(result_name, ty.clone(), loc.clone()));
-            }
-        }
-
-        // Create the uninterpreted spec function declaration
-        let decl = SpecFunDecl {
-            loc: loc.clone(),
-            name,
-            type_params: fun_env.get_type_parameters(),
-            params,
-            context_params: None,
-            result_type: Type::Primitive(PrimitiveType::Bool),
-            used_memory: BTreeSet::new(),
-            uninterpreted: true,
-            is_move_fun: false,
-            is_native: false,
-            body: None,
-            callees: BTreeSet::new(),
-            is_recursive: RefCell::new(None),
-            insts_using_generic_type_reflection: Default::default(),
-            spec: RefCell::new(Default::default()),
-        };
-
-        // Add to environment
-        let spec_fun_id = self
-            .env
-            .add_spec_function_def(enclosing_fun.module_id, decl);
-
-        // Cache and return
-        self.behavior_spec_funs.insert(cache_key, spec_fun_id);
-        spec_fun_id
-    }
-
-    /// Reduces a behavioral predicate (requires_of, aborts_of, ensures_of, modifies_of)
-    /// for a known function target into plain predicates by using SpecTranslator
-    /// to properly extract and substitute the function's specification conditions.
-    fn reduce_behavior_predicate(
-        &mut self,
-        id: NodeId,
-        kind: BehaviorKind,
-        target_fun: &QualifiedInstId<FunId>,
-        args: &[Exp],
-    ) -> Exp {
-        let loc = self.env.get_node_loc(id);
-
-        // Scope the immutable borrow for SpecTranslator
-        let (translated, param_temps, ret_temps) = {
-            let env = &self.env;
-            let target_fun_env = env.get_function(target_fun.to_qualified_id());
-            let param_count = target_fun_env.get_parameter_count();
-            let type_args = &target_fun.inst;
-
-            // Create minimal ExpGenerator, starting temps after the function's parameters
-            let mut generator =
-                BehaviorExpGenerator::new(target_fun_env.clone(), loc.clone(), param_count);
-
-            // Allocate temps for parameters (used by param_substitution)
-            let param_temps: Vec<TempIndex> = (0..param_count)
-                .map(|i| {
-                    let ty = if i < args.len() {
-                        env.get_node_type(args[i].node_id())
-                    } else {
-                        Type::Error
-                    };
-                    generator.add_local(ty)
-                })
-                .collect();
-
-            // Allocate temps for results (used by ret_locals).
-            // We must allocate based on the function's return type, not the args provided,
-            // because SpecTranslator translates ALL conditions including ensures which may
-            // reference `result` even when we only need requires.
-            let ret_temps: Vec<TempIndex> = target_fun_env
-                .get_result_type()
-                .flatten()
-                .iter()
-                .map(|ty| generator.add_local(ty.clone()))
-                .collect();
-
-            // Translate the spec using SpecTranslator
-            let translated = SpecTranslator::translate_fun_spec(
-                false, // auto_trace
-                true,  // for_call
-                &mut generator,
-                &target_fun_env,
-                type_args,
-                Some(&param_temps),
-                &ret_temps,
-            );
-
-            (translated, param_temps, ret_temps)
-        };
-
-        // Build a mapping from saved param temps back to original param temps.
-        // SpecTranslator creates saved_params when translating post conditions to
-        // preserve pre-state values: saved_params maps param_temp -> saved_temp.
-        // We need the reverse: saved_temp -> param_temp, so we can trace back to args.
-        let saved_to_param: BTreeMap<TempIndex, TempIndex> = translated
-            .saved_params
-            .iter()
-            .map(|(param, saved)| (*saved, *param))
-            .collect();
-
-        // Extract and combine conditions based on behavior kind
-        let builder = ExpBuilder::new(self.env);
-        match kind {
-            BehaviorKind::RequiresOf => {
-                let conditions: Vec<Exp> = translated
-                    .pre
-                    .into_iter()
-                    .map(|(_, e)| {
-                        Self::substitute_temps_with_args(
-                            &e,
-                            &param_temps,
-                            &ret_temps,
-                            &saved_to_param,
-                            args,
-                        )
-                    })
-                    .collect();
-                builder.and_n(&loc, conditions)
-            },
-            BehaviorKind::AbortsOf => {
-                // Combine all abort conditions from TranslatedSpec
-                let abort_conds: Vec<Exp> = translated
-                    .aborts
-                    .into_iter()
-                    .map(|(_, e, _)| {
-                        Self::substitute_temps_with_args(
-                            &e,
-                            &param_temps,
-                            &ret_temps,
-                            &saved_to_param,
-                            args,
-                        )
-                    })
-                    .collect();
-                builder.or_n(&loc, abort_conds)
-            },
-            BehaviorKind::EnsuresOf => {
-                let conditions: Vec<Exp> = translated
-                    .post
-                    .into_iter()
-                    .map(|(_, e)| {
-                        Self::substitute_temps_with_args(
-                            &e,
-                            &param_temps,
-                            &ret_temps,
-                            &saved_to_param,
-                            args,
-                        )
-                    })
-                    .collect();
-                builder.and_n(&loc, conditions)
-            },
-            BehaviorKind::ModifiesOf => {
-                // Return true for now; proper semantics TBD
-                builder.bool_const(&loc, true)
-            },
-        }
-    }
-
-    /// Substitutes temporary references back to the original argument expressions.
-    /// SpecTranslator rewrites params to Temporary(param_temps[i]) and results to Temporary(ret_temps[j]).
-    /// For post conditions, params may be saved via saved_params (param_temp -> saved_temp).
-    /// We need to substitute these back to the original arg expressions.
-    fn substitute_temps_with_args(
-        exp: &Exp,
-        param_temps: &[TempIndex],
-        ret_temps: &[TempIndex],
-        saved_to_param: &BTreeMap<TempIndex, TempIndex>,
-        args: &[Exp],
-    ) -> Exp {
-        ExpData::rewrite(exp.clone(), &mut |e| {
-            if let ExpData::Temporary(_, idx) = e.as_ref() {
-                // Check if it's a param temp
-                if let Some(pos) = param_temps.iter().position(|t| *t == *idx) {
-                    if pos < args.len() {
-                        return RewriteResult::Rewritten(args[pos].clone());
-                    }
-                }
-                // Check if it's a result temp
-                if let Some(pos) = ret_temps.iter().position(|t| *t == *idx) {
-                    let arg_idx = param_temps.len() + pos;
-                    if arg_idx < args.len() {
-                        return RewriteResult::Rewritten(args[arg_idx].clone());
-                    }
-                }
-                // Check if it's a saved param temp (from post condition translation)
-                if let Some(original_param_temp) = saved_to_param.get(idx) {
-                    // Find the position of the original param temp
-                    if let Some(pos) = param_temps.iter().position(|t| *t == *original_param_temp) {
-                        if pos < args.len() {
-                            return RewriteResult::Rewritten(args[pos].clone());
-                        }
-                    }
-                }
-            }
-            RewriteResult::Unchanged(e)
-        })
     }
 }
 
@@ -966,77 +621,6 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 self.env.set_node_instantiation(new_id, new_inst);
             }
             Some(new_id)
-        } else {
-            None
-        }
-    }
-
-    fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
-        if let Operation::Behavior(kind, _pre_label, target, _post_label) = oper {
-            match target {
-                BehaviorTarget::Function(qid) => {
-                    Some(self.reduce_behavior_predicate(id, *kind, qid, args))
-                },
-                BehaviorTarget::Parameter(sym) => {
-                    let loc = self.env.get_node_loc(id);
-
-                    // modifies_of is not supported for parameter targets
-                    if *kind == BehaviorKind::ModifiesOf {
-                        self.env.error(
-                            &loc,
-                            "`modifies_of` is not supported for function-typed parameters",
-                        );
-                        return None;
-                    }
-
-                    // Get enclosing function context
-                    let enclosing_fun = self.enclosing_fun.or_else(|| {
-                        self.env.diag(
-                            Severity::Bug,
-                            &loc,
-                            "behavioral predicate with parameter target requires \
-                             enclosing function context",
-                        );
-                        None
-                    })?;
-                    let fun_env = self.env.get_function(enclosing_fun);
-                    let param_type = fun_env
-                        .get_parameters()
-                        .iter()
-                        .find(|p| p.0 == *sym)
-                        .map(|p| p.1.clone())
-                        .expect("parameter not found");
-
-                    // Generate or retrieve the uninterpreted spec function
-                    let spec_fun_id = self.generate_behavior_spec_fun(
-                        enclosing_fun,
-                        *kind,
-                        *sym,
-                        &param_type,
-                        &loc,
-                    );
-
-                    // Build call: $kind$fun$param(arg1, arg2, ...)
-                    // The function parameter is encoded in the spec function name, not passed as arg
-                    let call_args: Vec<Exp> = args.to_vec();
-
-                    // Create node for the spec function call
-                    let result_type = Type::Primitive(PrimitiveType::Bool);
-                    let call_node_id = self.env.new_node(loc, result_type);
-                    // Copy type instantiation from original node for generic functions
-                    self.env
-                        .set_node_instantiation(call_node_id, self.env.get_node_instantiation(id));
-
-                    Some(
-                        ExpData::Call(
-                            call_node_id,
-                            Operation::SpecFunction(spec_fun_id.module_id, spec_fun_id.id, None),
-                            call_args,
-                        )
-                        .into_exp(),
-                    )
-                },
-            }
         } else {
             None
         }

@@ -852,14 +852,70 @@ fn parse_typed_bind(context: &mut Context) -> Result<TypedBind, Box<Diagnostic>>
     ))
 }
 
+// Try to parse a literal value usable in a match pattern. Handles non-negative
+// numeric literals, bools, byte strings, and negative numeric literals (e.g. -1i8).
+// Returns `Ok(None)` if the current position doesn't start a literal pattern.
+fn maybe_parse_literal_pattern(context: &mut Context) -> Result<Option<Value>, Box<Diagnostic>> {
+    let tok = context.tokens.peek();
+    // Negative numeric literal: `-` followed by a number, but not `-0x1::module`.
+    if tok == Tok::Minus {
+        let is_negative_literal = match context.tokens.lookahead2()? {
+            (Tok::NumTypedValue, _) => true,
+            (Tok::NumValue, after) => after != Tok::ColonColon,
+            _ => false,
+        };
+        if is_negative_literal {
+            let start_loc = context.tokens.start_loc();
+            context.tokens.advance()?; // consume `-`
+            let val = parse_value(context)?;
+            let end_loc = context.tokens.previous_end_loc();
+            let neg_num = match val.value {
+                Value_::Num(s) => Value_::Num(Symbol::from(format!("-{}", s.as_str()))),
+                _ => unreachable!("expected numeric value after minus in pattern"),
+            };
+            return Ok(Some(spanned(
+                context.tokens.file_hash(),
+                start_loc,
+                end_loc,
+                neg_num,
+            )));
+        }
+        return Ok(None);
+    }
+    // Positive literal: bool, typed number, byte string, or untyped number
+    // (excluding `NumValue ::` which is a module access like `0x1::module`).
+    let is_literal = matches!(
+        tok,
+        Tok::True | Tok::False | Tok::NumTypedValue | Tok::ByteStringValue
+    ) || (tok == Tok::NumValue && context.tokens.lookahead()? != Tok::ColonColon);
+    if is_literal {
+        return Ok(Some(parse_value(context)?));
+    }
+    Ok(None)
+}
+
 // Parse a binding:
 //      Bind =
-//          <Var>
+//          <Literal>
+//          | <Var>
 //          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindFieldOrDotDot> "}"
 //          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<BindOrDotDot> "," ")"
 //          | <NameAccessChain> <OptionalTypeArgs>
+//
+// Literal patterns include numeric values (with optional sign), bools, and byte strings.
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
+
+    if let Some(val) = maybe_parse_literal_pattern(context)? {
+        let end_loc = context.tokens.previous_end_loc();
+        return Ok(spanned(
+            context.tokens.file_hash(),
+            start_loc,
+            end_loc,
+            Bind_::Literal(val),
+        ));
+    }
+
     if context.tokens.peek() == Tok::Identifier {
         let next_tok = context.tokens.lookahead()?;
         if next_tok != Tok::LBrace
@@ -1128,6 +1184,8 @@ fn exp_ends_with_rbrace(exp: &Exp) -> bool {
         | Exp_::Lambda(_, _, _, _)
         | Exp_::Quant(_, _, _, _, _)
         | Exp_::Behavior(_, _, _, _, _, _)
+        | Exp_::LabeledCall(_, _, _, _)
+        | Exp_::LabeledIndex(_, _, _)
         | Exp_::ExpList(_)
         | Exp_::Unit
         | Exp_::Assign(_, _, _)
@@ -1275,7 +1333,7 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 
             if at_start_of_exp(context) {
                 let mut diag = unexpected_token_error(context.tokens, "the end of an expression");
-                diag.add_note("'break' with a value is not yet supported");
+                diag.add_note("`break` with a value is not yet supported");
                 return Err(diag);
             }
             Exp_::Break(label)
@@ -1898,6 +1956,11 @@ fn parse_match_arms(
 //          | <NameAccessChain> "!" <CallArgs>
 //          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
+    // Check for behavioral predicates first, before parsing as a regular name
+    if is_behavior_predicate(context) {
+        return parse_behavior(context);
+    }
+
     let n = parse_name_access_chain(context, false, || {
         panic!("parse_name_exp with something other than a ModuleAccess")
     })?;
@@ -1994,6 +2057,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
             | Tok::AmpMut
             | Tok::Star
             | Tok::Exclaim
+            | Tok::Minus
             | Tok::LParen
             | Tok::LBrace
             | Tok::Abort
@@ -2081,8 +2145,28 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         Tok::Pipe | Tok::PipePipe => {
             parse_lambda(context, start_loc, LambdaCaptureKind::default(), token)?
         },
-        Tok::Identifier if is_quant(context) => parse_quant(context)?,
-        Tok::Identifier if is_behavior_predicate(context) => parse_behavior(context)?,
+        Tok::Identifier if is_quant(context) => {
+            let quant_exp = parse_quant(context)?;
+            let loc = make_loc(
+                context.tokens.file_hash(),
+                start_loc,
+                context.tokens.previous_end_loc(),
+            );
+            let lhs = sp(loc, quant_exp);
+            return parse_binop_exp(context, lhs, /* min_prec */ 1);
+        },
+        Tok::Identifier if is_behavior_predicate(context) => {
+            let behavior_exp = parse_behavior(context)?;
+            let loc = make_loc(
+                context.tokens.file_hash(),
+                start_loc,
+                context.tokens.previous_end_loc(),
+            );
+            let lhs = sp(loc, behavior_exp);
+            // Apply dot/index chain for postfix access (e.g., label@global<R>(addr).field)
+            let lhs = apply_dot_or_index_chain(context, start_loc, lhs)?;
+            return parse_binop_exp(context, lhs, /* min_prec */ 1);
+        },
         _ => {
             // This could be either an assignment, operator assignment (e.g., +=), or a binary operator
             // expression, or a cast or test
@@ -2271,6 +2355,7 @@ fn parse_binop_exp(context: &mut Context, lhs: Exp, min_prec: u32) -> Result<Exp
 // Parse a unary expression:
 //      UnaryExp =
 //          "!" <UnaryExp>
+//          | "-" <UnaryExp>
 //          | "&mut" <UnaryExp>
 //          | "&" <UnaryExp>
 //          | "*" <UnaryExp>
@@ -2363,7 +2448,16 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 //          | <Term>
 fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
-    let mut lhs = parse_term(context)?;
+    let lhs = parse_term(context)?;
+    apply_dot_or_index_chain(context, start_loc, lhs)
+}
+
+// Apply the dot/index/call chain to an existing expression.
+fn apply_dot_or_index_chain(
+    context: &mut Context,
+    start_loc: usize,
+    mut lhs: Exp,
+) -> Result<Exp, Box<Diagnostic>> {
     loop {
         let exp = match context.tokens.peek() {
             Tok::Period => {
@@ -2466,6 +2560,7 @@ fn behavior_kind_from_str(s: &str) -> Option<BehaviorKind> {
         "aborts_of" => Some(BehaviorKind::AbortsOf),
         "ensures_of" => Some(BehaviorKind::EnsuresOf),
         "modifies_of" => Some(BehaviorKind::ModifiesOf),
+        "result_of" => Some(BehaviorKind::ResultOf),
         _ => None,
     }
 }
@@ -2501,8 +2596,11 @@ fn is_behavior_predicate(context: &mut Context) -> bool {
     }
 }
 
-// Parses a behavior predicate expression:
+// Parses a behavior predicate expression or a labeled resource access:
 //   [pre_label@]behavior_kind<fn_exp>(args)[@post_label]
+//   label@global<R>(addr)
+//   label@exists<R>(addr)
+//   label@R[addr]
 fn parse_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     // Parse optional pre-state label
     let pre_label = if context.tokens.peek() == Tok::Identifier
@@ -2516,8 +2614,16 @@ fn parse_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
         None
     };
 
-    // Parse behavior kind
+    // Check if this is a labeled resource access (label@global<R>(addr), label@exists<R>(addr),
+    // or label@R[addr]) rather than a behavior predicate
     let kind_content = context.tokens.content();
+    if let Some(label) = pre_label {
+        if behavior_kind_from_str(kind_content).is_none() {
+            return parse_labeled_resource(context, label);
+        }
+    }
+
+    // Parse behavior kind
     let kind = behavior_kind_from_str(kind_content).ok_or_else(|| {
         Box::new(
             diag!(
@@ -2525,7 +2631,7 @@ fn parse_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
                 (
                     current_token_loc(context.tokens),
                     format!(
-                        "expected a behavior predicate keyword (requires_of, aborts_of, ensures_of, modifies_of), found '{}'",
+                        "expected a behavior predicate keyword (requires_of, aborts_of, ensures_of, modifies_of, result_of), found '{}'",
                         kind_content
                     )
                 )
@@ -2557,6 +2663,53 @@ fn parse_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     Ok(Exp_::Behavior(
         kind, pre_label, fn_name, type_args, args, post_label,
     ))
+}
+
+// Parses a labeled resource access expression, called after the label and '@' have been consumed.
+// The next token is an identifier that is NOT a behavior keyword.
+//   label@global<R>(addr) → LabeledCall
+//   label@exists<R>(addr) → LabeledCall
+//   label@R[addr]         → LabeledIndex
+fn parse_labeled_resource(context: &mut Context, label: Label) -> Result<Exp_, Box<Diagnostic>> {
+    let name_content = context.tokens.content();
+    if (name_content == "global" || name_content == "exists")
+        && matches!(context.tokens.lookahead(), Ok(Tok::Less))
+    {
+        // label@global<R>(addr) or label@exists<R>(addr)
+        let name = parse_name_access_chain(context, false, || "a builtin name")?;
+        let type_args = parse_optional_type_args(context)?;
+        let args = parse_call_args(context)?;
+        Ok(Exp_::LabeledCall(label, name, type_args, args))
+    } else {
+        // label@R[addr]
+        // Parse the resource name as a name expression (it could be qualified like M::R)
+        let start_loc = context.tokens.start_loc();
+        let n = parse_name_access_chain(context, false, || "a resource type name")?;
+        // Parse optional type arguments (e.g., label@R<T>[addr])
+        let tys = if context.tokens.peek() == Tok::Less
+            && n.loc.end() as usize == context.tokens.start_loc()
+        {
+            let loc = make_loc(
+                context.tokens.file_hash(),
+                context.tokens.start_loc(),
+                context.tokens.start_loc(),
+            );
+            parse_optional_type_args(context)
+                .map_err(|diag| add_type_args_ambiguity_label(loc, diag))?
+        } else {
+            None
+        };
+        let target_loc = make_loc(
+            context.tokens.file_hash(),
+            start_loc,
+            context.tokens.previous_end_loc(),
+        );
+        let target = Box::new(sp(target_loc, Exp_::Name(n, tys)));
+        consume_token(context.tokens, Tok::LBracket)?;
+        let index = Box::new(parse_exp(context)?);
+        consume_token(context.tokens, Tok::RBracket)?;
+        Ok(Exp_::LabeledIndex(label, target, index))
+    }
 }
 
 // Parses a quantifier expressions, assuming is_quant(context) is true.

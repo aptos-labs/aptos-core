@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-12:  publish [module 0x22::test]
+task 1 lines 14-14:  run --verbose 0x22::test::abort_instr --args 404u64
+Error: Function execution failed with VMError: {
+    message: None,
+    major_status: ABORTED,
+    sub_status: Some(404),
+    location: 0x22::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

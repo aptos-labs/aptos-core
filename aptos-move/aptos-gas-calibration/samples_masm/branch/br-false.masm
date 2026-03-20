@@ -1,0 +1,203 @@
+module 0xcafe::BrFalse
+entry public fun calibrate_br_false_x100()
+    ld_false
+    br_false l0
+l0: ld_false
+    br_false l1
+l1: ld_false
+    br_false l2
+l2: ld_false
+    br_false l3
+l3: ld_false
+    br_false l4
+l4: ld_false
+    br_false l5
+l5: ld_false
+    br_false l6
+l6: ld_false
+    br_false l7
+l7: ld_false
+    br_false l8
+l8: ld_false
+    br_false l9
+l9: ld_false
+    br_false l10
+l10: ld_false
+    br_false l11
+l11: ld_false
+    br_false l12
+l12: ld_false
+    br_false l13
+l13: ld_false
+    br_false l14
+l14: ld_false
+    br_false l15
+l15: ld_false
+    br_false l16
+l16: ld_false
+    br_false l17
+l17: ld_false
+    br_false l18
+l18: ld_false
+    br_false l19
+l19: ld_false
+    br_false l20
+l20: ld_false
+    br_false l21
+l21: ld_false
+    br_false l22
+l22: ld_false
+    br_false l23
+l23: ld_false
+    br_false l24
+l24: ld_false
+    br_false l25
+l25: ld_false
+    br_false l26
+l26: ld_false
+    br_false l27
+l27: ld_false
+    br_false l28
+l28: ld_false
+    br_false l29
+l29: ld_false
+    br_false l30
+l30: ld_false
+    br_false l31
+l31: ld_false
+    br_false l32
+l32: ld_false
+    br_false l33
+l33: ld_false
+    br_false l34
+l34: ld_false
+    br_false l35
+l35: ld_false
+    br_false l36
+l36: ld_false
+    br_false l37
+l37: ld_false
+    br_false l38
+l38: ld_false
+    br_false l39
+l39: ld_false
+    br_false l40
+l40: ld_false
+    br_false l41
+l41: ld_false
+    br_false l42
+l42: ld_false
+    br_false l43
+l43: ld_false
+    br_false l44
+l44: ld_false
+    br_false l45
+l45: ld_false
+    br_false l46
+l46: ld_false
+    br_false l47
+l47: ld_false
+    br_false l48
+l48: ld_false
+    br_false l49
+l49: ld_false
+    br_false l50
+l50: ld_false
+    br_false l51
+l51: ld_false
+    br_false l52
+l52: ld_false
+    br_false l53
+l53: ld_false
+    br_false l54
+l54: ld_false
+    br_false l55
+l55: ld_false
+    br_false l56
+l56: ld_false
+    br_false l57
+l57: ld_false
+    br_false l58
+l58: ld_false
+    br_false l59
+l59: ld_false
+    br_false l60
+l60: ld_false
+    br_false l61
+l61: ld_false
+    br_false l62
+l62: ld_false
+    br_false l63
+l63: ld_false
+    br_false l64
+l64: ld_false
+    br_false l65
+l65: ld_false
+    br_false l66
+l66: ld_false
+    br_false l67
+l67: ld_false
+    br_false l68
+l68: ld_false
+    br_false l69
+l69: ld_false
+    br_false l70
+l70: ld_false
+    br_false l71
+l71: ld_false
+    br_false l72
+l72: ld_false
+    br_false l73
+l73: ld_false
+    br_false l74
+l74: ld_false
+    br_false l75
+l75: ld_false
+    br_false l76
+l76: ld_false
+    br_false l77
+l77: ld_false
+    br_false l78
+l78: ld_false
+    br_false l79
+l79: ld_false
+    br_false l80
+l80: ld_false
+    br_false l81
+l81: ld_false
+    br_false l82
+l82: ld_false
+    br_false l83
+l83: ld_false
+    br_false l84
+l84: ld_false
+    br_false l85
+l85: ld_false
+    br_false l86
+l86: ld_false
+    br_false l87
+l87: ld_false
+    br_false l88
+l88: ld_false
+    br_false l89
+l89: ld_false
+    br_false l90
+l90: ld_false
+    br_false l91
+l91: ld_false
+    br_false l92
+l92: ld_false
+    br_false l93
+l93: ld_false
+    br_false l94
+l94: ld_false
+    br_false l95
+l95: ld_false
+    br_false l96
+l96: ld_false
+    br_false l97
+l97: ld_false
+    br_false l98
+l98: ld_false
+    br_false l99
+l99: ret

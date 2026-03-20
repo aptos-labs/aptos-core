@@ -3,6 +3,7 @@
 
 pub mod account_minter;
 pub mod local_account_generator;
+pub mod metrics;
 pub mod stats;
 pub mod submission_worker;
 pub mod transaction_executor;
@@ -12,8 +13,9 @@ use crate::emitter::{
     local_account_generator::{
         create_keyless_account_generator, create_private_key_account_generator,
     },
+    metrics::update_tps_gauges,
     stats::{DynamicStatsTracking, TxnStats},
-    submission_worker::SubmissionWorker,
+    submission_worker::{EncryptionKeyRotator, SubmissionWorker},
     transaction_executor::RestApiReliableTransactionSubmitter,
 };
 use again::RetryPolicy;
@@ -56,8 +58,8 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 const MAX_TXNS: u64 = 1_000_000_000;
 
 // TODO Transfer cost increases during Coin => FA migration, we can reduce back later.
-pub const EXPECTED_GAS_PER_TRANSFER: u64 = 50;
-pub const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 1100 + 20;
+pub const EXPECTED_GAS_PER_TRANSFER: u64 = 500;
+pub const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 11000 + 200;
 
 const MAX_RETRIES: usize = 12;
 
@@ -202,6 +204,8 @@ pub struct EmitJobRequest {
     epk_expiry_date_secs: Option<u64>,
 
     keyless_jwt: Option<String>,
+
+    encrypt_transactions: bool,
 }
 
 impl Default for EmitJobRequest {
@@ -237,6 +241,7 @@ impl Default for EmitJobRequest {
             proof_file_path: None,
             epk_expiry_date_secs: None,
             keyless_jwt: None,
+            encrypt_transactions: false,
         }
     }
 }
@@ -398,6 +403,11 @@ impl EmitJobRequest {
 
     pub fn skip_funding_accounts(mut self) -> Self {
         self.skip_funding_accounts = true;
+        self
+    }
+
+    pub fn encrypt_transactions(mut self, encrypt: bool) -> Self {
+        self.encrypt_transactions = encrypt;
         self
     }
 
@@ -699,11 +709,16 @@ impl EmitJob {
                     .map(|p| &p[cur_phase])
                     .unwrap_or(&default_stats);
             prev_stats = Some(stats);
+
+            // Update Prometheus TPS gauges
+            let rate = delta.rate();
+            update_tps_gauges(rate.committed, rate.submitted);
+
             info!(
                 "[{:?}s stat] phase {}: {}",
                 window.as_secs(),
                 cur_phase,
-                delta.rate()
+                rate
             );
         }
     }
@@ -754,6 +769,19 @@ impl TxnEmitter {
             num_accounts, num_accounts
         );
 
+        // Build init factory with its own independent (empty) encryption key
+        // so it never encrypts, regardless of what happens to the traffic factory.
+        let init_expiration_time =
+            (mode_params.txn_expiration_time_secs as f64 * req.init_expiration_multiplier) as u64;
+        let init_txn_factory = self
+            .txn_factory
+            .clone()
+            .without_encryption()
+            .with_max_gas_amount(req.get_init_max_gas_per_txn())
+            .with_gas_unit_price(req.get_init_gas_price())
+            .with_transaction_expiration_time(init_expiration_time);
+
+        // Build traffic factory (may encrypt)
         let txn_factory = self
             .txn_factory
             .clone()
@@ -761,13 +789,15 @@ impl TxnEmitter {
             .with_gas_unit_price(req.gas_price)
             .with_max_gas_amount(req.max_gas_per_txn);
 
-        let init_expiration_time =
-            (mode_params.txn_expiration_time_secs as f64 * req.init_expiration_multiplier) as u64;
-        let init_txn_factory = txn_factory
-            .clone()
-            .with_max_gas_amount(req.get_init_max_gas_per_txn())
-            .with_gas_unit_price(req.get_init_gas_price())
-            .with_transaction_expiration_time(init_expiration_time);
+        // Set the encryption key on the traffic factory upfront.
+        // init_txn_factory has its own independent Arc so it won't be affected.
+        let encrypt_transactions = req.encrypt_transactions;
+        if encrypt_transactions {
+            let state = self.rest_cli.get_ledger_information().await?.into_inner();
+            txn_factory
+                .update_encryption_key_state(state.epoch, state.encryption_key.as_deref())?;
+        }
+
         let init_retries: usize =
             usize::try_from(init_expiration_time / req.init_retry_interval.as_secs()).unwrap();
         let account_generator = match req.account_type {
@@ -867,6 +897,14 @@ impl TxnEmitter {
         // Creating workers is slow with many workers (TODO check why)
         // so we create them all first, before starting them - so they start at the right time for
         // traffic pattern to be correct.
+        let rotator = if encrypt_transactions {
+            Some(Arc::new(EncryptionKeyRotator::new(
+                txn_factory.encryption_key_handle(),
+            )))
+        } else {
+            None
+        };
+
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
         let all_clients = Arc::new(req.rest_clients.clone());
@@ -890,6 +928,7 @@ impl TxnEmitter {
                 all_start_sleep_durations[worker_index],
                 check_account_sequence_only_once_for.contains(&worker_index),
                 self.from_rng(),
+                rotator.clone(),
             );
             submission_workers.push(worker);
         }
@@ -994,29 +1033,35 @@ fn pick_client(clients: &[RestClient]) -> &RestClient {
 }
 
 async fn wait_for_orderless_txns(
+    start_time: Instant,
     client: &RestClient,
     account_orderless_txns: &HashMap<AccountAddress, HashSet<HashValue>>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
-) -> HashMap<AccountAddress, HashSet<HashValue>> {
+) -> (HashMap<AccountAddress, HashSet<HashValue>>, u128) {
     if account_orderless_txns.is_empty() {
-        return HashMap::new();
+        return (HashMap::new(), 0);
     }
+    let mut sum_of_completion_timestamps_millis = 0u128;
+
     let mut pending_account_txns = account_orderless_txns.clone();
     loop {
-        let futures = pending_account_txns.keys().map(|account| async move {
-            (
-                *account,
-                FETCH_ACCOUNT_RETRY_POLICY
-                    .retry(move || {
-                        client.get_account_transaction_summaries(*account, None, None, None)
-                    })
-                    .await,
-            )
-        });
+        let account_txn_summaries =
+            join_all(pending_account_txns.keys().map(|account| async move {
+                (
+                    *account,
+                    FETCH_ACCOUNT_RETRY_POLICY
+                        .retry(move || {
+                            client.get_account_transaction_summaries(*account, None, None, None)
+                        })
+                        .await,
+                )
+            }))
+            .await;
 
+        let millis_elapsed = start_time.elapsed().as_millis();
         let mut latest_ledger_ts_secs = u64::MAX;
-        for (account, txn_summaries_result) in join_all(futures).await {
+        for (account, txn_summaries_result) in account_txn_summaries {
             match txn_summaries_result {
                 Ok(response) => {
                     let ledger_timestamp =
@@ -1026,7 +1071,9 @@ async fn wait_for_orderless_txns(
                     for txn_summary in response.into_inner() {
                         let remove_account =
                             if let Some(txn_hashes) = pending_account_txns.get_mut(&account) {
-                                txn_hashes.remove(&txn_summary.transaction_hash());
+                                if txn_hashes.remove(&txn_summary.transaction_hash()) {
+                                    sum_of_completion_timestamps_millis += millis_elapsed;
+                                }
                                 txn_hashes.is_empty()
                             } else {
                                 false
@@ -1091,7 +1138,7 @@ async fn wait_for_orderless_txns(
 
         time::sleep(sleep_between_cycles).await;
     }
-    pending_account_txns
+    (pending_account_txns, sum_of_completion_timestamps_millis)
 }
 
 /// This function waits for the submitted transactions to be committed, up to
