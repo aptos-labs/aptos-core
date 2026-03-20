@@ -105,6 +105,14 @@ impl<I> InstrCost<I> {
 /// The instrumentation pass calls [`GasSchedule::cost`] once per instruction
 /// and bakes all parameters into the emitted charge ops — the interpreter
 /// never consults the schedule at runtime.
+///
+/// # Constraint
+///
+/// Branch instructions (those for which [`HasCfgInfo::branch_target`] returns
+/// `Some`) must not have a dynamic cost component. The dynamic charge op is
+/// inserted immediately after the instruction, so on the taken path execution
+/// jumps away and the charge is never reached. For unconditional jumps it is
+/// completely unreachable.
 pub trait GasSchedule<I> {
     fn cost(&self, instr: &I) -> InstrCost<I>;
 }
