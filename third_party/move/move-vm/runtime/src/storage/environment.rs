@@ -50,6 +50,9 @@ pub struct RuntimeEnvironment {
     /// is constructed, existing native functions are inlined in the module representation, so that
     /// the interpreter can call them directly.
     natives: NativeFunctions,
+    /// Hash of the serialized verifier config. Used as part of the verified module cache key so
+    /// that modules verified under one config are not treated as verified under a different config.
+    verifier_config_hash: [u8; 32],
 
     /// Map from struct names to indices, to save on unnecessary cloning and reduce memory
     /// consumption. Used by all struct type creations in the VM and in code cache.
@@ -106,9 +109,14 @@ impl RuntimeEnvironment {
     ) -> Self {
         let natives = NativeFunctions::new(natives)
             .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
+        let verifier_config_hash = move_vm_types::sha3_256(
+            &bcs::to_bytes(&vm_config.verifier_config)
+                .expect("Verifier config must be serializable"),
+        );
         Self {
             vm_config,
             natives,
+            verifier_config_hash,
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
             ty_tag_cache: Arc::new(TypeTagCache::empty()),
             interned_ty_pool: Arc::new(InternedTypePool::new()),
@@ -128,6 +136,15 @@ impl RuntimeEnvironment {
 
     pub fn module_id_pool(&self) -> &InternedModuleIdPool {
         &self.interned_module_id_pool
+    }
+
+    /// Returns a cache key combining the module hash with the verifier config hash, so that
+    /// modules verified under different configs get separate cache entries.
+    fn verifier_cache_key(&self, module_hash: &[u8; 32]) -> [u8; 32] {
+        let mut combined = [0u8; 64];
+        combined[..32].copy_from_slice(module_hash);
+        combined[32..].copy_from_slice(&self.verifier_config_hash);
+        move_vm_types::sha3_256(&combined)
     }
 
     /// Enables delayed field optimization for this environment.
@@ -181,7 +198,12 @@ impl RuntimeEnvironment {
         module_size: usize,
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
-        if !VERIFIED_MODULES_CACHE.contains(module_hash) {
+        // Combine module hash with verifier config hash so that modules verified under one
+        // config are not treated as verified under a different config. This prevents a race
+        // condition in concurrent replay where threads spanning an epoch boundary with a
+        // verifier config change could skip verification.
+        let cache_key = self.verifier_cache_key(module_hash);
+        if !VERIFIED_MODULES_CACHE.contains(&cache_key) {
             let _timer =
                 VM_TIMER.timer_with_label("move_bytecode_verifier::verify_module_with_config");
 
@@ -194,7 +216,7 @@ impl RuntimeEnvironment {
                 compiled_module.as_ref(),
             )?;
             check_natives(compiled_module.as_ref())?;
-            VERIFIED_MODULES_CACHE.put(*module_hash);
+            VERIFIED_MODULES_CACHE.put(cache_key);
         }
 
         Ok(LocallyVerifiedModule(compiled_module, module_size))
@@ -432,6 +454,7 @@ impl Clone for RuntimeEnvironment {
         Self {
             vm_config: self.vm_config.clone(),
             natives: self.natives.clone(),
+            verifier_config_hash: self.verifier_config_hash,
             struct_name_index_map: Arc::clone(&self.struct_name_index_map),
             ty_tag_cache: Arc::clone(&self.ty_tag_cache),
             interned_ty_pool: Arc::clone(&self.interned_ty_pool),
