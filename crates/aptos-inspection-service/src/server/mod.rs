@@ -111,28 +111,6 @@ async fn serve_requests(
     aptos_data_client: AptosDataClient,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Result<Response<Body>, hyper::Error> {
-    // Handle transaction_tracing endpoint separately (supports POST)
-    if req.uri().path() == TRANSACTION_TRACING_PATH {
-        let (status_code, body, content_type) = match *req.method() {
-            Method::GET => transaction_tracing::handle_get_request(),
-            Method::POST => {
-                let (_, body) = req.into_parts();
-                transaction_tracing::handle_post_request(body).await
-            },
-            _ => {
-                return Ok(Response::builder()
-                    .status(StatusCode::METHOD_NOT_ALLOWED)
-                    .body(Body::empty())
-                    .expect("Failed to build response"));
-            },
-        };
-        return Ok(Response::builder()
-            .header(HEADER_CONTENT_TYPE, content_type)
-            .status(status_code)
-            .body(body)
-            .expect("Failed to build response"));
-    }
-
     // Process the request and get the response components
     let (status_code, body, content_type) = match req.uri().path() {
         CONFIGURATION_PATH => {
@@ -183,6 +161,11 @@ async fn serve_requests(
             // /system_information
             // Exposes the system and build information
             system_information::handle_system_information_request(node_config)
+        },
+        TRANSACTION_TRACING_PATH => {
+            // /transaction_tracing
+            // Exposes the current tracing filter configuration (read-only)
+            transaction_tracing::handle_get_request()
         },
         _ => {
             // Handle the invalid path

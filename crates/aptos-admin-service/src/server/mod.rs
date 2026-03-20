@@ -30,6 +30,7 @@ mod consensus;
 #[cfg(unix)]
 mod malloc;
 mod mempool;
+mod transaction_tracing;
 
 #[derive(Default)]
 pub struct Context {
@@ -238,6 +239,9 @@ impl AdminService {
                         "Mempool parking lot is not available.",
                     ))
                 }
+            },
+            (hyper::Method::POST, "/transaction_tracing") => {
+                transaction_tracing::handle_post_request(req).await
             },
             _ => Ok(reply_with_status(StatusCode::NOT_FOUND, "Not found.")),
         }

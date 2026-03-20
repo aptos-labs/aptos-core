@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::create_emitter_and_request;
-use aptos_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, Result, Test};
+use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Node, NodeExt, Result, Test};
 use aptos_rest_client::aptos_api_types::Transaction;
 use async_trait::async_trait;
 use log::info;
@@ -104,7 +104,8 @@ impl NetworkTest for TransactionTracingTest {
             all_validators.len(),
         );
 
-        // Step 3: POST the tracing filter to each validator's inspection service
+        // Step 3: POST the tracing filter to each validator's admin service (write),
+        // then verify via the inspection service (read-only).
         let client = reqwest::Client::new();
         let filter_json = serde_json::json!({
             "enabled": true,
@@ -116,20 +117,25 @@ impl NetworkTest for TransactionTracingTest {
             swarm
                 .validators()
                 .map(|v| {
-                    let mut url = v.inspection_service_endpoint();
-                    url.set_path("transaction_tracing");
-                    (v.peer_id(), url)
+                    let admin_port = v.config().admin_service.port;
+                    let admin_url: reqwest::Url =
+                        format!("http://localhost:{}/transaction_tracing", admin_port)
+                            .parse()
+                            .unwrap();
+                    let mut inspect_url = v.inspection_service_endpoint();
+                    inspect_url.set_path("transaction_tracing");
+                    (v.peer_id(), admin_url, inspect_url)
                 })
                 .collect()
         };
 
-        for (peer_id, url) in &validator_endpoints {
+        for (peer_id, admin_url, _) in &validator_endpoints {
             info!(
                 "TxnTracing: POSTing filter to validator {} at {}",
-                peer_id, url
+                peer_id, admin_url
             );
 
-            let resp = client.post(url.clone()).json(&filter_json).send().await;
+            let resp = client.post(admin_url.clone()).json(&filter_json).send().await;
 
             match resp {
                 Ok(r) => {
@@ -156,10 +162,10 @@ impl NetworkTest for TransactionTracingTest {
             }
         }
 
-        // Step 4: Verify the filter was set by doing a GET
+        // Step 4: Verify the filter was set by doing a GET on the inspection service
         {
-            let (_, url) = &validator_endpoints[0];
-            let resp = client.get(url.clone()).send().await?;
+            let (_, _, inspect_url) = &validator_endpoints[0];
+            let resp = client.get(inspect_url.clone()).send().await?;
             let body = resp.text().await?;
             info!("TxnTracing: GET filter response: {}", body);
         }

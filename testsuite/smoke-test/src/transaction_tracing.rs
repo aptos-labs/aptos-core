@@ -11,13 +11,21 @@ use rand::{rngs::OsRng, SeedableRng};
 use reqwest::Url;
 use std::time::Duration;
 
+/// Build the admin service URL for a validator node.
+fn admin_service_url(v: &dyn Node, path: &str) -> Url {
+    let port = v.config().admin_service.port;
+    let mut url: Url = format!("http://localhost:{}", port).parse().unwrap();
+    url.set_path(path);
+    url
+}
+
 /// Smoke test for transaction tracing:
 /// 1. Spins up a local swarm with 4 validators
 /// 2. Creates and funds 5 accounts
-/// 3. POSTs a tracing filter with those 5 sender addresses to each validator
+/// 3. POSTs a tracing filter via the admin service
 /// 4. Submits coin transfer transactions from the tracked accounts
 /// 5. Verifies the transactions commit (tracing doesn't break the pipeline)
-/// 6. GETs the tracing filter back and verifies it matches
+/// 6. GETs the tracing filter back via the inspection service and verifies it
 /// 7. Checks validator logs for TxnTrace entries with the tracked sender addresses
 #[tokio::test]
 async fn test_transaction_tracing() {
@@ -38,25 +46,27 @@ async fn test_transaction_tracing() {
     let tracked_addresses: Vec<String> = accounts.iter().map(|a| a.address().to_hex()).collect();
     println!("Created {} tracked accounts", tracked_addresses.len());
 
-    // Step 2: POST the tracing filter to each validator's inspection service
+    // Step 2: POST the tracing filter to each validator's admin service
     let client = reqwest::Client::new();
     let filter_json = serde_json::json!({
         "enabled": true,
         "sender_allowlist": tracked_addresses,
     });
 
-    let validator_endpoints: Vec<(_, Url)> = swarm
+    // Collect both admin (POST) and inspection (GET) endpoints per validator
+    let endpoints: Vec<(_, Url, Url)> = swarm
         .validators()
         .map(|v| {
-            let mut url = v.inspection_service_endpoint();
-            url.set_path("transaction_tracing");
-            (v.peer_id(), url)
+            let admin_url = admin_service_url(v, "transaction_tracing");
+            let mut inspect_url = v.inspection_service_endpoint();
+            inspect_url.set_path("transaction_tracing");
+            (v.peer_id(), admin_url, inspect_url)
         })
         .collect();
 
-    for (peer_id, url) in &validator_endpoints {
+    for (peer_id, admin_url, _) in &endpoints {
         let resp = client
-            .post(url.clone())
+            .post(admin_url.clone())
             .json(&filter_json)
             .send()
             .await
@@ -76,9 +86,9 @@ async fn test_transaction_tracing() {
         );
     }
 
-    // Step 3: Verify the filter was set via GET
-    let (_, url) = &validator_endpoints[0];
-    let resp = client.get(url.clone()).send().await.unwrap();
+    // Step 3: Verify the filter was set via GET on the inspection service
+    let (_, _, inspect_url) = &endpoints[0];
+    let resp = client.get(inspect_url.clone()).send().await.unwrap();
     let status = resp.status();
     let body: serde_json::Value = resp.json().await.unwrap();
     println!("GET filter: status={}, body={}", status, body);
@@ -88,7 +98,6 @@ async fn test_transaction_tracing() {
     assert_eq!(allowlist.len(), num_accounts);
 
     // Step 4: Submit transactions from tracked accounts and verify they commit
-    // This proves that tracing doesn't interfere with normal transaction processing
     let receiver = info
         .create_and_fund_user_account(10_000_000_000)
         .await
@@ -131,8 +140,6 @@ async fn test_transaction_tracing() {
         total_trace_count += trace_lines.len();
     }
 
-    // We should see at least some TxnTrace entries across all validators.
-    // The leader validator that proposes the block with our transactions will have traces.
     assert!(
         total_trace_count > 0,
         "Expected TxnTrace log entries in validator logs, found none. \
@@ -162,21 +169,21 @@ async fn test_transaction_tracing() {
         "Expected at least one tracked sender address in TxnTrace logs, found none"
     );
 
-    // Step 7: Disable tracing and verify
+    // Step 7: Disable tracing via admin service and verify via inspection service
     let disable_json = serde_json::json!({
         "enabled": false,
         "sender_allowlist": [],
     });
-    let (_, url) = &validator_endpoints[0];
+    let (_, admin_url, inspect_url) = &endpoints[0];
     let resp = client
-        .post(url.clone())
+        .post(admin_url.clone())
         .json(&disable_json)
         .send()
         .await
         .unwrap();
     assert!(resp.status().is_success());
 
-    let resp = client.get(url.clone()).send().await.unwrap();
+    let resp = client.get(inspect_url.clone()).send().await.unwrap();
     let body: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(body["enabled"], false);
     println!("Tracing disabled successfully");
@@ -196,7 +203,7 @@ async fn test_transaction_tracing() {
 async fn test_transaction_tracing_trace_all() {
     let swarm = new_local_swarm_with_aptos(4).await;
 
-    // --- Enable tracing with empty allowlist (trace ALL senders) ----------
+    // --- Enable tracing with empty allowlist (trace ALL senders) via admin service ---
     let client = reqwest::Client::new();
     let filter_json = serde_json::json!({
         "enabled": true,
@@ -204,8 +211,7 @@ async fn test_transaction_tracing_trace_all() {
     });
 
     for validator in swarm.validators() {
-        let mut url = validator.inspection_service_endpoint();
-        url.set_path("transaction_tracing");
+        let url = admin_service_url(validator, "transaction_tracing");
         let resp = client
             .post(url)
             .json(&filter_json)
