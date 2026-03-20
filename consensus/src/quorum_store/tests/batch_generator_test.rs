@@ -1207,3 +1207,273 @@ async fn test_oversized_transaction_skipped() {
         .unwrap()
         .unwrap();
 }
+
+/// Test that transactions which overflow the max_batches limit are carried over
+/// to the next pull cycle and batched without a redundant mempool pull.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_pending_txns_carry_over() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    // max_batch_txns=10, max_num_batches=2 → can batch 20 txns per cycle
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 10,
+        sender_max_num_batches: 2,
+        pending_txns_max_count: 100,
+        pending_txns_max_age_ms: 5000,
+        ..Default::default()
+    };
+    let max_batch_bytes = config.sender_max_batch_bytes;
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    // Cycle 1: Pull 25 txns, can only batch 20 → 5 should be carried over
+    let signed_txns = create_vec_signed_transactions(25);
+    let join_handle = tokio::spawn(async move {
+        queue_mempool_batch_response(signed_txns, max_batch_bytes, &mut quorum_store_to_mempool_rx)
+            .await;
+        // Cycle 2: mempool returns empty since pending txns cover the remaining
+        queue_mempool_batch_response(vec![], max_batch_bytes, &mut quorum_store_to_mempool_rx)
+            .await;
+    });
+
+    let result1 = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(result1.len(), 2, "Should create max 2 batches");
+    assert_eq!(result1[0].num_txns(), 10);
+    assert_eq!(result1[1].num_txns(), 10);
+    // 5 txns should be in pending buffer
+    assert_eq!(batch_generator.pending_txns_len(), 5);
+    // Pending txns should be in exclusion set
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 25);
+
+    // Cycle 2: pending txns should be batched without needing mempool to return them
+    let result2 = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(result2.len(), 1, "Should batch the 5 pending txns");
+    assert_eq!(result2[0].num_txns(), 5);
+    // Pending buffer should be empty now
+    assert_eq!(batch_generator.pending_txns_len(), 0);
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+/// Test that pending txns are excluded from mempool pulls (in the exclusion set).
+#[tokio::test(flavor = "multi_thread")]
+async fn test_pending_txns_in_exclusion_set() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 5,
+        sender_max_num_batches: 1,
+        pending_txns_max_count: 100,
+        pending_txns_max_age_ms: 5000,
+        ..Default::default()
+    };
+    let max_batch_bytes = config.sender_max_batch_bytes;
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    // Pull 10 txns, can only batch 5 → 5 pending
+    let signed_txns = create_vec_signed_transactions(10);
+    let join_handle = tokio::spawn(async move {
+        // Cycle 1
+        let exclude_txns = queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+        assert_eq!(exclude_txns.len(), 0, "No txns in progress initially");
+
+        // Cycle 2: exclude_txns should contain all 10 (5 batched + 5 pending)
+        let exclude_txns = queue_mempool_batch_response(
+            vec![],
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+        assert_eq!(
+            exclude_txns.len(),
+            10,
+            "All 10 txns (5 batched + 5 pending) should be in exclusion set"
+        );
+    });
+
+    let _result1 = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(batch_generator.pending_txns_len(), 5);
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 10);
+
+    let _result2 = batch_generator.handle_scheduled_pull(300).await;
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+/// Test that pending txns are dropped when they exceed max age.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_pending_txns_expiry() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 5,
+        sender_max_num_batches: 1,
+        pending_txns_max_count: 100,
+        pending_txns_max_age_ms: 1, // 1ms TTL — will expire almost immediately
+        ..Default::default()
+    };
+    let max_batch_bytes = config.sender_max_batch_bytes;
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let signed_txns = create_vec_signed_transactions(10);
+    let join_handle = tokio::spawn(async move {
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+        // Cycle 2: mempool gets asked again, pending txns should have expired
+        queue_mempool_batch_response(
+            vec![],
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+    });
+
+    let _result1 = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(batch_generator.pending_txns_len(), 5);
+
+    // Sleep to ensure TTL expires
+    tokio::time::sleep(Duration::from_millis(5)).await;
+
+    let result2 = batch_generator.handle_scheduled_pull(300).await;
+    // Pending txns should have expired, so nothing to batch
+    assert!(result2.is_empty());
+    assert_eq!(batch_generator.pending_txns_len(), 0);
+    // Expired pending txns should be removed from exclusion set;
+    // only the 5 batched txns from cycle 1 remain
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 5);
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+/// Test that pending txns buffer is capped at pending_txns_max_count.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_pending_txns_max_count() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 5,
+        sender_max_num_batches: 1,
+        pending_txns_max_count: 3, // Cap at 3
+        pending_txns_max_age_ms: 5000,
+        ..Default::default()
+    };
+    let max_batch_bytes = config.sender_max_batch_bytes;
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    // Pull 10 txns, batch 5, overflow 5 but cap at 3 pending
+    let signed_txns = create_vec_signed_transactions(10);
+    let join_handle = tokio::spawn(async move {
+        queue_mempool_batch_response(signed_txns, max_batch_bytes, &mut quorum_store_to_mempool_rx)
+            .await;
+    });
+
+    let _result = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(
+        batch_generator.pending_txns_len(),
+        3,
+        "Pending buffer should be capped at 3"
+    );
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+/// Test that carry-over is disabled when pending_txns_max_count is 0.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_pending_txns_disabled() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 10,
+        sender_max_num_batches: 2,
+        pending_txns_max_count: 0, // Disabled
+        ..Default::default()
+    };
+    let max_batch_bytes = config.sender_max_batch_bytes;
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let signed_txns = create_vec_signed_transactions(25);
+    let join_handle = tokio::spawn(async move {
+        queue_mempool_batch_response(signed_txns, max_batch_bytes, &mut quorum_store_to_mempool_rx)
+            .await;
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(result.len(), 2);
+    // No carry-over when disabled
+    assert_eq!(batch_generator.pending_txns_len(), 0);
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}

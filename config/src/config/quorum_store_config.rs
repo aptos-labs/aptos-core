@@ -107,6 +107,12 @@ pub struct QuorumStoreConfig {
     pub enable_opt_qs_v2_payload_tx: bool,
     /// Enables handling of proposals with OptQS V2 Payload with Batch V2
     pub enable_opt_qs_v2_payload_rx: bool,
+    /// Maximum number of transactions to carry over from one pull cycle to the next
+    /// when bucket_into_batches() cannot batch all pulled transactions (e.g., due to
+    /// sender_max_num_batches limit). Set to 0 to disable carry-over.
+    pub pending_txns_max_count: usize,
+    /// Maximum duration (ms) that carried-over transactions are retained before being dropped.
+    pub pending_txns_max_age_ms: u64,
 }
 
 impl Default for QuorumStoreConfig {
@@ -152,6 +158,8 @@ impl Default for QuorumStoreConfig {
             enable_batch_v2_rx: false,
             enable_opt_qs_v2_payload_tx: false,
             enable_opt_qs_v2_payload_rx: false,
+            pending_txns_max_count: 2000,
+            pending_txns_max_age_ms: 2000,
         }
     }
 }

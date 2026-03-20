@@ -72,6 +72,10 @@ pub struct BatchGenerator {
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
     back_pressure: BackPressure,
+    // Transactions pulled from mempool but not batched due to max_batches limit,
+    // carried over to the next pull cycle to avoid redundant mempool pulls.
+    pending_txns: Vec<SignedTransaction>,
+    pending_txns_inserted_at: Option<Instant>,
 }
 
 impl BatchGenerator {
@@ -178,6 +182,8 @@ impl BatchGenerator {
                 txn_count: false,
                 proof_count: false,
             },
+            pending_txns: Vec::new(),
+            pending_txns_inserted_at: None,
         }
     }
 
@@ -326,11 +332,14 @@ impl BatchGenerator {
         }
     }
 
+    /// Sorts pulled transactions into gas-price buckets and creates batches.
+    /// Returns (created_batches, leftover_txns) where leftover_txns are transactions
+    /// that were pulled but could not be batched (e.g., due to sender_max_num_batches limit).
     fn bucket_into_batches(
         &mut self,
         pulled_txns: &mut Vec<SignedTransaction>,
         expiry_time: u64,
-    ) -> Vec<Batch<BatchInfoExt>> {
+    ) -> (Vec<Batch<BatchInfoExt>>, Vec<SignedTransaction>) {
         // Sort by gas, in descending order. This is a stable sort on existing mempool ordering,
         // so will not reorder accounts or their sequence numbers as long as they have the same gas.
         pulled_txns.sort_by_key(|txn| u64::MAX - txn.gas_unit_price());
@@ -346,6 +355,7 @@ impl BatchGenerator {
 
         let mut max_batches_remaining = self.config.sender_max_num_batches as u64;
         let mut batches = vec![];
+        let mut leftover = Vec::new();
 
         // Only categorize and separate transactions when BatchV2 is enabled
         if self.config.enable_batch_v2_tx {
@@ -377,7 +387,12 @@ impl BatchGenerator {
                         &mut max_batches_remaining,
                         batch_kind,
                     );
+                    leftover.extend(txns);
                 }
+            }
+            // Collect any remaining batch kinds not in the processing order
+            for (_, txns) in txns_by_kind {
+                leftover.extend(txns);
             }
         } else {
             // Legacy path: filter out encrypted transactions (only supported in BatchV2)
@@ -397,9 +412,10 @@ impl BatchGenerator {
                 &mut max_batches_remaining,
                 BatchKind::Normal,
             );
+            leftover.extend(pulled_txns.drain(..));
         }
 
-        batches
+        (batches, leftover)
     }
 
     fn remove_batch_in_progress(&mut self, author: PeerId, batch_id: BatchId) -> bool {
@@ -420,6 +436,51 @@ impl BatchGenerator {
         }
     }
 
+    fn add_pending_to_exclusion_set(&mut self, txns: &[SignedTransaction]) {
+        for txn in txns {
+            let summary = TransactionSummary::new(
+                txn.sender(),
+                txn.replay_protector(),
+                txn.committed_hash(),
+            );
+            let entry = self
+                .txns_in_progress_sorted
+                .entry(summary)
+                .or_insert_with(|| TransactionInProgress::new(txn.gas_unit_price()));
+            entry.increment();
+            entry.gas_unit_price = entry.gas_unit_price.max(txn.gas_unit_price());
+        }
+    }
+
+    fn remove_pending_from_exclusion_set(&mut self, txns: &[SignedTransaction]) {
+        for txn in txns {
+            let summary = TransactionSummary::new(
+                txn.sender(),
+                txn.replay_protector(),
+                txn.committed_hash(),
+            );
+            if let Entry::Occupied(mut o) = self.txns_in_progress_sorted.entry(summary) {
+                if o.get_mut().decrement() == 0 {
+                    o.remove();
+                }
+            }
+        }
+    }
+
+    fn expire_pending_txns(&mut self) {
+        if let Some(inserted_at) = self.pending_txns_inserted_at {
+            if inserted_at.elapsed()
+                > Duration::from_millis(self.config.pending_txns_max_age_ms)
+            {
+                let expired = std::mem::take(&mut self.pending_txns);
+                self.remove_pending_from_exclusion_set(&expired);
+                self.pending_txns_inserted_at = None;
+                counters::BATCH_GENERATOR_PENDING_TXNS_EXPIRED
+                    .inc_by(expired.len() as u64);
+            }
+        }
+    }
+
     #[cfg(test)]
     pub fn remove_batch_in_progress_for_test(&mut self, author: PeerId, batch_id: BatchId) -> bool {
         self.remove_batch_in_progress(author, batch_id)
@@ -430,31 +491,56 @@ impl BatchGenerator {
         self.txns_in_progress_sorted.len()
     }
 
+    #[cfg(test)]
+    pub fn pending_txns_len(&self) -> usize {
+        self.pending_txns.len()
+    }
+
     pub(crate) async fn handle_scheduled_pull(
         &mut self,
         max_count: u64,
     ) -> Vec<Batch<BatchInfoExt>> {
+        // Expire stale pending txns
+        self.expire_pending_txns();
+
         counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
+        counters::BATCH_GENERATOR_PENDING_TXNS.observe(self.pending_txns.len() as f64);
         trace!(
-            "QS: excluding txs len: {:?}",
-            self.txns_in_progress_sorted.len()
+            "QS: excluding txs len: {:?}, pending txns: {:?}",
+            self.txns_in_progress_sorted.len(),
+            self.pending_txns.len()
         );
 
-        let mut pulled_txns = self
-            .mempool_proxy
-            .pull_internal(
-                max_count,
-                self.config.sender_max_total_bytes as u64,
-                self.txns_in_progress_sorted.clone(),
-            )
-            .await
-            .unwrap_or_default();
+        // Account for pending txns when determining how many fresh txns to pull
+        let pending_count = self.pending_txns.len() as u64;
+        let fresh_pull_count = max_count.saturating_sub(pending_count);
 
-        trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
+        let fresh_txns = if fresh_pull_count > 0 {
+            self.mempool_proxy
+                .pull_internal(
+                    fresh_pull_count,
+                    self.config.sender_max_total_bytes as u64,
+                    self.txns_in_progress_sorted.clone(),
+                )
+                .await
+                .unwrap_or_default()
+        } else {
+            vec![]
+        };
 
-        if pulled_txns.is_empty() {
+        // Take pending txns out of the buffer and remove from exclusion set
+        let old_pending = std::mem::take(&mut self.pending_txns);
+        self.remove_pending_from_exclusion_set(&old_pending);
+        self.pending_txns_inserted_at = None;
+
+        // Combine: pending first (they've waited longer), then fresh
+        let mut all_txns = old_pending;
+        all_txns.extend(fresh_txns);
+
+        trace!("QS: all_txns len: {:?}", all_txns.len());
+
+        if all_txns.is_empty() {
             counters::PULLED_EMPTY_TXNS_COUNT.inc();
-            // Quorum store metrics
             counters::CREATED_EMPTY_BATCHES_COUNT.inc();
 
             counters::EMPTY_BATCH_CREATION_DURATION
@@ -463,8 +549,8 @@ impl BatchGenerator {
             return vec![];
         } else {
             counters::PULLED_TXNS_COUNT.inc();
-            counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
-            if pulled_txns.len() as u64 == max_count {
+            counters::PULLED_TXNS_NUM.observe(all_txns.len() as f64);
+            if all_txns.len() as u64 == max_count {
                 counters::BATCH_PULL_FULL_TXNS.observe(max_count as f64)
             }
         }
@@ -473,7 +559,21 @@ impl BatchGenerator {
         let bucket_compute_start = Instant::now();
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
-        let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
+        let (batches, leftover) = self.bucket_into_batches(&mut all_txns, expiry_time);
+
+        // Store leftovers in pending buffer for next cycle (capped)
+        if !leftover.is_empty() && self.config.pending_txns_max_count > 0 {
+            let capped: Vec<_> = leftover
+                .into_iter()
+                .take(self.config.pending_txns_max_count)
+                .collect();
+            counters::BATCH_GENERATOR_PENDING_TXNS_CARRIED_OVER
+                .observe(capped.len() as f64);
+            self.add_pending_to_exclusion_set(&capped);
+            self.pending_txns = capped;
+            self.pending_txns_inserted_at = Some(Instant::now());
+        }
+
         self.last_end_batch_time = Instant::now();
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
 

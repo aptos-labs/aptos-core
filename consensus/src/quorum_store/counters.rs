@@ -402,6 +402,32 @@ pub static BATCH_GENERATOR_SKIPPED_OVERSIZED_TXN: Lazy<IntCounter> = Lazy::new(|
     .unwrap()
 });
 
+pub static BATCH_GENERATOR_PENDING_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_batch_generator_pending_txns",
+        "Number of transactions in the pending carry-over buffer.",
+        TRANSACTION_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
+pub static BATCH_GENERATOR_PENDING_TXNS_CARRIED_OVER: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_batch_generator_pending_txns_carried_over",
+        "Number of transactions carried over to the next pull cycle.",
+        TRANSACTION_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
+pub static BATCH_GENERATOR_PENDING_TXNS_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_generator_pending_txns_expired",
+        "Count of pending transactions expired due to age."
+    )
+    .unwrap()
+});
+
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE: Lazy<Histogram> = Lazy::new(
     || {
         register_histogram!(
