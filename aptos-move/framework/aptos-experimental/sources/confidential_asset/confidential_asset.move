@@ -832,7 +832,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Sets or removes the auditor for a specific asset type. Epoch increments only on install/change.
-    public fun set_auditor_for_asset_type(
+    public fun set_asset_specific_auditor(
         aptos_framework: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         auditor_ek: Option<vector<u8>>
@@ -953,11 +953,19 @@ module aptos_experimental::confidential_asset {
     }
 
     #[view]
+    /// Returns the auditor hint for a user's confidential store, indicating which auditor the balance ciphertext is encrypted for.
+    public fun get_effective_auditor_hint(
+        user: address, asset_type: Object<fungible_asset::Metadata>
+    ): Option<EffectiveAuditorHint> acquires ConfidentialStore {
+        borrow_confidential_store(user, asset_type).auditor_hint
+    }
+
+    #[view]
     /// Note: Dapp developers should **not** need to call this function, which is why (for now) it is marked private.
     ///
     /// This ignores the global auditor, if any, and only returns the asset-specific auditor config. Furthermore, it returns
     /// the auditor config even if the asset_type is no longer allow-listed.
-    fun get_auditor_config_for_asset_type(
+    fun get_asset_specific_auditor_config(
         asset_type: Object<fungible_asset::Metadata>
     ): AuditorConfig acquires AssetConfig, GlobalConfig {
         let asset_config_address = get_asset_config_address(asset_type);

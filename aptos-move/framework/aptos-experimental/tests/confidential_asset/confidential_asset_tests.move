@@ -187,7 +187,7 @@ module aptos_experimental::confidential_asset_tests {
 
         let eff_aud_dk = if (has_eff_auditor) {
             let (dk, ek) = generate_twisted_elgamal_keypair();
-            confidential_asset::set_auditor_for_asset_type(
+            confidential_asset::set_asset_specific_auditor(
                 aptos_fx, token, option::some(ek.compressed_point_to_bytes()),
             );
             option::some(dk)
@@ -441,7 +441,7 @@ module aptos_experimental::confidential_asset_tests {
         let (alice_dk, alice_ek) = generate_twisted_elgamal_keypair();
         let (auditor_dk, auditor_ek) = generate_twisted_elgamal_keypair();
 
-        confidential_asset::set_auditor_for_asset_type(
+        confidential_asset::set_asset_specific_auditor(
             &aptos_fx, token, option::some(auditor_ek.compressed_point_to_bytes()),
         );
 
@@ -625,7 +625,7 @@ module aptos_experimental::confidential_asset_tests {
         );
 
         // Now set a global auditor AFTER proving
-        confidential_asset::set_auditor_for_asset_type(
+        confidential_asset::set_asset_specific_auditor(
             &aptos_fx,
             token,
             std::option::some(auditor1_ek.compressed_point_to_bytes())
