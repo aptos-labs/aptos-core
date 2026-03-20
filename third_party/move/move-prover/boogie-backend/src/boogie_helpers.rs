@@ -261,6 +261,16 @@ pub fn boogie_choice_fun_name(id: usize) -> String {
     format!("$choice_{}", id)
 }
 
+/// Return boogie name for function representing a lifted `exists` expression.
+pub fn boogie_exists_fun_name(id: usize) -> String {
+    format!("$exists_{}", id)
+}
+
+/// Return boogie name for witness function representing a lifted `exists` expression.
+pub fn boogie_exists_witness_fun_name(id: usize) -> String {
+    format!("$exists_witness_{}", id)
+}
+
 /// Creates the name of the resource memory domain for any function for the given struct.
 /// This variable represents a local variable of the Boogie translation of this function.
 pub fn boogie_modifies_memory_name(env: &GlobalEnv, memory: &QualifiedInstId<StructId>) -> String {

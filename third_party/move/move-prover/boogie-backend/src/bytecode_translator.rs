@@ -781,6 +781,43 @@ impl<'env> BoogieTranslator<'env> {
                 );
             } else {
                 emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
+                let explicit_results = results.clone().flatten();
+                if result_locals.len() == 1
+                    && explicit_results.len() == 1
+                    && !explicit_results[0].is_mutable_reference()
+                {
+                    let bp_args = params
+                        .iter()
+                        .enumerate()
+                        .map(|(pos, ty)| {
+                            if ty.is_mutable_reference() {
+                                format!("$Dereference(p{})", pos)
+                            } else {
+                                format!("p{}", pos)
+                            }
+                        })
+                        .join(", ");
+                    let bp_fun_args = if bp_args.is_empty() {
+                        "fun".to_string()
+                    } else {
+                        format!("fun, {}", bp_args)
+                    };
+                    let result_of_name = boogie_behavioral_eval_fun_name(
+                        self.env,
+                        fun_type,
+                        BehaviorKind::ResultOf,
+                    );
+                    let result_suffix =
+                        boogie_type_suffix(self.env, &explicit_results[0], false);
+                    emitln!(
+                        self.writer,
+                        "assume $IsEqual'{}'({}, {}({}));",
+                        result_suffix,
+                        result_locals[0],
+                        result_of_name,
+                        bp_fun_args
+                    );
+                }
             }
             if is_only {
                 // Single variant: no closing needed
@@ -862,6 +899,27 @@ impl<'env> BoogieTranslator<'env> {
                 &params,
                 memory,
             );
+            if result_locals.len() == 1
+                && explicit_results.len() == 1
+                && !explicit_results[0].is_mutable_reference()
+            {
+                let bp_fun_args = if bp_args.is_empty() {
+                    "fun".to_string()
+                } else {
+                    format!("fun, {}", bp_args)
+                };
+                let result_of_name =
+                    boogie_behavioral_eval_fun_name(self.env, fun_type, BehaviorKind::ResultOf);
+                let result_suffix = boogie_type_suffix(self.env, &explicit_results[0], false);
+                emitln!(
+                    self.writer,
+                    "assume $IsEqual'{}'({}, {}({}));",
+                    result_suffix,
+                    result_locals[0],
+                    result_of_name,
+                    bp_fun_args
+                );
+            }
             if is_only {
                 // Single variant: no outer block to close
             } else {

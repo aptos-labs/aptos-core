@@ -7,12 +7,13 @@
 use crate::{
     boogie_helpers::{
         boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name, boogie_byte_blob,
-        boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global, boogie_field_sel,
+        boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global,
+        boogie_exists_fun_name, boogie_exists_witness_fun_name, boogie_field_sel,
         boogie_inst_suffix, boogie_modifies_memory_name, boogie_num_type_base,
-        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_value_blob, boogie_well_formed_expr, MAX_TUPLE_SIZE,
+        boogie_reflection_type_info, boogie_reflection_type_is_struct,
+        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
+        boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name, boogie_type,
+        boogie_type_suffix, boogie_value_blob, boogie_well_formed_expr, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
 };
@@ -66,11 +67,18 @@ pub struct SpecTranslator<'env> {
     /// instantiation, it will have a different node id, but again the same instantiations
     /// map to the same node id, which is the desired semantics.
     lifted_choice_infos: Rc<RefCell<HashMap<(ExpData, Vec<Type>), LiftedChoiceInfo>>>,
+    /// Information about lifted `exists` expressions, represented by a boolean helper function
+    /// plus a witness function.
+    lifted_exists_infos: Rc<RefCell<HashMap<(ExpData, Vec<Type>), LiftedExistsInfo>>>,
     /// Set of (node_id, type, bool) pairs for arbitrary value expressions that need uninterpreted
     /// function declarations. Each arbitrary value at a unique source location gets its own
     /// uninterpreted function to ensure soundness. The bool indicates whether the arbitrary value is of bv type.
     arbitrary_values: Rc<RefCell<BTreeSet<(NodeId, Type, bool)>>>,
+    /// Optional substitutions for local variables used when expanding bounded quantifiers.
+    local_substitutions: Rc<HashMap<Symbol, String>>,
 }
+
+const MAX_UNROLLED_EXISTS_RANGE_SIZE: usize = 8;
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
 /// Those expressions are replaced by a call to an axiomatized function which is generated from
@@ -80,6 +88,20 @@ struct LiftedChoiceInfo {
     id: usize,
     node_id: NodeId,
     kind: QuantKind,
+    result_type: Type,
+    free_vars: Vec<(Symbol, Type)>,
+    used_temps: Vec<(TempIndex, Type)>,
+    used_memory: Vec<(QualifiedInstId<StructId>, Option<MemoryLabel>)>,
+    var: Symbol,
+    range: Exp,
+    condition: Exp,
+}
+
+#[derive(Clone)]
+struct LiftedExistsInfo {
+    id: usize,
+    node_id: NodeId,
+    result_type: Type,
     free_vars: Vec<(Symbol, Type)>,
     used_temps: Vec<(TempIndex, Type)>,
     used_memory: Vec<(QualifiedInstId<StructId>, Option<MemoryLabel>)>,
@@ -102,7 +124,9 @@ impl<'env> SpecTranslator<'env> {
             type_inst: vec![],
             fresh_var_count: Default::default(),
             lifted_choice_infos: Default::default(),
+            lifted_exists_infos: Default::default(),
             arbitrary_values: Default::default(),
+            local_substitutions: Default::default(),
         }
     }
 
@@ -143,6 +167,313 @@ impl<'env> SpecTranslator<'env> {
             }
             f(item);
         }
+    }
+
+    fn translate_exp_to_string_with_substitutions(
+        &self,
+        exp: &Exp,
+        local_substitutions: Rc<HashMap<Symbol, String>>,
+    ) -> String {
+        let temp_writer = CodeWriter::new(self.env.internal_loc());
+        let mut merged_substitutions = (*self.local_substitutions).clone();
+        for (symbol, value) in local_substitutions.iter() {
+            merged_substitutions.insert(*symbol, value.clone());
+        }
+        let temp_spec_translator = SpecTranslator {
+            env: self.env,
+            options: self.options,
+            writer: &temp_writer,
+            type_inst: self.type_inst.clone(),
+            fresh_var_count: Default::default(),
+            lifted_choice_infos: self.lifted_choice_infos.clone(),
+            lifted_exists_infos: self.lifted_exists_infos.clone(),
+            arbitrary_values: self.arbitrary_values.clone(),
+            local_substitutions: Rc::new(merged_substitutions),
+        };
+        temp_spec_translator.translate_exp(exp);
+        let mut translated = temp_writer.extract_result();
+        if translated.ends_with('\n') {
+            translated.pop();
+        }
+        translated
+    }
+
+    fn try_eval_small_vector_len(&self, exp: &Exp) -> Option<usize> {
+        match exp.as_ref() {
+            ExpData::Value(_, Value::Vector(values)) => Some(values.len()),
+            ExpData::Value(_, Value::ByteArray(values)) => Some(values.len()),
+            ExpData::Value(_, Value::AddressArray(values)) => Some(values.len()),
+            ExpData::Call(_, Operation::Vector, args) => Some(args.len()),
+            _ => None,
+        }
+    }
+
+    fn try_eval_small_nonnegative_usize(&self, exp: &Exp) -> Option<usize> {
+        match exp.as_ref() {
+            ExpData::Value(_, Value::Number(value)) => {
+                let value = value.to_string();
+                if value.starts_with('-') {
+                    None
+                } else {
+                    value.parse::<usize>().ok()
+                }
+            },
+            ExpData::Call(_, Operation::Len, args) if args.len() == 1 => {
+                self.try_eval_small_vector_len(&args[0])
+            },
+            _ => self.try_eval_small_vector_len(exp),
+        }
+    }
+
+    fn try_get_small_unrolled_exists_values(&self, range: &Exp) -> Option<Vec<String>> {
+        match range.as_ref() {
+            ExpData::Call(_, Operation::Range, args) if args.len() == 2 => {
+                let start = self.try_eval_small_nonnegative_usize(&args[0])?;
+                let end = self.try_eval_small_nonnegative_usize(&args[1])?;
+                let len = end.saturating_sub(start);
+                if len > MAX_UNROLLED_EXISTS_RANGE_SIZE {
+                    return None;
+                }
+                Some((start..end).map(|i| i.to_string()).collect())
+            },
+            _ => None,
+        }
+    }
+
+    fn try_translate_unrolled_exists(
+        &self,
+        ranges: &[(Pattern, Exp)],
+        condition: &Option<Exp>,
+        body: &Exp,
+    ) -> bool {
+        if ranges.len() != 1 {
+            return false;
+        }
+        let (pattern, range) = &ranges[0];
+        if !matches!(
+            self.get_node_type(range.node_id()).skip_reference(),
+            Type::Primitive(PrimitiveType::Range)
+        ) {
+            return false;
+        }
+        let values = match self.try_get_small_unrolled_exists_values(range) {
+            Some(values) => values,
+            None => return false,
+        };
+        if values.is_empty() {
+            emit!(self.writer, "false");
+            return true;
+        }
+        let (_, var_name) = self.require_range_var(pattern);
+        emit!(self.writer, "(");
+        for (idx, value) in values.iter().enumerate() {
+            if idx > 0 {
+                emit!(self.writer, " || ");
+            }
+            let mut substitutions = HashMap::new();
+            substitutions.insert(var_name, value.clone());
+            let substitutions = Rc::new(substitutions);
+            emit!(self.writer, "(");
+            if let Some(cond) = condition {
+                let translated =
+                    self.translate_exp_to_string_with_substitutions(cond, substitutions.clone());
+                emit!(self.writer, "({}) && ", translated);
+            }
+            let translated_body =
+                self.translate_exp_to_string_with_substitutions(body, substitutions);
+            emit!(self.writer, "({})", translated_body);
+            emit!(self.writer, ")");
+        }
+        emit!(self.writer, ")");
+        true
+    }
+
+    fn get_or_create_lifted_choice(
+        &self,
+        node_id: NodeId,
+        kind: QuantKind,
+        result_type: Type,
+        range: &(Pattern, Exp),
+        condition: &Exp,
+    ) -> (
+        usize,
+        Vec<(Symbol, Type)>,
+        Vec<(TempIndex, Type)>,
+        Vec<(QualifiedInstId<StructId>, Option<MemoryLabel>)>,
+    ) {
+        let range_and_body = ExpData::Quant(
+            node_id,
+            kind,
+            vec![range.clone()],
+            vec![],
+            None,
+            condition.clone(),
+        );
+        let (_, some_var) = self.require_range_var(&range.0);
+        let free_vars = range_and_body
+            .free_vars_with_types(self.env)
+            .into_iter()
+            .filter(|(s, _)| *s != some_var)
+            .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
+            .collect_vec();
+        let used_temps: Vec<(TempIndex, Type)> = range_and_body
+            .used_temporaries_with_types(self.env)
+            .into_iter()
+            .collect_vec();
+        let used_memory = range_and_body
+            .used_memory(self.env)
+            .into_iter()
+            .collect_vec();
+
+        let choice_infos_key_pair = (range_and_body, self.type_inst.clone());
+        let mut choice_infos = self.lifted_choice_infos.borrow_mut();
+        let choice_count = choice_infos.len();
+        let info = choice_infos
+            .entry(choice_infos_key_pair)
+            .or_insert_with(|| LiftedChoiceInfo {
+                id: choice_count,
+                node_id,
+                kind,
+                result_type,
+                free_vars: free_vars.clone(),
+                used_temps: used_temps.clone(),
+                used_memory: used_memory.clone(),
+                var: some_var,
+                range: range.1.clone(),
+                condition: condition.clone(),
+            });
+        (info.id, free_vars, used_temps, used_memory)
+    }
+
+    fn lifted_choice_context_args(
+        &self,
+        free_vars: &[(Symbol, Type)],
+        used_temps: &[(TempIndex, Type)],
+        used_memory: &[(QualifiedInstId<StructId>, Option<MemoryLabel>)],
+    ) -> String {
+        free_vars
+            .iter()
+            .map(|(s, _)| s.display(self.env.symbol_pool()).to_string())
+            .chain(used_temps.iter().map(|(t, _)| format!("$t{}", t)))
+            .chain(
+                used_memory
+                    .iter()
+                    .map(|(m, l)| boogie_resource_memory_name(self.env, m, l)),
+            )
+            .join(", ")
+    }
+
+    fn lifted_choice_call(
+        &self,
+        id: usize,
+        free_vars: &[(Symbol, Type)],
+        used_temps: &[(TempIndex, Type)],
+        used_memory: &[(QualifiedInstId<StructId>, Option<MemoryLabel>)],
+    ) -> String {
+        format!(
+            "{}({})",
+            boogie_choice_fun_name(id),
+            self.lifted_choice_context_args(free_vars, used_temps, used_memory)
+        )
+    }
+
+    fn get_or_create_lifted_exists(
+        &self,
+        node_id: NodeId,
+        result_type: Type,
+        range: &(Pattern, Exp),
+        condition: &Exp,
+    ) -> (
+        usize,
+        Vec<(Symbol, Type)>,
+        Vec<(TempIndex, Type)>,
+        Vec<(QualifiedInstId<StructId>, Option<MemoryLabel>)>,
+    ) {
+        let range_and_body = ExpData::Quant(
+            node_id,
+            QuantKind::Exists,
+            vec![range.clone()],
+            vec![],
+            None,
+            condition.clone(),
+        );
+        let (_, some_var) = self.require_range_var(&range.0);
+        let free_vars = range_and_body
+            .free_vars_with_types(self.env)
+            .into_iter()
+            .filter(|(s, _)| *s != some_var)
+            .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
+            .collect_vec();
+        let used_temps: Vec<(TempIndex, Type)> = range_and_body
+            .used_temporaries_with_types(self.env)
+            .into_iter()
+            .collect_vec();
+        let used_memory = range_and_body
+            .used_memory(self.env)
+            .into_iter()
+            .collect_vec();
+
+        let exists_infos_key_pair = (range_and_body, self.type_inst.clone());
+        let mut exists_infos = self.lifted_exists_infos.borrow_mut();
+        let exists_count = exists_infos.len();
+        let info = exists_infos
+            .entry(exists_infos_key_pair)
+            .or_insert_with(|| LiftedExistsInfo {
+                id: exists_count,
+                node_id,
+                result_type,
+                free_vars: free_vars.clone(),
+                used_temps: used_temps.clone(),
+                used_memory: used_memory.clone(),
+                var: some_var,
+                range: range.1.clone(),
+                condition: condition.clone(),
+            });
+        (info.id, free_vars, used_temps, used_memory)
+    }
+
+    fn lifted_exists_call(
+        &self,
+        id: usize,
+        free_vars: &[(Symbol, Type)],
+        used_temps: &[(TempIndex, Type)],
+        used_memory: &[(QualifiedInstId<StructId>, Option<MemoryLabel>)],
+    ) -> String {
+        format!(
+            "{}({})",
+            boogie_exists_fun_name(id),
+            self.lifted_choice_context_args(free_vars, used_temps, used_memory)
+        )
+    }
+
+    fn try_translate_lifted_exists(
+        &self,
+        node_id: NodeId,
+        ranges: &[(Pattern, Exp)],
+        condition: &Option<Exp>,
+        body: &Exp,
+    ) -> bool {
+        if ranges.len() != 1 {
+            return false;
+        }
+        let combined_condition = if let Some(cond) = condition {
+            ExpData::Call(node_id, Operation::And, vec![cond.clone(), body.clone()]).into_exp()
+        } else {
+            body.clone()
+        };
+        let result_type = self.get_node_type(ranges[0].0.node_id());
+        let (id, free_vars, used_temps, used_memory) = self.get_or_create_lifted_exists(
+            node_id,
+            result_type,
+            &ranges[0],
+            &combined_condition,
+        );
+        emit!(
+            self.writer,
+            "{}",
+            self.lifted_exists_call(id, &free_vars, &used_temps, &used_memory)
+        );
+        true
     }
 }
 
@@ -558,6 +889,7 @@ impl SpecTranslator<'_> {
 impl SpecTranslator<'_> {
     pub(crate) fn finalize(&self) {
         self.translate_choice_functions();
+        self.translate_exists_functions();
         self.translate_arbitrary_value_functions();
     }
 
@@ -573,7 +905,7 @@ impl SpecTranslator<'_> {
         assert!(self.type_inst.is_empty());
         for (key, info) in infos_sorted_with_keys {
             let fun_name = boogie_choice_fun_name(info.id);
-            let result_ty = &env.get_node_type(info.node_id);
+            let result_ty = &info.result_type;
             let exp_loc = env.get_node_loc(info.node_id);
             let var_name = info.var.display(env.symbol_pool()).to_string();
             self.writer.set_location(&exp_loc);
@@ -783,6 +1115,230 @@ impl SpecTranslator<'_> {
         }
     }
 
+    /// Translate lifted helper functions for `exists` expressions.
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn translate_exists_functions(&self) {
+        let env = self.env;
+        let infos_ref = self.lifted_exists_infos.borrow();
+        let infos_sorted_with_keys = infos_ref.iter().sorted_by(|v1, v2| v1.1.id.cmp(&v2.1.id));
+        assert!(self.type_inst.is_empty());
+        for (key, info) in infos_sorted_with_keys {
+            let exists_fun_name = boogie_exists_fun_name(info.id);
+            let witness_fun_name = boogie_exists_witness_fun_name(info.id);
+            let result_ty = &info.result_type;
+            let exp_loc = env.get_node_loc(info.node_id);
+            let var_name = info.var.display(env.symbol_pool()).to_string();
+            self.writer.set_location(&exp_loc);
+
+            let new_spec_trans = SpecTranslator {
+                type_inst: key.1.clone(),
+                ..self.clone()
+            };
+
+            let skip_immutable_reference = |ty: &Type| {
+                if !ty.is_mutable_reference() {
+                    ty.skip_reference().clone()
+                } else {
+                    ty.clone()
+                }
+            };
+            let param_decls = info
+                .free_vars
+                .iter()
+                .map(|(s, ty)| {
+                    (
+                        s.display(env.symbol_pool()).to_string(),
+                        boogie_type(env, &skip_immutable_reference(ty), false),
+                    )
+                })
+                .chain(info.used_temps.iter().map(|(t, ty)| {
+                    (
+                        format!("$t{}", t),
+                        boogie_type(env, &skip_immutable_reference(ty), false),
+                    )
+                }))
+                .chain(info.used_memory.iter().map(|(m, l)| {
+                    let struct_env = &env.get_struct(m.to_qualified_id());
+                    (
+                        boogie_resource_memory_name(env, m, l),
+                        format!("$Memory {}", boogie_struct_name(struct_env, &m.inst, false)),
+                    )
+                }))
+                .collect_vec();
+            let var_decl = (var_name, boogie_type(env, result_ty, false));
+
+            let mk_decl = |(n, t): &(String, String)| format!("{}: {}", n, t);
+            let mk_arg = |(n, _): &(String, String)| n.to_owned();
+            let emit_valid = |n: &str, ty: &Type| {
+                let suffix = boogie_type_suffix(env, ty.skip_reference(), false);
+                let n = if ty.is_mutable_reference() {
+                    format!("$Dereference({})", n)
+                } else {
+                    n.to_owned()
+                };
+                emit!(new_spec_trans.writer, "$IsValid'{}'({})", suffix, n);
+            };
+            let mk_temp = |t: TempIndex| format!("$t{}", t);
+
+            emitln!(
+                new_spec_trans.writer,
+                "// exists expression {}",
+                exp_loc.display(new_spec_trans.env)
+            );
+
+            emitln!(
+                new_spec_trans.writer,
+                "function {{:inline}} {}_pred({}): bool {{",
+                exists_fun_name,
+                vec![&var_decl]
+                    .into_iter()
+                    .chain(param_decls.iter())
+                    .map(mk_decl)
+                    .join(", ")
+            );
+            new_spec_trans.writer.indent();
+            emit_valid(&var_decl.0, result_ty);
+            match env.get_node_type(info.range.node_id()) {
+                Type::Vector(..) => {
+                    emit!(new_spec_trans.writer, " && InRangeVec(");
+                    new_spec_trans.translate_exp(&info.range);
+                    emit!(new_spec_trans.writer, ", {})", &var_decl.0);
+                },
+                Type::Primitive(PrimitiveType::Range) => {
+                    emit!(new_spec_trans.writer, " && $InRange(");
+                    new_spec_trans.translate_exp(&info.range);
+                    emit!(new_spec_trans.writer, ", {})", &var_decl.0);
+                },
+                Type::Primitive(_)
+                | Type::Tuple(_)
+                | Type::Struct(_, _, _)
+                | Type::TypeParameter(_)
+                | Type::Reference(_, _)
+                | Type::Fun(..)
+                | Type::TypeDomain(_)
+                | Type::ResourceDomain(_, _, _)
+                | Type::Error
+                | Type::Var(_) => {},
+            }
+            emitln!(new_spec_trans.writer, " &&");
+            new_spec_trans.translate_exp(&info.condition);
+            new_spec_trans.writer.unindent();
+            emitln!(new_spec_trans.writer, "\n}");
+
+            let predicate = format!(
+                "{}_pred({})",
+                exists_fun_name,
+                vec![&var_decl]
+                    .into_iter()
+                    .chain(param_decls.iter())
+                    .map(mk_arg)
+                    .join(", ")
+            );
+            let condition_trigger = new_spec_trans
+                .translate_exp_to_string_with_substitutions(&info.condition, Default::default());
+
+            emitln!(
+                new_spec_trans.writer,
+                "function {}({}): bool;",
+                exists_fun_name,
+                param_decls.iter().map(mk_decl).join(", ")
+            );
+            emitln!(
+                new_spec_trans.writer,
+                "function {}({}): {};",
+                witness_fun_name,
+                param_decls.iter().map(mk_decl).join(", "),
+                boogie_type(env, result_ty, false)
+            );
+
+            let exists_call = format!(
+                "{}({})",
+                exists_fun_name,
+                param_decls.iter().map(mk_arg).join(", ")
+            );
+            let witness_call = format!(
+                "{}({})",
+                witness_fun_name,
+                param_decls.iter().map(mk_arg).join(", ")
+            );
+
+            emit!(
+                new_spec_trans.writer,
+                "axiom (forall {}:: ",
+                vec![&var_decl]
+                    .into_iter()
+                    .chain(param_decls.iter())
+                    .map(mk_decl)
+                    .join(", ")
+            );
+            emit!(
+                new_spec_trans.writer,
+                "{{{}}} {{{}}} ",
+                predicate,
+                condition_trigger
+            );
+            let mut sep = "";
+            for (s, ty) in &info.free_vars {
+                emit!(new_spec_trans.writer, sep);
+                emit_valid(env.symbol_pool().string(*s).as_ref(), ty);
+                sep = " && ";
+            }
+            for (t, ty) in &info.used_temps {
+                emit!(new_spec_trans.writer, sep);
+                emit_valid(&mk_temp(*t), ty);
+                sep = " && ";
+            }
+            if !sep.is_empty() {
+                emit!(new_spec_trans.writer, " ==> ");
+            }
+            emitln!(
+                new_spec_trans.writer,
+                "{} ==> {});",
+                predicate,
+                exists_call
+            );
+
+            if !param_decls.is_empty() {
+                emit!(
+                    new_spec_trans.writer,
+                    "axiom (forall {}:: ",
+                    param_decls.iter().map(mk_decl).join(", ")
+                );
+                emit!(new_spec_trans.writer, "{{{}}} ", exists_call);
+                let mut sep = "";
+                for (s, ty) in &info.free_vars {
+                    emit!(new_spec_trans.writer, sep);
+                    emit_valid(env.symbol_pool().string(*s).as_ref(), ty);
+                    sep = " && ";
+                }
+                for (t, ty) in &info.used_temps {
+                    emit!(new_spec_trans.writer, sep);
+                    emit_valid(&mk_temp(*t), ty);
+                    sep = " && ";
+                }
+                if !sep.is_empty() {
+                    emitln!(new_spec_trans.writer, " ==>");
+                }
+            } else {
+                emitln!(new_spec_trans.writer, "axiom");
+            }
+            new_spec_trans.writer.indent();
+            emitln!(
+                new_spec_trans.writer,
+                "{} ==> (var {} := {}; {}",
+                exists_call,
+                &var_decl.0,
+                witness_call,
+                predicate
+            );
+            new_spec_trans.writer.unindent();
+            if !param_decls.is_empty() {
+                emit!(new_spec_trans.writer, ")");
+            }
+            emitln!(new_spec_trans.writer, ");\n");
+        }
+    }
+
     /// Translate uninterpreted functions for arbitrary value expressions.
     /// Each distinct source location gets its own uninterpreted function to ensure
     /// that different arbitrary values can have different values in verification.
@@ -973,7 +1529,11 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_local_var(&self, _node_id: NodeId, name: Symbol) {
-        emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
+        if let Some(substitution) = self.local_substitutions.get(&name) {
+            emit!(self.writer, "{}", substitution);
+        } else {
+            emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
+        }
     }
 
     fn translate_temporary(&self, node_id: NodeId, idx: TempIndex) {
@@ -1875,7 +2435,7 @@ impl SpecTranslator<'_> {
 
     fn translate_quant(
         &self,
-        _node_id: NodeId,
+        node_id: NodeId,
         kind: QuantKind,
         ranges: &[(Pattern, Exp)],
         triggers: &[Vec<Exp>],
@@ -1887,6 +2447,15 @@ impl SpecTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         assert!(!kind.is_choice());
+        if kind == QuantKind::Exists && self.try_translate_unrolled_exists(ranges, condition, body)
+        {
+            return;
+        }
+        if kind == QuantKind::Exists
+            && self.try_translate_lifted_exists(node_id, ranges, condition, body)
+        {
+            return;
+        }
         // Translate range expressions. While doing, check for currently unsupported
         // type quantification
         let mut range_tmps = HashMap::new();
@@ -2100,72 +2669,14 @@ impl SpecTranslator<'_> {
         range: &(Pattern, Exp),
         body: &Exp,
     ) {
-        // Reconstruct the choice so we can easily determine used locals and temps.
-        let range_and_body = ExpData::Quant(
-            node_id,
-            kind,
-            vec![range.clone()],
-            vec![],
-            None,
-            body.clone(),
+        let result_type = self.get_node_type(range.0.node_id());
+        let (id, free_vars, used_temps, used_memory) =
+            self.get_or_create_lifted_choice(node_id, kind, result_type, range, body);
+        emit!(
+            self.writer,
+            "{}",
+            self.lifted_choice_call(id, &free_vars, &used_temps, &used_memory)
         );
-        let (_, some_var) = self.require_range_var(&range.0);
-        let free_vars = range_and_body
-            .free_vars_with_types(self.env)
-            .into_iter()
-            .filter(|(s, _)| *s != some_var)
-            .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
-            .collect_vec();
-        let used_temps: Vec<(TempIndex, Type)> = range_and_body
-            .used_temporaries_with_types(self.env)
-            .into_iter()
-            .collect_vec();
-        let used_memory = range_and_body
-            .used_memory(self.env)
-            .into_iter()
-            .collect_vec();
-
-        // Create a new uninterpreted function and choice info only if it does not
-        // stem from the same original source than an existing one. This needs to be done to
-        // avoid non-determinism in reasoning with choices resulting from duplication
-        // of the same expressions. Consider a user has written `ensures choose i: ..`.
-        // This expression might be duplicated many times e.g. via opaque function caller
-        // sites. We want that the choice consistently returns the same value in each case;
-        // we can only guarantee this if we use the same uninterpreted function for each instance.
-        // We also need to consider the type instantiation.
-        // As a result, (ExpData, Vec<Type>) is used as the key
-        let choice_infos_key_pair = (range_and_body, self.type_inst.clone());
-        let mut choice_infos = self.lifted_choice_infos.borrow_mut();
-        let choice_count = choice_infos.len();
-        let info = choice_infos
-            .entry(choice_infos_key_pair)
-            .or_insert_with(|| LiftedChoiceInfo {
-                id: choice_count,
-                node_id,
-                kind,
-                free_vars: free_vars.clone(),
-                used_temps: used_temps.clone(),
-                used_memory: used_memory.clone(),
-                var: some_var,
-                range: range.1.clone(),
-                condition: body.clone(),
-            });
-        let fun_name = boogie_choice_fun_name(info.id);
-
-        // Construct the arguments. Notice that those might be different for each call of
-        // the choice function, resulting from the choice being injected into multiple contexts
-        // with different substitutions.
-        let args = free_vars
-            .iter()
-            .map(|(s, _)| s.display(self.env.symbol_pool()).to_string())
-            .chain(used_temps.iter().map(|(t, _)| format!("$t{}", t)))
-            .chain(
-                used_memory
-                    .iter()
-                    .map(|(m, l)| boogie_resource_memory_name(self.env, m, l)),
-            )
-            .join(", ");
-        emit!(self.writer, "{}({})", fun_name, args);
     }
 
     fn translate_eq_neq(&self, boogie_val_fun: &str, args: &[Exp]) {
