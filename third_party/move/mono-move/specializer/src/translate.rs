@@ -10,159 +10,22 @@
 //! Pass 2: Map value IDs to named registers using liveness-driven reuse
 //!         with StLoc look-ahead and CopyLoc/MoveLoc coalescing.
 
+use crate::{
+    instr_utils::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks},
+    ir::{BinaryOp, FunctionIR, Instr, Label, ModuleIR, Reg, UnaryOp},
+    type_conversion::{convert_sig_token, convert_sig_tokens},
+};
 use anyhow::{bail, ensure, Context, Result};
-use crate::ir::{BinaryOp, FunctionIR, Instr, Label, ModuleIR, Reg, UnaryOp};
-use crate::instr_utils::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
-use crate::type_conversion::{convert_sig_token, convert_sig_tokens};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Bytecode, CodeOffset, SignatureToken, StructDefInstantiationIndex,
-        StructDefinitionIndex, StructFieldInformation,
+        Bytecode, CodeOffset, SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
+        StructFieldInformation,
     },
     CompiledModule,
 };
-use move_vm_types::loaded_data::{
-    runtime_types::Type,
-    struct_name_indexing::StructNameIndex,
-};
+use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use std::collections::BTreeMap;
-
-/// Intermediate SSA representation of a single function, before register allocation.
-pub(crate) struct SSAFunction {
-    pub instrs: Vec<Instr>,
-    pub vid_types: Vec<Type>,
-    pub local_types: Vec<Type>,
-}
-
-impl SSAFunction {
-    /// Fuse consecutive borrow+deref patterns into combined field access instructions.
-    fn fuse_field_access_instrs(&mut self) {
-        let instrs = &mut self.instrs;
-        let mut i = 0;
-        while i + 1 < instrs.len() {
-            let fused = match (&instrs[i], &instrs[i + 1]) {
-                (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-                    if *ref_r == *read_src =>
-                {
-                    Some(Instr::ReadField(*dst, *fld, *src))
-                },
-                (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-                    if *ref_r == *read_src =>
-                {
-                    Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
-                },
-                (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-                    if *ref_r == *write_ref =>
-                {
-                    Some(Instr::WriteField(*fld, *dst_ref, *val))
-                },
-                (Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-                    if *ref_r == *write_ref =>
-                {
-                    Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val))
-                },
-                (
-                    Instr::ImmBorrowVariantField(ref_r, fld, src),
-                    Instr::ReadRef(dst, read_src),
-                ) if *ref_r == *read_src => {
-                    Some(Instr::ReadVariantField(*dst, *fld, *src))
-                },
-                (
-                    Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src),
-                    Instr::ReadRef(dst, read_src),
-                ) if *ref_r == *read_src => {
-                    Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src))
-                },
-                (
-                    Instr::MutBorrowVariantField(ref_r, fld, dst_ref),
-                    Instr::WriteRef(write_ref, val),
-                ) if *ref_r == *write_ref => {
-                    Some(Instr::WriteVariantField(*fld, *dst_ref, *val))
-                },
-                (
-                    Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
-                    Instr::WriteRef(write_ref, val),
-                ) if *ref_r == *write_ref => {
-                    Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val))
-                },
-                _ => None,
-            };
-
-            if let Some(fused_instr) = fused {
-                instrs[i] = fused_instr;
-                instrs.remove(i + 1);
-            } else {
-                i += 1;
-            }
-        }
-    }
-
-    /// Fuse consecutive `Ld*` + `BinaryOp` pairs into `BinaryOpImm` in the SSA IR.
-    fn fuse_immediate_binops(&mut self) {
-        let instrs = &self.instrs;
-        let blocks = split_into_blocks(instrs);
-        let mut result = Vec::with_capacity(instrs.len());
-
-        let mut block_idx = 0;
-        let mut skip_next = false;
-
-        for i in 0..instrs.len() {
-            if skip_next {
-                skip_next = false;
-                continue;
-            }
-
-            // Advance to the current block.
-            while block_idx < blocks.len() && i >= blocks[block_idx].1 {
-                block_idx += 1;
-            }
-
-            // Only fuse within the same basic block.
-            if i + 1 < instrs.len()
-                && block_idx < blocks.len()
-                && i + 1 < blocks[block_idx].1
-                && let Some((tmp, imm)) = extract_imm_value(&instrs[i])
-            {
-                let fused = match &instrs[i + 1] {
-                    Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
-                        Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm.clone()))
-                    },
-                    Instr::BinaryOp(dst, op, lhs, rhs)
-                        if *lhs == tmp && is_commutative(op) =>
-                    {
-                        Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm.clone()))
-                    },
-                    _ => None,
-                };
-                if let Some(fused_instr) = fused {
-                    debug_assert!({
-                        let (bstart, bend) = blocks[block_idx];
-                        instrs[bstart..bend]
-                            .iter()
-                            .enumerate()
-                            .filter(|&(j, _)| bstart + j != i + 1)
-                            .all(|(_, ins)| {
-                                let (_, uses) = get_defs_uses(ins);
-                                !uses.contains(&tmp)
-                            })
-                    },
-                        "BinaryOpImm SSA fusion: VID {:?} has uses outside the \
-                         consecutive Ld+BinaryOp pair — stack machine invariant violated",
-                        tmp,
-                    );
-                    result.push(fused_instr);
-                    skip_next = true;
-                    continue;
-                }
-            }
-
-            result.push(instrs[i].clone());
-        }
-
-        self.instrs = result;
-    }
-}
 
 /// Convert an entire compiled module to stackless IR.
 ///
@@ -192,7 +55,10 @@ impl SSAFunction {
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed registers
 ///   truly hold dead values, so type-keyed register recycling is sound.
-pub fn translate_module(module: CompiledModule, struct_name_table: &[StructNameIndex]) -> Result<ModuleIR> {
+pub fn translate_module(
+    module: CompiledModule,
+    struct_name_table: &[StructNameIndex],
+) -> Result<ModuleIR> {
     let functions = module
         .function_defs
         .iter()
@@ -205,8 +71,11 @@ pub fn translate_module(module: CompiledModule, struct_name_table: &[StructNameI
                 let handle_idx = fdef.function;
                 let param_sig_toks = &module.signature_at(handle.parameters).0;
                 let local_sig_toks = &module.signature_at(code.locals).0;
-                let all_sig_toks: Vec<SignatureToken> =
-                    param_sig_toks.iter().chain(local_sig_toks.iter()).cloned().collect();
+                let all_sig_toks: Vec<SignatureToken> = param_sig_toks
+                    .iter()
+                    .chain(local_sig_toks.iter())
+                    .cloned()
+                    .collect();
                 // [TODO]: we currently convert signature tokens into the runtime type representation, but
                 // this will change to use more efficient cached type representations.
                 let local_types = convert_sig_tokens(&module, &all_sig_toks, struct_name_table);
@@ -241,8 +110,200 @@ pub fn translate_module(module: CompiledModule, struct_name_table: &[StructNameI
 }
 
 // ================================================================================================
+// SSA intermediate representation
+// ================================================================================================
+
+/// Intermediate SSA representation of a single function, before register allocation.
+pub(crate) struct SSAFunction {
+    /// Stackless instructions in SSA form.
+    pub instrs: Vec<Instr>,
+    /// Type of each value ID, indexed by `vid - num_pinned` where `num_pinned = local_types.len()`.
+    pub vid_types: Vec<Type>,
+    /// Types of all locals (params ++ declared locals).
+    pub local_types: Vec<Type>,
+}
+
+impl SSAFunction {
+    /// Fuse consecutive borrow+deref patterns into combined field access instructions.
+    fn fuse_field_access_instrs(&mut self) {
+        let instrs = &self.instrs;
+        let mut result = Vec::with_capacity(instrs.len());
+        let mut skip_next = false;
+
+        for w in instrs.windows(2) {
+            if skip_next {
+                skip_next = false;
+                continue;
+            }
+
+            let fused = match (&w[0], &w[1]) {
+                (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+                    if *ref_r == *read_src =>
+                {
+                    Some(Instr::ReadField(*dst, *fld, *src))
+                },
+                (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+                    if *ref_r == *read_src =>
+                {
+                    Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
+                },
+                (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+                    if *ref_r == *write_ref =>
+                {
+                    Some(Instr::WriteField(*fld, *dst_ref, *val))
+                },
+                (
+                    Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref),
+                    Instr::WriteRef(write_ref, val),
+                ) if *ref_r == *write_ref => Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val)),
+                (Instr::ImmBorrowVariantField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+                    if *ref_r == *read_src =>
+                {
+                    Some(Instr::ReadVariantField(*dst, *fld, *src))
+                },
+                (
+                    Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src),
+                    Instr::ReadRef(dst, read_src),
+                ) if *ref_r == *read_src => Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src)),
+                (
+                    Instr::MutBorrowVariantField(ref_r, fld, dst_ref),
+                    Instr::WriteRef(write_ref, val),
+                ) if *ref_r == *write_ref => Some(Instr::WriteVariantField(*fld, *dst_ref, *val)),
+                (
+                    Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
+                    Instr::WriteRef(write_ref, val),
+                ) if *ref_r == *write_ref => {
+                    Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val))
+                },
+                _ => None,
+            };
+
+            if let Some(fused_instr) = fused {
+                result.push(fused_instr);
+                skip_next = true;
+            } else {
+                result.push(w[0].clone());
+            }
+        }
+
+        // The last instruction is only the second element of the final window,
+        // so it's never pushed as w[0]. Emit it unless it was consumed by fusion.
+        if !skip_next {
+            if let Some(last) = instrs.last() {
+                result.push(last.clone());
+            }
+        }
+
+        self.instrs = result;
+    }
+
+    /// Fuse consecutive `Ld*` + `BinaryOp` pairs into `BinaryOpImm` in the SSA IR.
+    fn fuse_immediate_binops(&mut self) {
+        let instrs = &self.instrs;
+        let blocks = split_into_blocks(instrs);
+        let mut result = Vec::with_capacity(instrs.len());
+
+        let mut block_idx = 0;
+        let mut skip_next = false;
+
+        for i in 0..instrs.len() {
+            if skip_next {
+                skip_next = false;
+                continue;
+            }
+
+            // Advance to the current block.
+            while block_idx < blocks.len() && i >= blocks[block_idx].1 {
+                block_idx += 1;
+            }
+
+            // Only fuse within the same basic block.
+            if i + 1 < instrs.len()
+                && block_idx < blocks.len()
+                && i + 1 < blocks[block_idx].1
+                && let Some((tmp, imm)) = extract_imm_value(&instrs[i])
+            {
+                let fused = match &instrs[i + 1] {
+                    Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
+                        Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm.clone()))
+                    },
+                    Instr::BinaryOp(dst, op, lhs, rhs) if *lhs == tmp && is_commutative(op) => {
+                        Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm.clone()))
+                    },
+                    _ => None,
+                };
+                if let Some(fused_instr) = fused {
+                    debug_assert!(
+                        {
+                            let (bstart, bend) = blocks[block_idx];
+                            instrs[bstart..bend]
+                                .iter()
+                                .enumerate()
+                                .filter(|&(j, _)| bstart + j != i + 1)
+                                .all(|(_, ins)| {
+                                    let (_, uses) = get_defs_uses(ins);
+                                    !uses.contains(&tmp)
+                                })
+                        },
+                        "BinaryOpImm SSA fusion: VID {:?} has uses outside the \
+                         consecutive Ld+BinaryOp pair — stack machine invariant violated",
+                        tmp,
+                    );
+                    result.push(fused_instr);
+                    skip_next = true;
+                    continue;
+                }
+            }
+
+            result.push(instrs[i].clone());
+        }
+
+        self.instrs = result;
+    }
+}
+
+// ================================================================================================
 // Pass: Bytecode -> Intra-Block SSA
 // ================================================================================================
+
+/// Split bytecode into basic blocks, returning `[start, end)` offset pairs.
+///
+/// A new block starts at every branch target (present in `label_map`) and after
+/// every terminator (`Branch`, `BrTrue`, `BrFalse`, `Ret`, `Abort`, `AbortMsg`).
+fn split_bytecode_into_blocks(
+    code: &[Bytecode],
+    label_map: &BTreeMap<CodeOffset, Label>,
+) -> Result<Vec<(usize, usize)>> {
+    let mut blocks = Vec::new();
+    let mut start = 0;
+
+    for (offset, bc) in code.iter().enumerate() {
+        if label_map.contains_key(&(offset as CodeOffset)) && offset > start {
+            blocks.push((start, offset));
+            start = offset;
+        }
+        match bc {
+            Bytecode::Branch(_)
+            | Bytecode::BrTrue(_)
+            | Bytecode::BrFalse(_)
+            | Bytecode::Ret
+            | Bytecode::Abort
+            | Bytecode::AbortMsg => {
+                blocks.push((start, offset + 1));
+                start = offset + 1;
+            },
+            _ => {},
+        }
+    }
+    // The bytecode verifier's `verify_fallthrough` rejects code whose last
+    // instruction is not an unconditional branch (Ret/Abort/Branch), so every
+    // block-ending terminator in the loop above will have consumed all code.
+    ensure!(
+        start >= code.len(),
+        "verified bytecode must end with a terminator"
+    );
+    Ok(blocks)
+}
 
 struct SsaConverter<'a> {
     /// Next value ID (starts at num_pinned, monotonically increasing across blocks)
@@ -319,9 +380,7 @@ impl<'a> SsaConverter<'a> {
     fn assign_labels(&mut self, code: &[Bytecode]) {
         for (offset, bc) in code.iter().enumerate() {
             match bc {
-                Bytecode::Branch(target)
-                | Bytecode::BrTrue(target)
-                | Bytecode::BrFalse(target) => {
+                Bytecode::Branch(target) | Bytecode::BrTrue(target) | Bytecode::BrFalse(target) => {
                     self.get_or_create_label(*target);
                 },
                 _ => {},
@@ -343,11 +402,7 @@ impl<'a> SsaConverter<'a> {
         convert_sig_token(module, &tok, self.struct_name_table)
     }
 
-    fn struct_inst_type(
-        &self,
-        module: &CompiledModule,
-        idx: StructDefInstantiationIndex,
-    ) -> Type {
+    fn struct_inst_type(&self, module: &CompiledModule, idx: StructDefInstantiationIndex) -> Type {
         let inst = &module.struct_def_instantiations[idx.0 as usize];
         let def = &module.struct_defs[inst.def.0 as usize];
         let type_params = module.signature_at(inst.type_parameters).0.clone();
@@ -432,41 +487,20 @@ impl<'a> SsaConverter<'a> {
     // --------------------------------------------------------------------------------------------
 
     /// Converts the function's bytecode into SSA form, consuming the converter.
-    fn convert_function(mut self, module: &CompiledModule, code: &[Bytecode]) -> Result<SSAFunction> {
+    fn convert_function(
+        mut self,
+        module: &CompiledModule,
+        code: &[Bytecode],
+    ) -> Result<SSAFunction> {
         self.assign_labels(code);
 
-        // Split into basic blocks
-        let mut block_start = 0;
-        let mut block_boundaries: Vec<(usize, usize)> = Vec::new(); // [start, end) bytecode offsets
-
-        for (offset, bc) in code.iter().enumerate() {
-            if self.label_map.contains_key(&(offset as CodeOffset)) && offset > block_start {
-                block_boundaries.push((block_start, offset));
-                block_start = offset;
-            }
-            match bc {
-                Bytecode::Branch(_)
-                | Bytecode::BrTrue(_)
-                | Bytecode::BrFalse(_)
-                | Bytecode::Ret
-                | Bytecode::Abort
-                | Bytecode::AbortMsg => {
-                    block_boundaries.push((block_start, offset + 1));
-                    block_start = offset + 1;
-                },
-                _ => {},
-            }
-        }
-        // The bytecode verifier's `verify_fallthrough` rejects code whose last
-        // instruction is not an unconditional branch (Ret/Abort/Branch), so every
-        // block-ending terminator in the loop above will have consumed all code.
-        ensure!(
-            block_start >= code.len(),
-            "verified bytecode must end with a terminator"
-        );
+        let block_boundaries = split_bytecode_into_blocks(code, &self.label_map)?;
 
         for (start, end) in block_boundaries {
-            ensure!(self.stack.is_empty(), "stack must be empty at block boundary");
+            ensure!(
+                self.stack.is_empty(),
+                "stack must be empty at block boundary"
+            );
 
             for (i, bc) in code[start..end].iter().enumerate() {
                 let offset = start + i;
@@ -674,11 +708,13 @@ impl<'a> SsaConverter<'a> {
                 let (src, _src_ty) = self.pop()?;
                 let n = struct_field_count(module, *idx);
                 let ftypes = struct_field_type_toks(module, *idx);
-                let ftypes: Vec<Type> =
-                    convert_sig_tokens(module, &ftypes, self.struct_name_table);
+                let ftypes: Vec<Type> = convert_sig_tokens(module, &ftypes, self.struct_name_table);
                 let mut dsts = Vec::with_capacity(n);
                 for i in 0..n {
-                    let fty = ftypes.get(i).cloned().context("field type index out of bounds")?;
+                    let fty = ftypes
+                        .get(i)
+                        .cloned()
+                        .context("field type index out of bounds")?;
                     dsts.push(self.alloc_vid(fty));
                 }
                 self.instrs.push(Instr::Unpack(dsts.clone(), *idx, src));
@@ -700,10 +736,14 @@ impl<'a> SsaConverter<'a> {
                     convert_sig_tokens(module, &ftypes_tok, self.struct_name_table);
                 let mut dsts = Vec::with_capacity(n);
                 for i in 0..n {
-                    let fty = ftypes.get(i).cloned().context("field type index out of bounds")?;
+                    let fty = ftypes
+                        .get(i)
+                        .cloned()
+                        .context("field type index out of bounds")?;
                     dsts.push(self.alloc_vid(fty));
                 }
-                self.instrs.push(Instr::UnpackGeneric(dsts.clone(), *idx, src));
+                self.instrs
+                    .push(Instr::UnpackGeneric(dsts.clone(), *idx, src));
                 for (dst, fty) in dsts.into_iter().zip(ftypes) {
                     self.push(dst, fty);
                 }
@@ -731,22 +771,28 @@ impl<'a> SsaConverter<'a> {
                 let tok = SignatureToken::StructInstantiation(def.struct_handle, type_params);
                 let result_ty = convert_sig_token(module, &tok, self.struct_name_table);
                 let dst = self.alloc_vid(result_ty.clone());
-                self.instrs.push(Instr::PackVariantGeneric(dst, *idx, fields));
+                self.instrs
+                    .push(Instr::PackVariantGeneric(dst, *idx, fields));
                 self.push(dst, result_ty);
             },
             B::UnpackVariant(idx) => {
                 let (src, _src_ty) = self.pop()?;
                 let handle = &module.struct_variant_handles[idx.0 as usize];
                 let n = variant_field_count(module, handle.struct_index, handle.variant);
-                let ftypes_tok = variant_field_type_toks(module, handle.struct_index, handle.variant);
+                let ftypes_tok =
+                    variant_field_type_toks(module, handle.struct_index, handle.variant);
                 let ftypes: Vec<Type> =
                     convert_sig_tokens(module, &ftypes_tok, self.struct_name_table);
                 let mut dsts = Vec::with_capacity(n);
                 for i in 0..n {
-                    let fty = ftypes.get(i).cloned().context("field type index out of bounds")?;
+                    let fty = ftypes
+                        .get(i)
+                        .cloned()
+                        .context("field type index out of bounds")?;
                     dsts.push(self.alloc_vid(fty));
                 }
-                self.instrs.push(Instr::UnpackVariant(dsts.clone(), *idx, src));
+                self.instrs
+                    .push(Instr::UnpackVariant(dsts.clone(), *idx, src));
                 for (dst, fty) in dsts.into_iter().zip(ftypes) {
                     self.push(dst, fty);
                 }
@@ -757,7 +803,8 @@ impl<'a> SsaConverter<'a> {
                 let handle = &module.struct_variant_handles[inst.handle.0 as usize];
                 let n = variant_field_count(module, handle.struct_index, handle.variant);
                 let type_params = module.signature_at(inst.type_parameters).0.clone();
-                let raw_ftypes = variant_field_type_toks(module, handle.struct_index, handle.variant);
+                let raw_ftypes =
+                    variant_field_type_toks(module, handle.struct_index, handle.variant);
                 let ftypes_tok: Vec<SignatureToken> = raw_ftypes
                     .iter()
                     .map(|ft| substitute_type_params(ft, &type_params))
@@ -766,7 +813,10 @@ impl<'a> SsaConverter<'a> {
                     convert_sig_tokens(module, &ftypes_tok, self.struct_name_table);
                 let mut dsts = Vec::with_capacity(n);
                 for i in 0..n {
-                    let fty = ftypes.get(i).cloned().context("field type index out of bounds")?;
+                    let fty = ftypes
+                        .get(i)
+                        .cloned()
+                        .context("field type index out of bounds")?;
                     dsts.push(self.alloc_vid(fty));
                 }
                 self.instrs
@@ -828,7 +878,8 @@ impl<'a> SsaConverter<'a> {
                 let fty = self.field_inst_type(module, *idx)?;
                 let ty = Type::Reference(Box::new(fty));
                 let dst = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ImmBorrowFieldGeneric(dst, *idx, src));
+                self.instrs
+                    .push(Instr::ImmBorrowFieldGeneric(dst, *idx, src));
                 self.push(dst, ty);
             },
             B::MutBorrowFieldGeneric(idx) => {
@@ -836,7 +887,8 @@ impl<'a> SsaConverter<'a> {
                 let fty = self.field_inst_type(module, *idx)?;
                 let ty = Type::MutableReference(Box::new(fty));
                 let dst = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MutBorrowFieldGeneric(dst, *idx, src));
+                self.instrs
+                    .push(Instr::MutBorrowFieldGeneric(dst, *idx, src));
                 self.push(dst, ty);
             },
             B::ImmBorrowVariantField(idx) => {
@@ -844,7 +896,8 @@ impl<'a> SsaConverter<'a> {
                 let fty = self.variant_field_handle_type(module, *idx)?;
                 let ty = Type::Reference(Box::new(fty));
                 let dst = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::ImmBorrowVariantField(dst, *idx, src));
+                self.instrs
+                    .push(Instr::ImmBorrowVariantField(dst, *idx, src));
                 self.push(dst, ty);
             },
             B::MutBorrowVariantField(idx) => {
@@ -852,7 +905,8 @@ impl<'a> SsaConverter<'a> {
                 let fty = self.variant_field_handle_type(module, *idx)?;
                 let ty = Type::MutableReference(Box::new(fty));
                 let dst = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::MutBorrowVariantField(dst, *idx, src));
+                self.instrs
+                    .push(Instr::MutBorrowVariantField(dst, *idx, src));
                 self.push(dst, ty);
             },
             B::ImmBorrowVariantFieldGeneric(idx) => {
@@ -993,7 +1047,8 @@ impl<'a> SsaConverter<'a> {
                 for rty in &ret_types {
                     rets.push(self.alloc_vid(rty.clone()));
                 }
-                self.instrs.push(Instr::CallGeneric(rets.clone(), *idx, args));
+                self.instrs
+                    .push(Instr::CallGeneric(rets.clone(), *idx, args));
                 for (r, rty) in rets.into_iter().zip(ret_types) {
                     self.push(r, rty);
                 }
@@ -1069,7 +1124,8 @@ impl<'a> SsaConverter<'a> {
                 let elem_ty = convert_sig_token(module, elem_tok, self.struct_name_table);
                 let ty = Type::Vector(triomphe::Arc::new(elem_ty));
                 let dst = self.alloc_vid(ty.clone());
-                self.instrs.push(Instr::VecPack(dst, *sig_idx, *count, elems));
+                self.instrs
+                    .push(Instr::VecPack(dst, *sig_idx, *count, elems));
                 self.push(dst, ty);
             },
             B::VecLen(sig_idx) => {
@@ -1186,9 +1242,7 @@ impl<'a> SsaConverter<'a> {
         let result_ty = match result_ty {
             Some(ty) => ty,
             None => match (&op, src_ty) {
-                (UnaryOp::FreezeRef, Type::MutableReference(inner)) => {
-                    Type::Reference(inner)
-                },
+                (UnaryOp::FreezeRef, Type::MutableReference(inner)) => Type::Reference(inner),
                 (UnaryOp::Negate | UnaryOp::FreezeRef, ty) => ty,
                 _ => bail!("unary op {:?} requires an explicit result type", op),
             },
@@ -1243,13 +1297,11 @@ fn variant_field_type_toks(
     variant: move_binary_format::file_format::VariantIndex,
 ) -> Vec<SignatureToken> {
     match &module.struct_defs[struct_idx.0 as usize].field_information {
-        StructFieldInformation::DeclaredVariants(variants) => {
-            variants[variant as usize]
-                .fields
-                .iter()
-                .map(|f| f.signature.0.clone())
-                .collect()
-        },
+        StructFieldInformation::DeclaredVariants(variants) => variants[variant as usize]
+            .fields
+            .iter()
+            .map(|f| f.signature.0.clone())
+            .collect(),
         _ => vec![],
     }
 }
@@ -1270,7 +1322,10 @@ fn substitute_type_params(ty: &SignatureToken, params: &[SignatureToken]) -> Sig
             SignatureToken::MutableReference(Box::new(substitute_type_params(inner, params)))
         },
         SignatureToken::StructInstantiation(handle, tps) => {
-            let new_tps: Vec<_> = tps.iter().map(|p| substitute_type_params(p, params)).collect();
+            let new_tps: Vec<_> = tps
+                .iter()
+                .map(|p| substitute_type_params(p, params))
+                .collect();
             SignatureToken::StructInstantiation(*handle, new_tps)
         },
         _ => ty.clone(),
