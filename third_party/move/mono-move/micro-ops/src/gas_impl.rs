@@ -62,7 +62,6 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::HeapMoveToImm8 { .. }
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::Charge { .. }
-            | MicroOp::ChargeVariable { .. }
             | MicroOp::StoreRandomU64 { .. }
             | MicroOp::ForceGC => None,
         }
@@ -124,7 +123,6 @@ impl RemapTargets for MicroOp {
             | MicroOp::HeapMoveToImm8 { .. }
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::Charge { .. }
-            | MicroOp::ChargeVariable { .. }
             | MicroOp::StoreRandomU64 { .. }
             | MicroOp::ForceGC) => op,
         }
@@ -188,7 +186,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             },
 
             // --- Gas metering (inserted by instrumentation; not in input) ---
-            MicroOp::Charge { .. } | MicroOp::ChargeVariable { .. } => 0,
+            MicroOp::Charge { .. } => 0,
 
             // --- Debug ---
             MicroOp::StoreRandomU64 { .. } => 1,

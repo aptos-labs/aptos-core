@@ -463,10 +463,6 @@ pub enum MicroOp {
     /// The interpreter must call the gas meter and abort on exhaustion.
     Charge { cost: u64 },
 
-    /// Charge a runtime-variable gas cost: `per_unit * frame[slot]`.
-    /// The interpreter must call the gas meter and abort on exhaustion.
-    ChargeVariable { per_unit: u64, slot: FrameOffset },
-
     //======================================================================
     // Debugging
     //======================================================================
