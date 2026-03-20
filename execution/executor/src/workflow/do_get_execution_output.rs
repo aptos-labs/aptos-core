@@ -301,11 +301,11 @@ impl DoGetExecutionOutput {
     #[cfg(feature = "consensus-only-perf-test")]
     fn execute_block<V: VMBlockExecutor>(
         executor: &V,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>> {
         use aptos_types::{
             state_store::{StateViewId, TStateView},
             transaction::TransactionAuxiliaryData,
