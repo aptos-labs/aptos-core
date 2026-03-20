@@ -193,12 +193,19 @@ module aptos_experimental::confidential_asset {
 
     // === Events (4 out of 13) ===
 
+
+    #[event]
+    enum Registered has drop, store {
+        V1 { addr: address, asset_type: Object<fungible_asset::Metadata>, ek: CompressedRistretto }
+    }
+
     #[event]
     enum Deposited has drop, store {
         V1 {
             addr: address,
             amount: u64,
-            asset_type: Object<fungible_asset::Metadata>
+            asset_type: Object<fungible_asset::Metadata>,
+            new_pending_balance: CompressedBalance<Pending>,
         }
     }
 
@@ -208,15 +215,9 @@ module aptos_experimental::confidential_asset {
             from: address,
             to: address,
             amount: u64,
-            asset_type: Object<fungible_asset::Metadata>
-        }
-    }
-
-    #[event]
-    enum Normalized has drop, store {
-        V1 {
-            addr: address,
-            asset_type: Object<fungible_asset::Metadata>
+            asset_type: Object<fungible_asset::Metadata>,
+            new_available_balance: CompressedBalance<Available>,
+            auditor_hint: Option<EffectiveAuditorHint>,
         }
     }
 
@@ -225,8 +226,70 @@ module aptos_experimental::confidential_asset {
         V1 {
             from: address,
             to: address,
-            asset_type: Object<fungible_asset::Metadata>
+            asset_type: Object<fungible_asset::Metadata>,
+            amount: CompressedAmount,
+            ek_volun_auds: vector<CompressedRistretto>,
+            sender_auditor_hint: Option<EffectiveAuditorHint>,
+            new_sender_available_balance: CompressedBalance<Available>,
+            new_recip_pending_balance: CompressedBalance<Pending>,
         }
+    }
+
+    #[event]
+    enum Normalized has drop, store {
+        V1 {
+            addr: address,
+            asset_type: Object<fungible_asset::Metadata>,
+            new_available_balance: CompressedBalance<Available>,
+            auditor_hint: Option<EffectiveAuditorHint>,
+        }
+    }
+
+    #[event]
+    enum RolledOver has drop, store {
+        V1 {
+            addr: address,
+            asset_type: Object<fungible_asset::Metadata>,
+            new_available_balance: CompressedBalance<Available>,
+        }
+    }
+
+    #[event]
+    enum KeyRotated has drop, store {
+        V1 {
+            addr: address,
+            asset_type: Object<fungible_asset::Metadata>,
+            new_ek: CompressedRistretto,
+            new_available_balance: CompressedBalance<Available>,
+        }
+    }
+
+    #[event]
+    enum IncomingTransfersPauseChanged has drop, store {
+        V1 { addr: address, asset_type: Object<fungible_asset::Metadata>, paused: bool }
+    }
+
+    #[event]
+    enum AllowListingChanged has drop, store {
+        V1 { enabled: bool }
+    }
+
+    #[event]
+    enum ConfidentialityForAssetTypeChanged has drop, store {
+        V1 { asset_type: Object<fungible_asset::Metadata>, allowed: bool }
+    }
+
+    // SDK note: when you see this event, call `get_effective_auditor` to determine the current effective EK
+    // for any asset that doesn't have an asset-specific auditor override.
+    #[event]
+    enum GlobalAuditorChanged has drop, store {
+        V1 { new: AuditorConfig }
+    }
+
+    // SDK note: when you see this event, call `get_effective_auditor` to determine the current effective EK for this asset.
+    #[event]
+    enum AssetSpecificAuditorChanged has drop, store {
+        V1 { asset_type: Object<fungible_asset::Metadata>, new: AuditorConfig }
     }
 
     // === Module initialization (5 out of 13) ===
@@ -362,6 +425,7 @@ module aptos_experimental::confidential_asset {
         };
 
         move_to(&get_confidential_store_signer(sender, asset_type), ca_store);
+        event::emit(Registered::V1 { addr: signer::address_of(sender), asset_type, ek });
     }
 
     /// Deposits tokens from the sender's primary FA store into their pending balance.
@@ -399,7 +463,7 @@ module aptos_experimental::confidential_asset {
             error::invalid_state(E_PENDING_BALANCE_MUST_BE_ROLLED_OVER)
         );
 
-        event::emit(Deposited::V1 { addr, amount, asset_type });
+        event::emit(Deposited::V1 { addr, amount, asset_type, new_pending_balance: ca_store.pending_balance });
 
         // Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
         assert!(amount == fungible_asset::balance(pool_fa_store) - before, error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
@@ -453,17 +517,21 @@ module aptos_experimental::confidential_asset {
         ca_store.available_balance = compressed_new_balance;
         ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
 
+        // Copy state for the event (before any further borrows)
+        let new_available_balance = ca_store.available_balance;
+        let auditor_hint = ca_store.auditor_hint;
+
         if (amount > 0) {
             let pool_fa_store = get_pool_fa_store(asset_type);  // must exist b.c. sender's CA store exists
             let before = fungible_asset::balance(pool_fa_store);
 
             dispatchable_fungible_asset::transfer(&get_global_config_signer(), pool_fa_store, primary_fungible_store::ensure_primary_store_exists(to, asset_type), amount);
-            event::emit(Withdrawn::V1 { from: sender_addr, to, amount, asset_type });
+            event::emit(Withdrawn::V1 { from: sender_addr, to, amount, asset_type, new_available_balance, auditor_hint });
 
             // Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
             assert!(amount == before - fungible_asset::balance(pool_fa_store), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         } else {
-            event::emit(Normalized::V1 { addr: sender_addr, asset_type });
+            event::emit(Normalized::V1 { addr: sender_addr, asset_type, new_available_balance, auditor_hint });
         };
     }
 
@@ -533,7 +601,7 @@ module aptos_experimental::confidential_asset {
         let old_balance = get_available_balance(from, asset_type);
 
         // Note: Sender's amount in `TransferProof::compressed_amount::compressed_R_sender` is not used here; only included so it can be indexed for dapps that need it
-        let (compressed_new_balance,recipient_amount) =
+        let (compressed_new_balance, recipient_amount, amount, ek_volun_auds) =
             assert_valid_transfer_proof(
                 sender, to, asset_type,
                 &ek_sender, &ek_recip,
@@ -541,15 +609,9 @@ module aptos_experimental::confidential_asset {
                 proof
             );
 
-        // Update sender's confidential store
-        let sender_ca_store = borrow_confidential_store_mut(from, asset_type);
-        sender_ca_store.normalized = true;
-        sender_ca_store.available_balance = compressed_new_balance;
-        sender_ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
-
         // Update recipient's confidential store
         let recip_ca_store = borrow_confidential_store_mut(to, asset_type);
-        add_assign_pending(&mut recip_ca_store.pending_balance, &recipient_amount);
+        let new_pending_balance = add_assign_pending(&mut recip_ca_store.pending_balance, &recipient_amount);
         recip_ca_store.transfers_received += 1;
 
         assert!(
@@ -557,7 +619,18 @@ module aptos_experimental::confidential_asset {
             error::invalid_state(E_PENDING_BALANCE_MUST_BE_ROLLED_OVER)
         );
 
-        event::emit(Transferred::V1 { from, to, asset_type });
+        // Update sender's confidential store
+        let sender_ca_store = borrow_confidential_store_mut(from, asset_type);
+        sender_ca_store.normalized = true;
+        sender_ca_store.available_balance = compressed_new_balance;
+        sender_ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
+
+        event::emit(Transferred::V1 {
+            from, to, asset_type, amount, ek_volun_auds,
+            sender_auditor_hint: sender_ca_store.auditor_hint,
+            new_sender_available_balance: compressed_new_balance,
+            new_recip_pending_balance: new_pending_balance,
+        });
     }
 
     /// Deserializes cryptographic data and forwards to `rotate_encryption_key`.
@@ -616,7 +689,11 @@ module aptos_experimental::confidential_asset {
         confidential_balance::set_available_R(&mut ca_store.available_balance, compressed_new_R);
         if (resume_incoming_transfers) {
             ca_store.pause_incoming = false;
-        }
+            event::emit(IncomingTransfersPauseChanged::V1 { addr: signer::address_of(owner), asset_type, paused: false });
+        };
+        event::emit(KeyRotated::V1 {
+            addr: signer::address_of(owner), asset_type, new_ek: compressed_new_ek, new_available_balance: ca_store.available_balance,
+        });
     }
 
     /// Deserializes cryptographic data and ultimately forwards to `withdraw_to` with amount = 0.
@@ -671,6 +748,8 @@ module aptos_experimental::confidential_asset {
         ca_store.normalized = false;
         ca_store.transfers_received = 0;
         ca_store.pending_balance = new_zero_pending_compressed();
+
+        event::emit(RolledOver::V1 { addr: user, asset_type, new_available_balance: ca_store.available_balance });
     }
 
     /// Rollover + pause incoming transfers (required before key rotation).
@@ -699,7 +778,12 @@ module aptos_experimental::confidential_asset {
         asset_type: Object<fungible_asset::Metadata>,
         paused: bool
     ) acquires ConfidentialStore {
-        borrow_confidential_store_mut(signer::address_of(owner), asset_type).pause_incoming = paused;
+        let ca_store = borrow_confidential_store_mut(signer::address_of(owner), asset_type);
+        let old_paused = ca_store.pause_incoming;
+        if (old_paused != paused) {
+            ca_store.pause_incoming = paused;
+            event::emit(IncomingTransfersPauseChanged::V1 { addr: signer::address_of(owner), asset_type, paused });
+        }
     }
 
     // === Public, governance functions (8 out of 13) ===
@@ -712,7 +796,12 @@ module aptos_experimental::confidential_asset {
     /// Enables or disables the allow list for confidential transfers.
     public fun set_allow_listing(aptos_framework: &signer, enabled: bool) acquires GlobalConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
-        borrow_global_mut<GlobalConfig>(@aptos_experimental).allow_list_enabled = enabled;
+        let global_config = borrow_global_mut<GlobalConfig>(@aptos_experimental);
+        let old_allow_listing_enabled = global_config.allow_list_enabled;
+        if (old_allow_listing_enabled != enabled) {
+            global_config.allow_list_enabled = enabled;
+            event::emit(AllowListingChanged::V1 { enabled });
+        }
     }
 
     /// Enables or disables confidentiality for the APT token.
@@ -735,7 +824,11 @@ module aptos_experimental::confidential_asset {
         // When allow listing is disabled, updates to `AssetConfig::V1::allowed` are not meaningful, so we forbid them.
         assert!(is_allow_listing_required(), error::invalid_state(E_ALLOW_LISTING_IS_DISABLED));
 
-        borrow_global_mut<AssetConfig>(get_asset_config_address_or_create(asset_type)).allowed = allowed;
+        let config = borrow_global_mut<AssetConfig>(get_asset_config_address_or_create(asset_type));
+        if (config.allowed != allowed) {
+            config.allowed = allowed;
+            event::emit(ConfidentialityForAssetTypeChanged::V1 { asset_type, allowed });
+        }
     }
 
     /// Sets or removes the auditor for a specific asset type. Epoch increments only on install/change.
@@ -747,26 +840,32 @@ module aptos_experimental::confidential_asset {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         let config_addr = get_asset_config_address_or_create(asset_type);
-        update_auditor(&mut borrow_global_mut<AssetConfig>(config_addr).auditor, auditor_ek)
+        if (update_auditor(&mut borrow_global_mut<AssetConfig>(config_addr).auditor, auditor_ek)) {
+            let new = borrow_global<AssetConfig>(config_addr).auditor;
+            event::emit(AssetSpecificAuditorChanged::V1 { asset_type, new });
+        }
     }
 
     /// Sets or removes the global auditor (fallback when no asset-specific auditor). Epoch increments only on install/change.
     public fun set_global_auditor(aptos_framework: &signer, auditor_ek: Option<vector<u8>>) acquires GlobalConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         let config = borrow_global_mut<GlobalConfig>(@aptos_experimental);
-        update_auditor(&mut config.global_auditor, auditor_ek);
+        if (update_auditor(&mut config.global_auditor, auditor_ek)) {
+            event::emit(GlobalAuditorChanged::V1 { new: config.global_auditor });
+        }
     }
 
-    /// Shared logic for setting/removing an auditor EK. Validates non-identity, increments epoch on install/change.
-    fun update_auditor(auditor: &mut AuditorConfig, new_ek_bytes: Option<vector<u8>>) {
+    /// Shared logic for installing/changing/removing an auditor EK. Validates non-identity, increments epoch on install/change.
+    /// Returns `true` if the auditor config actually changed.
+    fun update_auditor(auditor: &mut AuditorConfig, new_ek_bytes: Option<vector<u8>>): bool {
         let new_ek = new_ek_bytes.map(|ek| new_compressed_point_from_bytes(ek).extract());
 
         if (new_ek.is_some()) {
             assert!(!new_ek.borrow().is_identity(), error::invalid_argument(E_AUDITOR_EK_IS_IDENTITY));
         };
 
-        // Increment epoch only when installing or changing the EK (not when removing): i.e., when None --> Some(ek), or
-        // when Some(old) --> Some(new), with new != old
+        // Increment epoch only when installing or changing the EK (not when removing):
+        // i.e.,  should_increment = [ Is None --> Some(ek) ? ] or [ Is Some(old) --> Some(new), with new != old ? ]
         let should_increment = if (new_ek.is_some()) {
             if (auditor.ek.is_some()) {
                 !new_ek.borrow().compressed_point_equals(auditor.ek.borrow())   // i.e., new != old
@@ -777,8 +876,14 @@ module aptos_experimental::confidential_asset {
             false // removing or no-op
         };
 
+        // Changed if: epoch incremented (install/change), or EK removed (Some → None)
+        let is_removal = auditor.ek.is_some() && new_ek.is_none();
+        let changed = should_increment || is_removal;
+
         auditor.epoch += if (should_increment) { 1 } else { 0 };
         auditor.ek = new_ek;
+
+        changed
     }
 
     // ============================================================== //
@@ -1159,6 +1264,8 @@ module aptos_experimental::confidential_asset {
     ): (
         CompressedBalance<Available>,
         Balance<Pending>,
+        CompressedAmount,
+        vector<CompressedRistretto>,
     ) {
 
         let TransferProof::V1 {
@@ -1186,7 +1293,7 @@ module aptos_experimental::confidential_asset {
         );
         session.assert_verifies(&stmt, &sigma);
 
-        (compressed_new_balance, recip_pending)
+        (compressed_new_balance, recip_pending, compressed_amount, compressed_ek_volun_auds)
     }
 
     fun assert_valid_key_rotation_proof(

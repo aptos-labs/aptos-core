@@ -161,10 +161,11 @@ module aptos_experimental::confidential_balance {
     }
 
     /// Adds a pending balance to a compressed pending balance in place.
-    public fun add_assign_pending(balance: &mut CompressedBalance<Pending>, rhs: &Balance<Pending>) {
+    public fun add_assign_pending(balance: &mut CompressedBalance<Pending>, rhs: &Balance<Pending>): CompressedBalance<Pending> {
         let decompressed = balance.decompress();
         decompressed.add_mut_base(rhs.get_P(), rhs.get_R());
         *balance = decompressed.compress();
+        *balance
     }
 
     #[view]
