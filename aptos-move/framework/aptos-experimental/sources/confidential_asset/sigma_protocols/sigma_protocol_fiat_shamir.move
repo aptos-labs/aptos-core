@@ -33,10 +33,6 @@ module aptos_experimental::sigma_protocol_fiat_shamir {
     /// Note: The session identifier can be tricky, since in some settings the "session" accumulates implicitly in the
     /// statement being proven. For confidential assets, it does not AFAICT: the "session" is represented at least by
     /// the confidential balances of the users & their addresses.
-    ///
-    /// TODO(Security): We may want to add more here (like some sort of account TXN counter). I suspect that the
-    ///   ciphertext randomness in the public statement would act as enough of a "session ID", but I would prefer
-    ///   to avoid reasoning about that.
     enum DomainSeparator has drop, copy {
         V1 {
             contract_address: address,
