@@ -1,0 +1,7 @@
+{
+  "0xcafe::ops::add": [],
+  "0xcafe::ops::apply": [],
+  "0xcafe::ops::run": [
+    "0xcafe::ops::apply"
+  ]
+}

@@ -9,8 +9,8 @@ use aptos_types::{
     secret_sharing::{Ciphertext, EvalProof},
     state_store::state_key::StateKey,
     transaction::{
-        encrypted_payload::EncryptedPayload, ExecutionStatus, TransactionExtraConfig,
-        TransactionPayload,
+        encrypted_payload::{DecryptionFailureReason, EncryptedPayload},
+        ExecutionStatus, TransactionExtraConfig, TransactionPayload,
     },
     write_set::WriteOp,
 };
@@ -95,7 +95,8 @@ fn failed_encrypted_transaction_increments_sequence_number() {
         ciphertext,
         extra_config,
         payload_hash,
-        eval_proof: EvalProof::random(),
+        eval_proof: Some(EvalProof::random()),
+        reason: DecryptionFailureReason::CryptoFailure,
     };
     *txn.payload_mut() = TransactionPayload::EncryptedPayload(failed_payload);
 

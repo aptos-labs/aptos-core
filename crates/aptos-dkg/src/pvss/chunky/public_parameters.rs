@@ -31,6 +31,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Mul;
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
+pub const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
+pub const DEFAULT_ELL_FOR_DEPLOYMENT: u8 = 32; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 const DEFAULT_MAX_AGGREGATION: usize = 166;
 const DLOG_EXTRA_BITS: u8 = 4;
 
@@ -323,8 +325,6 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
         bcs::to_bytes(&self).expect("unexpected error during PVSS transcript serialization")
     }
 }
-
-pub const DEFAULT_ELL_FOR_TESTING: u8 = 32; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 
 impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking

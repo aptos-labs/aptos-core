@@ -1,7 +1,7 @@
 [
   {
     "name": "move_package_coverage",
-    "description": "Get uncovered source lines for a package. Uses existing coverage map if available, otherwise runs tests first. Use this to identify which code paths need test coverage.",
+    "description": "Get uncovered source lines for a package, optionally scoped to a function. Uses existing coverage map if available, otherwise runs tests first. Use this to identify which code paths need test coverage.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "MovePackageCoverageParams",
@@ -11,6 +11,11 @@
         "package_path": {
           "description": "Path to the Move package directory.",
           "type": "string"
+        },
+        "function": {
+          "description": "Optional function to scope coverage to, in the format \"module_name::function_name\".\nIf omitted, returns uncovered lines for all functions.",
+          "type": "string",
+          "nullable": true
         }
       },
       "required": [
@@ -37,6 +42,87 @@
       },
       "required": [
         "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_package_query",
+    "description": "Query structural information about a Move package.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageQueryParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_path"
+      ],
+      "oneOf": [
+        {
+          "description": "Returns a map from each module to the modules it depends on.",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "const": "dep_graph"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        {
+          "description": "Returns a summary of each module's constants, structs, and functions.",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "const": "module_summary"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        {
+          "description": "Returns a function-level call graph as a map from each function to the functions it calls.",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "const": "call_graph"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        {
+          "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
+          "type": "object",
+          "properties": {
+            "function": {
+              "description": "Function to query, in the form \"module_name::function_name\".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string",
+              "const": "function_usage"
+            }
+          },
+          "required": [
+            "query",
+            "function"
+          ]
+        }
       ]
     },
     "annotations": {

@@ -12,7 +12,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::arkworks::{
     msm::{merge_msm_inputs, MsmInput},
     random::sample_field_element,
@@ -48,14 +48,14 @@ pub trait Trait:
         statement: Self::Codomain, // TODO: should allow to either submit H::Codomain or H::CodomainNormalized
         cntxt: &Ct,                // needed for SoK purposes
         rng: &mut R,
-    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized) {
+    ) -> Result<(Proof<Self::Scalar, Self>, Self::CodomainNormalized)> {
         let store_prover_commitment = true; // TODO: should change this into a parameter when code is ready
 
         // Step 1: Sample randomness. Here the `witness` is only used to make sure that `r` has the right dimensions
         let r = witness.rand(rng);
 
         // Step 2: Compute commitment A = Ψ(r)
-        let A_proj = self.apply(&r);
+        let A_proj = self.apply(&r)?;
         let A = self.normalize(A_proj);
         let normalized_statement = self.normalize(statement); // TODO: combine these two normalisations
 
@@ -72,13 +72,13 @@ pub trait Trait:
             FirstProofItem::Challenge(c)
         };
 
-        (
+        Ok((
             Proof {
                 first_proof_item,
                 z,
             },
             normalized_statement,
-        )
+        ))
     }
 
     /// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
@@ -196,7 +196,7 @@ pub trait CurveGroupTrait:
             <Self::Group as PrimeGroup>::ScalarField,
         >,
     ) -> Result<()> {
-        let result = Self::msm_eval(input);
+        let result = Self::msm_eval(input)?;
         ensure!(result == <Self::Group as AdditiveGroup>::ZERO);
         Ok(())
     }
@@ -213,25 +213,33 @@ pub trait CurveGroupTrait:
             MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
         >,
     > {
-        let msm_terms_for_prover_response = self.msm_terms(&prover_response);
+        let msm_terms_for_prover_response = self.msm_terms(&prover_response)?;
 
         let minus_one = -<Self::Group as PrimeGroup>::ScalarField::ONE;
         let minus_challenge = -challenge;
 
-        let msm_terms = msm_terms_for_prover_response
-            .into_iter()
-            .zip(prover_first_message.clone().into_iter()) // TODO: not sure the cloning is ideal here
-            .zip(public_statement.clone().into_iter())
-            .map(|((term, A), P)| {
-                let mut bases = term.bases().to_vec();
-                bases.push(A);
-                bases.push(P);
-                let mut scalars = term.scalars().to_vec();
-                scalars.push(minus_one);
-                scalars.push(minus_challenge);
-                MsmInput::new(bases, scalars)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut it_msm = msm_terms_for_prover_response.into_iter();
+        let mut it_commitment = prover_first_message.clone().into_iter(); // not sure the cloning is efficient here
+        let mut it_statement = public_statement.clone().into_iter();
+
+        let msm_terms = std::iter::from_fn(|| {
+            match (it_msm.next(), it_commitment.next(), it_statement.next()) {
+                (Some(term), Some(A), Some(P)) => {
+                    let mut bases = term.bases().to_vec();
+                    bases.push(A);
+                    bases.push(P);
+                    let mut scalars = term.scalars().to_vec();
+                    scalars.push(minus_one);
+                    scalars.push(minus_challenge);
+                    Some(MsmInput::new(bases, scalars))
+                }
+                (None, None, None) => None,
+                _ => Some(Err(anyhow!(
+                    "length mismatch: msm_terms, prover_first_message, and public_statement must have the same arity"
+                ))),
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
         Ok(msm_terms)
     }

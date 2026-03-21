@@ -4,9 +4,11 @@
 //! Move package testing and coverage tools.
 
 use super::super::{
-    file_watcher::PauseGuard, package_data::PackageData, session::FlowSession, McpArgs,
+    common::{format_error_chain, mcp_err, mcp_err_chain, resolve_function, tool_error},
+    package_data::PackageData,
+    session::FlowSession,
+    McpArgs,
 };
-use crate::utilities::format_error_chain;
 use aptos_framework::extended_checks;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::on_chain_config::{
@@ -61,7 +63,7 @@ struct TestResponse {
     /// Maps source file path to list of newly covered line numbers.
     #[serde(skip_serializing_if = "Option::is_none")]
     newly_covered: Option<BTreeMap<String, BTreeSet<u32>>>,
-    /// Test output (only on failure).
+    /// Test output (only on failure, or hint when baseline is missing).
     #[serde(skip_serializing_if = "Option::is_none")]
     output: Option<String>,
 }
@@ -71,6 +73,9 @@ struct TestResponse {
 struct MovePackageCoverageParams {
     /// Path to the Move package directory.
     package_path: String,
+    /// Optional function to scope coverage to, in the format "module_name::function_name".
+    /// If omitted, returns uncovered lines for all functions.
+    function: Option<String>,
 }
 
 /// Response for `move_package_coverage` tool.
@@ -104,7 +109,7 @@ impl FlowSession {
     }
 
     #[tool(
-        description = "Get uncovered source lines for a package. \
+        description = "Get uncovered source lines for a package, optionally scoped to a function. \
                           Uses existing coverage map if available, otherwise runs tests first. \
                           Use this to identify which code paths need test coverage.",
         annotations(read_only_hint = false, destructive_hint = false)
@@ -139,13 +144,8 @@ impl FlowSession {
             ))]));
         }
 
-        // Do not remove — guards must stay alive until end of scope.
-        let (_pause_guard, _lock) = self.coverage_guards(&pkg_path).await?;
-
-        // Clean slate: remove both coverage map and baseline before re-establishing.
-        if params.establish_baseline {
-            delete_coverage_state(self.temp_dir(), &pkg_path);
-        }
+        // File lock serializes concurrent test runs on the same package.
+        let _lock = self.coverage_lock(&pkg_path).await?;
 
         let (success, output) = self.run_tests_async(&pkg_path).await?;
 
@@ -171,8 +171,9 @@ impl FlowSession {
 
         // Normal mode: compare current coverage against baseline to find newly covered lines.
         // Skip coverage analysis on test failure (coverage map may reflect partial execution).
-        let newly_covered = if success && has_baseline(self.temp_dir(), &pkg_path) {
-            let pkg_data = self.resolve_package(&params.package_path).await?;
+        let has_baseline = has_baseline(self.temp_dir(), &pkg_path);
+        let newly_covered = if success && has_baseline {
+            let (pkg_data, _) = self.resolve_package(&params.package_path).await?;
             let mut pkg = pkg_data
                 .lock()
                 .map_err(|_| mcp_err("package lock poisoned"))?;
@@ -192,11 +193,19 @@ impl FlowSession {
             newly_covered_count
         );
 
+        let output = if !success {
+            Some(output)
+        } else if !has_baseline {
+            Some("No baseline established. Call with establish_baseline=true first.".to_string())
+        } else {
+            None
+        };
+
         test_response_to_result(TestResponse {
             success,
             baseline_established: None,
             newly_covered,
-            output: if success { None } else { Some(output) },
+            output,
         })
     }
 
@@ -214,13 +223,19 @@ impl FlowSession {
             ))]));
         }
 
-        // Do not remove — guards must stay alive until end of scope.
-        let (_pause_guard, _lock) = self.coverage_guards(&pkg_path).await?;
+        // File lock serializes concurrent test runs on the same package.
+        let _lock = self.coverage_lock(&pkg_path).await?;
+
+        // If source changed since last build, the coverage map on disk is stale.
+        let (pkg_data, rebuilt) = self.resolve_package(&params.package_path).await?;
+        if rebuilt {
+            delete_coverage_map(&pkg_path);
+        }
 
         // Run tests if coverage map is missing, or if no baseline exists
         // (coverage map without baseline is likely stale from a previous session).
-        if !has_baseline(self.temp_dir(), &pkg_path) || !has_coverage_map(&pkg_path) {
-            delete_coverage_state(self.temp_dir(), &pkg_path);
+        let need_baseline = !has_baseline(self.temp_dir(), &pkg_path);
+        if need_baseline || !has_coverage_map(&pkg_path) {
             log::info!("move_package_coverage: running tests to generate fresh coverage");
             let (success, output) = self.run_tests_async(&pkg_path).await?;
             if !success {
@@ -229,16 +244,18 @@ impl FlowSession {
                     output
                 ))]));
             }
-            // Establish baseline so subsequent calls trust the coverage map.
-            save_baseline_coverage_map(self.temp_dir(), &pkg_path)
-                .map_err(|e| mcp_err_chain("failed to save baseline", &e))?;
+            if need_baseline {
+                if let Err(e) = save_baseline_coverage_map(self.temp_dir(), &pkg_path) {
+                    log::warn!("move_package_coverage: no baseline exists; attempt to create one failed: {}", e);
+                }
+            }
         }
 
-        let pkg_data = self.resolve_package(&params.package_path).await?;
         let mut pkg = pkg_data
             .lock()
             .map_err(|_| mcp_err("package lock poisoned"))?;
-        let uncovered = compute_uncovered(&pkg_path, &mut pkg)
+        let line_filter = make_function_line_filter(params.function.as_deref(), &mut pkg)?;
+        let uncovered = compute_uncovered(&pkg_path, &mut pkg, line_filter.as_deref())
             .map_err(|e| mcp_err_chain("failed to compute coverage", &e))?;
 
         log::info!(
@@ -251,25 +268,20 @@ impl FlowSession {
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
-    /// Acquire file watcher pause guard and per-package coverage file lock.
-    async fn coverage_guards(
-        &self,
-        pkg_path: &Path,
-    ) -> Result<(PauseGuard, FileLock), rmcp::ErrorData> {
-        let pause_guard = self.file_watcher().pause_guard();
-        let lock = FileLock::lock_with_alert_on_wait(
+    /// Acquire per-package file lock to serialize concurrent coverage operations.
+    async fn coverage_lock(&self, pkg_path: &Path) -> Result<FileLock, rmcp::ErrorData> {
+        FileLock::lock_with_alert_on_wait(
             pkg_path.join(".coverage_map.lock"),
             Duration::from_millis(1000),
             || log::info!("waiting for coverage map lock on `{}`", pkg_path.display()),
         )
         .await
-        .map_err(|e| mcp_err(format!("failed to acquire coverage lock: {}", e)))?;
-        Ok((pause_guard, lock))
+        .map_err(|e| mcp_err(format!("failed to acquire coverage lock: {}", e)))
     }
 
     /// Run tests on a blocking thread.
-    /// The caller is responsible for holding the file watcher pause guard and
-    /// per-package file lock for the duration of the call.
+    /// The caller is responsible for holding the per-package file lock
+    /// for the duration of the call.
     async fn run_tests_async(&self, pkg_path: &Path) -> Result<(bool, String), rmcp::ErrorData> {
         let args = self.args().clone();
         let path = pkg_path.to_path_buf();
@@ -283,24 +295,6 @@ impl FlowSession {
 }
 
 // ========== Helpers ==========
-
-// --------- Error helpers -------------------------------------------------------------
-// All errors are converted to tool output so the AI client always sees them.
-// Errors propagate via `?` inside the _impl methods, then tool_error turns
-// them into CallToolResult::error before returning to the MCP client.
-
-fn tool_error(e: rmcp::ErrorData) -> CallToolResult {
-    log::error!("{}", e.message);
-    CallToolResult::error(vec![Content::text(e.message.to_string())])
-}
-
-fn mcp_err(msg: impl Into<String>) -> rmcp::ErrorData {
-    rmcp::ErrorData::internal_error(msg.into(), None)
-}
-
-fn mcp_err_chain(prefix: &str, e: &anyhow::Error) -> rmcp::ErrorData {
-    mcp_err(format!("{}: {}", prefix, format_error_chain(e)))
-}
 
 /// Serialize a TestResponse into a tool result (success or error based on outcome).
 fn test_response_to_result(response: TestResponse) -> Result<CallToolResult, rmcp::ErrorData> {
@@ -459,10 +453,9 @@ fn has_baseline(base_dir: &Path, pkg_path: &Path) -> bool {
     baseline_coverage_map_path(base_dir, pkg_path).exists()
 }
 
-/// Delete both coverage map and baseline for a clean slate.
-fn delete_coverage_state(base_dir: &Path, pkg_path: &Path) {
+/// Delete the coverage map (preserves baseline).
+fn delete_coverage_map(pkg_path: &Path) {
     let _ = std::fs::remove_file(coverage_map_path(pkg_path));
-    let _ = std::fs::remove_file(baseline_coverage_map_path(base_dir, pkg_path));
 }
 
 /// Load coverage map from disk, falling back to an empty map when no file exists
@@ -494,11 +487,16 @@ fn uncovered_lines(builder: &SourceCoverageBuilder, env: &GlobalEnv) -> BTreeSet
         .collect()
 }
 
+/// Optional filter: given a source path and line number, returns whether the line
+/// should be included in coverage results.
+type LineFilter = dyn Fn(&str, u32) -> bool;
+
 /// Compute uncovered lines from the current coverage map.
 /// Returns a map from source file path to uncovered line numbers.
 fn compute_uncovered(
     pkg_path: &Path,
     pkg_data: &mut PackageData,
+    line_filter: Option<&LineFilter>,
 ) -> anyhow::Result<BTreeMap<String, BTreeSet<u32>>> {
     let env = ensure_env(pkg_data)?;
     let cov_map = load_coverage_map(&coverage_map_path(pkg_path))?;
@@ -517,7 +515,11 @@ fn compute_uncovered(
         let source_path = module.get_source_path().to_string_lossy().to_string();
         let builder =
             SourceCoverageBuilder::new(&cov_map, source_map, vec![(compiled_module, source_map)]);
-        let lines = uncovered_lines(&builder, env);
+        let mut lines = uncovered_lines(&builder, env);
+
+        if let Some(filter) = line_filter {
+            lines.retain(|&line| filter(&source_path, line));
+        }
 
         if !lines.is_empty() {
             result.entry(source_path).or_default().extend(lines);
@@ -574,4 +576,33 @@ fn compute_newly_covered(
     }
 
     Ok(Some(result))
+}
+
+/// Build a line filter for a specific function's span.
+fn make_function_line_filter(
+    function: Option<&str>,
+    pkg_data: &mut PackageData,
+) -> Result<Option<Box<LineFilter>>, rmcp::ErrorData> {
+    let Some(function) = function else {
+        return Ok(None);
+    };
+    let env = ensure_env(pkg_data).map_err(|e| mcp_err_chain("failed to load env", &e))?;
+    let func = resolve_function(env, function)?;
+    let loc = func.get_loc();
+    let start = env
+        .get_location(&loc)
+        .map(|l| l.line.0 + 1)
+        .ok_or_else(|| mcp_err("cannot resolve function location"))?;
+    let end = env
+        .get_location(&loc.at_end())
+        .map(|l| l.line.0 + 1)
+        .ok_or_else(|| mcp_err("cannot resolve function location"))?;
+    let source_path = func
+        .module_env
+        .get_source_path()
+        .to_string_lossy()
+        .to_string();
+    Ok(Some(Box::new(move |path: &str, line: u32| {
+        path == source_path && line >= start && line <= end
+    })))
 }

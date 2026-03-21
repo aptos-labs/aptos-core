@@ -31,6 +31,9 @@ use std::iter::repeat_with;
 // Serialize/Deserialize are required for ValidCryptoMaterial (BCS). CanonicalSerialize/
 // CanonicalDeserialize are used by the transcripts to automatically derive serialization, since
 // Pairing types do not implement serde.
+//
+// TODO: should probably record here how many times the subtranscript has been aggregated, since
+// it can speed up the BSGS algorithm, especially in tests
 #[allow(non_snake_case)]
 #[derive(
     CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,

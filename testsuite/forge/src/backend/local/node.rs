@@ -11,7 +11,7 @@ use aptos_db::{
     common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME},
     fast_sync_storage_wrapper::SECONDARY_DB_DIR,
 };
-use aptos_logger::{debug, info};
+use aptos_logger::{debug, error, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{account_address::AccountAddress, PeerId},
@@ -23,11 +23,16 @@ use std::{
     path::PathBuf,
     process::{Child, Command},
     str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::Duration,
 };
 use url::Url;
 
 #[derive(Debug)]
-struct Process(Child);
+pub(crate) struct Process(Child);
 
 impl Drop for Process {
     // When the Process struct goes out of scope we need to kill the child process
@@ -46,10 +51,113 @@ impl Drop for Process {
     }
 }
 
+/// Information needed to spawn a node process.
+#[derive(Clone, Debug)]
+pub(crate) struct NodeSpawnInfo {
+    pub name: String,
+    pub bin: PathBuf,
+    pub directory: PathBuf,
+    pub config_path: PathBuf,
+    pub log_path: PathBuf,
+    pub cpu_affinity: Option<String>,
+    pub mem_bind: Option<String>,
+}
+
+/// Handle used by the auto-restart monitor to check and restart a node.
+pub(crate) struct NodeMonitor {
+    pub info: NodeSpawnInfo,
+    pub process: Arc<Mutex<Option<Process>>>,
+}
+
+/// Spawn a node process from the given spawn info.
+pub(crate) fn spawn_node_process(info: &NodeSpawnInfo) -> Result<Process> {
+    // Ensure log file exists
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&info.log_path)?;
+
+    // Start node process, optionally wrapped with numactl for CPU/memory affinity
+    let mut node_command = if info.cpu_affinity.is_some() || info.mem_bind.is_some() {
+        let mut cmd = Command::new("numactl");
+        if let Some(ref cpus) = info.cpu_affinity {
+            cmd.arg(format!("--physcpubind={}", cpus));
+        }
+        if let Some(ref mem) = info.mem_bind {
+            cmd.arg(format!("--membind={}", mem));
+        }
+        cmd.arg(&info.bin);
+        cmd
+    } else {
+        Command::new(&info.bin)
+    };
+    node_command
+        .current_dir(&info.directory)
+        .arg("-f")
+        .arg(&info.config_path);
+    if env::var("RUST_LOG").is_err() {
+        // Only set our RUST_LOG if its not present in environment
+        node_command.env("RUST_LOG", "debug");
+    }
+    node_command.stdout(log_file.try_clone()?).stderr(log_file);
+    let process = node_command
+        .spawn()
+        .with_context(|| format!("Error launching node process with binary: {:?}", info.bin))?;
+
+    // We print out the commands and PIDs for debugging of local swarms
+    info!(
+        "Started node {} (PID: {}) with command: {:?}, log_path: {:?}",
+        info.name,
+        process.id(),
+        node_command,
+        info.log_path,
+    );
+
+    Ok(Process(process))
+}
+
+/// Background loop that monitors nodes and restarts any that have crashed.
+/// Runs until `stop` is set to true.
+pub(crate) fn run_restart_monitor(monitors: Vec<NodeMonitor>, stop: Arc<AtomicBool>) {
+    info!("Auto-restart monitor started for {} nodes", monitors.len());
+    while !stop.load(Ordering::Acquire) {
+        std::thread::sleep(Duration::from_secs(5));
+        for monitor in &monitors {
+            let mut lock = monitor.process.lock().unwrap();
+            if let Some(ref mut p) = *lock {
+                match p.0.try_wait() {
+                    Ok(Some(status)) => {
+                        error!(
+                            "Node '{}' exited with: {}. Restarting...",
+                            monitor.info.name, status
+                        );
+                        // Drop the dead process to reap the zombie
+                        *lock = None;
+                        drop(lock);
+                        match spawn_node_process(&monitor.info) {
+                            Ok(new_process) => {
+                                info!("Successfully restarted node '{}'", monitor.info.name);
+                                *monitor.process.lock().unwrap() = Some(new_process);
+                            },
+                            Err(e) => {
+                                error!("Failed to restart node '{}': {}", monitor.info.name, e);
+                            },
+                        }
+                    },
+                    Ok(None) => {}, // Still running
+                    Err(e) => error!("Error checking node '{}' status: {}", monitor.info.name, e),
+                }
+            }
+            // If process is None, the node was intentionally stopped — don't restart
+        }
+    }
+    info!("Auto-restart monitor stopped");
+}
+
 #[derive(Debug)]
 pub struct LocalNode {
     version: LocalVersion,
-    process: std::sync::Mutex<Option<Process>>,
+    process: Arc<Mutex<Option<Process>>>,
     name: String,
     index: usize,
     account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
@@ -84,7 +192,7 @@ impl LocalNode {
 
         Ok(Self {
             version,
-            process: std::sync::Mutex::new(None),
+            process: Arc::new(Mutex::new(None)),
             name,
             index,
             account_private_key,
@@ -120,6 +228,26 @@ impl LocalNode {
         &self.account_private_key
     }
 
+    fn spawn_info(&self) -> NodeSpawnInfo {
+        NodeSpawnInfo {
+            name: self.name.clone(),
+            bin: self.version.bin().to_path_buf(),
+            directory: self.directory.clone(),
+            config_path: self.config_path(),
+            log_path: self.log_path(),
+            cpu_affinity: self.cpu_affinity.clone(),
+            mem_bind: self.mem_bind.clone(),
+        }
+    }
+
+    /// Returns a monitor handle for the auto-restart thread.
+    pub(crate) fn monitor(&self) -> NodeMonitor {
+        NodeMonitor {
+            info: self.spawn_info(),
+            process: Arc::clone(&self.process),
+        }
+    }
+
     pub fn start(&self) -> Result<()> {
         let mut process_locker = self.process.lock().unwrap();
         ensure!(
@@ -128,50 +256,7 @@ impl LocalNode {
             self.name
         );
 
-        // Ensure log file exists
-        let log_file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(self.log_path())?;
-
-        // Start node process, optionally wrapped with numactl for CPU/memory affinity
-        let mut node_command = if self.cpu_affinity.is_some() || self.mem_bind.is_some() {
-            let mut cmd = Command::new("numactl");
-            if let Some(ref cpus) = self.cpu_affinity {
-                cmd.arg(format!("--physcpubind={}", cpus));
-            }
-            if let Some(ref mem) = self.mem_bind {
-                cmd.arg(format!("--membind={}", mem));
-            }
-            cmd.arg(self.version.bin());
-            cmd
-        } else {
-            Command::new(self.version.bin())
-        };
-        node_command
-            .current_dir(&self.directory)
-            .arg("-f")
-            .arg(self.config_path());
-        if env::var("RUST_LOG").is_err() {
-            // Only set our RUST_LOG if its not present in environment
-            node_command.env("RUST_LOG", "debug");
-        }
-        node_command.stdout(log_file.try_clone()?).stderr(log_file);
-        let process = node_command.spawn().with_context(|| {
-            format!(
-                "Error launching node process with binary: {:?}",
-                self.version.bin()
-            )
-        })?;
-
-        // We print out the commands and PIDs for debugging of local swarms
-        info!(
-            "Started node {} (PID: {}) with command: {:?}, log_path: {:?}",
-            self.name,
-            process.id(),
-            node_command,
-            self.log_path(),
-        );
+        let process = spawn_node_process(&self.spawn_info())?;
 
         // We print out the API endpoints of each node for local debugging
         info!(
@@ -193,7 +278,7 @@ impl LocalNode {
             self.config.storage.backup_service_address.port()
         );
 
-        *process_locker = Some(Process(process));
+        *process_locker = Some(process);
 
         Ok(())
     }

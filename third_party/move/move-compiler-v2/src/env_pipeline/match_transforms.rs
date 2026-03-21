@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Primitive match transformation: converts match expressions over primitive types
-//! (booleans, integers, byte strings, and tuples of primitives) into if-else chains.
-//! Also handles "mixed tuple" matches where a tuple discriminator contains both
-//! primitive and non-primitive (enum/struct) elements.
+//! Match transformations for patterns involving primitive literals:
+//!
+//! 1. Extract nested literals in struct/enum patterns into equality guards.
+//! 2. Convert fully-primitive matches into if-else chains.
+//! 3. Split mixed-tuple matches (primitive + non-primitive elements) into
+//!    guards on the primitive positions.
 
 use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
@@ -61,6 +63,8 @@ enum TempSymbol {
     PrimitiveTemp(usize),
     /// Non-primitive-position temp in a mixed tuple: `_$np_0`, `_$np_1`, etc.
     NonPrimitiveTemp(usize),
+    /// Nested literal extraction temp: `_$nlit_0`, `_$nlit_1`, etc.
+    NestedLiteralTemp(usize),
 }
 
 impl TempSymbol {
@@ -72,6 +76,9 @@ impl TempSymbol {
             },
             TempSymbol::PrimitiveTemp(seq) => env.symbol_pool().make(&format!("_$prim_{}", seq)),
             TempSymbol::NonPrimitiveTemp(seq) => env.symbol_pool().make(&format!("_$np_{}", seq)),
+            TempSymbol::NestedLiteralTemp(seq) => {
+                env.symbol_pool().make(&format!("_$nlit_{}", seq))
+            },
         }
     }
 }
@@ -118,7 +125,20 @@ struct MatchTransformer<'env> {
 
 impl ExpRewriterFunctions for MatchTransformer<'_> {
     fn rewrite_match(&mut self, id: NodeId, discriminator: &Exp, arms: &[MatchArm]) -> Option<Exp> {
-        // Transform primitive matches to if-else chains or combinations of match with guards.
+        // Two phases run in sequence:
+        //
+        // Phase 1: Replace literals nested inside struct/enum patterns with
+        // temp vars + equality guards. Runs unconditionally.
+        //
+        // Phase 2: Lower primitive-typed matches. Three mutually exclusive
+        // outcomes based on the discriminator type and pattern shapes:
+        //   `fully_transformable` → all-primitive match, lowered to if-else chain.
+        //   `mixed_tuple`         → tuple mixing primitive and non-primitive
+        //                           positions; primitive parts become guards.
+        //   neither               → emit updated arms from Phase 1, or no-op.
+        let extracted = extract_nested_literals_from_arms(self.env, arms);
+        let arms = extracted.as_deref().unwrap_or(arms);
+
         let fully_transformable = is_match_fully_transformable(self.env, discriminator, arms);
         let mixed_tuple =
             !fully_transformable && is_mixed_tuple_match(self.env, discriminator, arms);
@@ -151,6 +171,11 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
                 },
             };
             Some(result)
+        } else if extracted.is_some() {
+            // Phase 1 changed arms but Phase 2 does not apply (the match is
+            // over non-primitive types only). Emit the modified match so the
+            // new guards take effect.
+            Some(ExpData::Match(id, discriminator.clone(), arms.to_vec()).into_exp())
         } else {
             // By this point every reachable literal pattern should have been
             // handled by one of the two transforms above.  Flag any that
@@ -266,6 +291,113 @@ fn pattern_has_vars(pat: &Pattern) -> bool {
         Pattern::Var(..) => true,
         Pattern::Tuple(_, pats) => pats.iter().any(pattern_has_vars),
         _ => false,
+    }
+}
+
+// ================================================================================================
+// Nested Literal Extraction
+//
+// Extracts literal values nested inside struct/enum variant patterns into fresh
+// temp variables and guard conditions.
+
+/// Check if any arm contains a `LiteralValue` nested inside a `Struct` pattern.
+fn has_nested_literals(arms: &[MatchArm]) -> bool {
+    arms.iter()
+        .any(|arm| has_nested_literal_in(&arm.pattern, false))
+}
+
+/// Recursive check: `inside_struct` tracks whether we're under a Struct node.
+fn has_nested_literal_in(pat: &Pattern, inside_struct: bool) -> bool {
+    match pat {
+        Pattern::LiteralValue(..) => inside_struct,
+        Pattern::Struct(_, _, _, pats) => pats.iter().any(|p| has_nested_literal_in(p, true)),
+        Pattern::Tuple(_, pats) => pats.iter().any(|p| has_nested_literal_in(p, inside_struct)),
+        _ => false,
+    }
+}
+
+/// Extract nested literals from all arms, returning new arms if any changed.
+fn extract_nested_literals_from_arms(env: &GlobalEnv, arms: &[MatchArm]) -> Option<Vec<MatchArm>> {
+    if !has_nested_literals(arms) {
+        return None;
+    }
+    let new_arms: Vec<MatchArm> = arms
+        .iter()
+        .map(|arm| {
+            let mut counter = 0;
+            let mut conditions = Vec::new();
+            let new_pattern = extract_literals_from_pattern(
+                env,
+                &arm.pattern,
+                false,
+                &mut counter,
+                &mut conditions,
+            );
+            if conditions.is_empty() {
+                arm.clone()
+            } else {
+                let loc = env.get_node_loc(arm.pattern.node_id());
+                // Compose guard: literal_conditions && existing_guard
+                let guard_parts: Vec<Exp> = conditions
+                    .into_iter()
+                    .chain(arm.condition.iter().cloned())
+                    .collect();
+                let new_condition = conjoin(env, &loc, guard_parts);
+                MatchArm {
+                    loc: arm.loc.clone(),
+                    pattern: new_pattern,
+                    condition: new_condition,
+                    body: arm.body.clone(),
+                }
+            }
+        })
+        .collect();
+    Some(new_arms)
+}
+
+/// Recursively replace `LiteralValue` nodes inside `Struct` patterns with `Var` nodes,
+/// accumulating equality conditions.
+///
+/// - `inside_struct`: `Struct` sets it to `true` for children; `Tuple` propagates;
+///   top-level literals (flag=false) are untouched (handled by other transforms).
+/// - Conditions are pushed in pattern traversal order (left-to-right field order).
+fn extract_literals_from_pattern(
+    env: &GlobalEnv,
+    pat: &Pattern,
+    inside_struct: bool,
+    counter: &mut usize,
+    conditions: &mut Vec<Exp>,
+) -> Pattern {
+    match pat {
+        Pattern::LiteralValue(id, val) if inside_struct => {
+            let ty = env.get_node_type(*id);
+            let loc = env.get_node_loc(*id);
+            let sym = TempSymbol::NestedLiteralTemp(*counter).create(env);
+            *counter += 1;
+            // Create var pattern to replace the literal
+            let var_id = env.new_node(loc.clone(), ty.clone());
+            // Create equality condition: _$nlit_N == literal_value
+            let var_exp = make_local_var(env, &loc, ty.clone(), sym);
+            let val_id = env.new_node(loc.clone(), ty);
+            let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
+            conditions.push(make_eq(env, &loc, var_exp, val_exp));
+            Pattern::Var(var_id, sym)
+        },
+        Pattern::Struct(id, sid, variant, pats) => {
+            let new_pats: Vec<Pattern> = pats
+                .iter()
+                .map(|p| extract_literals_from_pattern(env, p, true, counter, conditions))
+                .collect();
+            Pattern::Struct(*id, sid.clone(), *variant, new_pats)
+        },
+        Pattern::Tuple(id, pats) => {
+            let new_pats: Vec<Pattern> = pats
+                .iter()
+                .map(|p| extract_literals_from_pattern(env, p, inside_struct, counter, conditions))
+                .collect();
+            Pattern::Tuple(*id, new_pats)
+        },
+        _ => pat.clone(),
     }
 }
 
@@ -428,7 +560,7 @@ fn generate_tuple_condition(
         return make_true(env, &loc);
     }
 
-    // Extract element expressions from the Tuple call.
+    // Extract element expressions from the `Tuple` call.
     let elem_exps = match tuple_exp.as_ref() {
         ExpData::Call(_, Operation::Tuple, args) => args,
         _ => {
@@ -865,7 +997,7 @@ fn transform_mixed_arm(
             }
         },
         Pattern::Var(id, ..) => {
-            // A top-level Var pattern on a mixed tuple match would require binding a
+            // A top-level `Var` pattern on a mixed tuple match would require binding a
             // tuple-typed local. The type checker's NoTuple constraint rejects this
             // before the env pipeline runs, so this branch should be unreachable.
             env.diag(

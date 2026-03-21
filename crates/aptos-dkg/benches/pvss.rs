@@ -418,7 +418,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
                 // we have to serialize and deserialize because otherwise verify gets a transcript with "non-normalised" projective group elements
             },
             |trx| {
-                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux, &mut rng2)
+                trx.verify(&sc, &pp, spks, &eks, &NoAux, &mut rng2)
                     .expect("PVSS transcript verification should succeed");
             },
         )

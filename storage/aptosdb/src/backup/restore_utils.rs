@@ -261,6 +261,7 @@ pub(crate) fn save_transactions_impl(
             first_version + idx as Version,
             ws,
             &mut ledger_db_batch.write_set_db_batches,
+            /*persist_hotness=*/ false, // TODO(HotState): revisit.
         )?;
     }
 

@@ -1,4 +1,4 @@
-module 0xc0ffee::enum_variant_literal_not_supported {
+module 0xc0ffee::enum_variant_literal_ok {
     enum E has drop {
         V1(u64),
         V2,

@@ -25,8 +25,10 @@ impl FlowSession {
         Parameters(params): Parameters<MovePackageStatusParams>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         log::info!("move_package_status({})", params.package_path);
-        let pkg = self.resolve_package(&params.package_path).await?;
-        let data = pkg.lock().unwrap();
+        let (pkg, _) = self.resolve_package(&params.package_path).await?;
+        let data = pkg
+            .lock()
+            .map_err(|_| rmcp::ErrorData::internal_error("package lock poisoned", None))?;
         let has_errors = data.env().has_errors();
         let (messages, source) = data.diagnostics();
         let content = if messages.is_empty() {

@@ -1,0 +1,66 @@
+module 0x42::phantom_defs {
+    public struct Cap<phantom T> has copy, drop {
+        addr: address,
+    }
+    public struct Empty has copy, drop {
+    }
+    public struct Handle<phantom T> has copy, drop {
+        id: u64,
+    }
+    public struct Tagged<phantom K, V: copy + drop> has copy, drop {
+        value: V,
+    }
+}
+module 0x42::phantom_consumer {
+    use 0x42::phantom_defs;
+    fun consume_empty(e: phantom_defs::Empty) {
+        let phantom_defs::Empty{} = e;
+    }
+    fun end_to_end(): u64 {
+        let _v0 = unpack_handle<bool>(make_handle<bool>(10));
+        let _v1 = unpack_tagged<u8, u64>(make_tagged<u8, u64>(20));
+        roundtrip_empty();
+        _v0 + _v1
+    }
+    fun make_handle<T>(id: u64): phantom_defs::Handle<T> {
+        phantom_defs::Handle<T>{id: id}
+    }
+    fun unpack_handle<T>(h: phantom_defs::Handle<T>): u64 {
+        let phantom_defs::Handle<T>{id: _v0} = h;
+        _v0
+    }
+    fun make_tagged<K, V: copy + drop>(value: V): phantom_defs::Tagged<K, V> {
+        phantom_defs::Tagged<K, V>{value: value}
+    }
+    fun unpack_tagged<K, V: copy + drop>(t: phantom_defs::Tagged<K, V>): V {
+        let phantom_defs::Tagged<K, V>{value: _v0} = t;
+        _v0
+    }
+    fun roundtrip_empty() {
+        consume_empty(make_empty());
+    }
+    fun get_cap_addr<T>(c: &phantom_defs::Cap<T>): address {
+        *&c.addr
+    }
+    fun get_id<T>(h: &phantom_defs::Handle<T>): u64 {
+        *&h.id
+    }
+    fun get_value<K, V: copy + drop>(t: &phantom_defs::Tagged<K, V>): V {
+        *&t.value
+    }
+    fun make_cap<T>(addr: address): phantom_defs::Cap<T> {
+        phantom_defs::Cap<T>{addr: addr}
+    }
+    fun make_empty(): phantom_defs::Empty {
+        phantom_defs::Empty{}
+    }
+    fun use_two_handles(): u64 {
+        let _v0 = make_handle<u8>(1);
+        let _v1 = make_handle<u64>(2);
+        let _v2 = get_id<u8>(&_v0);
+        let _v3 = get_id<u64>(&_v1);
+        _v2 + _v3
+    }
+}
+
+============ recompilation succeeded ========

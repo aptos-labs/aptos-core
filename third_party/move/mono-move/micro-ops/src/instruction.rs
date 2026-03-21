@@ -102,7 +102,7 @@
 //! Frame slots that refer to heap objects store a raw pointer to the heap
 //! allocation. Every heap object has a header
 //! `[descriptor_id: u32 | size_in_bytes: u32]`.
-//! `descriptor_id` indexes into a table of [`HeapObjectDescriptor`] entries
+//! `descriptor_id` indexes into a table of `ObjectDescriptor` entries
 //! that tell the GC how to trace internal pointers. Three variants:
 //!
 //! - **Trivial** — no internal heap pointers; GC just copies the blob.
@@ -118,9 +118,54 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FrameOffset(pub u32);
 
+impl From<FrameOffset> for usize {
+    #[inline(always)]
+    fn from(o: FrameOffset) -> usize {
+        o.0 as usize
+    }
+}
+
+impl std::ops::Add<u32> for FrameOffset {
+    type Output = usize;
+
+    #[inline(always)]
+    fn add(self, rhs: u32) -> usize {
+        self.0 as usize + rhs as usize
+    }
+}
+
 /// A typed wrapper around a `u32` program-counter offset (instruction index).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeOffset(pub u32);
+
+impl From<CodeOffset> for usize {
+    #[inline(always)]
+    fn from(o: CodeOffset) -> usize {
+        o.0 as usize
+    }
+}
+
+/// Typed index into the program's object descriptor table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DescriptorId(pub u32);
+
+impl DescriptorId {
+    #[inline(always)]
+    pub fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+
+    #[inline(always)]
+    pub fn as_u32(self) -> u32 {
+        self.0
+    }
+}
+
+impl std::fmt::Display for DescriptorId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug)]
 pub enum MicroOp {
@@ -187,6 +232,13 @@ pub enum MicroOp {
         imm: u64,
     },
 
+    /// `dst = lhs ^ rhs` (u64, bitwise XOR).
+    XorU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
     /// `dst = src >> imm` (u64, logical right shift).
     ShrU64Imm {
         dst: FrameOffset,
@@ -219,8 +271,8 @@ pub enum MicroOp {
     /// Call function `func_id`. The compiler has already emitted micro-ops
     /// to place arguments into the callee's frame. This instruction
     /// implicitly writes the metadata `(pc, fp, func_id)` at
-    /// `current_fp + data_size` and sets `fp` to
-    /// `current_fp + data_size + FRAME_METADATA_SIZE`.
+    /// `current_fp + args_and_locals_size` and sets `fp` to
+    /// `current_fp + args_and_locals_size + FRAME_METADATA_SIZE`.
     CallFunc { func_id: u32 },
 
     /// Return from the current function call. The compiler has already
@@ -245,8 +297,29 @@ pub enum MicroOp {
         imm: u64,
     },
 
+    /// Jump to `target` if the u64 at `src` is **<** `imm`.
+    JumpLessU64Imm {
+        target: CodeOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
     /// Jump to `target` if u64 at `lhs` < u64 at `rhs`.
     JumpLessU64 {
+        target: CodeOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// Jump to `target` if u64 at `lhs` >= u64 at `rhs`.
+    JumpGreaterEqualU64 {
+        target: CodeOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// Jump to `target` if u64 at `lhs` != u64 at `rhs`.
+    JumpNotEqualU64 {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
@@ -255,7 +328,9 @@ pub enum MicroOp {
     //======================================================================
     // Vector operations
     //======================================================================
-    // Heap-allocated: [header | length | capacity | elements...].
+    // Heap-allocated: [header | length | elements...].
+    // Capacity is derived from the header's size field.
+    // A null pointer represents an empty vector (no allocation).
     // `elem_size` is baked into each instruction (statically known).
     //
     // May want:
@@ -266,55 +341,56 @@ pub enum MicroOp {
     // - specializations for common element sizes (e.g. 1-byte for
     //   byte strings, 8-byte for primitives).
     //======================================================================
-    /// Allocate a new empty vector with the given initial capacity.
-    /// `descriptor_id = 0` indexes the **Trivial** variant in the heap
-    /// object descriptor table (element 0 is always the trivial
-    /// descriptor, meaning no internal heap pointers); `>= 1` indexes
-    /// other descriptors. Writes heap pointer to `dst`.
-    /// MAY TRIGGER GC.
-    VecNew {
-        dst: FrameOffset,
-        descriptor_id: u16,
-        elem_size: u32,
-        initial_capacity: u64,
-    },
+    /// Initialize an empty vector by writing a null pointer to `dst`.
+    /// No heap allocation occurs; the first `VecPushBack` allocates lazily
+    /// using the `descriptor_id` and `elem_size` it carries.
+    VecNew { dst: FrameOffset },
 
     /// Write the length (u64) of the vector to `dst`.
+    /// `vec_ref` is a 16-byte fat pointer `(base, offset)` whose target
+    /// holds the vector's heap pointer.
     VecLen {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
     },
 
     /// Append an element. Copies `elem_size` bytes from `elem`
-    /// into the vector. If capacity is exceeded, reallocates (bump) and
-    /// updates `heap_ptr` in place. MAY TRIGGER GC.
+    /// into the vector. If the vector is null (empty), allocates a new
+    /// buffer using `descriptor_id`. If capacity is exceeded, reallocates
+    /// (bump) and writes the new pointer back through `vec_ref`.
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. MAY TRIGGER GC.
     VecPushBack {
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         elem: FrameOffset,
         elem_size: u32,
+        descriptor_id: DescriptorId,
     },
 
     /// Pop last element. Copies `elem_size` bytes to `dst`.
-    /// Aborts if empty.
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. Aborts if empty.
     VecPopBack {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         elem_size: u32,
     },
 
     /// Read vector[idx]. Copies `elem_size` bytes to `dst`.
-    /// Aborts if out of bounds.
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. Aborts if out of bounds.
     VecLoadElem {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         idx: FrameOffset,
         elem_size: u32,
     },
 
     /// Write vector[idx]. Copies `elem_size` bytes from `src`.
-    /// Aborts if out of bounds.
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. Aborts if out of bounds.
     VecStoreElem {
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         idx: FrameOffset,
         src: FrameOffset,
         elem_size: u32,
@@ -349,27 +425,30 @@ pub enum MicroOp {
     },
 
     /// Borrow a vector element, producing a fat pointer `(base, offset)`.
-    /// Writes 16 bytes at `[dst, dst+16)`:
+    /// `vec_ref` is a 16-byte fat pointer whose target holds the vector's
+    /// heap pointer. Writes 16 bytes at `[dst, dst+16)`:
     ///   - base   = the vector's heap pointer
     ///   - offset = VEC_DATA_OFFSET + idx * elem_size
     ///
     /// Aborts if index is out of bounds.
     VecBorrow {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        vec_ref: FrameOffset,
         idx: FrameOffset,
         elem_size: u32,
     },
 
-    /// Borrow a location within a heap object, producing a fat pointer
-    /// `(heap_ptr, offset)`. Writes 16 bytes at `[dst, dst+16)`:
-    ///   - base   = the object's heap pointer
-    ///   - offset = offset from the object's start
+    /// Borrow a location within a heap object, producing a fat pointer.
+    /// `obj_ref` is a 16-byte fat pointer `(base, ref_offset)` whose
+    /// target holds the heap object pointer. Writes 16 bytes at
+    /// `[dst, dst+16)`:
+    ///   - base   = the object's heap pointer (read through `obj_ref`)
+    ///   - offset = `offset` (byte offset from the object's start)
     ///
     /// Move semantics guarantee the offset is within bounds.
     HeapBorrow {
         dst: FrameOffset,
-        heap_ptr: FrameOffset,
+        obj_ref: FrameOffset,
         offset: u32,
     },
 
@@ -414,7 +493,7 @@ pub enum MicroOp {
     /// preferable.
     HeapNew {
         dst: FrameOffset,
-        descriptor_id: u16,
+        descriptor_id: DescriptorId,
     },
 
     /// Copy 8 bytes from a heap object at `heap_ptr + offset` into `dst`.
@@ -489,16 +568,16 @@ pub enum MicroOp {
 pub const FRAME_METADATA_SIZE: usize = 24;
 
 /// Size of the object header: [descriptor_id: u32 | size_in_bytes: u32].
-const OBJECT_HEADER_SIZE: usize = 8;
+pub const OBJECT_HEADER_SIZE: usize = 8;
 
 /// Offset where struct field data begins (same as OBJECT_HEADER_SIZE).
-const STRUCT_DATA_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const STRUCT_DATA_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
 
 /// Offset of the variant tag (u64) within an enum object.
-const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
 
 /// Offset where enum variant field data begins (after header + tag).
-const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+pub const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
 
 impl MicroOp {
     // ----- Struct helpers (offsets relative to STRUCT_DATA_OFFSET) -----
@@ -547,10 +626,10 @@ impl MicroOp {
         }
     }
 
-    pub fn struct_borrow(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
+    pub fn struct_borrow(obj_ref: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapBorrow {
             dst,
-            heap_ptr,
+            obj_ref,
             offset: STRUCT_DATA_OFFSET as u32 + field_offset,
         }
     }
@@ -617,10 +696,10 @@ impl MicroOp {
         }
     }
 
-    pub fn enum_borrow(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
+    pub fn enum_borrow(obj_ref: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapBorrow {
             dst,
-            heap_ptr,
+            obj_ref,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
         }
     }
@@ -632,7 +711,7 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // Current size is 24 bytes due to large variants (e.g. VecNew,
+        // Current size is 24 bytes due to large variants (e.g.
         // JumpGreaterEqualU64Imm). We should aim to bring this down to 16.
         assert_eq!(std::mem::size_of::<MicroOp>(), 24);
     }

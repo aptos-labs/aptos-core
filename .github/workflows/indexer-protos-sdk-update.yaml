@@ -51,7 +51,7 @@ jobs:
           fi
 
   update-sdk:
-    needs: [check-protos]
+    needs: check-protos
     runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       contents: read
@@ -79,9 +79,11 @@ jobs:
         working-directory: protos/proto
       - name: Capture the commit hash
         id: commit_hash
+        env:
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         run: |
-          echo "commit_hash=${GITHUB_SHA}" >> $GITHUB_OUTPUT
-          echo "branch_name=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          echo "commit_hash=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          printf 'branch_name=%s\n' "$BRANCH_NAME" >> "$GITHUB_OUTPUT"
       
       - name: Google Cloud Auth
         id: auth

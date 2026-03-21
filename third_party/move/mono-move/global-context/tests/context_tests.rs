@@ -5,6 +5,7 @@
 //! context.
 
 use mono_move_global_context::GlobalContext;
+use move_core_types::{account_address::AccountAddress, ident_str};
 use std::{
     sync::{Arc, Barrier},
     thread,
@@ -26,6 +27,9 @@ fn test_contexts() {
         let _guard2 = ctx.try_execution_context(1).unwrap();
         let _guard3 = ctx.try_execution_context(2).unwrap();
         let _guard4 = ctx.try_execution_context(3).unwrap();
+
+        // Arena shard at 0 is already locked.
+        assert!(ctx.try_execution_context(0).is_none())
     }
 }
 
@@ -168,4 +172,23 @@ fn test_block_execution_simulation() {
         let _guard = ctx.try_maintenance_context().unwrap();
         thread::sleep(Duration::from_millis(100));
     }
+}
+
+#[test]
+fn test_global_arena_reset() {
+    let ctx = GlobalContext::with_num_execution_workers(1);
+
+    {
+        let guard = ctx.try_execution_context(0).unwrap();
+        guard.intern_identifier(ident_str!("foo"));
+        guard.intern_address_name(&AccountAddress::ZERO, ident_str!("bar"));
+    }
+
+    let mut guard = ctx.try_maintenance_context().unwrap();
+    assert_eq!(guard.interned_identifiers_count(), 2);
+    assert_eq!(guard.interned_executable_ids_count(), 1);
+
+    guard.reset_arena_pool();
+    assert_eq!(guard.interned_identifiers_count(), 0);
+    assert_eq!(guard.interned_executable_ids_count(), 0);
 }

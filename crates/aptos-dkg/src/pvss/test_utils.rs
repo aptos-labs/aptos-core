@@ -182,11 +182,11 @@ where
     (d1, d2)
 }
 
-/// Setup dealing for all four chunky weighted transcript variants (unsigned v1/v2, signed v1/v2).
-/// Public parameters (incl. dlog table) are created once and reused.
-pub fn setup_dealing_chunky_all_four<const N: usize, P, E, R>(
+/// Setup dealing for all four chunky weighted transcript variants (unsigned v1/v2, signed v1/v2)
+/// using **pre-built** public parameters (e.g. to reuse one dlog table across multiple configs).
+pub fn setup_dealing_chunky_all_four_with_pp<const N: usize, P, E, R>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
-    ell: Option<u8>,
+    pp: &PublicParameters<E>,
     rng: &mut R,
 ) -> (
     DealingArgs<UnsignedWeightedTranscript<E>>,
@@ -199,8 +199,32 @@ where
     E: Pairing<ScalarField = Fp<P, N>>,
     R: RngCore + CryptoRng,
 {
-    let (d1, d2) = setup_dealing_chunky_both::<N, P, E, R>(sc, ell, rng);
-    let pp = &d1.pp;
+    let (ssks1, spks1, dks1, eks1, iss1, s1, dsk1, dpk1) =
+        generate_keys_and_secrets::<UnsignedWeightedTranscript<E>, R>(sc, pp, rng);
+    let d1 = DealingArgs {
+        pp: pp.clone(),
+        ssks: ssks1,
+        spks: spks1,
+        dks: dks1,
+        eks: eks1,
+        iss: iss1,
+        s: s1,
+        dsk: dsk1,
+        dpk: dpk1,
+    };
+    let (ssks2, spks2, dks2, eks2, iss2, s2, dsk2, dpk2) =
+        generate_keys_and_secrets::<UnsignedWeightedTranscriptv2<E>, R>(sc, pp, rng);
+    let d2 = DealingArgs {
+        pp: pp.clone(),
+        ssks: ssks2,
+        spks: spks2,
+        dks: dks2,
+        eks: eks2,
+        iss: iss2,
+        s: s2,
+        dsk: dsk2,
+        dpk: dpk2,
+    };
     let (ssks3, spks3, dks3, eks3, iss3, s3, dsk3, dpk3) =
         generate_keys_and_secrets::<SignedWeightedTranscript<E>, R>(sc, pp, rng);
     let d3 = DealingArgs {

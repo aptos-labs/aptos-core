@@ -1,0 +1,50 @@
+[package]
+name = "mono-move-programs"
+description = "Synthetic programs for testing and benchmarking the MonoMove runtime"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[features]
+default = ["micro-op", "move-bytecode", "testing"]
+micro-op = ["mono-move-runtime"]
+move-bytecode = ["move-compiler-v2", "legacy-move-compiler", "move-binary-format", "tempfile"]
+testing = ["move-bytecode", "move-core-types", "move-vm-runtime", "move-vm-test-utils", "move-vm-types"]
+
+[dependencies]
+legacy-move-compiler = { workspace = true, optional = true }
+mono-move-runtime = { workspace = true, optional = true }
+move-binary-format = { workspace = true, optional = true }
+move-compiler-v2 = { workspace = true, optional = true }
+move-core-types = { workspace = true, optional = true }
+move-vm-runtime = { workspace = true, optional = true }
+move-vm-test-utils = { workspace = true, optional = true }
+move-vm-types = { workspace = true, optional = true }
+rand = { workspace = true }
+tempfile = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "fib"
+harness = false
+
+[[bench]]
+name = "nested_loop"
+harness = false
+
+[[bench]]
+name = "merge_sort"
+harness = false
+
+[[bench]]
+name = "bst"
+harness = false

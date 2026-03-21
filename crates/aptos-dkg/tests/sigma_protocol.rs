@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use anyhow::{anyhow, Result};
 use aptos_crypto::arkworks::{
     msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
@@ -35,9 +36,11 @@ where
 {
     let mut rng = thread_rng();
 
-    let statement = hom.apply(&witness);
+    let statement = hom.apply(&witness).expect("apply");
 
-    let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
+    let (proof, normalized_statement) = hom
+        .prove(&witness, statement, CNTXT, &mut rng)
+        .expect("prove");
 
     hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
         .expect("Sigma protocol proof failed verification");
@@ -54,9 +57,11 @@ fn test_imhomog_chaum_pedersen<
 ) {
     let mut rng = thread_rng();
 
-    let statement = hom.apply(&witness);
+    let statement = hom.apply(&witness).expect("apply");
 
-    let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
+    let (proof, normalized_statement) = hom
+        .prove(&witness, statement, CNTXT, &mut rng)
+        .expect("prove");
 
     hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
         .expect("Inhomogeneous Chaum-Pedersen sigma proof failed verification");
@@ -70,9 +75,11 @@ fn test_imhomog_scalar_mul<'a, E>(
 {
     let mut rng = thread_rng();
 
-    let statement = hom.apply(&witness);
+    let statement = hom.apply(&witness).expect("apply");
 
-    let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
+    let (proof, normalized_statement) = hom
+        .prove(&witness, statement, CNTXT, &mut rng)
+        .expect("prove");
 
     hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
         .expect("Inhomogeneous chunked scalar mul sigma proof failed verification");
@@ -104,8 +111,8 @@ mod schnorr {
         type CodomainNormalized = CodomainShape<C::Affine>;
         type Domain = Fp<P, N>;
 
-        fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-            self.apply_msm(self.msm_terms(input))
+        fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
+            self.apply_msm(self.msm_terms(input)?)
         }
 
         fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -127,17 +134,17 @@ mod schnorr {
         fn msm_terms(
             &self,
             input: &Self::Domain,
-        ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
-            CodomainShape(MsmInput {
+        ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
+            Ok(CodomainShape(MsmInput {
                 bases: vec![self.G],
                 scalars: vec![*input],
-            })
+            }))
         }
 
-        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
             // for the homomorphism we only need `input.bases()[0] * input.scalars()[0]`
             // but the verification needs a 3-term MSM... so we should really do a custom MSM which dispatches based on length TODO
-            C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
+            C::msm(input.bases(), input.scalars()).map_err(|e| anyhow!("MSM failed: {}", e))
         }
 
         fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

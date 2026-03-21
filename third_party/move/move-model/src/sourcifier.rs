@@ -104,6 +104,18 @@ impl<'a> Sourcifier<'a> {
         }
         if module_env.get_function_count() > 0 {
             for fun_env in module_env.get_functions() {
+                // Skip auto-generated struct API wrappers (pack$S, unpack$S, borrow$S$N, …).
+                // They are reconstructed by the compiler from the public struct declaration
+                // and must not appear in decompiled source.
+                if fun_env.is_struct_api() {
+                    debug_assert!(
+                        fun_env.get_def().is_none(),
+                        "struct API wrapper `{}` should never have a def; \
+                         lift_to_stackless_bytecode must have excluded it",
+                        fun_env.get_name_string()
+                    );
+                    continue;
+                }
                 self.print_fun(fun_env.get_qualified_id(), fun_env.get_def())
             }
         }
@@ -489,10 +501,16 @@ impl<'a> Sourcifier<'a> {
             "".to_string()
         };
         let type_param_str = self.type_params(struct_env.get_type_parameters());
+        let vis_prefix = match struct_env.get_visibility() {
+            Visibility::Public => "public ",
+            Visibility::Friend => "friend ",
+            Visibility::Private => "",
+        };
         if struct_env.has_variants() {
             emitln!(
                 self.writer,
-                "enum {}{}{} {{",
+                "{}enum {}{}{} {{",
+                vis_prefix,
                 self.sym(struct_env.get_name()),
                 type_param_str,
                 ability_str
@@ -516,7 +534,8 @@ impl<'a> Sourcifier<'a> {
         } else {
             emitln!(
                 self.writer,
-                "struct {}{}{} {{",
+                "{}struct {}{}{} {{",
+                vis_prefix,
                 self.sym(struct_env.get_name()),
                 type_param_str,
                 ability_str

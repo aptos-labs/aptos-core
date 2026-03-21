@@ -1,0 +1,2 @@
+is_error: true
+invalid function format `no_colons`, expected `module::function` or `address::module::function`

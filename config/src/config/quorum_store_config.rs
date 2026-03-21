@@ -11,6 +11,7 @@ use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
 pub const DEFEAULT_MAX_BATCH_TXNS: usize = 50;
+pub const DEFAULT_MAX_ENCRYPTED_BATCH_TXNS: usize = 64;
 const DEFAULT_MAX_NUM_BATCHES: usize = 10;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
@@ -56,6 +57,9 @@ pub struct QuorumStoreConfig {
     pub batch_generation_max_interval_ms: usize,
     /// The maximum number of transactions that the batch generator puts in a batch.
     pub sender_max_batch_txns: usize,
+    /// The maximum number of transactions that the batch generator puts in an encrypted batch.
+    /// Controls encrypted batch size independently to respect decryption pipeline limits.
+    pub sender_max_encrypted_batch_txns: usize,
     /// The maximum number of bytes that the batch generator puts in a batch.
     pub sender_max_batch_bytes: usize,
     /// The maximum number of batches that the batch generator creates every time it pull transactions
@@ -118,6 +122,7 @@ impl Default for QuorumStoreConfig {
             batch_generation_min_non_empty_interval_ms: 50,
             batch_generation_max_interval_ms: 250,
             sender_max_batch_txns: DEFEAULT_MAX_BATCH_TXNS,
+            sender_max_encrypted_batch_txns: DEFAULT_MAX_ENCRYPTED_BATCH_TXNS,
             // TODO: on next release, remove BATCH_PADDING_BYTES
             sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,

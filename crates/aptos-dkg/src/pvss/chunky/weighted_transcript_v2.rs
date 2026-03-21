@@ -32,7 +32,7 @@ use crate::{
         CurveGroupTrait, Trait as _,
     },
 };
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Result};
 use aptos_crypto::{
     arkworks::{
         msm,
@@ -142,7 +142,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         // Encrypt the chunked shares and generate the sharing proof
         let (Cs, Rs, Vs, sharing_proof) =
-            Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
+            Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng)
+                .expect("encrypt_chunked_shares");
 
         let V0_proj: E::G2 = pp.get_commitment_base() * f[0];
 
@@ -195,12 +196,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         sc: &<Self as traits::TranscriptCore>::SecretSharingConfig, // only for debugging purposes?
         sok_cntxt: SokContext<'a, A>,
         rng: &mut R,
-    ) -> (
+    ) -> Result<(
         Vec<Vec<Vec<E::G1Affine>>>,
         Vec<Vec<E::G1Affine>>,
         Vec<Vec<E::G2Affine>>,
         SharingProof<E>,
-    ) {
+    )> {
         let WitnessData {
             witness,
             f_evals_chunked_flat,
@@ -224,9 +225,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             pp.ell,
         );
         //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
-        let statement = hom.apply(&witness); // hmm slightly inefficient that we're unchunking here, so might be better to set up a "small" hom just for this part
-                                             //   (2c) Produce the SoK
-        let (SoK, normalized_statement) = hom.prove(&witness, statement, &sok_cntxt, rng);
+        let statement = hom.apply(&witness)?; // hmm slightly inefficient that we're unchunking here, so might be better to set up a "small" hom just for this part
+                                              //   (2c) Produce the SoK
+        let (SoK, normalized_statement) = hom.prove(&witness, statement, &sok_cntxt, rng)?;
         let SoK = SoK.change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
         // Destructure the "public statement" of the above sigma protocol
@@ -266,7 +267,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
 
         // Vs_flat from homomorphism codomain was grouped by player into Vs above.
 
-        (Cs, Rs, Vs, sharing_proof)
+        Ok((Cs, Rs, Vs, sharing_proof))
     }
 }
 

@@ -143,16 +143,16 @@ module 0xc0ffee::m {
     friend 0xc0ffee::n7;
     friend 0xc0ffee::n8;
     friend 0xc0ffee::n9;
-    struct Empty {
+    friend struct Empty {
     }
-    struct S {
+    friend struct S {
         x: u64,
     }
-    struct S2 {
+    friend struct S2 {
         x: u64,
         s: S,
     }
-    enum Wrapper has drop {
+    friend enum Wrapper has drop {
         V1 {
             0: u64,
         }
@@ -166,7 +166,7 @@ module 0xc0ffee::m {
 }
 module 0xc0ffee::m_friend {
     friend 0xc0ffee::n_friend;
-    struct T {
+    friend struct T {
         x: u64,
     }
 }

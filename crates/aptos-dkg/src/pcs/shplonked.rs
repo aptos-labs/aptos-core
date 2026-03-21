@@ -31,6 +31,7 @@ use crate::{
     },
     Scalar,
 };
+use anyhow::Result;
 use aptos_crypto::{
     arkworks::{
         msm,
@@ -169,8 +170,8 @@ impl<F: Field> HomTrait for SumEvalHom<F> {
     type CodomainNormalized = F;
     type Domain = Vec<Vec<F>>;
 
-    fn apply(&self, hidden_evals: &Self::Domain) -> Self::Codomain {
-        hidden_evals.iter().flatten().fold(F::zero(), |a, &b| a + b)
+    fn apply(&self, hidden_evals: &Self::Domain) -> Result<Self::Codomain> {
+        Ok(hidden_evals.iter().flatten().fold(F::zero(), |a, &b| a + b))
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -444,7 +445,7 @@ pub fn batch_open_generalized<
         y_hid_per_poly.push(evals_i.iter().skip(n_rev).cloned().collect());
     }
     let y_hid_flat: Vec<E::ScalarField> = y_hid_per_poly.iter().flatten().cloned().collect();
-    let phi_y = hom.apply(&y_hid_per_poly);
+    let phi_y = hom.apply(&y_hid_per_poly).expect("hom.apply");
 
     let c_y_hid_randomness = sample_field_element(rng);
     let com_y_hom = shplonked_sigma::com_y_hom::<E>(&srs.taus_1[..y_hid_flat.len()], srs.xi_1);
@@ -454,6 +455,7 @@ pub fn batch_open_generalized<
             hidden_evals: y_hid_per_poly.clone(),
             C_evals_randomness: E::ScalarField::zero(),
         })
+        .expect("com_y_hom.apply")
         .0
         .into_affine();
 
@@ -531,6 +533,7 @@ pub fn batch_open_generalized<
             hiding_randomness: Scalar(rho_q),
             values: Scalar::vec_from_inner(q_poly.coeffs().to_vec()),
         })
+        .expect("hom_commit_q.apply")
         .0
         .into_affine();
 
@@ -593,7 +596,10 @@ pub fn batch_open_generalized<
         hidden_evals: y_hid_per_poly.clone(),
         C_evals_randomness: rho_eval,
     };
-    let C_eval_hid_proj: E::G1 = eval_point_commit_hom.apply(&witness_for_C_eval_hid).0;
+    let C_eval_hid_proj: E::G1 = eval_point_commit_hom
+        .apply(&witness_for_C_eval_hid)
+        .expect("eval_point_commit_hom.apply")
+        .0;
 
     // Step 5a: f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g.
     let mut f_poly = DensePolynomial::zero();
@@ -648,8 +654,9 @@ pub fn batch_open_generalized<
         ),
         phi_y,
     );
-    let (sigma_protocol_proof, sigma_statement) =
-        full_hom.prove(&witness, statement_proj, SHPLONKED_SIGMA_DST, rng);
+    let (sigma_protocol_proof, sigma_statement) = full_hom
+        .prove(&witness, statement_proj, SHPLONKED_SIGMA_DST, rng)
+        .expect("full_hom.prove");
     let sigma_proof =
         sigma_protocol_proof.change_lifetime::<shplonked_sigma::ShplonkedSigmaHom<'static, E>>();
 
@@ -1015,6 +1022,7 @@ where
                 hiding_randomness: Scalar(r),
                 values: Scalar::vec_from_inner(poly.coeffs.clone()),
             })
+            .expect("Shplonked commit")
             .0;
         ShplonkedCommitment(comm)
     }

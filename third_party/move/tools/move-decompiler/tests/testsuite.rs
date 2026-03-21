@@ -197,6 +197,19 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .no_cfg_opt(false)
                 .no_assign_opt(false)
         },
+        TestConfig {
+            name: "public-struct",
+            runner: |p| run_test(p, get_config_by_name("public-struct")),
+            sources: "./tests/public-struct",
+            sources_deps: vec![],
+            dependencies: vec!["./tests/legacy-move-stdlib"],
+            exclude: vec![],
+            test_level: TestLevel::Recompile,
+            ..config()
+                .lang(LanguageVersion::latest())
+                .no_cfg_opt(false)
+                .no_assign_opt(false)
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });

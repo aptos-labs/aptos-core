@@ -37,6 +37,9 @@ pub const LEGACY_OPTION_VEC: &str = "vec";
 pub const OPTION_MODULE_NAME_STR: &str = "option";
 pub const OPTION_STRUCT_NAME_STR: &str = "Option";
 
+// Module path separator used in fully-qualified type names (e.g. "0x1::string::String")
+pub const MODULE_SEPARATOR: &str = "::";
+
 // Struct API constants for public struct/enum APIs
 pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
 pub const PACK: &str = "pack";
@@ -157,6 +160,32 @@ impl TypeTag {
             Vector(t) => format!("vector<{}>", t.to_canonical_string()),
             Struct(s) => s.to_canonical_string(),
             Function(f) => f.to_canonical_string(),
+        }
+    }
+
+    /// Returns a short string for the top-level type without any type parameters.
+    /// Useful for error messages where the full canonical string would be unbounded in size.
+    pub fn to_short_string(&self) -> &'static str {
+        use TypeTag::*;
+        match self {
+            Bool => "bool",
+            U8 => "u8",
+            U16 => "u16",
+            U32 => "u32",
+            U64 => "u64",
+            U128 => "u128",
+            U256 => "u256",
+            I8 => "i8",
+            I16 => "i16",
+            I32 => "i32",
+            I64 => "i64",
+            I128 => "i128",
+            I256 => "i256",
+            Address => "address",
+            Signer => "signer",
+            Vector(_) => "vector",
+            Struct(_) => "struct",
+            Function(_) => "function",
         }
     }
 
