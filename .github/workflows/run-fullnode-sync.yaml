@@ -105,12 +105,12 @@ jobs:
         id: slack
         uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
         with:
+          webhook: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
           payload: |
             {
               "text": "${{ ':x:' }} `${{ inputs.TEST_NAME  }}`: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
             }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}
 
       # Because we have to checkout the actions and then check out a different
       # git ref, it's possible the actions directory will be modified. So, we
