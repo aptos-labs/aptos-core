@@ -188,15 +188,16 @@ impl PeersAndMetadata {
             get_peer_metadata_for_network(&peer_network_id, &mut peers_and_metadata)?;
 
         // Update the metadata for the peer or insert a new entry.
-        // We wrap in Arc for cheap cache cloning.
+        // We wrap in Arc for cheap cache cloning. Since only one arm executes,
+        // we can move connection_metadata instead of cloning it.
         match peer_metadata_for_network.entry(peer_network_id.peer_id()) {
             Entry::Occupied(mut entry) => {
                 let mut updated = (**entry.get()).clone();
-                updated.connection_metadata = connection_metadata.clone();
+                updated.connection_metadata = connection_metadata;
                 entry.insert(Arc::new(updated));
             },
             Entry::Vacant(entry) => {
-                entry.insert(Arc::new(PeerMetadata::new(connection_metadata.clone())));
+                entry.insert(Arc::new(PeerMetadata::new(connection_metadata)));
             },
         }
 
