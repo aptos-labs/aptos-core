@@ -92,6 +92,8 @@
 module aptos_experimental::sigma_protocol_transfer {
     friend aptos_experimental::confidential_asset;
     #[test_only]
+    friend aptos_experimental::confidential_asset_tests;
+    #[test_only]
     friend aptos_experimental::sigma_protocol_proof_tests;
 
     use std::bcs;

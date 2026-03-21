@@ -4,7 +4,7 @@ module aptos_experimental::confidential_asset_tests {
     use std::option;
     use std::signer;
     use std::string::utf8;
-    use aptos_std::ristretto255::{Scalar, CompressedRistretto};
+    use aptos_std::ristretto255::{Scalar, CompressedRistretto, new_scalar_from_u64};
     use aptos_framework::account;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
@@ -12,9 +12,23 @@ module aptos_experimental::confidential_asset_tests {
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
 
+    use aptos_std::ristretto255_bulletproofs::RangeProof;
     use aptos_experimental::confidential_asset;
-    use aptos_experimental::confidential_balance::{Pending, Balance};
-    use aptos_experimental::confidential_crypto_test_utils::generate_twisted_elgamal_keypair;
+    use aptos_experimental::confidential_balance::{Pending, Available, Balance, CompressedBalance,
+        new_pending_from_p_and_r, split_available_into_chunks, split_pending_into_chunks,
+    };
+    use aptos_experimental::confidential_crypto_test_utils::{Self as crypto_test_utils,
+        decompress_points, generate_twisted_elgamal_keypair,
+        generate_available_randomness, new_available_from_amount,
+        generate_pending_randomness, prove_range,
+    };
+    use aptos_experimental::sigma_protocol_key_rotation;
+    use aptos_experimental::sigma_protocol_proof;
+    use aptos_experimental::sigma_protocol_proof_tests;
+    use aptos_experimental::sigma_protocol_registration;
+    use aptos_experimental::sigma_protocol_transfer;
+    use aptos_experimental::sigma_protocol_utils::points_clone;
+    use aptos_experimental::sigma_protocol_withdraw;
 
     struct MockCoin {}
 
@@ -25,7 +39,7 @@ module aptos_experimental::confidential_asset_tests {
         ek: CompressedRistretto,
         token: Object<Metadata>,
     ) {
-        let proof = confidential_asset::prove_registration(signer::address_of(sender), token, dk);
+        let proof = prove_registration(signer::address_of(sender), token, dk);
         confidential_asset::register(sender, token, ek, proof);
     }
 
@@ -37,7 +51,7 @@ module aptos_experimental::confidential_asset_tests {
         amount: u64,
         new_amount: u128
     ) {
-        let proof = confidential_asset::prove_withdrawal(
+        let proof = prove_withdrawal(
             signer::address_of(sender),
             token,
             sender_dk,
@@ -62,7 +76,7 @@ module aptos_experimental::confidential_asset_tests {
         amount: u64,
         new_amount: u128
     ) {
-        let proof = confidential_asset::prove_transfer(
+        let proof = prove_transfer(
             signer::address_of(sender), to, token, sender_dk, amount, new_amount, &vector[],
         );
 
@@ -78,12 +92,12 @@ module aptos_experimental::confidential_asset_tests {
         new_amount: u128,
         volun_auditor_eks: &vector<CompressedRistretto>,
     ): (Balance<Pending>, vector<Balance<Pending>>) {
-        let proof = confidential_asset::prove_transfer(
+        let proof = prove_transfer(
             signer::address_of(sender), to, token, sender_dk, amount, new_amount, volun_auditor_eks,
         );
 
-        let eff_aud_amount = confidential_asset::get_amount_ciphertext_for_effective_auditor(&proof);
-        let volun_aud_amounts = confidential_asset::get_amount_ciphertexts_for_volun_auditors(&proof);
+        let eff_aud_amount = get_amount_ciphertext_for_effective_auditor(&proof);
+        let volun_aud_amounts = get_amount_ciphertexts_for_volun_auditors(&proof);
 
         confidential_asset::confidential_transfer(sender, token, to, proof);
 
@@ -97,7 +111,7 @@ module aptos_experimental::confidential_asset_tests {
         new_dk: &Scalar,
     ) {
         let proof =
-            confidential_asset::prove_key_rotation(
+            prove_key_rotation(
                 signer::address_of(sender),
                 token,
                 sender_dk,
@@ -211,20 +225,20 @@ module aptos_experimental::confidential_asset_tests {
         confidential_asset::deposit(alice, token, 200);
         confidential_asset::rollover_pending_balance(alice, token);
 
-        let proof = confidential_asset::prove_transfer(
+        let proof = prove_transfer(
             alice_addr, bob_addr, token, &alice_dk, 100, 100, &volun_aud_eks,
         );
 
         if (has_eff_auditor) {
-            let eff_aud_amount = confidential_asset::get_amount_ciphertext_for_effective_auditor(&proof);
-            assert!(eff_aud_amount.check_decrypts_to(eff_aud_amount.get_R(), option::borrow(&eff_aud_dk), 100), 1);
+            let eff_aud_amount = get_amount_ciphertext_for_effective_auditor(&proof);
+            assert!(crypto_test_utils::check_decrypts_to(&eff_aud_amount, eff_aud_amount.get_R(), option::borrow(&eff_aud_dk), 100), 1);
         };
 
         if (num_volun_auditors > 0) {
-            let volun_aud_amounts = confidential_asset::get_amount_ciphertexts_for_volun_auditors(&proof);
+            let volun_aud_amounts = get_amount_ciphertexts_for_volun_auditors(&proof);
             let i = 0;
             while (i < num_volun_auditors) {
-                assert!(volun_aud_amounts[i].check_decrypts_to(volun_aud_amounts[i].get_R(), &volun_aud_dks[i], 100), 1);
+                assert!(crypto_test_utils::check_decrypts_to(&volun_aud_amounts[i], volun_aud_amounts[i].get_R(), &volun_aud_dks[i], 100), 1);
                 i = i + 1;
             };
         };
@@ -232,17 +246,17 @@ module aptos_experimental::confidential_asset_tests {
         confidential_asset::confidential_transfer(alice, token, bob_addr, proof);
 
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
             1
         );
         assert!(
-            confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 100),
+            check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 100),
             1
         );
 
         if (has_eff_auditor) {
             assert!(
-                confidential_asset::check_available_balance_decrypts_to(
+                check_available_balance_decrypts_to(
                     alice_addr, token, option::borrow(&eff_aud_dk), 100, true,
                 ),
                 1
@@ -276,11 +290,11 @@ module aptos_experimental::confidential_asset_tests {
         register(&alice, &alice_dk, alice_ek, token);
 
         assert!(
-            confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 0),
+            check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 0),
             1
         );
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 0, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 0, false),
             1
         );
         assert!(confidential_asset::get_encryption_key(alice_addr, token) == alice_ek, 1);
@@ -313,11 +327,11 @@ module aptos_experimental::confidential_asset_tests {
         confidential_asset::deposit(&alice, token, 100);
 
         assert!(
-            confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
+            check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
             1
         );
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 0, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 0, false),
             1
         );
         assert!(confidential_asset::is_normalized(alice_addr, token));
@@ -325,11 +339,11 @@ module aptos_experimental::confidential_asset_tests {
         confidential_asset::rollover_pending_balance(&alice, token);
 
         assert!(
-            confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 0),
+            check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 0),
             1
         );
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
             1
         );
     }
@@ -367,11 +381,11 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(primary_fungible_store::balance(alice_addr, token) == 400, 1);
         assert!(
-            confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
+            check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 100),
             1
         );
         assert!(
-            confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 150),
+            check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 150),
             1
         );
     }
@@ -409,7 +423,7 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(primary_fungible_store::balance(bob_addr, token) == 550, 1);
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 150, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 150, false),
             1
         );
 
@@ -417,7 +431,7 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(primary_fungible_store::balance(alice_addr, token) == 350, 1);
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
             1
         );
     }
@@ -454,11 +468,11 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(primary_fungible_store::balance(bob_addr, token) == 550, 1);
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 150, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 150, false),
             1
         );
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &auditor_dk, 150, true),
+            check_available_balance_decrypts_to(alice_addr, token, &auditor_dk, 150, true),
             1
         );
     }
@@ -497,22 +511,22 @@ module aptos_experimental::confidential_asset_tests {
         transfer(&alice, &alice_dk, token, bob_addr, 100, 100);
 
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
             1
         );
         assert!(
-            confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 100),
+            check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 100),
             1
         );
 
         transfer(&alice, &alice_dk, token, bob_addr, 100, 0);
 
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 0, false),
+            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 0, false),
             1
         );
         assert!(
-            confidential_asset::check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 200),
+            check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 200),
             1
         );
     }
@@ -614,7 +628,7 @@ module aptos_experimental::confidential_asset_tests {
         confidential_asset::rollover_pending_balance(&alice, token);
 
         // Prove without an effective auditor (none set on chain)
-        let proof = confidential_asset::prove_transfer(
+        let proof = prove_transfer(
             signer::address_of(&alice),
             bob_addr,
             token,
@@ -686,7 +700,7 @@ module aptos_experimental::confidential_asset_tests {
 
         assert!(confidential_asset::get_encryption_key(alice_addr, token) == new_alice_ek, 1);
         assert!(
-            confidential_asset::check_available_balance_decrypts_to(
+            check_available_balance_decrypts_to(
                 alice_addr, token, &new_alice_dk, 150, false
             ),
             1
@@ -789,5 +803,189 @@ module aptos_experimental::confidential_asset_tests {
         register(&alice, &alice_dk, alice_ek, token);
         // Alice only has 100 coins but tries to deposit 200 — should abort.
         confidential_asset::deposit(&alice, token, 200);
+    }
+
+    // === Proof generation and balance checking helpers ===
+
+    fun check_pending_balance_decrypts_to(
+        user: address,
+        asset_type: Object<Metadata>,
+        user_dk: &Scalar,
+        amount: u64
+    ): bool {
+        let pending_balance =
+            confidential_asset::get_pending_balance(user, asset_type).decompress();
+
+        crypto_test_utils::check_decrypts_to(&pending_balance, pending_balance.get_R(), user_dk, (amount as u128))
+    }
+
+    /// Checks that the available balance decrypts to `amount`.
+    /// When `is_auditor_dk` is true, decrypts the auditor's ciphertext rather than the user's.
+    fun check_available_balance_decrypts_to(
+        user: address,
+        asset_type: Object<Metadata>,
+        dk: &Scalar,
+        amount: u128,
+        is_auditor_dk: bool,
+    ): bool {
+        let available_balance =
+            confidential_asset::get_available_balance(user, asset_type).decompress();
+
+        let decrypt_R = if (is_auditor_dk) { available_balance.get_R_aud() } else { available_balance.get_R() };
+        crypto_test_utils::check_decrypts_to(&available_balance, decrypt_R, dk, amount)
+    }
+
+    fun get_amount_ciphertext_for_effective_auditor(proof: &confidential_asset::TransferProof): Balance<Pending> {
+        let compressed_amount = confidential_asset::get_transfer_proof_compressed_amount(proof);
+        let p = decompress_points(compressed_amount.get_compressed_P());
+        let r_eff_aud = decompress_points(compressed_amount.get_compressed_R_eff_aud());
+        new_pending_from_p_and_r(p, r_eff_aud)
+    }
+
+    fun get_amount_ciphertexts_for_volun_auditors(proof: &confidential_asset::TransferProof): vector<Balance<Pending>> {
+        let compressed_amount = confidential_asset::get_transfer_proof_compressed_amount(proof);
+        let p = decompress_points(compressed_amount.get_compressed_P());
+        compressed_amount.get_compressed_R_volun_auds().map_ref(|r| {
+            new_pending_from_p_and_r(points_clone(&p), decompress_points(r))
+        })
+    }
+
+    fun prove_registration(
+        sender_addr: address,
+        asset_type: Object<Metadata>,
+        dk: &Scalar,
+    ): confidential_asset::RegistrationProof {
+        let (stmt, witn) = sigma_protocol_registration::compute_statement_and_witness(dk);
+        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
+        let session = sigma_protocol_registration::new_session(&sender, asset_type);
+        confidential_asset::new_registration_proof(session.prove(&stmt, &witn))
+    }
+
+    fun prove_withdrawal_internal(
+        sender_addr: address,
+        asset_type: Object<Metadata>,
+        dk_sender: &Scalar,
+        v: u64,
+        new_amount: u128,
+    ): (CompressedBalance<Available>, RangeProof, sigma_protocol_proof::Proof) {
+        let ek = confidential_asset::get_encryption_key(sender_addr, asset_type);
+        let compressed_ek_aud = confidential_asset::get_effective_auditor_ek(asset_type);
+        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
+
+        let new_balance_randomness = generate_available_randomness();
+        let new_balance = new_available_from_amount(
+            new_amount, &new_balance_randomness, &ek, &compressed_ek_aud
+        );
+
+        let new_r = new_balance_randomness.scalars();
+        let new_a = split_available_into_chunks(new_amount);
+        let zkrp_new_balance = prove_range(&new_a, new_r);
+
+        let v = new_scalar_from_u64(v);
+        let compressed_old_balance = confidential_asset::get_available_balance(sender_addr, asset_type);
+        let compressed_new_balance = new_balance.compress();
+        let (stmt, _) = sigma_protocol_withdraw::new_withdrawal_statement(
+            ek, &compressed_old_balance, &compressed_new_balance, &compressed_ek_aud, v
+        );
+        let witn = sigma_protocol_proof_tests::new_withdrawal_witness(*dk_sender, new_a, *new_r);
+        let session = sigma_protocol_withdraw::new_session(&sender, asset_type, compressed_ek_aud.is_some());
+        (compressed_new_balance, zkrp_new_balance, session.prove(&stmt, &witn))
+    }
+
+    fun prove_withdrawal(
+        sender_addr: address,
+        asset_type: Object<Metadata>,
+        sender_dk: &Scalar,
+        amount: u64,
+        new_amount: u128,
+    ): confidential_asset::WithdrawalProof {
+        let (compressed_new_balance, zkrp_new_balance, sigma) =
+            prove_withdrawal_internal(sender_addr, asset_type, sender_dk, amount, new_amount);
+        confidential_asset::new_withdrawal_proof(compressed_new_balance, zkrp_new_balance, sigma)
+    }
+
+    fun prove_normalization(
+        sender_addr: address,
+        asset_type: Object<Metadata>,
+        sender_dk: &Scalar,
+        amount: u128,
+    ): confidential_asset::WithdrawalProof {
+        let (compressed_new_balance, zkrp_new_balance, sigma) =
+            prove_withdrawal_internal(sender_addr, asset_type, sender_dk, 0, amount);
+        confidential_asset::new_withdrawal_proof(compressed_new_balance, zkrp_new_balance, sigma)
+    }
+
+    fun prove_transfer(
+        sender_addr: address,
+        recipient_addr: address,
+        asset_type: Object<Metadata>,
+        sender_dk: &Scalar,
+        amount_u64: u64,
+        new_balance_u128: u128,
+        compressed_ek_volun_auds: &vector<CompressedRistretto>,
+    ): confidential_asset::TransferProof {
+        let ek_sender = confidential_asset::get_encryption_key(sender_addr, asset_type);
+        let ek_recipient = confidential_asset::get_encryption_key(recipient_addr, asset_type);
+        let compressed_old_balance = confidential_asset::get_available_balance(sender_addr, asset_type);
+        let compressed_ek_eff_aud = confidential_asset::get_effective_auditor_ek(asset_type);
+        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
+        let has_effective_auditor = compressed_ek_eff_aud.is_some();
+        let num_volun_auditors = compressed_ek_volun_auds.length();
+
+        let new_balance_randomness = generate_available_randomness();
+        let amount_randomness = generate_pending_randomness();
+
+        let (stmt, witn, new_balance, amount) =
+            sigma_protocol_proof_tests::build_transfer_statement_and_witness(
+                sender_dk, &ek_sender, &ek_recipient, &compressed_old_balance,
+                &compressed_ek_eff_aud, compressed_ek_volun_auds,
+                amount_u64, new_balance_u128, &new_balance_randomness, &amount_randomness,
+            );
+
+        let new_a = split_available_into_chunks(new_balance_u128);
+        let v = split_pending_into_chunks((amount_u64 as u128));
+        let zkrp_new_balance = prove_range(&new_a, new_balance_randomness.scalars());
+        let zkrp_amount = prove_range(&v, amount_randomness.scalars());
+
+        let session = sigma_protocol_transfer::new_session(
+            &sender, recipient_addr, asset_type, has_effective_auditor, num_volun_auditors,
+        );
+
+        confidential_asset::new_transfer_proof(
+            new_balance.compress(),
+            amount.compress(),
+            *compressed_ek_volun_auds,
+            zkrp_new_balance, zkrp_amount, session.prove(&stmt, &witn)
+        )
+    }
+
+    fun prove_key_rotation(
+        owner_addr: address,
+        asset_type: Object<Metadata>,
+        sender_dk: &Scalar,
+        new_dk: &Scalar,
+    ): confidential_asset::KeyRotationProof {
+        let owner = aptos_framework::account::create_signer_for_test(owner_addr);
+
+        // Get old EK and available balance
+        let compressed_old_ek = confidential_asset::get_encryption_key(owner_addr, asset_type);
+        let available_balance = confidential_asset::get_available_balance(owner_addr, asset_type);
+
+        // Build statement and witness using the helper
+        let (stmt, witn, compressed_new_ek, compressed_new_R) =
+            sigma_protocol_key_rotation::compute_statement_and_witness_from_keys_and_old_ctxt(
+                sender_dk, new_dk,
+                compressed_old_ek,
+                available_balance.get_compressed_R(),
+            );
+
+        // Prove
+        let session = sigma_protocol_key_rotation::new_session(&owner, asset_type);
+
+        confidential_asset::new_key_rotation_proof(
+            compressed_new_ek,
+            compressed_new_R,
+            session.prove(&stmt, &witn),
+        )
     }
 }

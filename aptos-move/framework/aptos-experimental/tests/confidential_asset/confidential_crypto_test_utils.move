@@ -260,4 +260,20 @@ module aptos_experimental::confidential_crypto_test_utils {
         new_secret_witness(vector[dk])
     }
 
+    /// Verifies that a balance encrypts `amount` using DK on the given R component.
+    public fun check_decrypts_to<T>(
+        balance: &Balance<T>, decrypt_R: &vector<RistrettoPoint>,
+        dk: &Scalar, amount: u128,
+    ): bool {
+        let num_chunks = balance.get_P().length();
+        let b_powers = confidential_balance::get_b_powers(num_chunks);
+
+        let decrypted_chunks: vector<RistrettoPoint> = vector::range(0, num_chunks).map(|i| {
+            balance.get_P()[i].point_sub(&decrypt_R[i].point_mul(dk))
+        });
+
+        let combined = aptos_std::ristretto255::multi_scalar_mul(&decrypted_chunks, &b_powers);
+        combined.point_equals(&aptos_std::ristretto255::new_scalar_from_u128(amount).basepoint_mul())
+    }
+
 }

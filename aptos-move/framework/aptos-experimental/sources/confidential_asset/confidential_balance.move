@@ -303,23 +303,4 @@ module aptos_experimental::confidential_balance {
         &self.r
     }
 
-    #[test_only]
-    use aptos_std::ristretto255::multi_scalar_mul;
-
-    #[test_only]
-    /// Verifies that a balance encrypts `amount` using DK on the given R component.
-    public(friend) fun check_decrypts_to<T>(
-        self: &Balance<T>, decrypt_R: &vector<RistrettoPoint>,
-        dk: &Scalar, amount: u128,
-    ): bool {
-        let num_chunks = self.P.length();
-        let b_powers = get_b_powers(num_chunks);
-
-        let decrypted_chunks: vector<RistrettoPoint> = vector::range(0, num_chunks).map(|i| {
-            self.P[i].point_sub(&decrypt_R[i].point_mul(dk))
-        });
-
-        let combined = multi_scalar_mul(&decrypted_chunks, &b_powers);
-        combined.point_equals(&new_scalar_from_u128(amount).basepoint_mul())
-    }
 }
