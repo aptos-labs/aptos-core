@@ -1,4 +1,16 @@
 module aptos_experimental::sigma_protocol_representation {
+    friend aptos_experimental::sigma_protocol_representation_vec;
+    friend aptos_experimental::sigma_protocol_homomorphism;
+    friend aptos_experimental::sigma_protocol;
+    friend aptos_experimental::sigma_protocol_registration;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_transfer;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_pedeq_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_schnorr_example;
+
     use std::error;
     use aptos_std::ristretto255::{Scalar, RistrettoPoint, scalar_one};
     use aptos_experimental::sigma_protocol_statement::Statement;
@@ -19,7 +31,7 @@ module aptos_experimental::sigma_protocol_representation {
         scalars: vector<Scalar>,
     }
 
-    public fun new_representation(points: vector<u64>, scalars: vector<Scalar>): Representation {
+    public(friend) fun new_representation(points: vector<u64>, scalars: vector<Scalar>): Representation {
         assert!(points.length() == scalars.length(), error::invalid_argument(E_MISMATCHED_LENGTHS));
         Representation {
             point_idxs: points, scalars
@@ -27,28 +39,28 @@ module aptos_experimental::sigma_protocol_representation {
     }
 
     /// A single statement point scaled by 1 (used extensively in f()).
-    public fun repr_point(idx: u64): Representation {
+    public(friend) fun repr_point(idx: u64): Representation {
         new_representation(vector[idx], vector[scalar_one()])
     }
 
     /// A single statement point scaled by a witness scalar (used extensively in psi()).
-    public fun repr_scaled(idx: u64, scalar: Scalar): Representation {
+    public(friend) fun repr_scaled(idx: u64, scalar: Scalar): Representation {
         new_representation(vector[idx], vector[scalar])
     }
 
     /// Given a representation, which only stores locations of group elements within a public statement, returns the
     /// actual vector of group elements by "looking up" these elements in the public statement.
-    public fun to_points<P>(self: &Representation, stmt: &Statement<P>): vector<RistrettoPoint> {
+    public(friend) fun to_points<P>(self: &Representation, stmt: &Statement<P>): vector<RistrettoPoint> {
         self.point_idxs.map(|idx| stmt.get_point(idx).point_clone())
     }
 
     /// Returns the scalars in the representation.
-    public fun get_scalars(self: &Representation): &vector<Scalar> {
+    public(friend) fun get_scalars(self: &Representation): &vector<Scalar> {
         &self.scalars
     }
 
     /// Multiplies all the scalars in the representation by $e$.
-    public fun scale(self: &mut Representation, e: &Scalar) {
+    public(friend) fun scale(self: &mut Representation, e: &Scalar) {
         self.scalars.for_each_mut(|scalar| {
             scalar.scalar_mul_assign(e);
         });

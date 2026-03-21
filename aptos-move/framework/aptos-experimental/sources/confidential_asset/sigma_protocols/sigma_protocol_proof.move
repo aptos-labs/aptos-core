@@ -1,5 +1,14 @@
 module aptos_experimental::sigma_protocol_proof {
     friend aptos_experimental::confidential_asset;
+    friend aptos_experimental::sigma_protocol;
+    friend aptos_experimental::sigma_protocol_registration;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_transfer;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_pedeq_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_schnorr_example;
 
     use std::error;
     use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto};
@@ -20,7 +29,7 @@ module aptos_experimental::sigma_protocol_proof {
     }
 
     /// Creates a new proof consisting of the commitment $A \in \mathbb{G}^m$ and the scalars $\sigma \in \mathbb{F}^k$.
-    public fun new_proof(
+    public(friend) fun new_proof(
         _A: vector<RistrettoPoint>,
         compressed_A: vector<CompressedRistretto>,
         sigma: vector<Scalar>
@@ -47,19 +56,19 @@ module aptos_experimental::sigma_protocol_proof {
     /// Returns a `Witness` with the `w` field set to the proof's $\sigma$ field.
     /// This is needed during proof verification: when calling the homomorphism on the `Proof`'s $\sigma$, it expects a
     /// `Witness` not a `vector<Scalar>`.
-    public fun response_to_witness(self: &Proof): Witness {
+    public(friend) fun response_to_witness(self: &Proof): Witness {
         new_secret_witness(self.resp_sigma)
     }
 
-    public fun get_commitment(self: &Proof): &vector<RistrettoPoint> {
+    public(friend) fun get_commitment(self: &Proof): &vector<RistrettoPoint> {
         &self.comm_A
     }
 
-    public fun get_compressed_commitment(self: &Proof): &vector<CompressedRistretto> {
+    public(friend) fun get_compressed_commitment(self: &Proof): &vector<CompressedRistretto> {
         &self.compressed_comm_A
     }
 
-    public fun get_response_length(self: &Proof): u64 {
+    public(friend) fun get_response_length(self: &Proof): u64 {
         self.resp_sigma.length()
     }
 

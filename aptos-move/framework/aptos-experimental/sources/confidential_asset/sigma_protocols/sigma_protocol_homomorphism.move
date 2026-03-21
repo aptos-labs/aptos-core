@@ -42,10 +42,21 @@
 ///                                                                  9. Check $\psi(\sigma) = A + e f(X)$
 ///
 module aptos_experimental::sigma_protocol_homomorphism {
-    use aptos_std::ristretto255::{RistrettoPoint, multi_scalar_mul};
     use aptos_experimental::sigma_protocol_witness::Witness;
     use aptos_experimental::sigma_protocol_statement::Statement;
     use aptos_experimental::sigma_protocol_representation_vec::RepresentationVec;
+    #[test_only]
+    use aptos_std::ristretto255::{RistrettoPoint, multi_scalar_mul};
+
+    friend aptos_experimental::sigma_protocol;
+    friend aptos_experimental::sigma_protocol_registration;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_transfer;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_pedeq_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_schnorr_example;
 
     /// The transformation function  $f : \mathbb{G}^{n_1} \times \mathbb{F}^{n_2} \rightarrow \mathbb{G}^m$
     struct TransformationFunction<phantom P>(|&Statement<P>| RepresentationVec);
@@ -53,15 +64,17 @@ module aptos_experimental::sigma_protocol_homomorphism {
     /// The homomorphism $\psi : \mathbb{F}^k \rightarrow \mathbb{G}^m$
     struct Homomorphism<phantom P>(|&Statement<P>, &Witness| RepresentationVec);
 
+    #[test_only]
     /// Computes and returns $\psi(X, w) \in \mathbb{G}^m$ given the public statement $X$ and the secret witness $w$.
-    public inline fun evaluate_psi<P>(psi: Homomorphism<P>,
+    public(friend) inline fun evaluate_psi<P>(psi: Homomorphism<P>,
                                    stmt: &Statement<P>,
                                    witn: &Witness): vector<RistrettoPoint> {
         psi(stmt, witn).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
     }
 
+    #[test_only]
     /// Returns $f(X) \in \mathbb{G}^m$ given the public statement $X$.
-    public inline fun evaluate_f<P>(f: TransformationFunction<P>,
+    public(friend) inline fun evaluate_f<P>(f: TransformationFunction<P>,
                                  stmt: &Statement<P>): vector<RistrettoPoint> {
         f(stmt).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
     }

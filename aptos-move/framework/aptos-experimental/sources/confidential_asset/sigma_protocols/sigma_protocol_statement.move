@@ -4,6 +4,17 @@ module aptos_experimental::sigma_protocol_statement {
 
     friend aptos_experimental::sigma_protocol_homomorphism;
     friend aptos_experimental::sigma_protocol_statement_builder;
+    friend aptos_experimental::sigma_protocol_representation;
+    friend aptos_experimental::sigma_protocol_fiat_shamir;
+    friend aptos_experimental::sigma_protocol;
+    friend aptos_experimental::sigma_protocol_registration;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_transfer;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_pedeq_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_schnorr_example;
 
     /// When creating a `Statement`, the # of points must match the # of compressed points.
     const E_MISMATCHED_NUMBER_OF_COMPRESSED_POINTS : u64 = 1;
@@ -31,24 +42,24 @@ module aptos_experimental::sigma_protocol_statement {
     }
 
     /// Returns the $i$th elliptic curve point in the public statement.
-    public fun get_point<P>(self: &Statement<P>, i: u64): &RistrettoPoint {
+    public(friend) fun get_point<P>(self: &Statement<P>, i: u64): &RistrettoPoint {
         &self.points[i]
     }
 
     /// Returns all the scalars in the statement.
     /// (Needed to feed in the statement in the Fiat-Shamir transform.)
-    public fun get_scalars<P>(self: &Statement<P>): &vector<Scalar> {
+    public(friend) fun get_scalars<P>(self: &Statement<P>): &vector<Scalar> {
         &self.scalars
     }
 
     /// Returns all the elliptic curve points in the statement.
-    public fun get_points<P>(self: &Statement<P>): &vector<RistrettoPoint> {
+    public(friend) fun get_points<P>(self: &Statement<P>): &vector<RistrettoPoint> {
         &self.points
     }
 
     /// Returns all the compressed elliptic curve points in the statement.
     /// (Needed to feed in the statement in the Fiat-Shamir transform.)
-    public fun get_compressed_points<P>(self: &Statement<P>): &vector<CompressedRistretto> {
+    public(friend) fun get_compressed_points<P>(self: &Statement<P>): &vector<CompressedRistretto> {
         &self.compressed_points
     }
 }
