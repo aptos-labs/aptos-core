@@ -202,3 +202,34 @@ impl Ord for BatchSortKey {
         other.batch_key.batch_id.cmp(&self.batch_key.batch_id)
     }
 }
+
+/// Key for pre-sorted pull candidate BTreeMaps. Items are sorted by:
+/// 1. Gas priority (highest gas bucket first via Reverse)
+/// 2. Author tiebreaker (random per-author "seat number" for fair interleaving)
+/// 3. BatchSortKey reversed for correct intra-author ordering (lower batch_id first)
+///
+/// Cross-author fairness: random tiebreakers ensure fair interleaving in expectation.
+/// Within same author: reversed BatchSortKey gives lowest batch_id first (same as old
+/// reverse-iterated BTreeMap), preserving transaction sequence number ordering.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct PullKey {
+    pub gas_priority: Reverse<u64>,
+    pub author_tiebreaker: u64,
+    /// Reversed so that lower batch_id (earlier sequence) comes first
+    pub batch_sort_key_rev: Reverse<BatchSortKey>,
+}
+
+impl PartialOrd for PullKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PullKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.gas_priority
+            .cmp(&other.gas_priority)
+            .then_with(|| self.author_tiebreaker.cmp(&other.author_tiebreaker))
+            .then_with(|| self.batch_sort_key_rev.cmp(&other.batch_sort_key_rev))
+    }
+}

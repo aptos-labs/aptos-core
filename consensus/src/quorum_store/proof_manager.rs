@@ -19,7 +19,12 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use std::{cmp::min, collections::HashSet, sync::Arc, time::{Duration, Instant}};
+use std::{
+    cmp::min,
+    collections::HashSet,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -158,11 +163,7 @@ impl ProofManager {
                     - params.minimum_batch_age_usecs;
                 non_proof_items.into_iter().partition(|item| {
                     !params.exclude_authors.contains(&item.info.author())
-                        && item
-                            .info
-                            .expiration()
-                            .saturating_sub(batch_expiry_gap)
-                            <= max_create_ts
+                        && item.info.expiration().saturating_sub(batch_expiry_gap) <= max_create_ts
                 })
             } else {
                 (Vec::new(), non_proof_items)
@@ -171,8 +172,9 @@ impl ProofManager {
         // Record per-phase metrics for opt_batches
         let opt_batches: Vec<BatchInfoExt> =
             opt_batches.into_iter().map(|item| item.info).collect();
-        let opt_batch_txns_size: PayloadTxnsSize =
-            opt_batches.iter().fold(PayloadTxnsSize::zero(), |acc, b| acc + b.size());
+        let opt_batch_txns_size: PayloadTxnsSize = opt_batches
+            .iter()
+            .fold(PayloadTxnsSize::zero(), |acc, b| acc + b.size());
         counters::CONSENSUS_PULL_NUM_TXNS
             .observe_with(&["optbatch"], opt_batch_txns_size.count() as f64);
         counters::CONSENSUS_PULL_SIZE_IN_BYTES
@@ -183,10 +185,7 @@ impl ProofManager {
             let max_create_ts = aptos_infallible::duration_since_epoch().as_micros() as u64
                 - params.minimum_batch_age_usecs;
             for item in &remaining_non_proof {
-                let batch_create_ts = item
-                    .info
-                    .expiration()
-                    .saturating_sub(batch_expiry_gap);
+                let batch_create_ts = item.info.expiration().saturating_sub(batch_expiry_gap);
                 if batch_create_ts > max_create_ts {
                     counters::BATCH_SKIPPED_TOO_YOUNG
                         .with_label_values(&[item.info.author().short_str().as_str()])
@@ -196,50 +195,52 @@ impl ProofManager {
         }
 
         // inline_block: remaining non-proof items, capped at max_inline_txns
-        let txns_with_proof_size: PayloadTxnsSize =
-            proof_block.iter().fold(PayloadTxnsSize::zero(), |acc, p| acc + p.info().size());
+        let txns_with_proof_size: PayloadTxnsSize = proof_block
+            .iter()
+            .fold(PayloadTxnsSize::zero(), |acc, p| acc + p.info().size());
         let cur_txns = txns_with_proof_size + opt_batch_txns_size;
         let cur_unique_txns = all_unique_txns;
-        let (inline_block, inline_block_size) =
-            if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
-                let mut max_inline_txns_to_pull = request
-                    .max_txns
-                    .saturating_sub(cur_txns)
-                    .minimum(request.max_inline_txns);
-                max_inline_txns_to_pull.set_count(min(
-                    max_inline_txns_to_pull.count(),
-                    request
-                        .max_txns_after_filtering
-                        .saturating_sub(cur_unique_txns),
-                ));
+        let (inline_block, inline_block_size) = if self.allow_batches_without_pos_in_proposal
+            && proof_queue_fully_utilized
+        {
+            let mut max_inline_txns_to_pull = request
+                .max_txns
+                .saturating_sub(cur_txns)
+                .minimum(request.max_inline_txns);
+            max_inline_txns_to_pull.set_count(min(
+                max_inline_txns_to_pull.count(),
+                request
+                    .max_txns_after_filtering
+                    .saturating_sub(cur_unique_txns),
+            ));
 
-                // Fetch transactions for remaining non-proof items up to limit
-                let mut inline_result = Vec::new();
-                let mut inline_size = PayloadTxnsSize::zero();
-                for item in remaining_non_proof {
-                    if inline_size + item.info.size() > max_inline_txns_to_pull {
-                        break;
-                    }
-                    if let Ok(mut persisted_value) =
-                        self.batch_proof_queue.batch_store().get_batch_from_local(
-                            item.info.digest(),
-                        )
-                    {
-                        if let Some(txns) = persisted_value.take_payload() {
-                            inline_size += item.info.size();
-                            inline_result.push((item.info, txns));
-                        }
-                    } else {
-                        warn!(
-                            "Couldn't find a batch in local storage while creating inline block: {:?}",
-                            item.info.digest()
-                        );
-                    }
+            // Fetch transactions for remaining non-proof items up to limit
+            let mut inline_result = Vec::new();
+            let mut inline_size = PayloadTxnsSize::zero();
+            for item in remaining_non_proof {
+                if inline_size + item.info.size() > max_inline_txns_to_pull {
+                    break;
                 }
-                (inline_result, inline_size)
-            } else {
-                (Vec::new(), PayloadTxnsSize::zero())
-            };
+                if let Ok(mut persisted_value) = self
+                    .batch_proof_queue
+                    .batch_store()
+                    .get_batch_from_local(item.info.digest())
+                {
+                    if let Some(txns) = persisted_value.take_payload() {
+                        inline_size += item.info.size();
+                        inline_result.push((item.info, txns));
+                    }
+                } else {
+                    warn!(
+                        "Couldn't find a batch in local storage while creating inline block: {:?}",
+                        item.info.digest()
+                    );
+                }
+            }
+            (inline_result, inline_size)
+        } else {
+            (Vec::new(), PayloadTxnsSize::zero())
+        };
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
