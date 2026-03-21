@@ -17,6 +17,8 @@
 ///
 module aptos_experimental::sigma_protocol_registration {
     friend aptos_experimental::confidential_asset;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     use std::bcs;
     use std::error;
@@ -36,7 +38,7 @@ module aptos_experimental::sigma_protocol_registration {
     use aptos_experimental::sigma_protocol_utils::{e_wrong_num_points, e_wrong_num_scalars, e_wrong_witness_len, e_wrong_output_len};
     use aptos_experimental::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
     #[test_only]
-    use aptos_std::ristretto255::{Scalar, point_identity_compressed, random_scalar};
+    use aptos_std::ristretto255::{Scalar, random_scalar};
     #[test_only]
     use aptos_experimental::sigma_protocol_witness::new_secret_witness;
 
@@ -46,8 +48,6 @@ module aptos_experimental::sigma_protocol_registration {
     use aptos_experimental::confidential_crypto_test_utils::{pubkey_from_secret_key, equal_vec_points};
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_proof;
 
     //
     // Constants
@@ -196,7 +196,7 @@ module aptos_experimental::sigma_protocol_registration {
     //
 
     #[test_only]
-    fun registration_session_for_testing(): RegistrationSession {
+    public(friend) fun registration_session_for_testing(): RegistrationSession {
         let (sender, asset_type) = setup_test_environment();
         RegistrationSession { sender: signer::address_of(&sender), asset_type }
     }
@@ -247,41 +247,4 @@ module aptos_experimental::sigma_protocol_registration {
         assert!(equal_vec_points(&actual_psi, &expected_psi), 1);
     }
 
-    #[test]
-    /// Verifies that a correctly computed proof verifies.
-    fun proof_correctness() {
-        let dk = random_scalar();
-        let (stmt, witn) = compute_statement_and_witness(&dk);
-
-        let ss = registration_session_for_testing();
-        let proof = ss.prove(&stmt, &witn);
-
-        ss.assert_verifies(&stmt, &proof);
-    }
-
-    #[test]
-    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
-    /// Verifies that an empty proof does not verify for a random statement.
-    fun proof_soundness_against_random_statement() {
-        let dk = random_scalar();
-        let (stmt, _) = compute_statement_and_witness(&dk);
-
-        let proof = sigma_protocol_proof::empty();
-
-        registration_session_for_testing().assert_verifies(&stmt, &proof);
-    }
-
-    #[test]
-    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
-    /// Verifies that an empty proof does not verify for a "zero" statement (all identity points).
-    fun proof_soundness_against_zero_statement_and_empty_proof() {
-        let b = new_builder();
-        b.add_point(point_identity_compressed()); // H
-        b.add_point(point_identity_compressed()); // ek
-        let stmt: Statement<Registration> = b.build();
-
-        let proof = sigma_protocol_proof::empty();
-
-        registration_session_for_testing().assert_verifies(&stmt, &proof);
-    }
 }

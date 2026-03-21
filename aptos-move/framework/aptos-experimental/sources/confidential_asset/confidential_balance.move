@@ -24,6 +24,8 @@ module aptos_experimental::confidential_balance {
     friend aptos_experimental::confidential_asset_tests;
     #[test_only]
     friend aptos_experimental::confidential_crypto_test_utils;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     //
     // Constants

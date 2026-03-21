@@ -8,6 +8,8 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     friend aptos_experimental::sigma_protocol_withdraw;
     friend aptos_experimental::sigma_protocol_transfer;
     friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     // === Public functions ===
 

@@ -14,6 +14,8 @@ module aptos_experimental::sigma_protocol_utils {
     friend aptos_experimental::sigma_protocol_schnorr_example;
     #[test_only]
     friend aptos_experimental::confidential_crypto_test_utils;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto,
         new_point_and_compressed_from_bytes, new_compressed_point_from_bytes,

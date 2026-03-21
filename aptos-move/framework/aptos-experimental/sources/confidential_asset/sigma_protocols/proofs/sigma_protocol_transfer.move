@@ -91,6 +91,8 @@
 ///
 module aptos_experimental::sigma_protocol_transfer {
     friend aptos_experimental::confidential_asset;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     use std::bcs;
     use std::error;
@@ -109,8 +111,6 @@ module aptos_experimental::sigma_protocol_transfer {
     use aptos_experimental::sigma_protocol_proof::Proof;
     use aptos_experimental::sigma_protocol_fiat_shamir::new_domain_separator;
     use aptos_experimental::sigma_protocol_witness::Witness;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_witness::new_secret_witness;
     use aptos_experimental::sigma_protocol_statement::Statement;
     use aptos_experimental::sigma_protocol_statement_builder::new_builder;
     use aptos_experimental::sigma_protocol_utils::{e_wrong_num_points, e_wrong_num_scalars, e_wrong_witness_len, e_wrong_output_len};
@@ -119,24 +119,7 @@ module aptos_experimental::sigma_protocol_transfer {
     #[test_only]
     use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
     #[test_only]
-    use aptos_experimental::confidential_amount;
-    #[test_only]
-    use aptos_experimental::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
-    #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_proof;
-    #[test_only]
-    use aptos_experimental::confidential_crypto_test_utils::{equal_vec_points,
-        generate_twisted_elgamal_keypair, generate_available_randomness, generate_pending_randomness,
-        new_available_from_amount, new_amount_from_u64};
-    #[test_only]
-    use aptos_experimental::sigma_protocol_utils::points_clone;
-    #[test_only]
-    use aptos_std::ristretto255::{Scalar, double_scalar_mul, multi_scalar_mul, scalar_zero};
-    #[test_only]
-    use aptos_experimental::confidential_balance::{ConfidentialBalanceRandomness,
-        split_available_into_chunks, split_pending_into_chunks};
 
     //
     // Constants
@@ -333,20 +316,6 @@ module aptos_experimental::sigma_protocol_transfer {
         assert_transfer_statement_is_well_formed(&stmt, has_eff, num_volun);
         let recip_pending = new_pending_from_p_and_r(amount_P, recip_R);
         (stmt, new_balance_P, recip_pending)
-    }
-
-    #[test_only]
-    /// Creates a transfer witness: (dk, new_a[1..ℓ], new_r[1..ℓ], v[1..n], r[1..n]).
-    public(friend) fun new_transfer_witness(
-        dk: Scalar, new_a: vector<Scalar>, new_r: vector<Scalar>,
-        v: vector<Scalar>, r: vector<Scalar>,
-    ): Witness {
-        let w = vector[dk];
-        w.append(new_a);
-        w.append(new_r);
-        w.append(v);
-        w.append(r);
-        new_secret_witness(w)
     }
 
     /// The combined homomorphism $\psi$ for the transfer relation (see module-level doc for full definition).
@@ -593,7 +562,7 @@ module aptos_experimental::sigma_protocol_transfer {
     //
 
     #[test_only]
-    fun transfer_session_for_testing(
+    public(friend) fun transfer_session_for_testing(
         has_effective_auditor: bool, num_volun_auditors: u64,
     ): TransferSession {
         let (sender, asset_type) = setup_test_environment();
@@ -602,6 +571,15 @@ module aptos_experimental::sigma_protocol_transfer {
             num_avail_chunks: get_ell(), num_transfer_chunks: get_n(),
             has_effective_auditor, num_volun_auditors,
         }
+    }
+
+    #[test_only]
+    /// Evaluates the transfer psi homomorphism for testing (wraps the private `psi` closure).
+    public(friend) fun evaluate_psi_for_testing(
+        stmt: &Statement<Transfer>, witn: &Witness,
+        has_effective_auditor: bool, num_volun_auditors: u64,
+    ): vector<RistrettoPoint> {
+        evaluate_psi(|_X, w| psi(_X, w, has_effective_auditor, num_volun_auditors), stmt, witn)
     }
 
     #[test_only]
@@ -618,258 +596,4 @@ module aptos_experimental::sigma_protocol_transfer {
         proof
     }
 
-    #[test_only]
-    /// Creates transfer ciphertexts under all keys, builds the transfer statement and witness.
-    /// Callers provide randomness so they can access the scalars afterwards (e.g., for range proofs).
-    public(friend) fun build_transfer_statement_and_witness(
-        dk_sender: &Scalar,
-        compressed_ek_sender: &CompressedRistretto,
-        compressed_ek_recip: &CompressedRistretto,
-        compressed_old_balance: &CompressedBalance<Available>,
-        compressed_ek_eff_aud: &Option<CompressedRistretto>,
-        compressed_ek_volun_auds: &vector<CompressedRistretto>,
-        amount_u64: u64,
-        new_balance_u128: u128,
-        new_balance_randomness: &ConfidentialBalanceRandomness,
-        amount_randomness: &ConfidentialBalanceRandomness,
-    ): (
-        Statement<Transfer>, Witness,
-        Balance<Available>,
-        confidential_amount::Amount,
-    ) {
-        let new_balance = new_available_from_amount(
-            new_balance_u128, new_balance_randomness, compressed_ek_sender, compressed_ek_eff_aud
-        );
-
-        let amount = new_amount_from_u64(
-            amount_u64, amount_randomness,
-            compressed_ek_sender, compressed_ek_recip,
-            compressed_ek_eff_aud, compressed_ek_volun_auds,
-        );
-
-        let compressed_new_balance = new_balance.compress();
-        let compressed_amount = amount.compress();
-        let (stmt, _, _) = new_transfer_statement(
-            *compressed_ek_sender, *compressed_ek_recip,
-            compressed_old_balance, &compressed_new_balance,
-            &compressed_amount,
-            compressed_ek_eff_aud, compressed_ek_volun_auds,
-        );
-
-        let new_a = split_available_into_chunks(new_balance_u128);
-        let new_r = *new_balance_randomness.scalars();
-        let v = split_pending_into_chunks(amount_u64 as u128);
-        let r = *amount_randomness.scalars();
-        let witn = new_transfer_witness(*dk_sender, new_a, new_r, v, r);
-
-        (stmt, witn, new_balance, amount)
-    }
-
-    #[test_only]
-    /// Generates random keys for the sender, recipient and auditor(s), and an old balance for our transfer tests.
-    fun generate_keys_and_ciphertexts(
-        has_effective_auditor: bool, num_volun_auditors: u64,
-    ): (
-        Scalar, CompressedRistretto, CompressedRistretto,
-        Option<CompressedRistretto>, vector<CompressedRistretto>,
-        Balance<Available>,
-    ) {
-        let (dk_sender, compressed_ek_sender) = generate_twisted_elgamal_keypair();
-        let (_, compressed_ek_recip) = generate_twisted_elgamal_keypair();
-        let compressed_ek_eff_aud = if (has_effective_auditor) {
-            let (_, ek) = generate_twisted_elgamal_keypair();
-            std::option::some(ek)
-        } else { std::option::none() };
-        let compressed_ek_volun_auds = vector::range(0, num_volun_auditors).map(|_| {
-            let (_, ek) = generate_twisted_elgamal_keypair();
-            ek
-        });
-
-        let old_balance_randomness = generate_available_randomness();
-        let old_balance = new_available_from_amount(
-            1000, &old_balance_randomness, &compressed_ek_sender, &compressed_ek_eff_aud
-        );
-
-        (dk_sender, compressed_ek_sender, compressed_ek_recip, compressed_ek_eff_aud, compressed_ek_volun_auds, old_balance)
-    }
-
-    #[test_only]
-    /// Generates a random valid statement-witness pair for testing.
-    /// Supports all auditor configurations.
-    fun random_valid_statement_witness_pair(
-        has_effective_auditor: bool, num_volun_auditors: u64,
-    ): (Statement<Transfer>, Witness) {
-        let (dk_sender, compressed_ek_sender, compressed_ek_recip,
-             compressed_ek_eff_aud, compressed_ek_volun_auds, old_balance) =
-            generate_keys_and_ciphertexts(has_effective_auditor, num_volun_auditors);
-
-        let new_balance_randomness = generate_available_randomness();
-        let amount_randomness = generate_pending_randomness();
-
-        let compressed_old_balance = old_balance.compress();
-        let (stmt, witn, _, _) = build_transfer_statement_and_witness(
-            &dk_sender, &compressed_ek_sender, &compressed_ek_recip, &compressed_old_balance,
-            &compressed_ek_eff_aud, &compressed_ek_volun_auds,
-            100, 900, &new_balance_randomness, &amount_randomness,
-        );
-
-        (stmt, witn)
-    }
-
-    #[test_only]
-    /// Verifies that `evaluate_psi` produces the same points as a manual computation using
-    /// direct ristretto255 arithmetic, for all auditor configurations.
-    ///
-    /// The manual computation uses only raw points/scalars — no `IDX_*` constants — so it is
-    /// completely independent of the statement layout.
-    fun psi_correctness(has_eff: bool, num_volun: u64) {
-        let (ell, n) = (get_ell(), get_n());
-        let b_powers_ell = get_b_powers(ell);
-        let b_powers_n = get_b_powers(n);
-
-        let (dk_sender, compressed_ek_sender, compressed_ek_recip,
-             compressed_ek_eff_aud, compressed_ek_volun_auds, old_balance) =
-            generate_keys_and_ciphertexts(has_eff, num_volun);
-
-        let new_balance_randomness = generate_available_randomness();
-        let amount_randomness = generate_pending_randomness();
-
-        let compressed_old_balance = old_balance.compress();
-        let (stmt, witn, _, _) = build_transfer_statement_and_witness(
-            &dk_sender, &compressed_ek_sender, &compressed_ek_recip, &compressed_old_balance,
-            &compressed_ek_eff_aud, &compressed_ek_volun_auds,
-            100, 900,
-            &new_balance_randomness, &amount_randomness,
-        );
-
-        // Decompress keys for manual psi computation
-        let _G = ristretto255::basepoint();
-        let _H = get_encryption_key_basepoint_compressed().point_decompress();
-        let ek_sender = compressed_ek_sender.point_decompress();
-        let ek_recip = compressed_ek_recip.point_decompress();
-        let ek_eff_aud = compressed_ek_eff_aud.map(|ek| ek.point_decompress());
-        let ek_volun_auds = compressed_ek_volun_auds.map(|ek| ek.point_decompress());
-        let old_R = points_clone(old_balance.get_R());
-        let new_a = split_available_into_chunks(900);
-        let new_r = *new_balance_randomness.scalars();
-        let v = split_pending_into_chunks(100);
-        let r = *amount_randomness.scalars();
-
-        //
-        // Manually compute the homomorphism using raw components (no IDX_* constants)
-        //
-        let manual_psi = vector[];
-
-        // 1. dk_sender · ek_sender
-        manual_psi.push_back(ek_sender.point_mul(&dk_sender));
-
-        // 2. new_a[i] · G + new_r[i] · H, for i in [1..ell]
-        vector::range(0, ell).for_each(|i| {
-            manual_psi.push_back(double_scalar_mul(&new_a[i], &_G, &new_r[i], &_H));
-        });
-
-        // 3. new_r[i] · ek_sender, for i in [1..ell]
-        vector::range(0, ell).for_each(|i| {
-            manual_psi.push_back(ek_sender.point_mul(&new_r[i]));
-        });
-
-        // 3b. (effective auditor only) new_r[i] · ek_eff_aud, for i in [1..ell]
-        if (ek_eff_aud.is_some()) {
-            let ek_eff_aud_pt = ek_eff_aud.borrow();
-            vector::range(0, ell).for_each(|i| {
-                manual_psi.push_back(ek_eff_aud_pt.point_mul(&new_r[i]));
-            });
-        };
-
-        // 4. dk_sender · ⟨B, old_R⟩ + (⟨B, new_a⟩ + ⟨B, v⟩) · G
-        let dk_b_scalars: vector<Scalar> = vector::range(0, ell).map(|i| {
-            dk_sender.scalar_mul(&b_powers_ell[i])
-        });
-        let dk_inner_b_old_R = multi_scalar_mul(&old_R, &dk_b_scalars);
-
-        let inner_b_new_a = scalar_zero();
-        vector::range(0, ell).for_each(|i| {
-            inner_b_new_a = inner_b_new_a.scalar_add(&new_a[i].scalar_mul(&b_powers_ell[i]));
-        });
-        let inner_b_v = scalar_zero();
-        vector::range(0, n).for_each(|j| {
-            inner_b_v = inner_b_v.scalar_add(&v[j].scalar_mul(&b_powers_n[j]));
-        });
-        let sum_times_G = _G.point_mul(&inner_b_new_a.scalar_add(&inner_b_v));
-
-        manual_psi.push_back(dk_inner_b_old_R.point_add(&sum_times_G));
-
-        // 5. v[j] · G + r[j] · H, for j in [1..n]
-        vector::range(0, n).for_each(|j| {
-            manual_psi.push_back(double_scalar_mul(&v[j], &_G, &r[j], &_H));
-        });
-
-        // 6. r[j] · ek_sender, for j in [1..n]
-        vector::range(0, n).for_each(|j| {
-            manual_psi.push_back(ek_sender.point_mul(&r[j]));
-        });
-
-        // 7. r[j] · ek_recip, for j in [1..n]
-        vector::range(0, n).for_each(|j| {
-            manual_psi.push_back(ek_recip.point_mul(&r[j]));
-        });
-
-        // 7b. (effective auditor only) r[j] · ek_eff_aud, for j in [1..n]
-        if (ek_eff_aud.is_some()) {
-            let ek_eff_aud_pt = ek_eff_aud.borrow();
-            vector::range(0, n).for_each(|j| {
-                manual_psi.push_back(ek_eff_aud_pt.point_mul(&r[j]));
-            });
-        };
-
-        // 7c. (voluntary auditors) r[j] · ek_volun_aud_t, for j in [1..n], for each voluntary auditor t
-        vector::range(0, num_volun).for_each(|t| {
-            vector::range(0, n).for_each(|j| {
-                manual_psi.push_back(ek_volun_auds[t].point_mul(&r[j]));
-            });
-        });
-
-        //
-        // Compare: implemented_psi vs manual_psi computation
-        //
-        let implemented_psi = evaluate_psi(
-            |_X, w| psi(_X, w, has_eff, num_volun), &stmt, &witn
-        );
-
-        assert!(equal_vec_points(&implemented_psi, &manual_psi), 1);
-    }
-
-    #[test]
-    fun psi_correctness_0_volun() { psi_correctness(false, 0); }
-    #[test]
-    fun psi_correctness_1_volun() { psi_correctness(false, 1); }
-    #[test]
-    fun psi_correctness_2_volun() { psi_correctness(false, 2); }
-    #[test]
-    fun psi_correctness_effective_0_volun() { psi_correctness(true, 0); }
-    #[test]
-    fun psi_correctness_effective_1_volun() { psi_correctness(true, 1); }
-    #[test]
-    fun psi_correctness_effective_2_volun() { psi_correctness(true, 2); }
-
-    #[test]
-    fun proof_correctness() {
-        let (sender, asset_type) = setup_test_environment();
-
-        // Test all auditor configurations
-        vector[false, true].for_each(|has_eff| {
-            vector[0u64, 1, 2].for_each(|num_volun| {
-                let ss = new_session(&sender, @0x2, asset_type, has_eff, num_volun);
-                let (stmt, witn) = random_valid_statement_witness_pair(has_eff, num_volun);
-                ss.assert_verifies(&stmt, &ss.prove(&stmt, &witn));
-            });
-        });
-    }
-
-    #[test]
-    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
-    fun proof_soundness_empty_proof() {
-        let (stmt, _) = random_valid_statement_witness_pair(false, 0);
-        transfer_session_for_testing(false, 0).assert_verifies(&stmt, &sigma_protocol_proof::empty());
-    }
 }

@@ -74,6 +74,8 @@
 ///
 module aptos_experimental::sigma_protocol_withdraw {
     friend aptos_experimental::confidential_asset;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     use std::bcs;
     use std::error;
@@ -96,23 +98,7 @@ module aptos_experimental::sigma_protocol_withdraw {
     use aptos_experimental::sigma_protocol_representation::{repr_point, repr_scaled, new_representation};
     use aptos_experimental::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
     #[test_only]
-    use aptos_experimental::confidential_balance::{split_available_into_chunks, Balance};
-    #[test_only]
-    use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
-    #[test_only]
-    use aptos_experimental::confidential_crypto_test_utils::{
-        generate_twisted_elgamal_keypair, generate_available_randomness,
-        new_available_from_amount, equal_vec_points};
-    #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_proof;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_utils::points_clone;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_witness::new_secret_witness;
-    #[test_only]
-    use aptos_std::ristretto255::{new_scalar_from_u64, double_scalar_mul, multi_scalar_mul, scalar_zero};
 
     //
     // Constants
@@ -247,17 +233,6 @@ module aptos_experimental::sigma_protocol_withdraw {
         let stmt = b.build();
         assert_withdraw_statement_is_well_formed(&stmt, compressed_ek_aud.is_some());
         (stmt, new_P)
-    }
-
-    #[test_only]
-    /// Creates a withdrawal witness: $(\mathsf{dk}, \new{a}_0, \ldots, \new{a}_{\ell-1}, \new{r}_0, \ldots, \new{r}_{\ell-1})$.
-    public(friend) fun new_withdrawal_witness(dk: Scalar, new_a: vector<Scalar>, new_r: vector<Scalar>): Witness {
-        assert!(new_a.length() == new_r.length(), e_wrong_witness_len());
-
-        let w = vector[dk];
-        w.append(new_a);
-        w.append(new_r);
-        new_secret_witness(w)
     }
 
     /// The homomorphism $\psi$ for the withdrawal relation.
@@ -423,6 +398,14 @@ module aptos_experimental::sigma_protocol_withdraw {
     //
 
     #[test_only]
+    /// Evaluates the withdrawal psi homomorphism for testing (wraps the private `psi` closure).
+    public(friend) fun evaluate_psi_for_testing(
+        stmt: &Statement<Withdrawal>, witn: &Witness, has_auditor: bool,
+    ): vector<RistrettoPoint> {
+        evaluate_psi(|_X, w| psi(_X, w, has_auditor), stmt, witn)
+    }
+
+    #[test_only]
     /// Creates a withdrawal proof (for testing).
     public(friend) fun prove(self: &WithdrawSession, stmt: &Statement<Withdrawal>, witn: &Witness): Proof {
         let (proof, _) = sigma_protocol::prove(
@@ -434,177 +417,4 @@ module aptos_experimental::sigma_protocol_withdraw {
         proof
     }
 
-    #[test_only]
-    /// Returns the components of a random valid statement-witness pair.
-    /// Used by `random_valid_statement_witness_pair` (which assembles Statement/Witness)
-    /// and by `psi_correctness` (which needs the raw points for an independent manual computation).
-    fun random_valid_statement_witness_pair_internal(
-        amount: u64, with_auditor: bool
-    ): (
-        CompressedRistretto,           // compressed_ek
-        Option<CompressedRistretto>,   // compressed_ek_aud
-        Balance<Available>,              // old_balance
-        Balance<Available>,              // new_balance
-        Scalar,                        // v
-        Scalar,                        // dk
-        vector<Scalar>,                // new_a
-        vector<Scalar>,                // new_r
-    ) {
-        // Generate sender keypair
-        let (dk, compressed_ek) = generate_twisted_elgamal_keypair();
-
-        // Generate optional auditor keypair
-        let compressed_ek_aud = if (with_auditor) {
-            let (_, ek_aud) = generate_twisted_elgamal_keypair();
-            std::option::some(ek_aud)
-        } else {
-            std::option::none()
-        };
-
-        // Create old and new balances using the high-level API
-        let old_balance_u128 = 1000u128;
-        let new_balance_u128 = old_balance_u128 - (amount as u128);
-
-        let old_randomness = generate_available_randomness();
-        let old_balance = new_available_from_amount(
-            old_balance_u128, &old_randomness, &compressed_ek, &compressed_ek_aud
-        );
-        let new_randomness = generate_available_randomness();
-        let new_balance = new_available_from_amount(
-            new_balance_u128, &new_randomness, &compressed_ek, &compressed_ek_aud
-        );
-
-        let v = new_scalar_from_u64(amount);
-        let new_a = split_available_into_chunks(new_balance_u128);
-        let new_r = *new_randomness.scalars();
-
-        (compressed_ek, compressed_ek_aud, old_balance, new_balance, v, dk, new_a, new_r)
-    }
-
-    #[test_only]
-    /// Generates a random valid statement-witness pair for testing.
-    /// When `with_auditor` is true, includes auditor components in the statement.
-    fun random_valid_statement_witness_pair(amount: u64, with_auditor: bool): (Statement<Withdrawal>, Witness) {
-        let (compressed_ek, compressed_ek_aud, old_balance, new_balance,
-            v, dk, new_a, new_r
-        ) = random_valid_statement_witness_pair_internal(amount, with_auditor);
-
-        let compressed_old_balance = old_balance.compress();
-        let compressed_new_balance = new_balance.compress();
-
-        let (stmt, _) = new_withdrawal_statement(
-            compressed_ek, &compressed_old_balance, &compressed_new_balance, &compressed_ek_aud, v,
-        );
-        let witn = new_withdrawal_witness(dk, new_a, new_r);
-
-        (stmt, witn)
-    }
-
-    #[test_only]
-    /// Verifies that `evaluate_psi` produces the same points as a manual computation using
-    /// direct ristretto255 arithmetic, for both auditor and auditorless cases.
-    ///
-    /// The manual computation uses only raw points/scalars — no `IDX_*` constants — so it is
-    /// completely independent of the statement layout.
-    fun psi_correctness(with_auditor: bool) {
-        let ell = get_num_chunks();
-        let (compressed_ek, compressed_ek_aud, old_balance, new_balance,
-            v, dk, new_a, new_r
-        ) = random_valid_statement_witness_pair_internal(100, with_auditor);
-        let b_powers = get_b_powers(ell);
-
-        // Derive raw points from compressed keys and balances
-        let _G = ristretto255::basepoint();
-        let _H = get_encryption_key_basepoint_compressed().point_decompress();
-        let ek = compressed_ek.point_decompress();
-        let ek_aud = compressed_ek_aud.map(|ek| ek.point_decompress());
-
-        // Sanity check: ek = dk^{-1} * H
-        assert!(_H.point_equals(&ek.point_mul(&dk)), error::internal(E_TEST_INTERNAL));
-
-        // Clone old_R for the manual computation below (before old_balance is consumed)
-        let old_R_clone = points_clone(old_balance.get_R());
-
-        // Build statement + witness for evaluate_psi
-        let (stmt, _) = new_withdrawal_statement(
-            compressed_ek, &old_balance.compress(), &new_balance.compress(), &compressed_ek_aud, v,
-        );
-        let witn = new_withdrawal_witness(dk, new_a, new_r);
-
-        //
-        // Manually compute the homomorphism using raw components (no IDX_* constants)
-        //
-        let manual_psi = vector[];
-
-        // 1. dk · ek
-        manual_psi.push_back(ek.point_mul(&dk));
-
-        // 2. new_a[i] · G + new_r[i] · H, for i in [1..ell]
-        vector::range(0, ell).for_each(|i| {
-            manual_psi.push_back(double_scalar_mul(&new_a[i], &_G, &new_r[i], &_H));
-        });
-
-        // 3. new_r[i] · ek, for i in [1..ell]
-        vector::range(0, ell).for_each(|i| {
-            manual_psi.push_back(ek.point_mul(&new_r[i]));
-        });
-
-        // 3b. (auditor only) new_r[i] · ek_aud, for i in [1..ell]
-        if (ek_aud.is_some()) {
-            let ek_aud_pt = ek_aud.borrow();
-            vector::range(0, ell).for_each(|i| {
-                manual_psi.push_back(ek_aud_pt.point_mul(&new_r[i]));
-            });
-        };
-
-        // 4. dk · ⟨B, old_R⟩ + ⟨B, new_a⟩ · G
-        let dk_b_scalars: vector<Scalar> = vector::range(0, ell).map(|i| {
-            dk.scalar_mul(&b_powers[i])
-        });
-        let dk_inner_b_old_R = multi_scalar_mul(&old_R_clone, &dk_b_scalars);
-
-        let inner_b_new_a = scalar_zero();
-        vector::range(0, ell).for_each(|i| {
-            inner_b_new_a = inner_b_new_a.scalar_add(&new_a[i].scalar_mul(&b_powers[i]));
-        });
-        let inner_b_new_a_times_G = _G.point_mul(&inner_b_new_a);
-
-        manual_psi.push_back(dk_inner_b_old_R.point_add(&inner_b_new_a_times_G));
-
-        //
-        // Compare: implemented_psi vs manual_psi computation
-        //
-        let implemented_psi = evaluate_psi(|_X, w| psi(_X, w, with_auditor), &stmt, &witn);
-
-        assert!(equal_vec_points(&implemented_psi, &manual_psi), 1);
-    }
-
-    #[test]
-    fun psi_correctness_no_auditor() { psi_correctness(false); }
-
-    #[test]
-    fun psi_correctness_with_auditor() { psi_correctness(true); }
-
-    #[test]
-    fun proof_correctness() {
-        let (sender, asset_type) = setup_test_environment();
-
-        // Test both auditor configurations and both withdrawal (v=100) and normalization (v=0)
-        vector[false, true].for_each(|with_auditor| {
-            vector[0u64, 100].for_each(|amount| {
-                let ss = new_session(&sender, asset_type, with_auditor);
-                let (stmt, witn) = random_valid_statement_witness_pair(amount, with_auditor);
-                ss.assert_verifies(&stmt, &ss.prove(&stmt, &witn));
-            });
-        });
-    }
-
-    #[test]
-    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
-    fun proof_soundness_empty_proof() {
-        let (sender, asset_type) = setup_test_environment();
-
-        let (stmt, _) = random_valid_statement_witness_pair(100, false);
-        new_session(&sender, asset_type, false).assert_verifies(&stmt, &sigma_protocol_proof::empty());
-    }
 }

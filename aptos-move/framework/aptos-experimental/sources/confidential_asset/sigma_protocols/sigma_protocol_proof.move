@@ -9,6 +9,8 @@ module aptos_experimental::sigma_protocol_proof {
     friend aptos_experimental::sigma_protocol_pedeq_example;
     #[test_only]
     friend aptos_experimental::sigma_protocol_schnorr_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     use std::error;
     use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto};
