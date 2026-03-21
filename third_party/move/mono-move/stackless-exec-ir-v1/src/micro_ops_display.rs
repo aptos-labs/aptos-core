@@ -4,7 +4,7 @@
 //! Display for lowered micro-ops in test baselines.
 
 use crate::lowering_context::LoweringContext;
-use mono_move_micro_ops::instruction::MicroOp;
+use mono_move_micro_ops::MicroOp;
 use std::fmt;
 
 pub struct MicroOpsFunctionDisplay<'a> {
@@ -53,6 +53,9 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
         MicroOp::ShrU64Imm { dst, src, imm } => {
             write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
         },
+        MicroOp::XorU64 { dst, lhs, rhs } => {
+            write!(f, "XorU64 [{}] <- [{}] ^ [{}]", dst.0, lhs.0, rhs.0)
+        },
         MicroOp::ModU64 { dst, lhs, rhs } => {
             write!(f, "ModU64 [{}] <- [{}] % [{}]", dst.0, lhs.0, rhs.0)
         },
@@ -75,61 +78,70 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
                 target.0, src.0, imm
             )
         },
+        MicroOp::JumpLessU64Imm { target, src, imm } => {
+            write!(f, "JumpLessU64Imm @{} [{}] < #{}", target.0, src.0, imm)
+        },
         MicroOp::JumpLessU64 { target, lhs, rhs } => {
             write!(f, "JumpLessU64 @{} [{}] < [{}]", target.0, lhs.0, rhs.0)
         },
-        // Vector ops
-        MicroOp::VecNew {
-            dst,
-            descriptor_id,
-            elem_size,
-            initial_capacity,
-        } => {
+        MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => {
             write!(
                 f,
-                "VecNew [{}] desc={} elem_size={} cap={}",
-                dst.0, descriptor_id, elem_size, initial_capacity
+                "JumpGreaterEqualU64 @{} [{}] >= [{}]",
+                target.0, lhs.0, rhs.0
             )
         },
-        MicroOp::VecLen { dst, heap_ptr } => {
-            write!(f, "VecLen [{}] <- vec_len([{}])", dst.0, heap_ptr.0)
+        MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
+            write!(
+                f,
+                "JumpNotEqualU64 @{} [{}] != [{}]",
+                target.0, lhs.0, rhs.0
+            )
+        },
+        // Vector ops
+        MicroOp::VecNew { dst } => {
+            write!(f, "VecNew [{}]", dst.0)
+        },
+        MicroOp::VecLen { dst, vec_ref } => {
+            write!(f, "VecLen [{}] <- vec_len([{}])", dst.0, vec_ref.0)
         },
         MicroOp::VecPushBack {
-            heap_ptr,
+            vec_ref,
             elem,
             elem_size,
+            descriptor_id,
         } => {
             write!(
                 f,
-                "VecPushBack [{}].push([{}], size={})",
-                heap_ptr.0, elem.0, elem_size
+                "VecPushBack [{}].push([{}], size={}, desc={})",
+                vec_ref.0, elem.0, elem_size, descriptor_id
             )
         },
         MicroOp::VecPopBack {
             dst,
-            heap_ptr,
+            vec_ref,
             elem_size,
         } => {
             write!(
                 f,
                 "VecPopBack [{}] <- [{}].pop(size={})",
-                dst.0, heap_ptr.0, elem_size
+                dst.0, vec_ref.0, elem_size
             )
         },
         MicroOp::VecLoadElem {
             dst,
-            heap_ptr,
+            vec_ref,
             idx,
             elem_size,
         } => {
             write!(
                 f,
                 "VecLoadElem [{}] <- [{}][[{}]] (size={})",
-                dst.0, heap_ptr.0, idx.0, elem_size
+                dst.0, vec_ref.0, idx.0, elem_size
             )
         },
         MicroOp::VecStoreElem {
-            heap_ptr,
+            vec_ref,
             idx,
             src,
             elem_size,
@@ -137,7 +149,7 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
             write!(
                 f,
                 "VecStoreElem [{}][[{}]] <- [{}] (size={})",
-                heap_ptr.0, idx.0, src.0, elem_size
+                vec_ref.0, idx.0, src.0, elem_size
             )
         },
         // Reference ops
@@ -146,22 +158,22 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
         },
         MicroOp::VecBorrow {
             dst,
-            heap_ptr,
+            vec_ref,
             idx,
             elem_size,
         } => {
             write!(
                 f,
                 "VecBorrow [{}] <- &[{}][[{}]] (elem_size={})",
-                dst.0, heap_ptr.0, idx.0, elem_size
+                dst.0, vec_ref.0, idx.0, elem_size
             )
         },
         MicroOp::HeapBorrow {
             dst,
-            heap_ptr,
+            obj_ref,
             offset,
         } => {
-            write!(f, "HeapBorrow [{}] <- &[{}]+{}", dst.0, heap_ptr.0, offset)
+            write!(f, "HeapBorrow [{}] <- &[{}]+{}", dst.0, obj_ref.0, offset)
         },
         MicroOp::ReadRef { dst, ref_ptr, size } => {
             write!(f, "ReadRef [{}] <- *[{}] (size={})", dst.0, ref_ptr.0, size)
