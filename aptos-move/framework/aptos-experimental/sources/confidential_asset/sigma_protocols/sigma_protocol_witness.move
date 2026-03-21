@@ -10,6 +10,8 @@ module aptos_experimental::sigma_protocol_witness {
     friend aptos_experimental::sigma_protocol_pedeq_example;
     #[test_only]
     friend aptos_experimental::sigma_protocol_schnorr_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     use aptos_std::ristretto255::Scalar;
     #[test_only]

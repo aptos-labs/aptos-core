@@ -13,6 +13,8 @@ module aptos_experimental::confidential_amount {
     friend aptos_experimental::sigma_protocol_transfer;
     #[test_only]
     friend aptos_experimental::confidential_crypto_test_utils;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     /// Expected the effective auditor R-component to be either empty or have n chunks.
     const E_WRONG_NUM_CHUNKS_FOR_EFFECTIVE_AUDITOR: u64 = 1;

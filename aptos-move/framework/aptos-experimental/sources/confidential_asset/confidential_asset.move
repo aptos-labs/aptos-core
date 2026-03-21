@@ -42,6 +42,8 @@ module aptos_experimental::confidential_asset {
         decompress_points, generate_available_randomness, new_available_from_amount,
         generate_pending_randomness, prove_range
     };
+    #[test_only]
+    use aptos_experimental::sigma_protocol_proof_tests;
 
     #[test_only]
     friend aptos_experimental::confidential_asset_tests;
@@ -1382,7 +1384,7 @@ module aptos_experimental::confidential_asset {
         let (stmt, _) = sigma_protocol_withdraw::new_withdrawal_statement(
             ek, &compressed_old_balance, &compressed_new_balance, &compressed_ek_aud, v
         );
-        let witn = sigma_protocol_withdraw::new_withdrawal_witness(*dk_sender, new_a, *new_r);
+        let witn = sigma_protocol_proof_tests::new_withdrawal_witness(*dk_sender, new_a, *new_r);
         let session = sigma_protocol_withdraw::new_session(&sender, asset_type, compressed_ek_aud.is_some());
         (compressed_new_balance, zkrp_new_balance, session.prove(&stmt, &witn))
     }
@@ -1434,7 +1436,7 @@ module aptos_experimental::confidential_asset {
         let amount_randomness = generate_pending_randomness();
 
         let (stmt, witn, new_balance, amount) =
-            sigma_protocol_transfer::build_transfer_statement_and_witness(
+            sigma_protocol_proof_tests::build_transfer_statement_and_witness(
                 sender_dk, &ek_sender, &ek_recipient, &compressed_old_balance,
                 &compressed_ek_eff_aud, compressed_ek_volun_auds,
                 amount_u64, new_balance_u128, &new_balance_randomness, &amount_randomness,

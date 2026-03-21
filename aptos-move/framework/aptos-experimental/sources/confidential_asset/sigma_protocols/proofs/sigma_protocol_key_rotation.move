@@ -57,6 +57,8 @@
 ///
 module aptos_experimental::sigma_protocol_key_rotation {
     friend aptos_experimental::confidential_asset;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_proof_tests;
 
     use std::bcs;
     use std::error;
@@ -78,17 +80,15 @@ module aptos_experimental::sigma_protocol_key_rotation {
     use aptos_experimental::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
     use aptos_experimental::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
     #[test_only]
-    use aptos_std::ristretto255::{Scalar, random_scalar, random_point, point_identity_compressed};
+    use aptos_std::ristretto255::{Scalar, random_scalar, random_point};
     #[test_only]
     use aptos_experimental::sigma_protocol_witness::new_secret_witness;
     #[test_only]
-    use aptos_experimental::confidential_crypto_test_utils::{compressed_identity_points, equal_vec_points, compress_points, generate_twisted_elgamal_keypair};
+    use aptos_experimental::confidential_crypto_test_utils::{equal_vec_points, compress_points, generate_twisted_elgamal_keypair};
     #[test_only]
     use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_proof;
 
     //
     // Constants
@@ -319,7 +319,7 @@ module aptos_experimental::sigma_protocol_key_rotation {
     //
 
     #[test_only]
-    fun key_rotation_session_for_testing(): KeyRotationSession {
+    public(friend) fun key_rotation_session_for_testing(): KeyRotationSession {
         let (sender, token_type) = setup_test_environment();
         KeyRotationSession { sender: signer::address_of(&sender), token_type, num_chunks: get_num_available_chunks() }
     }
@@ -375,7 +375,7 @@ module aptos_experimental::sigma_protocol_key_rotation {
 
     #[test_only]
     /// Generates a random valid statement-witness pair for testing.
-    fun random_valid_statement_witness_pair(): (Statement<KeyRotation>, Witness) {
+    public(friend) fun random_valid_statement_witness_pair(): (Statement<KeyRotation>, Witness) {
         let ell = get_num_available_chunks();
         let (dk, compressed_ek) = generate_twisted_elgamal_keypair();
         let new_dk = random_scalar();
@@ -426,35 +426,4 @@ module aptos_experimental::sigma_protocol_key_rotation {
         assert!(equal_vec_points(&actual_psi, &expected_psi), 1);
     }
 
-    #[test]
-    /// Verifies that a correctly computed proof verifies.
-    fun proof_correctness() {
-        let (stmt, witn) = random_valid_statement_witness_pair();
-        let ss = key_rotation_session_for_testing();
-        ss.assert_verifies(&stmt, &ss.prove(&stmt, &witn));
-    }
-
-    #[test]
-    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
-    /// Verifies that an empty proof does not verify for a random statement.
-    fun proof_soundness_against_random_statement() {
-        let (stmt, _) = random_valid_statement_witness_pair();
-        key_rotation_session_for_testing().assert_verifies(&stmt, &sigma_protocol_proof::empty());
-    }
-
-    #[test]
-    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
-    /// Verifies that an empty proof does not verify for a "zero" statement (all identity points).
-    fun proof_soundness_against_zero_statement_and_empty_proof() {
-        let ell = get_num_available_chunks();
-
-        let stmt = new_key_rotation_statement(
-            point_identity_compressed(),
-            point_identity_compressed(),
-            &compressed_identity_points(ell),
-            &compressed_identity_points(ell),
-        );
-
-        key_rotation_session_for_testing().assert_verifies(&stmt, &sigma_protocol_proof::empty());
-    }
 }
