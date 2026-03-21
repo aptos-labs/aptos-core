@@ -28,23 +28,6 @@ module aptos_experimental::confidential_asset {
     use aptos_experimental::sigma_protocol_proof;
     use aptos_experimental::confidential_range_proofs;
 
-
-    #[test_only]
-    use aptos_std::ristretto255::Scalar;
-    #[test_only]
-    use aptos_experimental::confidential_balance::{new_pending_from_p_and_r,
-        split_available_into_chunks, split_pending_into_chunks
-    };
-    #[test_only]
-    use aptos_experimental::sigma_protocol_utils::points_clone;
-    #[test_only]
-    use aptos_experimental::confidential_crypto_test_utils::{
-        decompress_points, generate_available_randomness, new_available_from_amount,
-        generate_pending_randomness, prove_range
-    };
-    #[test_only]
-    use aptos_experimental::sigma_protocol_proof_tests;
-
     #[test_only]
     friend aptos_experimental::confidential_asset_tests;
 
@@ -108,7 +91,6 @@ module aptos_experimental::confidential_asset {
     const E_INIT_MODULE_FAILED_FOR_DEVNET: u64 = 1000;
 
     // === Constants (2 out of 13) ===
-
 
     /// Any natural number that fits in this # of bits will be less than the Ristretto255 order $p$ and thus fit in its scalar field $\mathbb{Z}_p$ without "wrapping around."
     const MAX_NUM_BITS_IN_SCALAR_FIELD : u64 = 252;
@@ -202,7 +184,6 @@ module aptos_experimental::confidential_asset {
 
     // === Events (4 out of 13) ===
 
-
     #[event]
     enum Registered has drop, store {
         V1 { addr: address, asset_type: Object<fungible_asset::Metadata>, ek: CompressedRistretto }
@@ -288,9 +269,9 @@ module aptos_experimental::confidential_asset {
         V1 { asset_type: Object<fungible_asset::Metadata>, allowed: bool }
     }
 
-    // SDK note: when you see this event, call `get_effective_auditor` to determine the current effective EK
-    // for any asset that doesn't have an asset-specific auditor override.
     #[event]
+    /// SDK note: when you see this event, call `get_effective_auditor` to determine the current effective EK
+    /// for any asset that doesn't have an asset-specific auditor override.
     enum GlobalAuditorChanged has drop, store {
         V1 { new: AuditorConfig }
     }
@@ -1140,50 +1121,43 @@ module aptos_experimental::confidential_asset {
     }
 
     #[test_only]
-    public(friend) fun check_pending_balance_decrypts_to(
-        user: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        user_dk: &Scalar,
-        amount: u64
-    ): bool acquires ConfidentialStore {
-        let pending_balance =
-            get_pending_balance(user, asset_type).decompress();
-
-        pending_balance.check_decrypts_to(pending_balance.get_R(), user_dk, (amount as u128))
+    public(friend) fun get_effective_auditor_ek(
+        asset_type: Object<fungible_asset::Metadata>
+    ): Option<CompressedRistretto> acquires AssetConfig, GlobalConfig {
+        get_effective_auditor_config(asset_type).config.ek
     }
 
     #[test_only]
-    /// Checks that the available balance decrypts to `amount`.
-    /// When `is_auditor_dk` is true, decrypts the auditor's ciphertext rather than the user's.
-    public(friend) fun check_available_balance_decrypts_to(
-        user: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        dk: &Scalar,
-        amount: u128,
-        is_auditor_dk: bool,
-    ): bool acquires ConfidentialStore {
-        let available_balance =
-            get_available_balance(user, asset_type).decompress();
-
-        let decrypt_R = if (is_auditor_dk) { available_balance.get_R_aud() } else { available_balance.get_R() };
-        available_balance.check_decrypts_to(decrypt_R, dk, amount)
+    public(friend) fun new_registration_proof(sigma: sigma_protocol_proof::Proof): RegistrationProof {
+        RegistrationProof::V1 { sigma }
     }
 
     #[test_only]
-    public(friend) fun get_amount_ciphertext_for_effective_auditor(proof: &TransferProof): Balance<Pending> {
-        let TransferProof::V1 { compressed_amount, .. } = proof;
-        let p = decompress_points(compressed_amount.get_compressed_P());
-        let r_eff_aud = decompress_points(compressed_amount.get_compressed_R_eff_aud());
-        new_pending_from_p_and_r(p, r_eff_aud)
+    public(friend) fun new_withdrawal_proof(
+        compressed_new_balance: CompressedBalance<Available>, zkrp_new_balance: RangeProof, sigma: sigma_protocol_proof::Proof,
+    ): WithdrawalProof {
+        WithdrawalProof::V1 { compressed_new_balance, zkrp_new_balance, sigma }
     }
 
     #[test_only]
-    public(friend) fun get_amount_ciphertexts_for_volun_auditors(proof: &TransferProof): vector<Balance<Pending>> {
-        let TransferProof::V1 { compressed_amount, .. } = proof;
-        let p = decompress_points(compressed_amount.get_compressed_P());
-        compressed_amount.get_compressed_R_volun_auds().map_ref(|r| {
-            new_pending_from_p_and_r(points_clone(&p), decompress_points(r))
-        })
+    public(friend) fun new_transfer_proof(
+        compressed_new_balance: CompressedBalance<Available>, compressed_amount: CompressedAmount,
+        compressed_ek_volun_auds: vector<CompressedRistretto>,
+        zkrp_new_balance: RangeProof, zkrp_amount: RangeProof, sigma: sigma_protocol_proof::Proof,
+    ): TransferProof {
+        TransferProof::V1 { compressed_new_balance, compressed_amount, compressed_ek_volun_auds, zkrp_new_balance, zkrp_amount, sigma }
+    }
+
+    #[test_only]
+    public(friend) fun new_key_rotation_proof(
+        compressed_new_ek: CompressedRistretto, compressed_new_R: vector<CompressedRistretto>, sigma: sigma_protocol_proof::Proof,
+    ): KeyRotationProof {
+        KeyRotationProof::V1 { compressed_new_ek, compressed_new_R, sigma }
+    }
+
+    #[test_only]
+    public(friend) fun get_transfer_proof_compressed_amount(proof: &TransferProof): &CompressedAmount {
+        &proof.compressed_amount
     }
 
     // === Proof enums & verification functions (12 out of 13) ===
@@ -1340,153 +1314,4 @@ module aptos_experimental::confidential_asset {
     // ^^^ End of SECURITY-SENSITIVE proof verification functions ^^^ //
     //                                                                //
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ //
-
-    // === Test-only proof generation functions (13 out of 13) ===
-
-    #[test_only]
-    public(friend) fun prove_registration(
-        sender_addr: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        dk: &Scalar,
-    ): RegistrationProof {
-        let (stmt, witn) = sigma_protocol_registration::compute_statement_and_witness(dk);
-        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
-        let session = sigma_protocol_registration::new_session(&sender, asset_type);
-        RegistrationProof::V1 { sigma: session.prove(&stmt, &witn) }
-    }
-
-    #[test_only]
-    fun prove_withdrawal_internal(
-        sender_addr: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        dk_sender: &Scalar,
-        v: u64,
-        new_amount: u128,
-    ): (CompressedBalance<Available>, RangeProof, sigma_protocol_proof::Proof)
-        acquires ConfidentialStore, AssetConfig, GlobalConfig
-    {
-        let ek = get_encryption_key(sender_addr, asset_type);
-        let compressed_ek_aud = get_effective_auditor_config(asset_type).config.ek;
-        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
-
-        let new_balance_randomness = generate_available_randomness();
-        let new_balance = new_available_from_amount(
-            new_amount, &new_balance_randomness, &ek, &compressed_ek_aud
-        );
-
-        let new_r = new_balance_randomness.scalars();
-        let new_a = split_available_into_chunks(new_amount);
-        let zkrp_new_balance = prove_range(&new_a, new_r);
-
-        let v = new_scalar_from_u64(v);
-        let compressed_old_balance = get_available_balance(sender_addr, asset_type);
-        let compressed_new_balance = new_balance.compress();
-        let (stmt, _) = sigma_protocol_withdraw::new_withdrawal_statement(
-            ek, &compressed_old_balance, &compressed_new_balance, &compressed_ek_aud, v
-        );
-        let witn = sigma_protocol_proof_tests::new_withdrawal_witness(*dk_sender, new_a, *new_r);
-        let session = sigma_protocol_withdraw::new_session(&sender, asset_type, compressed_ek_aud.is_some());
-        (compressed_new_balance, zkrp_new_balance, session.prove(&stmt, &witn))
-    }
-
-    #[test_only]
-    public(friend) fun prove_withdrawal(
-        sender_addr: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        sender_dk: &Scalar,
-        amount: u64,
-        new_amount: u128,
-    ): WithdrawalProof acquires ConfidentialStore, AssetConfig, GlobalConfig {
-        let (compressed_new_balance, zkrp_new_balance, sigma) =
-            prove_withdrawal_internal(sender_addr, asset_type, sender_dk, amount, new_amount);
-        WithdrawalProof::V1 { compressed_new_balance, zkrp_new_balance, sigma }
-    }
-
-    #[test_only]
-    public(friend) fun prove_normalization(
-        sender_addr: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        sender_dk: &Scalar,
-        amount: u128,
-    ): WithdrawalProof acquires ConfidentialStore, AssetConfig, GlobalConfig {
-        let (compressed_new_balance, zkrp_new_balance, sigma) =
-            prove_withdrawal_internal(sender_addr, asset_type, sender_dk, 0, amount);
-        WithdrawalProof::V1 { compressed_new_balance, zkrp_new_balance, sigma }
-    }
-
-    #[test_only]
-    public(friend) fun prove_transfer(
-        sender_addr: address,
-        recipient_addr: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        sender_dk: &Scalar,
-        amount_u64: u64,
-        new_balance_u128: u128,
-        compressed_ek_volun_auds: &vector<CompressedRistretto>,
-    ): TransferProof acquires ConfidentialStore, AssetConfig, GlobalConfig {
-        let ek_sender = get_encryption_key(sender_addr, asset_type);
-        let ek_recipient = get_encryption_key(recipient_addr, asset_type);
-        let compressed_old_balance = get_available_balance(sender_addr, asset_type);
-        let compressed_ek_eff_aud = get_effective_auditor_config(asset_type).config.ek;
-        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
-        let has_effective_auditor = compressed_ek_eff_aud.is_some();
-        let num_volun_auditors = compressed_ek_volun_auds.length();
-
-        let new_balance_randomness = generate_available_randomness();
-        let amount_randomness = generate_pending_randomness();
-
-        let (stmt, witn, new_balance, amount) =
-            sigma_protocol_proof_tests::build_transfer_statement_and_witness(
-                sender_dk, &ek_sender, &ek_recipient, &compressed_old_balance,
-                &compressed_ek_eff_aud, compressed_ek_volun_auds,
-                amount_u64, new_balance_u128, &new_balance_randomness, &amount_randomness,
-            );
-
-        let new_a = split_available_into_chunks(new_balance_u128);
-        let v = split_pending_into_chunks((amount_u64 as u128));
-        let zkrp_new_balance = prove_range(&new_a, new_balance_randomness.scalars());
-        let zkrp_amount = prove_range(&v, amount_randomness.scalars());
-
-        let session = sigma_protocol_transfer::new_session(
-            &sender, recipient_addr, asset_type, has_effective_auditor, num_volun_auditors,
-        );
-
-        TransferProof::V1 {
-            compressed_new_balance: new_balance.compress(),
-            compressed_amount: amount.compress(),
-            compressed_ek_volun_auds: *compressed_ek_volun_auds,
-            zkrp_new_balance, zkrp_amount, sigma: session.prove(&stmt, &witn)
-        }
-    }
-
-    #[test_only]
-    public(friend) fun prove_key_rotation(
-        owner_addr: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        sender_dk: &Scalar,
-        new_dk: &Scalar,
-    ): KeyRotationProof acquires ConfidentialStore {
-        let owner = aptos_framework::account::create_signer_for_test(owner_addr);
-
-        // Get old EK and available balance
-        let compressed_old_ek = get_encryption_key(owner_addr, asset_type);
-        let available_balance = get_available_balance(owner_addr, asset_type);
-
-        // Build statement and witness using the helper
-        let (stmt, witn, compressed_new_ek, compressed_new_R) =
-            sigma_protocol_key_rotation::compute_statement_and_witness_from_keys_and_old_ctxt(
-                sender_dk, new_dk,
-                compressed_old_ek,
-                available_balance.get_compressed_R(),
-            );
-
-        // Prove
-        let session = sigma_protocol_key_rotation::new_session(&owner, asset_type);
-
-        KeyRotationProof::V1 {
-            compressed_new_ek,
-            compressed_new_R,
-            sigma: session.prove(&stmt, &witn),
-        }
-    }
 }

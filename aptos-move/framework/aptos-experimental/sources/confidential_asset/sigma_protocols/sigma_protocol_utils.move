@@ -9,6 +9,8 @@ module aptos_experimental::sigma_protocol_utils {
     friend aptos_experimental::confidential_balance;
     friend aptos_experimental::confidential_amount;
     #[test_only]
+    friend aptos_experimental::confidential_asset_tests;
+    #[test_only]
     friend aptos_experimental::sigma_protocol_pedeq_example;
     #[test_only]
     friend aptos_experimental::sigma_protocol_schnorr_example;
