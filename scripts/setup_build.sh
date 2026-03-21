@@ -1313,8 +1313,8 @@ install_cvc5() {
     (
         cd "$_tmpdir" || exit 1
         curl -LOs "https://github.com/cvc5/cvc5/releases/download/cvc5-${CVC5_VERSION}/${_cvc5_pkg}" || {
-            log_warn "Failed to download cvc5 -- skipping"
-            exit 0
+            log_error "Failed to download cvc5 v${CVC5_VERSION}."
+            exit 1
         }
         cp "$_cvc5_pkg" "${INSTALL_DIR}cvc5" || {
             log_error "Failed to copy cvc5 binary to ${INSTALL_DIR}"
