@@ -65,11 +65,10 @@ $BOOGIE_VERSION        = "3.5.6"
 # cvc5 -- alternative SMT solver for the Move Prover
 $CVC5_VERSION          = "0.0.3"
 
-# Node.js major version (LTS)
-$NODE_MAJOR_VERSION    = "22"
-
-# pnpm -- Node.js package manager
-$PNPM_VERSION          = "10.6.4"
+# Node.js and pnpm are installed via WinGet without version pinning
+# (WinGet manages versioning).  These constants are for reference only.
+$NODE_MAJOR_VERSION    = "24"
+$PNPM_VERSION          = "10.32.1"
 
 # ============================================================================
 # Logging Utilities
@@ -231,7 +230,7 @@ function Safe-Download {
     if (Test-Path $Destination) { Remove-Item $Destination -Force }
     Write-Info "Downloading $Url"
     $ProgressPreference = 'SilentlyContinue'
-    Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing
+    Invoke-WebRequest -Uri $Url -OutFile $Destination
 }
 
 # ============================================================================

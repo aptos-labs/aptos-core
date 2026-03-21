@@ -78,13 +78,13 @@ PROTOC_VERSION=29.3
 SHELLCHECK_VERSION=0.10.0
 
 # kubectl -- Kubernetes cluster CLI (https://kubernetes.io/docs/reference/kubectl/)
-KUBECTL_VERSION=1.32.3
+KUBECTL_VERSION=1.35.1
 
 # Terraform -- declarative infrastructure as code (https://www.terraform.io/)
-TERRAFORM_VERSION=1.10.5
+TERRAFORM_VERSION=1.14.7
 
 # Helm -- Kubernetes package manager (https://helm.sh/)
-HELM_VERSION=3.17.4
+HELM_VERSION=4.1.3
 
 # HashiCorp Vault -- secrets management (https://www.vaultproject.io/)
 VAULT_VERSION=1.18.5
@@ -121,10 +121,10 @@ BOOGIE_VERSION=3.5.6
 # -- JS/TS tools --
 
 # Node.js LTS major version -- used for JS/TS SDK development
-NODE_MAJOR_VERSION=22
+NODE_MAJOR_VERSION=24
 
 # pnpm -- fast, disk-efficient Node.js package manager (https://pnpm.io/)
-PNPM_VERSION=10.6.4
+PNPM_VERSION=10.32.1
 
 # ============================================================================
 # Resolve script location and cd to repo root
@@ -258,7 +258,7 @@ COMPONENT FLAGS
 
     -J    Install JavaScript / TypeScript tools:
 
-            Node.js (v22)     JavaScript runtime (LTS).
+            Node.js (v24)     JavaScript runtime (LTS).
             pnpm              Fast, disk-efficient Node.js package manager.
 
 MODIFIER FLAGS
@@ -330,6 +330,10 @@ HELPTEXT
 # Usage:  $(sudo_if_needed) apt-get install ...
 sudo_if_needed() {
     if [ "$(id -u)" != "0" ]; then
+        if ! command -v sudo >/dev/null 2>&1; then
+            die "This script requires 'sudo' when not run as root, but it was not found." \
+                "Either install sudo, or re-run this script as root."
+        fi
         echo "sudo"
     fi
 }
@@ -1206,7 +1210,12 @@ install_allure() {
             "https://github.com/diem/allure2/releases/download/${ALLURE_VERSION}/allure_${ALLURE_VERSION}-1_all.deb" || \
             die "Failed to download Allure .deb package."
         # shellcheck disable=SC2086
-        $_sudo dpkg -i "$_deb"
+        if ! $_sudo dpkg -i "$_deb"; then
+            log_warn "dpkg failed; attempting to fix dependencies..."
+            # shellcheck disable=SC2086
+            $_sudo apt-get -f install -y || \
+                die "Failed to install Allure .deb package and dependency fix failed."
+        fi
         rm -rf "$_tmpdir"
     elif [ "$PACKAGE_MANAGER" = "apk" ]; then
         # shellcheck disable=SC2086
@@ -1398,16 +1407,19 @@ install_nodejs() {
     if [ "$PACKAGE_MANAGER" = "apt-get" ]; then
         # Ensure bash is available (minimal images may not have it)
         install_pkg bash "$PACKAGE_MANAGER"
-        curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" -o nodesource_setup.sh || \
+        _tmpdir="$(make_tmp_dir)"
+        _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
+        curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" \
+            -o "${_tmpdir}/nodesource_setup.sh" || \
             die "Failed to download NodeSource setup script for Node.js v${NODE_MAJOR_VERSION}."
         # NodeSource setup script requires bash, not POSIX sh
         if [ -n "$_sudo" ]; then
             # shellcheck disable=SC2086
-            $_sudo -E bash nodesource_setup.sh
+            $_sudo -E bash "${_tmpdir}/nodesource_setup.sh"
         else
-            bash nodesource_setup.sh
+            bash "${_tmpdir}/nodesource_setup.sh"
         fi
-        rm -f nodesource_setup.sh
+        rm -rf "$_tmpdir"
     fi
 
     if [ "$PACKAGE_MANAGER" = "brew" ]; then
