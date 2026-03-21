@@ -336,7 +336,7 @@ module aptos_experimental::sigma_protocol_transfer {
 
     #[test_only]
     /// Creates a transfer witness: (dk, new_a[1..ℓ], new_r[1..ℓ], v[1..n], r[1..n]).
-    public fun new_transfer_witness(
+    public(friend) fun new_transfer_witness(
         dk: Scalar, new_a: vector<Scalar>, new_r: vector<Scalar>,
         v: vector<Scalar>, r: vector<Scalar>,
     ): Witness {
@@ -605,7 +605,7 @@ module aptos_experimental::sigma_protocol_transfer {
 
     #[test_only]
     /// Creates a transfer proof (for testing).
-    public fun prove(self: &TransferSession, stmt: &Statement<Transfer>, witn: &Witness): Proof {
+    public(friend) fun prove(self: &TransferSession, stmt: &Statement<Transfer>, witn: &Witness): Proof {
         let has_eff = self.has_effective_auditor;
         let num_volun = self.num_volun_auditors;
         let (proof, _) = sigma_protocol::prove(
@@ -620,7 +620,7 @@ module aptos_experimental::sigma_protocol_transfer {
     #[test_only]
     /// Creates transfer ciphertexts under all keys, builds the transfer statement and witness.
     /// Callers provide randomness so they can access the scalars afterwards (e.g., for range proofs).
-    public fun build_transfer_statement_and_witness(
+    public(friend) fun build_transfer_statement_and_witness(
         dk_sender: &Scalar,
         compressed_ek_sender: &CompressedRistretto,
         compressed_ek_recip: &CompressedRistretto,

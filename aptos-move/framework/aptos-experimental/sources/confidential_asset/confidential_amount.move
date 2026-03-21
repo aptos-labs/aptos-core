@@ -107,23 +107,23 @@ module aptos_experimental::confidential_amount {
 
     // === Accessors (CompressedAmount) ===
 
-    public fun get_compressed_P(self: &CompressedAmount): &vector<CompressedRistretto> { &self.compressed_P }
-    public fun get_compressed_R_sender(self: &CompressedAmount): &vector<CompressedRistretto> { &self.compressed_R_sender }
-    public fun get_compressed_R_recip(self: &CompressedAmount): &vector<CompressedRistretto> { &self.compressed_R_recip }
-    public fun get_compressed_R_eff_aud(self: &CompressedAmount): &vector<CompressedRistretto> { &self.compressed_R_eff_aud }
-    public fun get_compressed_R_volun_auds(self: &CompressedAmount): &vector<vector<CompressedRistretto>> { &self.compressed_R_volun_auds }
+    public(friend) fun get_compressed_P(self: &CompressedAmount): &vector<CompressedRistretto> { &self.compressed_P }
+    public(friend) fun get_compressed_R_sender(self: &CompressedAmount): &vector<CompressedRistretto> { &self.compressed_R_sender }
+    public(friend) fun get_compressed_R_recip(self: &CompressedAmount): &vector<CompressedRistretto> { &self.compressed_R_recip }
+    public(friend) fun get_compressed_R_eff_aud(self: &CompressedAmount): &vector<CompressedRistretto> { &self.compressed_R_eff_aud }
+    public(friend) fun get_compressed_R_volun_auds(self: &CompressedAmount): &vector<vector<CompressedRistretto>> { &self.compressed_R_volun_auds }
 
-    public fun num_volun_auditors_compressed(self: &CompressedAmount): u64 {
+    public(friend) fun num_volun_auditors_compressed(self: &CompressedAmount): u64 {
         self.compressed_R_volun_auds.length()
     }
 
-    public fun has_effective_auditor_compressed(self: &CompressedAmount): bool {
+    public(friend) fun has_effective_auditor_compressed(self: &CompressedAmount): bool {
         !self.compressed_R_eff_aud.is_empty()
     }
 
     // === Compress ===
 
-    public fun compress(self: &Amount): CompressedAmount {
+    public(friend) fun compress(self: &Amount): CompressedAmount {
         CompressedAmount {
             compressed_P: self.P.map_ref(|p| p.point_compress()),
             compressed_R_sender: self.R_sender.map_ref(|r| r.point_compress()),
@@ -140,7 +140,7 @@ module aptos_experimental::confidential_amount {
     #[test_only]
     /// Creates an Amount by encrypting `amount_u64` under sender, recipient, effective auditor
     /// (if present), and voluntary auditor keys, all using the same `randomness`.
-    public fun new_from_amount(
+    public(friend) fun new_from_amount(
         amount_u64: u64,
         randomness: &confidential_balance::ConfidentialBalanceRandomness,
         compressed_ek_sender: &CompressedRistretto,

@@ -42,7 +42,7 @@ module aptos_experimental::sigma_protocol_witness {
 
     #[test_only]
     /// Returns a size-$k$ random witness. Useful when creating a ZKP during testing.
-    public fun random(k: u64): Witness {
+    public(friend) fun random(k: u64): Witness {
         new_secret_witness(range(0, k).map(|_| random_scalar()))
     }
 }
