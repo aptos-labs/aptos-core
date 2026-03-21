@@ -70,6 +70,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `is_address_balance_at_least`](#0x1_fungible_asset_is_address_balance_at_least)
 -  [Function `is_frozen`](#0x1_fungible_asset_is_frozen)
 -  [Function `is_store_dispatchable`](#0x1_fungible_asset_is_store_dispatchable)
+-  [Function `is_asset_type_dispatchable`](#0x1_fungible_asset_is_asset_type_dispatchable)
 -  [Function `deposit_dispatch_function`](#0x1_fungible_asset_deposit_dispatch_function)
 -  [Function `has_deposit_dispatch_function`](#0x1_fungible_asset_has_deposit_dispatch_function)
 -  [Function `withdraw_dispatch_function`](#0x1_fungible_asset_withdraw_dispatch_function)
@@ -2655,6 +2656,32 @@ Return whether a fungible asset type is dispatchable.
     <b>let</b> fa_store = <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store);
     <b>let</b> metadata_addr = fa_store.metadata.object_address();
     <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a>&gt;(metadata_addr)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_is_asset_type_dispatchable"></a>
+
+## Function `is_asset_type_dispatchable`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_asset_type_dispatchable">is_asset_type_dispatchable</a>(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_asset_type_dispatchable">is_asset_type_dispatchable</a>(metadata: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;): bool {
+    <b>let</b> metadata_addr = metadata.object_address();
+    <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a>&gt;(metadata_addr) || <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DeriveSupply">DeriveSupply</a>&gt;(metadata_addr)
 }
 </code></pre>
 
