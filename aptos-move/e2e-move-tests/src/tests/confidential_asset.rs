@@ -30,14 +30,7 @@ use thousands::Separable;
 // Constants
 // =================================================================================================
 
-/// Address where aptos_experimental modules are deployed (0x7)
-const EXPERIMENTAL_ADDRESS: AccountAddress = AccountAddress::new([
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
-]);
-
-const FRAMEWORK_ADDRESS: AccountAddress = AccountAddress::new([
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-]);
+const FRAMEWORK_ADDRESS: AccountAddress = AccountAddress::ONE;
 
 /// Standard test account addresses
 const ALICE_ADDRESS: &str = "0xa11ce";
@@ -103,7 +96,7 @@ fn register_account(
     // Generate real registration proof via Move test helper
     let result = h
         .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
+            FRAMEWORK_ADDRESS,
             MODULE_NAME,
             "prove_registration",
             vec![],
@@ -138,7 +131,7 @@ fn register_account(
 fn generate_keypair(h: &mut MoveHarness) -> (Vec<u8>, Vec<u8>) {
     let result = h
         .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
+            FRAMEWORK_ADDRESS,
             "ristretto255_twisted_elgamal",
             "generate_twisted_elgamal_keypair",
             vec![],
@@ -169,7 +162,7 @@ fn set_up_confidential_store_for_apt(h: &mut MoveHarness) -> AccountAddress {
     // Get the FA store address used by confidential assets
     let return_values = h
         .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
+            FRAMEWORK_ADDRESS,
             MODULE_NAME,
             "get_global_config_address",
             vec![],
@@ -214,7 +207,7 @@ fn create_register_payload(
     sigma_proto_resp: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
+        ModuleId::new(FRAMEWORK_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
         ident_str!("register_raw").to_owned(),
         vec![],
         vec![
@@ -230,7 +223,7 @@ fn create_register_payload(
 #[cfg(feature = "move-harness-with-test-only")]
 fn create_deposit_payload(token_metadata: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
+        ModuleId::new(FRAMEWORK_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
         ident_str!("deposit").to_owned(),
         vec![],
         vec![
@@ -244,7 +237,7 @@ fn create_deposit_payload(token_metadata: AccountAddress, amount: u64) -> Transa
 #[cfg(feature = "move-harness-with-test-only")]
 fn create_rollover_pending_balance_payload(token_metadata: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
+        ModuleId::new(FRAMEWORK_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
         ident_str!("rollover_pending_balance").to_owned(),
         vec![],
         vec![bcs::to_bytes(&token_metadata).unwrap()],
@@ -292,7 +285,7 @@ fn create_withdraw_to_payload(
     sigma_proto_resp: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
+        ModuleId::new(FRAMEWORK_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
         ident_str!("withdraw_to_raw").to_owned(),
         vec![],
         vec![
@@ -331,7 +324,7 @@ fn create_confidential_transfer_payload(
     memo: Vec<u8>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
+        ModuleId::new(FRAMEWORK_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
         ident_str!("confidential_transfer_raw").to_owned(),
         vec![],
         vec![
@@ -373,7 +366,7 @@ fn set_auditor_for_asset_type(
 ) {
     let ek_aud_option: Option<Vec<u8>> = Some(ek_aud_bytes.to_vec());
     h.exec_function_bypass_visibility(
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
         "set_auditor_for_asset_type",
         vec![],
@@ -398,7 +391,7 @@ fn create_rotate_encryption_key_payload(
     sigma_proto_resp: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
+        ModuleId::new(FRAMEWORK_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
         ident_str!("rotate_encryption_key_raw").to_owned(),
         vec![],
         vec![
@@ -416,7 +409,7 @@ fn create_rotate_encryption_key_payload(
 #[cfg(feature = "move-harness-with-test-only")]
 fn create_rollover_and_freeze_payload(token_metadata: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
+        ModuleId::new(FRAMEWORK_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
         ident_str!("rollover_pending_balance_and_pause").to_owned(),
         vec![],
         vec![bcs::to_bytes(&token_metadata).unwrap()],
@@ -628,7 +621,7 @@ fn profile_confidential_asset_register(detailed: bool) {
     let (dk_bytes, ek_bytes) = generate_keypair(&mut h);
     let result = h
         .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
+            FRAMEWORK_ADDRESS,
             MODULE_NAME,
             "prove_registration",
             vec![],
@@ -656,7 +649,7 @@ fn profile_confidential_asset_register(detailed: bool) {
         "register",
         gas_used,
         &fee_statement.unwrap(),
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
     );
     maybe_generate_html_report(detailed, &gas_log, "confidential_asset_register");
@@ -703,7 +696,7 @@ fn profile_confidential_asset_deposit(detailed: bool) {
         "deposit",
         gas_used,
         &fee_statement.unwrap(),
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
     );
     maybe_generate_html_report(detailed, &gas_log, "confidential_asset_deposit");
@@ -768,7 +761,7 @@ fn profile_confidential_asset_rollover_pending_balance(detailed: bool) {
         "rollover_pending_balance",
         gas_used,
         &fee_statement.unwrap(),
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
     );
     maybe_generate_html_report(
@@ -847,7 +840,7 @@ fn prove_and_build_withdraw_to(
 ) -> TransactionPayload {
     let result = h
         .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
+            FRAMEWORK_ADDRESS,
             MODULE_NAME,
             "prove_withdrawal",
             vec![],
@@ -958,7 +951,7 @@ fn profile_confidential_asset_withdraw_to(detailed: bool, auditor_mode: AuditorM
         label,
         gas_used,
         &fee_statement.unwrap(),
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
     );
     maybe_generate_html_report(detailed, &gas_log, "confidential_asset_withdraw_to");
@@ -1007,7 +1000,7 @@ fn prove_and_build_confidential_transfer(
 ) -> TransactionPayload {
     let result = h
         .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
+            FRAMEWORK_ADDRESS,
             MODULE_NAME,
             "prove_transfer",
             vec![],
@@ -1169,7 +1162,7 @@ fn profile_confidential_asset_confidential_transfer(
         &label,
         gas_used,
         &fee_statement.unwrap(),
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
     );
     maybe_generate_html_report(
@@ -1292,7 +1285,7 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
     // Note: Scalar has the same BCS layout as Vec<u8>, so alice_dk/new_dk pass through directly.
     let result = h
         .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
+            FRAMEWORK_ADDRESS,
             MODULE_NAME,
             "prove_key_rotation",
             vec![],
@@ -1336,7 +1329,7 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
         "rotate_encryption_key",
         gas_used,
         &fee_statement.unwrap(),
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
     );
     maybe_generate_html_report(
@@ -1374,7 +1367,7 @@ fn test_call_private_function() {
 
     let return_values = h
         .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
+            FRAMEWORK_ADDRESS,
             MODULE_NAME,
             "get_global_config_address",
             vec![],
@@ -1433,7 +1426,7 @@ fn call_test_only_function() {
     // Now call the #[test_only] function check_pending_balance_decrypts_to
     // This should succeed and return true since we just deposited `deposit_amount`
     let result = h.exec_function_bypass_visibility(
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
         "check_pending_balance_decrypts_to",
         vec![],
@@ -1471,7 +1464,7 @@ fn call_test_only_function() {
     // Also verify that wrong amount returns false
     let wrong_amount: u64 = 999;
     let result = h.exec_function_bypass_visibility(
-        EXPERIMENTAL_ADDRESS,
+        FRAMEWORK_ADDRESS,
         MODULE_NAME,
         "check_pending_balance_decrypts_to",
         vec![],

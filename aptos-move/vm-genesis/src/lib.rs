@@ -1051,14 +1051,14 @@ fn initialize_confidential_asset(
     traversal_context: &mut TraversalContext,
 ) {
     if !chain_id.is_mainnet() && !chain_id.is_testnet() {
-        exec_experimental_function(
+        exec_function(
             session,
             module_storage,
             traversal_context,
             "confidential_asset",
             "init_module_for_devnet",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(EXPERIMENTAL_CODE_ADDRESS)]),
+            serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
         );
     }
 }
