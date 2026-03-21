@@ -80,7 +80,7 @@ module aptos_experimental::confidential_asset_tests {
             signer::address_of(sender), to, token, sender_dk, amount, new_amount, &vector[],
         );
 
-        confidential_asset::confidential_transfer(sender, token, to, proof);
+        confidential_asset::confidential_transfer(sender, token, to, proof, vector[]);
     }
 
     fun audit_transfer(
@@ -99,7 +99,7 @@ module aptos_experimental::confidential_asset_tests {
         let eff_aud_amount = get_amount_ciphertext_for_effective_auditor(&proof);
         let volun_aud_amounts = get_amount_ciphertexts_for_volun_auditors(&proof);
 
-        confidential_asset::confidential_transfer(sender, token, to, proof);
+        confidential_asset::confidential_transfer(sender, token, to, proof, vector[]);
 
         (eff_aud_amount, volun_aud_amounts)
     }
@@ -243,7 +243,7 @@ module aptos_experimental::confidential_asset_tests {
             };
         };
 
-        confidential_asset::confidential_transfer(alice, token, bob_addr, proof);
+        confidential_asset::confidential_transfer(alice, token, bob_addr, proof, vector[]);
 
         assert!(
             check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
@@ -651,7 +651,8 @@ module aptos_experimental::confidential_asset_tests {
             &alice,
             token,
             bob_addr,
-            proof
+            proof,
+            vector[],
         );
     }
 
