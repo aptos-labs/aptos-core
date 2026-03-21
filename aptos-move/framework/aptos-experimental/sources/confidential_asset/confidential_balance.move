@@ -18,6 +18,10 @@ module aptos_experimental::confidential_balance {
     friend aptos_experimental::confidential_asset;
     friend aptos_experimental::confidential_range_proofs;
     friend aptos_experimental::sigma_protocol_transfer;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::confidential_asset_tests;
 
     //
     // Constants
@@ -66,16 +70,16 @@ module aptos_experimental::confidential_balance {
 
     // === Generic accessors ===
 
-    public fun get_P<T>(self: &Balance<T>): &vector<RistrettoPoint> { &self.P }
-    public fun get_R<T>(self: &Balance<T>): &vector<RistrettoPoint> { &self.R }
-    public fun get_R_aud<T>(self: &Balance<T>): &vector<RistrettoPoint> { &self.R_aud }
-    public fun get_compressed_P<T>(self: &CompressedBalance<T>): &vector<CompressedRistretto> { &self.P }
-    public fun get_compressed_R<T>(self: &CompressedBalance<T>): &vector<CompressedRistretto> { &self.R }
-    public fun get_compressed_R_aud<T>(self: &CompressedBalance<T>): &vector<CompressedRistretto> { &self.R_aud }
+    public(friend) fun get_P<T>(self: &Balance<T>): &vector<RistrettoPoint> { &self.P }
+    public(friend) fun get_R<T>(self: &Balance<T>): &vector<RistrettoPoint> { &self.R }
+    public(friend) fun get_R_aud<T>(self: &Balance<T>): &vector<RistrettoPoint> { &self.R_aud }
+    public(friend) fun get_compressed_P<T>(self: &CompressedBalance<T>): &vector<CompressedRistretto> { &self.P }
+    public(friend) fun get_compressed_R<T>(self: &CompressedBalance<T>): &vector<CompressedRistretto> { &self.R }
+    public(friend) fun get_compressed_R_aud<T>(self: &CompressedBalance<T>): &vector<CompressedRistretto> { &self.R_aud }
 
     // === Generic compress/decompress ===
 
-    public fun compress<T>(self: &Balance<T>): CompressedBalance<T> {
+    public(friend) fun compress<T>(self: &Balance<T>): CompressedBalance<T> {
         CompressedBalance::V1 {
             P: self.P.map_ref(|p| p.point_compress()),
             R: self.R.map_ref(|r| r.point_compress()),
@@ -83,7 +87,7 @@ module aptos_experimental::confidential_balance {
         }
     }
 
-    public fun decompress<T>(self: &CompressedBalance<T>): Balance<T> {
+    public(friend) fun decompress<T>(self: &CompressedBalance<T>): Balance<T> {
         Balance::V1 {
             P: self.P.map_ref(|p| p.point_decompress()),
             R: self.R.map_ref(|r| r.point_decompress()),
@@ -93,7 +97,7 @@ module aptos_experimental::confidential_balance {
 
     // === Generic operations ===
 
-    public fun is_zero<T>(self: &CompressedBalance<T>): bool {
+    public(friend) fun is_zero<T>(self: &CompressedBalance<T>): bool {
         self.P.all(|p| p.is_identity()) &&
         self.R.all(|r| r.is_identity())
     }
@@ -108,7 +112,7 @@ module aptos_experimental::confidential_balance {
 
     // === Generic constructors (friend-gated) ===
 
-    public(friend) fun new_balance<T>(
+    fun new_balance<T>(
         p: vector<RistrettoPoint>, r: vector<RistrettoPoint>, r_aud: vector<RistrettoPoint>,
         expected_chunks: u64,
     ): Balance<T> {
@@ -116,7 +120,7 @@ module aptos_experimental::confidential_balance {
         Balance::V1 { P: p, R: r, R_aud: r_aud }
     }
 
-    public(friend) fun new_compressed_balance<T>(
+    fun new_compressed_balance<T>(
         p: vector<CompressedRistretto>, r: vector<CompressedRistretto>, r_aud: vector<CompressedRistretto>,
         expected_chunks: u64,
     ): CompressedBalance<T> {
@@ -142,26 +146,27 @@ module aptos_experimental::confidential_balance {
         new_balance(p, r, vector[], PENDING_BALANCE_CHUNKS)
     }
 
-    public fun new_zero_pending_compressed(): CompressedBalance<Pending> {
+    public(friend) fun new_zero_pending_compressed(): CompressedBalance<Pending> {
         new_zero_compressed(PENDING_BALANCE_CHUNKS)
     }
 
     /// Creates a pending balance from a 64-bit amount with no randomness (R = identity).
-    public fun new_pending_u64_no_randomness(amount: u64): Balance<Pending> {
+    public(friend) fun new_pending_u64_no_randomness(amount: u64): Balance<Pending> {
         let identity = point_identity();
         new_pending_from_p_and_r(
-            split_pending_into_chunks((amount as u128)).map(|chunk| chunk.basepoint_mul()),
+            split_into_chunks((amount as u128), PENDING_BALANCE_CHUNKS).map(|chunk| chunk.basepoint_mul()),
             vector::range(0, PENDING_BALANCE_CHUNKS).map(|_| identity.point_clone()),
         )
     }
 
+    #[test_only]
     /// Splits an integer amount into `PENDING_BALANCE_CHUNKS` 16-bit chunks.
-    public fun split_pending_into_chunks(amount: u128): vector<Scalar> {
+    public(friend) fun split_pending_into_chunks(amount: u128): vector<Scalar> {
         split_into_chunks(amount, PENDING_BALANCE_CHUNKS)
     }
 
     /// Adds a pending balance to a compressed pending balance in place.
-    public fun add_assign_pending(balance: &mut CompressedBalance<Pending>, rhs: &Balance<Pending>): CompressedBalance<Pending> {
+    public(friend) fun add_assign_pending(balance: &mut CompressedBalance<Pending>, rhs: &Balance<Pending>): CompressedBalance<Pending> {
         let decompressed = balance.decompress();
         decompressed.add_mut_base(rhs.get_P(), rhs.get_R());
         *balance = decompressed.compress();
@@ -187,7 +192,7 @@ module aptos_experimental::confidential_balance {
         new_compressed_balance(p, r, r_aud, AVAILABLE_BALANCE_CHUNKS)
     }
 
-    public fun new_zero_available_compressed(): CompressedBalance<Available> {
+    public(friend) fun new_zero_available_compressed(): CompressedBalance<Available> {
         new_zero_compressed(AVAILABLE_BALANCE_CHUNKS)
     }
 
@@ -204,19 +209,20 @@ module aptos_experimental::confidential_balance {
         )
     }
 
+    #[test_only]
     /// Splits an integer amount into `AVAILABLE_BALANCE_CHUNKS` 16-bit chunks.
-    public fun split_available_into_chunks(amount: u128): vector<Scalar> {
+    public(friend) fun split_available_into_chunks(amount: u128): vector<Scalar> {
         split_into_chunks(amount, AVAILABLE_BALANCE_CHUNKS)
     }
 
     /// Sets only the R component (EK component) of a compressed available balance.
-    public fun set_available_R(balance: &mut CompressedBalance<Available>, new_R: vector<CompressedRistretto>) {
+    public(friend) fun set_available_R(balance: &mut CompressedBalance<Available>, new_R: vector<CompressedRistretto>) {
         assert!(new_R.length() == AVAILABLE_BALANCE_CHUNKS, error::invalid_argument(E_WRONG_NUM_CHUNKS));
         balance.R = new_R;
     }
 
     /// Adds a pending balance to an available balance in place. R_aud is NOT touched (stale after rollover).
-    public fun add_assign_available_excluding_auditor(self: &mut CompressedBalance<Available>, rhs: &CompressedBalance<Pending>) {
+    public(friend) fun add_assign_available_excluding_auditor(self: &mut CompressedBalance<Available>, rhs: &CompressedBalance<Pending>) {
         let lhs_P = self.P.map_ref(|p| p.point_decompress());
         let lhs_R = self.R.map_ref(|r| r.point_decompress());
         let rhs_P = rhs.P.map_ref(|p| p.point_decompress());
@@ -238,20 +244,20 @@ module aptos_experimental::confidential_balance {
     //          Chunk-splitting functions         //
     // ========================================= //
 
-    public fun get_chunk_size_bits(): u64 { CHUNK_SIZE_BITS }
+    public(friend) fun get_chunk_size_bits(): u64 { CHUNK_SIZE_BITS }
 
     /// Every balance chunk is $<$ than this bound (i.e., $< 2^{16}$).
-    public fun get_chunk_upper_bound(): u64 { CHUNK_UPPER_BOUND }
+    public(friend) fun get_chunk_upper_bound(): u64 { CHUNK_UPPER_BOUND }
 
     /// Splits `amount` into `num_chunks` 16-bit chunks as `Scalar` values.
-    public fun split_into_chunks(amount: u128, num_chunks: u64): vector<Scalar> {
+    fun split_into_chunks(amount: u128, num_chunks: u64): vector<Scalar> {
         vector::range(0, num_chunks).map(|i| {
             new_scalar_from_u128(amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff)
         })
     }
 
     /// Returns [B^0, B^1, ..., B^{count-1}] where B = 2^chunk_size_bits.
-    public fun get_b_powers(count: u64): vector<Scalar> {
+    public(friend) fun get_b_powers(count: u64): vector<Scalar> {
         let b = new_scalar_from_u128((CHUNK_UPPER_BOUND as u128));
         let powers = vector[scalar_one()];
         let prev = scalar_one();
@@ -284,12 +290,12 @@ module aptos_experimental::confidential_balance {
     }
 
     #[test_only]
-    public fun new_randomness(r: vector<Scalar>): ConfidentialBalanceRandomness {
+    public(friend) fun new_randomness(r: vector<Scalar>): ConfidentialBalanceRandomness {
         ConfidentialBalanceRandomness { r }
     }
 
     #[test_only]
-    public fun scalars(self: &ConfidentialBalanceRandomness): &vector<Scalar> {
+    public(friend) fun scalars(self: &ConfidentialBalanceRandomness): &vector<Scalar> {
         &self.r
     }
 
@@ -301,23 +307,23 @@ module aptos_experimental::confidential_balance {
     use std::option::Option;
 
     #[test_only]
-    public fun generate_randomness(num_chunks: u64): ConfidentialBalanceRandomness {
+    public(friend) fun generate_randomness(num_chunks: u64): ConfidentialBalanceRandomness {
         new_randomness(vector::range(0, num_chunks).map(|_| random_scalar()))
     }
 
     #[test_only]
-    public fun generate_pending_randomness(): ConfidentialBalanceRandomness {
+    public(friend) fun generate_pending_randomness(): ConfidentialBalanceRandomness {
         generate_randomness(PENDING_BALANCE_CHUNKS)
     }
 
     #[test_only]
-    public fun generate_available_randomness(): ConfidentialBalanceRandomness {
+    public(friend) fun generate_available_randomness(): ConfidentialBalanceRandomness {
         generate_randomness(AVAILABLE_BALANCE_CHUNKS)
     }
 
     #[test_only]
     /// Shared encryption logic: computes (P, R) where P_i = amount_i*G + r_i*H, R_i = r_i*EK.
-    public fun encrypt_amount(
+    public(friend) fun encrypt_amount(
         amount_chunks: &vector<Scalar>,
         randomness: &ConfidentialBalanceRandomness,
         ek: &CompressedRistretto,
@@ -342,7 +348,7 @@ module aptos_experimental::confidential_balance {
 
     #[test_only]
     /// Creates a new pending balance from an amount using the provided randomness and encryption key.
-    public fun new_pending_from_amount(
+    public(friend) fun new_pending_from_amount(
         amount: u128,
         randomness: &ConfidentialBalanceRandomness,
         ek: &CompressedRistretto
@@ -354,7 +360,7 @@ module aptos_experimental::confidential_balance {
 
     #[test_only]
     /// If `auditor_ek` is `Some`, computes R_aud_i = r_i * EK_auditor; otherwise R_aud is empty.
-    public fun new_available_from_amount(
+    public(friend) fun new_available_from_amount(
         amount: u128,
         randomness: &ConfidentialBalanceRandomness,
         ek: &CompressedRistretto,
@@ -378,7 +384,7 @@ module aptos_experimental::confidential_balance {
 
     #[test_only]
     /// Verifies that a balance encrypts `amount` using DK on the given R component.
-    public fun check_decrypts_to<T>(
+    public(friend) fun check_decrypts_to<T>(
         self: &Balance<T>, decrypt_R: &vector<RistrettoPoint>,
         dk: &Scalar, amount: u128,
     ): bool {

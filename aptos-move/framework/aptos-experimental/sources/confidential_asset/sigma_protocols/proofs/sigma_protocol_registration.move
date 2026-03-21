@@ -147,7 +147,7 @@ module aptos_experimental::sigma_protocol_registration {
 
     #[test_only]
     /// Creates a new registration witness: $(\mathsf{dk})$.
-    public fun new_registration_witness(dk: Scalar): Witness {
+    public(friend) fun new_registration_witness(dk: Scalar): Witness {
         new_secret_witness(vector[dk])
     }
 
@@ -205,7 +205,7 @@ module aptos_experimental::sigma_protocol_registration {
 
     #[test_only]
     /// Creates a registration proof (for testing).
-    public fun prove(self: &RegistrationSession, stmt: &Statement<Registration>, witn: &Witness): Proof {
+    public(friend) fun prove(self: &RegistrationSession, stmt: &Statement<Registration>, witn: &Witness): Proof {
         let (proof, _) = sigma_protocol::prove(
             new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w),
@@ -218,7 +218,7 @@ module aptos_experimental::sigma_protocol_registration {
 
     #[test_only]
     /// Computes the statement and witness from a decryption key.
-    public fun compute_statement_and_witness(
+    public(friend) fun compute_statement_and_witness(
         dk: &Scalar,
     ): (Statement<Registration>, Witness) {
         let compressed_ek = pubkey_from_secret_key(dk).extract();

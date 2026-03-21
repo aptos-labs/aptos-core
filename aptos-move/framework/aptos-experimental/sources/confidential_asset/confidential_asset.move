@@ -38,6 +38,8 @@ module aptos_experimental::confidential_asset {
     #[test_only]
     use aptos_experimental::sigma_protocol_utils::{points_clone, decompress_points};
 
+    #[test_only]
+    friend aptos_experimental::confidential_asset_tests;
 
     // === Errors (1 out of 13) ===
 
@@ -398,7 +400,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Registers a confidential store for a specified asset type, encrypted under the given EK.
-    public fun register(
+    public(friend) fun register(
         sender: &signer, asset_type: Object<fungible_asset::Metadata>,
         ek: CompressedRistretto,
         proof: RegistrationProof
@@ -491,7 +493,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Withdraws tokens from the sender's available balance to recipient's primary FA store. Also used internally by `normalize` (amount = 0).
-    public fun withdraw_to(
+    public(friend) fun withdraw_to(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         to: address,
@@ -583,7 +585,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Transfers a secret amount of tokens from sender's available balance to recipient's pending balance.
-    public fun confidential_transfer(
+    public(friend) fun confidential_transfer(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         to: address,
@@ -657,7 +659,7 @@ module aptos_experimental::confidential_asset {
         );
     }
 
-    public fun rotate_encryption_key(
+    public(friend) fun rotate_encryption_key(
         owner: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         proof: KeyRotationProof,
@@ -718,7 +720,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Re-encrypts the available balance to ensure all chunks are within 16-bit bounds (required before rollover).
-    public fun normalize(
+    fun normalize(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         proof: WithdrawalProof
@@ -1126,12 +1128,12 @@ module aptos_experimental::confidential_asset {
     // === Test-only functions (11 out of 13) ===
 
     #[test_only]
-    public fun init_module_for_testing(deployer: &signer) {
+    public(friend) fun init_module_for_testing(deployer: &signer) {
         init_module(deployer)
     }
 
     #[test_only]
-    public fun check_pending_balance_decrypts_to(
+    public(friend) fun check_pending_balance_decrypts_to(
         user: address,
         asset_type: Object<fungible_asset::Metadata>,
         user_dk: &Scalar,
@@ -1146,7 +1148,7 @@ module aptos_experimental::confidential_asset {
     #[test_only]
     /// Checks that the available balance decrypts to `amount`.
     /// When `is_auditor_dk` is true, decrypts the auditor's ciphertext rather than the user's.
-    public fun check_available_balance_decrypts_to(
+    public(friend) fun check_available_balance_decrypts_to(
         user: address,
         asset_type: Object<fungible_asset::Metadata>,
         dk: &Scalar,
@@ -1161,7 +1163,7 @@ module aptos_experimental::confidential_asset {
     }
 
     #[test_only]
-    public fun get_amount_ciphertext_for_effective_auditor(proof: &TransferProof): Balance<Pending> {
+    public(friend) fun get_amount_ciphertext_for_effective_auditor(proof: &TransferProof): Balance<Pending> {
         let TransferProof::V1 { compressed_amount, .. } = proof;
         let p = decompress_points(compressed_amount.get_compressed_P());
         let r_eff_aud = decompress_points(compressed_amount.get_compressed_R_eff_aud());
@@ -1169,7 +1171,7 @@ module aptos_experimental::confidential_asset {
     }
 
     #[test_only]
-    public fun get_amount_ciphertexts_for_volun_auditors(proof: &TransferProof): vector<Balance<Pending>> {
+    public(friend) fun get_amount_ciphertexts_for_volun_auditors(proof: &TransferProof): vector<Balance<Pending>> {
         let TransferProof::V1 { compressed_amount, .. } = proof;
         let p = decompress_points(compressed_amount.get_compressed_P());
         compressed_amount.get_compressed_R_volun_auds().map_ref(|r| {
@@ -1335,7 +1337,7 @@ module aptos_experimental::confidential_asset {
     // === Test-only proof generation functions (13 out of 13) ===
 
     #[test_only]
-    public fun prove_registration(
+    public(friend) fun prove_registration(
         sender_addr: address,
         asset_type: Object<fungible_asset::Metadata>,
         dk: &Scalar,
@@ -1381,7 +1383,7 @@ module aptos_experimental::confidential_asset {
     }
 
     #[test_only]
-    public fun prove_withdrawal(
+    public(friend) fun prove_withdrawal(
         sender_addr: address,
         asset_type: Object<fungible_asset::Metadata>,
         sender_dk: &Scalar,
@@ -1394,7 +1396,7 @@ module aptos_experimental::confidential_asset {
     }
 
     #[test_only]
-    public fun prove_normalization(
+    public(friend) fun prove_normalization(
         sender_addr: address,
         asset_type: Object<fungible_asset::Metadata>,
         sender_dk: &Scalar,
@@ -1406,7 +1408,7 @@ module aptos_experimental::confidential_asset {
     }
 
     #[test_only]
-    public fun prove_transfer(
+    public(friend) fun prove_transfer(
         sender_addr: address,
         recipient_addr: address,
         asset_type: Object<fungible_asset::Metadata>,
@@ -1451,7 +1453,7 @@ module aptos_experimental::confidential_asset {
     }
 
     #[test_only]
-    public fun prove_key_rotation(
+    public(friend) fun prove_key_rotation(
         owner_addr: address,
         asset_type: Object<fungible_asset::Metadata>,
         sender_dk: &Scalar,

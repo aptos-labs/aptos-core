@@ -221,7 +221,7 @@ module aptos_experimental::sigma_protocol_key_rotation {
     /// @param dk: The old decryption key
     /// @param delta: The ratio new_dk / old_dk (i.e., new_dk * old_dk^{-1})
     /// @param delta_inv: The inverse of delta
-    public fun new_key_rotation_witness(dk: Scalar, delta: Scalar, delta_inv: Scalar): Witness {
+    public(friend) fun new_key_rotation_witness(dk: Scalar, delta: Scalar, delta_inv: Scalar): Witness {
         new_secret_witness(vector[dk, delta, delta_inv])
     }
 
@@ -332,7 +332,7 @@ module aptos_experimental::sigma_protocol_key_rotation {
 
     #[test_only]
     /// Creates a key rotation proof (for testing)
-    public fun prove(self: &KeyRotationSession, stmt: &Statement<KeyRotation>, witn: &Witness): Proof {
+    public(friend) fun prove(self: &KeyRotationSession, stmt: &Statement<KeyRotation>, witn: &Witness): Proof {
         let (proof, _) = sigma_protocol::prove(
             new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w),
@@ -346,7 +346,7 @@ module aptos_experimental::sigma_protocol_key_rotation {
     #[test_only]
     /// Computes the key rotation statement and witness from actual keys and balance.
     /// Returns (statement, witness, compressed_new_ek, compressed_new_R).
-    public fun compute_statement_and_witness_from_keys_and_old_ctxt(
+    public(friend) fun compute_statement_and_witness_from_keys_and_old_ctxt(
         old_dk: &Scalar,
         new_dk: &Scalar,
         compressed_old_ek: CompressedRistretto,

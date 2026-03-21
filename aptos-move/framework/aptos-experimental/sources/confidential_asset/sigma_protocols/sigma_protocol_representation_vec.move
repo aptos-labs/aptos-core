@@ -58,7 +58,7 @@ module aptos_experimental::sigma_protocol_representation_vec {
 
     #[test_only]
     /// Returns an empty representation vector. Used for testing.
-    public fun empty_representation_vec(): RepresentationVec {
+    public(friend) fun empty_representation_vec(): RepresentationVec {
         new_representation_vec(vector[])
     }
 }

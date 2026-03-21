@@ -250,7 +250,7 @@ module aptos_experimental::sigma_protocol_withdraw {
 
     #[test_only]
     /// Creates a withdrawal witness: $(\mathsf{dk}, \new{a}_0, \ldots, \new{a}_{\ell-1}, \new{r}_0, \ldots, \new{r}_{\ell-1})$.
-    public fun new_withdrawal_witness(dk: Scalar, new_a: vector<Scalar>, new_r: vector<Scalar>): Witness {
+    public(friend) fun new_withdrawal_witness(dk: Scalar, new_a: vector<Scalar>, new_r: vector<Scalar>): Witness {
         assert!(new_a.length() == new_r.length(), e_wrong_witness_len());
 
         let w = vector[dk];
@@ -423,7 +423,7 @@ module aptos_experimental::sigma_protocol_withdraw {
 
     #[test_only]
     /// Creates a withdrawal proof (for testing).
-    public fun prove(self: &WithdrawSession, stmt: &Statement<Withdrawal>, witn: &Witness): Proof {
+    public(friend) fun prove(self: &WithdrawSession, stmt: &Statement<Withdrawal>, witn: &Witness): Proof {
         let (proof, _) = sigma_protocol::prove(
             new_domain_separator(@aptos_experimental, chain_id::get(), WITHDRAWAL_PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w, self.has_auditor),

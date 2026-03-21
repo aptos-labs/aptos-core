@@ -74,7 +74,7 @@ module aptos_experimental::sigma_protocol_proof {
 
     #[test_only]
     /// Returns an empty proof. Used for testing.
-    public fun empty(): Proof {
+    public(friend) fun empty(): Proof {
         Proof {
             comm_A: vector[],
             compressed_comm_A: vector[],
