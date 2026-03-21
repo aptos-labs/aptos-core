@@ -64,6 +64,21 @@ module aptos_experimental::sigma_protocol_proof {
     }
 
     #[test_only]
+    public fun get_commitment_mut(self: &mut Proof): &mut vector<RistrettoPoint> {
+        &mut self.comm_A
+    }
+
+    #[test_only]
+    public fun get_compressed_commitment_mut(self: &mut Proof): &mut vector<CompressedRistretto> {
+        &mut self.compressed_comm_A
+    }
+
+    #[test_only]
+    public fun get_response_mut(self: &mut Proof): &mut vector<Scalar> {
+        &mut self.resp_sigma
+    }
+
+    #[test_only]
     /// Returns an empty proof. Used for testing.
     public fun empty(): Proof {
         Proof {

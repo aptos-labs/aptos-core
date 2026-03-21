@@ -51,4 +51,19 @@ module aptos_experimental::sigma_protocol_statement {
     public fun get_compressed_points<P>(self: &Statement<P>): &vector<CompressedRistretto> {
         &self.compressed_points
     }
+
+    #[test_only]
+    public fun get_points_mut<P>(self: &mut Statement<P>): &mut vector<RistrettoPoint> {
+        &mut self.points
+    }
+
+    #[test_only]
+    public fun get_compressed_points_mut<P>(self: &mut Statement<P>): &mut vector<CompressedRistretto> {
+        &mut self.compressed_points
+    }
+
+    #[test_only]
+    public fun get_scalars_mut<P>(self: &mut Statement<P>): &mut vector<Scalar> {
+        &mut self.scalars
+    }
 }

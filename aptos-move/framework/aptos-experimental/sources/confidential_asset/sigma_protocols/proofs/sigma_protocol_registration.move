@@ -45,11 +45,15 @@ module aptos_experimental::sigma_protocol_registration {
     #[test_only]
     use aptos_experimental::ristretto255_twisted_elgamal::pubkey_from_secret_key;
     #[test_only]
-    use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
+    use aptos_experimental::sigma_protocol_homomorphism::{evaluate_psi, evaluate_f};
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
     #[test_only]
     use aptos_experimental::sigma_protocol_utils::equal_vec_points;
+    #[test_only]
+    use std::vector;
+    #[test_only]
+    use aptos_experimental::sigma_protocol_mutation_tests;
 
     //
     // Constants
@@ -180,17 +184,20 @@ module aptos_experimental::sigma_protocol_registration {
         ])
     }
 
-    /// Asserts that a registration proof verifies.
-    public(friend) fun assert_verifies(self: &RegistrationSession, stmt: &Statement<Registration>, proof: &Proof) {
-        let success = sigma_protocol::verify(
+    /// Returns true if the proof verifies, false otherwise.
+    fun verify(self: &RegistrationSession, stmt: &Statement<Registration>, proof: &Proof): bool {
+        sigma_protocol::verify(
             new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w),
             |_X| f(_X),
             stmt,
             proof
-        );
+        )
+    }
 
-        assert!(success, error::invalid_argument(E_INVALID_REGISTRATION_PROOF));
+    /// Asserts that a registration proof verifies.
+    public(friend) fun assert_verifies(self: &RegistrationSession, stmt: &Statement<Registration>, proof: &Proof) {
+        assert!(self.verify(stmt, proof), error::invalid_argument(E_INVALID_REGISTRATION_PROOF));
     }
 
     //
@@ -246,6 +253,7 @@ module aptos_experimental::sigma_protocol_registration {
         // Compute actual psi output via our implementation
         let actual_psi = evaluate_psi(|_X, w| psi(_X, w), &_X, &w);
 
+        assert!(actual_psi.length() == M, 2);
         assert!(equal_vec_points(&actual_psi, &expected_psi), 1);
     }
 
@@ -285,5 +293,164 @@ module aptos_experimental::sigma_protocol_registration {
         let proof = sigma_protocol_proof::empty();
 
         registration_session_for_testing().assert_verifies(&stmt, &proof);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Transformation function f correctness
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    /// Verifies that the transformation function f is implemented correctly.
+    fun f_correctness() {
+        let dk = random_scalar();
+        let (_X, _w) = compute_statement_and_witness(&dk);
+
+        let _H = get_encryption_key_basepoint_compressed().point_decompress();
+        let expected_f = vector[_H];
+        let actual_f = evaluate_f(|_X| f(_X), &_X);
+
+        assert!(actual_f.length() == M, 2);
+        assert!(equal_vec_points(&actual_f, &expected_f), 1);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Witness-dimension tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    /// Verify witness length matches the paper's k=1 for R_dl.
+    fun witness_dimension_matches_paper() {
+        let dk = random_scalar();
+        let (_, witn) = compute_statement_and_witness(&dk);
+
+        assert!(witn.length() == K, 1);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Tamper-one-field soundness tests (witness)
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_registration)]
+    /// Tamper dk: proof generated with dk+1 must not verify against the dk statement.
+    fun tamper_witness_dk() {
+        let dk = random_scalar();
+        let (stmt, witn) = compute_statement_and_witness(&dk);
+        let ss = registration_session_for_testing();
+
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, IDX_DK);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Homomorphism linearity test
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    /// Dynamic check that ψ is a homomorphism: ψ(w₁ + w₂) == ψ(w₁) + ψ(w₂).
+    fun psi_is_homomorphism() {
+        let dk = random_scalar();
+        let (stmt, _) = compute_statement_and_witness(&dk);
+
+        let s1 = vector[random_scalar()];
+        let s2 = vector[random_scalar()];
+        let s_sum = vector[s1[0].scalar_add(&s2[0])];
+
+        let w1 = new_secret_witness(s1);
+        let w2 = new_secret_witness(s2);
+        let w_sum = new_secret_witness(s_sum);
+
+        let psi_w1 = evaluate_psi(|_X, w| psi(_X, w), &stmt, &w1);
+        let psi_w2 = evaluate_psi(|_X, w| psi(_X, w), &stmt, &w2);
+        let psi_sum = evaluate_psi(|_X, w| psi(_X, w), &stmt, &w_sum);
+
+        vector::range(0, psi_sum.length()).for_each(|i| {
+            assert!(psi_w1[i].point_add(&psi_w2[i]).point_equals(&psi_sum[i]), 1);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Cross-statement replay tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_registration)]
+    /// Cross-statement replay: a proof for statement A must not verify against statement B.
+    fun cross_statement_replay() {
+        let dk_a = random_scalar();
+        let (stmt_a, witn_a) = compute_statement_and_witness(&dk_a);
+
+        let dk_b = random_scalar();
+        let (stmt_b, _) = compute_statement_and_witness(&dk_b);
+
+        let ss = registration_session_for_testing();
+        let proof_a = ss.prove(&stmt_a, &witn_a);
+
+        ss.assert_verifies(&stmt_b, &proof_a);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    /// Corrupting ANY single statement point must cause verification to fail.
+    fun mutate_all_statement_points() {
+        let dk = random_scalar();
+        let (stmt, witn) = compute_statement_and_witness(&dk);
+        let ss = registration_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        assert!(ss.verify(&stmt, &proof), 9999);
+
+        vector::range(0, N_1).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_statement_point(&mut stmt, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_statement_point(&mut stmt, i, saved);
+        });
+    }
+
+    #[test]
+    /// Corrupting ANY single commitment A_i must cause verification to fail.
+    fun mutate_every_commitment() {
+        let dk = random_scalar();
+        let (stmt, witn) = compute_statement_and_witness(&dk);
+        let ss = registration_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        vector::range(0, M).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_commitment(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_commitment(&mut proof, i, saved);
+        });
+    }
+
+    #[test]
+    /// Corrupting ANY single response sigma_j must cause verification to fail.
+    fun mutate_every_response() {
+        let dk = random_scalar();
+        let (stmt, witn) = compute_statement_and_witness(&dk);
+        let ss = registration_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        vector::range(0, K).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_response(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_response(&mut proof, i, saved);
+        });
+    }
+
+    #[test]
+    /// Swapping the only adjacent pair (H, ek) must cause verification to fail.
+    fun mutate_swap_adjacent() {
+        let dk = random_scalar();
+        let (stmt, witn) = compute_statement_and_witness(&dk);
+        let ss = registration_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, 0, 1);
+        assert!(!ss.verify(&stmt, &proof), 0);
     }
 }

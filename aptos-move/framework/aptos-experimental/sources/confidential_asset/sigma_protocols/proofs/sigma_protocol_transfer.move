@@ -125,17 +125,19 @@ module aptos_experimental::sigma_protocol_transfer {
         get_encryption_key_basepoint_compressed, generate_twisted_elgamal_keypair
     };
     #[test_only]
-    use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
+    use aptos_experimental::sigma_protocol_homomorphism::{evaluate_psi, evaluate_f};
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
     #[test_only]
     use aptos_experimental::sigma_protocol_utils::{equal_vec_points, points_clone};
     #[test_only]
-    use aptos_std::ristretto255::{Scalar, double_scalar_mul, multi_scalar_mul, scalar_zero};
+    use aptos_std::ristretto255::{Scalar, double_scalar_mul, multi_scalar_mul, scalar_zero, random_scalar};
     #[test_only]
     use aptos_experimental::confidential_balance::{ConfidentialBalanceRandomness,
         generate_available_randomness, generate_pending_randomness,
         new_available_from_amount, split_available_into_chunks, split_pending_into_chunks};
+    #[test_only]
+    use aptos_experimental::sigma_protocol_mutation_tests;
 
     //
     // Constants
@@ -568,23 +570,26 @@ module aptos_experimental::sigma_protocol_transfer {
         new_representation_vec(reprs)
     }
 
-    /// Asserts that a transfer proof verifies.
-    public(friend) fun assert_verifies(
+    /// Returns true if the proof verifies, false otherwise.
+    fun verify(
         self: &TransferSession, stmt: &Statement<Transfer>, proof: &Proof,
-    ) {
+    ): bool {
         let has_eff = self.has_effective_auditor;
         let num_volun = self.num_volun_auditors;
         assert_transfer_statement_is_well_formed(stmt, has_eff, num_volun);
 
-        let success = sigma_protocol::verify(
+        sigma_protocol::verify(
             new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w, has_eff, num_volun),
             |_X| f(_X, has_eff, num_volun),
             stmt,
             proof
-        );
+        )
+    }
 
-        assert!(success, error::invalid_argument(E_INVALID_TRANSFER_PROOF));
+    /// Asserts that a transfer proof verifies.
+    public(friend) fun assert_verifies(self: &TransferSession, stmt: &Statement<Transfer>, proof: &Proof) {
+        assert!(self.verify(stmt, proof), error::invalid_argument(E_INVALID_TRANSFER_PROOF));
     }
 
     //
@@ -835,6 +840,7 @@ module aptos_experimental::sigma_protocol_transfer {
             |_X, w| psi(_X, w, has_eff, num_volun), &stmt, &witn
         );
 
+        assert!(implemented_psi.length() == expected_output_len(ell, n, has_eff, num_volun), 2);
         assert!(equal_vec_points(&implemented_psi, &manual_psi), 1);
     }
 
@@ -870,5 +876,369 @@ module aptos_experimental::sigma_protocol_transfer {
     fun proof_soundness_empty_proof() {
         let (stmt, _) = random_valid_statement_witness_pair(false, 0);
         transfer_session_for_testing(false, 0).assert_verifies(&stmt, &sigma_protocol_proof::empty());
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Transformation function f correctness
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test_only]
+    fun f_correctness(has_eff: bool, num_volun: u64) {
+        let (ell, n) = (get_ell(), get_n());
+        let b_powers_ell = get_b_powers(ell);
+
+        let (dk_sender, compressed_ek_sender, compressed_ek_recip,
+             compressed_ek_eff_aud, compressed_ek_volun_auds, old_balance) =
+            generate_keys_and_ciphertexts(has_eff, num_volun);
+
+        let new_balance_randomness = generate_available_randomness();
+        let amount_randomness = generate_pending_randomness();
+
+        let old_P = points_clone(old_balance.get_P());
+        let new_balance = new_available_from_amount(
+            900, &new_balance_randomness, &compressed_ek_sender, &compressed_ek_eff_aud
+        );
+        let new_P = points_clone(new_balance.get_P());
+        let new_R = points_clone(new_balance.get_R());
+        let new_R_eff_aud = if (has_eff) { points_clone(new_balance.get_R_aud()) } else { vector[] };
+
+        let compressed_old_balance = old_balance.compress();
+        let (stmt, _witn, _, _) = build_transfer_statement_and_witness(
+            &dk_sender, &compressed_ek_sender, &compressed_ek_recip, &compressed_old_balance,
+            &compressed_ek_eff_aud, &compressed_ek_volun_auds,
+            100, 900, &new_balance_randomness, &amount_randomness,
+        );
+
+        let _G = ristretto255::basepoint();
+        let _H = get_encryption_key_basepoint_compressed().point_decompress();
+        let ek_sender = compressed_ek_sender.point_decompress();
+        let ek_recip = compressed_ek_recip.point_decompress();
+        let ek_eff_aud = compressed_ek_eff_aud.map(|ek| ek.point_decompress());
+        let ek_volun_auds = compressed_ek_volun_auds.map(|ek| ek.point_decompress());
+        let v = split_pending_into_chunks(100);
+        let r = *amount_randomness.scalars();
+
+        let expected_f = vector[];
+
+        // 1. H
+        expected_f.push_back(get_encryption_key_basepoint_compressed().point_decompress());
+
+        // 2. new_P[i]
+        expected_f.append(new_P);
+
+        // 3. new_R[i]
+        expected_f.append(new_R);
+
+        // 3b. (effective auditor only) new_R_eff_aud[i]
+        if (has_eff) {
+            expected_f.append(new_R_eff_aud);
+        };
+
+        // 4. ⟨B, old_P⟩
+        let inner_b_old_P = multi_scalar_mul(&old_P, &b_powers_ell);
+        expected_f.push_back(inner_b_old_P);
+
+        // 5. amount_P[j] = v[j]·G + r[j]·H
+        vector::range(0, n).for_each(|j| {
+            expected_f.push_back(double_scalar_mul(&v[j], &_G, &r[j], &_H));
+        });
+
+        // 6. amount_R_sender[j] = r[j]·ek_sender
+        vector::range(0, n).for_each(|j| {
+            expected_f.push_back(ek_sender.point_mul(&r[j]));
+        });
+
+        // 7. amount_R_recip[j] = r[j]·ek_recip
+        vector::range(0, n).for_each(|j| {
+            expected_f.push_back(ek_recip.point_mul(&r[j]));
+        });
+
+        // 7b. (effective auditor only) amount_R_eff_aud[j]
+        if (ek_eff_aud.is_some()) {
+            let ek_eff_aud_pt = ek_eff_aud.borrow();
+            vector::range(0, n).for_each(|j| {
+                expected_f.push_back(ek_eff_aud_pt.point_mul(&r[j]));
+            });
+        };
+
+        // 7c. (voluntary auditors) amount_R_volun_aud_t[j]
+        vector::range(0, num_volun).for_each(|t| {
+            vector::range(0, n).for_each(|j| {
+                expected_f.push_back(ek_volun_auds[t].point_mul(&r[j]));
+            });
+        });
+
+        let actual_f = evaluate_f(|_X| f(_X, has_eff, num_volun), &stmt);
+
+        assert!(actual_f.length() == expected_output_len(ell, n, has_eff, num_volun), 2);
+        assert!(equal_vec_points(&actual_f, &expected_f), 1);
+    }
+
+    #[test]
+    fun f_correctness_0_volun() { f_correctness(false, 0); }
+    #[test]
+    fun f_correctness_1_volun() { f_correctness(false, 1); }
+    #[test]
+    fun f_correctness_2_volun() { f_correctness(false, 2); }
+    #[test]
+    fun f_correctness_effective_0_volun() { f_correctness(true, 0); }
+    #[test]
+    fun f_correctness_effective_1_volun() { f_correctness(true, 1); }
+    #[test]
+    fun f_correctness_effective_2_volun() { f_correctness(true, 2); }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Witness-dimension tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun witness_dimension_matches_paper() {
+        let (stmt, witn) = random_valid_statement_witness_pair(false, 0);
+        let (ell, n) = (get_ell(), get_n());
+
+        let expected_k = 1 + 2 * ell + 2 * n;
+        assert!(witn.length() == expected_k, 1);
+        assert!(stmt.get_points().length() == 4 + 4 * ell + 3 * n, 2);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Tamper-one-field soundness tests (witness)
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_transfer)]
+    fun tamper_witness_dk() {
+        let (stmt, witn) = random_valid_statement_witness_pair(false, 0);
+        let ss = transfer_session_for_testing(false, 0);
+
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, IDX_DK);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_transfer)]
+    fun tamper_witness_v0() {
+        let (stmt, witn) = random_valid_statement_witness_pair(false, 0);
+        let ss = transfer_session_for_testing(false, 0);
+
+        let ell = get_ell();
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, 1 + 2 * ell);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_transfer)]
+    fun tamper_witness_r0() {
+        let (stmt, witn) = random_valid_statement_witness_pair(false, 0);
+        let ss = transfer_session_for_testing(false, 0);
+
+        let ell = get_ell();
+        let n = get_n();
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, 1 + 2 * ell + n);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Homomorphism linearity tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test_only]
+    fun psi_is_homomorphism(has_eff: bool, num_volun: u64) {
+        let (stmt, _) = random_valid_statement_witness_pair(has_eff, num_volun);
+        let k = 1 + 2 * get_ell() + 2 * get_n();
+
+        let s1: vector<Scalar> = vector::range(0, k).map(|_| random_scalar());
+        let s2: vector<Scalar> = vector::range(0, k).map(|_| random_scalar());
+        let s_sum: vector<Scalar> = vector::range(0, k).map(|i| s1[i].scalar_add(&s2[i]));
+
+        let w1 = new_secret_witness(s1);
+        let w2 = new_secret_witness(s2);
+        let w_sum = new_secret_witness(s_sum);
+
+        let psi_w1 = evaluate_psi(|_X, w| psi(_X, w, has_eff, num_volun), &stmt, &w1);
+        let psi_w2 = evaluate_psi(|_X, w| psi(_X, w, has_eff, num_volun), &stmt, &w2);
+        let psi_sum = evaluate_psi(|_X, w| psi(_X, w, has_eff, num_volun), &stmt, &w_sum);
+
+        vector::range(0, psi_sum.length()).for_each(|i| {
+            assert!(psi_w1[i].point_add(&psi_w2[i]).point_equals(&psi_sum[i]), 1);
+        });
+    }
+
+    #[test]
+    fun psi_is_homomorphism_no_auditors() { psi_is_homomorphism(false, 0); }
+    #[test]
+    fun psi_is_homomorphism_eff_2_volun() { psi_is_homomorphism(true, 2); }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Cross-statement replay tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_transfer)]
+    fun cross_statement_replay() {
+        let (stmt_a, witn_a) = random_valid_statement_witness_pair(false, 0);
+        let (stmt_b, _) = random_valid_statement_witness_pair(false, 0);
+
+        let ss = transfer_session_for_testing(false, 0);
+        let proof_a = ss.prove(&stmt_a, &witn_a);
+
+        ss.assert_verifies(&stmt_b, &proof_a);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: helpers
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test_only]
+    /// Parameterized mutation test for statement points over index range [from, to).
+    fun mutate_statement_points_range(
+        has_eff: bool, num_volun: u64, from: u64, to: u64,
+    ) {
+        let ss = transfer_session_for_testing(has_eff, num_volun);
+        let (stmt, witn) = random_valid_statement_witness_pair(has_eff, num_volun);
+        let proof = ss.prove(&stmt, &witn);
+
+        assert!(ss.verify( &stmt, &proof), 9999);
+
+        vector::range(from, to).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_statement_point(&mut stmt, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_statement_point(&mut stmt, i, saved);
+        });
+    }
+
+    #[test_only]
+    /// Parameterized swap test for adjacent statement points over index range [from, to).
+    fun mutate_swap_points_range(
+        has_eff: bool, num_volun: u64, from: u64, to: u64,
+    ) {
+        let ss = transfer_session_for_testing(has_eff, num_volun);
+        let (stmt, witn) = random_valid_statement_witness_pair(has_eff, num_volun);
+        let proof = ss.prove(&stmt, &witn);
+
+        vector::range(from, to).for_each(|i| {
+            sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, i, i + 1);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, i, i + 1);
+        });
+    }
+
+    #[test_only]
+    /// Parameterized mutation test for proof commitments over range [from, to).
+    fun mutate_commitments_range(
+        has_eff: bool, num_volun: u64, from: u64, to: u64,
+    ) {
+        let ss = transfer_session_for_testing(has_eff, num_volun);
+        let (stmt, witn) = random_valid_statement_witness_pair(has_eff, num_volun);
+        let proof = ss.prove(&stmt, &witn);
+
+        vector::range(from, to).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_commitment(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_commitment(&mut proof, i, saved);
+        });
+    }
+
+    #[test_only]
+    /// Parameterized mutation test for proof responses.
+    fun mutate_every_response(has_eff: bool, num_volun: u64) {
+        let ss = transfer_session_for_testing(has_eff, num_volun);
+        let (stmt, witn) = random_valid_statement_witness_pair(has_eff, num_volun);
+        let proof = ss.prove(&stmt, &witn);
+
+        let k = proof.get_response_length();
+        vector::range(0, k).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_response(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_response(&mut proof, i, saved);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: statement points
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_statement_points_base() {
+        let base_end = 4 + 4 * get_ell() + 3 * get_n();
+        mutate_statement_points_range(false, 0, 0, base_end);
+    }
+
+    #[test]
+    fun mutate_statement_points_eff_auditor() {
+        let base_end = 4 + 4 * get_ell() + 3 * get_n();
+        let eff_end = base_end + 1 + get_ell() + get_n();
+        mutate_statement_points_range(true, 0, base_end, eff_end);
+    }
+
+    #[test]
+    fun mutate_statement_points_volun_0() {
+        let eff_end = 4 + 4 * get_ell() + 3 * get_n() + 1 + get_ell() + get_n();
+        let volun_end = eff_end + 1 + get_n();
+        mutate_statement_points_range(true, 1, eff_end, volun_end);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: proof commitments
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_commitments_no_auditor() {
+        let m = 2 + 2 * get_ell() + 3 * get_n();
+        mutate_commitments_range(false, 0, 0, m);
+    }
+
+    #[test]
+    fun mutate_commitments_eff_auditor() {
+        let m = 2 + 2 * get_ell() + 3 * get_n() + get_ell() + get_n();
+        mutate_commitments_range(true, 0, 0, m);
+    }
+
+    #[test]
+    fun mutate_commitments_volun_suffix() {
+        let base_eff_m = 2 + 2 * get_ell() + 3 * get_n() + get_ell() + get_n();
+        let full_m = base_eff_m + get_n();
+        mutate_commitments_range(true, 1, base_eff_m, full_m);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: proof responses
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_every_response_no_auditor() { mutate_every_response(false, 0); }
+    #[test]
+    fun mutate_every_response_eff_auditor() { mutate_every_response(true, 0); }
+    #[test]
+    fun mutate_every_response_eff_1_volun() { mutate_every_response(true, 1); }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: adjacent-point swaps
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_swap_points_base() {
+        let base_end = 4 + 4 * get_ell() + 3 * get_n();
+        mutate_swap_points_range(false, 0, 0, base_end - 1);
+    }
+
+    #[test]
+    fun mutate_swap_points_eff_auditor() {
+        let base_end = 4 + 4 * get_ell() + 3 * get_n();
+        let eff_end = base_end + 1 + get_ell() + get_n();
+        mutate_swap_points_range(true, 0, base_end - 1, eff_end - 1);
+    }
+
+    #[test]
+    fun mutate_swap_points_volun_0() {
+        let eff_end = 4 + 4 * get_ell() + 3 * get_n() + 1 + get_ell() + get_n();
+        let volun_end = eff_end + 1 + get_n();
+        mutate_swap_points_range(true, 1, eff_end - 1, volun_end - 1);
     }
 }

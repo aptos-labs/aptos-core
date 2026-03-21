@@ -88,13 +88,15 @@ module aptos_experimental::sigma_protocol_key_rotation {
     #[test_only]
     use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
     #[test_only]
-    use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
+    use aptos_experimental::sigma_protocol_homomorphism::{evaluate_psi, evaluate_f};
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
     #[test_only]
     use aptos_experimental::sigma_protocol_utils::equal_vec_points;
     #[test_only]
     use aptos_experimental::sigma_protocol_utils::compress_points;
+    #[test_only]
+    use aptos_experimental::sigma_protocol_mutation_tests;
 
     //
     // Constants
@@ -305,19 +307,22 @@ module aptos_experimental::sigma_protocol_key_rotation {
         new_representation_vec(reprs)
     }
 
-    /// Asserts that a key rotation proof verifies
-    public(friend) fun assert_verifies(self: &KeyRotationSession, stmt: &Statement<KeyRotation>, proof: &Proof) {
+    /// Returns true if the proof verifies, false otherwise.
+    fun verify(self: &KeyRotationSession, stmt: &Statement<KeyRotation>, proof: &Proof): bool {
         assert_key_rotation_statement_is_well_formed(stmt);
 
-        let success = sigma_protocol::verify(
+        sigma_protocol::verify(
             new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w),
             |_X| f(_X),
             stmt,
             proof
-        );
+        )
+    }
 
-        assert!(success, error::invalid_argument(E_INVALID_KEY_ROTATION_PROOF));
+    /// Asserts that a key rotation proof verifies
+    public(friend) fun assert_verifies(self: &KeyRotationSession, stmt: &Statement<KeyRotation>, proof: &Proof) {
+        assert!(self.verify(stmt, proof), error::invalid_argument(E_INVALID_KEY_ROTATION_PROOF));
     }
 
     //
@@ -429,6 +434,7 @@ module aptos_experimental::sigma_protocol_key_rotation {
         // Compute actual psi output via our implementation
         let actual_psi = evaluate_psi(|_X, w| psi(_X, w), &_X, &w);
 
+        assert!(actual_psi.length() == 3 + ell, 2);
         assert!(equal_vec_points(&actual_psi, &expected_psi), 1);
     }
 
@@ -462,5 +468,253 @@ module aptos_experimental::sigma_protocol_key_rotation {
         );
 
         key_rotation_session_for_testing().assert_verifies(&stmt, &sigma_protocol_proof::empty());
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Transformation function f correctness
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    /// Verifies that the transformation function f is implemented correctly.
+    fun f_correctness() {
+        let ell = get_num_available_chunks();
+        let (dk, compressed_ek) = generate_twisted_elgamal_keypair();
+        let new_dk = random_scalar();
+        let old_R = vector::range(0, ell).map(|_| random_point());
+        let compressed_old_R = compress_points(&old_R);
+
+        let (stmt, _witn, compressed_new_ek, compressed_new_R) =
+            compute_statement_and_witness_from_keys_and_old_ctxt(
+                &dk, &new_dk, compressed_ek, &compressed_old_R,
+            );
+
+        let _H = get_encryption_key_basepoint_compressed().point_decompress();
+        let ek = compressed_ek.point_decompress();
+        let new_ek = compressed_new_ek.point_decompress();
+        let new_R = compressed_new_R.map(|r| r.point_decompress());
+
+        let expected_f = vector[_H, new_ek, ek];
+        expected_f.append(new_R);
+
+        let actual_f = evaluate_f(|_X| f(_X), &stmt);
+        assert!(actual_f.length() == 3 + ell, 2);
+        assert!(equal_vec_points(&actual_f, &expected_f), 1);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Witness-dimension tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    /// Verify witness length matches the paper's k=3 for R_keyrot.
+    fun witness_dimension_matches_paper() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ell = get_num_available_chunks();
+
+        assert!(witn.length() == 3, 1);
+        assert!(stmt.get_points().length() == 3 + 2 * ell, 2);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Tamper-one-field soundness tests (witness)
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_key_rotation)]
+    /// Tamper dk: proof generated with dk+1 must not verify.
+    fun tamper_witness_dk() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, IDX_DK);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_key_rotation)]
+    /// Tamper delta: proof generated with delta+1 must not verify.
+    fun tamper_witness_delta() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, IDX_DELTA);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_key_rotation)]
+    /// Tamper delta_inv: proof generated with delta_inv+1 must not verify.
+    fun tamper_witness_delta_inv() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, IDX_DELTA_INV);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Homomorphism linearity test
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    /// Dynamic check that ψ is a homomorphism: ψ(w₁ + w₂) == ψ(w₁) + ψ(w₂).
+    fun psi_is_homomorphism() {
+        let (stmt, _) = random_valid_statement_witness_pair();
+        let k = 3u64;
+
+        let s1: vector<Scalar> = vector::range(0, k).map(|_| random_scalar());
+        let s2: vector<Scalar> = vector::range(0, k).map(|_| random_scalar());
+        let s_sum: vector<Scalar> = vector::range(0, k).map(|i| s1[i].scalar_add(&s2[i]));
+
+        let w1 = new_secret_witness(s1);
+        let w2 = new_secret_witness(s2);
+        let w_sum = new_secret_witness(s_sum);
+
+        let psi_w1 = evaluate_psi(|_X, w| psi(_X, w), &stmt, &w1);
+        let psi_w2 = evaluate_psi(|_X, w| psi(_X, w), &stmt, &w2);
+        let psi_sum = evaluate_psi(|_X, w| psi(_X, w), &stmt, &w_sum);
+
+        vector::range(0, psi_sum.length()).for_each(|i| {
+            assert!(psi_w1[i].point_add(&psi_w2[i]).point_equals(&psi_sum[i]), 1);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Cross-statement replay tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_key_rotation)]
+    /// Cross-statement replay: a proof for one key rotation must not verify against a different one.
+    fun cross_statement_replay() {
+        let (stmt_a, witn_a) = random_valid_statement_witness_pair();
+        let (stmt_b, _) = random_valid_statement_witness_pair();
+
+        let ss = key_rotation_session_for_testing();
+        let proof_a = ss.prove(&stmt_a, &witn_a);
+
+        ss.assert_verifies(&stmt_b, &proof_a);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    /// Tamper each statement point individually; every mutation must cause rejection.
+    fun mutate_all_statement_points() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        let n = stmt.get_compressed_points().length();
+        vector::range(0, n).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_statement_point(&mut stmt, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_statement_point(&mut stmt, i, saved);
+        });
+    }
+
+    #[test]
+    /// Tamper each proof commitment A[i] individually; every mutation must cause rejection.
+    fun mutate_every_commitment() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        let m = proof.get_commitment().length();
+        vector::range(0, m).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_commitment(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_commitment(&mut proof, i, saved);
+        });
+    }
+
+    #[test]
+    /// Tamper each proof response sigma[j] individually; every mutation must cause rejection.
+    fun mutate_every_response() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        let k = proof.get_response_length();
+        vector::range(0, k).for_each(|j| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_response(&mut proof, j);
+            assert!(!ss.verify(&stmt, &proof), j);
+            sigma_protocol_mutation_tests::restore_proof_response(&mut proof, j, saved);
+        });
+    }
+
+    #[test]
+    /// Swap every adjacent pair of statement points; every swap must cause rejection.
+    fun mutate_swap_every_adjacent_point_pair() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        let n = stmt.get_compressed_points().length();
+        vector::range(0, n - 1).for_each(|i| {
+            sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, i, i + 1);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, i, i + 1);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Dimension mutation tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_key_rotation)]
+    /// Extra commitment: psi output length mismatch.
+    fun mutate_dimension_extra_commitment() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        sigma_protocol_mutation_tests::append_to_proof_commitments(&mut proof);
+        ss.assert_verifies(&stmt, &proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_key_rotation)]
+    /// Fewer commitments: psi output length mismatch.
+    fun mutate_dimension_fewer_commitments() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        sigma_protocol_mutation_tests::pop_from_proof_commitments(&mut proof);
+        ss.assert_verifies(&stmt, &proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65539, location=aptos_experimental::sigma_protocol_key_rotation)]
+    /// Extra response: psi aborts on witness length.
+    fun mutate_dimension_extra_response() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        sigma_protocol_mutation_tests::append_to_proof_responses(&mut proof);
+        ss.assert_verifies(&stmt, &proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65539, location=aptos_experimental::sigma_protocol_key_rotation)]
+    /// Fewer responses: psi aborts on witness length.
+    fun mutate_dimension_fewer_responses() {
+        let (stmt, witn) = random_valid_statement_witness_pair();
+        let ss = key_rotation_session_for_testing();
+        let proof = ss.prove(&stmt, &witn);
+
+        sigma_protocol_mutation_tests::pop_from_proof_responses(&mut proof);
+        ss.assert_verifies(&stmt, &proof);
     }
 }

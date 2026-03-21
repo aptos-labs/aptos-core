@@ -103,7 +103,7 @@ module aptos_experimental::sigma_protocol_withdraw {
     #[test_only]
     use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
     #[test_only]
-    use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
+    use aptos_experimental::sigma_protocol_homomorphism::{evaluate_psi, evaluate_f};
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
     #[test_only]
@@ -111,7 +111,9 @@ module aptos_experimental::sigma_protocol_withdraw {
     #[test_only]
     use aptos_experimental::sigma_protocol_witness::new_secret_witness;
     #[test_only]
-    use aptos_std::ristretto255::{new_scalar_from_u64, double_scalar_mul, multi_scalar_mul, scalar_zero};
+    use aptos_experimental::sigma_protocol_mutation_tests;
+    #[test_only]
+    use aptos_std::ristretto255::{new_scalar_from_u64, double_scalar_mul, multi_scalar_mul, scalar_zero, random_scalar};
 
     //
     // Constants
@@ -402,19 +404,22 @@ module aptos_experimental::sigma_protocol_withdraw {
         new_representation_vec(reprs)
     }
 
-    /// Asserts that a withdrawal proof verifies.
-    public(friend) fun assert_verifies(self: &WithdrawSession, stmt: &Statement<Withdrawal>, proof: &Proof) {
+    /// Returns true if the proof verifies, false otherwise.
+    fun verify(self: &WithdrawSession, stmt: &Statement<Withdrawal>, proof: &Proof): bool {
         assert_withdraw_statement_is_well_formed(stmt, self.has_auditor);
 
-        let success = sigma_protocol::verify(
+        sigma_protocol::verify(
             new_domain_separator(@aptos_experimental, chain_id::get(), WITHDRAWAL_PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w, self.has_auditor),
             |_X| f(_X, self.has_auditor),
             stmt,
             proof
-        );
+        )
+    }
 
-        assert!(success, error::invalid_argument(E_INVALID_PROOF));
+    /// Asserts that a withdrawal proof verifies.
+    public(friend) fun assert_verifies(self: &WithdrawSession, stmt: &Statement<Withdrawal>, proof: &Proof) {
+        assert!(self.verify(stmt, proof), error::invalid_argument(E_INVALID_PROOF));
     }
 
     //
@@ -575,6 +580,7 @@ module aptos_experimental::sigma_protocol_withdraw {
         //
         let implemented_psi = evaluate_psi(|_X, w| psi(_X, w, with_auditor), &stmt, &witn);
 
+        assert!(implemented_psi.length() == expected_output_len(ell, with_auditor), 2);
         assert!(equal_vec_points(&implemented_psi, &manual_psi), 1);
     }
 
@@ -605,5 +611,411 @@ module aptos_experimental::sigma_protocol_withdraw {
 
         let (stmt, _) = random_valid_statement_witness_pair(100, false);
         new_session(&sender, asset_type, false).assert_verifies(&stmt, &sigma_protocol_proof::empty());
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Transformation function f correctness
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test_only]
+    fun f_correctness(with_auditor: bool) {
+        let ell = get_num_chunks();
+        let (compressed_ek, compressed_ek_aud, old_balance, new_balance,
+            v, _dk, _new_a, _new_r
+        ) = random_valid_statement_witness_pair_internal(100, with_auditor);
+        let b_powers = get_b_powers(ell);
+
+        let _G = ristretto255::basepoint();
+        let _H = get_encryption_key_basepoint_compressed().point_decompress();
+        let old_P = points_clone(old_balance.get_P());
+        let new_P = points_clone(new_balance.get_P());
+        let new_R = points_clone(new_balance.get_R());
+        let new_R_aud = if (with_auditor) { points_clone(new_balance.get_R_aud()) } else { vector[] };
+
+        let (stmt, _) = new_withdrawal_statement(
+            compressed_ek, &old_balance.compress(), &new_balance.compress(), &compressed_ek_aud, v,
+        );
+
+        let expected_f = vector[];
+
+        // 1. H
+        expected_f.push_back(_H);
+
+        // 2. new_P[i]
+        expected_f.append(new_P);
+
+        // 3. new_R[i]
+        expected_f.append(new_R);
+
+        // 3b. (auditor only) new_R_aud[i]
+        if (with_auditor) {
+            expected_f.append(new_R_aud);
+        };
+
+        // 4. ⟨B, old_P⟩ − v · G
+        let inner_b_old_P = multi_scalar_mul(&old_P, &b_powers);
+        let v_G = _G.point_mul(&v);
+        expected_f.push_back(inner_b_old_P.point_sub(&v_G));
+
+        let actual_f = evaluate_f(|_X| f(_X, with_auditor), &stmt);
+
+        assert!(actual_f.length() == expected_output_len(ell, with_auditor), 2);
+        assert!(equal_vec_points(&actual_f, &expected_f), 1);
+    }
+
+    #[test]
+    fun f_correctness_no_auditor() { f_correctness(false); }
+
+    #[test]
+    fun f_correctness_with_auditor() { f_correctness(true); }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Witness-dimension tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun witness_dimension_matches_paper() {
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+        let ell = get_num_chunks();
+
+        let expected_k = 1 + 2 * ell;
+        assert!(witn.length() == expected_k, 1);
+        assert!(stmt.get_points().length() == 3 + 4 * ell, 2);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Tamper-one-field soundness tests (witness)
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_withdraw)]
+    fun tamper_witness_dk() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, IDX_DK);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_withdraw)]
+    fun tamper_witness_new_a0() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, 1);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_withdraw)]
+    fun tamper_witness_new_r0() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+
+        let ell = get_num_chunks();
+        sigma_protocol_mutation_tests::tamper_witness(&mut witn, 1 + ell);
+        let bad_proof = ss.prove(&stmt, &witn);
+
+        ss.assert_verifies(&stmt, &bad_proof);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Homomorphism linearity tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun psi_is_homomorphism() {
+        let (stmt, _) = random_valid_statement_witness_pair(100, false);
+        let k = 1 + 2 * get_num_chunks();
+
+        let s1: vector<Scalar> = vector::range(0, k).map(|_| random_scalar());
+        let s2: vector<Scalar> = vector::range(0, k).map(|_| random_scalar());
+        let s_sum: vector<Scalar> = vector::range(0, k).map(|i| s1[i].scalar_add(&s2[i]));
+
+        let w1 = new_secret_witness(s1);
+        let w2 = new_secret_witness(s2);
+        let w_sum = new_secret_witness(s_sum);
+
+        let psi_w1 = evaluate_psi(|_X, w| psi(_X, w, false), &stmt, &w1);
+        let psi_w2 = evaluate_psi(|_X, w| psi(_X, w, false), &stmt, &w2);
+        let psi_sum = evaluate_psi(|_X, w| psi(_X, w, false), &stmt, &w_sum);
+
+        vector::range(0, psi_sum.length()).for_each(|i| {
+            assert!(psi_w1[i].point_add(&psi_w2[i]).point_equals(&psi_sum[i]), 1);
+        });
+    }
+
+    #[test]
+    fun psi_is_homomorphism_with_auditor() {
+        let (stmt, _) = random_valid_statement_witness_pair(100, true);
+        let k = 1 + 2 * get_num_chunks();
+
+        let s1: vector<Scalar> = vector::range(0, k).map(|_| random_scalar());
+        let s2: vector<Scalar> = vector::range(0, k).map(|_| random_scalar());
+        let s_sum: vector<Scalar> = vector::range(0, k).map(|i| s1[i].scalar_add(&s2[i]));
+
+        let w1 = new_secret_witness(s1);
+        let w2 = new_secret_witness(s2);
+        let w_sum = new_secret_witness(s_sum);
+
+        let psi_w1 = evaluate_psi(|_X, w| psi(_X, w, true), &stmt, &w1);
+        let psi_w2 = evaluate_psi(|_X, w| psi(_X, w, true), &stmt, &w2);
+        let psi_sum = evaluate_psi(|_X, w| psi(_X, w, true), &stmt, &w_sum);
+
+        vector::range(0, psi_sum.length()).for_each(|i| {
+            assert!(psi_w1[i].point_add(&psi_w2[i]).point_equals(&psi_sum[i]), 1);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Cross-statement replay tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_withdraw)]
+    fun cross_statement_replay() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+
+        let (stmt_a, witn_a) = random_valid_statement_witness_pair(100, false);
+        let (stmt_b, _) = random_valid_statement_witness_pair(50, false);
+
+        let proof_a = ss.prove(&stmt_a, &witn_a);
+
+        ss.assert_verifies(&stmt_b, &proof_a);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_all_statement_points_no_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+        let proof = ss.prove(&stmt, &witn);
+
+        assert!(ss.verify( &stmt, &proof), E_TEST_INTERNAL);
+
+        let n = stmt.get_compressed_points().length();
+        vector::range(0, n).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_statement_point(&mut stmt, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_statement_point(&mut stmt, i, saved);
+        });
+    }
+
+    #[test]
+    fun mutate_all_statement_points_with_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, true);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, true);
+        let proof = ss.prove(&stmt, &witn);
+
+        assert!(ss.verify( &stmt, &proof), E_TEST_INTERNAL);
+
+        let n = stmt.get_compressed_points().length();
+        vector::range(0, n).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_statement_point(&mut stmt, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_statement_point(&mut stmt, i, saved);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: statement scalars
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_every_statement_scalar_no_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+        let proof = ss.prove(&stmt, &witn);
+
+        let n = stmt.get_scalars().length();
+        vector::range(0, n).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_statement_scalar(&mut stmt, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_statement_scalar(&mut stmt, i, saved);
+        });
+    }
+
+    #[test]
+    fun mutate_every_statement_scalar_with_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, true);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, true);
+        let proof = ss.prove(&stmt, &witn);
+
+        let n = stmt.get_scalars().length();
+        vector::range(0, n).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_statement_scalar(&mut stmt, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_statement_scalar(&mut stmt, i, saved);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: proof commitments
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_every_commitment_no_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+        let proof = ss.prove(&stmt, &witn);
+
+        let m = proof.get_commitment().length();
+        vector::range(0, m).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_commitment(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_commitment(&mut proof, i, saved);
+        });
+    }
+
+    #[test]
+    fun mutate_every_commitment_with_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, true);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, true);
+        let proof = ss.prove(&stmt, &witn);
+
+        let m = proof.get_commitment().length();
+        vector::range(0, m).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_commitment(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_commitment(&mut proof, i, saved);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: proof responses
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_every_response_no_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+        let proof = ss.prove(&stmt, &witn);
+
+        let k = proof.get_response_length();
+        vector::range(0, k).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_response(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_response(&mut proof, i, saved);
+        });
+    }
+
+    #[test]
+    fun mutate_every_response_with_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, true);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, true);
+        let proof = ss.prove(&stmt, &witn);
+
+        let k = proof.get_response_length();
+        vector::range(0, k).for_each(|i| {
+            let saved = sigma_protocol_mutation_tests::tamper_proof_response(&mut proof, i);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::restore_proof_response(&mut proof, i, saved);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Exhaustive mutation tests: adjacent-point swaps
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fun mutate_swap_every_adjacent_point_pair_no_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, false);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, false);
+        let proof = ss.prove(&stmt, &witn);
+
+        let n = stmt.get_compressed_points().length();
+        vector::range(0, n - 1).for_each(|i| {
+            sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, i, i + 1);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, i, i + 1);
+        });
+    }
+
+    #[test]
+    fun mutate_swap_every_adjacent_point_pair_with_auditor() {
+        let (sender, asset_type) = setup_test_environment();
+        let ss = new_session(&sender, asset_type, true);
+        let (stmt, witn) = random_valid_statement_witness_pair(100, true);
+        let proof = ss.prove(&stmt, &witn);
+
+        let n = stmt.get_compressed_points().length();
+        vector::range(0, n - 1).for_each(|i| {
+            sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, i, i + 1);
+            assert!(!ss.verify(&stmt, &proof), i);
+            sigma_protocol_mutation_tests::swap_statement_points(&mut stmt, i, i + 1);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Mixed-auditor configuration tests
+    // ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_withdraw)]
+    /// A proof generated WITH an auditor fails when verified WITHOUT an auditor.
+    fun mixed_auditor_soundness_with_to_no() {
+        let (sender, asset_type) = setup_test_environment();
+
+        let (stmt_with, witn_with) = random_valid_statement_witness_pair(100, true);
+        let ss_with = new_session(&sender, asset_type, true);
+        let proof_with = ss_with.prove(&stmt_with, &witn_with);
+
+        let (stmt_no, _) = random_valid_statement_witness_pair(100, false);
+        let ss_no = new_session(&sender, asset_type, false);
+
+        ss_no.assert_verifies(&stmt_no, &proof_with);
+    }
+
+    #[test]
+    #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_withdraw)]
+    /// A proof generated WITHOUT an auditor fails when verified WITH an auditor.
+    fun mixed_auditor_soundness_no_to_with() {
+        let (sender, asset_type) = setup_test_environment();
+
+        let (stmt_no, witn_no) = random_valid_statement_witness_pair(100, false);
+        let ss_no = new_session(&sender, asset_type, false);
+        let proof_no = ss_no.prove(&stmt_no, &witn_no);
+
+        let (stmt_with, _) = random_valid_statement_witness_pair(100, true);
+        let ss_with = new_session(&sender, asset_type, true);
+
+        ss_with.assert_verifies(&stmt_with, &proof_no);
+    }
+
+    #[test]
+    /// Swapping the auditor key must cause verification to fail.
+    fun mixed_auditor_soundness_swap_auditor_key() {
+        let (sender, asset_type) = setup_test_environment();
+
+        let (stmt, witn) = random_valid_statement_witness_pair(100, true);
+        let ss = new_session(&sender, asset_type, true);
+        let proof = ss.prove(&stmt, &witn);
+
+        let ell = get_num_chunks();
+        let idx_ek_aud = START_IDX_OLD_P + 4 * ell;
+        sigma_protocol_mutation_tests::tamper_statement_point(&mut stmt, idx_ek_aud);
+
+        assert!(!ss.verify(&stmt, &proof), 1);
     }
 }
