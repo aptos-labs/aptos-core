@@ -14,6 +14,8 @@ module aptos_experimental::confidential_crypto_test_utils {
     };
     use aptos_experimental::confidential_amount::{Self, Amount};
     use aptos_experimental::sigma_protocol_utils::points_clone;
+    use aptos_experimental::sigma_protocol_witness::{Witness, new_secret_witness};
+
 
     // ========================================= //
     //     Twisted ElGamal key generation         //
@@ -242,4 +244,20 @@ module aptos_experimental::confidential_crypto_test_utils {
     public fun mul_scalars(a: &vector<Scalar>, e: &Scalar): vector<Scalar> {
         a.map_ref(|s| s.scalar_mul(e))
     }
+
+    // ========================================= //
+    //     Sigma protocol test helpers            //
+    //     (from sigma_protocol_* modules)        //
+    // ========================================= //
+
+    /// Returns a size-$k$ random witness. Useful when creating a ZKP during testing.
+    public fun random_witness(k: u64): Witness {
+        new_secret_witness(vector::range(0, k).map(|_| random_scalar()))
+    }
+
+    /// Creates a new registration witness: $(\mathsf{dk})$.
+    public fun new_registration_witness(dk: Scalar): Witness {
+        new_secret_witness(vector[dk])
+    }
+
 }

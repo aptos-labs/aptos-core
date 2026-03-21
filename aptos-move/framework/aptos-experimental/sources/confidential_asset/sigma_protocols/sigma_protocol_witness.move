@@ -12,12 +12,10 @@ module aptos_experimental::sigma_protocol_witness {
     friend aptos_experimental::sigma_protocol_schnorr_example;
     #[test_only]
     friend aptos_experimental::sigma_protocol_proof_tests;
+    #[test_only]
+    friend aptos_experimental::confidential_crypto_test_utils;
 
     use aptos_std::ristretto255::Scalar;
-    #[test_only]
-    use std::vector::range;
-    #[test_only]
-    use aptos_std::ristretto255::random_scalar;
 
     /// A *secret witness* consists of a vector $w$ of $k$ scalars
     struct Witness has drop {
@@ -40,11 +38,5 @@ module aptos_experimental::sigma_protocol_witness {
     /// Returns the underling vector of witness scalars.
     public(friend) fun get_scalars(self: &Witness): &vector<Scalar> {
         &self.w
-    }
-
-    #[test_only]
-    /// Returns a size-$k$ random witness. Useful when creating a ZKP during testing.
-    public(friend) fun random(k: u64): Witness {
-        new_secret_witness(range(0, k).map(|_| random_scalar()))
     }
 }
