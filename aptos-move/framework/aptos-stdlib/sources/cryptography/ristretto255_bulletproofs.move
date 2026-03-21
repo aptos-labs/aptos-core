@@ -45,6 +45,9 @@ module aptos_std::ristretto255_bulletproofs {
     /// The native functions have not been rolled out yet.
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 7;
 
+    /// Batched bulletproof calls are restricted to framework (`0x1`) modules only.
+    const E_BATCHED_BULLETPROOF_CALLS_RESTRICTED_TO_FRAMEWORK: u64 = 8;
+
     //
     // Structs
     //

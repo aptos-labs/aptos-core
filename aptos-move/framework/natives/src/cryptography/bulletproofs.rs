@@ -5,6 +5,8 @@
 use crate::cryptography::ristretto255::{pop_scalar_from_bytes, pop_scalars_from_bytes};
 use crate::cryptography::ristretto255_point::{get_point_handle, NativeRistrettoPointContext};
 use aptos_crypto::bulletproofs::MAX_RANGE_BITS;
+use aptos_types::on_chain_config::FeatureFlag;
+use move_core_types::account_address::AccountAddress;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
@@ -68,6 +70,9 @@ pub mod abort_codes {
     pub const NFE_PROVER_BATCH_FAILED: u64 = 0x0A_000A;
     /// Unsupported (batch_size, bit_length) combination when charging verify gas.
     pub const NFE_VERIFY_BATCH_BITS_UNSUPPORTED: u64 = 0x0A_000B;
+    /// Batched bulletproof calls are restricted to framework (`0x1`) modules only.
+    /// NOTE: This must match the code in the Move implementation (error::permission_denied(E_BATCHED_BULLETPROOF_CALLS_RESTRICTED_TO_FRAMEWORK))
+    pub const NFE_BATCHED_BULLETPROOF_CALLS_RESTRICTED_TO_FRAMEWORK: u64 = 0x05_0008;
 }
 
 /// The Bulletproofs library only seems to support proving [0, 2^{num_bits}) ranges where num_bits is
@@ -152,6 +157,27 @@ fn native_verify_batch_range_proof(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
+
+    // When the feature flag is enabled, restrict batch verification to framework (0x1) callers only.
+    if context
+        .get_feature_flags()
+        .is_enabled(FeatureFlag::BATCHED_BULLETPROOFS_CALLABLE_BY_FRAMEWORK_ONLY)
+    {
+        // frame 0 = Move wrapper (0x1::ristretto255_bulletproofs::verify_batch_range_proof)
+        // frame 1 = the module that called the wrapper
+        let stack = context.stack_frames(2);
+        let caller_is_framework = stack
+            .stack_trace()
+            .get(1)
+            .and_then(|(module_id, _, _)| module_id.as_ref())
+            .map(|id| *id.address() == AccountAddress::ONE)
+            .unwrap_or(false);
+        if !caller_is_framework {
+            return Err(SafeNativeError::abort(
+                abort_codes::NFE_BATCHED_BULLETPROOF_CALLS_RESTRICTED_TO_FRAMEWORK,
+            ));
+        }
+    }
 
     let dst = safely_pop_arg!(args, Vec<u8>);
     let num_bits = safely_pop_arg!(args, u64) as usize;
