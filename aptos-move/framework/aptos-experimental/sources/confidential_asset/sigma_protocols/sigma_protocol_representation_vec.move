@@ -9,6 +9,8 @@ module aptos_experimental::sigma_protocol_representation_vec {
     friend aptos_experimental::sigma_protocol_pedeq_example;
     #[test_only]
     friend aptos_experimental::sigma_protocol_schnorr_example;
+    #[test_only]
+    friend aptos_experimental::confidential_crypto_test_utils;
 
     use aptos_std::ristretto255::Scalar;
     use aptos_experimental::sigma_protocol_representation::Representation;
@@ -54,11 +56,5 @@ module aptos_experimental::sigma_protocol_representation_vec {
         self.v.enumerate_mut(|i, repr| {
             repr.scale(&b[i])
         });
-    }
-
-    #[test_only]
-    /// Returns an empty representation vector. Used for testing.
-    public(friend) fun empty_representation_vec(): RepresentationVec {
-        new_representation_vec(vector[])
     }
 }

@@ -20,9 +20,9 @@ module aptos_experimental::sigma_protocol {
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
     #[test_only]
-    use aptos_experimental::sigma_protocol_witness::{Self, Witness};
+    use aptos_experimental::sigma_protocol_witness::Witness;
     #[test_only]
-    use aptos_experimental::confidential_crypto_test_utils::{equal_vec_points, add_vec_points, mul_points, mul_scalars, add_vec_scalars, compress_points};
+    use aptos_experimental::confidential_crypto_test_utils::{random_witness, equal_vec_points, add_vec_points, mul_points, mul_scalars, add_vec_scalars, compress_points};
 
     //
     // Error codes
@@ -45,7 +45,7 @@ module aptos_experimental::sigma_protocol {
         let k = witn.length();
 
         // Step 1: Pick a random \alpha \in \F^k
-        let alpha = sigma_protocol_witness::random(k);
+        let alpha = random_witness(k);
 
         // Step 2: A <- \psi(\alpha) \in \Gr^m
         let _A = evaluate_psi(|_X, w| psi(_X, w), stmt, &alpha);

@@ -40,12 +40,9 @@ module aptos_experimental::sigma_protocol_registration {
     #[test_only]
     use aptos_std::ristretto255::{Scalar, random_scalar};
     #[test_only]
-    use aptos_experimental::sigma_protocol_witness::new_secret_witness;
-
-    #[test_only]
     use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
     #[test_only]
-    use aptos_experimental::confidential_crypto_test_utils::{pubkey_from_secret_key, equal_vec_points};
+    use aptos_experimental::confidential_crypto_test_utils::{pubkey_from_secret_key, equal_vec_points, new_registration_witness};
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
 
@@ -141,12 +138,6 @@ module aptos_experimental::sigma_protocol_registration {
         let stmt = b.build();
         assert_registration_statement_is_well_formed(&stmt);
         stmt
-    }
-
-    #[test_only]
-    /// Creates a new registration witness: $(\mathsf{dk})$.
-    public(friend) fun new_registration_witness(dk: Scalar): Witness {
-        new_secret_witness(vector[dk])
     }
 
     /// The homomorphism $\psi_\mathsf{dl}(\mathsf{dk} \mid \mathsf{ek}) = \mathsf{dk} \cdot \mathsf{ek}$.
