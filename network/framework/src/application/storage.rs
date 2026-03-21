@@ -327,7 +327,7 @@ impl PeersAndMetadata {
     /// Returns a clone of the trusted peer set for the given network ID
     pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<PeerSet, Error> {
         let trusted_peers = self.get_trusted_peer_set_for_network(network_id)?;
-        // load() returns an Arc<Arc<PeerSet>>; use deref to reach PeerSet and clone once
+        // load() returns a guard that derefs to Arc<PeerSet>; deref twice to reach &PeerSet
         Ok((**trusted_peers.load()).clone())
     }
 

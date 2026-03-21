@@ -682,7 +682,7 @@ where
         // Spawn a task that pings each peer concurrently
         let ping_start_time = Instant::now();
         let mut ping_tasks = vec![];
-        for &(peer_id, peer) in peers_to_ping.iter() {
+        for (peer_id, peer) in &peers_to_ping {
             // Get the network address for the peer
             let network_context = self.network_context;
             let network_address = match self.dial_states.get(peer_id) {
@@ -1291,15 +1291,10 @@ impl Addresses {
         self.0.iter().flatten().nth(idx)
     }
 
-    /// Returns the deduplicated union of addresses across all discovery sources.
-    /// Order is not guaranteed to be stable.
+    /// The Union isn't stable, and order is completely disregarded
     fn union(&self) -> Vec<NetworkAddress> {
-        let mut all: Vec<NetworkAddress> = self.0.iter().flatten().cloned().collect();
-        // Deduplicate in place using a HashSet, avoiding a second allocation
-        // for collecting from the HashSet back into a Vec.
-        let mut seen = HashSet::with_capacity(all.len());
-        all.retain(|addr| seen.insert(addr.clone()));
-        all
+        let set: HashSet<_> = self.0.iter().flatten().cloned().collect();
+        set.into_iter().collect()
     }
 }
 

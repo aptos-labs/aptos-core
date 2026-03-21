@@ -168,8 +168,9 @@ where
         } = connection;
         let remote_peer_id = connection_metadata.remote_peer_id;
         let max_fragments = max_message_size / max_frame_size;
-        // Build InboundRpcs and OutboundRpcs before constructing Self so we can
-        // move time_service instead of cloning it an extra time.
+        // Build sub-components first, then move time_service into Self.
+        // This keeps clone count the same (2 clones for InboundRpcs/OutboundRpcs)
+        // but lets Self receive the original rather than a third clone.
         let inbound_rpcs = InboundRpcs::new(
             network_context,
             time_service.clone(),

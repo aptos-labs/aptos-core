@@ -868,7 +868,7 @@ where
             }
         }
         // Move the notification into the last handler to avoid a final clone.
-        // On error the notification is returned inside the Err, so we log it from there.
+        // The notification is consumed by push(), so we cannot log its contents on error.
         if let Some(last_handler) = self.connection_event_handlers.last_mut() {
             if let Err(e) = last_handler.push(peer_id, notification) {
                 warn!(
