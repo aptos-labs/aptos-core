@@ -114,14 +114,17 @@ impl ProofManager {
             .map(|p| p.per_kind_txn_limits.clone())
             .unwrap_or_default();
 
+        // Create PullSession once — accumulates state across all 3 pulls
+        let mut session = self.batch_proof_queue.create_pull_session(&excluded_batches);
+
         let (
             proof_block,
             txns_with_proof_size,
             cur_unique_txns,
             proof_queue_fully_utilized,
-            proof_txns_per_kind,
+            _proof_txns_per_kind,
         ) = self.batch_proof_queue.pull_proofs(
-            &excluded_batches,
+            &mut session,
             request.max_txns,
             request.max_txns_after_filtering,
             request.soft_max_txns_after_filtering,
@@ -135,19 +138,15 @@ impl ProofManager {
         counters::PROOF_QUEUE_FULLY_UTILIZED
             .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-        let (opt_batches, opt_batch_txns_size, opt_batch_txns_per_kind) =
+        let (opt_batches, opt_batch_txns_size, _opt_batch_txns_per_kind) =
             // TODO(ibalajiarun): Support unique txn calculation
             if let Some(ref params) = request.maybe_optqs_payload_pull_params {
                 let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
                 let max_opt_batch_txns_after_filtering = request.max_txns_after_filtering - cur_unique_txns;
-                let remaining_per_kind = per_kind_txn_limits.remaining(&proof_txns_per_kind);
-                let (opt_batches, opt_payload_size, _, opt_txns_per_kind) =
+                let remaining_per_kind = session.remaining_per_kind(&per_kind_txn_limits);
+                let (opt_batches, opt_payload_size, _, _opt_txns_per_kind) =
                     self.batch_proof_queue.pull_batches(
-                        &excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .collect(),
+                        &mut session,
                         &params.exclude_authors,
                         max_opt_batch_txns_size,
                         max_opt_batch_txns_after_filtering,
@@ -157,7 +156,7 @@ impl ProofManager {
                         Some(params.minimum_batch_age_usecs),
                         &remaining_per_kind,
                     );
-                (opt_batches, opt_payload_size, opt_txns_per_kind)
+                (opt_batches, opt_payload_size, _opt_txns_per_kind)
             } else {
                 (Vec::new(), PayloadTxnsSize::zero(), Default::default())
             };
@@ -175,20 +174,10 @@ impl ProofManager {
                         .max_txns_after_filtering
                         .saturating_sub(cur_unique_txns),
                 ));
-                // Combine proof + opt batch per-kind counters for inline limits
-                let mut combined_per_kind = proof_txns_per_kind.clone();
-                for (kind, count) in &opt_batch_txns_per_kind {
-                    *combined_per_kind.entry(*kind).or_insert(0) += count;
-                }
-                let remaining_per_kind = per_kind_txn_limits.remaining(&combined_per_kind);
+                let remaining_per_kind = session.remaining_per_kind(&per_kind_txn_limits);
                 let (inline_batches, inline_payload_size, _) =
                     self.batch_proof_queue.pull_batches_with_transactions(
-                        &excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .chain(opt_batches.clone())
-                            .collect(),
+                        &mut session,
                         max_inline_txns_to_pull,
                         request.max_txns_after_filtering,
                         request.soft_max_txns_after_filtering,

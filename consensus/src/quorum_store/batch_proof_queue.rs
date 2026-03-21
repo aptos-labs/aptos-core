@@ -7,7 +7,7 @@ use super::{
 };
 use crate::quorum_store::counters;
 use aptos_consensus_types::{
-    common::{Author, TxnSummaryWithExpiration},
+    common::{Author, TransactionSummary, TxnSummaryWithExpiration},
     payload_pull_params::PerBatchKindTxnLimits,
     proof_of_store::{BatchInfoExt, BatchKind, ProofOfStore, TBatchInfo},
     utils::PayloadTxnsSize,
@@ -60,14 +60,98 @@ impl QueueItem {
     }
 }
 
+/// Accumulates state across the 3 sequential pulls (proofs, opt-batches, inline-batches)
+/// to avoid redundant work.
+pub(crate) struct PullSession {
+    pub(crate) excluded_batch_keys: HashSet<BatchKey>,
+    pub(crate) filtered_txns: HashSet<TransactionSummary>,
+    pub(crate) cur_txns_per_kind: HashMap<BatchKind, u64>,
+}
+
+impl PullSession {
+    fn new(
+        excluded_batches: &HashSet<BatchInfoExt>,
+        items: &HashMap<BatchKey, QueueItem>,
+    ) -> Self {
+        let mut excluded_batch_keys = HashSet::with_capacity(excluded_batches.len());
+        let mut filtered_txns = HashSet::new();
+        for batch_info in excluded_batches {
+            let batch_key = BatchKey::from_info(batch_info);
+            if let Some(txn_summaries) = items
+                .get(&batch_key)
+                .and_then(|item| item.txn_summaries.as_ref())
+            {
+                filtered_txns.extend(txn_summaries.iter().map(|s| {
+                    TransactionSummary::new(s.sender, s.replay_protector, s.hash)
+                }));
+            }
+            excluded_batch_keys.insert(batch_key);
+        }
+        Self {
+            excluded_batch_keys,
+            filtered_txns,
+            cur_txns_per_kind: HashMap::new(),
+        }
+    }
+
+    /// Add pulled batches to the session so subsequent pulls exclude them.
+    fn add_pulled_batches(
+        &mut self,
+        pulled: &[BatchInfoExt],
+        items: &HashMap<BatchKey, QueueItem>,
+    ) {
+        for info in pulled {
+            let batch_key = BatchKey::from_info(info);
+            if let Some(txn_summaries) = items
+                .get(&batch_key)
+                .and_then(|item| item.txn_summaries.as_ref())
+            {
+                self.filtered_txns.extend(txn_summaries.iter().map(|s| {
+                    TransactionSummary::new(s.sender, s.replay_protector, s.hash)
+                }));
+            }
+            self.excluded_batch_keys.insert(batch_key);
+        }
+    }
+
+    /// Add pulled proofs to the session so subsequent pulls exclude them.
+    fn add_pulled_proofs(
+        &mut self,
+        pulled: &[ProofOfStore<BatchInfoExt>],
+        items: &HashMap<BatchKey, QueueItem>,
+    ) {
+        for proof in pulled {
+            let batch_key = BatchKey::from_info(proof.info());
+            if let Some(txn_summaries) = items
+                .get(&batch_key)
+                .and_then(|item| item.txn_summaries.as_ref())
+            {
+                self.filtered_txns.extend(txn_summaries.iter().map(|s| {
+                    TransactionSummary::new(s.sender, s.replay_protector, s.hash)
+                }));
+            }
+            self.excluded_batch_keys.insert(batch_key);
+        }
+    }
+
+    pub(crate) fn remaining_per_kind(
+        &self,
+        per_kind_txn_limits: &PerBatchKindTxnLimits,
+    ) -> PerBatchKindTxnLimits {
+        per_kind_txn_limits.remaining(&self.cur_txns_per_kind)
+    }
+}
+
 pub struct BatchProofQueue {
     my_peer_id: PeerId,
-    // Queue per peer to ensure fairness between peers and priority within peer
-    author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfoExt>>,
+    // Queue per peer for batches WITH proofs
+    author_to_proof_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfoExt>>,
+    // Queue per peer for batches WITHOUT proofs
+    author_to_non_proof_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfoExt>>,
     // Map of Batch key to QueueItem containing Batch data and proofs
     items: HashMap<BatchKey, QueueItem>,
     // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, replay protector, hash, expiration)
-    // has been included. We only count those batches that are in both author_to_batches and items along with proofs.
+    // has been included. We only count those batches that are in both author maps and items along with proofs.
     txn_summary_num_occurrences: HashMap<TxnSummaryWithExpiration, u64>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
@@ -80,6 +164,12 @@ pub struct BatchProofQueue {
     remaining_local_proofs: u64,
 
     batch_expiry_gap_when_init_usecs: u64,
+
+    // Incremental counters (Phase 1: Optimization 3)
+    num_batches_without_proof_count: u64,
+    num_proofs_without_summary_count: u64,
+    num_proofs_with_summary_count: u64,
+    remaining_proof_txns_without_summary: u64,
 }
 
 impl BatchProofQueue {
@@ -90,7 +180,8 @@ impl BatchProofQueue {
     ) -> Self {
         Self {
             my_peer_id,
-            author_to_batches: HashMap::new(),
+            author_to_proof_batches: HashMap::new(),
+            author_to_non_proof_batches: HashMap::new(),
             items: HashMap::new(),
             txn_summary_num_occurrences: HashMap::new(),
             expirations: TimeExpirations::new(),
@@ -101,6 +192,10 @@ impl BatchProofQueue {
             remaining_local_txns: 0,
             remaining_local_proofs: 0,
             batch_expiry_gap_when_init_usecs,
+            num_batches_without_proof_count: 0,
+            num_proofs_without_summary_count: 0,
+            num_proofs_with_summary_count: 0,
+            remaining_proof_txns_without_summary: 0,
         }
     }
 
@@ -132,50 +227,29 @@ impl BatchProofQueue {
             .count()
     }
 
-    pub(crate) fn num_batches_without_proof(&self) -> usize {
-        self.items
-            .iter()
-            .filter(|(_, item)| item.proof.is_none())
-            .count()
+    pub(crate) fn num_batches_without_proof(&self) -> u64 {
+        self.num_batches_without_proof_count
     }
 
     #[cfg(test)]
     pub(crate) fn is_empty(&self) -> bool {
         self.items.is_empty()
-            && self.author_to_batches.is_empty()
+            && self.author_to_proof_batches.is_empty()
+            && self.author_to_non_proof_batches.is_empty()
             && self.expirations.is_empty()
             && self.txn_summary_num_occurrences.is_empty()
     }
 
     fn remaining_txns_without_duplicates(&self) -> u64 {
-        // txn_summary_num_occurrences counts all the unexpired and uncommitted proofs that have txn summaries
-        // in batch_summaries.
-        let mut remaining_txns = self.txn_summary_num_occurrences.len() as u64;
+        self.txn_summary_num_occurrences.len() as u64 + self.remaining_proof_txns_without_summary
+    }
 
-        // For the unexpired and uncommitted proofs that don't have transaction summaries in batch_summaries,
-        // we need to add the proof.num_txns() to the remaining_txns.
-        remaining_txns += self
-            .author_to_batches
-            .values()
-            .map(|batches| {
-                batches
-                    .keys()
-                    .map(|batch_sort_key| {
-                        if let Some(item) = self.items.get(&batch_sort_key.batch_key) {
-                            if item.txn_summaries.is_none() {
-                                if let Some(ref proof) = item.proof {
-                                    // The batch has a proof but not txn summaries
-                                    return proof.num_txns();
-                                }
-                            }
-                        }
-                        0
-                    })
-                    .sum::<u64>()
-            })
-            .sum::<u64>();
-
-        remaining_txns
+    /// Create a new PullSession for the given excluded batches.
+    pub(crate) fn create_pull_session(
+        &self,
+        excluded_batches: &HashSet<BatchInfoExt>,
+    ) -> PullSession {
+        PullSession::new(excluded_batches, &self.items)
     }
 
     /// Add the ProofOfStore to proof queue.
@@ -201,11 +275,27 @@ impl BatchProofQueue {
         let batch_version = if proof.info().is_v2() { "v2" } else { "v1" };
 
         let batch_sort_key = BatchSortKey::from_info(proof.info());
-        let batches_for_author = self.author_to_batches.entry(author).or_default();
-        batches_for_author.insert(batch_sort_key.clone(), proof.info().clone());
+
+        // Move from non_proof to proof map if it existed there, otherwise insert into proof map
+        let prev_in_non_proof = self
+            .author_to_non_proof_batches
+            .get_mut(&author)
+            .and_then(|q| q.remove(&batch_sort_key));
+        if let Some(ref _prev) = prev_in_non_proof {
+            // Clean up empty maps
+            if self
+                .author_to_non_proof_batches
+                .get(&author)
+                .is_some_and(|q| q.is_empty())
+            {
+                self.author_to_non_proof_batches.remove(&author);
+            }
+        }
+        let proof_batches_for_author = self.author_to_proof_batches.entry(author).or_default();
+        proof_batches_for_author.insert(batch_sort_key.clone(), proof.info().clone());
 
         // Check if a batch with a higher batch Id (reverse sorted) exists
-        if let Some((prev_batch_key, _)) = batches_for_author
+        if let Some((prev_batch_key, _)) = proof_batches_for_author
             .range((Bound::Unbounded, Bound::Excluded(batch_sort_key.clone())))
             .next_back()
         {
@@ -217,6 +307,12 @@ impl BatchProofQueue {
         }
 
         self.expirations.add_item(batch_sort_key, expiration);
+
+        // Determine if existing item had txn_summaries for counter updates
+        let had_summaries = self
+            .items
+            .get(&batch_key)
+            .is_some_and(|item| item.txn_summaries.is_some());
 
         // If we are here, then proof is added for the first time. Otherwise, we will
         // return early. We only count when proof is added for the first time and txn
@@ -270,6 +366,17 @@ impl BatchProofQueue {
         }
         self.inc_remaining_proofs(&author, num_txns);
 
+        // Update incremental counters
+        if had_summaries {
+            // Was a batch without proof, now has proof with summary
+            self.num_batches_without_proof_count -= 1;
+            self.num_proofs_with_summary_count += 1;
+        } else {
+            // New item with proof but no summary
+            self.num_proofs_without_summary_count += 1;
+            self.remaining_proof_txns_without_summary += num_txns;
+        }
+
         sample!(
             SampleRate::Duration(Duration::from_millis(500)),
             self.gc_expired_batch_summaries_without_proofs()
@@ -296,20 +403,31 @@ impl BatchProofQueue {
                 continue;
             }
 
-            self.author_to_batches
-                .entry(batch_info.author())
-                .or_default()
-                .insert(batch_sort_key.clone(), batch_info.clone());
+            // Determine if existing item already has a proof
+            let has_proof = self
+                .items
+                .get(&batch_key)
+                .is_some_and(|item| item.proof.is_some());
+
+            if has_proof {
+                // Already in proof map, just update the entry there
+                self.author_to_proof_batches
+                    .entry(batch_info.author())
+                    .or_default()
+                    .insert(batch_sort_key.clone(), batch_info.clone());
+            } else {
+                // No proof yet, goes in non-proof map
+                self.author_to_non_proof_batches
+                    .entry(batch_info.author())
+                    .or_default()
+                    .insert(batch_sort_key.clone(), batch_info.clone());
+            }
             self.expirations
                 .add_item(batch_sort_key, batch_info.expiration());
 
             // We only count txn summaries first time it is added to the queue
             // and only if the proof already exists.
-            if self
-                .items
-                .get(&batch_key)
-                .is_some_and(|item| item.proof.is_some())
-            {
+            if has_proof {
                 for txn_summary in &txn_summaries {
                     *self
                         .txn_summary_num_occurrences
@@ -318,6 +436,7 @@ impl BatchProofQueue {
                 }
             }
 
+            let num_txns = batch_info.num_txns();
             match self.items.entry(batch_key) {
                 Entry::Occupied(mut entry) => {
                     let item = entry.get_mut();
@@ -336,6 +455,17 @@ impl BatchProofQueue {
                     });
                 },
             }
+
+            // Update incremental counters
+            if has_proof {
+                // Had proof without summary, now has both
+                self.num_proofs_without_summary_count -= 1;
+                self.num_proofs_with_summary_count += 1;
+                self.remaining_proof_txns_without_summary -= num_txns;
+            } else {
+                // New batch without proof
+                self.num_batches_without_proof_count += 1;
+            }
         }
 
         sample!(
@@ -353,12 +483,13 @@ impl BatchProofQueue {
             if item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp {
                 true
             } else {
-                self.author_to_batches
+                self.author_to_non_proof_batches
                     .get_mut(&item.info.author())
                     .map(|queue| queue.remove(&BatchSortKey::from_info(&item.info)));
                 counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
                     .with_label_values(&["expired_batch_without_proof"])
                     .inc();
+                self.num_batches_without_proof_count -= 1;
                 false
             }
         });
@@ -366,44 +497,14 @@ impl BatchProofQueue {
 
     fn log_remaining_data_after_pull(
         &self,
-        excluded_batches: &HashSet<BatchInfoExt>,
         pulled_proofs: &[ProofOfStore<BatchInfoExt>],
     ) {
-        let mut num_proofs_remaining_after_pull = 0;
-        let mut num_txns_remaining_after_pull = 0;
-        let excluded_batch_keys = excluded_batches
-            .iter()
-            .map(BatchKey::from_info)
-            .collect::<HashSet<_>>();
-
-        let remaining_batches = self
-            .author_to_batches
-            .iter()
-            .flat_map(|(_, batches)| batches)
-            .filter(|(batch_sort_key, _)| {
-                !excluded_batch_keys.contains(&batch_sort_key.batch_key)
-                    && !pulled_proofs
-                        .iter()
-                        .any(|p| BatchKey::from_info(p.info()) == batch_sort_key.batch_key)
-            })
-            .filter_map(|(batch_sort_key, batch)| {
-                if self
-                    .items
-                    .get(&batch_sort_key.batch_key)
-                    .is_some_and(|item| item.proof.is_some())
-                {
-                    Some(batch)
-                } else {
-                    None
-                }
-            });
-
-        for batch in remaining_batches {
-            num_proofs_remaining_after_pull += 1;
-            num_txns_remaining_after_pull += batch.num_txns();
-        }
-
         let pulled_txns = pulled_proofs.iter().map(|p| p.num_txns()).sum::<u64>();
+        let num_proofs_remaining_after_pull =
+            self.remaining_proofs.saturating_sub(pulled_proofs.len() as u64);
+        let num_txns_remaining_after_pull =
+            self.remaining_txns_with_duplicates.saturating_sub(pulled_txns);
+
         debug!(
             "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}, remaining_txns: {:?}",
             pulled_proofs.len(),
@@ -425,7 +526,7 @@ impl BatchProofQueue {
     // whether the proof queue is fully utilized.
     pub(crate) fn pull_proofs(
         &mut self,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
@@ -441,7 +542,7 @@ impl BatchProofQueue {
     ) {
         let (result, all_txns, unique_txns, is_full, cur_txns_per_kind) = self.pull_internal(
             false,
-            excluded_batches,
+            session,
             &HashSet::new(),
             max_txns,
             max_txns_after_filtering,
@@ -482,8 +583,12 @@ impl BatchProofQueue {
 
             counters::PROOF_SIZE_WHEN_PULL.observe(proof_of_stores.len() as f64);
             // Number of proofs remaining in proof queue after the pull
-            self.log_remaining_data_after_pull(excluded_batches, &proof_of_stores);
+            self.log_remaining_data_after_pull(&proof_of_stores);
         }
+
+        // Add pulled proofs to the session
+        session.add_pulled_proofs(&proof_of_stores, &self.items);
+        session.cur_txns_per_kind = cur_txns_per_kind.clone();
 
         (
             proof_of_stores,
@@ -496,7 +601,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches(
         &mut self,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -513,7 +618,7 @@ impl BatchProofQueue {
     ) {
         let (result, pulled_txns, unique_txns, is_full, cur_txns_per_kind) = self
             .pull_batches_internal(
-                excluded_batches,
+                session,
                 exclude_authors,
                 max_txns,
                 max_txns_after_filtering,
@@ -533,12 +638,20 @@ impl BatchProofQueue {
             counters::CONSENSUS_PULL_SIZE_IN_BYTES
                 .observe_with(&["optbatch"], pulled_txns.size_in_bytes() as f64);
         }
+
+        // Add pulled batches to session
+        session.add_pulled_batches(&result, &self.items);
+        // Merge per-kind counts into session
+        for (kind, count) in &cur_txns_per_kind {
+            *session.cur_txns_per_kind.entry(*kind).or_insert(0) += count;
+        }
+
         (result, pulled_txns, unique_txns, cur_txns_per_kind)
     }
 
     fn pull_batches_internal(
         &mut self,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -557,7 +670,7 @@ impl BatchProofQueue {
     ) {
         let (result, all_txns, unique_txns, is_full, cur_txns_per_kind) = self.pull_internal(
             true,
-            excluded_batches,
+            session,
             exclude_authors,
             max_txns,
             max_txns_after_filtering,
@@ -574,7 +687,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches_with_transactions(
         &mut self,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
@@ -588,7 +701,7 @@ impl BatchProofQueue {
     ) {
         let (batches, pulled_txns, unique_txns, is_full, _cur_txns_per_kind) = self
             .pull_batches_internal(
-                excluded_batches,
+                session,
                 &HashSet::new(),
                 max_txns,
                 max_txns_after_filtering,
@@ -625,7 +738,7 @@ impl BatchProofQueue {
     fn pull_internal(
         &mut self,
         batches_without_proofs: bool,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -648,37 +761,29 @@ impl BatchProofQueue {
         let mut excluded_txns = 0;
         let mut full = false;
         let mut cur_txns_per_kind: HashMap<BatchKind, u64> = HashMap::new();
-        // Set of all the excluded transactions and all the transactions included in the result
-        let mut filtered_txns = HashSet::new();
-        for batch_info in excluded_batches {
-            let batch_key = BatchKey::from_info(batch_info);
-            if let Some(txn_summaries) = self
-                .items
-                .get(&batch_key)
-                .and_then(|item| item.txn_summaries.as_ref())
-            {
-                for txn_summary in txn_summaries {
-                    filtered_txns.insert(*txn_summary);
-                }
-            }
-        }
+        // Defer session mutation: collect pending txns locally so that if the pull
+        // is discarded (return_non_full == false && !full), we don't pollute the
+        // session's filtered_txns for subsequent pulls.
+        let mut pending_filtered_txns: HashSet<TransactionSummary> = HashSet::new();
 
         let max_batch_creation_ts_usecs = min_batch_age_usecs
             .map(|min_age| aptos_infallible::duration_since_epoch().as_micros() as u64 - min_age);
+
+        // Select the appropriate author map based on proof status
+        let author_map = if batches_without_proofs {
+            &self.author_to_non_proof_batches
+        } else {
+            &self.author_to_proof_batches
+        };
+
         let mut iters = vec![];
-        for (_, batches) in self
-            .author_to_batches
+        for (_, batches) in author_map
             .iter()
             .filter(|(author, _)| !exclude_authors.contains(author))
         {
             let batch_iter = batches.iter().rev().filter_map(|(sort_key, info)| {
                 if let Some(item) = self.items.get(&sort_key.batch_key) {
-                    if item.is_committed() {
-                        return None;
-                    }
-                    if batches_without_proofs ^ item.proof.is_none() {
-                        return None;
-                    }
+                    // No need to check is_committed() or proof status — split maps handle that
 
                     let batch_create_ts_usecs = item
                         .info
@@ -703,15 +808,13 @@ impl BatchProofQueue {
             iters.push(batch_iter);
         }
 
-        while !iters.is_empty() {
-            iters.shuffle(&mut thread_rng());
-            iters.retain_mut(|iter| {
-                if full {
-                    return false;
-                }
-
-                if let Some((batch, item)) = iter.next() {
-                    if excluded_batches.contains(batch) {
+        // Single shuffle then round-robin (Optimization 6)
+        iters.shuffle(&mut thread_rng());
+        let mut idx = 0;
+        while !iters.is_empty() && !full {
+            match iters[idx].next() {
+                Some((batch, item)) => {
+                    if session.excluded_batch_keys.contains(&BatchKey::from_info(batch)) {
                         excluded_txns += batch.num_txns();
                     } else {
                         // Check per-kind txn limit
@@ -720,53 +823,53 @@ impl BatchProofQueue {
                                 let cur = cur_txns_per_kind.get(&kind).copied().unwrap_or(0);
                                 if cur + batch.num_txns() > max {
                                     // Skip this batch — would exceed per-kind limit.
-                                    // Don't set full=true; other kinds may still have room.
-                                    return true; // continue iterating
+                                    idx = (idx + 1) % iters.len();
+                                    continue;
                                 }
                             }
                         }
 
-                        // Calculate the number of unique transactions if this batch is included in the result
-                        let unique_txns = if let Some(ref txn_summaries) = item.txn_summaries {
-                            cur_unique_txns
-                                + txn_summaries
+                        // Calculate unique txns (Optimization 5: single pass)
+                        let new_unique =
+                            item.txn_summaries.as_ref().map_or(batch.num_txns(), |summaries| {
+                                summaries
                                     .iter()
                                     .filter(|txn_summary| {
-                                        !filtered_txns.contains(txn_summary)
+                                        let summary = TransactionSummary::new(
+                                            txn_summary.sender,
+                                            txn_summary.replay_protector,
+                                            txn_summary.hash,
+                                        );
+                                        !session.filtered_txns.contains(&summary)
+                                            && !pending_filtered_txns.contains(&summary)
                                             && block_timestamp.as_secs()
                                                 < txn_summary.expiration_timestamp_secs
                                     })
                                     .count() as u64
-                        } else {
-                            cur_unique_txns + batch.num_txns()
-                        };
+                            });
+
+                        let unique_txns = cur_unique_txns + new_unique;
                         if cur_all_txns + batch.size() > max_txns
                             || unique_txns > max_txns_after_filtering
                         {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
-                            return false;
+                            continue;
                         }
                         cur_all_txns += batch.size();
                         // Update per-kind counter
                         if let Some(kind) = batch.batch_kind() {
                             *cur_txns_per_kind.entry(kind).or_insert(0) += batch.num_txns();
                         }
-                        // Add this batch to filtered_txns and calculate the number of
-                        // unique transactions added in the result so far.
-                        cur_unique_txns +=
-                            item.txn_summaries
-                                .as_ref()
-                                .map_or(batch.num_txns(), |summaries| {
-                                    summaries
-                                        .iter()
-                                        .filter(|summary| {
-                                            filtered_txns.insert(**summary)
-                                                && block_timestamp.as_secs()
-                                                    < summary.expiration_timestamp_secs
-                                        })
-                                        .count() as u64
-                                });
+
+                        // Accept — bulk insert summaries into pending set (deferred)
+                        cur_unique_txns += new_unique;
+                        if let Some(ref summaries) = item.txn_summaries {
+                            pending_filtered_txns.extend(summaries.iter().map(|s| {
+                                TransactionSummary::new(s.sender, s.replay_protector, s.hash)
+                            }));
+                        }
+
                         assert!(item.proof.is_none() == batches_without_proofs);
                         result.push(item);
                         if cur_all_txns == max_txns
@@ -774,14 +877,18 @@ impl BatchProofQueue {
                             || cur_unique_txns >= soft_max_txns_after_filtering
                         {
                             full = true;
-                            return false;
+                            continue;
                         }
                     }
-                    true
-                } else {
-                    false
-                }
-            })
+                    idx = (idx + 1) % iters.len();
+                },
+                None => {
+                    let _ = iters.swap_remove(idx);
+                    if !iters.is_empty() {
+                        idx %= iters.len();
+                    }
+                },
+            }
         }
         debug!(
             // before non full check
@@ -801,6 +908,9 @@ impl BatchProofQueue {
         counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
 
         if full || return_non_full {
+            // Commit pending filtered txns into session only when the pull is accepted
+            session.filtered_txns.extend(pending_filtered_txns);
+
             // Stable sort, so the order of proofs within an author will not change.
             result.sort_by_key(|item| Reverse(item.info.gas_bucket_start()));
 
@@ -864,39 +974,75 @@ impl BatchProofQueue {
         let expired = self.expirations.expire(block_timestamp);
         let mut num_expired_but_not_committed = 0;
         for key in &expired {
-            if let Some(mut queue) = self.author_to_batches.remove(&key.author()) {
-                if let Some(batch) = queue.remove(key) {
-                    let item = self
-                        .items
-                        .get(&key.batch_key)
-                        .expect("Entry for unexpired batch must exist");
-                    if item.proof.is_some() {
-                        // not committed proof that is expired
-                        num_expired_but_not_committed += 1;
+            // Try to remove from proof batches first, then non-proof batches
+            let batch = self
+                .author_to_proof_batches
+                .get_mut(&key.author())
+                .and_then(|q| q.remove(key))
+                .or_else(|| {
+                    self.author_to_non_proof_batches
+                        .get_mut(&key.author())
+                        .and_then(|q| q.remove(key))
+                });
+
+            // ALWAYS clean up items — critical for committed batches
+            if let Some(item) = self.items.remove(&key.batch_key) {
+                if item.proof.is_some() {
+                    // not committed proof that is expired
+                    num_expired_but_not_committed += 1;
+                    if let Some(ref batch_info) = batch {
                         counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_COMMIT
-                            .observe((block_timestamp - batch.expiration()) as f64);
-                        if let Some(ref txn_summaries) = item.txn_summaries {
-                            for txn_summary in txn_summaries {
-                                if let Some(count) =
-                                    self.txn_summary_num_occurrences.get_mut(txn_summary)
-                                {
-                                    *count -= 1;
-                                    if *count == 0 {
-                                        self.txn_summary_num_occurrences.remove(txn_summary);
-                                    }
-                                };
-                            }
-                        }
-                        self.dec_remaining_proofs(&batch.author(), batch.num_txns());
-                        counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
-                            .with_label_values(&["expired_proof"])
-                            .inc();
+                            .observe((block_timestamp - batch_info.expiration()) as f64);
                     }
-                    claims::assert_some!(self.items.remove(&key.batch_key));
+                    if let Some(ref txn_summaries) = item.txn_summaries {
+                        for txn_summary in txn_summaries {
+                            if let Some(count) =
+                                self.txn_summary_num_occurrences.get_mut(txn_summary)
+                            {
+                                *count -= 1;
+                                if *count == 0 {
+                                    self.txn_summary_num_occurrences.remove(txn_summary);
+                                }
+                            };
+                        }
+                    }
+                    if let Some(ref batch_info) = batch {
+                        self.dec_remaining_proofs(&batch_info.author(), batch_info.num_txns());
+                    }
+                    counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
+                        .with_label_values(&["expired_proof"])
+                        .inc();
+
+                    // Update incremental counters
+                    if item.txn_summaries.is_some() {
+                        self.num_proofs_with_summary_count -= 1;
+                    } else {
+                        self.num_proofs_without_summary_count -= 1;
+                        self.remaining_proof_txns_without_summary -= batch
+                            .as_ref()
+                            .map_or(item.info.num_txns(), |b| b.num_txns());
+                    }
+                } else if !item.is_committed() {
+                    // Non-proof, non-committed item expiring
+                    self.num_batches_without_proof_count -= 1;
                 }
-                if !queue.is_empty() {
-                    self.author_to_batches.insert(key.author(), queue);
-                }
+                // committed items: no counter update needed (already decremented on commit)
+            }
+
+            // Clean up empty author queues from both maps
+            if self
+                .author_to_proof_batches
+                .get(&key.author())
+                .is_some_and(|q| q.is_empty())
+            {
+                self.author_to_proof_batches.remove(&key.author());
+            }
+            if self
+                .author_to_non_proof_batches
+                .get(&key.author())
+                .is_some_and(|q| q.is_empty())
+            {
+                self.author_to_non_proof_batches.remove(&key.author());
             }
         }
         counters::PROOF_QUEUE_UPDATE_TIMESTAMP_DURATION.observe_duration(start.elapsed());
@@ -906,35 +1052,13 @@ impl BatchProofQueue {
     // Number of unexpired and uncommitted proofs in the pipeline without txn summaries in
     // batch_summaries
     fn num_proofs_without_batch_summary(&self) -> u64 {
-        let mut count = 0;
-        self.author_to_batches.values().for_each(|batches| {
-            count += batches
-                .iter()
-                .filter(|(sort_key, _)| {
-                    self.items
-                        .get(&sort_key.batch_key)
-                        .is_some_and(|item| item.proof.is_some() && item.txn_summaries.is_none())
-                })
-                .count() as u64;
-        });
-        count
+        self.num_proofs_without_summary_count
     }
 
     // Number of unexpired and uncommitted proofs in the pipeline with txn summaries in
     // batch_summaries
     fn num_proofs_with_batch_summary(&self) -> u64 {
-        let mut count = 0;
-        self.author_to_batches.values().for_each(|batches| {
-            count += batches
-                .iter()
-                .filter(|(sort_key, _)| {
-                    self.items
-                        .get(&sort_key.batch_key)
-                        .is_some_and(|item| item.proof.is_some() && item.txn_summaries.is_some())
-                })
-                .count() as u64;
-        });
-        count
+        self.num_proofs_with_summary_count
     }
 
     pub(crate) fn remaining_txns_and_proofs(&self) -> (u64, u64) {
@@ -982,61 +1106,97 @@ impl BatchProofQueue {
         let start = Instant::now();
         for batch in batches.into_iter() {
             let batch_key = BatchKey::from_info(&batch);
-            if let Some(item) = self.items.get(&batch_key) {
-                if let Some(ref proof) = item.proof {
-                    let insertion_time = item
-                        .proof_insertion_time
-                        .expect("Insertion time is updated with proof");
-                    counters::pos_to_commit(
-                        proof.gas_bucket_start(),
-                        insertion_time.elapsed().as_secs_f64(),
-                    );
-                    self.dec_remaining_proofs(&batch.author(), batch.num_txns());
-                    counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
-                        .with_label_values(&["committed_proof"])
-                        .inc();
-                }
-                let item = self
-                    .items
-                    .get_mut(&batch_key)
-                    .expect("must exist due to check");
 
-                if item.proof.is_some() {
-                    if let Some(ref txn_summaries) = item.txn_summaries {
-                        for txn_summary in txn_summaries {
-                            if let Some(count) =
-                                self.txn_summary_num_occurrences.get_mut(txn_summary)
-                            {
-                                *count -= 1;
-                                if *count == 0 {
-                                    self.txn_summary_num_occurrences.remove(txn_summary);
-                                }
-                            };
+            // Extract state from immutable borrow first
+            let item_state = self.items.get(&batch_key).map(|item| {
+                let had_proof = item.proof.is_some();
+                let had_summaries = item.txn_summaries.is_some();
+                let is_committed = item.is_committed();
+                let gas_bucket = item.proof.as_ref().map(|p| p.gas_bucket_start());
+                let insertion_elapsed = item.proof_insertion_time.map(|t| t.elapsed());
+                (had_proof, had_summaries, is_committed, gas_bucket, insertion_elapsed)
+            });
+
+            match item_state {
+                Some((had_proof, had_summaries, is_already_committed, gas_bucket, insertion_elapsed)) => {
+                    if had_proof {
+                        if let (Some(bucket), Some(elapsed)) = (gas_bucket, insertion_elapsed) {
+                            counters::pos_to_commit(bucket, elapsed.as_secs_f64());
+                        }
+                        self.dec_remaining_proofs(&batch.author(), batch.num_txns());
+                        counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
+                            .with_label_values(&["committed_proof"])
+                            .inc();
+                    }
+
+                    let item = self
+                        .items
+                        .get_mut(&batch_key)
+                        .expect("must exist due to check");
+
+                    if item.proof.is_some() {
+                        if let Some(ref txn_summaries) = item.txn_summaries {
+                            for txn_summary in txn_summaries {
+                                if let Some(count) =
+                                    self.txn_summary_num_occurrences.get_mut(txn_summary)
+                                {
+                                    *count -= 1;
+                                    if *count == 0 {
+                                        self.txn_summary_num_occurrences.remove(txn_summary);
+                                    }
+                                };
+                            }
+                        }
+                    } else if !item.is_committed() {
+                        counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
+                            .with_label_values(&["committed_batch_without_proof"])
+                            .inc();
+                    }
+                    // The item is just marked committed for now.
+                    // When the batch is expired, then it will be removed from items.
+                    item.mark_committed();
+
+                    // Remove from whichever author map it's in (committed items no longer in author maps)
+                    let batch_sort_key = BatchSortKey::from_info(&batch);
+                    if let Some(q) = self.author_to_proof_batches.get_mut(&batch.author()) {
+                        q.remove(&batch_sort_key);
+                        if q.is_empty() {
+                            self.author_to_proof_batches.remove(&batch.author());
                         }
                     }
-                } else if !item.is_committed() {
-                    counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
-                        .with_label_values(&["committed_batch_without_proof"])
-                        .inc();
-                }
-                // The item is just marked committed for now.
-                // When the batch is expired, then it will be removed from items.
-                item.mark_committed();
-            } else {
-                let batch_sort_key = BatchSortKey::from_info(&batch);
-                self.expirations
-                    .add_item(batch_sort_key.clone(), batch.expiration());
-                self.author_to_batches
-                    .entry(batch.author())
-                    .or_default()
-                    .insert(batch_sort_key, batch.clone());
-                self.items.insert(batch_key, QueueItem {
-                    info: batch,
-                    txn_summaries: None,
-                    proof: None,
-                    proof_insertion_time: None,
-                    batch_insertion_time: None,
-                });
+                    if let Some(q) = self.author_to_non_proof_batches.get_mut(&batch.author()) {
+                        q.remove(&batch_sort_key);
+                        if q.is_empty() {
+                            self.author_to_non_proof_batches.remove(&batch.author());
+                        }
+                    }
+
+                    // Update incremental counters
+                    if !is_already_committed {
+                        if had_proof && had_summaries {
+                            self.num_proofs_with_summary_count -= 1;
+                        } else if had_proof {
+                            self.num_proofs_without_summary_count -= 1;
+                            self.remaining_proof_txns_without_summary -= batch.num_txns();
+                        } else {
+                            self.num_batches_without_proof_count -= 1;
+                        }
+                    }
+                },
+                None => {
+                    let batch_sort_key = BatchSortKey::from_info(&batch);
+                    self.expirations
+                        .add_item(batch_sort_key, batch.expiration());
+                    // Committed items that we haven't seen before: just track in items + expirations
+                    // No author map insertion needed — committed items don't participate in pulls
+                    self.items.insert(batch_key, QueueItem {
+                        info: batch,
+                        txn_summaries: None,
+                        proof: None,
+                        proof_insertion_time: None,
+                        batch_insertion_time: None,
+                    });
+                },
             }
         }
         counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
