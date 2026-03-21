@@ -1,4 +1,15 @@
 module aptos_experimental::sigma_protocol_representation_vec {
+    friend aptos_experimental::sigma_protocol_homomorphism;
+    friend aptos_experimental::sigma_protocol;
+    friend aptos_experimental::sigma_protocol_registration;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_transfer;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_pedeq_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_schnorr_example;
+
     use aptos_std::ristretto255::Scalar;
     use aptos_experimental::sigma_protocol_representation::Representation;
 
@@ -9,37 +20,37 @@ module aptos_experimental::sigma_protocol_representation_vec {
         v: vector<Representation>
     }
 
-    public fun new_representation_vec(v: vector<Representation>): RepresentationVec { RepresentationVec { v } }
+    public(friend) fun new_representation_vec(v: vector<Representation>): RepresentationVec { RepresentationVec { v } }
 
     /// Returns all the underlying `Representation`'s stored in this vector
     /// (Public due to forced inlining for functions that take lambda arguments.)
-    public fun get_representations(self: &RepresentationVec): &vector<Representation> {
+    public(friend) fun get_representations(self: &RepresentationVec): &vector<Representation> {
         &self.v
     }
 
     /// Returns the number of representations in the vector.
-    public fun length(self: &RepresentationVec): u64 {
+    public(friend) fun length(self: &RepresentationVec): u64 {
         self.v.length()
     }
 
     /// Iterates through every representation in the vector.
     /// (Forced inlining for functions that take lambda arguments.)
-    public inline fun for_each_ref(self: &RepresentationVec, lambda: |&Representation|) {
+    public(friend) inline fun for_each_ref(self: &RepresentationVec, lambda: |&Representation|) {
         self.get_representations().for_each_ref(|repr| lambda(repr))
     }
 
     /// Maps each representation in the vector to a value of type `T`.
-    public inline fun map_ref<T>(self: &RepresentationVec, lambda: |&Representation| T): vector<T> {
+    public(friend) inline fun map_ref<T>(self: &RepresentationVec, lambda: |&Representation| T): vector<T> {
         self.get_representations().map_ref(|repr| lambda(repr))
     }
 
     /// Multiply all representations by $e$ (i.e., multiply each `self.v[i].scalars` by $e$).
-    public fun scale_all(self: &mut RepresentationVec, e: &Scalar) {
+    public(friend) fun scale_all(self: &mut RepresentationVec, e: &Scalar) {
         self.v.for_each_mut(|repr| repr.scale(e));
     }
 
     /// For all $i$, multiply the $i$th representation by `b[i]` (i.e., multiply `self.v[i].scalars` by `b[i]`)
-    public fun scale_each(self: &mut RepresentationVec, b: &vector<Scalar>) {
+    public(friend) fun scale_each(self: &mut RepresentationVec, b: &vector<Scalar>) {
         self.v.enumerate_mut(|i, repr| {
             repr.scale(&b[i])
         });

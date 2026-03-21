@@ -3,6 +3,10 @@ module aptos_experimental::sigma_protocol {
     friend aptos_experimental::sigma_protocol_withdraw;
     friend aptos_experimental::sigma_protocol_transfer;
     friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_pedeq_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_schnorr_example;
 
     use std::error;
     use aptos_std::ristretto255::{point_identity, multi_scalar_mul};
@@ -32,7 +36,7 @@ module aptos_experimental::sigma_protocol {
     #[test_only]
     /// Creates a proof and additionally returns the randomness $\alpha \in \mathbb{F}^k$ used to
     /// create the sigma protocol commitment $A = \psi(\alpha) \in \mathbb{G}^m$.
-    public inline fun prove<P>(
+    public(friend) inline fun prove<P>(
         dst: DomainSeparator,
         psi: Homomorphism<P>,
         stmt: &Statement<P>,
@@ -81,7 +85,7 @@ module aptos_experimental::sigma_protocol {
     ///      );
     ///   );
     /// ```
-    public inline fun verify_slow<P>(
+    public(friend) inline fun verify_slow<P>(
         dst: DomainSeparator,
         psi: Homomorphism<P>,
         f: TransformationFunction<P>,
@@ -218,7 +222,7 @@ module aptos_experimental::sigma_protocol {
     #[test_only]
     /// A generic correctness test that takes the DST, the public statement, the secret witness, and the $\psi$ and $f$
     /// lambdas.
-    public inline fun assert_correctly_computed_proof_verifies<P>(
+    public(friend) inline fun assert_correctly_computed_proof_verifies<P>(
         dst: DomainSeparator,
         stmt: Statement<P>,
         witn: Witness,
@@ -257,7 +261,7 @@ module aptos_experimental::sigma_protocol {
 
     #[test_only]
     /// Returns `true` if the empty proof does not verify for the specific statement. Otherwise, returns `false`.
-    public inline fun empty_proof_verifies<P>(
+    public(friend) inline fun empty_proof_verifies<P>(
         dst: DomainSeparator,
         psi: Homomorphism<P>,
         f: TransformationFunction<P>,

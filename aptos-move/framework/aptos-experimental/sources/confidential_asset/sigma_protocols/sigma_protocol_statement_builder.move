@@ -13,6 +13,15 @@
 /// The `assert_*_statement_is_well_formed()` check catches size mismatches but NOT ordering mistakes.
 /// The builder does NOT change the index layout.
 module aptos_experimental::sigma_protocol_statement_builder {
+    friend aptos_experimental::sigma_protocol_registration;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_transfer;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_pedeq_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_schnorr_example;
+
     use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto};
     use aptos_experimental::sigma_protocol_statement::{Self, Statement};
 
@@ -22,7 +31,7 @@ module aptos_experimental::sigma_protocol_statement_builder {
         scalars: vector<Scalar>,
     }
 
-    public fun new_builder<P>(): StatementBuilder<P> {
+    public(friend) fun new_builder<P>(): StatementBuilder<P> {
         StatementBuilder {
             points: vector[],
             compressed_points: vector[],
@@ -31,7 +40,7 @@ module aptos_experimental::sigma_protocol_statement_builder {
     }
 
     /// Add a compressed point; decompresses internally. Returns the index.
-    public fun add_point<P>(self: &mut StatementBuilder<P>, p: CompressedRistretto): u64 {
+    public(friend) fun add_point<P>(self: &mut StatementBuilder<P>, p: CompressedRistretto): u64 {
         let idx = self.points.length();
         self.points.push_back(p.point_decompress());
         self.compressed_points.push_back(p);
@@ -39,7 +48,7 @@ module aptos_experimental::sigma_protocol_statement_builder {
     }
 
     /// Add a vector of compressed points; decompresses all internally. Returns the starting index.
-    public fun add_points<P>(self: &mut StatementBuilder<P>, v: &vector<CompressedRistretto>): u64 {
+    public(friend) fun add_points<P>(self: &mut StatementBuilder<P>, v: &vector<CompressedRistretto>): u64 {
         let start = self.points.length();
         v.for_each_ref(|p| {
             let p_val = *p;
@@ -51,7 +60,7 @@ module aptos_experimental::sigma_protocol_statement_builder {
 
     /// Like `add_points`, but also returns clones of the decompressed points.
     /// Useful when the caller needs the decompressed points for other purposes (e.g., range proofs).
-    public fun add_points_cloned<P>(self: &mut StatementBuilder<P>, v: &vector<CompressedRistretto>): (u64, vector<RistrettoPoint>) {
+    public(friend) fun add_points_cloned<P>(self: &mut StatementBuilder<P>, v: &vector<CompressedRistretto>): (u64, vector<RistrettoPoint>) {
         let start = self.points.length();
         let cloned = vector[];
         v.for_each_ref(|p| {
@@ -64,13 +73,13 @@ module aptos_experimental::sigma_protocol_statement_builder {
         (start, cloned)
     }
 
-    public fun add_scalar<P>(self: &mut StatementBuilder<P>, s: Scalar): u64 {
+    public(friend) fun add_scalar<P>(self: &mut StatementBuilder<P>, s: Scalar): u64 {
         let idx = self.scalars.length();
         self.scalars.push_back(s);
         idx
     }
 
-    public fun build<P>(self: StatementBuilder<P>): Statement<P> {
+    public(friend) fun build<P>(self: StatementBuilder<P>): Statement<P> {
         let StatementBuilder { points, compressed_points, scalars } = self;
         sigma_protocol_statement::new_statement(points, compressed_points, scalars)
     }

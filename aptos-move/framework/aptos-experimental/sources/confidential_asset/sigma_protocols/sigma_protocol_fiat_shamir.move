@@ -1,4 +1,14 @@
 module aptos_experimental::sigma_protocol_fiat_shamir {
+    friend aptos_experimental::sigma_protocol;
+    friend aptos_experimental::sigma_protocol_registration;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_transfer;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_pedeq_example;
+    #[test_only]
+    friend aptos_experimental::sigma_protocol_schnorr_example;
+
     use std::error;
     use std::string::String;
     use aptos_std::aptos_hash::{sha2_512, sha2_512_value};
@@ -42,7 +52,7 @@ module aptos_experimental::sigma_protocol_fiat_shamir {
         }
     }
 
-    public fun new_domain_separator(contract_address: address, chain_id: u8, protocol_id: vector<u8>, session_id: vector<u8>): DomainSeparator {
+    public(friend) fun new_domain_separator(contract_address: address, chain_id: u8, protocol_id: vector<u8>, session_id: vector<u8>): DomainSeparator {
         DomainSeparator::V1 {
             contract_address,
             chain_id,
@@ -67,7 +77,7 @@ module aptos_experimental::sigma_protocol_fiat_shamir {
     }
 
     /// Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1}$
-    public fun fiat_shamir<P>(
+    public(friend) fun fiat_shamir<P>(
         dst: DomainSeparator,
         stmt: &Statement<P>,
         compressed_A: &vector<CompressedRistretto>,
