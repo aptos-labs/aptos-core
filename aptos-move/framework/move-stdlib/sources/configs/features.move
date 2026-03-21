@@ -93,11 +93,6 @@ module std::features {
 
     #[deprecated]
     /// Deprecated feature
-    /// Lifetime: transient
-    const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
-
-    #[deprecated]
-    /// Deprecated feature
     public fun get_collect_and_distribute_gas_fees_feature(): u64 {
         abort error::invalid_argument(EINVALID_FEATURE)
     }
@@ -323,12 +318,6 @@ module std::features {
         abort error::invalid_argument(EINVALID_FEATURE)
     }
 
-    const SAFER_RESOURCE_GROUPS: u64 = 31;
-
-    const SAFER_METADATA: u64 = 32;
-
-    const SINGLE_SENDER_AUTHENTICATOR: u64 = 33;
-
     /// Whether the automatic creation of accounts is enabled for sponsored transactions.
     /// Lifetime: transient
     const SPONSORED_AUTOMATIC_ACCOUNT_CREATION: u64 = 34;
@@ -361,8 +350,6 @@ module std::features {
         abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
-    const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
-
     /// Whether allow changing beneficiaries for operators.
     /// Lifetime: transient
     const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
@@ -374,10 +361,6 @@ module std::features {
     public fun operator_beneficiary_change_enabled(): bool {
         is_enabled(OPERATOR_BENEFICIARY_CHANGE)
     }
-
-    const VM_BINARY_FORMAT_V7: u64 = 40;
-
-    const RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET: u64 = 41;
 
     /// Whether the operator commission rate change in delegation pool is enabled.
     /// Lifetime: transient
@@ -465,11 +448,9 @@ module std::features {
         is_enabled(CONCURRENT_FUNGIBLE_ASSETS)
     }
 
-    /// Whether deploying to objects is enabled.
-    const OBJECT_CODE_DEPLOYMENT: u64 = 52;
-
+    #[deprecated]
     public fun is_object_code_deployment_enabled(): bool {
-        is_enabled(OBJECT_CODE_DEPLOYMENT)
+        true
     }
 
     /// Whether checking the maximum object nesting is enabled.
@@ -561,8 +542,6 @@ module std::features {
         is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
     }
 
-    const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
-
     #[deprecated]
     public fun get_primary_apt_fungible_store_at_user_address_feature(): u64 {
         abort error::invalid_argument(EINVALID_FEATURE)
@@ -573,49 +552,40 @@ module std::features {
         true
     }
 
-    const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
-
+    #[deprecated]
     public fun aggregator_v2_is_at_least_api_enabled(): bool {
         true
     }
 
-    /// Whether we use more efficient native implementation of computing object derived address
-    const OBJECT_NATIVE_DERIVED_ADDRESS: u64 = 62;
-
+    #[deprecated]
     public fun get_object_native_derived_address_feature(): u64 {
-        OBJECT_NATIVE_DERIVED_ADDRESS
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
+    #[deprecated]
     public fun object_native_derived_address_enabled(): bool {
         true
     }
 
-    /// Whether the dispatchable fungible asset standard feature is enabled.
-    ///
-    /// Lifetime: transient
-    const DISPATCHABLE_FUNGIBLE_ASSET: u64 = 63;
-
+    #[deprecated]
     public fun get_dispatchable_fungible_asset_feature(): u64 {
-        DISPATCHABLE_FUNGIBLE_ASSET
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
+    #[deprecated]
     public fun dispatchable_fungible_asset_enabled(): bool {
         true
     }
 
-    /// Lifetime: transient
-    const NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE: u64 = 64;
-
+    #[deprecated]
     public fun get_new_accounts_default_to_fa_apt_store_feature(): u64 {
-        NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
+    #[deprecated]
     public fun new_accounts_default_to_fa_apt_store_enabled(): bool {
-        is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
+        true
     }
-
-    /// Lifetime: transient
-    const OPERATIONS_DEFAULT_TO_FA_APT_STORE: u64 = 65;
 
     #[deprecated]
     public fun get_operations_default_to_fa_apt_store_feature(): u64 {
@@ -756,12 +726,6 @@ module std::features {
         false
     }
 
-    /// Whether function values are enabled.
-    /// Lifetime: transient
-    ///
-    /// We do not expect use from Move, so for now only for documentation purposes here
-    const ENABLE_FUNCTION_VALUES: u64 = 89;
-
     /// Whether new accounts default to the Fungible Asset store.
     /// Lifetime: transient
     const NEW_ACCOUNTS_DEFAULT_TO_FA_STORE: u64 = 90;
@@ -837,9 +801,6 @@ module std::features {
     public fun is_distribute_transaction_fee_enabled(): bool {
         is_enabled(DISTRIBUTE_TRANSACTION_FEE)
     }
-
-    /// Whether the monotonically increasing counter native function is enabled.
-    const MONOTONICALLY_INCREASING_COUNTER: u64 = 98;
 
     #[deprecated]
     public fun get_monotonically_increasing_counter_feature(): u64 {

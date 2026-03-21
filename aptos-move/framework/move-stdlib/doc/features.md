@@ -282,15 +282,6 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>: u64 = 66;
-</code></pre>
-
-
-
 <a id="0x1_features_APTOS_STD_CHAIN_ID_NATIVES"></a>
 
 Whether the new <code>aptos_stdlib::type_info::chain_id()</code> native for fetching the chain ID is enabled.
@@ -427,17 +418,6 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES"></a>
-
-Deprecated feature
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>: u64 = 6;
-</code></pre>
-
-
-
 <a id="0x1_features_COMMISSION_CHANGE_DELEGATION_POOL"></a>
 
 Whether the operator commission rate change in delegation pool is enabled.
@@ -551,18 +531,6 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_DISPATCHABLE_FUNGIBLE_ASSET"></a>
-
-Whether the dispatchable fungible asset standard feature is enabled.
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>: u64 = 63;
-</code></pre>
-
-
-
 <a id="0x1_features_DISTRIBUTE_TRANSACTION_FEE"></a>
 
 Whether to distribute transaction fee to validators.
@@ -618,19 +586,6 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x1_features_ENABLE_FUNCTION_VALUES"></a>
-
-Whether function values are enabled.
-Lifetime: transient
-
-We do not expect use from Move, so for now only for documentation purposes here
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_ENABLE_FUNCTION_VALUES">ENABLE_FUNCTION_VALUES</a>: u64 = 89;
 </code></pre>
 
 
@@ -737,15 +692,6 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH">LIMIT_MAX_IDENTIFIER_LENGTH</a>: u64 = 38;
-</code></pre>
-
-
-
 <a id="0x1_features_MAX_OBJECT_NESTING_CHECK"></a>
 
 Whether checking the maximum object nesting is enabled.
@@ -776,16 +722,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>: u64 = 57;
-</code></pre>
-
-
-
-<a id="0x1_features_MONOTONICALLY_INCREASING_COUNTER"></a>
-
-Whether the monotonically increasing counter native function is enabled.
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_MONOTONICALLY_INCREASING_COUNTER">MONOTONICALLY_INCREASING_COUNTER</a>: u64 = 98;
 </code></pre>
 
 
@@ -833,16 +769,6 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE"></a>
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>: u64 = 64;
-</code></pre>
-
-
-
 <a id="0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE"></a>
 
 Whether new accounts default to the Fungible Asset store.
@@ -850,36 +776,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_STORE</a>: u64 = 90;
-</code></pre>
-
-
-
-<a id="0x1_features_OBJECT_CODE_DEPLOYMENT"></a>
-
-Whether deploying to objects is enabled.
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>: u64 = 52;
-</code></pre>
-
-
-
-<a id="0x1_features_OBJECT_NATIVE_DERIVED_ADDRESS"></a>
-
-Whether we use more efficient native implementation of computing object derived address
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_OBJECT_NATIVE_DERIVED_ADDRESS">OBJECT_NATIVE_DERIVED_ADDRESS</a>: u64 = 62;
-</code></pre>
-
-
-
-<a id="0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE"></a>
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a>: u64 = 65;
 </code></pre>
 
 
@@ -937,15 +833,6 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>: u64 = 61;
-</code></pre>
-
-
-
 <a id="0x1_features_RECONFIGURE_WITH_DKG"></a>
 
 Deprecated by <code>aptos_framework::randomness_config::RandomnessConfig</code>.
@@ -963,33 +850,6 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>: u64 = 9;
-</code></pre>
-
-
-
-<a id="0x1_features_RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET">RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET</a>: u64 = 41;
-</code></pre>
-
-
-
-<a id="0x1_features_SAFER_METADATA"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_METADATA">SAFER_METADATA</a>: u64 = 32;
-</code></pre>
-
-
-
-<a id="0x1_features_SAFER_RESOURCE_GROUPS"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_RESOURCE_GROUPS">SAFER_RESOURCE_GROUPS</a>: u64 = 31;
 </code></pre>
 
 
@@ -1024,15 +884,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>: u64 = 25;
-</code></pre>
-
-
-
-<a id="0x1_features_SINGLE_SENDER_AUTHENTICATOR"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_SINGLE_SENDER_AUTHENTICATOR">SINGLE_SENDER_AUTHENTICATOR</a>: u64 = 33;
 </code></pre>
 
 
@@ -1117,15 +968,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V6">VM_BINARY_FORMAT_V6</a>: u64 = 5;
-</code></pre>
-
-
-
-<a id="0x1_features_VM_BINARY_FORMAT_V7"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V7">VM_BINARY_FORMAT_V7</a>: u64 = 40;
 </code></pre>
 
 
@@ -2716,7 +2558,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_object_code_deployment_enabled">is_object_code_deployment_enabled</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_object_code_deployment_enabled">is_object_code_deployment_enabled</a>(): bool
 </code></pre>
 
 
@@ -2726,7 +2569,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_object_code_deployment_enabled">is_object_code_deployment_enabled</a>(): bool {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>)
+    <b>true</b>
 }
 </code></pre>
 
@@ -3126,7 +2969,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool
 </code></pre>
 
 
@@ -3150,7 +2994,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_object_native_derived_address_feature">get_object_native_derived_address_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_object_native_derived_address_feature">get_object_native_derived_address_feature</a>(): u64
 </code></pre>
 
 
@@ -3160,7 +3005,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_object_native_derived_address_feature">get_object_native_derived_address_feature</a>(): u64 {
-    <a href="features.md#0x1_features_OBJECT_NATIVE_DERIVED_ADDRESS">OBJECT_NATIVE_DERIVED_ADDRESS</a>
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 
@@ -3174,7 +3019,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_object_native_derived_address_enabled">object_native_derived_address_enabled</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_object_native_derived_address_enabled">object_native_derived_address_enabled</a>(): bool
 </code></pre>
 
 
@@ -3198,7 +3044,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_dispatchable_fungible_asset_feature">get_dispatchable_fungible_asset_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_dispatchable_fungible_asset_feature">get_dispatchable_fungible_asset_feature</a>(): u64
 </code></pre>
 
 
@@ -3208,7 +3055,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_dispatchable_fungible_asset_feature">get_dispatchable_fungible_asset_feature</a>(): u64 {
-    <a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 
@@ -3222,7 +3069,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dispatchable_fungible_asset_enabled">dispatchable_fungible_asset_enabled</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_dispatchable_fungible_asset_enabled">dispatchable_fungible_asset_enabled</a>(): bool
 </code></pre>
 
 
@@ -3246,7 +3094,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64
 </code></pre>
 
 
@@ -3256,7 +3105,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64 {
-    <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 
@@ -3270,7 +3119,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">new_accounts_default_to_fa_apt_store_enabled</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">new_accounts_default_to_fa_apt_store_enabled</a>(): bool
 </code></pre>
 
 
@@ -3280,7 +3130,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">new_accounts_default_to_fa_apt_store_enabled</a>(): bool {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>)
+    <b>true</b>
 }
 </code></pre>
 
@@ -4725,17 +4575,6 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_abort_if_multisig_payload_mismatch_enabled">spec_abort_if_multisig_payload_mismatch_enabled</a>(): bool {
    <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a>)
-}
-</code></pre>
-
-
-
-
-<a id="0x1_features_spec_new_accounts_default_to_fa_apt_store_enabled"></a>
-
-
-<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_new_accounts_default_to_fa_apt_store_enabled">spec_new_accounts_default_to_fa_apt_store_enabled</a>(): bool {
-   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>)
 }
 </code></pre>
 
