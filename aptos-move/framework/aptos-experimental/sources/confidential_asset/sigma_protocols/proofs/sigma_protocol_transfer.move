@@ -121,21 +121,22 @@ module aptos_experimental::sigma_protocol_transfer {
     #[test_only]
     use aptos_experimental::confidential_amount;
     #[test_only]
-    use aptos_experimental::ristretto255_twisted_elgamal::{
-        get_encryption_key_basepoint_compressed, generate_twisted_elgamal_keypair
-    };
+    use aptos_experimental::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
     #[test_only]
-    use aptos_experimental::sigma_protocol_utils::{equal_vec_points, points_clone};
+    use aptos_experimental::confidential_crypto_test_utils::{equal_vec_points,
+        generate_twisted_elgamal_keypair, generate_available_randomness, generate_pending_randomness,
+        new_available_from_amount, new_amount_from_u64};
+    #[test_only]
+    use aptos_experimental::sigma_protocol_utils::points_clone;
     #[test_only]
     use aptos_std::ristretto255::{Scalar, double_scalar_mul, multi_scalar_mul, scalar_zero};
     #[test_only]
     use aptos_experimental::confidential_balance::{ConfidentialBalanceRandomness,
-        generate_available_randomness, generate_pending_randomness,
-        new_available_from_amount, split_available_into_chunks, split_pending_into_chunks};
+        split_available_into_chunks, split_pending_into_chunks};
 
     //
     // Constants
@@ -640,7 +641,7 @@ module aptos_experimental::sigma_protocol_transfer {
             new_balance_u128, new_balance_randomness, compressed_ek_sender, compressed_ek_eff_aud
         );
 
-        let amount = confidential_amount::new_from_amount(
+        let amount = new_amount_from_u64(
             amount_u64, amount_randomness,
             compressed_ek_sender, compressed_ek_recip,
             compressed_ek_eff_aud, compressed_ek_volun_auds,

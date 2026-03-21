@@ -7,8 +7,7 @@ module aptos_experimental::confidential_range_proofs {
     use aptos_std::ristretto255_bulletproofs::{Self as bulletproofs, RangeProof};
     use aptos_experimental::confidential_balance;
 
-    #[test_only]
-    use aptos_std::ristretto255::Scalar;
+
 
     friend aptos_experimental::confidential_asset;
 
@@ -56,24 +55,6 @@ module aptos_experimental::confidential_range_proofs {
     /// Returns the DST for the range proofs.
     public fun get_bulletproofs_dst(): vector<u8> {
         BULLETPROOFS_DST
-    }
-
-    //
-    // Test-only range proof proving helpers
-    //
-
-    #[test_only]
-    public(friend) fun prove_range(
-        amount_chunks: &vector<Scalar>, randomness: &vector<Scalar>
-    ): RangeProof {
-        let (proof, _) =
-            bulletproofs::prove_batch_range_pedersen(
-                amount_chunks,
-                randomness,
-                confidential_balance::get_chunk_size_bits(),
-                BULLETPROOFS_DST
-            );
-        proof
     }
 
 }

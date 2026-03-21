@@ -82,19 +82,13 @@ module aptos_experimental::sigma_protocol_key_rotation {
     #[test_only]
     use aptos_experimental::sigma_protocol_witness::new_secret_witness;
     #[test_only]
-    use aptos_experimental::sigma_protocol_utils::compressed_identity_points;
+    use aptos_experimental::confidential_crypto_test_utils::{compressed_identity_points, equal_vec_points, compress_points, generate_twisted_elgamal_keypair};
     #[test_only]
     use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
-    #[test_only]
-    use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_utils::equal_vec_points;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_utils::compress_points;
 
     //
     // Constants
