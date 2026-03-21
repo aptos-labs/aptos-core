@@ -161,6 +161,7 @@ pub enum FeatureFlag {
     SlhDsaSha2_128sSignature,
     EncryptedTransactions,
     PublicStructEnumArgs,
+    BatchedBulletproofsCallableByFrameworkOnly,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -421,6 +422,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::VMBinaryFormatV10 => AptosFeatureFlag::VM_BINARY_FORMAT_V10,
             FeatureFlag::EncryptedTransactions => AptosFeatureFlag::ENCRYPTED_TRANSACTIONS,
             FeatureFlag::PublicStructEnumArgs => AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS,
+            FeatureFlag::BatchedBulletproofsCallableByFrameworkOnly => AptosFeatureFlag::BATCHED_BULLETPROOFS_CALLABLE_BY_FRAMEWORK_ONLY,
         }
     }
 }
@@ -608,6 +610,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::VM_BINARY_FORMAT_V10 => FeatureFlag::VMBinaryFormatV10,
             AptosFeatureFlag::ENCRYPTED_TRANSACTIONS => FeatureFlag::EncryptedTransactions,
             AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS => FeatureFlag::PublicStructEnumArgs,
+            AptosFeatureFlag::BATCHED_BULLETPROOFS_CALLABLE_BY_FRAMEWORK_ONLY => FeatureFlag::BatchedBulletproofsCallableByFrameworkOnly,
         }
     }
 }

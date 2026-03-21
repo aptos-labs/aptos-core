@@ -885,6 +885,18 @@ module std::features {
         is_enabled(ENCRYPTED_TRANSACTIONS)
     }
 
+    /// When enabled, batched Bulletproof range proof verification is restricted to `0x1` modules only.
+    /// Lifetime: transient
+    const BATCHED_BULLETPROOFS_CALLABLE_BY_FRAMEWORK_ONLY: u64 = 110;
+
+    public fun get_batched_bulletproofs_callable_by_framework_only_feature(): u64 {
+        BATCHED_BULLETPROOFS_CALLABLE_BY_FRAMEWORK_ONLY
+    }
+
+    public fun batched_bulletproofs_callable_by_framework_only_enabled(): bool {
+        is_enabled(BATCHED_BULLETPROOFS_CALLABLE_BY_FRAMEWORK_ONLY)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
