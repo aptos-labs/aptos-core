@@ -43,13 +43,11 @@ module aptos_experimental::sigma_protocol_registration {
     #[test_only]
     use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
     #[test_only]
-    use aptos_experimental::ristretto255_twisted_elgamal::pubkey_from_secret_key;
+    use aptos_experimental::confidential_crypto_test_utils::{pubkey_from_secret_key, equal_vec_points};
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_utils::equal_vec_points;
 
     //
     // Constants

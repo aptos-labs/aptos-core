@@ -14,7 +14,7 @@ module aptos_experimental::confidential_asset_tests {
 
     use aptos_experimental::confidential_asset;
     use aptos_experimental::confidential_balance::{Pending, Balance};
-    use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
+    use aptos_experimental::confidential_crypto_test_utils::generate_twisted_elgamal_keypair;
 
     struct MockCoin {}
 

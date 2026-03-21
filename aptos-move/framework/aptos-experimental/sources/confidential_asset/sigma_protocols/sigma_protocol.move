@@ -22,7 +22,7 @@ module aptos_experimental::sigma_protocol {
     #[test_only]
     use aptos_experimental::sigma_protocol_witness::{Self, Witness};
     #[test_only]
-    use aptos_experimental::sigma_protocol_utils::{equal_vec_points, add_vec_points, mul_points, mul_scalars, add_vec_scalars, compress_points};
+    use aptos_experimental::confidential_crypto_test_utils::{equal_vec_points, add_vec_points, mul_points, mul_scalars, add_vec_scalars, compress_points};
 
     //
     // Error codes

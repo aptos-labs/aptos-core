@@ -96,18 +96,19 @@ module aptos_experimental::sigma_protocol_withdraw {
     use aptos_experimental::sigma_protocol_representation::{repr_point, repr_scaled, new_representation};
     use aptos_experimental::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
     #[test_only]
-    use aptos_experimental::confidential_balance::{
-        generate_available_randomness, new_available_from_amount, split_available_into_chunks, Balance};
+    use aptos_experimental::confidential_balance::{split_available_into_chunks, Balance};
     #[test_only]
     use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
     #[test_only]
-    use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
+    use aptos_experimental::confidential_crypto_test_utils::{
+        generate_twisted_elgamal_keypair, generate_available_randomness,
+        new_available_from_amount, equal_vec_points};
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
     #[test_only]
-    use aptos_experimental::sigma_protocol_utils::{equal_vec_points, points_clone};
+    use aptos_experimental::sigma_protocol_utils::points_clone;
     #[test_only]
     use aptos_experimental::sigma_protocol_witness::new_secret_witness;
     #[test_only]

@@ -8,13 +8,11 @@ module aptos_experimental::confidential_amount {
     use aptos_std::ristretto255::{RistrettoPoint, CompressedRistretto};
     use aptos_experimental::confidential_balance;
     use aptos_experimental::sigma_protocol_utils::deserialize_compressed_points;
-    #[test_only]
-    use std::option::Option;
-    #[test_only]
-    use aptos_experimental::sigma_protocol_utils::points_clone;
 
     friend aptos_experimental::confidential_asset;
     friend aptos_experimental::sigma_protocol_transfer;
+    #[test_only]
+    friend aptos_experimental::confidential_crypto_test_utils;
 
     /// Expected the effective auditor R-component to be either empty or have n chunks.
     const E_WRONG_NUM_CHUNKS_FOR_EFFECTIVE_AUDITOR: u64 = 1;
@@ -135,45 +133,4 @@ module aptos_experimental::confidential_amount {
         }
     }
 
-    // === Test-only ===
-
-    #[test_only]
-    /// Creates an Amount by encrypting `amount_u64` under sender, recipient, effective auditor
-    /// (if present), and voluntary auditor keys, all using the same `randomness`.
-    public(friend) fun new_from_amount(
-        amount_u64: u64,
-        randomness: &confidential_balance::ConfidentialBalanceRandomness,
-        compressed_ek_sender: &CompressedRistretto,
-        compressed_ek_recip: &CompressedRistretto,
-        compressed_ek_eff_aud: &Option<CompressedRistretto>,
-        compressed_ek_volun_auds: &vector<CompressedRistretto>,
-    ): Amount {
-        let amount_sender = confidential_balance::new_pending_from_amount(
-            amount_u64 as u128, randomness, compressed_ek_sender
-        );
-        let amount_recip = confidential_balance::new_pending_from_amount(
-            amount_u64 as u128, randomness, compressed_ek_recip
-        );
-
-        let _R_eff_aud = if (compressed_ek_eff_aud.is_some()) {
-            let a = confidential_balance::new_pending_from_amount(
-                amount_u64 as u128, randomness, compressed_ek_eff_aud.borrow()
-            );
-            points_clone(a.get_R())
-        } else {
-            vector[]
-        };
-
-        let _R_volun_auds = compressed_ek_volun_auds.map_ref(|ek| {
-            let a = confidential_balance::new_pending_from_amount(amount_u64 as u128, randomness, ek);
-            points_clone(a.get_R())
-        });
-
-        new(
-            points_clone(amount_sender.get_P()),
-            points_clone(amount_sender.get_R()),
-            points_clone(amount_recip.get_R()),
-            _R_eff_aud, _R_volun_auds
-        )
-    }
 }

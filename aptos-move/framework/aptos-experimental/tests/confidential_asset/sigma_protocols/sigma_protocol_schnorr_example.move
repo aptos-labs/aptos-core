@@ -42,7 +42,7 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     #[test_only]
     use aptos_framework::account;
     #[test_only]
-    use aptos_experimental::sigma_protocol_utils::equal_vec_points;
+    use aptos_experimental::confidential_crypto_test_utils::equal_vec_points;
 
     /// Protocol ID used for domain separation
     const PROTOCOL_ID: vector<u8> = b"My Schnorr test case app";

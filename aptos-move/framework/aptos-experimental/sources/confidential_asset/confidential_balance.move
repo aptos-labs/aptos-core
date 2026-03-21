@@ -22,6 +22,8 @@ module aptos_experimental::confidential_balance {
     friend aptos_experimental::sigma_protocol_key_rotation;
     #[test_only]
     friend aptos_experimental::confidential_asset_tests;
+    #[test_only]
+    friend aptos_experimental::confidential_crypto_test_utils;
 
     //
     // Constants
@@ -300,87 +302,7 @@ module aptos_experimental::confidential_balance {
     }
 
     #[test_only]
-    use aptos_std::ristretto255::{Self, random_scalar, double_scalar_mul, multi_scalar_mul};
-    #[test_only]
-    use aptos_experimental::ristretto255_twisted_elgamal as twisted_elgamal;
-    #[test_only]
-    use std::option::Option;
-
-    #[test_only]
-    public(friend) fun generate_randomness(num_chunks: u64): ConfidentialBalanceRandomness {
-        new_randomness(vector::range(0, num_chunks).map(|_| random_scalar()))
-    }
-
-    #[test_only]
-    public(friend) fun generate_pending_randomness(): ConfidentialBalanceRandomness {
-        generate_randomness(PENDING_BALANCE_CHUNKS)
-    }
-
-    #[test_only]
-    public(friend) fun generate_available_randomness(): ConfidentialBalanceRandomness {
-        generate_randomness(AVAILABLE_BALANCE_CHUNKS)
-    }
-
-    #[test_only]
-    /// Shared encryption logic: computes (P, R) where P_i = amount_i*G + r_i*H, R_i = r_i*EK.
-    public(friend) fun encrypt_amount(
-        amount_chunks: &vector<Scalar>,
-        randomness: &ConfidentialBalanceRandomness,
-        ek: &CompressedRistretto,
-        num_chunks: u64,
-    ): (vector<RistrettoPoint>, vector<RistrettoPoint>) {
-        let r = randomness.scalars();
-        let ek_point = ek.point_decompress();
-        let basepoint_H = twisted_elgamal::get_encryption_key_basepoint();
-
-        let p = vector::range(0, num_chunks).map(|i| {
-            double_scalar_mul(
-                &amount_chunks[i], &ristretto255::basepoint(),
-                &r[i], &basepoint_H
-            )
-        });
-        let r_out = vector::range(0, num_chunks).map(|i| {
-            ek_point.point_mul(&r[i])
-        });
-
-        (p, r_out)
-    }
-
-    #[test_only]
-    /// Creates a new pending balance from an amount using the provided randomness and encryption key.
-    public(friend) fun new_pending_from_amount(
-        amount: u128,
-        randomness: &ConfidentialBalanceRandomness,
-        ek: &CompressedRistretto
-    ): Balance<Pending> {
-        let amount_chunks = split_pending_into_chunks(amount);
-        let (p, r) = encrypt_amount(&amount_chunks, randomness, ek, PENDING_BALANCE_CHUNKS);
-        new_pending_from_p_and_r(p, r)
-    }
-
-    #[test_only]
-    /// If `auditor_ek` is `Some`, computes R_aud_i = r_i * EK_auditor; otherwise R_aud is empty.
-    public(friend) fun new_available_from_amount(
-        amount: u128,
-        randomness: &ConfidentialBalanceRandomness,
-        ek: &CompressedRistretto,
-        auditor_ek: &Option<CompressedRistretto>
-    ): Balance<Available> {
-        let amount_chunks = split_available_into_chunks(amount);
-        let (p, r) = encrypt_amount(&amount_chunks, randomness, ek, AVAILABLE_BALANCE_CHUNKS);
-
-        let r_aud_components = if (auditor_ek.is_some()) {
-            let auditor_ek_point = auditor_ek.borrow().point_decompress();
-            let r_scalars = randomness.scalars();
-            vector::range(0, AVAILABLE_BALANCE_CHUNKS).map(|i| {
-                auditor_ek_point.point_mul(&r_scalars[i])
-            })
-        } else {
-            vector[]
-        };
-
-        new_available_from_p_r_r_aud(p, r, r_aud_components)
-    }
+    use aptos_std::ristretto255::multi_scalar_mul;
 
     #[test_only]
     /// Verifies that a balance encrypts `amount` using DK on the given R component.

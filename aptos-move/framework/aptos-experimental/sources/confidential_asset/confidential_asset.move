@@ -32,11 +32,16 @@ module aptos_experimental::confidential_asset {
     #[test_only]
     use aptos_std::ristretto255::Scalar;
     #[test_only]
-    use aptos_experimental::confidential_balance::{new_pending_from_p_and_r, generate_available_randomness,
-        new_available_from_amount, split_available_into_chunks, split_pending_into_chunks, generate_pending_randomness
+    use aptos_experimental::confidential_balance::{new_pending_from_p_and_r,
+        split_available_into_chunks, split_pending_into_chunks
     };
     #[test_only]
-    use aptos_experimental::sigma_protocol_utils::{points_clone, decompress_points};
+    use aptos_experimental::sigma_protocol_utils::points_clone;
+    #[test_only]
+    use aptos_experimental::confidential_crypto_test_utils::{
+        decompress_points, generate_available_randomness, new_available_from_amount,
+        generate_pending_randomness, prove_range
+    };
 
     #[test_only]
     friend aptos_experimental::confidential_asset_tests;
@@ -1369,7 +1374,7 @@ module aptos_experimental::confidential_asset {
 
         let new_r = new_balance_randomness.scalars();
         let new_a = split_available_into_chunks(new_amount);
-        let zkrp_new_balance = confidential_range_proofs::prove_range(&new_a, new_r);
+        let zkrp_new_balance = prove_range(&new_a, new_r);
 
         let v = new_scalar_from_u64(v);
         let compressed_old_balance = get_available_balance(sender_addr, asset_type);
@@ -1437,8 +1442,8 @@ module aptos_experimental::confidential_asset {
 
         let new_a = split_available_into_chunks(new_balance_u128);
         let v = split_pending_into_chunks((amount_u64 as u128));
-        let zkrp_new_balance = confidential_range_proofs::prove_range(&new_a, new_balance_randomness.scalars());
-        let zkrp_amount = confidential_range_proofs::prove_range(&v, amount_randomness.scalars());
+        let zkrp_new_balance = prove_range(&new_a, new_balance_randomness.scalars());
+        let zkrp_amount = prove_range(&v, amount_randomness.scalars());
 
         let session = sigma_protocol_transfer::new_session(
             &sender, recipient_addr, asset_type, has_effective_auditor, num_volun_auditors,

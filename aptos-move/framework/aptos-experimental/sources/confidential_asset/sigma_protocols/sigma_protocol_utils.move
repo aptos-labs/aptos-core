@@ -12,6 +12,8 @@ module aptos_experimental::sigma_protocol_utils {
     friend aptos_experimental::sigma_protocol_pedeq_example;
     #[test_only]
     friend aptos_experimental::sigma_protocol_schnorr_example;
+    #[test_only]
+    friend aptos_experimental::confidential_crypto_test_utils;
 
     use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto,
         new_point_and_compressed_from_bytes, new_compressed_point_from_bytes,
@@ -60,72 +62,4 @@ module aptos_experimental::sigma_protocol_utils {
         a.map_ref(|s| s.scalar_neg())
     }
 
-    #[test_only]
-    use aptos_std::ristretto255::point_identity_compressed;
-
-    #[test_only]
-    public(friend) fun decompress_points(compressed: &vector<CompressedRistretto>): vector<RistrettoPoint> {
-        compressed.map_ref(|p| p.point_decompress())
-    }
-
-    #[test_only]
-    public(friend) fun compress_points(points: &vector<RistrettoPoint>): vector<CompressedRistretto> {
-        points.map_ref(|p| p.point_compress())
-    }
-
-    #[test_only]
-    const E_INTERNAL_INVARIANT_FAILED: u64 = 1;
-
-    #[test_only]
-    /// Returns a vector of `n` compressed identity (zero) points.
-    public(friend) fun compressed_identity_points(n: u64): vector<CompressedRistretto> {
-        std::vector::range(0, n).map(|_| point_identity_compressed())
-    }
-
-    #[test_only]
-    /// Adds up two vectors of points `a` and `b` returning a new vector `c` where `c[i] = a[i] + b[i]`.
-    public(friend) fun add_vec_points(a: &vector<RistrettoPoint>, b: &vector<RistrettoPoint>): vector<RistrettoPoint> {
-        assert!(a.length() == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
-
-        let r = vector[];
-        a.enumerate_ref(|i, pt| {
-            r.push_back(pt.point_add(&b[i]));
-        });
-
-        r
-    }
-
-    #[test_only]
-    /// Given a vector of Ristretto255 points `a` and a scalar `e`, returns a new vector `c` where `c[i] = e * a[i]`.
-    public(friend) fun mul_points(a: &vector<RistrettoPoint>, e: &Scalar): vector<RistrettoPoint> {
-        a.map_ref(|pt| pt.point_mul(e))
-    }
-
-    #[test_only]
-    /// Ensures two vectors of Ristretto255 points are equal.
-    public(friend) fun equal_vec_points(a: &vector<RistrettoPoint>, b: &vector<RistrettoPoint>): bool {
-        let m = a.length();
-        assert!(m == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
-
-        std::vector::range(0, m).all(|i| a[*i].point_equals(&b[*i]))
-    }
-
-    #[test_only]
-    /// Adds up two vectors of scalars `a` and `b` returning a new vector `c` where `c[i] = a[i] + b[i]`.
-    public(friend) fun add_vec_scalars(a: &vector<Scalar>, b: &vector<Scalar>): vector<Scalar> {
-        assert!(a.length() == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
-
-        let r = vector[];
-        a.enumerate_ref(|i, a_i| {
-            r.push_back(a_i.scalar_add(&b[i]));
-        });
-
-        r
-    }
-
-    #[test_only]
-    /// Given a vector of scalars `a` and a scalar `e`, returns a new vector `c` where `c[i] = e * a[i]`.
-    public(friend) fun mul_scalars(a: &vector<Scalar>, e: &Scalar): vector<Scalar> {
-        a.map_ref(|s| s.scalar_mul(e))
-    }
 }
