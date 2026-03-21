@@ -31,12 +31,13 @@ _cleanup_on_exit() {
 }
 trap _cleanup_on_exit EXIT
 
-# Helper: create a temp dir and register it for automatic cleanup.
+# Helper: create a temp dir.  The caller MUST register it immediately
+# after with: _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
+# (Command substitution runs in a subshell, so registering inside
+# make_tmp_dir would lose the update to _CLEANUP_DIRS.)
 make_tmp_dir() {
     # Use -t for BSD/macOS mktemp compatibility (GNU mktemp also accepts it)
-    _td="$(mktemp -d -t setup_build.XXXXXX)"
-    _CLEANUP_DIRS="$_CLEANUP_DIRS $_td"
-    echo "$_td"
+    mktemp -d -t setup_build.XXXXXX
 }
 
 # ============================================================================
@@ -261,9 +262,8 @@ COMPONENT FLAGS
             pnpm              Fast, disk-efficient Node.js package manager.
 
 MODIFIER FLAGS
-    -b    Batch mode.  Suppresses the interactive confirmation prompt and
-          reduces informational output.  Recommended for CI/CD pipelines
-          and Docker image builds.
+    -b    Batch mode.  Suppresses the interactive confirmation prompt.
+          Recommended for CI/CD pipelines and Docker image builds.
 
     -p    Update ~/.profile with PATH entries for all installed tools.
           Adds CARGO_HOME, DOTNET_ROOT, Z3_EXE, CVC5_EXE, BOOGIE_EXE
@@ -433,7 +433,8 @@ resolve_pkg_name() {
                 apt-get)     echo "libpq-dev" ;;
                 apk)         echo "postgresql-dev" ;;
                 pacman)      echo "postgresql-libs" ;;
-                yum|dnf)     echo "postgresql-devel" ;;
+                yum)         echo "postgresql-devel" ;;
+                dnf)         echo "libpq-devel" ;;
                 brew)        echo "postgresql" ;;
                 *)           echo "" ;;
             esac
@@ -773,12 +774,12 @@ install_cargo_tool() {
 
     if command -v "$_cmd" >/dev/null 2>&1; then
         _actual="$("$_cmd" --version 2>/dev/null || echo "")"
-        # Use grep with word-boundary to avoid substring false positives
-        # (e.g. 0.9.1 matching 0.9.10)
+        # Check for exact version match.  grep -qF does fixed-string matching
+        # (no regex).  Then verify the match isn't a prefix of a longer version
+        # (e.g. 0.9.1 should not match 0.9.10) by checking the next character.
         if echo "$_actual" | grep -qF "$_expected"; then
-            # Verify it's not a prefix of a longer version
-            _stripped="$(echo "$_actual" | sed "s/.*${_expected}//")"
-            case "$_stripped" in
+            _after="$(echo "$_actual" | sed "s/.*$(echo "$_expected" | sed 's/[.]/\\./g')//")"
+            case "$_after" in
                 ""| " "* | ")"* | "-"*)
                     log_info "$_cmd v${_expected} already installed"
                     return 0
@@ -853,6 +854,7 @@ install_protoc() {
         esac
 
         _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
         (
             cd "$_tmpdir" || exit 1
             _url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${_protoc_pkg}.zip"
@@ -934,6 +936,7 @@ install_shellcheck() {
     install_generic xz
     _machine="$(uname -m)"
     _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
     _url="https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${_machine}.tar.xz"
     curl -sL -o "${_tmpdir}/out.xz" "$_url" || {
         rm -rf "$_tmpdir"
@@ -1003,6 +1006,7 @@ install_helm() {
     _os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
     _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
     curl -sL -o "${_tmpdir}/helm.tar.gz" \
         "https://get.helm.sh/helm-v${HELM_VERSION}-${_os}-${_machine}.tar.gz" || {
         rm -rf "$_tmpdir"
@@ -1111,6 +1115,7 @@ install_awscli() {
     _os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
     _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
     curl -sL -o "${_tmpdir}/aws.zip" \
         "https://awscli.amazonaws.com/awscli-exe-${_os}-${_machine}.zip" || {
         rm -rf "$_tmpdir"
@@ -1160,6 +1165,7 @@ install_s5cmd() {
 
         if [ -n "$_suffix" ]; then
             _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
             curl -sL -o "${_tmpdir}/s5cmd.tar.gz" \
                 "https://github.com/peak/s5cmd/releases/download/v${S5CMD_VERSION}/s5cmd_${S5CMD_VERSION}_Linux-${_suffix}.tar.gz" || {
                 rm -rf "$_tmpdir"
@@ -1194,6 +1200,7 @@ install_allure() {
         # shellcheck disable=SC2086
         $_sudo apt-get install default-jre -y --no-install-recommends
         _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
         _deb="${_tmpdir}/allure_${ALLURE_VERSION}-1_all.deb"
         curl -sL -o "$_deb" \
             "https://github.com/diem/allure2/releases/download/${ALLURE_VERSION}/allure_${ALLURE_VERSION}-1_all.deb" || \
@@ -1251,6 +1258,7 @@ install_z3() {
     esac
 
     _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
     (
         cd "$_tmpdir" || exit 1
         curl -LOs "https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/${_z3_pkg}.zip" || \
@@ -1292,6 +1300,7 @@ install_cvc5() {
     esac
 
     _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
     (
         cd "$_tmpdir" || exit 1
         curl -LOs "https://github.com/cvc5/cvc5/releases/download/cvc5-${CVC5_VERSION}/${_cvc5_pkg}" || {
@@ -1345,6 +1354,7 @@ install_dotnet() {
     fi
 
     _tmpdir="$(make_tmp_dir)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_tmpdir"
     wget --tries 10 --retry-connrefused --waitretry=5 \
         https://dot.net/v1/dotnet-install.sh -O "${_tmpdir}/dotnet-install.sh" || \
         die "Failed to download .NET install script." \

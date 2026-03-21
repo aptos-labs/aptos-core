@@ -7,6 +7,11 @@ on:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   # schedule: # NOTE: the schedule is dictated by PIES
 
+env:
+  # Windows default stack is 1MB vs 8MB on Linux; some tests (e.g.
+  # ensure_every_command_args_work) overflow without a larger stack.
+  RUST_MIN_STACK: 8388608
+
 jobs:
   windows-build:
     runs-on: windows-2025
@@ -24,9 +29,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
-
-      - name: Set up WinGet
-        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/setup_build.ps1 -b
 
       # Ensure that long paths work
       - name: Ensure long paths work

@@ -171,7 +171,9 @@ if ($Help) {
 # Architecture detection
 # ============================================================================
 
-$Arch = if ([Environment]::Is64BitOperatingSystem) { "64" } else { "86" }
+# Arch tokens: "64"/"32" for protoc (win64/win32), "64"/"86" for Z3 (x64/x86)
+$Arch    = if ([Environment]::Is64BitOperatingSystem) { "64" } else { "32" }
+$ArchX86 = if ([Environment]::Is64BitOperatingSystem) { "64" } else { "86" }
 
 # ============================================================================
 # OS check
@@ -244,7 +246,12 @@ function Invoke-Native {
     param([string]$Command, [string[]]$Arguments)
     $prevPref = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    try { & $Command @Arguments }
+    try {
+        & $Command @Arguments
+        if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+            Write-Warn "$Command exited with code $LASTEXITCODE"
+        }
+    }
     finally { $ErrorActionPreference = $prevPref }
 }
 
@@ -406,10 +413,10 @@ function Install-Z3 {
         Write-Info "Z3 already installed at $env:Z3_EXE"
         return
     }
-    $zip = "z3-${Z3_VERSION}-x${Arch}-win.zip"
+    $zip = "z3-${Z3_VERSION}-x${ArchX86}-win.zip"
     $url = "https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/$zip"
     $dest = Join-Path $env:USERPROFILE "Downloads\$zip"
-    $extractDir = Join-Path $env:USERPROFILE "z3-${Z3_VERSION}-x${Arch}-win"
+    $extractDir = Join-Path $env:USERPROFILE "z3-${Z3_VERSION}-x${ArchX86}-win"
 
     Safe-Download -Url $url -Destination $dest
     Expand-Archive -Path $dest -DestinationPath $env:USERPROFILE -Force
