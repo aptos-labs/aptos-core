@@ -655,12 +655,14 @@ install_clang() {
             $_sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "$_version" || \
                 die "Failed to run the LLVM apt setup script for Clang $_version." \
                     "Check https://apt.llvm.org/ for supported distro/version combinations."
+            # Register alternatives only when we just installed via LLVM apt
+            # (the binary path is known to be /usr/bin/clang-N in that case)
+            _sudo="$(sudo_if_needed)"
+            # shellcheck disable=SC2086
+            $_sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${_version}" 100
+            # shellcheck disable=SC2086
+            $_sudo update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${_version}" 100
         fi
-        _sudo="$(sudo_if_needed)"
-        # shellcheck disable=SC2086
-        $_sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${_version}" 100
-        # shellcheck disable=SC2086
-        $_sudo update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${_version}" 100
     else
         install_pkg clang "$_pm"
         install_pkg llvm "$_pm"

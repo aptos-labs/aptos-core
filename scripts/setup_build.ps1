@@ -62,8 +62,8 @@ $Z3_VERSION            = "4.11.2"
 # Boogie -- verification language for the Move Prover
 $BOOGIE_VERSION        = "3.5.6"
 
-# cvc5 -- alternative SMT solver for the Move Prover
-$CVC5_VERSION          = "0.0.3"
+# cvc5 is not installed on Windows (binary distribution format differs).
+# The Move Prover can use Z3 alone; cvc5 is only needed on Linux/macOS.
 
 # Node.js and pnpm are installed via WinGet without version pinning
 # (WinGet manages versioning).  These constants are for reference only.
