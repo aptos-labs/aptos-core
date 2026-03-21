@@ -222,6 +222,7 @@ module aptos_experimental::confidential_asset {
             sender_auditor_hint: Option<EffectiveAuditorHint>,
             new_sender_available_balance: CompressedBalance<Available>,
             new_recip_pending_balance: CompressedBalance<Pending>,
+            memo: vector<u8>,
         }
     }
 
@@ -542,7 +543,8 @@ module aptos_experimental::confidential_asset {
         zkrp_new_balance: vector<u8>,
         zkrp_amount: vector<u8>,
         sigma_proto_comm: vector<vector<u8>>,
-        sigma_proto_resp: vector<vector<u8>>
+        sigma_proto_resp: vector<vector<u8>>,
+        memo: vector<u8>,
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
         let compressed_new_balance = new_compressed_available_from_bytes(new_balance_P, new_balance_R, new_balance_R_eff_aud);
 
@@ -568,7 +570,8 @@ module aptos_experimental::confidential_asset {
             sender,
             asset_type,
             to,
-            proof
+            proof,
+            memo,
         )
     }
 
@@ -577,7 +580,8 @@ module aptos_experimental::confidential_asset {
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         to: address,
-        proof: TransferProof
+        proof: TransferProof,
+        memo: vector<u8>,
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
@@ -620,6 +624,7 @@ module aptos_experimental::confidential_asset {
             sender_auditor_hint: sender_ca_store.auditor_hint,
             new_sender_available_balance: compressed_new_balance,
             new_recip_pending_balance: new_pending_balance,
+            memo,
         });
     }
 

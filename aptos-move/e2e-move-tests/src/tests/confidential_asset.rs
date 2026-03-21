@@ -328,6 +328,7 @@ fn create_confidential_transfer_payload(
     zkrp_transfer_amount_bytes: Vec<u8>,
     sigma_proto_comm: Vec<Vec<u8>>,
     sigma_proto_resp: Vec<Vec<u8>>,
+    memo: Vec<u8>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
@@ -349,6 +350,7 @@ fn create_confidential_transfer_payload(
             bcs::to_bytes(&zkrp_transfer_amount_bytes).unwrap(),
             bcs::to_bytes(&sigma_proto_comm).unwrap(),
             bcs::to_bytes(&sigma_proto_resp).unwrap(),
+            bcs::to_bytes(&memo).unwrap(),
         ],
     ))
 }
@@ -1066,6 +1068,7 @@ fn prove_and_build_confidential_transfer(
         zkrp_amount.bytes,
         extract_compressed_bytes(sigma.compressed_comm_a),
         extract_scalar_bytes(sigma.resp_sigma),
+        vec![], // memo
     )
 }
 
