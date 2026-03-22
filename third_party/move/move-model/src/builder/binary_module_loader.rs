@@ -94,7 +94,41 @@ impl GlobalEnv {
         let BinaryModuleLoader { module_id, .. } = loader;
         self.attach_compiled_module(module_id, module, source_map);
         self.update_loaded_modules();
+        // Inject serialized inline function bodies from module metadata so downstream
+        // packages can inline them without needing the original source.
+        self.inject_inline_bodies_from_metadata(module_id);
         module_id
+    }
+}
+
+impl GlobalEnv {
+    /// Check the compiled module's metadata for serialized inline function bodies and, if found,
+    /// deserialize them and inject them as AST definitions into the module's function stubs.
+    fn inject_inline_bodies_from_metadata(&mut self, module_id: ModuleId) {
+        use crate::serialized_ast::{AstDeserializer, InlineFunctionBodies};
+
+        // Clone metadata to avoid holding a borrow on `self` while mutably constructing
+        // the deserializer below.
+        let metadata_clone: Option<Vec<_>> = self
+            .get_module(module_id)
+            .get_compiled_module()
+            .map(|cm| cm.metadata.clone());
+
+        let bodies_opt = metadata_clone
+            .and_then(|meta| InlineFunctionBodies::from_metadata(&meta).ok().flatten());
+
+        if let Some(bodies) = bodies_opt {
+            let mut deser = AstDeserializer::new(self);
+            let errors = deser.inject_inline_bodies(module_id, &bodies);
+            for (name, err) in errors {
+                // Log but do not abort — an injection failure means the function
+                // body is missing but the module is still usable for non-inline calls.
+                eprintln!(
+                    "warning: failed to inject inline body for {}: {}",
+                    name, err
+                );
+            }
+        }
     }
 }
 
