@@ -38,6 +38,7 @@ use move_model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
     },
+    serialized_ast::InlineFunctionBodies,
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
     well_known,
@@ -173,15 +174,37 @@ impl ModuleGenerator {
         let gen_access_specifiers = language_version.is_at_least(LANGUAGE_VERSION_FOR_RAC);
         let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
-        let metadata = Metadata {
+        let compilation_metadata_entry = Metadata {
             key: COMPILATION_METADATA_KEY.to_vec(),
             value: bcs::to_bytes(&compilation_metadata)
                 .expect("Serialization of CompilationMetadata should succeed"),
         };
+        // Collect pre-serialized inline function bodies stored by the "serialize inline bodies"
+        // pipeline step (which ran before the inliner deleted the bodies from GlobalEnv).
+        let mut metadata_entries = vec![compilation_metadata_entry];
+        let module_id = module_env.get_id();
+        if let Some(bodies_map) = ctx
+            .env
+            .get_extension::<std::collections::BTreeMap<
+                move_model::model::ModuleId,
+                InlineFunctionBodies,
+            >>()
+        {
+            if let Some(bodies) = bodies_map.get(&module_id) {
+                match bodies.clone().into_metadata() {
+                    Ok(entry) => metadata_entries.push(entry),
+                    Err(e) => ctx.env.diag(
+                        codespan_reporting::diagnostic::Severity::Warning,
+                        &module_env.get_loc(),
+                        &format!("Failed to serialize inline function bodies: {}", e),
+                    ),
+                }
+            }
+        }
         let module = move_binary_format::CompiledModule {
             version: file_format_common::VERSION_MAX,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
-            metadata: vec![metadata],
+            metadata: metadata_entries,
             ..Default::default()
         };
         let source_map = {

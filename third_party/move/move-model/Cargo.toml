@@ -8,6 +8,7 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
+bcs = { workspace = true }
 codespan = { workspace = true }
 codespan-reporting = { workspace = true }
 either = { workspace = true }

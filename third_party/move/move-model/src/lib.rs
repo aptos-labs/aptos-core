@@ -47,6 +47,7 @@ pub mod model;
 pub mod options;
 pub mod pragmas;
 pub mod pureness_checker;
+pub mod serialized_ast;
 pub mod sourcifier;
 pub mod spec_translator;
 pub mod symbol;

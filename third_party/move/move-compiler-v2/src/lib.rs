@@ -62,6 +62,7 @@ use move_core_types::vm_status::StatusType;
 use move_model::{
     metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
+    serialized_ast::AstSerializer,
     PackageInfo,
 };
 use move_stackless_bytecode::function_target_pipeline::{
@@ -501,6 +502,25 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         };
         let keep_inline_funs = options.experiment_on(Experiment::KEEP_INLINE_FUNS);
         let lift_inline_funs = options.experiment_on(Experiment::LIFT_INLINE_FUNS);
+
+        // Serialize `public inline` function bodies into the GlobalEnv before the inliner
+        // removes them.  The serialized bytes are stored as a GlobalEnv extension and later
+        // attached as metadata entries in each CompiledModule (see module_generator.rs).
+        env_pipeline.add("serialize inline bodies", |env: &mut GlobalEnv| {
+            let serializer = AstSerializer::new(env);
+            let mut bodies_by_module = std::collections::BTreeMap::new();
+            for module in env.get_modules() {
+                if !module.is_target() {
+                    continue;
+                }
+                let mid = module.get_id();
+                if let Some(bodies) = serializer.serialize_module_inline_bodies(mid) {
+                    bodies_by_module.insert(mid, bodies);
+                }
+            }
+            env.set_extension(bodies_by_module);
+        });
+
         env_pipeline.add("inlining", {
             move |env| {
                 inliner::run_inlining(env, rewriting_scope, keep_inline_funs, lift_inline_funs)
