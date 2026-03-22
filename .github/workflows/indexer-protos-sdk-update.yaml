@@ -16,13 +16,13 @@ jobs:
       - uses: actions/checkout@v6
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf
-        uses: bufbuild/buf-setup-action@v1.50.0
+        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # pin@v1.50.0
         with:
           version: 1.28.1
-      - uses: pre-commit/action@v3.0.0
+      - uses: pre-commit/action@646c83fcd040023954eafda54b4db0192ce70507 # pin@v3.0.0
       # Install protoc itself.
       - name: Install Protoc
-        uses: arduino/setup-protoc@v3
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # pin@v3.0.0
         with:
           version: "25.x"
       # Set up pnpm.
@@ -68,7 +68,7 @@ jobs:
 
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf
-        uses: bufbuild/buf-setup-action@v1.50.0
+        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # pin@v1.50.0
         with:
           version: 1.28.1
 
@@ -99,7 +99,7 @@ jobs:
             token:aptos-ci/github-actions-repository-dispatch
 
       - name: Dispatch Event to SDK Repo
-        uses: peter-evans/repository-dispatch@v3.0.0
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # pin@v3.0.0
         with:
           token: ${{ steps.secrets.outputs.token }}
           repository: 'aptos-labs/aptos-indexer-processor-sdk'
