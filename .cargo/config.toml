@@ -50,9 +50,18 @@ CFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3"
 # Need `-mpclmul` for RocksDB to build until its build script is fixed.
 CXXFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3 -mpclmul"
 
-# Apple Silicon (local dev): tune codegen for the host CPU. Merged with [build].rustflags.
+# Apple Silicon (local dev): same rustc flags as [build] plus host CPU tuning.
 [target.aarch64-apple-darwin]
-rustflags = ["-C", "target-cpu=native"]
+rustflags = [
+  "--cfg",
+  "tokio_unstable",
+  "-C",
+  "force-frame-pointers=yes",
+  "-C",
+  "force-unwind-tables=yes",
+  "-C",
+  "target-cpu=native",
+]
 
 # 64 bit MSVC
 [target.x86_64-pc-windows-msvc]

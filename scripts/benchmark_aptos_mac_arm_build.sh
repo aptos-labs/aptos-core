@@ -29,7 +29,7 @@ run_timed() {
   echo "${label}: $((end - start))s wall time"
 }
 
-echo "=== Baseline: force generic CPU (RUSTFLAGS after config; last target-cpu wins) ==="
+echo "=== Baseline: generic CPU (RUSTFLAGS=-C target-cpu=generic; other flags unchanged from config) ==="
 cargo clean -p "${PKG}"
 run_timed "generic" env RUSTFLAGS="-C target-cpu=generic ${RUSTFLAGS:-}" cargo build -p "${PKG}"
 
