@@ -95,6 +95,7 @@ spec aptos_std::ristretto255 {
 
     spec scalar_from_u128_internal {
         pragma opaque;
+        pragma bv=b"0";
         aborts_if [abstract] false;
         ensures result == spec_scalar_from_u128_internal(num);
     }
@@ -163,6 +164,7 @@ spec aptos_std::ristretto255 {
     }
 
     spec new_scalar_from_u128 {
+        pragma bv=b"0";
         aborts_if false;
         ensures result.data == spec_scalar_from_u128_internal(sixteen_bytes);
     }
