@@ -97,7 +97,7 @@ fn register_account(
     let result = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
-            MODULE_NAME,
+            TEST_MODULE_NAME,
             "prove_registration",
             vec![],
             vec![
@@ -132,7 +132,7 @@ fn generate_keypair(h: &mut MoveHarness) -> (Vec<u8>, Vec<u8>) {
     let result = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
-            "ristretto255_twisted_elgamal",
+            "confidential_crypto_test_utils",
             "generate_twisted_elgamal_keypair",
             vec![],
             vec![],
@@ -152,50 +152,11 @@ fn get_apt_metadata_address() -> AccountAddress {
 }
 
 const MODULE_NAME: &str = "confidential_asset";
+const TEST_MODULE_NAME: &str = "confidential_asset_tests";
 
-/// Set up the confidential asset FA store for APT.
-/// This ensures the primary FA store exists for the confidential asset module's FA store address.
-/// Returns the APT metadata address.
-fn set_up_confidential_store_for_apt(h: &mut MoveHarness) -> AccountAddress {
-    let apt_metadata = get_apt_metadata_address();
-
-    // Get the FA store address used by confidential assets
-    let return_values = h
-        .exec_function_bypass_visibility(
-            FRAMEWORK_ADDRESS,
-            MODULE_NAME,
-            "get_global_config_address",
-            vec![],
-            vec![],
-        )
-        .expect("get_global_config_address should succeed");
-
-    let (bytes, _) = &return_values.return_values[0];
-    let fa_store_address: AccountAddress =
-        bcs::from_bytes(bytes).expect("Failed to deserialize FA store address");
-
-    // Construct the type tag for Metadata (0x1::fungible_asset::Metadata)
-    let metadata_type = TypeTag::Struct(Box::new(StructTag {
-        address: AccountAddress::ONE,
-        module: Identifier::new("fungible_asset").unwrap(),
-        name: Identifier::new("Metadata").unwrap(),
-        type_args: vec![],
-    }));
-
-    // Ensure the primary store exists for the FA store address
-    h.exec_function_bypass_visibility(
-        AccountAddress::ONE, // 0x1::primary_fungible_store
-        "primary_fungible_store",
-        "ensure_primary_store_exists",
-        vec![metadata_type],
-        vec![
-            bcs::to_bytes(&fa_store_address).unwrap(), // owner: address
-            bcs::to_bytes(&apt_metadata).unwrap(),     // metadata: Object<Metadata>
-        ],
-    )
-    .expect("ensure_primary_store_exists should succeed");
-
-    apt_metadata
+/// Returns the APT metadata address. The FA pool store is created lazily by `deposit`.
+fn set_up_confidential_store_for_apt(_h: &mut MoveHarness) -> AccountAddress {
+    get_apt_metadata_address()
 }
 
 /// Create a payload for the confidential_asset::register_raw entry function.
@@ -368,7 +329,7 @@ fn set_auditor_for_asset_type(
     h.exec_function_bypass_visibility(
         FRAMEWORK_ADDRESS,
         MODULE_NAME,
-        "set_auditor_for_asset_type",
+        "set_asset_specific_auditor",
         vec![],
         vec![
             serialize_signer(FRAMEWORK_ADDRESS),
@@ -622,7 +583,7 @@ fn profile_confidential_asset_register(detailed: bool) {
     let result = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
-            MODULE_NAME,
+            TEST_MODULE_NAME,
             "prove_registration",
             vec![],
             vec![
@@ -673,7 +634,9 @@ fn bench_gas_register_detailed() {
 
 #[cfg(feature = "move-harness-with-test-only")]
 /// Profile gas usage for the confidential asset `deposit` function.
-fn profile_confidential_asset_deposit(detailed: bool) {
+/// When `first_deposit` is true, benchmarks the initial deposit (which lazily creates the FA pool store).
+/// When false, benchmarks a subsequent deposit (pool store already exists).
+fn profile_confidential_asset_deposit(detailed: bool, first_deposit: bool) {
     let mut h = setup_harness();
     let alice = create_alice(&mut h);
     let apt_metadata = set_up_confidential_store_for_apt(&mut h);
@@ -682,18 +645,25 @@ fn profile_confidential_asset_deposit(detailed: bool) {
     let (alice_dk, alice_ek) = generate_keypair(&mut h);
     register_account(&mut h, &alice, apt_metadata, &alice_dk, &alice_ek);
 
-    // Record balance before deposit
+    if !first_deposit {
+        // Warmup deposit: creates the FA pool store (one-time cost)
+        let warmup_payload = create_deposit_payload(apt_metadata, 1000u64);
+        let warmup_status = h.run_transaction_payload(&alice, warmup_payload);
+        assert_success(&warmup_status, "deposit (warmup)");
+    }
+
+    // Record balance before the benchmarked deposit
     let alice_balance_before = h.read_aptos_balance(alice.address());
 
-    // Benchmark deposit
     let deposit_amount = 1000u64;
     let payload = create_deposit_payload(apt_metadata, deposit_amount);
 
     let (status, gas_log, gas_used, fee_statement) =
         h.evaluate_gas_with_profiler_and_status(&alice, payload);
 
+    let label = if first_deposit { "deposit (first time)" } else { "deposit" };
     print_gas_cost(
-        "deposit",
+        label,
         gas_used,
         &fee_statement.unwrap(),
         FRAMEWORK_ADDRESS,
@@ -701,7 +671,7 @@ fn profile_confidential_asset_deposit(detailed: bool) {
     );
     maybe_generate_html_report(detailed, &gas_log, "confidential_asset_deposit");
 
-    assert_success(&status, "deposit");
+    assert_success(&status, label);
     assert!(gas_used > 0, "deposit should consume gas");
 
     // Verify balance
@@ -724,14 +694,20 @@ fn profile_confidential_asset_deposit(detailed: bool) {
 #[test]
 #[cfg(feature = "move-harness-with-test-only")]
 fn bench_gas_deposit() {
-    profile_confidential_asset_deposit(false);
+    profile_confidential_asset_deposit(false, false);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_deposit_first() {
+    profile_confidential_asset_deposit(false, true);
 }
 
 #[test]
 #[ignore]
 #[cfg(feature = "move-harness-with-test-only")]
 fn bench_gas_deposit_detailed() {
-    profile_confidential_asset_deposit(true);
+    profile_confidential_asset_deposit(true, false);
 }
 
 #[cfg(feature = "move-harness-with-test-only")]
@@ -841,7 +817,7 @@ fn prove_and_build_withdraw_to(
     let result = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
-            MODULE_NAME,
+            TEST_MODULE_NAME,
             "prove_withdrawal",
             vec![],
             vec![
@@ -1001,7 +977,7 @@ fn prove_and_build_confidential_transfer(
     let result = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
-            MODULE_NAME,
+            TEST_MODULE_NAME,
             "prove_transfer",
             vec![],
             vec![
@@ -1286,7 +1262,7 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
     let result = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
-            MODULE_NAME,
+            TEST_MODULE_NAME,
             "prove_key_rotation",
             vec![],
             vec![
@@ -1365,25 +1341,19 @@ fn bench_gas_rotate_encryption_key_detailed() {
 fn test_call_private_function() {
     let mut h = setup_harness();
 
+    // Test calling a #[test_only] function via bypass_visibility.
     let return_values = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
-            MODULE_NAME,
-            "get_global_config_address",
+            "confidential_crypto_test_utils",
+            "generate_twisted_elgamal_keypair",
             vec![],
             vec![],
         )
         .unwrap();
 
-    assert_eq!(return_values.return_values.len(), 1);
-    let (bytes, _) = &return_values.return_values[0];
-    let expected = AccountAddress::from_hex_literal(
-        "0x5d35f41578f4cebfdc2c4ae38761b890950dfc3c24315e8b5bafd003e8165db9",
-    )
-    .unwrap();
-    let value: AccountAddress = bcs::from_bytes(bytes).expect("Failed to deserialize address");
-    println!("Called private function, returned: {}", value);
-    assert_eq!(value, expected, "Wrong address returned!");
+    assert_eq!(return_values.return_values.len(), 2);
+    println!("Called test-only function, got keypair with {} return values", return_values.return_values.len());
 }
 
 /// Complete test that calls a #[test_only] function with proper setup.
@@ -1427,7 +1397,7 @@ fn call_test_only_function() {
     // This should succeed and return true since we just deposited `deposit_amount`
     let result = h.exec_function_bypass_visibility(
         FRAMEWORK_ADDRESS,
-        MODULE_NAME,
+        TEST_MODULE_NAME,
         "check_pending_balance_decrypts_to",
         vec![],
         vec![
@@ -1465,7 +1435,7 @@ fn call_test_only_function() {
     let wrong_amount: u64 = 999;
     let result = h.exec_function_bypass_visibility(
         FRAMEWORK_ADDRESS,
-        MODULE_NAME,
+        TEST_MODULE_NAME,
         "check_pending_balance_decrypts_to",
         vec![],
         vec![
