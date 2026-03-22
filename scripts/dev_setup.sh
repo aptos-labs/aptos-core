@@ -731,19 +731,6 @@ function install_lld {
   fi
 }
 
-function install_mold {
-  # Fast linker used by `.cargo/config.toml` on Linux x86_64 (see `-fuse-ld=mold`).
-  if [[ "$(uname)" == "Linux" ]]; then
-    case "$PACKAGE_MANAGER" in
-      apt-get | yum | dnf | pacman | apk | zypper | xbps-install | brew)
-        install_pkg mold "$PACKAGE_MANAGER"
-        ;;
-      *)
-        ;;
-    esac
-  fi
-}
-
 function install_libdw {
   # Right now, only install libdw for linux
   if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman" ]]; then
@@ -784,7 +771,6 @@ Build tools (since -t or no option was provided):
   * libssl-dev
   * protoc (and related tools)
   * lld (only for Linux)
-  * mold (only for Linux; used as the Rust linker)
 EOF
   fi
 
@@ -1023,7 +1009,6 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pkg_config "$PACKAGE_MANAGER"
 
   install_lld
-  install_mold
   install_libdw
 
   install_rustup "$BATCH_MODE"

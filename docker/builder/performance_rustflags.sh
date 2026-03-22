@@ -4,7 +4,7 @@ PERFORMANCE_RUSTFLAGS=(
   "--cfg"
   "tokio_unstable"
   "-C"
-  "link-arg=-fuse-ld=mold"
+  "link-arg=-fuse-ld=lld"
   "-C"
   "force-frame-pointers=yes"
   "-C"

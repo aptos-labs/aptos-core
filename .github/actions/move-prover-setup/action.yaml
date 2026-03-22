@@ -6,7 +6,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld mold --no-install-recommends --assume-yes
+    - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
       shell: bash
 
     - uses: dsherret/rust-toolchain-file@v1
