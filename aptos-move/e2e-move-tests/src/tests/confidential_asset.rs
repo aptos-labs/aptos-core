@@ -151,7 +151,9 @@ fn get_apt_metadata_address() -> AccountAddress {
     AccountAddress::from_hex_literal("0xa").unwrap()
 }
 
+#[cfg(feature = "move-harness-with-test-only")]
 const MODULE_NAME: &str = "confidential_asset";
+#[cfg(feature = "move-harness-with-test-only")]
 const TEST_MODULE_NAME: &str = "confidential_asset_tests";
 
 /// Returns the APT metadata address. The FA pool store is created lazily by `deposit`.
@@ -661,7 +663,11 @@ fn profile_confidential_asset_deposit(detailed: bool, first_deposit: bool) {
     let (status, gas_log, gas_used, fee_statement) =
         h.evaluate_gas_with_profiler_and_status(&alice, payload);
 
-    let label = if first_deposit { "deposit (first time)" } else { "deposit" };
+    let label = if first_deposit {
+        "deposit (first time)"
+    } else {
+        "deposit"
+    };
     print_gas_cost(
         label,
         gas_used,
@@ -1353,7 +1359,10 @@ fn test_call_private_function() {
         .unwrap();
 
     assert_eq!(return_values.return_values.len(), 2);
-    println!("Called test-only function, got keypair with {} return values", return_values.return_values.len());
+    println!(
+        "Called test-only function, got keypair with {} return values",
+        return_values.return_values.len()
+    );
 }
 
 /// Complete test that calls a #[test_only] function with proper setup.
