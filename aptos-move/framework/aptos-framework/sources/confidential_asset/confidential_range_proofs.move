@@ -3,11 +3,10 @@
 /// modules from constructing/destructuring enum variants).
 module aptos_framework::confidential_range_proofs {
     use std::error;
+    use std::features;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
     use aptos_std::ristretto255_bulletproofs::{Self as bulletproofs, RangeProof};
     use aptos_framework::confidential_balance;
-
-
 
     friend aptos_framework::confidential_asset;
 
@@ -16,6 +15,12 @@ module aptos_framework::confidential_range_proofs {
     //
 
     const ERANGE_PROOF_VERIFICATION_FAILED: u64 = 2;
+
+    /// DST exceeds 256 bytes.
+    const E_DST_TOO_LONG: u64 = 3;
+
+    /// The native functions have not been rolled out yet.
+    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 4;
 
     //
     // Constants
@@ -35,7 +40,7 @@ module aptos_framework::confidential_range_proofs {
         let commitments = commitments.map_ref(|c| c.point_clone());
 
         assert!(
-            bulletproofs::verify_batch_range_proof(
+            verify_batch_range_proof(
                 &commitments,
                 &ristretto255::basepoint(),
                 &ristretto255::hash_to_point_base(),
@@ -47,6 +52,24 @@ module aptos_framework::confidential_range_proofs {
         );
     }
 
+    /// Verifies a batch range proof for commitments, ensuring all committed values are in [0, 2^num_bits).
+    fun verify_batch_range_proof(
+        comms: &vector<RistrettoPoint>,
+        val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
+        proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
+    {
+        assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+        assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
+
+        let comms = comms.map_ref(|com| ristretto255::point_to_bytes(&ristretto255::point_compress(com)));
+
+        verify_batch_range_proof_internal(
+            comms,
+            val_base, rand_base,
+            bulletproofs::range_proof_to_bytes(proof), num_bits, dst
+        )
+    }
+
     //
     // Public view functions
     //
@@ -56,5 +79,17 @@ module aptos_framework::confidential_range_proofs {
     public fun get_bulletproofs_dst(): vector<u8> {
         BULLETPROOFS_DST
     }
+
+    //
+    // Native functions
+    //
+
+    native fun verify_batch_range_proof_internal(
+        comms: vector<vector<u8>>,
+        val_base: &RistrettoPoint,
+        rand_base: &RistrettoPoint,
+        proof: vector<u8>,
+        num_bits: u64,
+        dst: vector<u8>): bool;
 
 }

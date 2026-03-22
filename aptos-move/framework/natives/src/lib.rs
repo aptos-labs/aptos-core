@@ -79,6 +79,10 @@ pub fn all_natives(
         cryptography::bulletproofs::make_all(builder)
     );
     add_natives_from_module!(
+        "confidential_range_proofs",
+        cryptography::bulletproofs::make_all(builder)
+    );
+    add_natives_from_module!(
         "transaction_context",
         transaction_context::make_all(builder)
     );
