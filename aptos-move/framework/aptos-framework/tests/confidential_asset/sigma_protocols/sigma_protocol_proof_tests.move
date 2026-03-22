@@ -22,7 +22,7 @@ module aptos_framework::sigma_protocol_proof_tests {
     };
     use aptos_framework::sigma_protocol_witness::new_secret_witness;
     use aptos_framework::sigma_protocol_test_utils::setup_test_environment;
-    use aptos_framework::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
+    use aptos_framework::confidential_balance::get_encryption_key_basepoint_compressed;
 
     // ========================================= //
     //      Registration proof tests              //

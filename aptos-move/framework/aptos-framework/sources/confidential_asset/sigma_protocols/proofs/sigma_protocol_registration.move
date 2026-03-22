@@ -38,7 +38,7 @@ module aptos_framework::sigma_protocol_registration {
     use aptos_framework::sigma_protocol_representation::{repr_point, repr_scaled};
     use aptos_framework::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
     use aptos_framework::sigma_protocol_utils::{e_wrong_num_points, e_wrong_num_scalars, e_wrong_witness_len, e_wrong_output_len};
-    use aptos_framework::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
+    use aptos_framework::confidential_balance::get_encryption_key_basepoint_compressed;
     #[test_only]
     use aptos_std::ristretto255::{Scalar, random_scalar};
     #[test_only]

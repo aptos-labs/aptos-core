@@ -11,12 +11,13 @@
 module aptos_framework::confidential_balance {
     use std::error;
     use std::vector;
-    use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto, new_scalar_from_u128, scalar_one, point_identity, point_identity_compressed};
+    use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, new_scalar_from_u128, scalar_one, point_identity, point_identity_compressed};
     use aptos_framework::sigma_protocol_utils::deserialize_compressed_points;
 
     friend aptos_framework::confidential_amount;
     friend aptos_framework::confidential_asset;
     friend aptos_framework::confidential_range_proofs;
+    friend aptos_framework::sigma_protocol_registration;
     friend aptos_framework::sigma_protocol_transfer;
     friend aptos_framework::sigma_protocol_withdraw;
     friend aptos_framework::sigma_protocol_key_rotation;
@@ -270,6 +271,11 @@ module aptos_framework::confidential_balance {
             powers.push_back(prev);
         };
         powers
+    }
+
+    /// Returns the compressed generator H used to derive the encryption key as EK = DK^(-1) * H.
+    public(friend) fun get_encryption_key_basepoint_compressed(): CompressedRistretto {
+        ristretto255::basepoint_H_compressed()
     }
 
     //

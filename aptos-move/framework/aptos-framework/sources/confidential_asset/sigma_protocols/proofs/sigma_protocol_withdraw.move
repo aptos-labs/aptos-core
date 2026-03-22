@@ -88,8 +88,7 @@ module aptos_framework::sigma_protocol_withdraw {
     use aptos_framework::chain_id;
     use aptos_framework::fungible_asset::Metadata;
     use aptos_framework::object::Object;
-    use aptos_framework::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
-    use aptos_framework::confidential_balance::{Available, CompressedBalance, get_num_available_chunks, get_b_powers};
+    use aptos_framework::confidential_balance::{Available, CompressedBalance, get_num_available_chunks, get_b_powers, get_encryption_key_basepoint_compressed};
     use aptos_framework::sigma_protocol;
     use aptos_framework::sigma_protocol_proof::Proof;
     use aptos_framework::sigma_protocol_fiat_shamir::new_domain_separator;

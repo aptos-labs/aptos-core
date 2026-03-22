@@ -19,7 +19,6 @@ module aptos_framework::confidential_crypto_test_utils {
 
     // ========================================= //
     //     Twisted ElGamal key generation         //
-    //     (from ristretto255_twisted_elgamal)    //
     // ========================================= //
 
     /// Returns the decompressed generator H used to derive the encryption key as EK = DK^(-1) * H.

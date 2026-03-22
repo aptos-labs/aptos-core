@@ -105,10 +105,9 @@ module aptos_framework::sigma_protocol_transfer {
     use aptos_framework::chain_id;
     use aptos_framework::fungible_asset::Metadata;
     use aptos_framework::object::Object;
-    use aptos_framework::confidential_balance::{Pending, Available, CompressedBalance, Balance,
+    use aptos_framework::confidential_balance::{Self, Pending, Available, CompressedBalance, Balance,
         get_num_available_chunks, get_num_pending_chunks, get_b_powers, new_pending_from_p_and_r};
     use aptos_framework::confidential_amount::CompressedAmount;
-    use aptos_framework::ristretto255_twisted_elgamal;
     use aptos_framework::sigma_protocol;
     use aptos_framework::sigma_protocol_proof::Proof;
     use aptos_framework::sigma_protocol_fiat_shamir::new_domain_separator;
@@ -281,7 +280,7 @@ module aptos_framework::sigma_protocol_transfer {
 
         let b = new_builder();
         assert!(b.add_point(ristretto255::basepoint_compressed()) == IDX_G, e);                                            // G
-        assert!(b.add_point(ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed()) == IDX_H, e);         // H
+        assert!(b.add_point(confidential_balance::get_encryption_key_basepoint_compressed()) == IDX_H, e);         // H
         assert!(b.add_point(compressed_ek_sender) == IDX_EK_SENDER, e);                                                       // ek_sender
         assert!(b.add_point(compressed_ek_recip) == IDX_EK_RECIP, e);                                                         // ek_recip
         assert!(b.add_points(compressed_old_balance.get_compressed_P()) == START_IDX_OLD_P, e);                            // old_P
