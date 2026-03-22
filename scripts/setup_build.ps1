@@ -317,7 +317,7 @@ function Install-Protoc {
     Write-Step "Installing protoc v$PROTOC_VERSION"
     if (Get-Command protoc -ErrorAction SilentlyContinue) {
         $current = protoc --version 2>$null
-        if ($current -match $PROTOC_VERSION) {
+        if ($current -like "*$PROTOC_VERSION*") {
             Write-Info "protoc v$PROTOC_VERSION already installed"
             return
         }

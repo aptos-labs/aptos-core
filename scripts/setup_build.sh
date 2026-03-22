@@ -1406,7 +1406,6 @@ install_boogie() {
 
 install_nodejs() {
     log_step "Installing Node.js v${NODE_MAJOR_VERSION}"
-    _sudo="$(sudo_if_needed)"
 
     if [ "$PACKAGE_MANAGER" = "apt-get" ]; then
         # Ensure bash is available (minimal images may not have it)
@@ -1417,6 +1416,7 @@ install_nodejs() {
             -o "${_tmpdir}/nodesource_setup.sh" || \
             die "Failed to download NodeSource setup script for Node.js v${NODE_MAJOR_VERSION}."
         # NodeSource setup script requires bash, not POSIX sh
+        _sudo="$(sudo_if_needed)"
         if [ -n "$_sudo" ]; then
             # shellcheck disable=SC2086
             $_sudo -E bash "${_tmpdir}/nodesource_setup.sh"
