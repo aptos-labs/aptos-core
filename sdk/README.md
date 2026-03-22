@@ -7,6 +7,11 @@
 
 The official Rust SDK for Aptos.
 
+> **Deprecation notice:** This SDK is part of the `aptos-core` repository and is no longer
+> actively developed. New projects should use the standalone
+> [`aptos-rust-sdk`](https://github.com/aptos-labs/aptos-rust-sdk) instead.
+> See [MIGRATION.md](./MIGRATION.md) for a step-by-step migration guide.
+
 ## Usage
 
 This SDK provides all the necessary components for building on top of the Aptos Blockchain. Some of the important modules are:
