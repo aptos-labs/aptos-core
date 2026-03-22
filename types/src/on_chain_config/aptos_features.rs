@@ -169,8 +169,6 @@ pub enum FeatureFlag {
     ENCRYPTED_TRANSACTIONS = 108,
     /// Enables public struct and enum types as transaction arguments.
     PUBLIC_STRUCT_ENUM_ARGS = 109,
-    /// When enabled, batched Bulletproof range proof verification is restricted to `0x1` modules only.
-    BATCHED_BULLETPROOFS_CALLABLE_BY_FRAMEWORK_ONLY = 110,
 }
 
 impl FeatureFlag {
