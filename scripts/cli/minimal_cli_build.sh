@@ -31,7 +31,7 @@ case "$OS" in
     if has_command apt-get; then
       # Ubuntu / Debian based APT-GET
       sudo apt-get update
-      sh install_pkg.sh build-essential pkgconf libssl-dev git libudev-dev lld libdw-dev clang llvm cmake
+      sh install_pkg.sh build-essential pkgconf libssl-dev git libudev-dev lld mold libdw-dev clang llvm cmake
     elif has_command dnf; then
       # RHEL / CentOS based DNF
       # This depends on the OS!
@@ -41,29 +41,29 @@ case "$OS" in
       # Check if it's Rocky
       if [ "$ID" = "rocky" ]; then
         echo "Rocky Linux detected"
-        sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git systemd-devel lld elfutils-devel clang llvm cmake
+        sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git systemd-devel lld mold elfutils-devel clang llvm cmake
       else
-        sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git rust-libudev-devel lld elfutils-devel clang llvm cmake
+        sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git rust-libudev-devel lld mold elfutils-devel clang llvm cmake
       fi
     elif has_command yum; then
       # RHEL / CentOS based YUM
-      sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git rust-libudev-devel lld elfutils-devel clang llvm cmake
+      sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git rust-libudev-devel lld mold elfutils-devel clang llvm cmake
     elif has_command pacman; then
       # Arch based PACMAN
-      sh install_pkg.sh base-devel pkgconf openssl git lld clang llvm cmake
+      sh install_pkg.sh base-devel pkgconf openssl git lld mold clang llvm cmake
     elif has_command apk; then
       # Alpine based APK
-      sh install_pkg.sh alpine-sdk coreutils pkgconfig openssl-dev git lld elfutils-dev clang llvm cmake libc-dev
+      sh install_pkg.sh alpine-sdk coreutils pkgconfig openssl-dev git lld mold elfutils-dev clang llvm cmake libc-dev
     elif has_command zypper; then
       # OpenSUSE zypper
-      sh install_pkg.sh gcc gcc-c++ make pkg-config libopenssl-devel git libudev-devel lld libdw-devel clang llvm cmake
+      sh install_pkg.sh gcc gcc-c++ make pkg-config libopenssl-devel git libudev-devel lld mold libdw-devel clang llvm cmake
     elif has_command emerge; then
       # Gentoo Emerge
       sudo emerge --sync
       sh install_pkg.sh --skip-overrides sys-devel/gcc dev-libs/openssl dev-vcs/git dev-lang/rust llvm-core/clang
     elif has_command xbps-install; then
       # Void linux xbps
-      sh install_pkg.sh gcc make pkg-config git lld elfutils-devel clang llvm cmake
+      sh install_pkg.sh gcc make pkg-config git lld mold elfutils-devel clang llvm cmake
     else
       echo "Unable to find supported Linux package manager (apt-get, dnf, yum, zypper, xbps or pacman). Abort"
       exit 1
