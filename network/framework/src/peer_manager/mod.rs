@@ -847,12 +847,7 @@ where
 
     /// Sends a `ConnectionNotification` to all event handlers, warns on failures
     fn send_conn_notification(&mut self, peer_id: PeerId, notification: ConnectionNotification) {
-        let num_handlers = self.connection_event_handlers.len();
-        if num_handlers == 0 {
-            return;
-        }
-        // Send cloned notifications to all handlers except the last
-        for handler in self.connection_event_handlers[..num_handlers - 1].iter_mut() {
+        for handler in self.connection_event_handlers.iter_mut() {
             if let Err(e) = handler.push(peer_id, notification.clone()) {
                 warn!(
                     NetworkSchema::new(&self.network_context)
@@ -862,21 +857,6 @@ where
                     "{} Failed to send notification {} to handler for peer: {}. Error: {:?}",
                     self.network_context,
                     notification,
-                    peer_id.short_str(),
-                    e
-                );
-            }
-        }
-        // Move the notification into the last handler to avoid a final clone.
-        // The notification is consumed by push(), so we cannot log its contents on error.
-        if let Some(last_handler) = self.connection_event_handlers.last_mut() {
-            if let Err(e) = last_handler.push(peer_id, notification) {
-                warn!(
-                    NetworkSchema::new(&self.network_context)
-                        .remote_peer(&peer_id),
-                    error = ?e,
-                    "{} Failed to send notification to last handler for peer: {}. Error: {:?}",
-                    self.network_context,
                     peer_id.short_str(),
                     e
                 );
