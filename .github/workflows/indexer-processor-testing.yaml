@@ -149,7 +149,7 @@ jobs:
       # Conditionally Dispatch Event to Processor Repo if Differences Found
       - name: Dispatch Event to Processor Repo
         if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
-        uses: peter-evans/repository-dispatch@v3.0.0
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # pin@v3.0.0
         with:
           token: '${{ steps.secrets.outputs.token }}'
           repository: 'aptos-labs/aptos-indexer-processors'
