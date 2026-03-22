@@ -23,24 +23,24 @@
 //!
 //! | Source AST element | Serialized form |
 //! |--------------------|-----------------|
-//! | `NodeId` (per-compilation opaque index) | Dropped entirely |
+//! | `NodeId` (per-compilation opaque index) | Dropped; result type stored separately in `SerExp` |
 //! | `Symbol` (interned string index) | Resolved to the string content |
 //! | `ModuleId` (per-compilation opaque index) | Resolved to `"0x<hex>::<name>"` |
 //! | `StructId(Symbol)`, `FunId(Symbol)`, `FieldId(Symbol)` | Resolved to the symbol string |
 //! | `SpecFunId(RawIndex)` | Resolved to the spec function's name string |
-//! | `Address::Numerical` | 32-byte big-endian hex with `0x` prefix |
-//! | `Address::Symbolic` | `@<sym>` |
+//! | `Address::Numerical` | 32-byte big-endian address bytes |
+//! | `Address::Symbolic` | `\xff` prefix + UTF-8 name bytes |
 //! | `BigInt` | `[sign, be_magnitude...]` bytes |
 
 use crate::{
     ast::{
-        AbortKind, BehaviorKind, ExpData, LambdaCaptureKind, Operation, Pattern, QuantKind, Spec,
-        TraceKind, Value,
+        AbortKind, Address, BehaviorKind, BehaviorState, ExpData, LambdaCaptureKind, MatchArm,
+        ModuleName, Operation, Pattern, QuantKind, Spec, TraceKind, Value,
     },
     model::{FieldId, FunId, GlobalEnv, ModuleId, QualifiedInstId, SpecFunId, StructId},
     ty::{PrimitiveType, ReferenceKind, Type},
 };
-use move_core_types::metadata::Metadata;
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress, metadata::Metadata};
 use num::BigInt;
 use num_traits::Signed;
 use serde::{Deserialize, Serialize};
@@ -106,7 +106,7 @@ pub struct SerFunctionBody {
     pub params: Vec<(String, SerType)>,
     /// Return types.
     pub return_types: Vec<SerType>,
-    /// The function body expression.
+    /// The function body expression (typed).
     pub body: SerExp,
 }
 
@@ -147,15 +147,30 @@ pub enum SerType {
     // Spec-only types
     TypeDomain(Box<SerType>),
     ResourceDomain(String, Vec<SerType>),
+    /// Placeholder for types that shouldn't appear after type-checking.
+    Unknown,
 }
 
 // =============================================================================
-// SerExp
+// SerExp — typed wrapper
 
-/// Serializable expression — mirrors [`ExpData`] with `NodeId` dropped, `Symbol`
-/// resolved to strings, and module/struct/function IDs resolved to canonical names.
+/// A typed serialized expression.  Every node carries its result type so the
+/// deserializer can recreate properly-typed `NodeId`s in `GlobalEnv` without
+/// re-running the type checker.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub enum SerExp {
+pub struct SerExp {
+    /// Result type of this expression node.
+    pub ty: SerType,
+    /// The expression kind.
+    pub kind: SerExpKind,
+}
+
+// =============================================================================
+// SerExpKind
+
+/// The expression kind — mirrors [`ExpData`] with `NodeId` dropped.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum SerExpKind {
     Invalid,
     Value(SerValue),
     /// Local variable reference — the string is the variable name.
@@ -361,7 +376,7 @@ pub enum SerPattern {
 /// Serializable value — mirrors [`Value`].
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum SerValue {
-    /// 32-byte big-endian account address.
+    /// 32-byte big-endian account address, or `\xff` + UTF-8 for symbolic.
     Address(Vec<u8>),
     /// `[sign_byte=0(pos)/1(neg), be_magnitude...]`.
     Number(Vec<u8>),
@@ -373,10 +388,9 @@ pub enum SerValue {
 }
 
 // =============================================================================
-// SerSpec (simplified — enough for assert!/assume! in inline function bodies)
+// SerSpec
 
-/// Simplified serializable spec.  Only the pieces that can appear inside
-/// inline function bodies (assert!/assume! expanding to SpecBlock) are needed.
+/// Simplified serializable spec (enough for assert!/assume! in inline bodies).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SerSpec {
     pub conditions: Vec<SerCondition>,
@@ -391,10 +405,9 @@ pub struct SerCondition {
 }
 
 // =============================================================================
-// AstSerializer — conversion from live AST to serialized form
+// AstSerializer
 
-/// Converts a live [`GlobalEnv`] AST into the deterministically serializable
-/// stripped form.
+/// Converts live [`GlobalEnv`] AST into the deterministically serializable stripped form.
 pub struct AstSerializer<'a> {
     env: &'a GlobalEnv,
 }
@@ -407,9 +420,8 @@ impl<'a> AstSerializer<'a> {
     // -------------------------------------------------------------------------
     // Public entry points
 
-    /// Serialize all `public inline` functions in the given module into an
-    /// [`InlineFunctionBodies`] map.  Returns `None` if the module has no
-    /// inline functions with bodies.
+    /// Serialize all `public inline` functions in the given module.
+    /// Returns `None` if the module has no inline functions with bodies.
     pub fn serialize_module_inline_bodies(
         &self,
         module_id: ModuleId,
@@ -487,7 +499,7 @@ impl<'a> AstSerializer<'a> {
                     .map(|ts| ts.iter().map(|t| self.ser_type(t)).collect())
                     .unwrap_or_default(),
             ),
-            Error | Var(_) => SerType::Bool, // shouldn't appear after type-checking
+            Error | Var(_) => SerType::Unknown,
         }
     }
 
@@ -516,30 +528,38 @@ impl<'a> AstSerializer<'a> {
     }
 
     // -------------------------------------------------------------------------
-    // Expression conversion
+    // Expression conversion — each node also records its result type.
 
     pub fn ser_exp(&self, exp: &ExpData) -> SerExp {
+        let ty = self.ser_type(&self.env.get_node_type(exp.node_id()));
+        let kind = self.ser_exp_kind(exp);
+        SerExp { ty, kind }
+    }
+
+    fn ser_exp_kind(&self, exp: &ExpData) -> SerExpKind {
         use ExpData::*;
         match exp {
-            Invalid(_) => SerExp::Invalid,
-            Value(_, v) => SerExp::Value(self.ser_value(v)),
-            LocalVar(_, sym) => SerExp::LocalVar(self.env.symbol_pool().string(*sym).to_string()),
-            Temporary(_, idx) => SerExp::Temporary(*idx),
-            Call(_, op, args) => SerExp::Call(
+            Invalid(_) => SerExpKind::Invalid,
+            Value(_, v) => SerExpKind::Value(self.ser_value(v)),
+            LocalVar(_, sym) => {
+                SerExpKind::LocalVar(self.env.symbol_pool().string(*sym).to_string())
+            },
+            Temporary(_, idx) => SerExpKind::Temporary(*idx),
+            Call(_, op, args) => SerExpKind::Call(
                 self.ser_operation(op),
                 args.iter().map(|a| self.ser_exp(a.as_ref())).collect(),
             ),
-            Invoke(_, f, args) => SerExp::Invoke(
+            Invoke(_, f, args) => SerExpKind::Invoke(
                 Box::new(self.ser_exp(f.as_ref())),
                 args.iter().map(|a| self.ser_exp(a.as_ref())).collect(),
             ),
-            Lambda(_, pat, body, cap, spec) => SerExp::Lambda(
+            Lambda(_, pat, body, cap, spec) => SerExpKind::Lambda(
                 self.ser_pattern_with_env(pat),
                 Box::new(self.ser_exp(body.as_ref())),
                 self.ser_capture_kind(cap),
                 spec.as_ref().map(|s| Box::new(self.ser_exp(s.as_ref()))),
             ),
-            Quant(_, kind, ranges, triggers, cond, body) => SerExp::Quant(
+            Quant(_, kind, ranges, triggers, cond, body) => SerExpKind::Quant(
                 self.ser_quant_kind(kind),
                 ranges
                     .iter()
@@ -552,19 +572,19 @@ impl<'a> AstSerializer<'a> {
                 cond.as_ref().map(|c| Box::new(self.ser_exp(c.as_ref()))),
                 Box::new(self.ser_exp(body.as_ref())),
             ),
-            Block(_, pat, opt_init, body) => SerExp::Block(
+            Block(_, pat, opt_init, body) => SerExpKind::Block(
                 self.ser_pattern_with_env(pat),
                 opt_init
                     .as_ref()
                     .map(|e| Box::new(self.ser_exp(e.as_ref()))),
                 Box::new(self.ser_exp(body.as_ref())),
             ),
-            IfElse(_, cond, then_, else_) => SerExp::IfElse(
+            IfElse(_, cond, then_, else_) => SerExpKind::IfElse(
                 Box::new(self.ser_exp(cond.as_ref())),
                 Box::new(self.ser_exp(then_.as_ref())),
                 Box::new(self.ser_exp(else_.as_ref())),
             ),
-            Match(_, scrutinee, arms) => SerExp::Match(
+            Match(_, scrutinee, arms) => SerExpKind::Match(
                 Box::new(self.ser_exp(scrutinee.as_ref())),
                 arms.iter()
                     .map(|arm| SerMatchArm {
@@ -574,28 +594,26 @@ impl<'a> AstSerializer<'a> {
                     })
                     .collect(),
             ),
-            Return(_, val) => SerExp::Return(Box::new(self.ser_exp(val.as_ref()))),
+            Return(_, val) => SerExpKind::Return(Box::new(self.ser_exp(val.as_ref()))),
             Sequence(_, items) => {
-                SerExp::Sequence(items.iter().map(|e| self.ser_exp(e.as_ref())).collect())
+                SerExpKind::Sequence(items.iter().map(|e| self.ser_exp(e.as_ref())).collect())
             },
-            Loop(_, body) => SerExp::Loop(Box::new(self.ser_exp(body.as_ref()))),
-            LoopCont(_, nest, is_continue) => SerExp::LoopCont(*nest, *is_continue),
-            Assign(_, pat, rhs) => SerExp::Assign(
+            Loop(_, body) => SerExpKind::Loop(Box::new(self.ser_exp(body.as_ref()))),
+            LoopCont(_, nest, is_continue) => SerExpKind::LoopCont(*nest, *is_continue),
+            Assign(_, pat, rhs) => SerExpKind::Assign(
                 self.ser_pattern_with_env(pat),
                 Box::new(self.ser_exp(rhs.as_ref())),
             ),
-            Mutate(_, lhs, rhs) => SerExp::Mutate(
+            Mutate(_, lhs, rhs) => SerExpKind::Mutate(
                 Box::new(self.ser_exp(lhs.as_ref())),
                 Box::new(self.ser_exp(rhs.as_ref())),
             ),
-            SpecBlock(_, spec) => SerExp::SpecBlock(self.ser_spec(spec)),
+            SpecBlock(_, spec) => SerExpKind::SpecBlock(self.ser_spec(spec)),
         }
     }
 
     // -------------------------------------------------------------------------
     // Pattern conversion
-    //
-    // Patterns carry a NodeId from which we read the node's type via the GlobalEnv.
 
     fn ser_pattern_with_env(&self, pat: &Pattern) -> SerPattern {
         use Pattern::*;
@@ -762,26 +780,24 @@ impl<'a> AstSerializer<'a> {
     pub fn ser_value(&self, v: &Value) -> SerValue {
         use Value::*;
         match v {
-            Address(addr) => SerValue::Address(self.ser_address(addr)),
+            Address(addr) => SerValue::Address(self.ser_address_bytes(addr)),
             Number(n) => SerValue::Number(ser_bigint(n)),
             Bool(b) => SerValue::Bool(*b),
             ByteArray(bs) => SerValue::ByteArray(bs.clone()),
             AddressArray(addrs) => {
-                SerValue::AddressArray(addrs.iter().map(|a| self.ser_address(a)).collect())
+                SerValue::AddressArray(addrs.iter().map(|a| self.ser_address_bytes(a)).collect())
             },
             Vector(vs) => SerValue::Vector(vs.iter().map(|v| self.ser_value(v)).collect()),
             Tuple(vs) => SerValue::Tuple(vs.iter().map(|v| self.ser_value(v)).collect()),
         }
     }
 
-    fn ser_address(&self, addr: &crate::ast::Address) -> Vec<u8> {
-        use crate::ast::Address;
+    fn ser_address_bytes(&self, addr: &Address) -> Vec<u8> {
         match addr {
             Address::Numerical(account_addr) => account_addr.into_bytes().to_vec(),
             Address::Symbolic(sym) => {
-                // Encode as `\xff` prefix (invalid account address byte) followed by UTF-8 name.
-                // This distinguishes symbolic from numerical addresses.
-                let mut bytes = vec![0xFF];
+                // \xff prefix (not a valid first byte of an AccountAddress) followed by UTF-8.
+                let mut bytes = vec![0xFFu8];
                 bytes.extend_from_slice(self.env.symbol_pool().string(*sym).as_bytes());
                 bytes
             },
@@ -792,20 +808,21 @@ impl<'a> AstSerializer<'a> {
     // Spec conversion
 
     pub fn ser_spec(&self, spec: &Spec) -> SerSpec {
-        let conditions = spec
-            .conditions
-            .iter()
-            .map(|c| SerCondition {
-                kind: c.kind.to_string(),
-                exp: self.ser_exp(c.exp.as_ref()),
-                additional_exps: c
-                    .additional_exps
-                    .iter()
-                    .map(|e| self.ser_exp(e.as_ref()))
-                    .collect(),
-            })
-            .collect();
-        SerSpec { conditions }
+        SerSpec {
+            conditions: spec
+                .conditions
+                .iter()
+                .map(|c| SerCondition {
+                    kind: c.kind.to_string(),
+                    exp: self.ser_exp(c.exp.as_ref()),
+                    additional_exps: c
+                        .additional_exps
+                        .iter()
+                        .map(|e| self.ser_exp(e.as_ref()))
+                        .collect(),
+                })
+                .collect(),
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -841,17 +858,15 @@ impl<'a> AstSerializer<'a> {
     // -------------------------------------------------------------------------
     // Canonical name helpers
 
-    /// Returns `"0x<hex32>::<module_name>"` or `"@<symbolic>::<module_name>"`.
     fn module_name_str(&self, mid: ModuleId) -> String {
         let module = self.env.get_module(mid);
         let name = module.get_name();
-        let addr_str = self.ser_address_to_str(name.addr());
+        let addr_str = self.address_to_str(name.addr());
         let mod_str = self.env.symbol_pool().string(name.name()).to_string();
         format!("{}::{}", addr_str, mod_str)
     }
 
-    fn ser_address_to_str(&self, addr: &crate::ast::Address) -> String {
-        use crate::ast::Address;
+    fn address_to_str(&self, addr: &Address) -> String {
         match addr {
             Address::Numerical(account_addr) => {
                 format!("0x{}", account_addr.to_canonical_string())
@@ -862,30 +877,21 @@ impl<'a> AstSerializer<'a> {
         }
     }
 
-    /// Returns `"<module_name_str>::<fun_name>"`.
     fn fun_name_str(&self, mid: ModuleId, fid: FunId) -> String {
         let fun_name = self.env.symbol_pool().string(fid.symbol()).to_string();
         format!("{}::{}", self.module_name_str(mid), fun_name)
     }
 
-    /// Returns `"<module_name_str>::<struct_name>"`.
     fn struct_name_str(&self, mid: ModuleId, sid: StructId) -> String {
         let struct_name = self.env.symbol_pool().string(sid.symbol()).to_string();
         format!("{}::{}", self.module_name_str(mid), struct_name)
     }
 
-    /// Returns `"<struct_name_str>"` possibly with type instantiation.
     fn struct_inst_name_str(&self, qinst: &QualifiedInstId<StructId>) -> String {
-        let base = self.struct_name_str(qinst.module_id, qinst.id);
-        if qinst.inst.is_empty() {
-            base
-        } else {
-            let args: Vec<String> = qinst.inst.iter().map(|t| self.ser_type_to_str(t)).collect();
-            format!("{}<{}>", base, args.join(", "))
-        }
+        self.struct_name_str(qinst.module_id, qinst.id)
+        // Type instantiation is encoded in the pattern's sub-patterns, not in the name.
     }
 
-    /// Returns `"<module_name_str>::<spec_fun_name>"`.
     fn spec_fun_name_str(&self, mid: ModuleId, sfid: SpecFunId) -> String {
         let qid = mid.qualified(sfid);
         let decl = self.env.get_spec_fun(qid);
@@ -893,30 +899,648 @@ impl<'a> AstSerializer<'a> {
         format!("{}::{}", self.module_name_str(mid), fun_name)
     }
 
-    /// Returns the field name string.
     fn field_name_str(&self, fid: FieldId) -> String {
         self.env.symbol_pool().string(fid.symbol()).to_string()
-    }
-
-    /// Returns a human-readable type string (used in struct instantiation names).
-    fn ser_type_to_str(&self, ty: &Type) -> String {
-        // Reuse the serialized form's structure to produce a canonical string.
-        match self.ser_type(ty) {
-            SerType::Struct(name, args) if args.is_empty() => name,
-            SerType::Struct(name, args) => {
-                let arg_strs: Vec<String> = args.iter().map(|a| format!("{:?}", a)).collect();
-                format!("{}<{}>", name, arg_strs.join(", "))
-            },
-            other => format!("{:?}", other),
-        }
     }
 }
 
 // =============================================================================
-// BigInt serialization
+// AstDeserializer
 
-/// Serialize a `BigInt` as `[sign_byte, be_magnitude_bytes...]`.
-/// `sign_byte` is 0 for non-negative, 1 for negative.
+/// Converts serialized [`SerFunctionBody`] values back into live [`GlobalEnv`] AST,
+/// injecting the reconstructed body into the appropriate function stub so the
+/// inliner can expand it when processing downstream packages.
+pub struct AstDeserializer<'a> {
+    env: &'a mut GlobalEnv,
+}
+
+impl<'a> AstDeserializer<'a> {
+    pub fn new(env: &'a mut GlobalEnv) -> Self {
+        Self { env }
+    }
+
+    /// Deserialize all inline function bodies from `bodies` and inject them into
+    /// the function stubs belonging to `module_id`.  Errors are returned per-function;
+    /// a failure on one function does not prevent others from being injected.
+    pub fn inject_inline_bodies(
+        &mut self,
+        module_id: ModuleId,
+        bodies: &InlineFunctionBodies,
+    ) -> Vec<(String, anyhow::Error)> {
+        let mut errors = vec![];
+        for (fun_name, body) in &bodies.functions {
+            if let Err(e) = self.inject_function_body(module_id, fun_name, body) {
+                errors.push((fun_name.clone(), e));
+            }
+        }
+        errors
+    }
+
+    fn inject_function_body(
+        &mut self,
+        module_id: ModuleId,
+        fun_name: &str,
+        body: &SerFunctionBody,
+    ) -> anyhow::Result<()> {
+        let exp = self.deser_exp(&body.body)?;
+        let sym = self.env.symbol_pool().make(fun_name);
+        let qid = module_id.qualified(FunId::new(sym));
+        self.env.set_function_def(qid, exp);
+        Ok(())
+    }
+
+    // -------------------------------------------------------------------------
+    // Expression deserialization
+
+    fn deser_exp(&mut self, ser_exp: &SerExp) -> anyhow::Result<crate::ast::Exp> {
+        let ty = self.deser_type(&ser_exp.ty)?;
+        let loc = self.env.unknown_loc();
+        let nid = self.env.new_node(loc, ty);
+        let exp_data = self.deser_exp_kind(&ser_exp.kind, nid)?;
+        Ok(exp_data.into_exp())
+    }
+
+    fn deser_exp_kind(
+        &mut self,
+        kind: &SerExpKind,
+        nid: crate::model::NodeId,
+    ) -> anyhow::Result<ExpData> {
+        use ExpData as ED;
+        use SerExpKind::*;
+        Ok(match kind {
+            Invalid => ED::Invalid(nid),
+            Value(v) => ED::Value(nid, self.deser_value(v)?),
+            LocalVar(name) => {
+                let sym = self.env.symbol_pool().make(name.as_str());
+                ED::LocalVar(nid, sym)
+            },
+            Temporary(idx) => ED::Temporary(nid, *idx),
+            Call(op, args) => {
+                let dop = self.deser_operation(op)?;
+                let dargs = args
+                    .iter()
+                    .map(|a| self.deser_exp(a))
+                    .collect::<anyhow::Result<_>>()?;
+                ED::Call(nid, dop, dargs)
+            },
+            Invoke(f, args) => {
+                let df = self.deser_exp(f)?;
+                let dargs = args
+                    .iter()
+                    .map(|a| self.deser_exp(a))
+                    .collect::<anyhow::Result<_>>()?;
+                ED::Invoke(nid, df, dargs)
+            },
+            Lambda(pat, body, cap, spec) => {
+                let dpat = self.deser_pattern(pat)?;
+                let dbody = self.deser_exp(body)?;
+                let dcap = deser_capture_kind(cap);
+                let dspec = spec.as_ref().map(|s| self.deser_exp(s)).transpose()?;
+                ED::Lambda(nid, dpat, dbody, dcap, dspec)
+            },
+            Quant(qkind, ranges, triggers, cond, body) => {
+                let dkind = deser_quant_kind(qkind);
+                let dranges = ranges
+                    .iter()
+                    .map(|(p, e)| Ok((self.deser_pattern(p)?, self.deser_exp(e)?)))
+                    .collect::<anyhow::Result<_>>()?;
+                let dtriggers = triggers
+                    .iter()
+                    .map(|ts| {
+                        ts.iter()
+                            .map(|t| self.deser_exp(t))
+                            .collect::<anyhow::Result<_>>()
+                    })
+                    .collect::<anyhow::Result<_>>()?;
+                let dcond = cond.as_ref().map(|c| self.deser_exp(c)).transpose()?;
+                let dbody = self.deser_exp(body)?;
+                ED::Quant(nid, dkind, dranges, dtriggers, dcond, dbody)
+            },
+            Block(pat, opt_init, body) => {
+                let dpat = self.deser_pattern(pat)?;
+                let dinit = opt_init.as_ref().map(|e| self.deser_exp(e)).transpose()?;
+                let dbody = self.deser_exp(body)?;
+                ED::Block(nid, dpat, dinit, dbody)
+            },
+            IfElse(cond, then_, else_) => ED::IfElse(
+                nid,
+                self.deser_exp(cond)?,
+                self.deser_exp(then_)?,
+                self.deser_exp(else_)?,
+            ),
+            Match(scrutinee, arms) => {
+                let dscrutinee = self.deser_exp(scrutinee)?;
+                let darms = arms
+                    .iter()
+                    .map(|arm| {
+                        let loc = self.env.unknown_loc();
+                        Ok(MatchArm {
+                            loc,
+                            pattern: self.deser_pattern(&arm.pattern)?,
+                            condition: arm
+                                .condition
+                                .as_ref()
+                                .map(|c| self.deser_exp(c))
+                                .transpose()?,
+                            body: self.deser_exp(&arm.body)?,
+                        })
+                    })
+                    .collect::<anyhow::Result<_>>()?;
+                ED::Match(nid, dscrutinee, darms)
+            },
+            Return(val) => ED::Return(nid, self.deser_exp(val)?),
+            Sequence(items) => {
+                let ditems = items
+                    .iter()
+                    .map(|e| self.deser_exp(e))
+                    .collect::<anyhow::Result<_>>()?;
+                ED::Sequence(nid, ditems)
+            },
+            Loop(body) => ED::Loop(nid, self.deser_exp(body)?),
+            LoopCont(nest, is_continue) => ED::LoopCont(nid, *nest, *is_continue),
+            Assign(pat, rhs) => ED::Assign(nid, self.deser_pattern(pat)?, self.deser_exp(rhs)?),
+            Mutate(lhs, rhs) => ED::Mutate(nid, self.deser_exp(lhs)?, self.deser_exp(rhs)?),
+            SpecBlock(spec) => ED::SpecBlock(nid, self.deser_spec(spec)?),
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // Pattern deserialization
+
+    fn deser_pattern(&mut self, pat: &SerPattern) -> anyhow::Result<Pattern> {
+        use SerPattern::*;
+        Ok(match pat {
+            Var(name, ty) => {
+                let dty = self.deser_type(ty)?;
+                let loc = self.env.unknown_loc();
+                let nid = self.env.new_node(loc, dty);
+                let sym = self.env.symbol_pool().make(name.as_str());
+                Pattern::Var(nid, sym)
+            },
+            Wildcard => {
+                let loc = self.env.unknown_loc();
+                let nid = self.env.new_node(loc, Type::Error);
+                Pattern::Wildcard(nid)
+            },
+            Tuple(pats) => {
+                let loc = self.env.unknown_loc();
+                let dpats = pats
+                    .iter()
+                    .map(|p| self.deser_pattern(p))
+                    .collect::<anyhow::Result<_>>()?;
+                let nid = self.env.new_node(loc, Type::Error);
+                Pattern::Tuple(nid, dpats)
+            },
+            Struct(struct_str, variant, pats) => {
+                let (mid, sid) = self.resolve_struct(struct_str)?;
+                let loc = self.env.unknown_loc();
+                let dpats = pats
+                    .iter()
+                    .map(|p| self.deser_pattern(p))
+                    .collect::<anyhow::Result<_>>()?;
+                let nid = self.env.new_node(loc, Type::Struct(mid, sid, vec![]));
+                let qinst = QualifiedInstId {
+                    module_id: mid,
+                    id: sid,
+                    inst: vec![],
+                };
+                let dvariant = variant
+                    .as_ref()
+                    .map(|v| self.env.symbol_pool().make(v.as_str()));
+                Pattern::Struct(nid, qinst, dvariant, dpats)
+            },
+            LiteralValue(v) => {
+                let dv = self.deser_value(v)?;
+                let loc = self.env.unknown_loc();
+                let nid = self.env.new_node(loc, Type::Error);
+                Pattern::LiteralValue(nid, dv)
+            },
+            Error => {
+                let loc = self.env.unknown_loc();
+                let nid = self.env.new_node(loc, Type::Error);
+                Pattern::Error(nid)
+            },
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // Type deserialization
+
+    fn deser_type(&self, ty: &SerType) -> anyhow::Result<Type> {
+        use PrimitiveType as PT;
+        use SerType::*;
+        Ok(match ty {
+            Bool => Type::Primitive(PT::Bool),
+            U8 => Type::Primitive(PT::U8),
+            U16 => Type::Primitive(PT::U16),
+            U32 => Type::Primitive(PT::U32),
+            U64 => Type::Primitive(PT::U64),
+            U128 => Type::Primitive(PT::U128),
+            U256 => Type::Primitive(PT::U256),
+            I8 => Type::Primitive(PT::I8),
+            I16 => Type::Primitive(PT::I16),
+            I32 => Type::Primitive(PT::I32),
+            I64 => Type::Primitive(PT::I64),
+            I128 => Type::Primitive(PT::I128),
+            I256 => Type::Primitive(PT::I256),
+            Address => Type::Primitive(PT::Address),
+            Signer => Type::Primitive(PT::Signer),
+            Num => Type::Primitive(PT::Num),
+            Range => Type::Primitive(PT::Range),
+            EventStore => Type::Primitive(PT::EventStore),
+            Tuple(ts) => Type::Tuple(
+                ts.iter()
+                    .map(|t| self.deser_type(t))
+                    .collect::<anyhow::Result<_>>()?,
+            ),
+            Vector(inner) => Type::Vector(Box::new(self.deser_type(inner)?)),
+            Struct(name, args) => {
+                let (mid, sid) = self.resolve_struct(name)?;
+                let inst = args
+                    .iter()
+                    .map(|a| self.deser_type(a))
+                    .collect::<anyhow::Result<_>>()?;
+                Type::Struct(mid, sid, inst)
+            },
+            TypeParameter(idx) => Type::TypeParameter(*idx),
+            Fun(arg, result, abilities_byte) => {
+                let abilities = AbilitySet::from_u8(*abilities_byte).ok_or_else(|| {
+                    anyhow::anyhow!("invalid ability bitmask: {}", abilities_byte)
+                })?;
+                Type::Fun(
+                    Box::new(self.deser_type(arg)?),
+                    Box::new(self.deser_type(result)?),
+                    abilities,
+                )
+            },
+            Reference(is_mut, inner) => {
+                let kind = if *is_mut {
+                    ReferenceKind::Mutable
+                } else {
+                    ReferenceKind::Immutable
+                };
+                Type::Reference(kind, Box::new(self.deser_type(inner)?))
+            },
+            TypeDomain(inner) => Type::TypeDomain(Box::new(self.deser_type(inner)?)),
+            ResourceDomain(name, args) => {
+                let (mid, sid) = self.resolve_struct(name)?;
+                let inst: Vec<Type> = args
+                    .iter()
+                    .map(|a| self.deser_type(a))
+                    .collect::<anyhow::Result<_>>()?;
+                Type::ResourceDomain(mid, sid, if inst.is_empty() { None } else { Some(inst) })
+            },
+            Unknown => Type::Error,
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // Operation deserialization
+
+    fn deser_operation(&mut self, op: &SerOperation) -> anyhow::Result<Operation> {
+        use SerOperation::*;
+        Ok(match op {
+            MoveFunction(name) => {
+                let (mid, fid) = self.resolve_function(name)?;
+                Operation::MoveFunction(mid, fid)
+            },
+            Pack(struct_str, variant) => {
+                let (mid, sid) = self.resolve_struct(struct_str)?;
+                let dvariant = variant
+                    .as_ref()
+                    .map(|v| self.env.symbol_pool().make(v.as_str()));
+                Operation::Pack(mid, sid, dvariant)
+            },
+            Closure(name, mask_bits) => {
+                let (mid, fid) = self.resolve_function(name)?;
+                use move_core_types::function::ClosureMask;
+                Operation::Closure(mid, fid, ClosureMask::new(*mask_bits))
+            },
+            Tuple => Operation::Tuple,
+            Select(struct_str, field_name) => {
+                let (mid, sid) = self.resolve_struct(struct_str)?;
+                let fsym = self.env.symbol_pool().make(field_name.as_str());
+                Operation::Select(mid, sid, FieldId::new(fsym))
+            },
+            SelectVariants(struct_str, field_names) => {
+                let (mid, sid) = self.resolve_struct(struct_str)?;
+                let fids = field_names
+                    .iter()
+                    .map(|n| FieldId::new(self.env.symbol_pool().make(n.as_str())))
+                    .collect();
+                Operation::SelectVariants(mid, sid, fids)
+            },
+            TestVariants(struct_str, variant_names) => {
+                let (mid, sid) = self.resolve_struct(struct_str)?;
+                let vsyms = variant_names
+                    .iter()
+                    .map(|n| self.env.symbol_pool().make(n.as_str()))
+                    .collect();
+                Operation::TestVariants(mid, sid, vsyms)
+            },
+            SpecFunction(name, _labels) => {
+                // SpecFunction with memory labels: labels are spec-only and not
+                // needed for inline function bodies.  Reconstruct without labels.
+                let (mid, sfid) = self.resolve_spec_fun(name)?;
+                Operation::SpecFunction(mid, sfid, None)
+            },
+            UpdateField(struct_str, field_name) => {
+                let (mid, sid) = self.resolve_struct(struct_str)?;
+                let fsym = self.env.symbol_pool().make(field_name.as_str());
+                Operation::UpdateField(mid, sid, FieldId::new(fsym))
+            },
+            Behavior(kind, pre, post) => {
+                use crate::model::GlobalId;
+                Operation::Behavior(deser_behavior_kind(kind), BehaviorState {
+                    pre: pre.map(|v| GlobalId::new(v as usize)),
+                    post: post.map(|v| GlobalId::new(v as usize)),
+                })
+            },
+            Result(idx) => Operation::Result(*idx),
+            Index => Operation::Index,
+            Slice => Operation::Slice,
+            Range => Operation::Range,
+            Implies => Operation::Implies,
+            Iff => Operation::Iff,
+            Identical => Operation::Identical,
+            Add => Operation::Add,
+            Sub => Operation::Sub,
+            Mul => Operation::Mul,
+            Mod => Operation::Mod,
+            Div => Operation::Div,
+            BitOr => Operation::BitOr,
+            BitAnd => Operation::BitAnd,
+            Xor => Operation::Xor,
+            Shl => Operation::Shl,
+            Shr => Operation::Shr,
+            And => Operation::And,
+            Or => Operation::Or,
+            Eq => Operation::Eq,
+            Neq => Operation::Neq,
+            Lt => Operation::Lt,
+            Gt => Operation::Gt,
+            Le => Operation::Le,
+            Ge => Operation::Ge,
+            Copy => Operation::Copy,
+            Move => Operation::Move,
+            Not => Operation::Not,
+            Cast => Operation::Cast,
+            Negate => Operation::Negate,
+            Exists(label) => {
+                use crate::model::GlobalId;
+                Operation::Exists(label.map(|v| GlobalId::new(v as usize)))
+            },
+            BorrowGlobal(is_mut) => Operation::BorrowGlobal(
+                if *is_mut {
+                    ReferenceKind::Mutable
+                } else {
+                    ReferenceKind::Immutable
+                },
+            ),
+            Borrow(is_mut) => Operation::Borrow(
+                if *is_mut {
+                    ReferenceKind::Mutable
+                } else {
+                    ReferenceKind::Immutable
+                },
+            ),
+            Deref => Operation::Deref,
+            MoveTo => Operation::MoveTo,
+            MoveFrom => Operation::MoveFrom,
+            Freeze(explicit) => Operation::Freeze(*explicit),
+            Abort(kind) => Operation::Abort(match kind {
+                SerAbortKind::Code => AbortKind::Code,
+                SerAbortKind::Message => AbortKind::Message,
+            }),
+            Vector => Operation::Vector,
+            Len => Operation::Len,
+            TypeValue => Operation::TypeValue,
+            TypeDomain => Operation::TypeDomain,
+            ResourceDomain => Operation::ResourceDomain,
+            Global(label) => {
+                use crate::model::GlobalId;
+                Operation::Global(label.map(|v| GlobalId::new(v as usize)))
+            },
+            CanModify => Operation::CanModify,
+            Old => Operation::Old,
+            Trace(kind) => Operation::Trace(match kind {
+                SerTraceKind::User => TraceKind::User,
+                SerTraceKind::Auto => TraceKind::Auto,
+                SerTraceKind::SubAuto => TraceKind::SubAuto,
+            }),
+            EmptyVec => Operation::EmptyVec,
+            SingleVec => Operation::SingleVec,
+            UpdateVec => Operation::UpdateVec,
+            ConcatVec => Operation::ConcatVec,
+            IndexOfVec => Operation::IndexOfVec,
+            ContainsVec => Operation::ContainsVec,
+            InRangeRange => Operation::InRangeRange,
+            InRangeVec => Operation::InRangeVec,
+            RangeVec => Operation::RangeVec,
+            MaxU8 => Operation::MaxU8,
+            MaxU16 => Operation::MaxU16,
+            MaxU32 => Operation::MaxU32,
+            MaxU64 => Operation::MaxU64,
+            MaxU128 => Operation::MaxU128,
+            MaxU256 => Operation::MaxU256,
+            Bv2Int => Operation::Bv2Int,
+            Int2Bv => Operation::Int2Bv,
+            AbortFlag => Operation::AbortFlag,
+            AbortCode => Operation::AbortCode,
+            WellFormed => Operation::WellFormed,
+            BoxValue => Operation::BoxValue,
+            UnboxValue => Operation::UnboxValue,
+            EmptyEventStore => Operation::EmptyEventStore,
+            ExtendEventStore => Operation::ExtendEventStore,
+            EventStoreIncludes => Operation::EventStoreIncludes,
+            EventStoreIncludedIn => Operation::EventStoreIncludedIn,
+            NoOp => Operation::NoOp,
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // Value deserialization
+
+    fn deser_value(&self, v: &SerValue) -> anyhow::Result<Value> {
+        use SerValue::*;
+        Ok(match v {
+            Address(bytes) => Value::Address(deser_address_bytes(bytes, self.env.symbol_pool())?),
+            Number(bytes) => Value::Number(deser_bigint(bytes)?),
+            Bool(b) => Value::Bool(*b),
+            ByteArray(bs) => Value::ByteArray(bs.clone()),
+            AddressArray(addrs) => Value::AddressArray(
+                addrs
+                    .iter()
+                    .map(|a| deser_address_bytes(a, self.env.symbol_pool()))
+                    .collect::<anyhow::Result<_>>()?,
+            ),
+            Vector(vs) => Value::Vector(
+                vs.iter()
+                    .map(|v| self.deser_value(v))
+                    .collect::<anyhow::Result<_>>()?,
+            ),
+            Tuple(vs) => Value::Tuple(
+                vs.iter()
+                    .map(|v| self.deser_value(v))
+                    .collect::<anyhow::Result<_>>()?,
+            ),
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // Spec deserialization
+
+    fn deser_spec(&mut self, spec: &SerSpec) -> anyhow::Result<Spec> {
+        use crate::ast::{Condition, ConditionKind};
+        fn parse_condition_kind(s: &str) -> ConditionKind {
+            match s {
+                "assert" => ConditionKind::Assert,
+                "assume" => ConditionKind::Assume,
+                "ensures" => ConditionKind::Ensures,
+                "requires" => ConditionKind::Requires,
+                "aborts_if" => ConditionKind::AbortsIf,
+                "aborts_with" => ConditionKind::AbortsWith,
+                "succeeds_if" => ConditionKind::SucceedsIf,
+                "modifies" => ConditionKind::Modifies,
+                "emits" => ConditionKind::Emits,
+                "decreases" => ConditionKind::Decreases,
+                "invariant" => ConditionKind::LoopInvariant,
+                _ => ConditionKind::Assert,
+            }
+        }
+        let conditions = spec
+            .conditions
+            .iter()
+            .map(|c| {
+                let kind = parse_condition_kind(&c.kind);
+                let loc = self.env.unknown_loc();
+                Ok(Condition {
+                    loc,
+                    kind,
+                    properties: BTreeMap::new(),
+                    exp: self.deser_exp(&c.exp)?,
+                    additional_exps: c
+                        .additional_exps
+                        .iter()
+                        .map(|e| self.deser_exp(e))
+                        .collect::<anyhow::Result<_>>()?,
+                })
+            })
+            .collect::<anyhow::Result<_>>()?;
+        Ok(Spec {
+            conditions,
+            ..Default::default()
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // Name resolution helpers
+
+    /// Resolve `"0x<hex>::<module_name>"` or `"@<sym>::<module_name>"` → `ModuleId`.
+    fn resolve_module(&self, module_str: &str) -> anyhow::Result<ModuleId> {
+        let (addr_part, name_part) = split_first_component(module_str)?;
+        let addr = parse_address(&addr_part, self.env.symbol_pool())?;
+        let name_sym = self.env.symbol_pool().make(name_part);
+        let mod_name = ModuleName::new(addr, name_sym);
+        self.env
+            .find_module(&mod_name)
+            .map(|m| m.get_id())
+            .ok_or_else(|| anyhow::anyhow!("module not found in GlobalEnv: {}", module_str))
+    }
+
+    /// Resolve `"<module_str>::<StructName>"` → `(ModuleId, StructId)`.
+    fn resolve_struct(&self, qualified: &str) -> anyhow::Result<(ModuleId, StructId)> {
+        let (module_part, struct_name) = split_last_component(qualified)?;
+        let mid = self.resolve_module(module_part)?;
+        let sym = self.env.symbol_pool().make(struct_name);
+        self.env
+            .get_module(mid)
+            .find_struct(sym)
+            .map(|s| (mid, s.get_id()))
+            .ok_or_else(|| anyhow::anyhow!("struct not found: {}", qualified))
+    }
+
+    /// Resolve `"<module_str>::<fun_name>"` → `(ModuleId, FunId)`.
+    fn resolve_function(&self, qualified: &str) -> anyhow::Result<(ModuleId, FunId)> {
+        let (module_part, fun_name) = split_last_component(qualified)?;
+        let mid = self.resolve_module(module_part)?;
+        let sym = self.env.symbol_pool().make(fun_name);
+        self.env
+            .get_module(mid)
+            .find_function(sym)
+            .map(|f| (mid, f.get_id()))
+            .ok_or_else(|| anyhow::anyhow!("function not found: {}", qualified))
+    }
+
+    /// Resolve `"<module_str>::<spec_fun_name>"` → `(ModuleId, SpecFunId)`.
+    fn resolve_spec_fun(&self, qualified: &str) -> anyhow::Result<(ModuleId, SpecFunId)> {
+        let (module_part, fun_name) = split_last_component(qualified)?;
+        let mid = self.resolve_module(module_part)?;
+        let target_sym = self.env.symbol_pool().make(fun_name);
+        let module = self.env.get_module(mid);
+        for (idx, decl) in module.get_spec_funs() {
+            if decl.name == target_sym {
+                return Ok((mid, *idx));
+            }
+        }
+        anyhow::bail!("spec function not found: {}", qualified)
+    }
+}
+
+// =============================================================================
+// Free helper functions
+
+/// Split `"0x<hex>::<module>"` into `("0x<hex>", "<module>")`.
+/// Handles both numerical `"0x..."` and symbolic `"@..."` addresses.
+fn split_first_component(s: &str) -> anyhow::Result<(String, &str)> {
+    // The address part ends at the first `::`.
+    let sep = s
+        .find("::")
+        .ok_or_else(|| anyhow::anyhow!("missing '::' in module string: {}", s))?;
+    Ok((s[..sep].to_string(), &s[sep + 2..]))
+}
+
+/// Split `"<prefix>::<last>"` into `("<prefix>", "<last>")` using the last `::`.
+fn split_last_component(s: &str) -> anyhow::Result<(&str, &str)> {
+    let sep = s
+        .rfind("::")
+        .ok_or_else(|| anyhow::anyhow!("missing '::' in qualified name: {}", s))?;
+    Ok((&s[..sep], &s[sep + 2..]))
+}
+
+/// Parse a canonical address string back to an [`Address`].
+/// Accepts `"0x<64_hex_chars>"` (numerical) or `"@<name>"` (symbolic).
+fn parse_address(s: &str, pool: &crate::symbol::SymbolPool) -> anyhow::Result<Address> {
+    if let Some(hex) = s.strip_prefix("0x") {
+        let account_addr = AccountAddress::from_hex(hex)
+            .map_err(|e| anyhow::anyhow!("invalid account address '{}': {}", s, e))?;
+        Ok(Address::Numerical(account_addr))
+    } else if let Some(sym_name) = s.strip_prefix('@') {
+        Ok(Address::Symbolic(pool.make(sym_name)))
+    } else {
+        anyhow::bail!("unrecognized address format: {}", s)
+    }
+}
+
+/// Deserialize a serialized address (32-byte numerical or `\xff`+UTF-8 symbolic).
+fn deser_address_bytes(bytes: &[u8], pool: &crate::symbol::SymbolPool) -> anyhow::Result<Address> {
+    if bytes.first() == Some(&0xFF) {
+        let name = std::str::from_utf8(&bytes[1..])
+            .map_err(|e| anyhow::anyhow!("invalid UTF-8 in symbolic address: {}", e))?;
+        Ok(Address::Symbolic(pool.make(name)))
+    } else {
+        let arr: [u8; AccountAddress::LENGTH] = bytes
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("expected 32-byte address, got {} bytes", bytes.len()))?;
+        Ok(Address::Numerical(AccountAddress::new(arr)))
+    }
+}
+
+// =============================================================================
+// BigInt serialization / deserialization
+
+/// Serialize a [`BigInt`] as `[sign_byte, be_magnitude...]`.
+/// `sign_byte` is `0` for non-negative, `1` for negative.
 fn ser_bigint(n: &BigInt) -> Vec<u8> {
     let is_negative = n.is_negative();
     let (_, magnitude) = n.to_bytes_be();
@@ -924,6 +1548,46 @@ fn ser_bigint(n: &BigInt) -> Vec<u8> {
     result.push(if is_negative { 1u8 } else { 0u8 });
     result.extend_from_slice(&magnitude);
     result
+}
+
+fn deser_bigint(bytes: &[u8]) -> anyhow::Result<BigInt> {
+    if bytes.is_empty() {
+        anyhow::bail!("empty bigint bytes");
+    }
+    let is_negative = bytes[0] != 0;
+    let magnitude = &bytes[1..];
+    let abs = BigInt::from_bytes_be(num::bigint::Sign::Plus, magnitude);
+    Ok(if is_negative { -abs } else { abs })
+}
+
+// =============================================================================
+// Misc free deserialization helpers
+
+fn deser_capture_kind(k: &SerLambdaCaptureKind) -> LambdaCaptureKind {
+    match k {
+        SerLambdaCaptureKind::Default => LambdaCaptureKind::Default,
+        SerLambdaCaptureKind::Copy => LambdaCaptureKind::Copy,
+        SerLambdaCaptureKind::Move => LambdaCaptureKind::Move,
+    }
+}
+
+fn deser_quant_kind(k: &SerQuantKind) -> QuantKind {
+    match k {
+        SerQuantKind::Forall => QuantKind::Forall,
+        SerQuantKind::Exists => QuantKind::Exists,
+        SerQuantKind::Choose => QuantKind::Choose,
+        SerQuantKind::ChooseMin => QuantKind::ChooseMin,
+    }
+}
+
+fn deser_behavior_kind(k: &SerBehaviorKind) -> BehaviorKind {
+    match k {
+        SerBehaviorKind::RequiresOf => BehaviorKind::RequiresOf,
+        SerBehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
+        SerBehaviorKind::EnsuresOf => BehaviorKind::EnsuresOf,
+        SerBehaviorKind::ModifiesOf => BehaviorKind::ModifiesOf,
+        SerBehaviorKind::ResultOf => BehaviorKind::ResultOf,
+    }
 }
 
 // =============================================================================
@@ -937,23 +1601,27 @@ mod tests {
     fn test_ser_bigint_zero() {
         let n = BigInt::from(0);
         let bytes = ser_bigint(&n);
-        assert_eq!(bytes[0], 0); // non-negative
+        assert_eq!(bytes[0], 0);
+        let back = deser_bigint(&bytes).unwrap();
+        assert_eq!(back, n);
     }
 
     #[test]
     fn test_ser_bigint_positive() {
         let n = BigInt::from(255u64);
         let bytes = ser_bigint(&n);
-        assert_eq!(bytes[0], 0); // non-negative
-        assert_eq!(bytes[1], 255);
+        assert_eq!(bytes[0], 0);
+        let back = deser_bigint(&bytes).unwrap();
+        assert_eq!(back, n);
     }
 
     #[test]
     fn test_ser_bigint_negative() {
         let n = BigInt::from(-1i64);
         let bytes = ser_bigint(&n);
-        assert_eq!(bytes[0], 1); // negative
-        assert_eq!(bytes[1], 1); // magnitude 1
+        assert_eq!(bytes[0], 1);
+        let back = deser_bigint(&bytes).unwrap();
+        assert_eq!(back, n);
     }
 
     #[test]
@@ -968,11 +1636,34 @@ mod tests {
 
     #[test]
     fn test_ser_exp_determinism() {
-        // Two structurally identical SerExp values must serialize to the same bytes.
-        let exp1 = SerExp::Value(SerValue::Bool(true));
-        let exp2 = SerExp::Value(SerValue::Bool(true));
+        let exp1 = SerExp {
+            ty: SerType::Bool,
+            kind: SerExpKind::Value(SerValue::Bool(true)),
+        };
+        let exp2 = exp1.clone();
         let b1 = bcs::to_bytes(&exp1).unwrap();
         let b2 = bcs::to_bytes(&exp2).unwrap();
         assert_eq!(b1, b2);
+    }
+
+    #[test]
+    fn test_address_roundtrip_numerical() {
+        let addr = AccountAddress::from_hex(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .unwrap();
+        let ser = Address::Numerical(addr);
+        // Serialize then deserialize via the byte encoding.
+        let bytes = addr.into_bytes().to_vec();
+        let pool = crate::symbol::SymbolPool::new();
+        let back = deser_address_bytes(&bytes, &pool).unwrap();
+        assert_eq!(ser, back);
+    }
+
+    #[test]
+    fn test_split_last_component() {
+        let (prefix, last) = split_last_component("0x1::module::Struct").unwrap();
+        assert_eq!(prefix, "0x1::module");
+        assert_eq!(last, "Struct");
     }
 }
