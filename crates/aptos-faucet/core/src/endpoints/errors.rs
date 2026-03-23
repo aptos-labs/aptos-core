@@ -176,8 +176,8 @@ impl AptosTapErrorCode {
         match self {
             AptosTapErrorCode::InvalidRequest
             | AptosTapErrorCode::AccountDoesNotExist
-            | AptosTapErrorCode::EndpointNotEnabled
-            | AptosTapErrorCode::AssetDisabled => StatusCode::BAD_REQUEST,
+            | AptosTapErrorCode::EndpointNotEnabled => StatusCode::BAD_REQUEST,
+            AptosTapErrorCode::AssetDisabled => StatusCode::GONE,
             AptosTapErrorCode::Rejected
             | AptosTapErrorCode::SourceIpMissing
             | AptosTapErrorCode::TransactionFailed

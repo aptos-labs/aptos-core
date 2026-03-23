@@ -89,6 +89,10 @@ pub struct MintAssetConfig {
     /// minting for bypassed requests; to disable minting for all requests,
     /// set maximum_amount to zero as well.
     pub maximum_amount_with_bypass: Option<u64>,
+
+    /// Default amount to fund for this asset when no amount is specified in
+    /// the request. If not set, falls back to the funder-level amount_to_fund.
+    pub amount_to_fund: Option<u64>,
 }
 
 impl MintAssetConfig {
@@ -104,6 +108,7 @@ impl MintAssetConfig {
             transaction_method: TransactionMethod::default(),
             maximum_amount: None,
             maximum_amount_with_bypass: None,
+            amount_to_fund: None,
         }
     }
 
@@ -123,7 +128,8 @@ impl MintAssetConfig {
     }
 }
 
-/// explain these contain additional args for the mint funder.
+/// Configuration for the mint-based funder, including API connection details,
+/// transaction submission settings, and per-asset minting configuration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MintFunderConfig {
     #[serde(flatten)]
@@ -416,14 +422,20 @@ impl MintFunder {
         Ok(())
     }
 
-    /// Given the requested amount and the per-asset maximum, determine the
-    /// amount that can actually be funded.
-    fn get_amount(&self, amount: Option<u64>, maximum_amount: Option<u64>) -> u64 {
+    /// Given the requested amount, the per-asset default, and the per-asset
+    /// maximum, determine the amount that can actually be funded.
+    fn get_amount(
+        &self,
+        amount: Option<u64>,
+        maximum_amount: Option<u64>,
+        asset_amount_to_fund: Option<u64>,
+    ) -> u64 {
+        let default = asset_amount_to_fund.unwrap_or(self.amount_to_fund);
         match (amount, maximum_amount) {
             (Some(amount), Some(maximum_amount)) => std::cmp::min(amount, maximum_amount),
             (Some(amount), None) => amount,
-            (None, Some(maximum_amount)) => std::cmp::min(self.amount_to_fund, maximum_amount),
-            (None, None) => self.amount_to_fund,
+            (None, Some(maximum_amount)) => std::cmp::min(default, maximum_amount),
+            (None, None) => default,
         }
     }
 
@@ -555,7 +567,7 @@ impl FunderTrait for MintFunder {
         }
 
         let client = self.get_api_client();
-        let amount = self.get_amount(amount, maximum_amount);
+        let amount = self.get_amount(amount, maximum_amount, asset_config.amount_to_fund);
         self.process(
             &client,
             amount,
@@ -615,6 +627,7 @@ mod tests {
             transaction_method: TransactionMethod::default(),
             maximum_amount,
             maximum_amount_with_bypass,
+            amount_to_fund: None,
         }
     }
 

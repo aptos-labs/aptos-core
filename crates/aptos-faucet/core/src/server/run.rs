@@ -1030,7 +1030,7 @@ mod test {
             .header(CONTENT_TYPE, "application/json")
             .send()
             .await?;
-        assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), reqwest::StatusCode::GONE);
         let aptos_error = AptosTapError::parse_from_json_string(&response.text().await?)
             .expect("Failed to read response as AptosError");
         assert_eq!(aptos_error.error_code, AptosTapErrorCode::AssetDisabled);
