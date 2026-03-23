@@ -17,7 +17,7 @@ use aptos_dkg::pvss::{
     traits::transcript::{Aggregatable, Aggregated, HasAggregatableSubtranscript},
     Player,
 };
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::RwLock;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
 use aptos_types::{
@@ -52,7 +52,7 @@ pub fn start_subtranscript_aggregation(
     spks: Vec<DealerPublicKey>,
     start_time: Duration,
     agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
-    received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
 ) -> AbortHandle {
     let epoch = dkg_config.session_metadata.dealer_epoch;
     let req = ChunkyDKGTranscriptRequest::new(epoch);
@@ -110,7 +110,7 @@ pub struct ChunkyTranscriptAggregationState {
     dkg_config: ChunkyDKGConfig,
     signing_pubkeys: Vec<DealerPublicKey>,
     start_time: Duration,
-    received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
     inner_state: RwLock<InnerState>,
 }
 
@@ -122,7 +122,7 @@ impl ChunkyTranscriptAggregationState {
         signing_pubkeys: Vec<DealerPublicKey>,
         start_time: Duration,
         agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
-        received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
+        received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
     ) -> Self {
         Self {
             epoch_state,
@@ -221,7 +221,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
 
         // Store the transcript
         {
-            let mut received_transcripts = self.received_transcripts.lock();
+            let mut received_transcripts = self.received_transcripts.write();
             received_transcripts.insert(metadata.author, transcript.clone());
         }
 
@@ -277,7 +277,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                 // equivocated transcripts (where a dealer sent different transcripts to
                 // different validators), not just missing ones.
                 let dealer_transcript_hashes: Vec<HashValue> = {
-                    let received = self.received_transcripts.lock();
+                    let received = self.received_transcripts.read();
                     contributors
                         .iter()
                         .map(|addr| {
@@ -366,7 +366,7 @@ mod tests {
             setup.spks(),
             duration_since_epoch(),
             Some(tx),
-            Arc::new(Mutex::new(HashMap::new())),
+            Arc::new(RwLock::new(HashMap::new())),
         ));
         (state, rx)
     }

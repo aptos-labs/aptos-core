@@ -24,7 +24,7 @@ use aptos_dkg::pvss::{
     traits::transcript::{Aggregatable, HasAggregatableSubtranscript},
     Player,
 };
-use aptos_infallible::{duration_since_epoch, Mutex};
+use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_logger::{debug, error, info, warn};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_types::{
@@ -116,8 +116,9 @@ pub struct ChunkyDKGManager {
     pull_notification_tx: aptos_channel::Sender<(), Arc<ValidatorTransaction>>,
     pull_notification_rx: aptos_channel::Receiver<(), Arc<ValidatorTransaction>>,
 
-    // Shared map to track transcripts received from each recipient
-    received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
+    // Shared map to track transcripts received from each recipient.
+    // RwLock: aggregation task writes; main loop and handler tasks only read.
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
 
     // Guards for spawned RPC handler tasks, keyed by requesting validator's address.
     // If a new request arrives from the same sender, the old handler is aborted and replaced.
@@ -160,7 +161,7 @@ impl ChunkyDKGManager {
             certified_subtrx_tx: None,
             pull_notification_tx,
             pull_notification_rx,
-            received_transcripts: Arc::new(Mutex::new(HashMap::new())),
+            received_transcripts: Arc::new(RwLock::new(HashMap::new())),
             rpc_handler_guards: HashMap::new(),
             stopped: false,
             state: InnerState::Init,
@@ -670,7 +671,7 @@ impl ChunkyDKGManager {
         req: MissingTranscriptRequest,
         mut response_sender: Box<dyn RpcResponseSender>,
     ) -> Result<()> {
-        let received_transcripts = self.received_transcripts.lock();
+        let received_transcripts = self.received_transcripts.read();
         let dealer_addr = req.missing_dealer;
 
         let response = match received_transcripts.get(&dealer_addr) {
@@ -776,7 +777,7 @@ impl ChunkyDKGManager {
         dkg_config: ChunkyDKGConfig,
         ssk: Arc<DealerPrivateKey>,
         _my_addr: AccountAddress,
-        received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
+        received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
         epoch_state: Arc<EpochState>,
         network_sender: Arc<NetworkSender>,
     ) -> Result<DKGMessage> {
@@ -822,7 +823,7 @@ impl ChunkyDKGManager {
         // validators), so we must fetch any dealer whose local transcript hash differs from
         // the requester's hash — not just dealers we're missing entirely.
         let (mut subtranscripts, mismatched_dealers) = {
-            let received_transcripts_map = received_transcripts.lock();
+            let received_transcripts_map = received_transcripts.read();
             let mut subtranscripts: Vec<ChunkySubtranscript> = Vec::new();
             let mut mismatched_dealers: Vec<AccountAddress> = Vec::new();
 
@@ -940,7 +941,7 @@ impl ChunkyDKGManager {
             certified_subtrx_tx: None,
             pull_notification_tx,
             pull_notification_rx,
-            received_transcripts: Arc::new(Mutex::new(HashMap::new())),
+            received_transcripts: Arc::new(RwLock::new(HashMap::new())),
             rpc_handler_guards: HashMap::new(),
             stopped: false,
             state: InnerState::Init,
