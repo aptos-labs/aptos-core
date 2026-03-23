@@ -228,8 +228,16 @@ impl PayloadClient for ProxyBudgetPayloadClient {
                 (config.soft_max_txns_after_filtering / 2).max(1);
         }
 
-        // Force devnet fast path: QS returns immediately (no 30ms NO_TXN_DELAY sleep)
+        // Force QS to return immediately (no 30ms NO_TXN_DELAY sleep).
+        // The QS client sleeps 30ms per retry when `return_empty` is false.
+        // `return_empty = pending_ordering && return_non_full`, and `return_non_full`
+        // becomes false under high load (blocks are full → high recent_max_fill_fraction).
+        // Setting both pending_ordering=true AND low fill fraction ensures return_empty=true
+        // so the 30ms sleep never fires. Without this, proxy rounds timeout because the
+        // proposer sleeps 30-90ms during payload pull, exceeding the 100ms round timeout.
         config.pending_ordering = true;
+        config.recent_max_fill_fraction = 0.0;
+        config.pending_uncommitted_blocks = 0;
 
         // Pull validator txns periodically (every Nth block), skip on others for speed.
         // Validator txn pool pull can take ~25ms when pool is empty; skipping it on most
