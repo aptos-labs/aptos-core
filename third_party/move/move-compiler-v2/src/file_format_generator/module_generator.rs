@@ -38,7 +38,7 @@ use move_model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
     },
-    serialized_ast::InlineFunctionBodies,
+    serialized_ast::SerializedFunctionBodies,
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
     well_known,
@@ -187,7 +187,7 @@ impl ModuleGenerator {
             .env
             .get_extension::<std::collections::BTreeMap<
                 move_model::model::ModuleId,
-                InlineFunctionBodies,
+                SerializedFunctionBodies,
             >>()
         {
             if let Some(bodies) = bodies_map.get(&module_id) {

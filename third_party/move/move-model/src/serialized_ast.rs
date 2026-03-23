@@ -55,16 +55,21 @@ pub const INLINE_BODIES_METADATA_KEY: &[u8] = b"move:inline_bodies:v1";
 // =============================================================================
 // Top-level container
 
-/// Top-level container stored in `CompiledModule` metadata under
-/// [`INLINE_BODIES_METADATA_KEY`].  Maps the unqualified function name to its
-/// serialized body.  Only `public inline` functions are included.
+/// General-purpose container for storing serialized function AST bodies in
+/// `CompiledModule` metadata.  Maps unqualified function names to their
+/// serialized bodies.
+///
+/// The container is reused across different metadata keys — the key identifies
+/// the semantic purpose (e.g. [`INLINE_BODIES_METADATA_KEY`] for `public inline`
+/// functions, or a future `move:immutable_bodies:v1` for `#[immutable]` functions).
+/// Each use case has its own key and its own on-chain feature flag.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct InlineFunctionBodies {
+pub struct SerializedFunctionBodies {
     /// Sorted by function name for determinism.
     pub functions: BTreeMap<String, SerFunctionBody>,
 }
 
-impl InlineFunctionBodies {
+impl SerializedFunctionBodies {
     /// Serialize to bytes using BCS.
     pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
         bcs::to_bytes(self).map_err(|e| anyhow::anyhow!("BCS serialization failed: {}", e))
@@ -425,7 +430,7 @@ impl<'a> AstSerializer<'a> {
     pub fn serialize_module_inline_bodies(
         &self,
         module_id: ModuleId,
-    ) -> Option<InlineFunctionBodies> {
+    ) -> Option<SerializedFunctionBodies> {
         let module = self.env.get_module(module_id);
         let mut functions = BTreeMap::new();
         for func in module.get_functions() {
@@ -464,7 +469,7 @@ impl<'a> AstSerializer<'a> {
         if functions.is_empty() {
             None
         } else {
-            Some(InlineFunctionBodies { functions })
+            Some(SerializedFunctionBodies { functions })
         }
     }
 
@@ -925,7 +930,7 @@ impl<'a> AstDeserializer<'a> {
     pub fn inject_inline_bodies(
         &mut self,
         module_id: ModuleId,
-        bodies: &InlineFunctionBodies,
+        bodies: &SerializedFunctionBodies,
     ) -> Vec<(String, anyhow::Error)> {
         let mut errors = vec![];
         for (fun_name, body) in &bodies.functions {
@@ -1626,11 +1631,11 @@ mod tests {
 
     #[test]
     fn test_inline_bodies_roundtrip() {
-        let bodies = InlineFunctionBodies {
+        let bodies = SerializedFunctionBodies {
             functions: BTreeMap::new(),
         };
         let bytes = bodies.to_bytes().unwrap();
-        let decoded = InlineFunctionBodies::from_bytes(&bytes).unwrap();
+        let decoded = SerializedFunctionBodies::from_bytes(&bytes).unwrap();
         assert_eq!(bodies, decoded);
     }
 

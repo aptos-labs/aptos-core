@@ -25,7 +25,7 @@ use move_core_types::{
 use move_model::{
     metadata::{CompilationMetadata, COMPILATION_METADATA_KEY},
     model::StructEnv,
-    serialized_ast::{InlineFunctionBodies, INLINE_BODIES_METADATA_KEY},
+    serialized_ast::{SerializedFunctionBodies, INLINE_BODIES_METADATA_KEY},
 };
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, env, num::NonZeroUsize, str::FromStr, sync::Arc};
@@ -286,7 +286,7 @@ fn check_metadata_format(
             if !features.is_enabled(FeatureFlag::INLINE_FUNCTION_BODIES_IN_METADATA) {
                 return Err(MalformedError::UnknownKey(data.key.clone()));
             }
-            bcs::from_bytes::<InlineFunctionBodies>(&data.value)
+            bcs::from_bytes::<SerializedFunctionBodies>(&data.value)
                 .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
         } else {
             return Err(MalformedError::UnknownKey(data.key.clone()));
