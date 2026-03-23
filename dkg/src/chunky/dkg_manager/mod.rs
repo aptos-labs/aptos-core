@@ -67,8 +67,8 @@ enum InnerState {
     AwaitAggregatedSubtranscriptCertification {
         start_time: Duration,
         my_transcript: ChunkyDKGTranscript,
-        aggregated_subtranscript: AggregatedSubtranscript,
-        dkg_config: ChunkyDKGConfig,
+        aggregated_subtranscript: Arc<AggregatedSubtranscript>,
+        dkg_config: Arc<ChunkyDKGConfig>,
         _abort_guard: DropGuard,
     },
     Finished {
@@ -473,12 +473,15 @@ impl ChunkyDKGManager {
 
         counters::observe_chunky_dkg_stage(start_time, self.my_addr, "agg_transcript_ready");
 
+        let aggregated_subtranscript = Arc::new(aggregated_subtranscript);
+        let dkg_config = Arc::new(dkg_config);
+
         let abort_handle = subtrx_cert_producer::start_chunky_subtranscript_certification(
             self.reliable_broadcast.clone(),
             start_time,
             self.my_addr,
             self.epoch_state.clone(),
-            aggregated_subtranscript.clone(),
+            (*aggregated_subtranscript).clone(),
             dealer_transcript_hashes,
             self.certified_subtrx_tx.clone(),
         );
@@ -705,7 +708,7 @@ impl ChunkyDKGManager {
                 aggregated_subtranscript: aggregated_transcript,
                 dkg_config,
                 ..
-            } => (aggregated_transcript.clone(), dkg_config.clone()),
+            } => (Arc::clone(aggregated_transcript), Arc::clone(dkg_config)),
             _ => {
                 bail!(
                     "[ChunkyDKG] subtranscript validation request unexpected in state {:?}",
@@ -773,8 +776,8 @@ impl ChunkyDKGManager {
     async fn handle_subtranscript_signature_request(
         sender: AccountAddress,
         req: ChunkyDKGSubtranscriptSignatureRequest,
-        local_aggregated_transcript: AggregatedSubtranscript,
-        dkg_config: ChunkyDKGConfig,
+        local_aggregated_transcript: Arc<AggregatedSubtranscript>,
+        dkg_config: Arc<ChunkyDKGConfig>,
         ssk: Arc<DealerPrivateKey>,
         _my_addr: AccountAddress,
         received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
@@ -785,7 +788,7 @@ impl ChunkyDKGManager {
         // remote transcript, we can just sign and return immediately.
         if local_aggregated_transcript.hash() == req.subtranscript_hash {
             let signature = ssk
-                .sign(&local_aggregated_transcript)
+                .sign(local_aggregated_transcript.as_ref())
                 .map_err(|e| anyhow!("failed to sign subtranscript validation: {:?}", e))?;
 
             // Build and send a response message
@@ -860,7 +863,7 @@ impl ChunkyDKGManager {
                 req.dealer_epoch,
                 mismatched_dealers,
                 Duration::from_secs(10),
-                dkg_config.clone(),
+                (*dkg_config).clone(),
                 epoch_state.clone(),
             );
 
