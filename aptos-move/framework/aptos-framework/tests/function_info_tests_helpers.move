@@ -1,5 +1,5 @@
 #[test_only]
-module 0xcafe::function_info_tests_helpers {
+module aptos_framework::function_info_tests_helpers {
     use aptos_framework::function_info::FunctionInfo;
 
     public fun lhs(_s: &FunctionInfo) {}

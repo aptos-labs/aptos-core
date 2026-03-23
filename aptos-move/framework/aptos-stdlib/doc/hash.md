@@ -18,6 +18,7 @@ Non-cryptograhic hashes:
 -  [Function `sip_hash_from_value`](#0x1_aptos_hash_sip_hash_from_value)
 -  [Function `keccak256`](#0x1_aptos_hash_keccak256)
 -  [Function `sha2_512`](#0x1_aptos_hash_sha2_512)
+-  [Function `sha2_512_value`](#0x1_aptos_hash_sha2_512_value)
 -  [Function `sha3_512`](#0x1_aptos_hash_sha3_512)
 -  [Function `ripemd160`](#0x1_aptos_hash_ripemd160)
 -  [Function `blake2b_256`](#0x1_aptos_hash_blake2b_256)
@@ -155,6 +156,32 @@ Returns the SHA2-512 hash of <code>bytes</code>.
     };
 
     <a href="hash.md#0x1_aptos_hash_sha2_512_internal">sha2_512_internal</a>(bytes)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_hash_sha2_512_value"></a>
+
+## Function `sha2_512_value`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha2_512_value">sha2_512_value</a>&lt;T&gt;(val: &T): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha2_512_value">sha2_512_value</a>&lt;T&gt;(val: &T): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>let</b> bytes = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(val);
+
+    <a href="hash.md#0x1_aptos_hash_sha2_512">sha2_512</a>(bytes)
 }
 </code></pre>
 
