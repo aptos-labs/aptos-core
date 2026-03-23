@@ -43,9 +43,6 @@ pub(crate) fn get_realistic_env_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
-        "realistic_env_max_load_extra_vote_wait" => {
-            realistic_env_max_load_extra_vote_wait_test(duration, test_cmd)
-        },
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_orderbook_workload_sweep" => realistic_env_orderbook_workload_sweep_bench(),
