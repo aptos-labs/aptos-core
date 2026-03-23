@@ -7,9 +7,12 @@
 //! refreshed in the hot state.
 //!
 //! ```text
-//! |<---------- key ----------->|<--- value --->|
-//! |  state key hash | version  |  state value  |
+//! |<--------------- key ---------------->|<-------- value -------->|
+//! |  state key hash | hot since version  |  Option<HotStateEntry>  |
 //! ```
+//!
+//! `HotStateEntry` is either `Occupied { value, value_version }` or `Vacant`.
+//! `None` means the key was evicted from hot state at that version.
 
 use crate::schema::{ensure_slice_len_eq, HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME};
 use anyhow::Result;
@@ -31,17 +34,18 @@ type Key = (HashValue, Version);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub(crate) enum HotStateValue {
+pub(crate) enum HotStateEntry {
     Occupied {
-        value_version: Version,
         value: StateValue,
+        value_version: Version,
     },
     Vacant,
 }
+
 define_schema!(
     HotStateValueByKeyHashSchema,
     Key,
-    Option<HotStateValue>, // None means being evicted.
+    Option<HotStateEntry>,
     HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
 );
 
@@ -63,7 +67,7 @@ impl KeyCodec<HotStateValueByKeyHashSchema> for Key {
     }
 }
 
-impl ValueCodec<HotStateValueByKeyHashSchema> for Option<HotStateValue> {
+impl ValueCodec<HotStateValueByKeyHashSchema> for Option<HotStateEntry> {
     fn encode_value(&self) -> Result<Vec<u8>> {
         bcs::to_bytes(self).map_err(Into::into)
     }
