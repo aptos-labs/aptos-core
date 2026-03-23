@@ -82,10 +82,12 @@ pub struct MintAssetConfig {
     pub maximum_amount: Option<u64>,
 
     /// With this it is possible to set a different maximum amount for requests
-    /// that were allowed to skip the Checkers by a Bypasser. If not given,
-    /// maximum_amount is used whether the request bypassed the checks or not.
-    /// Setting this to zero disables minting for this asset entirely, even
-    /// with a bypass key.
+    /// that were allowed to skip the Checkers by a Bypasser. This limit is
+    /// only applied to bypassed requests; non-bypassed requests use
+    /// maximum_amount. If not given, maximum_amount is used whether the
+    /// request bypassed the checks or not. Setting this to zero disables
+    /// minting for bypassed requests; to disable minting for all requests,
+    /// set maximum_amount to zero as well.
     pub maximum_amount_with_bypass: Option<u64>,
 }
 
@@ -593,5 +595,61 @@ impl FunderTrait for MintFunder {
                 )),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::funder::common::AssetConfig;
+    use std::path::PathBuf;
+
+    fn make_asset_config(
+        maximum_amount: Option<u64>,
+        maximum_amount_with_bypass: Option<u64>,
+    ) -> MintAssetConfig {
+        MintAssetConfig {
+            default: AssetConfig::new(None, PathBuf::from("/dummy")),
+            mint_account_address: None,
+            do_not_delegate: true,
+            transaction_method: TransactionMethod::default(),
+            maximum_amount,
+            maximum_amount_with_bypass,
+        }
+    }
+
+    #[test]
+    fn test_get_maximum_amount_no_limits() {
+        let config = make_asset_config(None, None);
+        assert_eq!(config.get_maximum_amount(false), None);
+        assert_eq!(config.get_maximum_amount(true), None);
+    }
+
+    #[test]
+    fn test_get_maximum_amount_only_regular_limit() {
+        let config = make_asset_config(Some(100), None);
+        assert_eq!(config.get_maximum_amount(false), Some(100));
+        assert_eq!(config.get_maximum_amount(true), Some(100));
+    }
+
+    #[test]
+    fn test_get_maximum_amount_with_bypass_limit() {
+        let config = make_asset_config(Some(100), Some(10000));
+        assert_eq!(config.get_maximum_amount(false), Some(100));
+        assert_eq!(config.get_maximum_amount(true), Some(10000));
+    }
+
+    #[test]
+    fn test_get_maximum_amount_disabled_without_bypass() {
+        let config = make_asset_config(Some(0), Some(1000));
+        assert_eq!(config.get_maximum_amount(false), Some(0));
+        assert_eq!(config.get_maximum_amount(true), Some(1000));
+    }
+
+    #[test]
+    fn test_get_maximum_amount_disabled_entirely() {
+        let config = make_asset_config(Some(0), Some(0));
+        assert_eq!(config.get_maximum_amount(false), Some(0));
+        assert_eq!(config.get_maximum_amount(true), Some(0));
     }
 }
