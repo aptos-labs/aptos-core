@@ -25,6 +25,7 @@ use crate::{
     monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
+    util::time_service::SendTask,
     pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{VoteReceptionResult, VoteStatus},
     persistent_liveness_storage::PersistentLivenessStorage,
@@ -33,7 +34,9 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
-use aptos_config::config::{BlockTransactionFilterConfig, ConsensusConfig};
+use aptos_config::config::{
+    BlockTransactionFilterConfig, ConsensusConfig, WaitForExtraVotesConfig,
+};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
@@ -75,7 +78,13 @@ use fail::fail_point;
 use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, SinkExt, StreamExt};
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration,
+    collections::{BTreeMap, HashSet},
+    mem::Discriminant,
+    num::NonZeroUsize,
+    ops::Add,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
 };
 use tokio::{
     sync::oneshot as TokioOneshot,
@@ -309,6 +318,16 @@ pub mod round_manager_fuzzing;
 /// etc.). It is exposing the async processing functions for each event type.
 /// The caller is responsible for running the event loops and driving the execution via some
 /// executors.
+/// Tracks state when the proposer is waiting for extra votes before advancing the round.
+struct WaitingForExtraVotes {
+    round: Round,
+    voted_authors: HashSet<Author>,
+    target_voting_power: u128,
+    wait_for_validators: HashSet<Author>,
+    wait_start: Instant,
+    abort_handle: futures::future::AbortHandle,
+}
+
 pub struct RoundManager {
     epoch_state: Arc<EpochState>,
     block_store: Arc<BlockStore>,
@@ -334,6 +353,12 @@ pub struct RoundManager {
     proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
     pending_opt_proposals: BTreeMap<Round, OptBlockData>,
     opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
+    /// State for waiting for extra votes before advancing round (None = not waiting)
+    waiting_for_extra_votes: Option<WaitingForExtraVotes>,
+    /// Config for wait-for-extra-votes feature
+    wait_for_extra_votes_config: Option<WaitForExtraVotesConfig>,
+    /// Channel for wait-for-extra-votes timeout events
+    wait_for_votes_timeout_tx: aptos_channels::Sender<Round>,
 }
 
 impl RoundManager {
@@ -356,7 +381,7 @@ impl RoundManager {
         chunky_dkg_config: OnChainChunkyDKGConfig,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
         opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
-    ) -> Self {
+    ) -> (Self, aptos_channels::Receiver<Round>) {
         // when decoupled execution is false,
         // the counter is still static.
         counters::OP_COUNTERS
@@ -367,7 +392,10 @@ impl RoundManager {
             .set(onchain_config.decoupled_execution() as i64);
         let vtxn_config = onchain_config.effective_validator_txn_config();
         debug!("vtxn_config={:?}", vtxn_config);
-        Self {
+        let wait_for_extra_votes_config = local_config.wait_for_extra_votes.clone();
+        let (wait_for_votes_timeout_tx, wait_for_votes_timeout_rx) =
+            aptos_channels::new::<Round>(1, &counters::PENDING_EXTRA_VOTE_WAIT_TIMEOUTS);
+        (Self {
             epoch_state,
             block_store,
             round_state,
@@ -389,7 +417,10 @@ impl RoundManager {
             proposal_status_tracker,
             pending_opt_proposals: BTreeMap::new(),
             opt_proposal_loopback_tx,
-        }
+            waiting_for_extra_votes: None,
+            wait_for_extra_votes_config,
+            wait_for_votes_timeout_tx,
+        }, wait_for_votes_timeout_rx)
     }
 
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
@@ -405,6 +436,57 @@ impl RoundManager {
                 .max_blocks_per_sending_request(self.onchain_config.quorum_store_enabled()),
             self.block_store.pending_blocks(),
         )
+    }
+
+    /// Check if the extra votes condition is met given a set of voted authors.
+    fn extra_votes_condition_met(
+        &self,
+        authors: &HashSet<Author>,
+        target_power: u128,
+        wait_validators: &HashSet<Author>,
+    ) -> bool {
+        let current_power: u128 = authors
+            .iter()
+            .filter_map(|a| self.epoch_state.verifier.get_voting_power(a))
+            .map(|vp| vp as u128)
+            .sum();
+        let power_met = current_power >= target_power;
+        let validators_met = wait_validators.iter().all(|a| authors.contains(a));
+        power_met && validators_met
+    }
+
+    /// Check if extra votes target is met and advance the round if so.
+    async fn check_and_advance_extra_votes(&mut self) -> anyhow::Result<bool> {
+        let should_advance = if let Some(waiting) = &self.waiting_for_extra_votes {
+            self.extra_votes_condition_met(
+                &waiting.voted_authors,
+                waiting.target_voting_power,
+                &waiting.wait_for_validators,
+            )
+        } else {
+            false
+        };
+        if should_advance {
+            let waiting = self.waiting_for_extra_votes.take().unwrap();
+            waiting.abort_handle.abort();
+            counters::EXTRA_VOTE_WAIT_DURATION.observe(waiting.wait_start.elapsed().as_secs_f64());
+            self.do_advance_round().await?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Advance round by calling round_state.process_certificates and process_new_round_event.
+    async fn do_advance_round(&mut self) -> anyhow::Result<()> {
+        let sync_info = self.block_store.sync_info();
+        let epoch_state = self.epoch_state.clone();
+        if let Some(new_round_event) = self
+            .round_state
+            .process_certificates(sync_info, &epoch_state.verifier)
+        {
+            self.process_new_round_event(new_round_event).await?;
+        }
+        Ok(())
     }
 
     /// Leader:
@@ -1094,6 +1176,79 @@ impl RoundManager {
     /// This function is called only after all the dependencies of the given QC have been retrieved.
     async fn process_certificates(&mut self) -> anyhow::Result<()> {
         let sync_info = self.block_store.sync_info();
+        let next_round = sync_info.highest_round() + 1;
+
+        // If already waiting for extra votes on a lower round and a higher cert arrives,
+        // cancel the wait and advance immediately.
+        if let Some(waiting) = &self.waiting_for_extra_votes {
+            if next_round > waiting.round + 1 {
+                let waiting = self.waiting_for_extra_votes.take().unwrap();
+                waiting.abort_handle.abort();
+                counters::EXTRA_VOTE_WAIT_TIMEOUT.inc();
+                counters::EXTRA_VOTE_WAIT_DURATION
+                    .observe(waiting.wait_start.elapsed().as_secs_f64());
+            }
+        }
+
+        // Check if we should wait for extra votes before advancing
+        if let Some(config) = self.wait_for_extra_votes_config.clone() {
+            let is_qc_ready = sync_info.highest_certified_round() + 1 == next_round;
+            let is_next_proposer = self
+                .proposer_election
+                .is_valid_proposer(self.proposal_generator.author(), next_round);
+
+            if is_qc_ready
+                && is_next_proposer
+                && next_round > self.round_state.current_round()
+                && self.waiting_for_extra_votes.is_none()
+            {
+                let target_power = (self.epoch_state.verifier.total_voting_power() as f64
+                    * config.target_voting_power_pct) as u128;
+                let wait_validators: HashSet<Author> = config
+                    .wait_for_validators
+                    .iter()
+                    .filter(|a| self.epoch_state.verifier.get_voting_power(a).is_some())
+                    .cloned()
+                    .collect();
+
+                // Collect authors who already voted from pending_votes via round_state
+                // (votes that formed the QC are already tracked there)
+                let current_authors: HashSet<Author> = HashSet::new();
+                // We can't easily extract from pending_votes without a new API,
+                // but the QC required 2f+1 votes, so we know at least that much power.
+                // For a more precise check, we seed with an empty set and let late votes fill it.
+
+                if !self.extra_votes_condition_met(
+                    &current_authors,
+                    target_power,
+                    &wait_validators,
+                ) {
+                    // Schedule timeout
+                    let abort_handle = self.round_state.time_service().run_after(
+                        Duration::from_millis(config.max_wait_ms),
+                        SendTask::make(self.wait_for_votes_timeout_tx.clone(), next_round),
+                    );
+                    // Start waiting
+                    self.waiting_for_extra_votes = Some(WaitingForExtraVotes {
+                        round: self.round_state.current_round(),
+                        voted_authors: current_authors,
+                        target_voting_power: target_power,
+                        wait_for_validators: wait_validators,
+                        wait_start: Instant::now(),
+                        abort_handle,
+                    });
+                    counters::EXTRA_VOTE_WAIT_TRIGGERED.inc();
+                    info!(
+                        round = self.round_state.current_round(),
+                        next_round = next_round,
+                        "Waiting for extra votes before advancing round"
+                    );
+                    return Ok(());
+                }
+            }
+        }
+
+        // Normal path: advance round immediately
         let epoch_state = self.epoch_state.clone();
         if let Some(new_round_event) = self
             .round_state
@@ -1735,6 +1890,18 @@ impl RoundManager {
             );
         }
 
+        // Track late votes if we're waiting for extra votes before advancing
+        if let Some(waiting) = &mut self.waiting_for_extra_votes {
+            if round == waiting.round {
+                waiting.voted_authors.insert(vote.author());
+            }
+        }
+        if self.waiting_for_extra_votes.is_some() {
+            if self.check_and_advance_extra_votes().await? {
+                return Ok(());
+            }
+        }
+
         let block_id = vote.vote_data().proposed().id();
         // Check if the block already had a QC
         if self
@@ -2045,6 +2212,7 @@ impl RoundManager {
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         mut opt_proposal_loopback_rx: aptos_channels::UnboundedReceiver<OptBlockData>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
+        mut wait_for_votes_timeout_rx: aptos_channels::Receiver<Round>,
     ) {
         info!(epoch = self.epoch_state.epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
@@ -2056,6 +2224,20 @@ impl RoundManager {
                         ack_sender.send(()).expect("[RoundManager] Fail to ack shutdown");
                     }
                     break;
+                }
+                wait_round = wait_for_votes_timeout_rx.select_next_some() => {
+                    if self.waiting_for_extra_votes.as_ref().is_some_and(|w| w.round + 1 == wait_round) {
+                        let waiting = self.waiting_for_extra_votes.take().unwrap();
+                        counters::EXTRA_VOTE_WAIT_TIMEOUT.inc();
+                        counters::EXTRA_VOTE_WAIT_DURATION.observe(waiting.wait_start.elapsed().as_secs_f64());
+                        info!(
+                            round = waiting.round,
+                            "Extra vote wait timed out, advancing round"
+                        );
+                        if let Err(e) = self.do_advance_round().await {
+                            warn!("Error advancing round after extra vote wait timeout: {}", e);
+                        }
+                    }
                 }
                 opt_proposal = opt_proposal_loopback_rx.select_next_some() => {
                     self.pending_opt_proposals = self.pending_opt_proposals.split_off(&opt_proposal.round().add(1));

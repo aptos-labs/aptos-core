@@ -327,6 +327,10 @@ impl RoundState {
         }
     }
 
+    pub fn time_service(&self) -> &Arc<dyn TimeService> {
+        &self.time_service
+    }
+
     pub fn vote_sent(&self) -> Option<Vote> {
         self.vote_sent.clone()
     }

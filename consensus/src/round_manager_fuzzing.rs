@@ -202,7 +202,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         aptos_channels::new_unbounded(&counters::OP_COUNTERS.gauge("opt_proposal_loopback_queue"));
 
     // event processor
-    RoundManager::new(
+    let (round_manager, _wait_for_votes_timeout_rx) = RoundManager::new(
         epoch_state,
         Arc::clone(&block_store),
         round_state,
@@ -223,7 +223,8 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainChunkyDKGConfig::default_disabled(),
         Arc::new(MockPastProposalStatusTracker {}),
         opt_proposal_loopback_tx,
-    )
+    );
+    round_manager
 }
 
 // This functions fuzzes a Proposal protobuffer (not a ConsensusMsg)

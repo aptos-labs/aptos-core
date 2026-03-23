@@ -10,7 +10,7 @@ use crate::config::{
     SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
 use aptos_crypto::_once_cell::sync::Lazy;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
@@ -105,6 +105,8 @@ pub struct ConsensusConfig {
     pub enable_round_timeout_msg: bool,
     pub enable_optimistic_proposal_rx: bool,
     pub enable_optimistic_proposal_tx: bool,
+    /// Wait for extra votes beyond QC before proposing. Research/testing only.
+    pub wait_for_extra_votes: Option<WaitForExtraVotesConfig>,
     // Number of tokio worker theads to use for the Consensus runtime.
     // If set to 0, it will be minimum of num_cpus/2 and DEFAULT_WORKER_THREADS.
     pub num_tokio_worker_threads: u16,
@@ -212,6 +214,23 @@ pub struct PipelineBackpressureValues {
     // If we want to dynamically increase it beyond quorum_store_poll_time,
     // we need to adjust timeouts other nodes use for the backpressured round.
     pub backpressure_proposal_delay_ms: u64,
+}
+
+/// Configuration for waiting for additional votes beyond QC (2f+1) before proposing.
+/// When enabled, the proposer delays round advancement until target voting power is reached
+/// or specific validators have voted, bounded by max_wait_ms.
+/// Research/testing only — not for mainnet.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct WaitForExtraVotesConfig {
+    /// Target voting power as fraction of total (e.g., 0.80 for 80%).
+    pub target_voting_power_pct: f64,
+    /// Maximum time to wait for extra votes (ms). Proceed after this regardless.
+    pub max_wait_ms: u64,
+    /// Specific validator addresses to wait for. If any of these didn't vote,
+    /// wait until they do or max_wait_ms expires.
+    /// Checked in addition to target_voting_power_pct — both must be met.
+    #[serde(default)]
+    pub wait_for_validators: Vec<AccountAddress>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -398,6 +417,7 @@ impl Default for ConsensusConfig {
             enable_round_timeout_msg: true,
             enable_optimistic_proposal_rx: true,
             enable_optimistic_proposal_tx: true,
+            wait_for_extra_votes: None,
             num_tokio_worker_threads: 0,
         }
     }

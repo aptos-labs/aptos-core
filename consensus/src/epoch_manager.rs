@@ -983,7 +983,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .config
             .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
 
-        let mut round_manager = RoundManager::new(
+        let (mut round_manager, wait_for_votes_timeout_rx) = RoundManager::new(
             epoch_state,
             block_store.clone(),
             round_state,
@@ -1012,6 +1012,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffered_proposal_rx,
             opt_proposal_loopback_rx,
             close_rx,
+            wait_for_votes_timeout_rx,
         ));
 
         self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);

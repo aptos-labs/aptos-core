@@ -459,7 +459,7 @@ impl NodeSetup {
 
         let local_config = local_consensus_config.clone();
 
-        let mut round_manager = RoundManager::new(
+        let (mut round_manager, _wait_for_votes_timeout_rx) = RoundManager::new(
             epoch_state,
             Arc::clone(&block_store),
             round_state,

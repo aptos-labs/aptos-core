@@ -168,6 +168,42 @@ pub static PROPOSAL_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 //////////////////////
+// EXTRA VOTE WAIT COUNTERS
+//////////////////////
+
+pub static EXTRA_VOTE_WAIT_TRIGGERED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_extra_vote_wait_triggered",
+        "Count of times the proposer waited for extra votes before advancing round"
+    )
+    .unwrap()
+});
+
+pub static EXTRA_VOTE_WAIT_TIMEOUT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_extra_vote_wait_timeout",
+        "Count of times the extra vote wait hit the timeout without reaching target"
+    )
+    .unwrap()
+});
+
+pub static EXTRA_VOTE_WAIT_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_extra_vote_wait_duration_s",
+        "Duration of extra vote wait before advancing round (seconds)"
+    )
+    .unwrap()
+});
+
+pub static PENDING_EXTRA_VOTE_WAIT_TIMEOUTS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_pending_extra_vote_wait_timeouts",
+        "Count of the pending extra vote wait timeouts"
+    )
+    .unwrap()
+});
+
+//////////////////////
 // PROPOSAL ELECTION
 //////////////////////
 
