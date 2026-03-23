@@ -283,8 +283,6 @@ impl RunConfig {
                     chain_id.unwrap_or_else(ChainId::test),
                 ),
                 transaction_submission_config: TransactionSubmissionConfig::new(
-                    None,    // maximum_amount
-                    None,    // maximum_amount_with_bypass
                     30,      // gas_unit_price_ttl_secs
                     None,    // gas_unit_price_override
                     500_000, // max_gas_amount

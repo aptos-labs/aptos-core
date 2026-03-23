@@ -75,6 +75,18 @@ pub struct MintAssetConfig {
     /// Transaction method: script (default) or entry_function
     #[serde(default)]
     pub transaction_method: TransactionMethod,
+
+    /// Maximum amount of OCTA to give an account for this asset. If set to
+    /// zero, minting is disabled for this asset (without a bypass key). If
+    /// not set, no cap is enforced.
+    pub maximum_amount: Option<u64>,
+
+    /// With this it is possible to set a different maximum amount for requests
+    /// that were allowed to skip the Checkers by a Bypasser. If not given,
+    /// maximum_amount is used whether the request bypassed the checks or not.
+    /// Setting this to zero disables minting for this asset entirely, even
+    /// with a bypass key.
+    pub maximum_amount_with_bypass: Option<u64>,
 }
 
 impl MintAssetConfig {
@@ -88,12 +100,24 @@ impl MintAssetConfig {
             mint_account_address,
             do_not_delegate,
             transaction_method: TransactionMethod::default(),
+            maximum_amount: None,
+            maximum_amount_with_bypass: None,
         }
     }
 
     /// Delegate to the default AssetConfig's get_key method.
     pub fn get_key(&self) -> Result<Ed25519PrivateKey> {
         self.default.get_key()
+    }
+
+    /// Returns the effective maximum amount for this asset. If a Bypasser let
+    /// the request bypass the Checkers and maximum_amount_with_bypass is set,
+    /// returns that. Otherwise returns maximum_amount.
+    pub fn get_maximum_amount(&self, did_bypass_checkers: bool) -> Option<u64> {
+        match (self.maximum_amount_with_bypass, did_bypass_checkers) {
+            (Some(max), true) => Some(max),
+            _ => self.maximum_amount,
+        }
     }
 }
 
@@ -390,6 +414,17 @@ impl MintFunder {
         Ok(())
     }
 
+    /// Given the requested amount and the per-asset maximum, determine the
+    /// amount that can actually be funded.
+    fn get_amount(&self, amount: Option<u64>, maximum_amount: Option<u64>) -> u64 {
+        match (amount, maximum_amount) {
+            (Some(amount), Some(maximum_amount)) => std::cmp::min(amount, maximum_amount),
+            (Some(amount), None) => amount,
+            (None, Some(maximum_amount)) => std::cmp::min(self.amount_to_fund, maximum_amount),
+            (None, None) => self.amount_to_fund,
+        }
+    }
+
     /// Core processing logic that handles transaction submission.
     pub async fn process(
         &self,
@@ -503,14 +538,25 @@ impl FunderTrait for MintFunder {
         check_only: bool,
         did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
-        // Resolve asset (use configured default if not specified)
+        // Resolve asset (use configured default if not specified).
         let asset_name = asset.as_deref().unwrap_or(&self.default_asset);
 
-        // Validate asset exists
-        self.get_asset_config(asset_name)?;
+        let asset_config = self.get_asset_config(asset_name)?;
+        let maximum_amount = asset_config.get_maximum_amount(did_bypass_checkers);
+
+        // If the effective maximum for this asset is zero, the asset is disabled.
+        if maximum_amount == Some(0) {
+            return Err(AptosTapError::new(
+                format!(
+                    "Minting is disabled for asset '{}'",
+                    asset_name
+                ),
+                AptosTapErrorCode::AssetDisabled,
+            ));
+        }
 
         let client = self.get_api_client();
-        let amount = self.get_amount(amount, did_bypass_checkers);
+        let amount = self.get_amount(amount, maximum_amount);
         self.process(
             &client,
             amount,
@@ -520,18 +566,6 @@ impl FunderTrait for MintFunder {
             asset_name,
         )
         .await
-    }
-
-    fn get_amount(&self, amount: Option<u64>, did_bypass_checkers: bool) -> u64 {
-        match (
-            amount,
-            self.txn_config.get_maximum_amount(did_bypass_checkers),
-        ) {
-            (Some(amount), Some(maximum_amount)) => std::cmp::min(amount, maximum_amount),
-            (Some(amount), None) => amount,
-            (None, Some(maximum_amount)) => std::cmp::min(self.amount_to_fund, maximum_amount),
-            (None, None) => self.amount_to_fund,
-        }
     }
 
     /// Assert the funder account actually exists.
