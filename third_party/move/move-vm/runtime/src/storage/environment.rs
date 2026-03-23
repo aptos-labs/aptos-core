@@ -6,7 +6,7 @@ use crate::{
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
         ty_tag_converter::{TypeTagCache, TypeTagConverter},
-        verified_module_cache::VERIFIED_MODULES_CACHE,
+        verified_module_cache::{VerifierCacheKey, VERIFIED_MODULES_CACHE},
     },
     Module, Script,
 };
@@ -138,13 +138,11 @@ impl RuntimeEnvironment {
         &self.interned_module_id_pool
     }
 
-    /// Returns a cache key combining the module hash with the verifier config hash, so that
-    /// modules verified under different configs get separate cache entries.
-    fn verifier_cache_key(&self, module_hash: &[u8; 32]) -> [u8; 32] {
-        let mut combined = [0u8; 64];
-        combined[..32].copy_from_slice(module_hash);
-        combined[32..].copy_from_slice(&self.verifier_config_hash);
-        move_vm_types::sha3_256(&combined)
+    /// Returns the hash of the serialized verifier config. Used as part of the verified module
+    /// cache key so that modules verified under one config are not treated as verified under a
+    /// different config.
+    pub fn verifier_config_hash(&self) -> &[u8; 32] {
+        &self.verifier_config_hash
     }
 
     /// Enables delayed field optimization for this environment.
@@ -202,7 +200,7 @@ impl RuntimeEnvironment {
         // config are not treated as verified under a different config. This prevents a race
         // condition in concurrent replay where threads spanning an epoch boundary with a
         // verifier config change could skip verification.
-        let cache_key = self.verifier_cache_key(module_hash);
+        let cache_key = VerifierCacheKey::new(*module_hash, self.verifier_config_hash);
         if !VERIFIED_MODULES_CACHE.contains(&cache_key) {
             let _timer =
                 VM_TIMER.timer_with_label("move_bytecode_verifier::verify_module_with_config");
