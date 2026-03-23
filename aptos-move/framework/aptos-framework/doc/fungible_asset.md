@@ -61,9 +61,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `store_exists`](#0x1_fungible_asset_store_exists)
 -  [Function `store_exists_inline`](#0x1_fungible_asset_store_exists_inline)
 -  [Function `concurrent_fungible_balance_exists_inline`](#0x1_fungible_asset_concurrent_fungible_balance_exists_inline)
--  [Function `metadata_from_asset`](#0x1_fungible_asset_metadata_from_asset)
 -  [Function `store_metadata`](#0x1_fungible_asset_store_metadata)
--  [Function `amount`](#0x1_fungible_asset_amount)
 -  [Function `balance`](#0x1_fungible_asset_balance)
 -  [Function `balance_impl`](#0x1_fungible_asset_balance_impl)
 -  [Function `is_balance_at_least`](#0x1_fungible_asset_is_balance_at_least)
@@ -79,6 +77,8 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `has_supply_dispatch_function`](#0x1_fungible_asset_has_supply_dispatch_function)
 -  [Function `derived_balance_dispatch_function`](#0x1_fungible_asset_derived_balance_dispatch_function)
 -  [Function `derived_supply_dispatch_function`](#0x1_fungible_asset_derived_supply_dispatch_function)
+-  [Function `amount`](#0x1_fungible_asset_amount)
+-  [Function `metadata_from_asset`](#0x1_fungible_asset_metadata_from_asset)
 -  [Function `asset_metadata`](#0x1_fungible_asset_asset_metadata)
 -  [Function `mint_ref_metadata`](#0x1_fungible_asset_mint_ref_metadata)
 -  [Function `transfer_ref_metadata`](#0x1_fungible_asset_transfer_ref_metadata)
@@ -2390,31 +2390,6 @@ at the fungible store address.
 
 </details>
 
-<a id="0x1_fungible_asset_metadata_from_asset"></a>
-
-## Function `metadata_from_asset`
-
-Return the underlying metadata object
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(self: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(self: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
-    self.metadata
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_fungible_asset_store_metadata"></a>
 
 ## Function `store_metadata`
@@ -2434,31 +2409,6 @@ Return the underlying metadata object.
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>&lt;T: key&gt;(store: Object&lt;T&gt;): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).metadata
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_fungible_asset_amount"></a>
-
-## Function `amount`
-
-Return the <code>amount</code> of a given fungible asset.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>): u64 {
-    fa.amount
 }
 </code></pre>
 
@@ -2936,10 +2886,63 @@ Return whether a fungible asset type is dispatchable.
 
 </details>
 
+<a id="0x1_fungible_asset_amount"></a>
+
+## Function `amount`
+
+Return the <code>amount</code> of a given fungible asset.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(self: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(self: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>): u64 {
+    self.amount
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_metadata_from_asset"></a>
+
+## Function `metadata_from_asset`
+
+Return the underlying metadata object
+Duplicate of <code>asset_metadata</code>
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(self: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(self: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
+    self.metadata
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_fungible_asset_asset_metadata"></a>
 
 ## Function `asset_metadata`
 
+Return the underlying metadata object from the <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">asset_metadata</a>(self: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
@@ -3586,7 +3589,7 @@ Burns a fungible asset
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_burn">burn</a>(self: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a> {
     <b>assert</b>!(
-        self.metadata == fa.<a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(),
+        self.metadata == fa.<a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">asset_metadata</a>(),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH">EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH</a>)
     );
     fa.<a href="fungible_asset.md#0x1_fungible_asset_burn_internal">burn_internal</a>();

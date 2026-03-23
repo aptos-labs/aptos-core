@@ -837,6 +837,7 @@ module aptos_framework::fungible_asset {
         self.amount
     }
 
+    #[deprecated]
     /// Return the underlying metadata object
     /// Duplicate of `asset_metadata`
     public fun metadata_from_asset(self: &FungibleAsset): Object<Metadata> {
@@ -1079,7 +1080,7 @@ module aptos_framework::fungible_asset {
     /// Burns a fungible asset
     public fun burn(self: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
         assert!(
-            self.metadata == fa.metadata_from_asset(),
+            self.metadata == fa.asset_metadata(),
             error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH)
         );
         fa.burn_internal();
