@@ -1617,6 +1617,20 @@ impl RoundManager {
             .await
             .context("[RoundManager] Failed to insert the block into BlockStore")?;
 
+        // Speculatively update last_consumed_proxy_round on non-proposer validators when
+        // they receive a primary proposal. This fires ~130ms before QC formation, allowing
+        // proxy budget to refresh immediately so all proxy validators can include txns.
+        // Safe: even if proposal is rejected, proxy at most produces a few extra non-empty
+        // blocks that get consumed in a subsequent primary round.
+        if self.proxy_verifier.is_some() {
+            if let Some(proxy_round) = proposal.block_data().last_proxy_round() {
+                if proxy_round > self.last_consumed_proxy_round {
+                    self.last_consumed_proxy_round = proxy_round;
+                    self.send_pipeline_state_to_proxy();
+                }
+            }
+        }
+
         let block_store = self.block_store.clone();
         if block_store.check_payload(&proposal).is_err() {
             debug!("Payload not available locally for block: {}", proposal.id());
@@ -2337,6 +2351,21 @@ impl RoundManager {
             .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
+        // Update last_consumed_proxy_round on all validators (not just the proposer)
+        // when a primary block is certified. Without this, non-proposer validators have
+        // stale last_consumed_proxy_round, causing their ProxyBudgetPayloadClient to count
+        // all proxy blocks since round 0, exhausting the budget immediately and making
+        // 3 of 4 proxy validators always return empty payloads.
+        if self.proxy_verifier.is_some() {
+            let certified_id = qc.certified_block().id();
+            if let Some(block) = self.block_store.get_block(certified_id) {
+                if let Some(proxy_round) = block.block().block_data().last_proxy_round() {
+                    if proxy_round > self.last_consumed_proxy_round {
+                        self.last_consumed_proxy_round = proxy_round;
+                    }
+                }
+            }
+        }
         // Piggyback pipeline state on QC events for proxy backpressure
         self.send_pipeline_state_to_proxy();
         self.process_certificates().await?;
@@ -2363,6 +2392,17 @@ impl RoundManager {
                     )
                     .await
                     .context("[RoundManager] Failed to process the QC from order vote msg");
+                // Same as new_qc_aggregated: update last_consumed_proxy_round on all validators.
+                if self.proxy_verifier.is_some() {
+                    let certified_id = verified_qc.certified_block().id();
+                    if let Some(block) = self.block_store.get_block(certified_id) {
+                        if let Some(proxy_round) = block.block().block_data().last_proxy_round() {
+                            if proxy_round > self.last_consumed_proxy_round {
+                                self.last_consumed_proxy_round = proxy_round;
+                            }
+                        }
+                    }
+                }
                 // Piggyback pipeline state on QC events for proxy backpressure
                 self.send_pipeline_state_to_proxy();
                 self.process_certificates().await?;

@@ -73,6 +73,27 @@ fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) 
         .max_proxy_block_txns_after_filtering = 200;
     config.consensus.proxy_consensus_config.max_proxy_block_bytes = 5 * 1024 * 1024;
 
+    // Budget: allow up to 30 non-empty proxy blocks per primary consumption window
+    // (up from default 10). With primary at ~5 blocks/s and proxy at ~67 rounds/s,
+    // each 200ms primary window produces ~13 proxy rounds. budget=30 ensures all 13
+    // can carry transactions. 30 × 300 txns = 9000 txns/window, well within the
+    // 50000 max_receiving_block_txns for primary blocks.
+    config
+        .consensus
+        .proxy_consensus_config
+        .target_proxy_blocks_per_primary_round = 30;
+    // Raise backpressure thresholds to match the higher buffer target, avoiding
+    // spurious throttling when pending_proxy_batches is transiently near 30.
+    config
+        .consensus
+        .proxy_consensus_config
+        .backpressure
+        .batch_moderate_threshold = 50;
+    config
+        .consensus
+        .proxy_consensus_config
+        .backpressure
+        .batch_heavy_threshold = 100;
     // Proxy timeout tuning: default 100ms base causes ~15-65% of rounds to
     // timeout at 70 rounds/s. 300ms gives more headroom while staying 3x
     // faster than primary (1000ms).
