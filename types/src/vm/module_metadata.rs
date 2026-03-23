@@ -25,6 +25,7 @@ use move_core_types::{
 use move_model::{
     metadata::{CompilationMetadata, COMPILATION_METADATA_KEY},
     model::StructEnv,
+    serialized_ast::INLINE_BODIES_METADATA_KEY,
 };
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, env, num::NonZeroUsize, str::FromStr, sync::Arc};
@@ -274,6 +275,10 @@ fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> 
             compilation_key_exist = true;
             bcs::from_bytes::<CompilationMetadata>(&data.value)
                 .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
+        } else if data.key == INLINE_BODIES_METADATA_KEY {
+            // Serialized inline function bodies stored by the compiler for modular compilation.
+            // The value is BCS-encoded InlineFunctionBodies; we don't validate the schema here
+            // because the VM does not need to interpret it.
         } else {
             return Err(MalformedError::UnknownKey(data.key.clone()));
         }
