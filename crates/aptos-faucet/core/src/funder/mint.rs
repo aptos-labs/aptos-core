@@ -547,10 +547,7 @@ impl FunderTrait for MintFunder {
         // If the effective maximum for this asset is zero, the asset is disabled.
         if maximum_amount == Some(0) {
             return Err(AptosTapError::new(
-                format!(
-                    "Minting is disabled for asset '{}'",
-                    asset_name
-                ),
+                format!("Minting is disabled for asset '{}'", asset_name),
                 AptosTapErrorCode::AssetDisabled,
             ));
         }
