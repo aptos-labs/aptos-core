@@ -2,7 +2,7 @@
 server_config:
   api_path_base: ""
 metrics_server_config:
-  listen_port: 9105
+  listen_port: 9106
 bypasser_configs:
   - type: "AuthToken"
     file: "/tmp/auth_tokens.txt"
@@ -17,7 +17,7 @@ funder_config:
       do_not_delegate: false
       key_file_path: "/tmp/mint.key"
       mint_account_address: "0xA550C18"
-      maximum_amount: 100
+      maximum_amount: 0
       maximum_amount_with_bypass: 10000
 handler_config:
   use_helpful_errors: true

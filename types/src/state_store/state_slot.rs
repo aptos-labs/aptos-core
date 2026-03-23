@@ -25,7 +25,7 @@ pub enum StateSlot {
     ColdVacant,
     HotVacant {
         hot_since_version: Version,
-        lru_info: LRUEntry<StateKey>,
+        lru_info: LRUEntry<HashValue>,
     },
     ColdOccupied {
         value_version: Version,
@@ -35,7 +35,7 @@ pub enum StateSlot {
         value_version: Version,
         value: StateValue,
         hot_since_version: Version,
-        lru_info: LRUEntry<StateKey>,
+        lru_info: LRUEntry<HashValue>,
     },
 }
 
@@ -234,7 +234,7 @@ impl StateSlot {
 }
 
 impl THotStateSlot for StateSlot {
-    type Key = StateKey;
+    type Key = HashValue;
 
     fn prev(&self) -> Option<&Self::Key> {
         match self {

@@ -20,6 +20,7 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
+use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_logger::warn;
 use aptos_metrics_core::TimerHelper;
@@ -38,8 +39,8 @@ use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 
 #[derive(Clone, Debug, Default)]
 pub struct HotStateMetadata {
-    latest: Option<StateKey>,
-    oldest: Option<StateKey>,
+    latest: Option<HashValue>,
+    oldest: Option<HashValue>,
     num_items: usize,
 }
 
@@ -147,12 +148,12 @@ impl State {
             .all(|(base_shard, top_shard)| top_shard.can_view_after(base_shard))
     }
 
-    pub fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
-        self.hot_state_metadata[shard_id].latest.clone()
+    pub fn latest_hot_key(&self, shard_id: usize) -> Option<HashValue> {
+        self.hot_state_metadata[shard_id].latest
     }
 
-    pub fn oldest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
-        self.hot_state_metadata[shard_id].oldest.clone()
+    pub fn oldest_hot_key(&self, shard_id: usize) -> Option<HashValue> {
+        self.hot_state_metadata[shard_id].oldest
     }
 
     pub fn num_hot_items(&self, shard_id: usize) -> usize {
@@ -207,8 +208,8 @@ impl State {
                         NonZeroUsize::new(self.hot_state_config.max_items_per_shard).unwrap(),
                         Arc::clone(&persisted_hot_state),
                         overlay,
-                        hot_metadata.latest.clone(),
-                        hot_metadata.oldest.clone(),
+                        hot_metadata.latest,
+                        hot_metadata.oldest,
                         hot_metadata.num_items,
                     );
                     let mut all_updates = per_version.iter();
