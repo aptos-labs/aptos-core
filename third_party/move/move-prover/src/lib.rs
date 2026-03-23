@@ -88,6 +88,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
+        emit_inline_bodies: false,
         external_checks: vec![],
         print_errors: true,
     };

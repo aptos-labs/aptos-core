@@ -121,6 +121,14 @@ pub struct Options {
     #[clap(skip)]
     pub compile_verify_code: bool,
 
+    /// Whether to serialize inline function bodies into module metadata
+    /// (key `move:inline_bodies:v1`) for use by modular compilation.
+    /// Should only be set when the corresponding on-chain feature flag
+    /// (`INLINE_FUNCTION_BODIES_IN_METADATA`) is active; otherwise the
+    /// produced modules will be rejected by the VM on publish.
+    #[clap(skip)]
+    pub emit_inline_bodies: bool,
+
     /// External checks to be performed.
     #[clap(skip)]
     pub external_checks: Vec<Arc<dyn ExternalChecks>>,

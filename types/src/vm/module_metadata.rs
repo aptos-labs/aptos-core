@@ -251,7 +251,10 @@ pub fn get_randomness_annotation_for_entry_function(
 }
 
 /// Check if the metadata has unknown key/data types
-fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> {
+fn check_metadata_format(
+    module: &CompiledModule,
+    features: &Features,
+) -> Result<(), MalformedError> {
     let mut exist = false;
     let mut compilation_key_exist = false;
     for data in module.metadata.iter() {
@@ -276,9 +279,13 @@ fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> 
             bcs::from_bytes::<CompilationMetadata>(&data.value)
                 .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
         } else if data.key == INLINE_BODIES_METADATA_KEY {
-            // Serialized inline function bodies stored by the compiler for modular compilation.
-            // The value is BCS-encoded InlineFunctionBodies; we don't validate the schema here
-            // because the VM does not need to interpret it.
+            // Serialized inline function bodies for modular compilation.
+            // Only allowed after the feature flag is activated; before that, any module
+            // carrying this key was produced by pre-release software and must be rejected
+            // to prevent consensus divergence during node software upgrades.
+            if !features.is_enabled(FeatureFlag::INLINE_FUNCTION_BODIES_IN_METADATA) {
+                return Err(MalformedError::UnknownKey(data.key.clone()));
+            }
         } else {
             return Err(MalformedError::UnknownKey(data.key.clone()));
         }
@@ -452,7 +459,7 @@ pub fn verify_module_metadata_for_module_publishing(
     }
 
     if features.are_resource_groups_enabled() {
-        check_metadata_format(module)?;
+        check_metadata_format(module, features)?;
     }
     let metadata = if let Some(metadata) = get_metadata_from_compiled_code(module) {
         metadata

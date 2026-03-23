@@ -504,9 +504,17 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         let lift_inline_funs = options.experiment_on(Experiment::LIFT_INLINE_FUNS);
 
         // Serialize `public inline` function bodies into the GlobalEnv before the inliner
-        // removes them.  The serialized bytes are stored as a GlobalEnv extension and later
-        // attached as metadata entries in each CompiledModule (see module_generator.rs).
+        // removes them.  Only runs when `emit_inline_bodies` is set, which must be
+        // coordinated with the `INLINE_FUNCTION_BODIES_IN_METADATA` on-chain feature flag:
+        // if the flag is not yet active, the VM will reject modules with this metadata key.
         env_pipeline.add("serialize inline bodies", |env: &mut GlobalEnv| {
+            let emit = env
+                .get_extension::<Options>()
+                .map(|o| o.emit_inline_bodies)
+                .unwrap_or(false);
+            if !emit {
+                return;
+            }
             let serializer = AstSerializer::new(env);
             let mut bodies_by_module = std::collections::BTreeMap::new();
             for module in env.get_modules() {

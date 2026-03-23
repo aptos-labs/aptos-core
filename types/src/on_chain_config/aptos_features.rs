@@ -169,6 +169,10 @@ pub enum FeatureFlag {
     ENCRYPTED_TRANSACTIONS = 108,
     /// Enables public struct and enum types as transaction arguments.
     PUBLIC_STRUCT_ENUM_ARGS = 109,
+    /// Whether serialized inline function bodies may be embedded in module metadata
+    /// (key `move:inline_bodies:v1`) to support modular compilation.
+    /// Must be activated before modules carrying this metadata can be published.
+    INLINE_FUNCTION_BODIES_IN_METADATA = 110,
 }
 
 impl FeatureFlag {
