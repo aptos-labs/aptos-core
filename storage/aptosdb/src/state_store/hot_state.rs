@@ -24,6 +24,7 @@ use dashmap::{mapref::one::Ref, DashMap};
 #[cfg(test)]
 use std::collections::BTreeMap;
 use std::{
+    collections::HashMap,
     sync::{
         atomic::{AtomicU64, Ordering},
         mpsc::{Receiver, RecvTimeoutError, Sender, SyncSender},
@@ -80,25 +81,22 @@ where
 }
 
 #[derive(Debug)]
-struct HotStateBase<K = HashValue, V = StateSlot>
-where
-    K: Eq + std::hash::Hash,
-{
-    shards: [Shard<K, V>; NUM_STATE_SHARDS],
+struct HotStateBase {
+    shards: [Shard<HashValue, (StateKey, StateSlot)>; NUM_STATE_SHARDS],
 }
 
-impl<K, V> HotStateBase<K, V>
-where
-    K: Clone + Eq + std::hash::Hash,
-    V: Clone,
-{
+impl HotStateBase {
     fn new_empty(max_items_per_shard: usize) -> Self {
         Self {
             shards: arr![Shard::new(max_items_per_shard); 16],
         }
     }
 
-    fn get_from_shard(&self, shard_id: usize, key: &K) -> Option<Ref<'_, K, V>> {
+    fn get_from_shard(
+        &self,
+        shard_id: usize,
+        key: &HashValue,
+    ) -> Option<Ref<'_, HashValue, (StateKey, StateSlot)>> {
         self.shards[shard_id].get(key)
     }
 
@@ -112,25 +110,66 @@ where
 /// state. This enables RCU semantics: the new committed state is published immediately via the
 /// delta overlay, while DashMap mutations are deferred until all old readers are gone.
 struct LayeredHotStateView {
-    /// If `Some`, overlay these changes on top of base. If `None`, base is up-to-date.
-    delta: Option<StateDelta>,
+    /// Hash index built from the RCU delta (`merged_state → committed.state`), if present.
+    /// Enables both StateKey-based and hash-based lookups without the original `StateDelta`.
+    delta_index: Option<Box<[HashMap<HashValue, (StateKey, StateSlot)>; NUM_STATE_SHARDS]>>,
     base: Arc<HotStateBase>,
+}
+
+impl LayeredHotStateView {
+    fn new(delta: Option<StateDelta>, base: Arc<HotStateBase>) -> Self {
+        let delta_index = delta.map(|d| {
+            Box::new(std::array::from_fn(|shard_id| {
+                d.shards[shard_id]
+                    .iter()
+                    .map(|(key, slot)| (*key.crypto_hash_ref(), (key, slot)))
+                    .collect()
+            }))
+        });
+        Self { delta_index, base }
+    }
 }
 
 impl HotStateView for LayeredHotStateView {
     fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
-        if let Some(delta) = &self.delta {
-            if let Some(slot) = delta.get_state_slot(state_key) {
+        if let Some(index) = &self.delta_index {
+            let shard_id = state_key.get_shard_id();
+            if let Some((_, slot)) = index[shard_id].get(state_key.crypto_hash_ref()) {
                 // Delta says this key changed. If hot, return it. If cold/evicted, return None —
                 // do NOT fall through to base, the key was explicitly evicted in committed state.
-                return if slot.is_hot() { Some(slot) } else { None };
+                return if slot.is_hot() {
+                    Some(slot.clone())
+                } else {
+                    None
+                };
             }
         }
         // Key not in delta (unchanged) — read from base DashMap.
         let shard_id = state_key.get_shard_id();
         self.base
             .get_from_shard(shard_id, state_key.crypto_hash_ref())
-            .map(|v| v.clone())
+            .map(|entry| entry.value().1.clone())
+    }
+
+    fn get_state_entry_by_hash(
+        &self,
+        shard_id: usize,
+        key_hash: &HashValue,
+    ) -> Option<(StateKey, StateSlot)> {
+        if let Some(index) = &self.delta_index {
+            if let Some((key, slot)) = index[shard_id].get(key_hash) {
+                // Delta has this key. Return it only if hot; cold means evicted — do NOT fall
+                // through to the base DashMap which may still have the stale hot entry.
+                return if slot.is_hot() {
+                    Some((key.clone(), slot.clone()))
+                } else {
+                    None
+                };
+            }
+        }
+        self.base
+            .get_from_shard(shard_id, key_hash)
+            .map(|entry| entry.value().clone())
     }
 }
 
@@ -163,10 +202,7 @@ pub struct HotState {
 impl HotState {
     pub fn new(state: State, config: HotStateConfig) -> Self {
         let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
-        let view = Arc::new(LayeredHotStateView {
-            delta: None,
-            base: Arc::clone(&base),
-        });
+        let view = Arc::new(LayeredHotStateView::new(None, Arc::clone(&base)));
         let committed = Arc::new(Mutex::new(CommittedSnapshot {
             state: state.clone(),
             view,
@@ -194,10 +230,7 @@ impl HotState {
             committed.state = state.clone();
             // Reset view to base-only (no delta). hack_reset is only called when no commits are in
             // flight, so DashMaps and committed state are in sync from the readers' perspective.
-            committed.view = Arc::new(LayeredHotStateView {
-                delta: None,
-                base: Arc::clone(&self.base),
-            });
+            committed.view = Arc::new(LayeredHotStateView::new(None, Arc::clone(&self.base)));
         }
         // Synchronously reset the Committer's merged_state and old_views. Block until processed,
         // so the caller has a hard guarantee that no stale Committer state remains.
@@ -235,7 +268,7 @@ impl HotState {
     }
 
     #[cfg(test)]
-    pub fn get_all_entries(&self, shard_id: usize) -> BTreeMap<HashValue, StateSlot> {
+    pub fn get_all_entries(&self, shard_id: usize) -> BTreeMap<HashValue, (StateKey, StateSlot)> {
         self.base.shards[shard_id].iter().collect()
     }
 }
@@ -366,10 +399,10 @@ impl Committer {
 
             // Build a layered view: delta(merged_state -> to_commit) over base DashMaps.
             let delta = to_commit.make_delta(&self.merged_state);
-            let new_view = Arc::new(LayeredHotStateView {
-                delta: Some(delta),
-                base: Arc::clone(&self.base),
-            });
+            let new_view = Arc::new(LayeredHotStateView::new(
+                Some(delta),
+                Arc::clone(&self.base),
+            ));
 
             // Atomically publish new view + state; track the old view for deferred merge.
             {
@@ -484,10 +517,7 @@ impl Committer {
 
         // Publish a clean (delta-free) view so future readers hit the DashMaps directly without
         // the overhead of a delta lookup, now that the DashMaps are up to date.
-        let clean_view = Arc::new(LayeredHotStateView {
-            delta: None,
-            base: Arc::clone(&self.base),
-        });
+        let clean_view = Arc::new(LayeredHotStateView::new(None, Arc::clone(&self.base)));
         Self::swap_view(&mut self.old_views, &mut self.committed.lock(), clean_view);
         self.update_deferred_merge_gauges(self.merged_state.next_version());
 
@@ -520,25 +550,21 @@ impl Committer {
                 if slot.is_hot() {
                     self.total_key_bytes += HashValue::LENGTH;
                     self.total_value_bytes += slot.size();
-                    if let Some(old_slot) = self.base.shards[shard_id].insert(key_hash, slot) {
+                    if let Some(old) = self.base.shards[shard_id].insert(key_hash, (key, slot)) {
                         self.total_key_bytes -= HashValue::LENGTH;
-                        self.total_value_bytes -= old_slot.size();
+                        self.total_value_bytes -= old.1.size();
                         n_update += 1;
                     } else {
                         n_insert += 1;
                     }
-                } else if let Some((_, old_slot)) = self.base.shards[shard_id].remove(&key_hash) {
+                } else if let Some((_, old)) = self.base.shards[shard_id].remove(&key_hash) {
                     self.total_key_bytes -= HashValue::LENGTH;
-                    self.total_value_bytes -= old_slot.size();
+                    self.total_value_bytes -= old.1.size();
                     n_evict += 1;
                 }
             }
-            self.heads[shard_id] = target
-                .latest_hot_key(shard_id)
-                .map(|k| *k.crypto_hash_ref());
-            self.tails[shard_id] = target
-                .oldest_hot_key(shard_id)
-                .map(|k| *k.crypto_hash_ref());
+            self.heads[shard_id] = target.latest_hot_key(shard_id);
+            self.tails[shard_id] = target.oldest_hot_key(shard_id);
             assert_eq!(
                 self.base.shards[shard_id].len(),
                 target.num_hot_items(shard_id)
@@ -567,12 +593,16 @@ impl Committer {
                 self.base.shards[shard_id]
                     .get(k)
                     .expect("head must exist in base")
+                    .value()
+                    .1
                     .expect_hot_since_version()
             });
             let lru_version = self.tails[shard_id].as_ref().map(|k| {
                 self.base.shards[shard_id]
                     .get(k)
                     .expect("tail must exist in base")
+                    .value()
+                    .1
                     .expect_hot_since_version()
             });
 
@@ -608,10 +638,11 @@ impl Committer {
             let mut current = *head;
             while let Some(key_hash) = current {
                 let entry = shard.get(&key_hash).expect("Must exist.");
+                let (_, slot) = entry.value();
                 num_visited += 1;
                 ensure!(num_visited <= shard.len());
-                ensure!(entry.is_hot());
-                current = entry.next().map(|k| *k.crypto_hash_ref());
+                ensure!(slot.is_hot());
+                current = slot.next().copied();
             }
             ensure!(num_visited == shard.len());
         }
@@ -621,10 +652,11 @@ impl Committer {
             let mut current = *tail;
             while let Some(key_hash) = current {
                 let entry = shard.get(&key_hash).expect("Must exist.");
+                let (_, slot) = entry.value();
                 num_visited += 1;
                 ensure!(num_visited <= shard.len());
-                ensure!(entry.is_hot());
-                current = entry.prev().map(|k| *k.crypto_hash_ref());
+                ensure!(slot.is_hot());
+                current = slot.prev().copied();
             }
             ensure!(num_visited == shard.len());
         }
@@ -720,12 +752,9 @@ mod tests {
         let key = StateKey::raw(b"key_a");
         let shard_id = key.get_shard_id();
         let slot = make_hot_slot(1, b"value_a");
-        base.shards[shard_id].insert(*key.crypto_hash_ref(), slot.clone());
+        base.shards[shard_id].insert(*key.crypto_hash_ref(), (key.clone(), slot.clone()));
 
-        let view = LayeredHotStateView {
-            delta: None,
-            base: Arc::clone(&base),
-        };
+        let view = LayeredHotStateView::new(None, Arc::clone(&base));
 
         // Key in base -> returns base value.
         let result = view.get_state_slot(&key);
@@ -747,20 +776,27 @@ mod tests {
         // key_base_only: in base DashMap, NOT in delta.
         let key_base_only = StateKey::raw(b"base_only");
         let slot_base = make_hot_slot(1, b"base_value");
-        base.shards[key_base_only.get_shard_id()]
-            .insert(*key_base_only.crypto_hash_ref(), slot_base.clone());
+        base.shards[key_base_only.get_shard_id()].insert(
+            *key_base_only.crypto_hash_ref(),
+            (key_base_only.clone(), slot_base.clone()),
+        );
 
         // key_updated: in base DashMap AND in delta (hot) -> delta wins.
         let key_updated = StateKey::raw(b"updated");
         let slot_old = make_hot_slot(1, b"old_value");
         let slot_new = make_hot_slot(2, b"new_value");
-        base.shards[key_updated.get_shard_id()].insert(*key_updated.crypto_hash_ref(), slot_old);
+        base.shards[key_updated.get_shard_id()].insert(
+            *key_updated.crypto_hash_ref(),
+            (key_updated.clone(), slot_old),
+        );
 
         // key_evicted: in base DashMap AND in delta (cold) -> returns None.
         let key_evicted = StateKey::raw(b"evicted");
         let slot_was_hot = make_hot_slot(1, b"was_hot");
-        base.shards[key_evicted.get_shard_id()]
-            .insert(*key_evicted.crypto_hash_ref(), slot_was_hot);
+        base.shards[key_evicted.get_shard_id()].insert(
+            *key_evicted.crypto_hash_ref(),
+            (key_evicted.clone(), slot_was_hot),
+        );
 
         // key_new: NOT in base, in delta (hot) -> returns delta value.
         let key_new = StateKey::raw(b"new_key");
@@ -775,10 +811,7 @@ mod tests {
             (key_new.clone(), slot_new_key.clone()),
         ]);
 
-        let view = LayeredHotStateView {
-            delta: Some(delta),
-            base,
-        };
+        let view = LayeredHotStateView::new(Some(delta), base);
 
         // Key only in base -> falls through to base.
         let result = view.get_state_slot(&key_base_only);
@@ -819,10 +852,7 @@ mod tests {
         let slot = make_hot_vacant(5);
 
         let delta = make_test_delta(&[(key.clone(), slot)]);
-        let view = LayeredHotStateView {
-            delta: Some(delta),
-            base,
-        };
+        let view = LayeredHotStateView::new(Some(delta), base);
 
         let result = view.get_state_slot(&key);
         assert!(result.is_some());

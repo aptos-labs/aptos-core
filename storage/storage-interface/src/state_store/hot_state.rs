@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::state_view::hot_state_view::HotStateView;
+use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::state_store::{
     hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
@@ -16,12 +17,15 @@ pub(crate) struct HotStateLRU<'a> {
     committed: Arc<dyn HotStateView>,
     /// Additional entries resulted from previous speculative execution.
     overlay: &'a LayeredMap<StateKey, StateSlot>,
-    /// The new entries from current execution.
-    pending: HashMap<StateKey, StateSlot>,
+    /// Hash index of hot entries from the overlay, for hash-based pointer following.
+    overlay_index: HashMap<HashValue, (StateKey, StateSlot)>,
+    /// The new entries from current execution, indexed by key hash. Retains the `StateKey`
+    /// for output (feeding back into the `LayeredMap` overlay).
+    pending: HashMap<HashValue, (StateKey, StateSlot)>,
     /// Points to the latest entry. `None` if empty.
-    head: Option<StateKey>,
+    head: Option<HashValue>,
     /// Points to the oldest entry. `None` if empty.
-    tail: Option<StateKey>,
+    tail: Option<HashValue>,
     /// Total number of items.
     num_items: usize,
 }
@@ -31,14 +35,23 @@ impl<'a> HotStateLRU<'a> {
         capacity: NonZeroUsize,
         committed: Arc<dyn HotStateView>,
         overlay: &'a LayeredMap<StateKey, StateSlot>,
-        head: Option<StateKey>,
-        tail: Option<StateKey>,
+        head: Option<HashValue>,
+        tail: Option<HashValue>,
         num_items: usize,
     ) -> Self {
+        // Build hash index from the overlay so we can look up entries by hash. This must include
+        // cold entries too: a cold overlay entry (evicted key) must shadow a stale hot entry in
+        // the committed view to prevent `delete` from unlinking an already-evicted entry.
+        let overlay_index = overlay
+            .iter()
+            .map(|(key, slot)| (*key.crypto_hash_ref(), (key, slot)))
+            .collect();
+
         Self {
             capacity,
             committed,
             overlay,
+            overlay_index,
             pending: HashMap::new(),
             head,
             tail,
@@ -51,37 +64,39 @@ impl<'a> HotStateLRU<'a> {
             slot.is_hot(),
             "Should not insert cold slots into hot state."
         );
-        if self.delete(&key).is_none() {
+        let key_hash = *key.crypto_hash_ref();
+        if self.delete(key_hash).is_none() {
             self.num_items += 1;
         }
-        self.insert_as_head(key, slot);
+        self.insert_as_head(key, key_hash, slot);
     }
 
-    fn insert_as_head(&mut self, key: StateKey, mut slot: StateSlot) {
+    fn insert_as_head(&mut self, key: StateKey, key_hash: HashValue, mut slot: StateSlot) {
         match self.head.take() {
-            Some(head) => {
-                let mut old_head_slot = self.expect_hot_slot(&head);
-                old_head_slot.set_prev(Some(key.clone()));
+            Some(old_head_hash) => {
+                let (old_head_key, mut old_head_slot) = self.expect_hot_entry(old_head_hash);
+                old_head_slot.set_prev(Some(key_hash));
                 slot.set_prev(None);
-                slot.set_next(Some(head.clone()));
-                self.pending.insert(head, old_head_slot);
-                self.pending.insert(key.clone(), slot);
-                self.head = Some(key);
+                slot.set_next(Some(old_head_hash));
+                self.pending
+                    .insert(old_head_hash, (old_head_key, old_head_slot));
+                self.pending.insert(key_hash, (key, slot));
+                self.head = Some(key_hash);
             },
             None => {
                 slot.set_prev(None);
                 slot.set_next(None);
-                self.pending.insert(key.clone(), slot);
-                self.head = Some(key.clone());
-                self.tail = Some(key);
+                self.pending.insert(key_hash, (key, slot));
+                self.head = Some(key_hash);
+                self.tail = Some(key_hash);
             },
         }
     }
 
     /// Returns the list of entries evicted, beginning from the LRU.
     pub fn maybe_evict(&mut self) -> Vec<(StateKey, StateSlot)> {
-        let mut current = match &self.tail {
-            Some(tail) => tail.clone(),
+        let mut current = match self.tail {
+            Some(tail) => tail,
             None => {
                 assert_eq!(self.num_items, 0);
                 return Vec::new();
@@ -90,60 +105,64 @@ impl<'a> HotStateLRU<'a> {
 
         let mut evicted = Vec::new();
         while self.num_items > self.capacity.get() {
-            let slot = self
-                .delete(&current)
+            let (key, slot) = self
+                .delete(current)
                 .expect("There must be entries to evict when current size is above capacity.");
-            let prev_key = slot
+            let prev_hash = slot
                 .prev()
-                .cloned()
+                .copied()
                 .expect("There must be at least one newer entry (num_items > capacity >= 1).");
-            evicted.push((current.clone(), slot.clone()));
-            self.pending.insert(current, slot.to_cold());
-            current = prev_key;
+            evicted.push((key.clone(), slot.clone()));
+            self.pending.insert(current, (key, slot.to_cold()));
+            current = prev_hash;
             self.num_items -= 1;
         }
         evicted
     }
 
-    /// Returns the deleted slot, or `None` if the key doesn't exist or is not hot.
-    fn delete(&mut self, key: &StateKey) -> Option<StateSlot> {
-        // Fetch the slot corresponding to the given key. Note that `self.pending` and
-        // `self.overlay` may contain cold slots, like the ones recently evicted, and we need to
-        // ignore them.
-        let old_slot = match self.get_slot(key) {
-            Some(slot) if slot.is_hot() => slot,
+    /// Returns the deleted (key, slot) pair, or `None` if the key doesn't exist or is not hot.
+    fn delete(&mut self, key_hash: HashValue) -> Option<(StateKey, StateSlot)> {
+        // Fetch the slot corresponding to the given key hash. Note that `self.pending` and
+        // `self.overlay_index` may contain cold slots, like the ones recently evicted, and we
+        // need to ignore them.
+        let (key, old_slot) = match self.get_entry_by_hash(key_hash) {
+            Some((key, slot)) if slot.is_hot() => (key, slot),
             _ => return None,
         };
 
         match old_slot.prev() {
-            Some(prev_key) => {
-                let mut prev_slot = self.expect_hot_slot(prev_key);
-                prev_slot.set_next(old_slot.next().cloned());
-                self.pending.insert(prev_key.clone(), prev_slot);
+            Some(&prev_hash) => {
+                let (prev_key, mut prev_slot) = self.expect_hot_entry(prev_hash);
+                prev_slot.set_next(old_slot.next().copied());
+                self.pending.insert(prev_hash, (prev_key, prev_slot));
             },
             None => {
                 // There is no newer entry. The current key was the head.
-                self.head = old_slot.next().cloned();
+                self.head = old_slot.next().copied();
             },
         }
 
         match old_slot.next() {
-            Some(next_key) => {
-                let mut next_slot = self.expect_hot_slot(next_key);
-                next_slot.set_prev(old_slot.prev().cloned());
-                self.pending.insert(next_key.clone(), next_slot);
+            Some(&next_hash) => {
+                let (next_key, mut next_slot) = self.expect_hot_entry(next_hash);
+                next_slot.set_prev(old_slot.prev().copied());
+                self.pending.insert(next_hash, (next_key, next_slot));
             },
             None => {
                 // There is no older entry. The current key was the tail.
-                self.tail = old_slot.prev().cloned();
+                self.tail = old_slot.prev().copied();
             },
         }
 
-        Some(old_slot)
+        Some((key, old_slot))
     }
 
+    /// Look up a slot by `StateKey`. Used by callers that have the full key (e.g.
+    /// `State::apply_one_update`).
     pub(crate) fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
-        if let Some(slot) = self.pending.get(key) {
+        let key_hash = key.crypto_hash_ref();
+
+        if let Some((_, slot)) = self.pending.get(key_hash) {
             return Some(slot.clone());
         }
 
@@ -154,49 +173,66 @@ impl<'a> HotStateLRU<'a> {
         self.committed.get_state_slot(key)
     }
 
-    fn expect_hot_slot(&self, key: &StateKey) -> StateSlot {
-        let slot = self.get_slot(key).expect("Given key is expected to exist.");
+    /// Look up an entry by hash. Used internally for LRU pointer following.
+    fn get_entry_by_hash(&self, key_hash: HashValue) -> Option<(StateKey, StateSlot)> {
+        if let Some((key, slot)) = self.pending.get(&key_hash) {
+            return Some((key.clone(), slot.clone()));
+        }
+
+        if let Some((key, slot)) = self.overlay_index.get(&key_hash) {
+            return Some((key.clone(), slot.clone()));
+        }
+
+        let shard_id = usize::from(key_hash.nibble(0));
+        self.committed.get_state_entry_by_hash(shard_id, &key_hash)
+    }
+
+    fn expect_hot_entry(&self, key_hash: HashValue) -> (StateKey, StateSlot) {
+        let (key, slot) = self
+            .get_entry_by_hash(key_hash)
+            .expect("Given key is expected to exist.");
         assert!(slot.is_hot(), "Given key is expected to be hot.");
-        slot
+        (key, slot)
     }
 
     pub fn into_updates(
         self,
     ) -> (
         HashMap<StateKey, StateSlot>,
-        Option<StateKey>,
-        Option<StateKey>,
+        Option<HashValue>,
+        Option<HashValue>,
         usize,
     ) {
-        (self.pending, self.head, self.tail, self.num_items)
+        let pending = self.pending.into_values().collect();
+        (pending, self.head, self.tail, self.num_items)
     }
 
     #[cfg(test)]
     fn iter(&self) -> Iter<'_, '_> {
         Iter {
-            current_key: self.head.clone(),
+            current_hash: self.head,
             lru: self,
         }
     }
 
     #[cfg(test)]
     fn validate(&self) {
-        self.validate_impl(self.head.clone(), |slot| slot.next());
-        self.validate_impl(self.tail.clone(), |slot| slot.prev());
+        self.validate_impl(self.head, |slot| slot.next());
+        self.validate_impl(self.tail, |slot| slot.prev());
     }
 
     #[cfg(test)]
     fn validate_impl(
         &self,
-        start: Option<StateKey>,
-        func: impl Fn(&StateSlot) -> Option<&StateKey>,
+        start: Option<HashValue>,
+        func: impl Fn(&StateSlot) -> Option<&HashValue>,
     ) {
         let mut current = start;
         let mut num_visited = 0;
-        while let Some(key) = current {
-            let slot = self.expect_hot_slot(&key);
+        while let Some(key_hash) = current {
+            let (_key, slot) = self.expect_hot_entry(key_hash);
             num_visited += 1;
-            current = func(&slot).cloned();
+            current = func(&slot).copied();
         }
         assert_eq!(num_visited, self.num_items);
     }
@@ -204,18 +240,18 @@ impl<'a> HotStateLRU<'a> {
 
 #[cfg(test)]
 struct Iter<'a, 'b> {
-    current_key: Option<StateKey>,
+    current_hash: Option<HashValue>,
     lru: &'a HotStateLRU<'b>,
 }
 
 #[cfg(test)]
-impl<'a, 'b> Iterator for Iter<'a, 'b> {
+impl Iterator for Iter<'_, '_> {
     type Item = (StateKey, StateSlot);
 
     fn next(&mut self) -> Option<(StateKey, StateSlot)> {
-        let key = self.current_key.take()?;
-        let slot = self.lru.expect_hot_slot(&key);
-        self.current_key = slot.next().cloned();
+        let key_hash = self.current_hash.take()?;
+        let (key, slot) = self.lru.expect_hot_entry(key_hash);
+        self.current_hash = slot.next().copied();
         Some((key, slot))
     }
 }
@@ -224,6 +260,7 @@ impl<'a, 'b> Iterator for Iter<'a, 'b> {
 mod tests {
     use super::HotStateLRU;
     use crate::state_store::state_view::hot_state_view::HotStateView;
+    use aptos_crypto::HashValue;
     use aptos_experimental_layered_map::{LayeredMap, MapLayer};
     use aptos_types::{
         state_store::{
@@ -247,14 +284,29 @@ mod tests {
 
     #[derive(Debug)]
     struct HotState {
-        inner: HashMap<StateKey, StateSlot>,
-        head: Option<StateKey>,
-        tail: Option<StateKey>,
+        inner: HashMap<HashValue, (StateKey, StateSlot)>,
     }
 
     impl HotStateView for Mutex<HotState> {
         fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
-            self.lock().unwrap().inner.get(state_key).cloned()
+            let key_hash = *state_key.crypto_hash_ref();
+            self.lock()
+                .unwrap()
+                .inner
+                .get(&key_hash)
+                .map(|(_, slot)| slot.clone())
+        }
+
+        fn get_state_entry_by_hash(
+            &self,
+            _shard_id: usize,
+            key_hash: &HashValue,
+        ) -> Option<(StateKey, StateSlot)> {
+            self.lock()
+                .unwrap()
+                .inner
+                .get(key_hash)
+                .map(|(key, slot)| (key.clone(), slot.clone()))
         }
     }
 
@@ -269,8 +321,6 @@ mod tests {
         fn new_empty() -> Self {
             let hot_state = Arc::new(Mutex::new(HotState {
                 inner: HashMap::new(),
-                head: None,
-                tail: None,
             }));
             let base_layer = MapLayer::new_family("test");
             let top_layer = base_layer.clone();
@@ -287,8 +337,8 @@ mod tests {
         fn commit_updates(
             &self,
             updates: HashMap<StateKey, StateSlot>,
-            head: Option<StateKey>,
-            tail: Option<StateKey>,
+            _head: Option<HashValue>,
+            _tail: Option<HashValue>,
             num_items: usize,
         ) {
             // For most of the logic we don't really care whether the data is in committed state or
@@ -296,14 +346,13 @@ mod tests {
             // the overlay empty.
             let mut locked = self.hot_state.lock().unwrap();
             for (key, slot) in updates {
+                let key_hash = *key.crypto_hash_ref();
                 if slot.is_hot() {
-                    locked.inner.insert(key, slot);
+                    locked.inner.insert(key_hash, (key, slot));
                 } else {
-                    locked.inner.remove(&key);
+                    locked.inner.remove(&key_hash);
                 }
             }
-            locked.head = head;
-            locked.tail = tail;
             assert_eq!(locked.inner.len(), num_items);
         }
     }
@@ -392,15 +441,20 @@ mod tests {
                 while naive_lru.len() > capacity.get() {
                     expected_evicted.push(naive_lru.pop_lru().unwrap());
                 }
-                itertools::zip_eq(actual_evicted, expected_evicted).for_each(|(actual, expected)| {
-                    assert_eq!(actual.0, expected.0);
-                    assert_eq!(actual.1.into_state_value_opt(), expected.1.into_state_value_opt());
-                });
+                itertools::zip_eq(actual_evicted, expected_evicted).for_each(
+                    |(actual, expected)| {
+                        assert_eq!(actual.0, expected.0);
+                        assert_eq!(
+                            actual.1.into_state_value_opt(),
+                            expected.1.into_state_value_opt()
+                        );
+                    },
+                );
                 lru.validate();
                 assert_lru_equal(&lru, &naive_lru);
 
                 let (updates, new_head, new_tail, new_num_items) = lru.into_updates();
-                test_obj.commit_updates(updates, new_head.clone(), new_tail.clone(), new_num_items);
+                test_obj.commit_updates(updates, new_head, new_tail, new_num_items);
                 head = new_head;
                 tail = new_tail;
                 num_items = new_num_items;

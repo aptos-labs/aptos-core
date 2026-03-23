@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::state::State;
+use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::{
     state_store::{state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS},
@@ -52,11 +53,11 @@ impl StateDelta {
         self.shards[state_key.get_shard_id()].get(state_key)
     }
 
-    pub fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+    pub fn latest_hot_key(&self, shard_id: usize) -> Option<HashValue> {
         self.current.latest_hot_key(shard_id)
     }
 
-    pub fn oldest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+    pub fn oldest_hot_key(&self, shard_id: usize) -> Option<HashValue> {
         self.current.oldest_hot_key(shard_id)
     }
 }
