@@ -12,7 +12,7 @@ use crate::{
         },
         TEST_DIGEST_KEY,
     },
-    counters,
+    counters, monitor,
     network::{IncomingRpcRequest, NetworkSender, RpcResponseSender},
     types::{ChunkyDKGSubtranscriptSignatureRequest, ChunkyDKGSubtranscriptSignatureResponse},
     DKGMessage,
@@ -48,12 +48,7 @@ use futures_util::{
 };
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
-use std::{
-    collections::HashMap,
-    fmt, mem,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, fmt, mem, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 #[cfg(test)]
@@ -147,11 +142,7 @@ impl ChunkyDKGManager {
         // Signatures are created with ssk but verified with the consensus BLS key from
         // epoch_state.verifier. Assert they match to catch key misconfiguration early.
         debug_assert!(
-            epoch_state
-                .verifier
-                .get_public_key(&my_addr)
-                .as_ref()
-                == Some(spk.as_ref()),
+            epoch_state.verifier.get_public_key(&my_addr).as_ref() == Some(spk.as_ref()),
             "[ChunkyDKG] spk does not match consensus public key for my_addr"
         );
         let (pull_notification_tx, pull_notification_rx) =
@@ -228,34 +219,48 @@ impl ChunkyDKGManager {
         while !self.stopped {
             let handling_result = tokio::select! {
                 dkg_start_event = dkg_start_event_rx.select_next_some() => {
-                    self.process_dkg_start_event(dkg_start_event)
-                        .await
-                        .map_err(|e|anyhow!("[ChunkyDKG] process_dkg_start_event failed: {e}"))
+                    monitor!("chunky_mgr_process_dkg_start_event",
+                        self.process_dkg_start_event(dkg_start_event)
+                            .await
+                            .map_err(|e|anyhow!("[ChunkyDKG] process_dkg_start_event failed: {e}"))
+                    )
                 },
                 (_sender, msg) = rpc_msg_rx.select_next_some() => {
-                    self.process_peer_rpc_msg(msg)
-                        .await
-                        .map_err(|e|anyhow!("[ChunkyDKG] process_peer_rpc_msg failed: {e}"))
+                    monitor!("chunky_mgr_process_peer_rpc_msg",
+                        self.process_peer_rpc_msg(msg)
+                            .await
+                            .map_err(|e|anyhow!("[ChunkyDKG] process_peer_rpc_msg failed: {e}"))
+                    )
                 },
                 agg_subtranscript = agg_subtrx_rx.select_next_some() => {
-                    self.process_aggregated_subtranscript(agg_subtranscript)
-                        .await
-                        .map_err(|e|anyhow!("[ChunkyDKG] process_aggregated_subtranscript failed: {e}"))
+                    monitor!("chunky_mgr_process_aggregated_subtranscript",
+                        self.process_aggregated_subtranscript(agg_subtranscript)
+                            .await
+                            .map_err(|e|anyhow!("[ChunkyDKG] process_aggregated_subtranscript failed: {e}"))
+                    )
                 },
                 certified_transcript = certified_subtrx_rx.select_next_some() => {
-                    self.process_certified_aggregated_subtranscript(certified_transcript).await
-                        .map_err(|e|anyhow!("[ChunkyDKG] process_certified_aggregated_subtranscript failed: {e}"))
+                    monitor!("chunky_mgr_process_certified_aggregated_subtranscript",
+                        self.process_certified_aggregated_subtranscript(certified_transcript).await
+                            .map_err(|e|anyhow!("[ChunkyDKG] process_certified_aggregated_subtranscript failed: {e}"))
+                    )
                 },
                 dkg_txn = self.pull_notification_rx.select_next_some() => {
-                    self.process_dkg_txn_pulled_notification(dkg_txn)
-                        .await
-                        .map_err(|e|anyhow!("[ChunkyDKG] process_dkg_txn_pulled_notification failed: {e}"))
+                    monitor!("chunky_mgr_process_dkg_txn_pulled_notification",
+                        self.process_dkg_txn_pulled_notification(dkg_txn)
+                            .await
+                            .map_err(|e|anyhow!("[ChunkyDKG] process_dkg_txn_pulled_notification failed: {e}"))
+                    )
                 },
                 close_req = close_rx.select_next_some() => {
-                    self.process_close_cmd(close_req.ok())
+                    monitor!("chunky_mgr_process_close_cmd",
+                        self.process_close_cmd(close_req.ok())
+                    )
                 },
                 _ = interval.tick().fuse() => {
-                    self.observe()
+                    monitor!("chunky_mgr_observe",
+                        self.observe()
+                    )
                 },
             };
 
@@ -599,17 +604,26 @@ impl ChunkyDKGManager {
         );
         match &msg {
             DKGMessage::ChunkyTranscriptRequest(_) => {
-                self.handle_chunky_transcript_request_rpc(response_sender)?;
+                monitor!(
+                    "chunky_mgr_handle_chunky_transcript_request_rpc",
+                    self.handle_chunky_transcript_request_rpc(response_sender)
+                )?;
             },
             DKGMessage::SubtranscriptSignatureRequest(req) => {
-                self.process_subtranscript_signature_request_rpc(
-                    sender,
-                    req.clone(),
-                    response_sender,
+                monitor!(
+                    "chunky_mgr_process_subtranscript_signature_request_rpc",
+                    self.process_subtranscript_signature_request_rpc(
+                        sender,
+                        req.clone(),
+                        response_sender,
+                    )
                 )?;
             },
             DKGMessage::MissingTranscriptRequest(req) => {
-                self.handle_missing_transcript_request_rpc(req.clone(), response_sender)?;
+                monitor!(
+                    "chunky_mgr_handle_missing_transcript_request_rpc",
+                    self.handle_missing_transcript_request_rpc(req.clone(), response_sender)
+                )?;
             },
             _ => {
                 return Err(anyhow!(
@@ -633,7 +647,7 @@ impl ChunkyDKGManager {
             | InnerState::AwaitAggregatedSubtranscriptCertification { my_transcript, .. } => {
                 my_transcript
             },
-            _ => {
+            InnerState::Init => {
                 bail!(
                     "[ChunkyDKG] transcript request unexpected in state {:?}",
                     self.state.variant_name()

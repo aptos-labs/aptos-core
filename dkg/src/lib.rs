@@ -18,6 +18,7 @@ use aptos_config::config::{ReliableBroadcastConfig, SafetyRulesConfig};
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
+use aptos_metrics_core::IntGauge;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
@@ -54,4 +55,34 @@ pub fn start_dkg_runtime(
     runtime.spawn(network_task.start());
     runtime.spawn(dkg_epoch_manager.start(network_receiver));
     runtime
+}
+
+pub struct IntGaugeGuard {
+    gauge: IntGauge,
+}
+
+impl IntGaugeGuard {
+    fn new(gauge: IntGauge) -> Self {
+        gauge.inc();
+        Self { gauge }
+    }
+}
+
+impl Drop for IntGaugeGuard {
+    fn drop(&mut self) {
+        self.gauge.dec();
+    }
+}
+
+/// Helper function to record metrics for external calls.
+/// Include call counts, time, and whether it's inside or not (1 or 0).
+/// It assumes a OpMetrics defined as OP_COUNTERS in crate::counters;
+#[macro_export]
+macro_rules! monitor {
+    ($name:literal, $fn:expr) => {{
+        use $crate::{counters::OP_COUNTERS, IntGaugeGuard};
+        let _timer = OP_COUNTERS.timer($name);
+        let _guard = IntGaugeGuard::new(OP_COUNTERS.gauge(concat!($name, "_running")));
+        $fn
+    }};
 }

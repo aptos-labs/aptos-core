@@ -8,6 +8,10 @@ use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 use std::time::Duration;
 
+/// Monitor counters, used by monitor! macro
+pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
+    Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("dkg"));
+
 /// Count of the pending messages sent to itself in the channel
 pub static PENDING_SELF_MESSAGES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
