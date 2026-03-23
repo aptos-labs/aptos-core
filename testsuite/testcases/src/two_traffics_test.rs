@@ -28,7 +28,7 @@ impl Test for TwoTrafficsTest {
 #[async_trait]
 impl NetworkLoadTest for TwoTrafficsTest {
     async fn setup<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
-        Ok(LoadDestination::PfnsOtherwiseFullnodesOtherwiseValidators)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     async fn test(
@@ -42,7 +42,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
             duration.as_secs_f32()
         );
 
-        let clients_to_send_load_to = LoadDestination::PfnsOtherwiseFullnodesOtherwiseValidators
+        let clients_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
             .get_destination_clients(swarm.clone())
             .await;
 
