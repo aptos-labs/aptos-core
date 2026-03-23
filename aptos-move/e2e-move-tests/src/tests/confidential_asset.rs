@@ -1341,30 +1341,6 @@ fn bench_gas_rotate_encryption_key_detailed() {
 // Tests: Miscellaneous
 // =================================================================================================
 
-/// Test that we can call a private Move function using exec_function_bypass_visibility.
-#[test]
-#[ignore]
-fn test_call_private_function() {
-    let mut h = setup_harness();
-
-    // Test calling a #[test_only] function via bypass_visibility.
-    let return_values = h
-        .exec_function_bypass_visibility(
-            FRAMEWORK_ADDRESS,
-            "confidential_crypto_test_utils",
-            "generate_twisted_elgamal_keypair",
-            vec![],
-            vec![],
-        )
-        .unwrap();
-
-    assert_eq!(return_values.return_values.len(), 2);
-    println!(
-        "Called test-only function, got keypair with {} return values",
-        return_values.return_values.len()
-    );
-}
-
 /// Complete test that calls a #[test_only] function with proper setup.
 /// This test:
 /// 1. Sets up a harness (with test-only code when feature is enabled)

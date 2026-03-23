@@ -43,13 +43,13 @@ rstest = { workspace = true }
 serde = { workspace = true }
 sha3 = { workspace = true }
 test-case = { workspace = true }
-thousands = { workspace = true }
 
 [dev-dependencies]
 aptos-vm-types = { workspace = true }
 claims = { workspace = true }
 memory-stats = { workspace = true }
 test-case = { workspace = true }
+thousands = { workspace = true }
 tokio = { workspace = true }
 
 [lib]
