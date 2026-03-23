@@ -73,7 +73,7 @@ target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
     # Run `docker buildx imagetools inspect debian:trixie` to find the latest multi-platform hash
-    debian = "docker-image://debian:trixie@sha256:2c91e484d93f0830a7e05a2b9d92a7b102be7cab562198b984a84fdbc7806d91"
+    debian = "docker-image://debian:trixie@sha256:55a15a112b42be10bfc8092fcc40b6748dc236f7ef46a358d9392b339e9d60e8"
   }
 }
 
@@ -83,7 +83,7 @@ target "builder-base" {
   context    = "."
   contexts = {
     # Run `docker buildx imagetools inspect rust:1.93.1-trixie` to find the latest multi-platform hash
-    rust = "docker-image://rust:1.93.1-trixie@sha256:51c04d7a2b38418ba23ecbfb373c40d3bd493dec1ddfae00ab5669527320195e"
+    rust = "docker-image://rust:1.93.1-trixie@sha256:ecbe59a8408895edd02d9ef422504b8501dd9fa1526de27a45b73406d734d659"
   }
   args = {
     PROFILE            = "${PROFILE}"
