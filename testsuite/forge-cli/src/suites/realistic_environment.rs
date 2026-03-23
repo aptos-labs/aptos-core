@@ -43,6 +43,9 @@ pub(crate) fn get_realistic_env_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
+        "realistic_env_max_load_extra_vote_wait" => {
+            realistic_env_max_load_extra_vote_wait_test(duration, test_cmd)
+        },
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_orderbook_workload_sweep" => realistic_env_orderbook_workload_sweep_bench(),
@@ -482,7 +485,36 @@ pub(crate) fn realistic_env_max_load_test(
         .with_num_pfns(1)
 }
 
-pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
+/// Same as realistic_env_max_load_test but with extra-vote wait enabled.
+/// The proposer waits up to 100ms for all validators (100% voting power)
+/// before advancing the round, which should improve p90 latency at the
+/// cost of some p50 by waiting for slow (e.g. Singapore) validators.
+pub(crate) fn realistic_env_max_load_extra_vote_wait_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+) -> ForgeConfig {
+    realistic_env_max_load_test(duration, test_cmd, 7, 2)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.wait_for_extra_votes =
+                Some(aptos_config::config::WaitForExtraVotesConfig {
+                    target_voting_power_pct: 1.0,
+                    max_wait_ms: 100,
+                    wait_for_validators: vec![],
+                });
+        }))
+}
+
+pub(crate) fn realistic_env_max_load_encrypted_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+) -> ForgeConfig {
+    // Check if HAProxy is enabled
+    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
+        k8s.enable_haproxy
+    } else {
+        false
+    };
+
     let num_validators = 5;
     let num_fullnodes = 1;
     let mempool_backlog = 100;
