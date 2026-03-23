@@ -112,6 +112,7 @@ pub(crate) fn bootstrap_db(
 pub(crate) fn bootstrap_db(
     node_config: &NodeConfig,
 ) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
+    use aptos_config::config::HotStateConfig;
     use aptos_db::db::fake_aptosdb::FakeAptosDB;
 
     let aptos_db = AptosDB::open(
@@ -122,6 +123,8 @@ pub(crate) fn bootstrap_db(
         node_config.storage.enable_indexer,
         node_config.storage.buffered_state_target_items,
         node_config.storage.max_num_nodes_per_lru_cache_shard,
+        None, /* internal_indexer_db */
+        HotStateConfig::default(),
     )
     .map_err(|err| anyhow!("DB failed to open {}", err))?;
     let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
@@ -169,6 +172,7 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
 /// Creates any rocksdb checkpoints, opens the storage database,
 /// starts the backup service, handles genesis initialization and returns
 /// the various handles.
+#[cfg(not(feature = "consensus-only-perf-test"))]
 pub fn initialize_database_and_checkpoints(
     node_config: &mut NodeConfig,
 ) -> Result<(
@@ -201,5 +205,42 @@ pub fn initialize_database_and_checkpoints(
         node_config.base.waypoint.genesis_waypoint(),
         indexer_db_opt,
         update_receiver,
+    ))
+}
+
+/// In consensus-only mode, return simplified storage handles without
+/// backup service, internal indexer, or update receiver.
+#[cfg(feature = "consensus-only-perf-test")]
+pub fn initialize_database_and_checkpoints(
+    node_config: &mut NodeConfig,
+) -> Result<(
+    DbReaderWriter,
+    Option<Runtime>,
+    Waypoint,
+    Option<InternalIndexerDB>,
+    Option<WatchReceiver<(Instant, Version)>>,
+)> {
+    // If required, create RocksDB checkpoints and change the working directory.
+    // This is test-only.
+    if let Some(working_dir) = node_config.base.working_dir.clone() {
+        create_rocksdb_checkpoint_and_change_working_dir(node_config, working_dir);
+    }
+
+    // Open the database
+    let instant = Instant::now();
+    let (_aptos_db, db_rw, backup_service) = bootstrap_db(node_config)?;
+
+    // Log the duration to open storage
+    debug!(
+        "Storage service started in {} ms",
+        instant.elapsed().as_millis()
+    );
+
+    Ok((
+        db_rw,
+        backup_service,
+        node_config.base.waypoint.genesis_waypoint(),
+        None,
+        None,
     ))
 }
