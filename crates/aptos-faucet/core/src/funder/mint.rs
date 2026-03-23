@@ -76,9 +76,9 @@ pub struct MintAssetConfig {
     #[serde(default)]
     pub transaction_method: TransactionMethod,
 
-    /// Maximum amount of OCTA to give an account for this asset. If set to
-    /// zero, minting is disabled for this asset (without a bypass key). If
-    /// not set, no cap is enforced.
+    /// Maximum amount to give an account for this asset (in the asset's
+    /// smallest unit). If set to zero, minting is disabled for this asset
+    /// (without a bypass key). If not set, no cap is enforced.
     pub maximum_amount: Option<u64>,
 
     /// With this it is possible to set a different maximum amount for requests
