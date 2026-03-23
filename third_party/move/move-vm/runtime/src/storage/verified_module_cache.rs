@@ -38,8 +38,8 @@ impl VerifiedModuleCache {
         Self(Mutex::new(lru::LruCache::new(Self::VERIFIED_CACHE_SIZE)))
     }
 
-    /// Returns true if the module hash is contained in the cache. For tests, the cache is treated
-    /// as empty at all times.
+    /// Returns true if the key is contained in the cache. For tests, the cache is treated as empty
+    /// at all times.
     pub(crate) fn contains(&self, key: &VerifierCacheKey) -> bool {
         // Note: need to use get to update LRU queue.
         verifier_cache_enabled() && self.0.lock().get(key).is_some()
