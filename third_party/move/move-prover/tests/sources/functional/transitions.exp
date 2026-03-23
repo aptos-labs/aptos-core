@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/transitions.move:47:9
+   │
+47 │         ensures wrong_incr_R(a);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/transitions.move:43: do_incr_wrong
+   =         a = <redacted>
+   =     at tests/sources/functional/transitions.move:44: do_incr_wrong
+   =     at tests/sources/functional/transitions.move:45: do_incr_wrong
+   =     at tests/sources/functional/transitions.move:47: do_incr_wrong (spec)

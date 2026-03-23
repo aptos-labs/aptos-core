@@ -591,20 +591,12 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             eopt.iter().for_each(|e| exp(context, e));
             exp(context, e)
         },
-        E::Behavior(_, _, fn_name, type_args, sp!(_, args), _) => {
+        E::Behavior(_, fn_name, type_args, sp!(_, args)) => {
             module_access(context, fn_name);
             types_opt(context, type_args);
             args.iter().for_each(|e| exp(context, e))
         },
-        E::LabeledCall(_, name, type_args, sp!(_, args)) => {
-            module_access(context, name);
-            types_opt(context, type_args);
-            args.iter().for_each(|e| exp(context, e))
-        },
-        E::LabeledIndex(_, target, index) => {
-            exp(context, target);
-            exp(context, index)
-        },
+        E::StateLabeled(_, inner, _) => exp(context, inner),
     }
 }
 
@@ -679,6 +671,10 @@ fn spec_block_member(context: &mut Context, sp!(_, sbm_): &E::SpecBlockMember) {
                 }
             }
         },
-        M::Variable { .. } => (),
+        M::Variable { .. }
+        | M::ModifiesOf { .. }
+        | M::ReadsOf { .. }
+        | M::Modifies { .. }
+        | M::Reads { .. } => (),
     }
 }

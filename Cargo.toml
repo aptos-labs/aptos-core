@@ -819,6 +819,7 @@ termcolor = "1.1.2"
 test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
+thousands = "0.2.0"
 threadpool = "1.8.1"
 thread_local = "1.1.7"
 tiny-bip39 = "0.8.2"
@@ -925,6 +926,8 @@ move-vm-types = { path = "third_party/move/move-vm/types" }
 [profile.release]
 debug = true
 overflow-checks = true
+lto = "thin"
+codegen-units = 1
 
 # For [build-dependencies], cargo sets `opt-level=0` independent of the actual profile used.
 # In `aptos-cached-packages` crate, we have `aptos-framework` as a build dependency. Which in a `--release` mode,

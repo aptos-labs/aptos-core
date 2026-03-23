@@ -4,10 +4,10 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, FriendDecl, ModuleName, Operation, Pattern, PropertyBag, PropertyValue,
-        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
-        UseDecl, Value,
+        AccessSpecifier, Address, Attribute, AttributeValue, BehaviorKind, Condition,
+        ConditionKind, Exp, ExpData, FrameSpec, FriendDecl, FunParamAccessOf, MemoryRange,
+        ModuleName, Operation, Pattern, PropertyBag, PropertyValue, QualifiedSymbol, Spec,
+        SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex, UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -22,8 +22,9 @@ use crate::{
     metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
-        Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
-        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind, UserId,
+        GlobalId, Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter,
+        SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        UserId,
     },
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
@@ -89,6 +90,8 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub fun_defs: BTreeMap<Symbol, Exp>,
     /// Translated access specifiers, if we are compiling Move code
     pub fun_access_specifiers: BTreeMap<Symbol, Vec<AccessSpecifier>>,
+    /// Access specifiers for function-typed parameters (from `modifies_of`/`reads_of`)
+    pub fun_param_access_of: BTreeMap<Symbol, Vec<FunParamAccessOf>>,
     /// Translated struct specifications.
     pub struct_specs: BTreeMap<Symbol, Spec>,
     /// Translated module spec
@@ -98,6 +101,10 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     /// Let bindings for the current spec block, characterized by a boolean indicating whether
     /// post state is active and the node id of the original expression of the let.
     pub spec_block_lets: BTreeMap<Symbol, (bool, NodeId)>,
+    /// Shared state label map for the current spec block. Ensures that the same label name
+    /// (e.g. `S`) used in different conditions within the same spec block maps to the same
+    /// MemoryLabel (GlobalId).
+    pub spec_block_state_labels: BTreeMap<Symbol, GlobalId>,
 }
 
 /// A value which we pass in to spec block analyzers, describing the resolved target of the spec
@@ -169,10 +176,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             fun_specs: BTreeMap::new(),
             fun_defs: BTreeMap::new(),
             fun_access_specifiers: BTreeMap::new(),
+            fun_param_access_of: BTreeMap::new(),
             struct_specs: BTreeMap::new(),
             module_spec: Spec::default(),
             spec_block_infos: Default::default(),
             spec_block_lets: BTreeMap::new(),
+            spec_block_state_labels: BTreeMap::new(),
         }
     }
 
@@ -780,11 +789,18 @@ impl ModuleBuilder<'_, '_> {
     ) {
         let name = self.symbol_pool().make(&name.0.value);
         let (type_params, params, result_type) = self.decl_ana_signature(signature, false);
-        // Eliminate references in parameters and result type for spec functions
+        // Eliminate references in parameters and result type for spec functions,
+        // but keep &mut parameters as-is since they have dual-state semantics.
         // `derive_spec_fun` does the same when generating spec functions from general move functions
         let params = params
             .into_iter()
-            .map(|Parameter(sym, ty, loc)| Parameter(sym, ty.skip_reference().clone(), loc))
+            .map(|Parameter(sym, ty, loc)| {
+                if ty.is_mutable_reference() {
+                    Parameter(sym, ty, loc)
+                } else {
+                    Parameter(sym, ty.skip_reference().clone(), loc)
+                }
+            })
             .collect_vec();
         let result_type = result_type.skip_reference().clone();
 
@@ -794,7 +810,7 @@ impl ModuleBuilder<'_, '_> {
             self.qualified_by_module(name),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
-                oper: Operation::SpecFunction(self.module_id, fun_id, None),
+                oper: Operation::SpecFunction(self.module_id, fun_id, MemoryRange::default()),
                 type_params: type_params.clone(),
                 type_param_constraints: BTreeMap::default(),
                 params: params.clone(),
@@ -810,15 +826,17 @@ impl ModuleBuilder<'_, '_> {
             name,
             type_params,
             params,
-            context_params: None,
             result_type,
             used_memory: BTreeSet::new(),
+            old_memory: BTreeSet::new(),
             uninterpreted,
             is_move_fun: false,
             is_native: false,
             body: None,
             callees: Default::default(),
             is_recursive: Default::default(),
+            frame_spec: None,
+            uses_old: false,
             insts_using_generic_type_reflection: Default::default(),
             spec: RefCell::new(Default::default()),
         };
@@ -1208,6 +1226,9 @@ impl ModuleBuilder<'_, '_> {
                 {
                     self.def_ana_pragma(loc, &context, properties);
                 },
+                EA::SpecBlockMember_::Modifies { targets } => {
+                    self.def_ana_modifies(loc, &context, targets);
+                },
                 _ => {
                     self.parent.error(loc, "item not allowed");
                 },
@@ -1510,6 +1531,7 @@ impl ModuleBuilder<'_, '_> {
         self.update_spec(context, move |spec| spec.loc = Some(block_loc_for_spec));
 
         assert!(self.spec_block_lets.is_empty());
+        assert!(self.spec_block_state_labels.is_empty());
 
         // Sort members so that lets are processed first. This is needed so that lets included
         // from schemas are properly renamed on name clash.
@@ -1527,46 +1549,63 @@ impl ModuleBuilder<'_, '_> {
             self.def_ana_spec_block_member(context, member)
         }
 
-        // Validate behavior predicate state labels
-        self.validate_behavior_state_labels(context, &block_loc);
+        // Validate state labels
+        self.validate_state_labels(context, &block_loc);
 
-        // clear the let bindings stored in the build.
+        // clear the let bindings and state labels stored in the build.
         self.spec_block_lets.clear();
+        self.spec_block_state_labels.clear();
     }
 
-    /// Validates state labels in behavior predicates within a spec block.
+    /// Validates state labels within a spec block.
     /// Checks that:
-    /// 1. Every pre-state label references a post-state label defined in the same spec
+    /// 1. Every post-state label is referenced by a pre-state label in the same spec
     /// 2. There are no cycles in state label references
-    fn validate_behavior_state_labels(&mut self, context: &SpecBlockContext, loc: &Loc) {
+    fn validate_state_labels(&mut self, context: &SpecBlockContext, loc: &Loc) {
         use crate::ast::MemoryLabel;
         use std::collections::{BTreeMap, BTreeSet};
 
-        // Each behavior predicate with state labels can have:
-        // - A pre-label: reads from this state (must be defined by another predicate's post-label)
-        // - A post-label: defines this state (other predicates can reference it as pre-label)
+        // Each state-labeled expression can have:
+        // - A pre-label: reads from this state (must be defined by another expression's post-label)
+        // - A post-label: defines this state (other expressions can reference it as pre-label)
 
-        // Collect: (pre_label, post_label, node_id) for each predicate with state labels
-        let mut behavior_predicates: Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)> =
-            Vec::new();
+        // Collect: (pre_label, post_label, node_id, behavior_kind) for each expression with state labels
+        let mut labeled_exprs: Vec<(
+            Option<MemoryLabel>,
+            Option<MemoryLabel>,
+            NodeId,
+            Option<BehaviorKind>,
+        )> = Vec::new();
 
         // Also collect labels used in Global/Exists memory access operations, with NodeId
         // for error reporting
         let mut memory_access_labels: Vec<(MemoryLabel, NodeId)> = Vec::new();
 
         self.update_spec(context, |spec| {
-            fn collect_behavior_predicates(
+            fn collect_state_labels(
                 exp: &Exp,
-                predicates: &mut Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)>,
+                predicates: &mut Vec<(
+                    Option<MemoryLabel>,
+                    Option<MemoryLabel>,
+                    NodeId,
+                    Option<BehaviorKind>,
+                )>,
                 memory_labels: &mut Vec<(MemoryLabel, NodeId)>,
             ) {
+                // Collect pre/post labels from MemoryRange on Behavior/SpecFunction
+                // and memory labels from Global/Exists operations.
                 exp.visit_pre_order(&mut |e| {
                     if let ExpData::Call(id, op, _) = e {
                         match op {
-                            Operation::Behavior(_, state)
-                                if state.pre.is_some() || state.post.is_some() =>
-                            {
-                                predicates.push((state.pre, state.post, *id));
+                            Operation::Behavior(kind, range) => {
+                                if range.pre.is_some() || range.post.is_some() {
+                                    predicates.push((range.pre, range.post, *id, Some(*kind)));
+                                }
+                            },
+                            Operation::SpecFunction(_, _, range) => {
+                                if range.pre.is_some() || range.post.is_some() {
+                                    predicates.push((range.pre, range.post, *id, None));
+                                }
                             },
                             Operation::Global(Some(label)) | Operation::Exists(Some(label)) => {
                                 memory_labels.push((*label, *id));
@@ -1579,17 +1618,9 @@ impl ModuleBuilder<'_, '_> {
             }
 
             for cond in &spec.conditions {
-                collect_behavior_predicates(
-                    &cond.exp,
-                    &mut behavior_predicates,
-                    &mut memory_access_labels,
-                );
+                collect_state_labels(&cond.exp, &mut labeled_exprs, &mut memory_access_labels);
                 for additional in &cond.additional_exps {
-                    collect_behavior_predicates(
-                        additional,
-                        &mut behavior_predicates,
-                        &mut memory_access_labels,
-                    );
+                    collect_state_labels(additional, &mut labeled_exprs, &mut memory_access_labels);
                 }
             }
         });
@@ -1602,13 +1633,32 @@ impl ModuleBuilder<'_, '_> {
         // TODO(#18762): Duplicate post-state labels are silently overwritten; should report an error.
         let mut defined_post_labels: BTreeMap<Symbol, Loc> = BTreeMap::new();
         let mut used_pre_labels: BTreeSet<Symbol> = BTreeSet::new();
-        for (pre_label, post_label, node_id) in &behavior_predicates {
+        for (pre_label, post_label, node_id, behavior_kind) in &labeled_exprs {
             if let Some(post_name) = post_label.and_then(&get_label_name) {
                 let exp_loc = self.parent.env.get_node_loc(*node_id);
                 defined_post_labels.insert(post_name, exp_loc);
             }
             if let Some(pre_name) = pre_label.and_then(&get_label_name) {
                 used_pre_labels.insert(pre_name);
+            }
+            // Reject post-state labels on single-state predicates (requires_of, aborts_of).
+            if post_label.is_some() {
+                if let Some(BehaviorKind::RequiresOf | BehaviorKind::AbortsOf) = behavior_kind {
+                    let kind_name = match behavior_kind.unwrap() {
+                        BehaviorKind::RequiresOf => "requires_of",
+                        BehaviorKind::AbortsOf => "aborts_of",
+                        _ => unreachable!(),
+                    };
+                    let exp_loc = self.parent.env.get_node_loc(*node_id);
+                    self.parent.env.error(
+                        &exp_loc,
+                        &format!(
+                            "`{}` describes a single state and cannot have a post-state label; \
+                             only `ensures_of` and `result_of` support state transitions",
+                            kind_name,
+                        ),
+                    );
+                }
             }
         }
         // Labels in Global/Exists memory accesses also count as references
@@ -1620,38 +1670,9 @@ impl ModuleBuilder<'_, '_> {
 
         let symbol_pool = self.symbol_pool();
 
-        // Validate that all pre-labels reference defined post-labels
-        for (pre_label, _, node_id) in &behavior_predicates {
-            if let Some(pre_name) = pre_label.and_then(&get_label_name) {
-                if !defined_post_labels.contains_key(&pre_name) {
-                    let exp_loc = self.parent.env.get_node_loc(*node_id);
-                    self.parent.env.error(
-                        &exp_loc,
-                        &format!(
-                            "state label `{}` is not defined; \
-                             pre-state labels must reference a post-state label defined by another behavior predicate in the same spec",
-                            pre_name.display(symbol_pool)
-                        ),
-                    );
-                }
-            }
-        }
-        // Also validate labels from memory accesses
-        for (label, node_id) in &memory_access_labels {
-            if let Some(name) = get_label_name(*label) {
-                if !defined_post_labels.contains_key(&name) {
-                    let exp_loc = self.parent.env.get_node_loc(*node_id);
-                    self.parent.env.error(
-                        &exp_loc,
-                        &format!(
-                            "state label `{}` is not defined; \
-                             labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec",
-                            name.display(symbol_pool)
-                        ),
-                    );
-                }
-            }
-        }
+        // Note: we do NOT validate that pre-labels reference defined post-labels.
+        // Pre-only labels are legitimate — they represent state snapshots from sequential
+        // composition (e.g., the state after a `move_from` but before a `move_to`).
 
         // Validate that all post-labels are referenced by some pre-label
         for (post_label, post_loc) in &defined_post_labels {
@@ -1660,7 +1681,7 @@ impl ModuleBuilder<'_, '_> {
                     post_loc,
                     &format!(
                         "state label `{}` is defined but never referenced; \
-                         every post-state label must be referenced by a pre-state label in another behavior predicate",
+                         every post-state label must be referenced by a pre-state label in the same spec",
                         post_label.display(symbol_pool)
                     ),
                 );
@@ -1672,7 +1693,7 @@ impl ModuleBuilder<'_, '_> {
         // post_label_defined -> pre_label_used
         // This means: to get the state of `post_label_defined`, we need the state of `pre_label_used`
         let mut edges: BTreeMap<Symbol, BTreeSet<Symbol>> = BTreeMap::new();
-        for (pre_label, post_label, _) in &behavior_predicates {
+        for (pre_label, post_label, _, _) in &labeled_exprs {
             let pre_name = pre_label.and_then(&get_label_name);
             let post_name = post_label.and_then(&get_label_name);
             if let (Some(pre), Some(post)) = (pre_name, post_name) {
@@ -1756,9 +1777,19 @@ impl ModuleBuilder<'_, '_> {
             Function {
                 uninterpreted,
                 signature,
+                modifies,
+                reads,
                 body,
                 ..
-            } => self.def_ana_spec_fun(*uninterpreted, signature, body),
+            } => self.def_ana_spec_fun(*uninterpreted, signature, modifies, reads, body),
+            ModifiesOf {
+                fun_param,
+                params,
+                targets,
+            } => self.def_ana_modifies_of(loc, context, fun_param, params, targets),
+            ReadsOf { fun_param, types } => self.def_ana_reads_of(loc, context, fun_param, types),
+            Modifies { targets } => self.def_ana_modifies(loc, context, targets),
+            Reads { types } => self.def_ana_reads(loc, context, types),
             Let {
                 name,
                 post_state,
@@ -2500,15 +2531,6 @@ impl ModuleBuilder<'_, '_> {
                 let first = exps.remove(0);
                 (first, exps)
             },
-            ConditionKind::Modifies => {
-                // Parser has created a dummy exp, targets are all in additional_exps
-                let mut exps = additional_exps
-                    .iter()
-                    .map(|target| et.translate_modify_target(target).into_exp())
-                    .collect_vec();
-                let first = exps.remove(0);
-                (first, exps)
-            },
             ConditionKind::Emits => {
                 // TODO: `first` is the "message" part, and `second` is the "handle" part.
                 //       `second` should have type std::event::EventHandle<T>, and `first`
@@ -2607,7 +2629,6 @@ impl ModuleBuilder<'_, '_> {
             PK::Assert => Assert,
             PK::Assume => Assume,
             PK::Decreases => Decreases,
-            PK::Modifies => Modifies,
             PK::Emits => Emits,
             PK::Ensures => Ensures,
             PK::Requires => Requires,
@@ -2681,15 +2702,56 @@ impl ModuleBuilder<'_, '_> {
         &mut self,
         uninterpreted: bool,
         _signature: &EA::FunctionSignature,
+        modifies: &[EA::Exp],
+        reads: &[EA::Type],
         body: &EA::FunctionBody,
     ) {
+        if !modifies.is_empty() || !reads.is_empty() {
+            let entry = &self.spec_funs[self.spec_fun_index];
+            let type_params = entry.type_params.clone();
+            let params = entry.params.clone();
+            let mut et = ExpTranslator::new_with_old(self, true);
+            let loc = et.to_loc(&body.loc);
+            et.define_type_params(&loc, &type_params, false);
+            et.enter_scope();
+            for Parameter(n, ty, loc) in params {
+                et.define_local(&loc, n, ty, None, None);
+            }
+            let translated_modifies: Vec<Exp> = modifies
+                .iter()
+                .map(|target| et.translate_modify_target(target).into_exp())
+                .collect();
+            // Translate reads types to QualifiedInstId<StructId>
+            let mut reads_targets = BTreeSet::new();
+            for ty in reads {
+                let translated_ty = et.translate_type(ty);
+                if let Type::Struct(module_id, struct_id, inst) = &translated_ty {
+                    reads_targets.insert(module_id.qualified_inst(*struct_id, inst.clone()));
+                } else {
+                    et.error(
+                        &loc,
+                        &format!(
+                            "expected a resource type, found `{}`",
+                            translated_ty.display(&et.type_display_context()),
+                        ),
+                    );
+                }
+            }
+            et.finalize_types(true);
+            let frame = self.spec_funs[self.spec_fun_index]
+                .frame_spec
+                .get_or_insert_with(FrameSpec::default);
+            frame.modifies_targets = translated_modifies;
+            frame.reads_targets = reads_targets;
+        }
         match &body.value {
             EA::FunctionBody_::Defined(seq) => {
                 let entry = &self.spec_funs[self.spec_fun_index];
                 let type_params = entry.type_params.clone();
                 let params = entry.params.clone();
                 let result_type = entry.result_type.clone();
-                let mut et = ExpTranslator::new(self);
+                // Always allow old() in spec fun bodies
+                let mut et = ExpTranslator::new_with_old(self, true);
                 let loc = et.to_loc(&body.loc);
                 et.define_type_params(&loc, &type_params, false);
                 et.enter_scope();
@@ -2714,6 +2776,202 @@ impl ModuleBuilder<'_, '_> {
             },
         }
         self.spec_fun_index += 1;
+    }
+
+    fn def_ana_modifies_of(
+        &mut self,
+        loc: &Loc,
+        context: &SpecBlockContext,
+        fun_param: &Spanned<move_symbol_pool::Symbol>,
+        params: &[(PA::Var, EA::Type)],
+        targets: &[EA::Exp],
+    ) {
+        let fun_name = match context {
+            SpecBlockContext::Function(name) => name.clone(),
+            _ => {
+                self.parent.env.error(
+                    loc,
+                    "`modifies_of` can only appear in a function spec block",
+                );
+                return;
+            },
+        };
+        // Validate that fun_param names an actual function-typed parameter.
+        let param_sym = self.symbol_pool().make(&fun_param.value);
+        if let Some(entry) = self.parent.fun_table.get(&fun_name) {
+            let found = entry
+                .params
+                .iter()
+                .any(|Parameter(name, ty, _)| *name == param_sym && ty.is_function());
+            if !found {
+                self.parent.env.error(
+                    loc,
+                    &format!(
+                        "`{}` is not a function-typed parameter of `{}`",
+                        fun_param.value,
+                        fun_name.display(self.parent.env)
+                    ),
+                );
+                return;
+            }
+        }
+        let mut et = ExpTranslator::new_with_old(self, true);
+        et.enter_scope();
+        // Define the formal parameter names so target expressions can reference them
+        let translated_params: Vec<Parameter> = params
+            .iter()
+            .map(|(v, ty)| {
+                let ty = et.translate_type(ty);
+                let sym = et.symbol_pool().make(&v.0.value);
+                let loc = et.to_loc(&v.0.loc);
+                et.define_local(&loc, sym, ty.clone(), None, None);
+                Parameter(sym, ty, loc)
+            })
+            .collect();
+        let translated_targets: Vec<Exp> = targets
+            .iter()
+            .map(|target| et.translate_modify_target(target).into_exp())
+            .collect();
+        et.finalize_types(true);
+        // Find or create entry for this parameter
+        let entries = self.fun_param_access_of.entry(fun_name.symbol).or_default();
+        if let Some(entry) = entries.iter_mut().find(|e| e.fun_param == param_sym) {
+            entry.modifies_params = translated_params;
+            entry.frame_spec.modifies_targets = translated_targets;
+        } else {
+            entries.push(FunParamAccessOf {
+                loc: loc.clone(),
+                fun_param: param_sym,
+                modifies_params: translated_params,
+                frame_spec: FrameSpec {
+                    modifies_targets: translated_targets,
+                    reads_targets: BTreeSet::new(),
+                },
+                used_memory: BTreeSet::new(),
+                old_memory: BTreeSet::new(),
+            });
+        }
+    }
+
+    fn def_ana_reads_of(
+        &mut self,
+        loc: &Loc,
+        context: &SpecBlockContext,
+        fun_param: &Spanned<move_symbol_pool::Symbol>,
+        types: &[EA::Type],
+    ) {
+        let fun_name = match context {
+            SpecBlockContext::Function(name) => name.clone(),
+            _ => {
+                self.parent
+                    .env
+                    .error(loc, "`reads_of` can only appear in a function spec block");
+                return;
+            },
+        };
+        // Validate that fun_param names an actual function-typed parameter.
+        let param_sym = self.symbol_pool().make(&fun_param.value);
+        if let Some(entry) = self.parent.fun_table.get(&fun_name) {
+            let found = entry
+                .params
+                .iter()
+                .any(|Parameter(name, ty, _)| *name == param_sym && ty.is_function());
+            if !found {
+                self.parent.env.error(
+                    loc,
+                    &format!(
+                        "`{}` is not a function-typed parameter of `{}`",
+                        fun_param.value,
+                        fun_name.display(self.parent.env)
+                    ),
+                );
+                return;
+            }
+        }
+        let mut et = ExpTranslator::new(self);
+        let mut reads_types = BTreeSet::new();
+        for ty in types {
+            let translated_ty = et.translate_type(ty);
+            // Resolve the type to a struct type
+            if let Type::Struct(module_id, struct_id, inst) = &translated_ty {
+                reads_types.insert(module_id.qualified_inst(*struct_id, inst.clone()));
+            } else {
+                et.error(
+                    loc,
+                    &format!(
+                        "expected a resource type, found `{}`",
+                        translated_ty.display(&et.type_display_context()),
+                    ),
+                );
+            }
+        }
+        et.finalize_types(true);
+        let param_sym = self.symbol_pool().make(&fun_param.value);
+        // Find or create entry for this parameter
+        let entries = self.fun_param_access_of.entry(fun_name.symbol).or_default();
+        if let Some(entry) = entries.iter_mut().find(|e| e.fun_param == param_sym) {
+            entry.frame_spec.reads_targets = reads_types;
+        } else {
+            entries.push(FunParamAccessOf {
+                loc: loc.clone(),
+                fun_param: param_sym,
+                modifies_params: vec![],
+                frame_spec: FrameSpec {
+                    modifies_targets: vec![],
+                    reads_targets: reads_types,
+                },
+                used_memory: BTreeSet::new(),
+                old_memory: BTreeSet::new(),
+            });
+        }
+    }
+
+    fn def_ana_modifies(&mut self, loc: &Loc, context: &SpecBlockContext, targets: &[EA::Exp]) {
+        // Use AbortsIf as the condition kind for scope setup — gives function params
+        // in scope without result variables.
+        let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::AbortsIf);
+        let translated: Vec<Exp> = targets
+            .iter()
+            .filter_map(|target| {
+                let (_, exp) = et.translate_exp_free(target);
+                match &exp {
+                    ExpData::Call(_, Operation::Global(_), _) => Some(exp.into_exp()),
+                    _ => {
+                        et.error(&et.to_loc(&target.loc), "global resource access expected");
+                        None
+                    },
+                }
+            })
+            .collect();
+        et.finalize_types(true);
+        self.update_spec(context, |spec| {
+            let frame = spec.frame_spec.get_or_insert_with(FrameSpec::default);
+            frame.modifies_targets.extend(translated);
+        });
+    }
+
+    fn def_ana_reads(&mut self, loc: &Loc, context: &SpecBlockContext, types: &[EA::Type]) {
+        let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::AbortsIf);
+        let mut resolved = BTreeSet::new();
+        for ty in types {
+            let translated_ty = et.translate_type(ty);
+            if let Type::Struct(module_id, struct_id, inst) = &translated_ty {
+                resolved.insert(module_id.qualified_inst(*struct_id, inst.clone()));
+            } else {
+                et.error(
+                    loc,
+                    &format!(
+                        "expected a resource type, found `{}`",
+                        translated_ty.display(&et.type_display_context()),
+                    ),
+                );
+            }
+        }
+        et.finalize_types(true);
+        self.update_spec(context, |spec| {
+            let frame = spec.frame_spec.get_or_insert_with(FrameSpec::default);
+            frame.reads_targets.extend(resolved);
+        });
     }
 }
 
@@ -2888,6 +3146,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // in schema arguments of includes. This unfortunately means we can't refer in
         // lets to variables included from schemas, but this seems to be a rare use case.
         assert!(self.spec_block_lets.is_empty());
+        assert!(self.spec_block_state_labels.is_empty());
         for member in &block.value.members {
             let member_loc = self.parent.to_loc(&member.loc);
             if let EA::SpecBlockMember_::Let {
@@ -2959,12 +3218,21 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         );
                     }
                 },
+                EA::SpecBlockMember_::Modifies { targets } => {
+                    let context = SpecBlockContext::Schema(name.clone());
+                    self.def_ana_modifies(&member_loc, &context, targets);
+                },
+                EA::SpecBlockMember_::Reads { types } => {
+                    let context = SpecBlockContext::Schema(name.clone());
+                    self.def_ana_reads(&member_loc, &context, types);
+                },
                 _ => {
                     self.parent.error(&member_loc, "item not allowed in schema");
                 },
             };
         }
         self.spec_block_lets.clear();
+        self.spec_block_state_labels.clear();
     }
 
     /// Extracts all schema inclusions from a list of spec block members.
@@ -3380,6 +3648,31 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
         }
 
+        // Transfer frame_spec from schema (and included schemas) to the target spec.
+        for source_spec in [&schema_entry.spec, &schema_entry.included_spec] {
+            if let Some(frame) = &source_spec.frame_spec {
+                let mut replacer = |_, target: RewriteTarget| {
+                    if let RewriteTarget::LocalVar(sym) = target {
+                        argument_map.get(&sym).cloned()
+                    } else {
+                        None
+                    }
+                };
+                let mut rewriter =
+                    ExpRewriter::new(self.parent.env, &mut replacer).set_type_args(type_arguments);
+                let rewritten_targets: Vec<Exp> = frame
+                    .modifies_targets
+                    .iter()
+                    .map(|t| rewriter.rewrite_exp(t.clone()))
+                    .collect();
+                let target_frame = spec.frame_spec.get_or_insert_with(FrameSpec::default);
+                target_frame.modifies_targets.extend(rewritten_targets);
+                target_frame
+                    .reads_targets
+                    .extend(frame.reads_targets.iter().cloned());
+            }
+        }
+
         // Put schema entry back.
         self.parent
             .spec_schema_table
@@ -3502,6 +3795,16 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             context_properties,
             "(included from schema)",
         );
+        // Transfer frame_spec (modifies/reads) from the schema to the context.
+        if let Some(frame) = spec.frame_spec {
+            self.update_spec(context, |target_spec| {
+                let target_frame = target_spec
+                    .frame_spec
+                    .get_or_insert_with(FrameSpec::default);
+                target_frame.modifies_targets.extend(frame.modifies_targets);
+                target_frame.reads_targets.extend(frame.reads_targets);
+            });
+        }
     }
 
     /// Analyzes a schema apply weaving operator.
@@ -3775,6 +4078,10 @@ impl ModuleBuilder<'_, '_> {
             let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
             let used_funs = Some(def.as_ref().map(|e| e.used_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
+            let fun_param_access_of = self
+                .fun_param_access_of
+                .remove(&name.symbol)
+                .unwrap_or_default();
             let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
                 name: name.symbol,
@@ -3795,6 +4102,10 @@ impl ModuleBuilder<'_, '_> {
                 params: entry.params.clone(),
                 result_type: entry.result_type.clone(),
                 access_specifiers,
+                fun_param_access_of,
+                spec_used_memory: BTreeSet::new(),
+                spec_old_memory: BTreeSet::new(),
+                spec_uses_old: false,
                 acquired_structs: None,
                 spec: spec.into(),
                 def,

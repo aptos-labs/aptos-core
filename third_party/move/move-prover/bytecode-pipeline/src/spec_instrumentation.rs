@@ -6,9 +6,10 @@
 
 use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
+use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast,
-    ast::{Exp, ExpData, QuantKind, TempIndex, Value},
+    ast::{Exp, ExpData, MemoryLabel, QuantKind, TempIndex, Value},
     exp_generator::ExpGenerator,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
@@ -226,7 +227,10 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 }
                 for (variant, target) in targets.get_targets(fun) {
                     let spec = &*target.get_spec();
-                    if !spec.conditions.is_empty() {
+                    let has_frame = spec.frame_spec.as_ref().is_some_and(|f| {
+                        !f.modifies_targets.is_empty() || !f.reads_targets.is_empty()
+                    });
+                    if !spec.conditions.is_empty() || !spec.properties.is_empty() || has_frame {
                         writeln!(
                             f,
                             "fun {}[{}]\n{}",
@@ -398,7 +402,12 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             // Inject 'CanModify' assumptions for this function.
             for (loc, exp) in &spec.modifies {
-                let struct_ty = self.builder.global_env().get_node_type(exp.node_id());
+                let struct_ty = self
+                    .builder
+                    .global_env()
+                    .get_node_type(exp.node_id())
+                    .skip_reference()
+                    .clone();
                 self.generate_modifies_check(
                     PropKind::Assume,
                     spec,
@@ -443,8 +452,26 @@ impl<'a> Instrumenter<'a> {
             }
         }
 
+        // Collect intermediate state labels from spec conditions.
+        // These are labels (e.g. @inter, @inter1) that need SaveMem
+        // emitted at the appropriate bytecode offset (not at function entry).
+        let intermediate_saves = if self.is_verified() {
+            self.collect_intermediate_saves(spec, &old_code)
+        } else {
+            BTreeMap::new()
+        };
+
         // Instrument and generate new code
-        for bc in old_code {
+        for (offset, bc) in old_code.into_iter().enumerate() {
+            // Emit SaveMem for any intermediate state labels at this offset
+            if let Some(saves) = intermediate_saves.get(&(offset as CodeOffset)) {
+                for (mem, label) in saves {
+                    let mem = mem.clone();
+                    let label = *label;
+                    self.builder
+                        .emit_with(|attr_id| SaveMem(attr_id, label, mem));
+                }
+            }
             self.instrument_bytecode(spec, inlined_props, bc);
         }
 
@@ -618,7 +645,7 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             let loc = self.builder.get_loc(id);
             for (_, exp) in &callee_spec.modifies {
-                let rty = env.get_node_type(exp.node_id());
+                let rty = env.get_node_type(exp.node_id()).skip_reference().clone();
                 let new_addr = exp.call_args()[0].clone();
                 self.generate_modifies_check(
                     PropKind::Assert,
@@ -806,6 +833,258 @@ impl<'a> Instrumenter<'a> {
                     .emit_with(|attr_id| Assign(attr_id, *saved_idx, *idx, AssignKind::Copy))
             }
         }
+    }
+
+    /// Collect intermediate SaveMem instructions needed for state labels in the spec.
+    /// Uses structural matching: labels are ordered via the behavioral predicate chain,
+    /// then mapped to state-transition operations in the bytecode.
+    /// Returns a map from bytecode offset to the set of (memory, label) pairs to save at that offset.
+    fn collect_intermediate_saves(
+        &self,
+        spec: &TranslatedSpec,
+        code: &[Bytecode],
+    ) -> BTreeMap<CodeOffset, Vec<(QualifiedInstId<StructId>, MemoryLabel)>> {
+        let env = self.builder.global_env();
+
+        // Collect all expressions from spec conditions
+        let mut all_exps: Vec<&Exp> = Vec::new();
+        for (_, exp) in &spec.post {
+            all_exps.push(exp);
+        }
+        for (_, exp, code_exp) in &spec.aborts {
+            all_exps.push(exp);
+            if let Some(c) = code_exp {
+                all_exps.push(c);
+            }
+        }
+        for (_, exp) in &spec.modifies {
+            all_exps.push(exp);
+        }
+        for (_, exps) in &spec.aborts_with {
+            for exp in exps {
+                all_exps.push(exp);
+            }
+        }
+        for (_, exp, exp2, opt_exp) in &spec.emits {
+            all_exps.push(exp);
+            all_exps.push(exp2);
+            if let Some(e) = opt_exp {
+                all_exps.push(e);
+            }
+        }
+        for (_, exp, exp2) in &spec.updates {
+            all_exps.push(exp);
+            all_exps.push(exp2);
+        }
+
+        // Collect (label, memory) pairs from expressions that use intermediate state labels.
+        // These come from:
+        // - Behavior(kind, range) with non-default range: behavioral predicates with state labels
+        // - Exists(Some(label)): existence checks at intermediate states
+        // - Global(Some(label)): resource access at intermediate states
+        let mut label_memory_pairs: BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> =
+            BTreeSet::new();
+
+        for exp in &all_exps {
+            exp.visit_pre_order(&mut |e| {
+                if let ExpData::Call(node_id, op, args) = e {
+                    match op {
+                        ast::Operation::Behavior(_, range) if !range.is_default() => {
+                            // Resolve the closure target to get memory types
+                            let closure_info: Option<(
+                                Vec<Type>,
+                                move_model::model::ModuleId,
+                                FunId,
+                            )> = match args.first().map(|a| a.as_ref()) {
+                                Some(ExpData::Call(
+                                    closure_id,
+                                    ast::Operation::Closure(mid, fid, _),
+                                    _,
+                                )) => {
+                                    let inst = env.get_node_instantiation(*closure_id);
+                                    Some((inst, *mid, *fid))
+                                },
+                                Some(ExpData::Temporary(_, idx)) => {
+                                    code.iter().rev().find_map(|bc| {
+                                        if let Bytecode::Call(
+                                            _,
+                                            dests,
+                                            Operation::Closure(mid, fid, types, _),
+                                            _,
+                                            _,
+                                        ) = bc
+                                        {
+                                            if dests.first() == Some(idx) {
+                                                return Some((types.clone(), *mid, *fid));
+                                            }
+                                        }
+                                        None
+                                    })
+                                },
+                                _ => None,
+                            };
+                            if let Some((inst, mid, fid)) = closure_info {
+                                let closure_fun_env = env.get_function(mid.qualified(fid));
+                                let all_memory = closure_fun_env
+                                    .get_spec_used_memory()
+                                    .iter()
+                                    .chain(closure_fun_env.get_spec_old_memory().iter());
+                                for memory in all_memory {
+                                    let memory = memory.clone().instantiate(&inst);
+                                    for label in range.labels() {
+                                        label_memory_pairs.insert((label, memory.clone()));
+                                    }
+                                }
+                            }
+                        },
+                        ast::Operation::SpecFunction(mid, fid, range) if !range.is_default() => {
+                            // Two-state spec function with state labels
+                            let module = env.get_module(*mid);
+                            let sfun = module.get_spec_fun(*fid);
+                            let inst = env.get_node_instantiation(*node_id);
+                            let all_memory = sfun.used_memory.iter().chain(sfun.old_memory.iter());
+                            for memory in all_memory {
+                                let memory = memory.clone().instantiate(&inst);
+                                for label in range.labels() {
+                                    label_memory_pairs.insert((label, memory.clone()));
+                                }
+                            }
+                        },
+                        ast::Operation::Exists(Some(label))
+                        | ast::Operation::Global(Some(label)) => {
+                            // Extract memory type from node's type instantiation
+                            let mem_ty = &env.get_node_instantiation(*node_id)[0];
+                            let (mid, sid, inst) = mem_ty.require_struct();
+                            let memory = mid.qualified_inst(sid, inst.to_owned());
+                            label_memory_pairs.insert((*label, memory));
+                        },
+                        _ => {},
+                    }
+                }
+                true
+            });
+        }
+
+        // Build set of labels already saved at function entry (from saved_memory)
+        let already_saved: BTreeSet<MemoryLabel> = spec.saved_memory.values().copied().collect();
+
+        // Filter to labels that actually need intermediate SaveMem
+        let labels_needing_save: BTreeSet<MemoryLabel> = label_memory_pairs
+            .iter()
+            .map(|(label, _)| *label)
+            .filter(|label| !already_saved.contains(label))
+            .collect();
+
+        if labels_needing_save.is_empty() {
+            return BTreeMap::new();
+        }
+
+        // Build a total order of intermediate labels from the behavioral predicate chain.
+        // Behavioral predicates (Behavior/SpecFunction) with MemoryRange {pre, post}
+        // define edges pre→post in a DAG. Topologically sorting this DAG gives program
+        // order, which we then filter to labels that need saving.
+        let label_order = Self::build_label_order_from_spec(&all_exps, &labels_needing_save);
+
+        // Enumerate state-transition operations in bytecode order.
+        // These are the operations that change global memory state: function calls,
+        // MoveFrom, MoveTo, WriteBack to global root, and OpaqueCallBegin (which marks
+        // the start of an opaque call that may modify global state).
+        let state_transition_offsets: Vec<CodeOffset> = code
+            .iter()
+            .enumerate()
+            .filter(|(_, bc)| {
+                bc.is_global_state_transition()
+                    || matches!(
+                        bc,
+                        Bytecode::Call(_, _, Operation::OpaqueCallBegin(..), _, _)
+                    )
+            })
+            .map(|(i, _)| i as CodeOffset)
+            .collect();
+
+        // TODO: Support state labels on branching control flow by anchoring labels to
+        // specific transitions in the CFG rather than ordinal position.
+        if !label_order.is_empty() && code.iter().any(|bc| matches!(bc, Bytecode::Branch(..))) {
+            env.error(
+                &self.builder.fun_env.get_spec_loc(),
+                "intermediate state labels (`|~`) are currently only supported \
+                 for functions with linear control flow (no branches); \
+                 this restriction will be lifted in a future version",
+            );
+            return BTreeMap::new();
+        }
+
+        // Map the Nth intermediate label to the state after the Nth state-transition
+        // operation. SaveMem is emitted at (state_transition_offset + 1), i.e., right
+        // after the operation completes and before the next bytecode executes.
+        let mut result: BTreeMap<CodeOffset, Vec<(QualifiedInstId<StructId>, MemoryLabel)>> =
+            BTreeMap::new();
+        for (n, label) in label_order.iter().enumerate() {
+            if n >= state_transition_offsets.len() {
+                break;
+            }
+            let save_offset = state_transition_offsets[n] + 1;
+            for (l, memory) in &label_memory_pairs {
+                if l == label {
+                    result
+                        .entry(save_offset)
+                        .or_default()
+                        .push((memory.clone(), *label));
+                }
+            }
+        }
+        result
+    }
+
+    /// Build a total order of intermediate labels from behavioral predicate chains in spec
+    /// expressions. Returns labels from `labels_needing_save` sorted in program order.
+    fn build_label_order_from_spec(
+        all_exps: &[&Exp],
+        labels_needing_save: &BTreeSet<MemoryLabel>,
+    ) -> Vec<MemoryLabel> {
+        use petgraph::{algo::toposort, graph::DiGraph};
+
+        // Build a directed graph of label ordering edges from behavioral predicate ranges.
+        let mut graph = DiGraph::<MemoryLabel, ()>::new();
+        let mut node_map: BTreeMap<MemoryLabel, petgraph::graph::NodeIndex> = BTreeMap::new();
+        let mut get_or_insert =
+            |g: &mut DiGraph<MemoryLabel, ()>, label: MemoryLabel| -> petgraph::graph::NodeIndex {
+                *node_map.entry(label).or_insert_with(|| g.add_node(label))
+            };
+
+        for exp in all_exps {
+            exp.visit_pre_order(&mut |e| {
+                if let ExpData::Call(_, op, _) = e {
+                    match op {
+                        ast::Operation::Behavior(_, range)
+                        | ast::Operation::SpecFunction(_, _, range) => {
+                            for label in range.labels() {
+                                get_or_insert(&mut graph, label);
+                            }
+                            if let (Some(pre), Some(post)) = (range.pre, range.post) {
+                                let pre_node = get_or_insert(&mut graph, pre);
+                                let post_node = get_or_insert(&mut graph, post);
+                                graph.update_edge(pre_node, post_node, ());
+                            }
+                        },
+                        ast::Operation::Global(Some(label))
+                        | ast::Operation::Exists(Some(label)) => {
+                            get_or_insert(&mut graph, *label);
+                        },
+                        _ => {},
+                    }
+                }
+                true
+            });
+        }
+
+        // Topological sort to get program order, then filter to labels that need saving.
+        toposort(&graph, None)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|idx| graph[idx])
+            .filter(|label| labels_needing_save.contains(label))
+            .collect()
     }
 
     fn emit_updates(&mut self, spec: &TranslatedSpec, prop_rhs_opt: Option<Exp>) {
@@ -1207,6 +1486,7 @@ fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
                 if !fun_env.is_not_prover_target() {
                     check_caller_callee_modifies_relation(env, targets, &fun_env);
                     check_opaque_modifies_completeness(env, targets, &fun_env);
+                    check_reads_completeness(env, targets, &fun_env);
                 }
             }
         }
@@ -1291,6 +1571,56 @@ fn check_opaque_modifies_completeness(
             &format!("function `{}` is opaque but its specification does not have a modifies clause for `{}`",
                 fun_env.get_full_name_str(),
                 env.display(mem))
+            )
+        }
+    }
+}
+
+/// Check that a function's actual resource access is covered by its `reads` declaration.
+/// If a function declares `reads R, S;`, every resource it accesses (reads or writes)
+/// must be listed. Resources in `modifies` are implicitly included.
+fn check_reads_completeness(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    fun_env: &FunctionEnv,
+) {
+    let frame_spec = fun_env.get_frame_spec();
+    let reads_targets = match &frame_spec {
+        Some(fs) if !fs.reads_targets.is_empty() => &fs.reads_targets,
+        _ => return, // No reads declaration — nothing to check
+    };
+
+    let target = targets.get_target(fun_env, &FunctionVariant::Baseline);
+    let modify_ids = target.get_modify_ids();
+
+    // All accessed memory must be in reads_targets or modify_ids
+    for mem in usage_analysis::get_memory_usage(&target)
+        .accessed
+        .all
+        .iter()
+    {
+        if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {
+            continue;
+        }
+        if env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory() {
+            continue;
+        }
+        let in_reads = reads_targets
+            .iter()
+            .any(|r| r.to_qualified_id() == mem.to_qualified_id());
+        let in_modifies = modify_ids
+            .iter()
+            .any(|m| m.to_qualified_id() == mem.to_qualified_id());
+        if !in_reads && !in_modifies {
+            let loc = fun_env.get_spec_loc();
+            env.error(
+                &loc,
+                &format!(
+                    "function `{}` accesses resource `{}` which is not covered by \
+                     its `reads` or `modifies` declaration",
+                    fun_env.get_full_name_str(),
+                    env.display(mem)
+                ),
             )
         }
     }

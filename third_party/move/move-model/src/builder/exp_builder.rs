@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, BehaviorKind,
-        BehaviorState, Exp, ExpData, LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern,
+        Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryRange, ModuleName, Operation, Pattern,
         QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
@@ -15,6 +15,7 @@ use crate::{
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
+    exp_rewriter::ExpRewriterFunctions,
     metadata::{
         lang_feature_versions::{LANGUAGE_VERSION_FOR_RAC, LANGUAGE_VERSION_FOR_SINT},
         LanguageVersion,
@@ -1255,11 +1256,16 @@ impl ExpTranslator<'_, '_, '_> {
                 }
             },
             EA::AccessSpecifierKind::Reads | EA::AccessSpecifierKind::Writes => {
-                self.check_language_version(
-                    &loc,
-                    "read/write access specifiers.",
-                    LANGUAGE_VERSION_FOR_RAC,
-                )?;
+                // Only gate on language version for function-level access specifiers
+                // (Impl mode). In spec blocks (Spec mode), reads/writes are allowed
+                // at language version 2.4 for access_of and spec function declarations.
+                if self.mode == ExpTranslationMode::Impl {
+                    self.check_language_version(
+                        &loc,
+                        "read/write access specifiers.",
+                        LANGUAGE_VERSION_FOR_RAC,
+                    )?;
+                }
             },
         }
         let resource = match (module_address, module_name, resource_name) {
@@ -2051,23 +2057,25 @@ impl ExpTranslator<'_, '_, '_> {
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
-            EA::Exp_::Behavior(kind, pre_label, fn_name, type_args, sp!(_, args), post_label) => {
-                self.translate_behavior_predicate(
+            EA::Exp_::Behavior(kind, fn_name, type_args, sp!(_, args)) => self
+                .translate_behavior_predicate(
                     &loc,
                     *kind,
-                    pre_label,
-                    post_label,
                     fn_name,
                     type_args,
                     args,
                     expected_type,
                     context,
-                )
-            },
-            EA::Exp_::LabeledCall(label, name, type_args, sp!(_, args)) => self
-                .translate_labeled_call(&loc, label, name, type_args, args, expected_type, context),
-            EA::Exp_::LabeledIndex(label, target, index) => {
-                self.translate_labeled_index(&loc, label, target, index, expected_type, context)
+                ),
+            EA::Exp_::StateLabeled(pre_label, inner, post_label) => {
+                let inner_exp = self.translate_exp(inner, expected_type);
+                // Translate labels
+                let pre = pre_label.as_ref().map(|l| self.translate_state_label(l));
+                let post = post_label.as_ref().map(|l| self.translate_state_label(l));
+                let range = MemoryRange { pre, post };
+                // Propagate labels to leaf operations (Behavior, SpecFunction, Global, Exists)
+                self.propagate_state_labels(inner_exp.into_exp(), &range)
+                    .into()
             },
             EA::Exp_::UnresolvedError => {
                 // Error reported
@@ -4907,7 +4915,7 @@ impl ExpTranslator<'_, '_, '_> {
                     other => other,
                 };
 
-                if let Operation::SpecFunction(module_id, spec_fun_id, None) = oper {
+                if let Operation::SpecFunction(module_id, spec_fun_id, _) = oper {
                     // Record the usage of spec function in specs, used later
                     // in spec translator.
                     self.parent
@@ -5797,13 +5805,11 @@ impl ExpTranslator<'_, '_, '_> {
         ExpData::Quant(id, rkind, rranges, rtriggers, rcondition, rbody.into_exp())
     }
 
-    /// Translates a behavior predicate expression (requires_of, aborts_of, ensures_of, modifies_of).
+    /// Translates a behavior predicate expression (requires_of, aborts_of, ensures_of, result_of).
     fn translate_behavior_predicate(
         &mut self,
         loc: &Loc,
         kind: PA::BehaviorKind,
-        pre_label: &Option<PA::Label>,
-        post_label: &Option<PA::Label>,
         fn_name: &EA::ModuleAccess,
         type_args: &Option<Vec<EA::Type>>,
         args: &[EA::Exp],
@@ -5815,13 +5821,8 @@ impl ExpTranslator<'_, '_, '_> {
             PA::BehaviorKind::RequiresOf => BehaviorKind::RequiresOf,
             PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
             PA::BehaviorKind::EnsuresOf => BehaviorKind::EnsuresOf,
-            PA::BehaviorKind::ModifiesOf => BehaviorKind::ModifiesOf,
             PA::BehaviorKind::ResultOf => BehaviorKind::ResultOf,
         };
-
-        // Validate and translate state labels
-        let behavior_state =
-            self.translate_behavior_state_labels(loc, &model_kind, pre_label, post_label);
 
         // Resolve the function name to a function expression (Closure or Temporary)
         let Some((fun_exp, expected_arg_types)) =
@@ -5850,130 +5851,113 @@ impl ExpTranslator<'_, '_, '_> {
 
         ExpData::Call(
             id,
-            Operation::Behavior(model_kind, behavior_state),
+            Operation::Behavior(model_kind, MemoryRange::default()),
             all_args,
         )
     }
 
     /// Translates a single state label to a MemoryLabel (GlobalId), reusing existing labels
-    /// if the same name was already used. Registers the name in GlobalEnv for printing.
+    /// if the same name was already used. Uses the parent `ModuleBuilder`'s shared
+    /// `spec_block_state_labels` map so that the same label name across different conditions
+    /// in the same spec block resolves to the same MemoryLabel.
     fn translate_state_label(&mut self, label: &PA::Label) -> GlobalId {
         let sym = self.symbol_pool().make(label.value().as_str());
-        if let Some(&id) = self.state_label_map.get(&sym) {
+        // Check the spec-block-level shared map first
+        if let Some(&id) = self.parent.spec_block_state_labels.get(&sym) {
+            // Also cache in the local map for intra-condition dedup
+            self.state_label_map.insert(sym, id);
+            id
+        } else if let Some(&id) = self.state_label_map.get(&sym) {
+            self.parent.spec_block_state_labels.insert(sym, id);
             id
         } else {
             let id = self.env().new_global_id();
             self.state_label_map.insert(sym, id);
+            self.parent.spec_block_state_labels.insert(sym, id);
             self.env().set_memory_label_name(id, sym);
             id
         }
     }
 
-    /// Validates and translates state labels for behavior predicates.
-    /// Returns a BehaviorState with the translated memory labels. Names are registered
-    /// in GlobalEnv for lookup during printing.
-    fn translate_behavior_state_labels(
-        &mut self,
-        loc: &Loc,
-        kind: &BehaviorKind,
-        pre_label: &Option<PA::Label>,
-        post_label: &Option<PA::Label>,
-    ) -> BehaviorState {
-        // Validate label usage based on behavior kind
-        // Only ensures_of and result_of can have both pre and post labels
-        // Other predicates (requires_of, aborts_of, modifies_of) should not have post labels
-        if !matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf) && post_label.is_some()
-        {
-            self.error(
-                loc,
-                &format!(
-                    "only ensures_of and result_of can have a post-state label (@post), not {}",
-                    kind
-                ),
-            );
+    /// Propagates state labels from a `StateLabeled` wrapper down to leaf operations
+    /// that access memory: `Behavior`, `SpecFunction`, `Global`, `Exists`.
+    fn propagate_state_labels(&self, exp: Exp, range: &MemoryRange) -> Exp {
+        use ExpData::*;
+        use Operation::*;
+        struct LabelPropagator<'a> {
+            range: &'a MemoryRange,
+            inside_old: bool,
         }
+        impl ExpRewriterFunctions for LabelPropagator<'_> {
+            fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+                // Intercept Behavior nodes *before* descent so we don't propagate
+                // outer labels into nested behavioral predicate arguments (which
+                // belong to a different state context).
+                if let Call(id, Behavior(kind, existing_range), args) = exp.as_ref() {
+                    let merged = MemoryRange {
+                        pre: existing_range.pre.or(self.range.pre),
+                        post: existing_range.post.or(self.range.post),
+                    };
+                    Call(*id, Behavior(*kind, merged), args.clone()).into_exp()
+                } else if let Call(id, Old, args) = exp.as_ref() {
+                    // Handle Old before descent so inside_old is set when children are visited.
+                    // If this were in rewrite_call, children would be rewritten first and
+                    // Global(None) would get the post label instead of the pre label.
+                    let prev = self.inside_old;
+                    self.inside_old = true;
+                    let new_arg = self.rewrite_exp(args[0].clone());
+                    self.inside_old = prev;
+                    Call(*id, Old, vec![new_arg]).into_exp()
+                } else {
+                    self.rewrite_exp_descent(exp)
+                }
+            }
 
-        let pre = pre_label.as_ref().map(|l| self.translate_state_label(l));
-        let post = post_label.as_ref().map(|l| self.translate_state_label(l));
-        BehaviorState::new(pre, post)
-    }
-
-    /// Translates a labeled call expression (label@global<R>(addr) or label@exists<R>(addr)).
-    /// Strictly accepts only unqualified `global`/`exists`, translates the call, and injects
-    /// the memory label into the resulting operation.
-    fn translate_labeled_call(
-        &mut self,
-        loc: &Loc,
-        label: &PA::Label,
-        name: &EA::ModuleAccess,
-        type_args: &Option<Vec<EA::Type>>,
-        args: &[EA::Exp],
-        expected_type: &Type,
-        context: &ErrorMessageContext,
-    ) -> ExpData {
-        let mem_label = self.translate_state_label(label);
-        // Labeled calls are only valid for unqualified `global` / `exists`.
-        let builtin_name = match &name.value {
-            EA::ModuleAccess_::Name(n)
-                if n.value.as_str() == "global" || n.value.as_str() == "exists" =>
-            {
-                self.symbol_pool().make(n.value.as_str())
-            },
-            _ => {
-                self.error(
-                    &self.to_loc(&name.loc),
-                    "labeled call must use unqualified `global` or `exists`",
-                );
-                return self.new_error_exp();
-            },
+            fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
+                match oper {
+                    SpecFunction(mid, fid, existing_range) => {
+                        let merged = MemoryRange {
+                            pre: existing_range.pre.or(self.range.pre),
+                            post: existing_range.post.or(self.range.post),
+                        };
+                        if merged != *existing_range {
+                            Some(
+                                Call(id, SpecFunction(*mid, *fid, merged), args.to_vec())
+                                    .into_exp(),
+                            )
+                        } else {
+                            None
+                        }
+                    },
+                    Global(None) => {
+                        let label = if self.inside_old {
+                            self.range.pre
+                        } else {
+                            // Use post label if available, otherwise fall back to pre label.
+                            // This handles intermediate state labels (e.g., `@at_op_12`)
+                            // where only a pre label is set but it should apply to all
+                            // memory references, not just those inside old().
+                            self.range.post.or(self.range.pre)
+                        };
+                        label.map(|l| Call(id, Global(Some(l)), args.to_vec()).into_exp())
+                    },
+                    Exists(None) => {
+                        let label = if self.inside_old {
+                            self.range.pre
+                        } else {
+                            self.range.post.or(self.range.pre)
+                        };
+                        label.map(|l| Call(id, Exists(Some(l)), args.to_vec()).into_exp())
+                    },
+                    _ => None,
+                }
+            }
+        }
+        let mut propagator = LabelPropagator {
+            range,
+            inside_old: false,
         };
-        let args_refs: Vec<&EA::Exp> = args.iter().collect();
-        let result = self.translate_call(
-            loc,
-            &self.to_loc(&name.loc),
-            CallKind::Regular,
-            &Some(self.parent.parent.builtin_module()),
-            builtin_name,
-            type_args,
-            &args_refs,
-            expected_type,
-            context,
-        );
-        // Inject the memory label into the operation
-        Self::inject_memory_label(result, mem_label)
-    }
-
-    /// Translates a labeled index expression (label@R[addr]).
-    /// Translates the index expression and injects the memory label into the
-    /// resulting Global operation.
-    fn translate_labeled_index(
-        &mut self,
-        loc: &Loc,
-        label: &PA::Label,
-        target: &EA::Exp,
-        index: &EA::Exp,
-        expected_type: &Type,
-        context: &ErrorMessageContext,
-    ) -> ExpData {
-        let mem_label = self.translate_state_label(label);
-        let result = self.translate_index(loc, target, index, expected_type, context);
-        Self::inject_memory_label(result, mem_label)
-    }
-
-    /// Injects a memory label into a Global(None) or Exists(None) operation
-    /// within an ExpData::Call node.
-    // TODO(#18762): This does not handle BorrowGlobal from index ops, so `label@R[addr]`
-    // silently drops the label. Need to also match BorrowGlobal(ReferenceKind, _, None).
-    fn inject_memory_label(exp: ExpData, label: GlobalId) -> ExpData {
-        match exp {
-            ExpData::Call(id, Operation::Global(None), args) => {
-                ExpData::Call(id, Operation::Global(Some(label)), args)
-            },
-            ExpData::Call(id, Operation::Exists(None), args) => {
-                ExpData::Call(id, Operation::Exists(Some(label)), args)
-            },
-            other => other,
-        }
+        propagator.rewrite_exp(exp)
     }
 
     /// Resolves the target of a behavior predicate to either a local variable or a function.
@@ -6133,11 +6117,6 @@ impl ExpTranslator<'_, '_, '_> {
                 }
                 types
             },
-            BehaviorKind::ModifiesOf => {
-                // modifies_of takes global resource references, not function parameters.
-                // We don't enforce argument count or types here.
-                vec![]
-            },
         }
     }
 
@@ -6196,15 +6175,7 @@ impl ExpTranslator<'_, '_, '_> {
         expected_types: &[Type],
         kind: &BehaviorKind,
     ) -> Vec<Exp> {
-        // For modifies_of, arguments must be global resource expressions
-        if matches!(kind, BehaviorKind::ModifiesOf) {
-            return args
-                .iter()
-                .map(|arg| self.translate_modify_target(arg).into_exp())
-                .collect();
-        }
-
-        // Check arity for other behavior kinds
+        // Check arity for behavior kinds
         if args.len() != expected_types.len() {
             self.error(
                 loc,

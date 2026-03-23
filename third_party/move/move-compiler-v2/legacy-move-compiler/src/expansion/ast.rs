@@ -308,7 +308,24 @@ pub enum SpecBlockMember_ {
         uninterpreted: bool,
         name: FunctionName,
         signature: FunctionSignature,
+        modifies: Vec<Exp>,
+        reads: Vec<Type>,
         body: FunctionBody,
+    },
+    ModifiesOf {
+        fun_param: Name,
+        params: Vec<(Var, Type)>,
+        targets: Vec<Exp>,
+    },
+    ReadsOf {
+        fun_param: Name,
+        types: Vec<Type>,
+    },
+    Modifies {
+        targets: Vec<Exp>,
+    },
+    Reads {
+        types: Vec<Type>,
     },
     Variable {
         is_global: bool,
@@ -349,7 +366,6 @@ pub enum SpecConditionKind_ {
     AbortsIf,
     AbortsWith,
     SucceedsIf,
-    Modifies,
     Emits,
     Ensures,
     Requires,
@@ -545,31 +561,22 @@ pub enum Exp_ {
         Box<Exp>,
     ), // spec only
     // Behavior predicate for function values in specifications:
-    // [pre_label@]requires_of<f[<T1, ..., Tn>]>(args)[@post_label]
-    // [pre_label@]aborts_of<f[<T1, ..., Tn>]>(args)[@post_label]
-    // [pre_label@]ensures_of<f[<T1, ..., Tn>]>(args)[@post_label]
-    // [pre_label@]modifies_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // requires_of<f[<T1, ..., Tn>]>(args)
+    // aborts_of<f[<T1, ..., Tn>]>(args)
+    // ensures_of<f[<T1, ..., Tn>]>(args)
+    // result_of<f[<T1, ..., Tn>]>(args)
     Behavior(
         BehaviorKind,
-        Option<Label>,     // pre-state label
         ModuleAccess,      // function name
         Option<Vec<Type>>, // optional type instantiation
         Spanned<Vec<Exp>>, // arguments
-        Option<Label>,     // post-state label
     ), // spec only
-    // Labeled resource access in specifications:
-    // label@global<R>(addr) or label@exists<R>(addr)
-    LabeledCall(
-        Label,             // memory state label
-        ModuleAccess,      // function name (global/exists)
-        Option<Vec<Type>>, // type arguments
-        Spanned<Vec<Exp>>, // arguments
-    ), // spec only
-    // label@R[addr] — labeled resource index access
-    LabeledIndex(
-        Label,    // memory state label
-        Box<Exp>, // target (resource name expression)
-        Box<Exp>, // index (address expression)
+    // State-labeled expression in specifications:
+    // label |~ expr | pre.. |~ expr | ..post |~ expr | pre..post |~ expr
+    StateLabeled(
+        Option<Label>, // pre-state label
+        Box<Exp>,      // inner expression
+        Option<Label>, // post-state label
     ), // spec only
 
     Assign(LValueList, Box<Exp>),
@@ -1261,7 +1268,6 @@ impl AstDebug for SpecConditionKind_ {
             AbortsIf => w.write("aborts_if "),
             AbortsWith => w.write("aborts_with "),
             SucceedsIf => w.write("succeeds_if "),
-            Modifies => w.write("modifies "),
             Emits => w.write("emits "),
             Ensures => w.write("ensures "),
             Requires => w.write("requires "),
@@ -1304,6 +1310,8 @@ impl AstDebug for SpecBlockMember_ {
                 uninterpreted,
                 signature,
                 name,
+                modifies,
+                reads,
                 body,
             } => {
                 if *uninterpreted {
@@ -1313,10 +1321,63 @@ impl AstDebug for SpecBlockMember_ {
                 }
                 w.write(format!("define {}", name));
                 signature.ast_debug(w);
+                if !modifies.is_empty() {
+                    w.write(" modifies ");
+                    w.list(modifies, ", ", |w, e| {
+                        e.ast_debug(w);
+                        true
+                    });
+                }
+                if !reads.is_empty() {
+                    w.write(" reads ");
+                    w.list(reads, ", ", |w, ty| {
+                        ty.ast_debug(w);
+                        true
+                    });
+                }
                 match &body.value {
                     FunctionBody_::Defined(body) => w.block(|w| body.ast_debug(w)),
                     FunctionBody_::Native => w.writeln(";"),
                 }
+            },
+            SpecBlockMember_::ModifiesOf {
+                fun_param,
+                params,
+                targets,
+            } => {
+                w.write(format!("modifies_of<{}>", fun_param));
+                w.write("(");
+                w.list(params, ", ", |w, (v, ty)| {
+                    w.write(format!("{}: ", v));
+                    ty.ast_debug(w);
+                    true
+                });
+                w.write(") ");
+                w.list(targets, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+            },
+            SpecBlockMember_::ReadsOf { fun_param, types } => {
+                w.write(format!("reads_of<{}> ", fun_param));
+                w.list(types, ", ", |w, ty| {
+                    ty.ast_debug(w);
+                    true
+                });
+            },
+            SpecBlockMember_::Modifies { targets } => {
+                w.write("modifies ");
+                w.list(targets, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+            },
+            SpecBlockMember_::Reads { types } => {
+                w.write("reads ");
+                w.list(types, ", ", |w, ty| {
+                    ty.ast_debug(w);
+                    true
+                });
             },
             SpecBlockMember_::Variable {
                 is_global,
@@ -1892,15 +1953,11 @@ impl AstDebug for Exp_ {
                     w.write("]");
                 }
             },
-            E::Behavior(kind, pre_label, fn_name, type_args, sp!(_, args), post_label) => {
-                if let Some(label) = pre_label {
-                    w.write(format!("{}@", label.value().as_str()));
-                }
+            E::Behavior(kind, fn_name, type_args, sp!(_, args)) => {
                 let kind_str = match kind {
                     BehaviorKind::RequiresOf => "requires_of",
                     BehaviorKind::AbortsOf => "aborts_of",
                     BehaviorKind::EnsuresOf => "ensures_of",
-                    BehaviorKind::ModifiesOf => "modifies_of",
                     BehaviorKind::ResultOf => "result_of",
                 };
                 w.write(kind_str);
@@ -1908,34 +1965,21 @@ impl AstDebug for Exp_ {
                 fn_name.ast_debug(w);
                 if let Some(tys) = type_args {
                     w.write("<");
-                    w.comma(tys, |w, ty| ty.ast_debug(w));
+                    w.comma(tys, |w, ty: &Type| ty.ast_debug(w));
                     w.write(">");
                 }
                 w.write(">(");
-                w.comma(args, |w, e| e.ast_debug(w));
+                w.comma(args, |w, e: &Exp| e.ast_debug(w));
                 w.write(")");
+            },
+            E::StateLabeled(pre_label, inner, post_label) => {
+                if let Some(label) = pre_label {
+                    w.write(format!("{}@", label.value().as_str()));
+                }
+                inner.ast_debug(w);
                 if let Some(label) = post_label {
                     w.write(format!("@{}", label.value().as_str()));
                 }
-            },
-            E::LabeledCall(label, name, type_args, sp!(_, args)) => {
-                w.write(format!("{}@", label.value().as_str()));
-                name.ast_debug(w);
-                if let Some(tys) = type_args {
-                    w.write("<");
-                    w.comma(tys, |w, ty| ty.ast_debug(w));
-                    w.write(">");
-                }
-                w.write("(");
-                w.comma(args, |w, e| e.ast_debug(w));
-                w.write(")");
-            },
-            E::LabeledIndex(label, target, index) => {
-                w.write(format!("{}@", label.value().as_str()));
-                target.ast_debug(w);
-                w.write("[");
-                index.ast_debug(w);
-                w.write("]");
             },
             E::UnresolvedError => w.write("_|_"),
         }

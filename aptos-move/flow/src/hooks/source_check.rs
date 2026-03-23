@@ -367,7 +367,19 @@ fn walk_spec_block(block: &SpecBlock, diags: &mut Diagnostics) {
                     walk_spec_sequence(seq, &SpecContext::Other, diags);
                 }
             },
-            SpecBlockMember_::Pragma { .. } => {},
+            SpecBlockMember_::Modifies { targets } => {
+                for exp in targets {
+                    walk_spec_exp(exp, &SpecContext::Other, diags);
+                }
+            },
+            SpecBlockMember_::ModifiesOf { targets, .. } => {
+                for exp in targets {
+                    walk_spec_exp(exp, &SpecContext::Other, diags);
+                }
+            },
+            SpecBlockMember_::Pragma { .. }
+            | SpecBlockMember_::ReadsOf { .. }
+            | SpecBlockMember_::Reads { .. } => {},
         }
     }
 }

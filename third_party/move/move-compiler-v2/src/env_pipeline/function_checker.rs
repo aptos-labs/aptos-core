@@ -436,7 +436,7 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::Tuple
             | Operation::SpecFunction(_, _, _)
             | Operation::UpdateField(_, _, _)
-            | Operation::Behavior(_, _)
+            | Operation::Behavior(..)
             | Operation::Result(_)
             | Operation::Index
             | Operation::Slice

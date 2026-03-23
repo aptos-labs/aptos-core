@@ -5,6 +5,7 @@ module 0x1::smoke {
         a + b
     }
     spec add(a: u64, b: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == a + b;
         aborts_if [inferred] a + b > MAX_U64;
     }
@@ -14,7 +15,9 @@ module 0x1::smoke {
         x
     }
     spec id(x: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x;
+        aborts_if [inferred] false;
     }
 
 }

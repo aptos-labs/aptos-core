@@ -5,10 +5,10 @@
 //!
 //! For each `.move` file under `tests/inference/`, this driver:
 //! 1. Compiles a Move model from the source.
-//! 2. Runs the spec inference pipeline in Unified output mode, producing `.enriched.move`
+//! 2. Runs the spec inference pipeline in Unified output mode, producing `.exp.move`
 //!    files that contain the original source with inferred specs inlined.
 //! 3. Runs the Move Prover on the enriched file (original source + inline specs).
-//! 4. Records all diagnostics to a `.exp` baseline file.
+//! 4. Compares the `.exp.move` file against the baseline.
 
 use codespan_reporting::term::termcolor::Buffer;
 use libtest_mimic::{Arguments, Trial};
@@ -46,17 +46,19 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
 
     // ── Step 1: Run spec inference in Unified mode ───────────────────
 
-    let enriched_path = path.with_extension("enriched.move");
-
-    // Remove any stale enriched file from a previous run so it doesn't
-    // get picked up as a source during inference.
-    let _ = std::fs::remove_file(&enriched_path);
+    // Write the enriched file to a temp directory so no stale files are left
+    // next to the source. The temp dir is kept alive until the end of the test.
+    let enriched_dir = tempfile::TempDir::new()?;
+    let enriched_path = enriched_dir
+        .path()
+        .join(path.with_extension("enriched.move").file_name().unwrap());
 
     let mut inf_options = make_options(path)?;
     inf_options.inference = InferenceOptions {
         inference: true,
         inference_output: InferenceOutput::Unified,
-        inference_output_dir: None, // write next to source
+        inference_output_dir: Some(enriched_dir.path().to_string_lossy().to_string()),
+        inference_unified_suffix: "enriched.move".to_string(),
     };
     inf_options.setup_logging_for_test();
     inf_options.prover.stable_test_output = true;
@@ -152,10 +154,6 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
         }
         Ok(())
     })();
-
-    // Clean up the enriched file so it doesn't interfere with
-    // future runs or get accidentally committed.
-    let _ = std::fs::remove_file(&enriched_path);
 
     verify_result?;
 

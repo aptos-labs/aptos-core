@@ -17,7 +17,9 @@ module 0x42::references {
         *r
     }
     spec read_local(x: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x;
+        aborts_if [inferred] false;
     }
 
 
@@ -27,7 +29,9 @@ module 0x42::references {
         *r
     }
     spec read_field(p: Point): u64 {
+        pragma opaque = true;
         ensures [inferred] result == p.x;
+        aborts_if [inferred] false;
     }
 
 
@@ -38,6 +42,7 @@ module 0x42::references {
         *rx + *ry
     }
     spec sum_fields(p: Point): u64 {
+        pragma opaque = true;
         ensures [inferred] result == p.x + p.y;
         aborts_if [inferred] p.x + p.y > MAX_U64;
     }
@@ -50,7 +55,9 @@ module 0x42::references {
         *rx
     }
     spec nested_read(p: Point): u64 {
+        pragma opaque = true;
         ensures [inferred] result == p.x;
+        aborts_if [inferred] false;
     }
 
 
@@ -61,8 +68,10 @@ module 0x42::references {
         *rx
     }
     spec freeze_and_read(p: &mut Point): u64 {
+        pragma opaque = true;
         ensures [inferred] result == p.x;
         ensures [inferred] p == old(p);
+        aborts_if [inferred] false;
     }
 
 
@@ -74,8 +83,10 @@ module 0x42::references {
         }
     }
     spec read_rgb_red(c: Color): u8 {
+        pragma opaque = true;
         ensures [inferred] (c is RGB) ==> result == c.r;
         ensures [inferred] !(c is RGB) ==> result == 0;
+        aborts_if [inferred] false;
     }
 
 
@@ -85,8 +96,10 @@ module 0x42::references {
         *rx
     }
     spec read_mut_field(p: &mut Point): u64 {
+        pragma opaque = true;
         ensures [inferred] result == p.x;
         ensures [inferred] p == old(p);
+        aborts_if [inferred] false;
     }
 
 
@@ -96,6 +109,7 @@ module 0x42::references {
         c.r
     }
     spec get_red_component(c: Color): u8 {
+        pragma opaque = true;
         ensures [inferred] result == c.r;
         aborts_if [inferred] !(c is RGB);
     }
@@ -107,6 +121,7 @@ module 0x42::references {
         c.g
     }
     spec get_green_via_ref(c: &Color): u8 {
+        pragma opaque = true;
         ensures [inferred] result == c.g;
         aborts_if [inferred] !(c is RGB);
     }
@@ -117,6 +132,7 @@ module 0x42::references {
         (c.r as u16) + (c.g as u16) + (c.b as u16)
     }
     spec sum_rgb(c: Color): u16 {
+        pragma opaque = true;
         ensures [inferred] result == (c.r as u16) + (c.g as u16) + (c.b as u16);
         aborts_if [inferred] (c.r as u16) + (c.g as u16) + (c.b as u16) > MAX_U16;
         aborts_if [inferred] !(c is RGB);

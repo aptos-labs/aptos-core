@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         AbortKind, AccessSpecifierKind, AddressSpecifier, Condition, ConditionKind, Exp, ExpData,
-        LambdaCaptureKind, Operation, Pattern, PropertyBag, PropertyValue, QuantKind,
+        FrameSpec, LambdaCaptureKind, Operation, Pattern, PropertyBag, PropertyValue, QuantKind,
         ResourceSpecifier, Spec, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
@@ -39,6 +39,90 @@ pub struct Sourcifier<'a> {
     sym_alias_map: RefCell<BTreeMap<Symbol, String>>,
     // whether to amend the displayed results to be recompilable (e.g., remove `__` from lambda names) and more readable (e.g., local var names starting from `_v0`)
     amend: bool,
+}
+
+/// Returns true if a quantifier is "simple" — all ranges use TypeDomain with
+/// empty args (renders as `x: Type`), no triggers, and no where clause.
+/// Such quantifiers have no expressions in their header, so hoisting a state
+/// label from the body through them is safe.
+fn is_simple_quant(
+    ranges: &[(Pattern, Exp)],
+    triggers: &[Vec<Exp>],
+    where_clause: &Option<Exp>,
+) -> bool {
+    triggers.is_empty()
+        && where_clause.is_none()
+        && ranges.iter().all(|(_, range)| {
+            matches!(range.as_ref(), ExpData::Call(_, Operation::TypeDomain, args) if args.is_empty())
+        })
+}
+
+/// Returns true if the expression has a single state label that can be hoisted
+/// out of an enclosing operation for readability. Looks through Not, binary
+/// ops (where the other side has no labels), and quantifiers.
+fn has_hoistable_label(exp: &Exp) -> bool {
+    match exp.as_ref() {
+        ExpData::Call(_, Operation::Global(Some(_)), _)
+        | ExpData::Call(_, Operation::Exists(Some(_)), _) => true,
+        ExpData::Call(_, Operation::Behavior(_, range), _) => {
+            range.pre.is_some() || range.post.is_some()
+        },
+        // Look through Not
+        ExpData::Call(_, Operation::Not, args) if args.len() == 1 => has_hoistable_label(&args[0]),
+        // Look through hoistable binary ops
+        ExpData::Call(_, op, args) if args.len() == 2 && hoistable_bin_op_info(op).is_some() => {
+            (has_hoistable_label(&args[0]) && !has_any_state_label(&args[1]))
+                || (has_hoistable_label(&args[1]) && !has_any_state_label(&args[0]))
+        },
+        // Look through simple quantifiers (type-domain ranges only, no triggers/where)
+        ExpData::Quant(_, _, ranges, triggers, where_clause, body)
+            if is_simple_quant(ranges, triggers, where_clause) =>
+        {
+            has_hoistable_label(body)
+        },
+        _ => false,
+    }
+}
+
+/// Returns the priority and operator string for binary ops that support label hoisting.
+fn hoistable_bin_op_info(op: &Operation) -> Option<(Priority, &'static str)> {
+    match op {
+        Operation::And => Some((Prio::LogicalAnd, "&&")),
+        Operation::Or => Some((Prio::LogicalOr, "||")),
+        Operation::Eq => Some((Prio::Relations, "==")),
+        Operation::Neq => Some((Prio::Relations, "!=")),
+        Operation::Lt => Some((Prio::Relations, "<")),
+        Operation::Gt => Some((Prio::Relations, ">")),
+        Operation::Le => Some((Prio::Relations, "<=")),
+        Operation::Ge => Some((Prio::Relations, ">=")),
+        Operation::Implies => Some((Prio::LogicalRelations, "==>")),
+        Operation::Iff => Some((Prio::LogicalRelations, "<==>")),
+        _ => None,
+    }
+}
+
+/// Returns true if the expression (or any sub-expression) contains state labels
+/// or `old()` wrappers. Hoisting a state label past an `old()` would change
+/// semantics: `old(global<T>(a))` refers to function entry state, but
+/// `S |~ old(global<T>(a))` would apply label S inside old().
+fn has_any_state_label(exp: &Exp) -> bool {
+    let mut found = false;
+    exp.as_ref().visit_pre_order(&mut |e: &ExpData| match e {
+        ExpData::Call(_, Operation::Global(Some(_)), _)
+        | ExpData::Call(_, Operation::Exists(Some(_)), _)
+        | ExpData::Call(_, Operation::Old, _) => {
+            found = true;
+            false
+        },
+        ExpData::Call(_, Operation::Behavior(_, range), _)
+            if range.pre.is_some() || range.post.is_some() =>
+        {
+            found = true;
+            false
+        },
+        _ => !found,
+    });
+    found
 }
 
 impl<'a> Sourcifier<'a> {
@@ -853,13 +937,13 @@ impl<'a> Sourcifier<'a> {
             Ensures => {
                 emit!(self.writer, "ensures ");
                 self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
+                exp_sourcifier.print_exp_hoisting_label(&cond.exp);
                 emitln!(self.writer, ";");
             },
             AbortsIf => {
                 emit!(self.writer, "aborts_if ");
                 self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
+                exp_sourcifier.print_exp_hoisting_label(&cond.exp);
                 // Check for abort code in additional_exps
                 if !cond.additional_exps.is_empty() {
                     emit!(self.writer, " with ");
@@ -883,12 +967,6 @@ impl<'a> Sourcifier<'a> {
             },
             SucceedsIf => {
                 emit!(self.writer, "succeeds_if ");
-                self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
-                emitln!(self.writer, ";");
-            },
-            Modifies => {
-                emit!(self.writer, "modifies ");
                 self.print_properties(&cond.properties);
                 exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
                 emitln!(self.writer, ";");
@@ -1023,6 +1101,26 @@ impl<'a> Sourcifier<'a> {
     }
 
     /// Prints pragma declarations from a spec's PropertyBag.
+    /// Prints frame spec (modifies/reads) if present.
+    fn print_frame_spec(&self, frame_spec: &Option<FrameSpec>, exp_sourcifier: &ExpSourcifier) {
+        if let Some(frame) = frame_spec {
+            for target in &frame.modifies_targets {
+                emit!(self.writer, "modifies ");
+                exp_sourcifier.print_exp(Prio::General, false, target);
+                emitln!(self.writer, ";");
+            }
+            if !frame.reads_targets.is_empty() {
+                emit!(self.writer, "reads ");
+                let names: Vec<_> = frame
+                    .reads_targets
+                    .iter()
+                    .map(|qid| self.env().display(qid).to_string())
+                    .collect();
+                emitln!(self.writer, "{};", names.join(", "));
+            }
+        }
+    }
+
     fn print_pragmas(&self, properties: &PropertyBag) {
         if properties.is_empty() {
             return;
@@ -1043,7 +1141,11 @@ impl<'a> Sourcifier<'a> {
     /// Prints a spec block for a function, including the repeated signature.
     pub fn print_fun_spec(&self, fun_env: &FunctionEnv) {
         let spec = fun_env.get_spec();
-        if spec.conditions.is_empty() && spec.properties.is_empty() {
+        let has_frame = spec
+            .frame_spec
+            .as_ref()
+            .is_some_and(|f| !f.modifies_targets.is_empty() || !f.reads_targets.is_empty());
+        if spec.conditions.is_empty() && spec.properties.is_empty() && !has_frame {
             return;
         }
 
@@ -1056,6 +1158,13 @@ impl<'a> Sourcifier<'a> {
         let tctx = fun_env.get_type_display_ctx();
 
         self.print_pragmas(&spec.properties);
+
+        // Print frame spec (modifies/reads)
+        {
+            let exp_sourcifier =
+                ExpSourcifier::for_fun_spec(self, fun_env, tctx.clone(), self.amend);
+            self.print_frame_spec(&spec.frame_spec, &exp_sourcifier);
+        }
 
         // Print spec variable declarations that are referenced in this spec
         let spec_var_ids = self.collect_spec_var_refs(&spec);
@@ -1125,7 +1234,11 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a spec block directly from a Spec object with the given header.
     pub fn print_spec(&self, spec: &Spec, header: &str, tctx: TypeDisplayContext) {
-        if spec.conditions.is_empty() && spec.properties.is_empty() {
+        let has_frame = spec
+            .frame_spec
+            .as_ref()
+            .is_some_and(|f| !f.modifies_targets.is_empty() || !f.reads_targets.is_empty());
+        if spec.conditions.is_empty() && spec.properties.is_empty() && !has_frame {
             return;
         }
 
@@ -1134,6 +1247,11 @@ impl<'a> Sourcifier<'a> {
 
         self.writer.indent();
         self.print_pragmas(&spec.properties);
+        // Print frame spec (modifies/reads)
+        {
+            let exp_sourcifier = ExpSourcifier::for_spec(self, tctx.clone(), self.amend);
+            self.print_frame_spec(&spec.frame_spec, &exp_sourcifier);
+        }
         let exp_sourcifier = ExpSourcifier::for_spec(self, tctx, self.amend);
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
@@ -1629,67 +1747,66 @@ impl<'a> ExpSourcifier<'a> {
             },
             Quant(_, kind, ranges, triggers, where_clause, body) => {
                 self.parenthesize(context_prio, Prio::General, || {
-                    // Print quantifier keyword
-                    let keyword = match kind {
-                        QuantKind::Forall => "forall",
-                        QuantKind::Exists => "exists",
-                        QuantKind::Choose => "choose",
-                        QuantKind::ChooseMin => "choose min",
-                    };
-                    emit!(self.wr(), "{} ", keyword);
-
-                    // Print ranges: x in range, y in range, ...
-                    // For type domains, use `x: Type` syntax instead of `x in domain<Type>()`
-                    for (i, (pat, range)) in ranges.iter().enumerate() {
-                        if i > 0 {
-                            emit!(self.wr(), ", ");
-                        }
-                        self.print_pat(pat, false, true);
-                        if let ExpData::Call(range_id, Operation::TypeDomain, args) = range.as_ref()
-                        {
-                            if args.is_empty() {
-                                // Print as `x: Type` using the type instantiation
-                                let inst = self.env().get_node_instantiation(*range_id);
-                                if let Some(ty) = inst.first() {
-                                    emit!(self.wr(), ": {}", self.ty(ty));
-                                } else {
-                                    emit!(self.wr(), " in ");
-                                    self.print_exp(Prio::General, false, range);
-                                }
-                            } else {
-                                emit!(self.wr(), " in ");
-                                self.print_exp(Prio::General, false, range);
-                            }
-                        } else {
-                            emit!(self.wr(), " in ");
-                            self.print_exp(Prio::General, false, range);
-                        }
-                    }
-
-                    // Print triggers if present: {trigger1, trigger2}
-                    for trigger in triggers {
-                        emit!(self.wr(), " {");
-                        for (i, t) in trigger.iter().enumerate() {
-                            if i > 0 {
-                                emit!(self.wr(), ", ");
-                            }
-                            self.print_exp(Prio::General, false, t);
-                        }
-                        emit!(self.wr(), "}");
-                    }
-
-                    // Print where clause if present
-                    if let Some(where_exp) = where_clause {
-                        emit!(self.wr(), " where ");
-                        self.print_exp(Prio::General, false, where_exp);
-                    }
-
-                    // Print body
-                    emit!(self.wr(), ": ");
+                    self.print_quant_header(kind, ranges, triggers, where_clause);
                     self.print_exp(Prio::General, false, body);
                 })
             },
         }
+    }
+
+    /// Print quantifier header (keyword, ranges, triggers, where clause, and trailing `: `).
+    fn print_quant_header(
+        &self,
+        kind: &QuantKind,
+        ranges: &[(Pattern, Exp)],
+        triggers: &[Vec<Exp>],
+        where_clause: &Option<Exp>,
+    ) {
+        let keyword = match kind {
+            QuantKind::Forall => "forall",
+            QuantKind::Exists => "exists",
+            QuantKind::Choose => "choose",
+            QuantKind::ChooseMin => "choose min",
+        };
+        emit!(self.wr(), "{} ", keyword);
+        for (i, (pat, range)) in ranges.iter().enumerate() {
+            if i > 0 {
+                emit!(self.wr(), ", ");
+            }
+            self.print_pat(pat, false, true);
+            if let ExpData::Call(range_id, Operation::TypeDomain, args) = range.as_ref() {
+                if args.is_empty() {
+                    let inst = self.env().get_node_instantiation(*range_id);
+                    if let Some(ty) = inst.first() {
+                        emit!(self.wr(), ": {}", self.ty(ty));
+                    } else {
+                        emit!(self.wr(), " in ");
+                        self.print_exp(Prio::General, false, range);
+                    }
+                } else {
+                    emit!(self.wr(), " in ");
+                    self.print_exp(Prio::General, false, range);
+                }
+            } else {
+                emit!(self.wr(), " in ");
+                self.print_exp(Prio::General, false, range);
+            }
+        }
+        for trigger in triggers {
+            emit!(self.wr(), " {");
+            for (i, t) in trigger.iter().enumerate() {
+                if i > 0 {
+                    emit!(self.wr(), ", ");
+                }
+                self.print_exp(Prio::General, false, t);
+            }
+            emit!(self.wr(), "}");
+        }
+        if let Some(where_exp) = where_clause {
+            emit!(self.wr(), " where ");
+            self.print_exp(Prio::General, false, where_exp);
+        }
+        emit!(self.wr(), ": ");
     }
 
     /// Print a memory label with its name (from GlobalEnv) or fallback to numeric ID.
@@ -1880,14 +1997,30 @@ impl<'a> ExpSourcifier<'a> {
             Operation::Xor => self.print_bin(context_prio, Prio::BitXor, "^", args),
             Operation::Shl => self.print_bin(context_prio, Prio::BitShift, "<<", args),
             Operation::Shr => self.print_bin(context_prio, Prio::BitShift, ">>", args),
-            Operation::And => self.print_bin(context_prio, Prio::LogicalAnd, "&&", args),
-            Operation::Or => self.print_bin(context_prio, Prio::LogicalOr, "||", args),
-            Operation::Eq => self.print_bin(context_prio, Prio::Relations, "==", args),
-            Operation::Neq => self.print_bin(context_prio, Prio::Relations, "!=", args),
-            Operation::Lt => self.print_bin(context_prio, Prio::Relations, "<", args),
-            Operation::Gt => self.print_bin(context_prio, Prio::Relations, ">", args),
-            Operation::Le => self.print_bin(context_prio, Prio::Relations, "<=", args),
-            Operation::Ge => self.print_bin(context_prio, Prio::Relations, ">=", args),
+            Operation::And => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::LogicalAnd, "&&", args)
+            },
+            Operation::Or => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::LogicalOr, "||", args)
+            },
+            Operation::Eq => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, "==", args)
+            },
+            Operation::Neq => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, "!=", args)
+            },
+            Operation::Lt => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, "<", args)
+            },
+            Operation::Gt => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, ">", args)
+            },
+            Operation::Le => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, "<=", args)
+            },
+            Operation::Ge => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, ">=", args)
+            },
             Operation::Copy => self.parenthesize(context_prio, Prio::General, || {
                 emit!(self.wr(), "copy ");
                 self.print_exp(Prio::General, false, &args[0])
@@ -1923,10 +2056,20 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_exp(context_prio, false, &args[0]);
                 }
             },
-            Operation::Not => self.parenthesize(context_prio, Prio::Prefix, || {
-                emit!(self.wr(), "!");
-                self.print_exp(Prio::Prefix, false, &args[0])
-            }),
+            Operation::Not => {
+                if has_hoistable_label(&args[0]) {
+                    self.parenthesize(context_prio, Prio::General, || {
+                        self.print_hoisted_label_prefix(&args[0]);
+                        emit!(self.wr(), "!");
+                        self.print_exp_without_label(Prio::Prefix, &args[0])
+                    })
+                } else {
+                    self.parenthesize(context_prio, Prio::Prefix, || {
+                        emit!(self.wr(), "!");
+                        self.print_exp(Prio::Prefix, false, &args[0])
+                    })
+                }
+            },
             Operation::Negate => self.parenthesize(context_prio, Prio::Prefix, || {
                 emit!(self.wr(), "-");
                 self.print_exp(Prio::Prefix, false, &args[0])
@@ -1938,15 +2081,20 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), " as {}", self.ty(&ty))
             }),
             Operation::Exists(memory_label) => {
-                self.parenthesize(context_prio, Prio::Postfix, || {
-                    if let Some(label) = memory_label {
+                if let Some(label) = memory_label {
+                    self.parenthesize(context_prio, Prio::General, || {
                         self.print_memory_label(label);
-                        emit!(self.wr(), "@");
-                    }
-                    emit!(self.wr(), "exists");
-                    self.print_node_inst(id);
-                    self.print_exp_list("(", ")", args)
-                })
+                        emit!(self.wr(), " |~ exists");
+                        self.print_node_inst(id);
+                        self.print_exp_list("(", ")", args)
+                    })
+                } else {
+                    self.parenthesize(context_prio, Prio::Postfix, || {
+                        emit!(self.wr(), "exists");
+                        self.print_node_inst(id);
+                        self.print_exp_list("(", ")", args)
+                    })
+                }
             },
             Operation::BorrowGlobal(kind) => self.parenthesize(context_prio, Prio::Postfix, || {
                 if *kind == ReferenceKind::Mutable {
@@ -1997,20 +2145,41 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), ")")
             }),
             Operation::Global(memory_label) => {
-                self.parenthesize(context_prio, Prio::Postfix, || {
-                    if let Some(label) = memory_label {
+                if let Some(label) = memory_label {
+                    self.parenthesize(context_prio, Prio::General, || {
                         self.print_memory_label(label);
-                        emit!(self.wr(), "@");
-                    }
-                    emit!(self.wr(), "global");
-                    self.print_node_inst(id);
-                    emit!(self.wr(), "(");
-                    self.print_exp(Prio::General, false, &args[0]);
-                    emit!(self.wr(), ")")
-                })
+                        emit!(self.wr(), " |~ global");
+                        self.print_node_inst(id);
+                        emit!(self.wr(), "(");
+                        self.print_exp(Prio::General, false, &args[0]);
+                        emit!(self.wr(), ")")
+                    })
+                } else {
+                    // Print as Move-2 index syntax: Type[addr]
+                    self.parenthesize(context_prio, Prio::Postfix, || {
+                        if let Some(inst) = self.env().get_node_instantiation_opt(id) {
+                            if let Some(ty) = inst.first() {
+                                emit!(self.wr(), "{}", self.ty(ty));
+                            }
+                        }
+                        emit!(self.wr(), "[");
+                        self.print_exp(Prio::General, false, &args[0]);
+                        emit!(self.wr(), "]")
+                    })
+                }
             },
-            Operation::Implies => self.print_bin(context_prio, Prio::LogicalRelations, "==>", args),
-            Operation::Iff => self.print_bin(context_prio, Prio::LogicalRelations, "<==>", args),
+            Operation::Implies => self.print_bin_with_label_hoisting(
+                context_prio,
+                Prio::LogicalRelations,
+                "==>",
+                args,
+            ),
+            Operation::Iff => self.print_bin_with_label_hoisting(
+                context_prio,
+                Prio::LogicalRelations,
+                "<==>",
+                args,
+            ),
             Operation::Identical => self.print_bin(context_prio, Prio::Relations, "===", args),
             Operation::Range => self.parenthesize(context_prio, Prio::Range, || {
                 self.print_exp(Prio::Range, false, &args[0]);
@@ -2199,54 +2368,60 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::General, false, &args[0]);
                 emit!(self.wr(), ")")
             }),
-            Operation::Behavior(kind, state) => {
+            Operation::Behavior(kind, range) => {
                 let kind_str = match kind {
                     crate::ast::BehaviorKind::AbortsOf => "aborts_of",
                     crate::ast::BehaviorKind::EnsuresOf => "ensures_of",
                     crate::ast::BehaviorKind::RequiresOf => "requires_of",
-                    crate::ast::BehaviorKind::ModifiesOf => "modifies_of",
                     crate::ast::BehaviorKind::ResultOf => "result_of",
                 };
-                // Helper: prints `[pre@]kind<target>(args)[@post]`
-                let print_behavior_call = |target_str: &str| {
-                    if let Some(pre) = &state.pre {
-                        self.print_memory_label(pre);
-                        emit!(self.wr(), "@");
-                    }
-                    emit!(self.wr(), "{}<{}>", kind_str, target_str);
-                    self.print_exp_list("(", ")", &args[1..]);
-                    if let Some(post) = &state.post {
-                        emit!(self.wr(), "@");
-                        self.print_memory_label(post);
+                let has_labels = range.pre.is_some() || range.post.is_some();
+                let print_behavior = |this: &Self| {
+                    if this.is_simple_behavior_target(&args[0]) {
+                        this.parenthesize(context_prio, Prio::Postfix, || {
+                            emit!(this.wr(), "{}", kind_str);
+                            emit!(this.wr(), "<");
+                            this.print_behavior_target(&args[0]);
+                            emit!(this.wr(), ">");
+                            this.print_exp_list("(", ")", &args[1..]);
+                        })
+                    } else {
+                        emit!(this.wr(), "{{ let __f = ");
+                        this.print_exp(Prio::General, false, &args[0]);
+                        emit!(this.wr(), "; ");
+                        emit!(this.wr(), "{}<{}>", kind_str, "__f");
+                        this.print_exp_list("(", ")", &args[1..]);
+                        emit!(this.wr(), " }}");
                     }
                 };
-                if self.is_simple_behavior_target(&args[0]) {
-                    // Simple target (local var or plain closure): print
-                    // directly inside <...>.
-                    self.parenthesize(context_prio, Prio::Postfix, || {
-                        if let Some(pre) = &state.pre {
-                            self.print_memory_label(pre);
-                            emit!(self.wr(), "@");
+                if has_labels {
+                    // aborts_of/requires_of only take a pre-state (single state form),
+                    // ensures_of/result_of can have pre..post ranges.
+                    let is_single_state = matches!(
+                        kind,
+                        crate::ast::BehaviorKind::AbortsOf | crate::ast::BehaviorKind::RequiresOf
+                    ) && range.post.is_none();
+                    self.parenthesize(context_prio, Prio::General, || {
+                        if is_single_state {
+                            // Single state: `label |~ behavior<f>(args)`
+                            if let Some(pre) = &range.pre {
+                                self.print_memory_label(pre);
+                            }
+                        } else {
+                            // Range: `[pre]..[post] |~ behavior<f>(args)`
+                            if let Some(pre) = &range.pre {
+                                self.print_memory_label(pre);
+                            }
+                            emit!(self.wr(), "..");
+                            if let Some(post) = &range.post {
+                                self.print_memory_label(post);
+                            }
                         }
-                        emit!(self.wr(), "{}", kind_str);
-                        emit!(self.wr(), "<");
-                        self.print_behavior_target(&args[0]);
-                        emit!(self.wr(), ">");
-                        self.print_exp_list("(", ")", &args[1..]);
-                        if let Some(post) = &state.post {
-                            emit!(self.wr(), "@");
-                            self.print_memory_label(post);
-                        }
+                        emit!(self.wr(), " |~ ");
+                        print_behavior(self);
                     })
                 } else {
-                    // Complex target (contains `@`, `.`, etc.): wrap in a
-                    // let-binding block so only a simple name appears inside
-                    // `<...>`, which is all the parser accepts.
-                    emit!(self.wr(), "{{ let __f = ");
-                    self.print_exp(Prio::General, false, &args[0]);
-                    emit!(self.wr(), "; ");
-                    print_behavior_call("__f");
-                    emit!(self.wr(), " }}");
+                    print_behavior(self);
                 }
             },
 
@@ -2342,6 +2517,208 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), "ERROR")
             }
         })
+    }
+
+    /// Print an expression at the top level of a spec condition, hoisting any
+    /// state label prefix out if the entire expression has a single hoistable label.
+    ///
+    /// This is a readability normalization: in the AST, labels are tightly scoped
+    /// around individual memory operations (e.g., `(S |~ global<R>(a)) == x`).
+    /// Hoisting produces `S |~ global<R>(a) == x`, where the label provides context
+    /// for the entire relation — a more natural reading for humans.
+    fn print_exp_hoisting_label(&self, exp: &Exp) {
+        if has_hoistable_label(exp) {
+            self.print_hoisted_label_prefix(exp);
+            self.print_exp_without_label(Prio::General, exp);
+        } else {
+            self.print_exp(Prio::General, false, exp);
+        }
+    }
+
+    /// Print a binary operator, hoisting a state label out if possible.
+    fn print_bin_with_label_hoisting(
+        &self,
+        context_prio: Priority,
+        prio: Priority,
+        repr: &str,
+        args: &[Exp],
+    ) {
+        if !self.try_print_label_hoisted_bin(context_prio, prio, repr, args) {
+            self.print_bin(context_prio, prio, repr, args)
+        }
+    }
+
+    /// Try to hoist a state label out of a binary operation for readability.
+    /// If exactly one operand has a hoistable label and the other has no state labels,
+    /// renders `label |~ lhs op rhs` (with the label stripped from the labeled operand).
+    /// Returns true if hoisting was performed.
+    fn try_print_label_hoisted_bin(
+        &self,
+        context_prio: Priority,
+        prio: Priority,
+        repr: &str,
+        args: &[Exp],
+    ) -> bool {
+        if args.len() != 2 {
+            return false;
+        }
+        let lhs_labeled = has_hoistable_label(&args[0]);
+        let rhs_labeled = has_hoistable_label(&args[1]);
+        if lhs_labeled && !has_any_state_label(&args[1]) {
+            self.parenthesize(context_prio, Prio::General, || {
+                self.print_hoisted_label_prefix(&args[0]);
+                self.parenthesize(Prio::General, prio, || {
+                    self.print_exp_without_label(prio, &args[0]);
+                    emit!(self.wr(), " {} ", repr);
+                    self.print_exp(prio + 1, false, &args[1]);
+                });
+            });
+            true
+        } else if rhs_labeled && !has_any_state_label(&args[0]) {
+            self.parenthesize(context_prio, Prio::General, || {
+                self.print_hoisted_label_prefix(&args[1]);
+                self.parenthesize(Prio::General, prio, || {
+                    self.print_exp(prio, false, &args[0]);
+                    emit!(self.wr(), " {} ", repr);
+                    self.print_exp_without_label(prio + 1, &args[1]);
+                });
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Print the label/range prefix (e.g., `S |~ `) extracted from a labeled expression.
+    fn print_hoisted_label_prefix(&self, exp: &Exp) {
+        match exp.as_ref() {
+            ExpData::Call(_, Operation::Global(Some(label)), _)
+            | ExpData::Call(_, Operation::Exists(Some(label)), _) => {
+                self.print_memory_label(label);
+                emit!(self.wr(), " |~ ");
+            },
+            ExpData::Call(_, Operation::Behavior(kind, range), _) => {
+                let is_single_state = matches!(
+                    kind,
+                    crate::ast::BehaviorKind::AbortsOf | crate::ast::BehaviorKind::RequiresOf
+                ) && range.post.is_none();
+                if is_single_state {
+                    if let Some(pre) = &range.pre {
+                        self.print_memory_label(pre);
+                    }
+                } else {
+                    if let Some(pre) = &range.pre {
+                        self.print_memory_label(pre);
+                    }
+                    emit!(self.wr(), "..");
+                    if let Some(post) = &range.post {
+                        self.print_memory_label(post);
+                    }
+                }
+                emit!(self.wr(), " |~ ");
+            },
+            // Look through Not
+            ExpData::Call(_, Operation::Not, args) if args.len() == 1 => {
+                self.print_hoisted_label_prefix(&args[0])
+            },
+            // Look through binary ops
+            ExpData::Call(_, op, args)
+                if args.len() == 2 && hoistable_bin_op_info(op).is_some() =>
+            {
+                if has_hoistable_label(&args[0]) {
+                    self.print_hoisted_label_prefix(&args[0])
+                } else {
+                    self.print_hoisted_label_prefix(&args[1])
+                }
+            },
+            // Look through simple quantifiers
+            ExpData::Quant(_, _, _, _, _, body) => self.print_hoisted_label_prefix(body),
+            _ => {},
+        }
+    }
+
+    /// Print a labeled expression as if it had no label.
+    fn print_exp_without_label(&self, prio: Priority, exp: &Exp) {
+        match exp.as_ref() {
+            ExpData::Call(id, Operation::Global(Some(_)), args) => {
+                self.parenthesize(prio, Prio::Postfix, || {
+                    emit!(self.wr(), "global");
+                    self.print_node_inst(*id);
+                    emit!(self.wr(), "(");
+                    self.print_exp(Prio::General, false, &args[0]);
+                    emit!(self.wr(), ")")
+                })
+            },
+            ExpData::Call(id, Operation::Exists(Some(_)), args) => {
+                self.parenthesize(prio, Prio::Postfix, || {
+                    emit!(self.wr(), "exists");
+                    self.print_node_inst(*id);
+                    self.print_exp_list("(", ")", args)
+                })
+            },
+            ExpData::Call(_, Operation::Behavior(kind, _), args) => {
+                let kind_str = match kind {
+                    crate::ast::BehaviorKind::AbortsOf => "aborts_of",
+                    crate::ast::BehaviorKind::EnsuresOf => "ensures_of",
+                    crate::ast::BehaviorKind::RequiresOf => "requires_of",
+                    crate::ast::BehaviorKind::ResultOf => "result_of",
+                };
+                if self.is_simple_behavior_target(&args[0]) {
+                    self.parenthesize(prio, Prio::Postfix, || {
+                        emit!(self.wr(), "{}", kind_str);
+                        emit!(self.wr(), "<");
+                        self.print_behavior_target(&args[0]);
+                        emit!(self.wr(), ">");
+                        self.print_exp_list("(", ")", &args[1..]);
+                    })
+                } else {
+                    emit!(self.wr(), "{{ let __f = ");
+                    self.print_exp(Prio::General, false, &args[0]);
+                    emit!(self.wr(), "; ");
+                    emit!(self.wr(), "{}<{}>", kind_str, "__f");
+                    self.print_exp_list("(", ")", &args[1..]);
+                    emit!(self.wr(), " }}");
+                }
+            },
+            // Look through Not: print `!` then the inner without label
+            ExpData::Call(_, Operation::Not, args) if args.len() == 1 => {
+                self.parenthesize(prio, Prio::Prefix, || {
+                    emit!(self.wr(), "!");
+                    self.print_exp_without_label(Prio::Prefix, &args[0])
+                })
+            },
+            // Look through binary ops: strip label from the labeled side
+            ExpData::Call(_, op, args)
+                if args.len() == 2 && hoistable_bin_op_info(op).is_some() =>
+            {
+                let (op_prio, op_str) = hoistable_bin_op_info(op).unwrap();
+                if has_hoistable_label(&args[0]) && !has_any_state_label(&args[1]) {
+                    self.parenthesize(prio, op_prio, || {
+                        self.print_exp_without_label(op_prio, &args[0]);
+                        emit!(self.wr(), " {} ", op_str);
+                        self.print_exp(op_prio + 1, false, &args[1]);
+                    })
+                } else if has_hoistable_label(&args[1]) && !has_any_state_label(&args[0]) {
+                    self.parenthesize(prio, op_prio, || {
+                        self.print_exp(op_prio, false, &args[0]);
+                        emit!(self.wr(), " {} ", op_str);
+                        self.print_exp_without_label(op_prio + 1, &args[1]);
+                    })
+                } else {
+                    self.print_exp(prio, false, exp)
+                }
+            },
+            // Look through simple quantifiers
+            ExpData::Quant(_, kind, ranges, triggers, where_clause, body)
+                if is_simple_quant(ranges, triggers, where_clause) =>
+            {
+                self.parenthesize(prio, Prio::General, || {
+                    self.print_quant_header(kind, ranges, triggers, where_clause);
+                    self.print_exp_without_label(Prio::General, body);
+                })
+            },
+            _ => self.print_exp(prio, false, exp),
+        }
     }
 
     fn print_node_inst(&self, id: NodeId) {

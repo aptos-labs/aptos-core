@@ -41,6 +41,8 @@ rustflags = [
   "force-unwind-tables=yes",
   "-C",
   "target-cpu=x86-64-v3",
+  "-C",
+  "linker-plugin-lto",
 ]
 
 [env]

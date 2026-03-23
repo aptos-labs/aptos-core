@@ -51,6 +51,7 @@ pub enum Tok {
     XorEqual,
     ShlEqual,
     ShrEqual,
+    PipeTilde,
     EqualEqual,
     EqualGreater,
     EqualEqualGreater,
@@ -126,6 +127,7 @@ impl fmt::Display for Tok {
             XorEqual => "^=",
             ShlEqual => "<<=",
             ShrEqual => ">>=",
+            PipeTilde => "|~",
             Comma => ",",
             Minus => "-",
             Period => ".",
@@ -560,6 +562,8 @@ fn find_token(
         '|' => {
             if text.starts_with("||") {
                 (Tok::PipePipe, 2)
+            } else if text.starts_with("|~") {
+                (Tok::PipeTilde, 2)
             } else if text.starts_with("|=") {
                 (Tok::BitOrEqual, 2)
             } else {
