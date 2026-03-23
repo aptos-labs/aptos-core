@@ -63,20 +63,22 @@ fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) 
     config.consensus.max_receiving_block_txns = 50000;
     config.consensus.max_receiving_block_bytes = 30 * 1024 * 1024; // 30MB
 
-    // Proxy consensus block limits: match devnet per-block settings.
-    // At steady state (3k TPS / ~70 proxy blocks/s), each proxy block
-    // averages ~43 txns — well under the 300 cap.
-    config.consensus.proxy_consensus_config.max_proxy_block_txns = 300;
+    // Proxy consensus block limits: larger blocks compensate for timeout
+    // overhead. At 10k TPS with 4 proxy validators, each validator handles
+    // ~2500 TPS. With timeouts eating ~30% of rounds, effective block rate
+    // is ~30-50 blocks/s. At 500 txns/block = 15-25k TPS throughput,
+    // giving comfortable headroom above 10k.
+    config.consensus.proxy_consensus_config.max_proxy_block_txns = 500;
     config
         .consensus
         .proxy_consensus_config
-        .max_proxy_block_txns_after_filtering = 200;
-    config.consensus.proxy_consensus_config.max_proxy_block_bytes = 5 * 1024 * 1024;
+        .max_proxy_block_txns_after_filtering = 350;
+    config.consensus.proxy_consensus_config.max_proxy_block_bytes = 10 * 1024 * 1024;
 
     // Budget: allow up to 30 non-empty proxy blocks per primary consumption window
-    // (up from default 10). With primary at ~5 blocks/s and proxy at ~67 rounds/s,
-    // each 200ms primary window produces ~13 proxy rounds. budget=30 ensures all 13
-    // can carry transactions. 30 × 300 txns = 9000 txns/window, well within the
+    // (up from default 10). With primary at ~5 blocks/s and proxy at ~50+ rounds/s,
+    // each 200ms primary window produces ~10+ proxy rounds. budget=30 ensures all
+    // can carry transactions. 30 × 500 txns = 15000 txns/window, well within the
     // 50000 max_receiving_block_txns for primary blocks.
     config
         .consensus
@@ -94,17 +96,24 @@ fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) 
         .proxy_consensus_config
         .backpressure
         .batch_heavy_threshold = 100;
-    // Proxy timeout tuning: default 100ms base causes ~15-65% of rounds to
-    // timeout at 70 rounds/s. 300ms gives more headroom while staying 3x
-    // faster than primary (1000ms).
+    // Pull validator txns less frequently to avoid slow rounds. The vtxn pool
+    // query can take ~25ms when pool is empty; at 100ms timeout that's 25% of
+    // the budget. Pull every 50th block instead of every 10th.
+    config.consensus.proxy_consensus_config.vtxn_pull_interval = 50;
+
+    // Proxy timeout tuning: with opt proposals enabled + pending_ordering=true,
+    // healthy rounds complete in ~10-20ms (5ms intra-region RTT). Use 100ms
+    // timeout (the default) so timeouts waste only 100ms instead of 300ms.
+    // At 300ms, each timeout wastes ~30x a healthy round. At 100ms, only ~10x.
+    // Max exponent 4 caps escalation at 100 × 1.2^4 = 207ms.
     config
         .consensus
         .proxy_consensus_config
-        .round_initial_timeout_ms = 300;
+        .round_initial_timeout_ms = 100;
     config
         .consensus
         .proxy_consensus_config
-        .round_timeout_backoff_max_exponent = 6;
+        .round_timeout_backoff_max_exponent = 4;
 
     // Disable mempool failover broadcast to prevent cross-proxy txn sharing.
     // With QS enabled, each proxy validator should only batch transactions
