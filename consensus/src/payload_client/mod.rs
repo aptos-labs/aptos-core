@@ -270,6 +270,18 @@ impl PayloadClient for ProxyBudgetPayloadClient {
             );
         }
 
-        client.pull_payload(config, validator_txn_filter).await
+        let qs_start = std::time::Instant::now();
+        let result = client.pull_payload(config, validator_txn_filter).await;
+        let qs_elapsed = qs_start.elapsed();
+        crate::counters::PROXY_QS_PULL_DURATION.observe(qs_elapsed.as_secs_f64());
+        if qs_elapsed.as_millis() > 10 {
+            aptos_logger::warn!(
+                pull_num = pull_num,
+                qs_pull_ms = qs_elapsed.as_millis() as u64,
+                use_vtxns = use_vtxns,
+                "[PROXY_TIMING] Slow QS pull"
+            );
+        }
+        result
     }
 }

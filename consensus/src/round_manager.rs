@@ -543,6 +543,12 @@ impl RoundManager {
         // Clear any stale pending proposal event from a previous round
         self.pending_proposal_event = None;
 
+        // Proxy round lifecycle: track round start time for timeout diagnostics
+        if self.proxy_hooks.is_some() {
+            counters::PROXY_ROUND_START_TIME_MS
+                .set(aptos_infallible::duration_since_epoch().as_millis() as i64);
+        }
+
         // If the current proposer is the leader, try to propose a regular block if not opt proposed already
         if is_current_proposer
             && self
@@ -746,6 +752,7 @@ impl RoundManager {
         proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload, Round, HashValue)>,
     ) -> anyhow::Result<()> {
         let consensus_type = if proxy_hooks.is_some() { "proxy" } else { "primary" };
+        let gen_start = std::time::Instant::now();
         Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event, consensus_type);
         let proposal_msg = Self::generate_proposal(
             epoch_state.clone(),
@@ -758,6 +765,16 @@ impl RoundManager {
             proxy_payload,
         )
         .await?;
+        let gen_elapsed = gen_start.elapsed();
+        if consensus_type == "proxy" {
+            counters::PROXY_PROPOSAL_GENERATION_DURATION.observe(gen_elapsed.as_secs_f64());
+            if gen_elapsed.as_millis() > 20 {
+                warn!(
+                    "[PROXY_TIMING] Slow proposal generation: {}ms",
+                    gen_elapsed.as_millis()
+                );
+            }
+        }
         #[cfg(feature = "failpoints")]
         {
             if Self::check_whether_to_inject_reconfiguration_error() {
@@ -1334,6 +1351,21 @@ impl RoundManager {
         let has_deferred_proposal = self.pending_proposal_event.is_some();
         let pending_proxy_batches = self.pending_proxy_blocks.len();
         let is_proxy_active = self.proxy_verifier.is_some();
+        let is_proxy_rm = self.proxy_hooks.is_some();
+
+        // Track proxy-specific timeout reasons for Grafana
+        if is_proxy_rm {
+            let reason_label = match &timeout_reason {
+                RoundTimeoutReason::NoQC => "no_qc",
+                RoundTimeoutReason::ProposalNotReceived => "proposal_not_received",
+                RoundTimeoutReason::PayloadUnavailable { .. } => "payload_unavailable",
+                RoundTimeoutReason::Unknown => "unknown",
+            };
+            counters::PROXY_TIMEOUT_DETAIL
+                .with_label_values(&[reason_label])
+                .inc();
+        }
+
         warn!(
             consensus_type = self.consensus_type(),
             round = round,
@@ -1341,6 +1373,7 @@ impl RoundManager {
             has_deferred_proposal = has_deferred_proposal,
             pending_proxy_batches = pending_proxy_batches,
             is_proxy_active = is_proxy_active,
+            is_proxy_rm = is_proxy_rm,
             last_consumed_proxy_round = self.last_consumed_proxy_round,
             "[DIAG] Local timeout context"
         );
@@ -1761,6 +1794,7 @@ impl RoundManager {
         let proposal_round = proposal.round();
         let parent_qc = proposal.quorum_cert().clone();
         let sync_info = self.block_store.sync_info();
+        let vote_start = std::time::Instant::now();
 
         if proposal_round <= sync_info.highest_round() {
             sample!(
@@ -1775,6 +1809,16 @@ impl RoundManager {
         }
 
         let vote = self.create_vote(proposal).await?;
+        if self.proxy_hooks.is_some() {
+            let vote_elapsed = vote_start.elapsed();
+            counters::PROXY_VOTE_PROCESSING_DURATION.observe(vote_elapsed.as_secs_f64());
+            if vote_elapsed.as_millis() > 20 {
+                warn!(
+                    "[PROXY_TIMING] Slow vote processing: {}ms for round {}",
+                    vote_elapsed.as_millis(), proposal_round,
+                );
+            }
+        }
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 

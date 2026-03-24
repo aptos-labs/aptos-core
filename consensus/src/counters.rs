@@ -1504,3 +1504,48 @@ pub static PROXY_BLOCKS_VERIFIED_BY_PRIMARY: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+// Proxy timing diagnostics
+pub static PROXY_ROUND_START_TIME_MS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_proxy_round_start_time_ms",
+        "Timestamp (ms since epoch) when the last proxy round started"
+    )
+    .unwrap()
+});
+
+pub static PROXY_PROPOSAL_GENERATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_proxy_proposal_generation_duration_s",
+        "Duration of proxy proposal generation (QS pull + sign)",
+        exponential_buckets(/*start=*/ 0.0005, /*factor=*/ 2.0, /*count=*/ 15).unwrap()
+    )
+    .unwrap()
+});
+
+pub static PROXY_VOTE_PROCESSING_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_proxy_vote_processing_duration_s",
+        "Duration from proposal receipt to vote sent in proxy RM",
+        exponential_buckets(/*start=*/ 0.0005, /*factor=*/ 2.0, /*count=*/ 15).unwrap()
+    )
+    .unwrap()
+});
+
+pub static PROXY_QS_PULL_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_proxy_qs_pull_duration_s",
+        "Duration of QS payload pull in proxy budget client",
+        exponential_buckets(/*start=*/ 0.0001, /*factor=*/ 2.0, /*count=*/ 15).unwrap()
+    )
+    .unwrap()
+});
+
+pub static PROXY_TIMEOUT_DETAIL: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_proxy_timeout_detail",
+        "Detailed proxy timeout reason breakdown",
+        &["reason"]
+    )
+    .unwrap()
+});
