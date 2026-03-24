@@ -1001,7 +1001,7 @@ module aptos_framework::fungible_asset {
         owner_address: address, store: Object<T>, abort_on_dispatch: bool
     ) {
         assert!(
-            store.owns(owner_address),
+            object::owns(store, owner_address),
             error::permission_denied(ENOT_STORE_OWNER)
         );
         let fa_store = borrow_store_resource(&store);
@@ -1437,7 +1437,7 @@ module aptos_framework::fungible_asset {
         owner: &signer, store: Object<T>
     ) acquires FungibleStore {
         assert!(
-            store.owns(signer::address_of(owner)),
+            object::owns(store, signer::address_of(owner)),
             error::permission_denied(ENOT_STORE_OWNER)
         );
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));

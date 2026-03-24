@@ -599,7 +599,7 @@ module aptos_framework::object {
     /// Please use the test only [`object::burn_object_with_transfer`] for testing with previously burned objects.
     public entry fun burn<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
         let original_owner = signer::address_of(owner);
-        assert!(object.is_owner(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         let object_addr = object.inner;
         assert!(!exists<TombStone>(object_addr), EOBJECT_ALREADY_BURNT);
         move_to(&create_signer(object_addr), TombStone { original_owner });
@@ -656,14 +656,18 @@ module aptos_framework::object {
 
     #[view]
     /// Return true if the provided address is the current owner.
-    public fun is_owner<T: key>(self: Object<T>, owner: address): bool acquires ObjectCore {
-        self.owner() == owner
+    ///
+    /// Note: intentionally not using `self` as first argument, as a.is_owner(b) syntax would be ambiguous.
+    public fun is_owner<T: key>(object: Object<T>, owner: address): bool acquires ObjectCore {
+        object.owner() == owner
     }
 
     #[view]
     /// Return true if the provided address has indirect or direct ownership of the provided object.
-    public fun owns<T: key>(self: Object<T>, owner: address): bool acquires ObjectCore {
-        let current_address = self.object_address();
+    ///
+    /// Note: intentionally not using `self` as first argument, as a.owns(b) syntax would be ambiguous.
+    public fun owns<T: key>(object: Object<T>, owner: address): bool acquires ObjectCore {
+        let current_address = object.object_address();
 
         assert!(
             exists<ObjectCore>(current_address),
@@ -742,7 +746,7 @@ module aptos_framework::object {
     /// Original owners can reclaim burnt objects any time in the future by calling unburn.
     public fun burn_object_with_transfer<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
         let original_owner = signer::address_of(owner);
-        assert!(object.is_owner(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         let object_addr = object.inner;
         move_to(&create_signer(object_addr), TombStone { original_owner });
         transfer_raw_inner(object_addr, BURN_ADDRESS);
@@ -825,9 +829,9 @@ module aptos_framework::object {
         let (_, hero) = create_hero(creator);
         let (_, weapon) = create_weapon(creator);
 
-        assert!(weapon.owns(@0x123), 0);
+        assert!(owns(weapon, @0x123), 0);
         hero_equip(creator, hero, weapon);
-        assert!(weapon.owns(@0x123), 1);
+        assert!(owns(weapon, @0x123), 1);
         hero_unequip(creator, hero, weapon);
         assert!(hero.root_owner() == @0x123, 2);
         assert!(weapon.root_owner() == @0x123, 3);
@@ -842,7 +846,7 @@ module aptos_framework::object {
         let linear_transfer_ref = transfer_ref.generate_linear_transfer_ref();
         linear_transfer_ref.transfer_with_ref(@0x456);
         assert!(hero.owner() == @0x456, 1);
-        assert!(hero.owns(@0x456), 2);
+        assert!(owns(hero, @0x456), 2);
         assert!(hero.root_owner() == @0x456, 3);
     }
 
@@ -963,7 +967,7 @@ module aptos_framework::object {
 
         // Owner should be not be able to burn weapon directly.
         assert!(weapon.owner() == hero.object_address(), 0);
-        assert!(weapon.owns(signer::address_of(creator)), 0);
+        assert!(owns(weapon, signer::address_of(creator)), 0);
         burn(creator, weapon);
     }
 
@@ -1001,17 +1005,17 @@ module aptos_framework::object {
         transfer(creator, obj7, obj8.object_address());
         transfer(creator, obj8, obj9.object_address());
 
-        assert!(obj9.owns(signer::address_of(creator)), 1);
-        assert!(obj8.owns(signer::address_of(creator)), 1);
-        assert!(obj7.owns(signer::address_of(creator)), 1);
-        assert!(obj6.owns(signer::address_of(creator)), 1);
-        assert!(obj5.owns(signer::address_of(creator)), 1);
-        assert!(obj4.owns(signer::address_of(creator)), 1);
-        assert!(obj3.owns(signer::address_of(creator)), 1);
-        assert!(obj2.owns(signer::address_of(creator)), 1);
+        assert!(owns(obj9, signer::address_of(creator)), 1);
+        assert!(owns(obj8, signer::address_of(creator)), 1);
+        assert!(owns(obj7, signer::address_of(creator)), 1);
+        assert!(owns(obj6, signer::address_of(creator)), 1);
+        assert!(owns(obj5, signer::address_of(creator)), 1);
+        assert!(owns(obj4, signer::address_of(creator)), 1);
+        assert!(owns(obj3, signer::address_of(creator)), 1);
+        assert!(owns(obj2, signer::address_of(creator)), 1);
 
         // Calling `owns` should fail as the nesting is too deep.
-        assert!(obj1.owns(signer::address_of(creator)), 1);
+        assert!(owns(obj1, signer::address_of(creator)), 1);
     }
 
     #[test(creator = @0x123)]
@@ -1057,7 +1061,7 @@ module aptos_framework::object {
         // This creates a cycle (self-loop) in ownership.
         transfer(creator, obj1, obj1.object_address());
         // This should fails as the ownership is cyclic.
-        let _ = obj1.owns(signer::address_of(creator));
+        let _ = owns(obj1, signer::address_of(creator));
     }
 
     #[test(creator = @0x123)]
