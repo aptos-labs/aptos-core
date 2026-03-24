@@ -306,4 +306,3 @@ impl Default for Severity {
         Self::MIN
     }
 }
-

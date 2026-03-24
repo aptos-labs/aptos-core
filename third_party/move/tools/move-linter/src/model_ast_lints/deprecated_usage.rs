@@ -21,6 +21,7 @@
 //! - `DeprecatedUsageOfConstants` (`ConstantChecker`): for deprecated constants,
 //!   checks their users and warns at each non-deprecated usage site.
 
+use legacy_move_compiler::shared::known_attributes::LintAttribute;
 use move_compiler_v2::external_checks::{
     ConstantChecker, ExpChecker, FunctionChecker, StructChecker,
 };
@@ -49,13 +50,13 @@ fn is_deprecated(env: &GlobalEnv, attrs: &[Attribute]) -> bool {
 
 /// Check if attributes contain `#[lint::skip(deprecated_usage)]`.
 fn has_lint_skip_deprecated(env: &GlobalEnv, attrs: &[Attribute]) -> bool {
-    let pool = env.symbol_pool();
-    Attribute::has(attrs, |attr| {
+    let lint_skip = env.symbol_pool().make(LintAttribute::SKIP);
+    attrs.iter().any(|attr| {
         if let Attribute::Apply(_, name, args) = attr {
-            pool.string(*name).as_str() == "lint::skip"
-                && args.iter().any(|a| {
-                    pool.string(a.name()).as_str() == CHECKER_NAME
-                })
+            *name == lint_skip
+                && args
+                    .iter()
+                    .any(|a| env.symbol_pool().string(a.name()).as_str() == CHECKER_NAME)
         } else {
             false
         }
@@ -180,9 +181,7 @@ impl DeprecatedUsage {
 
     fn check_pattern_deprecated(&self, env: &GlobalEnv, pattern: &Pattern) {
         pattern.visit_pre_post(&mut |entering, pat| {
-            if entering
-                && let Pattern::Struct(id, qid, _, _) = pat
-            {
+            if entering && let Pattern::Struct(id, qid, _, _) = pat {
                 let loc = env.get_node_loc(*id);
                 self.report_deprecated_struct(env, qid.module_id, qid.id, &loc);
             }

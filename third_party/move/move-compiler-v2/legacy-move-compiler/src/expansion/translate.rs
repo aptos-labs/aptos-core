@@ -34,7 +34,6 @@ use move_command_line_common::parser::{
 };
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
-
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     iter::IntoIterator,
@@ -76,8 +75,6 @@ impl<'env> Context<'env, '_> {
     fn cur_address(&self) -> &Address {
         self.address.as_ref().unwrap()
     }
-
-
 
     /// Resets the alias map and reports errors for aliases that were unused
     pub fn set_to_outer_scope(&mut self, outer_scope: OldAliasMap) {
@@ -146,10 +143,7 @@ pub fn program(
         members
     };
 
-    let mut context = Context::new(
-        compilation_env,
-        module_members,
-    );
+    let mut context = Context::new(compilation_env, module_members);
 
     let mut source_module_map = UniqueMap::new();
     let mut lib_module_map = UniqueMap::new();
@@ -407,9 +401,6 @@ fn set_sender_address(
     })
 }
 
-// This is a hack to recognize APTOS StdLib, Framework, and Token libs to avoid warnings on some old errors.
-// This will be removed after library attributes are cleaned up.
-// (See https://github.com/aptos-labs/aptos-core/issues/9410)
 fn module_(
     context: &mut Context,
     package_name: Option<Symbol>,
@@ -717,9 +708,7 @@ fn check_module_name(context: &mut Context, ident_loc: &Loc, mident: &ModuleIden
                 (*ident_loc, format!("Unbound module '{}'", mident))
             ));
         },
-        Some(_module) => {
-
-        },
+        Some(_module) => {},
     }
 }
 
@@ -745,7 +734,6 @@ fn can_be_resolved_as_module(
         let mident = sp(full_loc, ModuleIdent_::new(addr, ModuleName(module_name)));
         // Is `addr::module_name` a resolvable module? If so, return it.
         if context.module_members.contains_key(&mident) {
-
             Some(mident)
         } else {
             None
@@ -791,12 +779,7 @@ fn attribute_value(
             };
             match value {
                 Some(mident) => EV::Module(mident),
-                None => EV::ModuleAccess(name_access_chain(
-                    context,
-                    Access::Type,
-                    ma,
-
-                )?),
+                None => EV::ModuleAccess(name_access_chain(context, Access::Type, ma)?),
             }
         },
     }))
@@ -865,9 +848,7 @@ fn record_module_member_info(
     name: &Spanned<Symbol>,
     member_kind: ModuleMemberKind,
 ) {
-    cur_members.insert(*name, ModuleMemberInfo {
-        kind: member_kind,
-    });
+    cur_members.insert(*name, ModuleMemberInfo { kind: member_kind });
 }
 
 /// Specified module with identifier mident and definition m,
@@ -889,25 +870,13 @@ fn module_members(
         use P::{SpecBlockMember_ as SBM, SpecBlockTarget_ as SBT, SpecBlock_ as SB};
         match mem {
             P::ModuleMember::Function(f) => {
-                record_module_member_info(
-                    &mut cur_members,
-                    &f.name.0,
-                    ModuleMemberKind::Function,
-                );
+                record_module_member_info(&mut cur_members, &f.name.0, ModuleMemberKind::Function);
             },
             P::ModuleMember::Constant(c) => {
-                record_module_member_info(
-                    &mut cur_members,
-                    &c.name.0,
-                    ModuleMemberKind::Constant,
-                );
+                record_module_member_info(&mut cur_members, &c.name.0, ModuleMemberKind::Constant);
             },
             P::ModuleMember::Struct(s) => {
-                record_module_member_info(
-                    &mut cur_members,
-                    &s.name.0,
-                    ModuleMemberKind::Struct,
-                );
+                record_module_member_info(&mut cur_members, &s.name.0, ModuleMemberKind::Struct);
             },
             P::ModuleMember::Spec(
                 sp!(_, SB {
@@ -917,11 +886,7 @@ fn module_members(
                 }),
             ) => match &target.value {
                 SBT::Schema(n, _) => {
-                    record_module_member_info(
-                        &mut cur_members,
-                        n,
-                        ModuleMemberKind::Schema,
-                    );
+                    record_module_member_info(&mut cur_members, n, ModuleMemberKind::Schema);
                 },
                 SBT::Module => {
                     for sp!(_, smember_) in members {
@@ -1577,11 +1542,7 @@ fn address_specifier(context: &mut Context, specifier: P::AddressSpecifier) -> E
         AddressSpecifier_::Literal(addr) => E::AddressSpecifier_::Literal(addr),
         AddressSpecifier_::Name(name) => E::AddressSpecifier_::Name(name),
         AddressSpecifier_::Call(chain, type_args, name) => {
-            if let Some(maccess) = name_access_chain(
-                context,
-                Access::ApplyPositional,
-                chain,
-            ) {
+            if let Some(maccess) = name_access_chain(context, Access::ApplyPositional, chain) {
                 E::AddressSpecifier_::Call(maccess, optional_types(context, type_args), name)
             } else {
                 debug_assert!(context.env.has_errors());
@@ -2343,12 +2304,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             let tys_opt = optional_types(context, ptys_opt);
             let ers = sp(rloc, exps(context, prs));
             let en_opt = if kind != CallKind::Receiver {
-                name_access_chain(
-                    context,
-                    Access::ApplyPositional,
-                    pn,
-
-                )
+                name_access_chain(context, Access::ApplyPositional, pn)
             } else {
                 // Skip resolution for receiver calls, which are expected to use a single name
                 let P::NameAccessChain_::One(name) = pn.value else {
@@ -2370,12 +2326,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             EE::ExpCall(e_fexp, e_args)
         },
         PE::Pack(pn, ptys_opt, pfields) => {
-            let en_opt = name_access_chain(
-                context,
-                Access::ApplyNamed,
-                pn,
-
-            );
+            let en_opt = name_access_chain(context, Access::ApplyNamed, pn);
             let tys_opt = optional_types(context, ptys_opt);
             let efields_vec = pfields
                 .into_iter()
@@ -2663,12 +2614,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 ));
                 EE::UnresolvedError
             } else {
-                let e_fn_name = name_access_chain(
-                    context,
-                    Access::Term,
-                    fn_name,
-
-                );
+                let e_fn_name = name_access_chain(context, Access::Term, fn_name);
                 let e_type_args = optional_types(context, type_args);
                 let e_args = sp(args_loc, exps(context, args));
                 if let Some(fn_access) = e_fn_name {
@@ -2948,12 +2894,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
         },
         PB::Unpack(ptn, ptys_opt, pfields) => {
             // check for type use
-            let tn = name_access_chain(
-                context,
-                Access::ApplyNamed,
-                *ptn,
-
-            )?;
+            let tn = name_access_chain(context, Access::ApplyNamed, *ptn)?;
             let tys_opt = optional_types(context, ptys_opt);
             let mut dotdot = None;
             let mut vfields = vec![];
@@ -2979,12 +2920,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             EL::Unpack(tn, tys_opt, fields, dotdot)
         },
         PB::PositionalUnpack(ptn, ptys_opt, pargs) => {
-            let tn = name_access_chain(
-                context,
-                Access::ApplyPositional,
-                *ptn,
-
-            )?;
+            let tn = name_access_chain(context, Access::ApplyPositional, *ptn)?;
             let tys_opt = optional_types(context, ptys_opt);
             let mut dot_seen = false;
             let fields: Option<Vec<E::LValueOrDotDot>> = pargs
@@ -3117,12 +3053,7 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
             }
         },
         PE::Pack(pn, ptys_opt, pfields) => {
-            let en = name_access_chain(
-                context,
-                Access::ApplyNamed,
-                pn,
-
-            )?;
+            let en = name_access_chain(context, Access::ApplyNamed, pn)?;
             let tys_opt = optional_types(context, ptys_opt);
             let efields = assign_unpack_fields(context, loc, pfields)?;
             // we have not implemented .. in the LHS of an assignment

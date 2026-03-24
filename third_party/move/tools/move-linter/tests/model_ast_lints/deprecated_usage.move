@@ -186,6 +186,12 @@ module 0xc0ffee::m {
         deprecated_fun()
     }
 
+    // #[lint::skip(deprecated_usage, unused_struct)] with multiple skips -> NO warn, no spurious errors
+    #[lint::skip(deprecated_usage, unused_struct)]
+    public fun test_skip_deprecated_multi(): u64 {
+        deprecated_fun()
+    }
+
     // Non-deprecated usage -> NO warn
     public fun test_no_warn(): u64 {
         good_fun()
