@@ -30,7 +30,7 @@ pub struct ChunkyTestSetup {
     pub voting_powers: Vec<u64>,
     pub epoch_state: Arc<EpochState>,
     pub session_metadata: ChunkyDKGSessionMetadata,
-    pub dkg_config: ChunkyDKGConfig,
+    pub dkg_config: Arc<ChunkyDKGConfig>,
 }
 
 impl ChunkyTestSetup {

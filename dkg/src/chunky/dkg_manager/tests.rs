@@ -109,12 +109,14 @@ async fn test_chunky_dkg_state_transition() {
     // Initial state should be Init.
     assert_eq!(manager.state_name(), "NotStarted");
 
-    // Transcript request should fail in Init state.
+    // Transcript request should return error response in Init state.
     let rpc_response_collector = Arc::new(RwLock::new(vec![]));
     let rpc_req =
         new_chunky_transcript_rpc_request(999, setup.addrs[3], rpc_response_collector.clone());
     let result = manager.process_peer_rpc_msg(rpc_req).await;
-    assert!(result.is_err()); // transcript request fails in Init state
+    assert!(result.is_ok()); // handler returns Ok, but sends error via response_sender
+    let last_responses = std::mem::take(&mut *rpc_response_collector.write());
+    assert!(last_responses.len() == 1 && last_responses[0].is_err());
 
     // process_dkg_start_event should transition to AwaitSubtranscriptAggregation.
     let event = ChunkyDKGStartEvent {

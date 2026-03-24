@@ -5,15 +5,13 @@ use crate::{
     chunky::types::CertifiedAggregatedSubtranscript,
     counters,
     types::{
-        ChunkyDKGSubtranscriptSignatureRequest, ChunkyDKGSubtranscriptSignatureResponse,
-        DKGMessage,
+        ChunkyDKGSubtranscriptSignatureRequest, ChunkyDKGSubtranscriptSignatureResponse, DKGMessage,
     },
 };
-use aptos_crypto::HashValue;
 use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel::Sender;
 use aptos_consensus_types::common::Author;
-use aptos_crypto::{bls12381::Signature, hash::CryptoHash, Signature as _};
+use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue, Signature as _};
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};

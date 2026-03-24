@@ -42,17 +42,17 @@ use std::{
 use tokio_retry::strategy::ExponentialBackoff;
 
 /// Starts a task to collect transcripts from all validators. The subtranscripts are
-/// extracted from valid transcripts and aggregated. When a quorum is aggragated,
+/// extracted from valid transcripts and aggregated. When a quorum is aggregated,
 /// the [ChunkyDKGManager] is notified via the channel.
 pub fn start_subtranscript_aggregation(
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     epoch_state: Arc<EpochState>,
     my_addr: AccountAddress,
-    dkg_config: ChunkyDKGConfig,
+    dkg_config: Arc<ChunkyDKGConfig>,
     spks: Vec<DealerPublicKey>,
     start_time: Duration,
     agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
-    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
 ) -> AbortHandle {
     let epoch = dkg_config.session_metadata.dealer_epoch;
     let req = ChunkyDKGTranscriptRequest::new(epoch);
@@ -94,7 +94,9 @@ struct InnerState {
 }
 
 impl InnerState {
-    fn new(agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>) -> Self {
+    fn new(
+        agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
+    ) -> Self {
         Self {
             valid_peer_transcript_seen: false,
             contributors: HashSet::new(),
@@ -107,10 +109,10 @@ impl InnerState {
 pub struct ChunkyTranscriptAggregationState {
     epoch_state: Arc<EpochState>,
     my_addr: AccountAddress,
-    dkg_config: ChunkyDKGConfig,
+    dkg_config: Arc<ChunkyDKGConfig>,
     signing_pubkeys: Vec<DealerPublicKey>,
     start_time: Duration,
-    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
     inner_state: RwLock<InnerState>,
 }
 
@@ -118,11 +120,11 @@ impl ChunkyTranscriptAggregationState {
     pub fn new(
         epoch_state: Arc<EpochState>,
         my_addr: AccountAddress,
-        dkg_config: ChunkyDKGConfig,
+        dkg_config: Arc<ChunkyDKGConfig>,
         signing_pubkeys: Vec<DealerPublicKey>,
         start_time: Duration,
         agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
-        received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscript>>>,
+        received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
     ) -> Self {
         Self {
             epoch_state,
@@ -219,10 +221,11 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             );
         }
 
-        // Store the transcript
+        // Store the transcript (Arc-wrapped for cheap clone-out by RPC handlers)
+        let transcript = Arc::new(transcript);
         {
             let mut received_transcripts = self.received_transcripts.write();
-            received_transcripts.insert(metadata.author, transcript.clone());
+            received_transcripts.insert(metadata.author, Arc::clone(&transcript));
         }
 
         // Aggregate the transcript (projective accumulator; normalize when quorum is met)
@@ -284,7 +287,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                             let transcript = received
                                 .get(addr)
                                 .expect("contributor must have a stored transcript");
-                            let bytes = bcs::to_bytes(transcript)
+                            let bytes = bcs::to_bytes(transcript.as_ref())
                                 .expect("transcript re-serialization should not fail");
                             HashValue::sha3_256_of(&bytes)
                         })
@@ -366,7 +369,9 @@ mod tests {
             setup.spks(),
             duration_since_epoch(),
             Some(tx),
-            Arc::new(RwLock::new(HashMap::new())),
+            Arc::new(RwLock::new(
+                HashMap::<AccountAddress, Arc<ChunkyTranscript>>::new(),
+            )),
         ));
         (state, rx)
     }
