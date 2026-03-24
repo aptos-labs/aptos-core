@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 
 def construct_humio_url(
-    labels_run: str, pod_name: str, start_time: float, end_time: float
+    pod_name: str, start_time: float, end_time: float
 ) -> str:
     query = f'#k8s.cluster = "devinfra-usce1-0" | "k8s.pod_name" = "{pod_name}"'
 
@@ -310,7 +310,7 @@ class WorkerPod:
         return pod_status
 
     def get_humio_log_link(self):
-        return construct_humio_url(self.label, self.name, self.start_time, time.time())
+        return construct_humio_url(self.name, self.start_time, time.time())
 
 
 class TaskStats:
