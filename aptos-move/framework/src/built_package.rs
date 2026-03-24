@@ -281,7 +281,7 @@ fn make_model_build_config(
             skip_attribute_checks,
             known_attributes,
             experiments,
-            print_errors: true,
+            print_errors: Some(true),
         },
     })
 }
@@ -340,7 +340,7 @@ impl BuiltPackage {
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
-                print_errors: true,
+                print_errors: Some(true),
             },
         })
     }

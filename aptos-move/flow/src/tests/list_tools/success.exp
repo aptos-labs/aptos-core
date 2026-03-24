@@ -60,70 +60,59 @@
         "package_path": {
           "description": "Path to the Move package directory.",
           "type": "string"
+        },
+        "query": {
+          "description": "The query to run.",
+          "$ref": "#/$defs/MovePackageQuery"
         }
       },
       "required": [
-        "package_path"
+        "package_path",
+        "query"
       ],
-      "oneOf": [
-        {
-          "description": "Returns a map from each module to the modules it depends on.",
-          "type": "object",
-          "properties": {
-            "query": {
+      "$defs": {
+        "MovePackageQuery": {
+          "oneOf": [
+            {
+              "description": "Returns a map from each module to the modules it depends on.",
               "type": "string",
               "const": "dep_graph"
-            }
-          },
-          "required": [
-            "query"
-          ]
-        },
-        {
-          "description": "Returns a summary of each module's constants, structs, and functions.",
-          "type": "object",
-          "properties": {
-            "query": {
+            },
+            {
+              "description": "Returns a summary of each module's constants, structs, and functions.",
               "type": "string",
               "const": "module_summary"
-            }
-          },
-          "required": [
-            "query"
-          ]
-        },
-        {
-          "description": "Returns a function-level call graph as a map from each function to the functions it calls.",
-          "type": "object",
-          "properties": {
-            "query": {
+            },
+            {
+              "description": "Returns a function-level call graph as a map from each function to the functions it calls.",
               "type": "string",
               "const": "call_graph"
-            }
-          },
-          "required": [
-            "query"
-          ]
-        },
-        {
-          "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
-          "type": "object",
-          "properties": {
-            "function": {
-              "description": "Function to query, in the form \"module_name::function_name\".",
-              "type": "string"
             },
-            "query": {
-              "type": "string",
-              "const": "function_usage"
+            {
+              "description": "Returns direct and transitive calls/uses by a given function.",
+              "type": "object",
+              "properties": {
+                "function_usage": {
+                  "type": "object",
+                  "properties": {
+                    "function": {
+                      "description": "Function to query, as \"module_name::function_name\".",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "function"
+                  ]
+                }
+              },
+              "required": [
+                "function_usage"
+              ],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "query",
-            "function"
           ]
         }
-      ]
+      }
     },
     "annotations": {
       "readOnlyHint": false,

@@ -12,7 +12,8 @@ use std::{
     io::{self, Write},
     sync::{Arc, Mutex},
 };
-use termcolor::{Buffer, ColorChoice, ColorSpec, StandardStream, WriteColor};
+pub use termcolor::Buffer;
+use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 /// A clonable writer that delegates to an `Arc<Mutex<dyn WriteColor + Send>>`.
 ///
@@ -27,6 +28,11 @@ impl DiagWriter {
         Self(Arc::new(Mutex::new(StandardStream::stderr(
             ColorChoice::Auto,
         ))))
+    }
+
+    /// Create a writer that discards all output.
+    pub fn sink() -> Self {
+        Self(Arc::new(Mutex::new(std::io::sink())))
     }
 
     /// Create a writer backed by an in-memory [`Buffer`] with colors stripped.

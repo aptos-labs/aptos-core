@@ -21,7 +21,7 @@
 //! to dereference any arena-based pointers stored in the map.
 
 use crate::{alloc::GlobalArenaPtr, context::ArenaRef, ExecutionGuard};
-use dashmap::{Entry, Equivalent};
+use dashmap::Equivalent;
 use move_core_types::identifier::IdentStr;
 use std::hash::{Hash, Hasher};
 
@@ -31,7 +31,7 @@ impl<'guard> ArenaRef<'guard, str> {
         // SAFETY: The lifetime on this reference guarantees that the execution
         // guard is still alive, which guarantees that the arena allocation is
         // still valid and there were no deallocations.
-        unsafe { self.ptr.as_ref() }
+        unsafe { self.ptr.as_ref_unchecked() }
     }
 }
 
@@ -56,7 +56,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     where
         'ctx: 'guard,
     {
-        let ptr = self.intern_identifier_impl(identifier);
+        let ptr = self.intern_identifier_internal(identifier);
 
         // SAFETY: If the returned pointer is the one that was allocated, it is
         // trivially valid until the next maintenance phase, and it is safe to
@@ -73,7 +73,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 // ------------------------
 
 impl<'ctx> ExecutionGuard<'ctx> {
-    pub(super) fn intern_identifier_impl(&self, identifier: &IdentStr) -> GlobalArenaPtr<str> {
+    pub(super) fn intern_identifier_internal(&self, identifier: &IdentStr) -> GlobalArenaPtr<str> {
         // TODO:
         //   Consider checking that the identifier size is within bounds. While
         //   CompiledModule / CompiledScript deserializer enforces 256 byte
@@ -104,11 +104,11 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
         // valid pointers because the map is cleared on arena's reset.
-        let key = IdentifierInternerKey(ptr);
-        match self.ctx.identifiers.entry(key) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => *entry.insert(ptr),
-        }
+        *self
+            .ctx
+            .identifiers
+            .entry(IdentifierInternerKey(ptr))
+            .or_insert(ptr)
     }
 }
 

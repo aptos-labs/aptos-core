@@ -22,7 +22,7 @@
 //! any arena-based pointers stored in the map.
 
 use crate::{alloc::GlobalArenaPtr, context::ArenaRef, ExecutionGuard};
-use dashmap::{Entry, Equivalent};
+use dashmap::Equivalent;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
@@ -34,7 +34,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         // SAFETY: The lifetime on this reference guarantees that the execution
         // guard is still alive, which guarantees that the arena allocation is
         // still valid and there were no deallocations.
-        unsafe { &self.ptr.as_ref().address }
+        unsafe { &self.ptr.as_ref_unchecked().address }
     }
 
     /// Returns the name of this executable.
@@ -45,7 +45,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         // allocator APIs), the name allocation is  also valid for the same
         // lifetime.
         unsafe {
-            let id = self.ptr.as_ref();
+            let id = self.ptr.as_ref_unchecked();
             id.name.as_ref_unchecked()
         }
     }
@@ -135,7 +135,7 @@ pub struct ExecutableId {
 
 #[allow(private_interfaces)]
 impl<'ctx> ExecutionGuard<'ctx> {
-    fn intern_address_name_internal(
+    pub(super) fn intern_address_name_internal(
         &self,
         address: AccountAddress,
         name: &IdentStr,
@@ -148,17 +148,17 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
         // SAFETY: Name pointer has been just interned - it is valid and can be
         // used safely for ID construction.
-        let name = self.intern_identifier_impl(name);
+        let name = self.intern_identifier_internal(name);
         let ptr = self.global_arena.alloc(ExecutableId { address, name });
 
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
         // valid pointers because the map is cleared on arena's reset.
-        let key = ExecutableIdInternerKey(ptr);
-        match self.ctx.executable_ids.entry(key) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => *entry.insert(ptr),
-        }
+        *self
+            .ctx
+            .executable_ids
+            .entry(ExecutableIdInternerKey(ptr))
+            .or_insert(ptr)
     }
 }
 

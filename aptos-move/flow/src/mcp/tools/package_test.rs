@@ -213,7 +213,14 @@ impl FlowSession {
         &self,
         params: MovePackageCoverageParams,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        log::info!("move_package_coverage: path=`{}`", params.package_path);
+        log::info!(
+            "move_package_coverage: path=`{}`{}",
+            params.package_path,
+            params
+                .function
+                .as_deref()
+                .map_or(String::new(), |f| format!(", function=`{}`", f))
+        );
 
         let pkg_path = PathBuf::from(&params.package_path);
         if !pkg_path.exists() {
@@ -350,7 +357,12 @@ fn run_tests(pkg_path: &Path, args: &McpArgs) -> anyhow::Result<(bool, String)> 
         },
         Err(e) => {
             log::error!("test execution error: {}", e);
-            Err(e.context("test execution error"))
+            log::error!(
+                "captured output ({} bytes): {}",
+                output_str.len(),
+                output_str
+            );
+            Err(e.context(output_str))
         },
     }
 }

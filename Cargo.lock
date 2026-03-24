@@ -12640,9 +12640,12 @@ name = "mono-move-global-context"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
+ "anyhow",
  "bumpalo",
  "crossbeam-utils",
  "dashmap 7.0.0-rc2",
+ "fxhash",
+ "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.1",
 ]

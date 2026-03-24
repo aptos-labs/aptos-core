@@ -664,7 +664,7 @@ impl CompiledPackage {
                         compile_test_code: flags.keep_testing_functions(),
                         experiments: config.experiments.clone(),
                         external_checks,
-                        print_errors: config.print_errors,
+                        print_errors: config.print_errors.unwrap_or(true),
                         ..Default::default()
                     };
                     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
