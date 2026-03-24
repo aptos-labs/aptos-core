@@ -320,8 +320,8 @@ impl DoGetExecutionOutput {
                 onchain_config,
                 transaction_slice_metadata,
             )?,
-            _ => BlockOutput::new(
-                (0..txn_provider.num_txns())
+            _ => {
+                let mut outputs: Vec<TransactionOutput> = (0..txn_provider.num_txns())
                     .map(|_| {
                         TransactionOutput::new(
                             WriteSet::default(),
@@ -331,9 +331,27 @@ impl DoGetExecutionOutput {
                             TransactionAuxiliaryData::None,
                         )
                     })
-                    .collect::<Vec<_>>(),
-                None,
-            ),
+                    .collect();
+
+                // Generate a synthetic StateCheckpoint as the block epilogue.
+                // Real execution generates this via generate_block_epilogue_if_needed()
+                // in the block executor. Without it, Parser::parse asserts that the
+                // last transaction is a block-ending transaction.
+                let block_epilogue_txn = transaction_slice_metadata
+                    .append_state_checkpoint_to_block()
+                    .map(|block_id| {
+                        outputs.push(TransactionOutput::new(
+                            WriteSet::default(),
+                            Vec::new(),
+                            0,
+                            TransactionStatus::Keep(ExecutionStatus::Success),
+                            TransactionAuxiliaryData::None,
+                        ));
+                        Transaction::StateCheckpoint(block_id).into()
+                    });
+
+                BlockOutput::new(outputs, block_epilogue_txn)
+            },
         };
         Ok(transaction_outputs)
     }
