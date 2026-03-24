@@ -26,6 +26,8 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `swap`](#0x1_vector_swap)
 -  [Function `move_range`](#0x1_vector_move_range)
 -  [Function `singleton`](#0x1_vector_singleton)
+-  [Function `last`](#0x1_vector_last)
+-  [Function `last_mut`](#0x1_vector_last_mut)
 -  [Function `reverse`](#0x1_vector_reverse)
 -  [Function `reverse_slice`](#0x1_vector_reverse_slice)
 -  [Function `append`](#0x1_vector_append)
@@ -414,6 +416,60 @@ Return an vector of size one containing element <code>e</code>.
     <b>let</b> v = <a href="vector.md#0x1_vector_empty">empty</a>();
     v.<a href="vector.md#0x1_vector_push_back">push_back</a>(e);
     v
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vector_last"></a>
+
+## Function `last`
+
+Returns a reference to last element in the vector, or aborts if the vector is empty.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_last">last</a>&lt;Element&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): &Element
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_last">last</a>&lt;Element&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): &Element {
+    <b>assert</b>!(self.<a href="vector.md#0x1_vector_length">length</a>() &gt; 0, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
+
+    &self[self.<a href="vector.md#0x1_vector_length">length</a>() - 1]
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vector_last_mut"></a>
+
+## Function `last_mut`
+
+Returns a mutable reference to the last element in the vector, or aborts if the vector is empty.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_last_mut">last_mut</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): &<b>mut</b> Element
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_last_mut">last_mut</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): &<b>mut</b> Element {
+    <b>assert</b>!(self.<a href="vector.md#0x1_vector_length">length</a>() &gt; 0, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
+    <b>let</b> len = self.<a href="vector.md#0x1_vector_length">length</a>();
+    &<b>mut</b> self[len - 1]
 }
 </code></pre>
 
