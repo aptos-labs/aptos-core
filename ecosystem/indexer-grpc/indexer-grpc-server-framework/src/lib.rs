@@ -17,7 +17,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::convert::Infallible;
 use std::{panic::PanicHookInfo, path::PathBuf, process};
 use tracing::error;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 use warp::{http::Response, reply::Reply, Filter};
 
 /// ServerArgs bootstraps a server with all common pieces. And then triggers the run method for
@@ -177,12 +177,12 @@ fn handle_panic(panic_info: &PanicHookInfo<'_>) {
 /// added that exports spans to the configured OTLP collector (e.g. Jaeger). The
 /// service name is read from `OTEL_SERVICE_NAME`.
 pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write> + Send + Sync>>) {
+    // Apply EnvFilter only to the fmt layer so RUST_LOG controls log verbosity
+    // without suppressing spans from the OpenTelemetry exporter.
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
         .unwrap();
 
-    // The otel layer must be added to the bare Registry first so its type
-    // parameter matches. EnvFilter and fmt are stacked on top.
     let otel_layer = try_init_otel_layer();
     let registry = tracing_subscriber::registry().with(otel_layer);
 
@@ -196,8 +196,9 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
                 .with_thread_ids(true)
                 .with_target(false)
                 .with_thread_names(true)
-                .with_writer(w);
-            registry.with(env_filter).with(fmt_layer).init();
+                .with_writer(w)
+                .with_filter(env_filter);
+            registry.with(fmt_layer).init();
         },
         None => {
             let fmt_layer = tracing_subscriber::fmt::layer()
@@ -207,8 +208,9 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
                 .with_line_number(true)
                 .with_thread_ids(true)
                 .with_target(false)
-                .with_thread_names(true);
-            registry.with(env_filter).with(fmt_layer).init();
+                .with_thread_names(true)
+                .with_filter(env_filter);
+            registry.with(fmt_layer).init();
         },
     }
 }

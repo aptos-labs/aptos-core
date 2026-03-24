@@ -113,31 +113,19 @@ impl GrpcManager for GrpcManagerService {
         &self,
         request: Request<HeartbeatRequest>,
     ) -> Result<Response<HeartbeatResponse>, Status> {
-        let trace_ctx = extract_or_create_trace_context(request.metadata());
-        let span = info_span!(
-            "grpc_manager.heartbeat",
-            trace_id = %trace_ctx.trace_id,
-            parent_span_id = %trace_ctx.parent_span_id,
-            otel.kind = "server",
-        );
-        set_otel_parent(&span, &trace_ctx);
-
-        async {
-            let request = request.into_inner();
-            if let Some(service_info) = request.service_info {
-                if let Some(address) = service_info.address {
-                    if let Some(info) = service_info.info {
-                        return self.handle_heartbeat(address, info).await.map_err(|e| {
-                            Status::internal(format!("Error handling heartbeat: {e}"))
-                        });
-                    }
+        let request = request.into_inner();
+        if let Some(service_info) = request.service_info {
+            if let Some(address) = service_info.address {
+                if let Some(info) = service_info.info {
+                    return self
+                        .handle_heartbeat(address, info)
+                        .await
+                        .map_err(|e| Status::internal(format!("Error handling heartbeat: {e}")));
                 }
             }
-
-            Err(Status::invalid_argument("Bad request."))
         }
-        .instrument(span)
-        .await
+
+        Err(Status::invalid_argument("Bad request."))
     }
 
     async fn get_transactions(
