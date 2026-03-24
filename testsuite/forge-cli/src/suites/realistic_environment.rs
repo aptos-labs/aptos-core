@@ -483,9 +483,9 @@ pub(crate) fn realistic_env_max_load_test(
 }
 
 /// Same as realistic_env_max_load_test but with extra-vote wait enabled.
-/// The proposer waits up to 100ms for all validators (100% voting power)
-/// before advancing the round, which should improve p90 latency at the
-/// cost of some p50 by waiting for slow (e.g. Singapore) validators.
+/// The proposer waits up to 50ms for 6/7 validators (~86% voting power)
+/// before advancing the round. Skips waiting for the slowest validator
+/// (Singapore) to avoid adding unnecessary delay.
 pub(crate) fn realistic_env_max_load_extra_vote_wait_test(
     duration: Duration,
     test_cmd: &TestCommand,
@@ -494,8 +494,8 @@ pub(crate) fn realistic_env_max_load_extra_vote_wait_test(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.consensus.wait_for_extra_votes =
                 Some(aptos_config::config::WaitForExtraVotesConfig {
-                    target_voting_power_pct: 1.0,
-                    max_wait_ms: 100,
+                    target_voting_power_pct: 6.0 / 7.0,
+                    max_wait_ms: 50,
                     wait_for_validators: vec![],
                 });
         }))
