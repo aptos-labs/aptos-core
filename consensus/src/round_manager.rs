@@ -1631,8 +1631,13 @@ impl RoundManager {
             }
         }
 
+        // Proxy voters don't execute blocks, so they don't need batch data to vote.
+        // Skip the payload availability check for proxy blocks to avoid blocking on
+        // wait_for_payload when OptQS opt_batches haven't propagated yet.
+        // The primary handles batch availability when it aggregates and executes.
+        let is_proxy = self.proxy_hooks.is_some();
         let block_store = self.block_store.clone();
-        if block_store.check_payload(&proposal).is_err() {
+        if !is_proxy && block_store.check_payload(&proposal).is_err() {
             debug!("Payload not available locally for block: {}", proposal.id());
             counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
                 .with_label_values(&["missing"])
