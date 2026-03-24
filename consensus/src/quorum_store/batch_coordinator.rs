@@ -15,7 +15,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_config::config::BatchTransactionFilterConfig;
-use aptos_consensus_types::proof_of_store::{BatchInfoExt, TBatchInfo};
+use aptos_consensus_types::proof_of_store::{BatchInfoExt, BatchKind, TBatchInfo};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
@@ -39,6 +39,7 @@ pub struct BatchCoordinator {
     sender_to_batch_generator: Arc<Sender<BatchGeneratorCommand>>,
     batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
+    max_encrypted_batch_txns: u64,
     max_batch_bytes: u64,
     max_total_txns: u64,
     max_total_bytes: u64,
@@ -54,6 +55,7 @@ impl BatchCoordinator {
         sender_to_batch_generator: Sender<BatchGeneratorCommand>,
         batch_store: Arc<BatchStore>,
         max_batch_txns: u64,
+        max_encrypted_batch_txns: u64,
         max_batch_bytes: u64,
         max_total_txns: u64,
         max_total_bytes: u64,
@@ -67,6 +69,7 @@ impl BatchCoordinator {
             sender_to_batch_generator: Arc::new(sender_to_batch_generator),
             batch_store,
             max_batch_txns,
+            max_encrypted_batch_txns,
             max_batch_bytes,
             max_total_txns,
             max_total_bytes,
@@ -155,6 +158,14 @@ impl BatchCoordinator {
                 batch.num_txns(),
                 self.max_batch_txns,
             );
+            if batch.batch_info().batch_kind() == Some(BatchKind::Encrypted) {
+                ensure!(
+                    batch.num_txns() <= self.max_encrypted_batch_txns,
+                    "Exceeds encrypted batch txn limit {} > {}",
+                    batch.num_txns(),
+                    self.max_encrypted_batch_txns,
+                );
+            }
             ensure!(
                 batch.num_bytes() <= self.max_batch_bytes,
                 "Exceeds batch bytes limit {} > {}",
