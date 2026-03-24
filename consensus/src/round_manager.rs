@@ -581,21 +581,25 @@ impl RoundManager {
                         self.last_consumed_proxy_round,
                     );
                 }
-                self.spawn_proposal_generation(new_round_event);
+                self.spawn_proposal_generation(new_round_event).await;
             } else {
                 // No proxy consensus — or this IS the proxy RM.
-                self.spawn_proposal_generation(new_round_event);
+                self.spawn_proposal_generation(new_round_event).await;
             }
         }
         Ok(())
     }
 
-    /// Spawn the proposal generation task (used by process_new_round_event).
+    /// Generate and send a proposal for the current round.
     ///
     /// Leader-driven cutting: collects proxy blocks from `pending_proxy_blocks`
     /// BTreeMap starting after the parent block's `last_proxy_round`, aggregates
     /// their payloads, and passes the result to proposal generation.
-    fn spawn_proposal_generation(&mut self, new_round_event: NewRoundEvent) {
+    ///
+    /// For the proxy RM, proposal generation runs inline (awaited) to avoid
+    /// tokio::spawn scheduling delays that push broadcast past the 100ms timeout.
+    /// For the primary RM (1000ms timeout), generation is spawned as before.
+    async fn spawn_proposal_generation(&mut self, new_round_event: NewRoundEvent) {
         let sync_info = self.block_store.sync_info();
         let proxy_hooks = self.proxy_hooks.clone();
 
@@ -719,7 +723,13 @@ impl RoundManager {
         let safety_rules = self.safety_rules.clone();
         let proposer_election = self.proposer_election.clone();
         let consensus_type = self.consensus_type();
-        tokio::spawn(async move {
+        let is_proxy_rm = proxy_hooks.is_some();
+
+        // Proxy RM: run inline to avoid tokio::spawn scheduling delay (50-80ms
+        // under load) that pushes proposal broadcast past the 100ms timeout.
+        // Proxy proposal generation is fast (<20ms) so inline execution is safe.
+        // Primary RM: spawn as before — 1000ms timeout has plenty of slack.
+        if is_proxy_rm {
             if let Err(e) = monitor!(
                 "generate_and_send_proposal",
                 Self::generate_and_send_proposal(
@@ -737,7 +747,27 @@ impl RoundManager {
             ) {
                 warn!(consensus_type = consensus_type, "Error generating and sending proposal: {}", e);
             }
-        });
+        } else {
+            tokio::spawn(async move {
+                if let Err(e) = monitor!(
+                    "generate_and_send_proposal",
+                    Self::generate_and_send_proposal(
+                        epoch_state,
+                        new_round_event,
+                        network,
+                        sync_info,
+                        proposal_generator,
+                        safety_rules,
+                        proposer_election,
+                        proxy_hooks,
+                        proxy_payload,
+                    )
+                    .await
+                ) {
+                    warn!(consensus_type = consensus_type, "Error generating and sending proposal: {}", e);
+                }
+            });
+        }
     }
 
     async fn generate_and_send_proposal(
@@ -2590,7 +2620,7 @@ impl RoundManager {
                     "Proxy blocks arrived, generating deferred proposal for round {}",
                     event.round,
                 );
-                self.spawn_proposal_generation(event);
+                self.spawn_proposal_generation(event).await;
             }
         }
 
