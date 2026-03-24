@@ -111,9 +111,13 @@ impl ProofManager {
             PayloadFilter::InQuorumStore(batches) => batches,
         };
 
+        let mut session = self
+            .batch_proof_queue
+            .create_pull_session(&excluded_batches);
+
         let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
             self.batch_proof_queue.pull_proofs(
-                &excluded_batches,
+                &mut session,
                 request.max_txns,
                 request.max_txns_after_filtering,
                 request.soft_max_txns_after_filtering,
@@ -133,11 +137,7 @@ impl ProofManager {
                 let max_opt_batch_txns_after_filtering = request.max_txns_after_filtering - cur_unique_txns;
                 let (opt_batches, opt_payload_size, _) =
                     self.batch_proof_queue.pull_batches(
-                        &excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .collect(),
+                        &mut session,
                         &params.exclude_authors,
                         max_opt_batch_txns_size,
                         max_opt_batch_txns_after_filtering,
@@ -166,12 +166,7 @@ impl ProofManager {
                 ));
                 let (inline_batches, inline_payload_size, _) =
                     self.batch_proof_queue.pull_batches_with_transactions(
-                        &excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .chain(opt_batches.clone())
-                            .collect(),
+                        &mut session,
                         max_inline_txns_to_pull,
                         request.max_txns_after_filtering,
                         request.soft_max_txns_after_filtering,

@@ -53,6 +53,11 @@ impl QueueItem {
     }
 }
 
+pub(crate) struct PullSession {
+    pub(crate) excluded_batch_keys: HashSet<BatchKey>,
+    pub(crate) filtered_txns: HashSet<TxnSummaryWithExpiration>,
+}
+
 pub struct BatchProofQueue {
     my_peer_id: PeerId,
     // Queue per peer to ensure fairness between peers and priority within peer
@@ -71,6 +76,9 @@ pub struct BatchProofQueue {
     remaining_proofs: u64,
     remaining_local_txns: u64,
     remaining_local_proofs: u64,
+
+    // Incremental counter for batches without proof (Optimization 2)
+    num_batches_without_proof_count: u64,
 
     batch_expiry_gap_when_init_usecs: u64,
 }
@@ -93,6 +101,7 @@ impl BatchProofQueue {
             remaining_proofs: 0,
             remaining_local_txns: 0,
             remaining_local_proofs: 0,
+            num_batches_without_proof_count: 0,
             batch_expiry_gap_when_init_usecs,
         }
     }
@@ -125,11 +134,8 @@ impl BatchProofQueue {
             .count()
     }
 
-    pub(crate) fn num_batches_without_proof(&self) -> usize {
-        self.items
-            .iter()
-            .filter(|(_, item)| item.proof.is_none())
-            .count()
+    pub(crate) fn num_batches_without_proof(&self) -> u64 {
+        self.num_batches_without_proof_count
     }
 
     #[cfg(test)]
@@ -169,6 +175,31 @@ impl BatchProofQueue {
             .sum::<u64>();
 
         remaining_txns
+    }
+
+    pub(crate) fn create_pull_session(
+        &self,
+        excluded_batches: &HashSet<BatchInfoExt>,
+    ) -> PullSession {
+        let mut excluded_batch_keys = HashSet::with_capacity(excluded_batches.len());
+        let mut filtered_txns = HashSet::new();
+        for batch_info in excluded_batches {
+            let batch_key = BatchKey::from_info(batch_info);
+            excluded_batch_keys.insert(batch_key.clone());
+            if let Some(txn_summaries) = self
+                .items
+                .get(&batch_key)
+                .and_then(|item| item.txn_summaries.as_ref())
+            {
+                for txn_summary in txn_summaries {
+                    filtered_txns.insert(*txn_summary);
+                }
+            }
+        }
+        PullSession {
+            excluded_batch_keys,
+            filtered_txns,
+        }
     }
 
     /// Add the ProofOfStore to proof queue.
@@ -226,6 +257,12 @@ impl BatchProofQueue {
             }
         }
 
+        // Decrement counter if an existing batch without proof is getting its proof
+        let had_no_proof = self
+            .items
+            .get(&batch_key)
+            .is_some_and(|item| item.proof.is_none());
+
         match self.items.entry(batch_key) {
             Entry::Occupied(mut entry) => {
                 let item = entry.get_mut();
@@ -240,6 +277,10 @@ impl BatchProofQueue {
                     txn_summaries: None,
                 });
             },
+        }
+
+        if had_no_proof {
+            self.num_batches_without_proof_count -= 1;
         }
 
         if author == self.my_peer_id {
@@ -308,6 +349,8 @@ impl BatchProofQueue {
                         proof_insertion_time: None,
                         txn_summaries: Some(txn_summaries),
                     });
+                    // New batch without proof
+                    self.num_batches_without_proof_count += 1;
                 },
             }
         }
@@ -323,6 +366,7 @@ impl BatchProofQueue {
     // proof before the batch expires, the batch summary will be garbage collected.
     fn gc_expired_batch_summaries_without_proofs(&mut self) {
         let timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
+        let mut gc_count: u64 = 0;
         self.items.retain(|_, item| {
             if item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp {
                 true
@@ -333,61 +377,33 @@ impl BatchProofQueue {
                 counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
                     .with_label_values(&["expired_batch_without_proof"])
                     .inc();
+                gc_count += 1;
                 false
             }
         });
+        self.num_batches_without_proof_count -= gc_count;
     }
 
     fn log_remaining_data_after_pull(
         &self,
-        excluded_batches: &HashSet<BatchInfoExt>,
         pulled_proofs: &[ProofOfStore<BatchInfoExt>],
     ) {
-        let mut num_proofs_remaining_after_pull = 0;
-        let mut num_txns_remaining_after_pull = 0;
-        let excluded_batch_keys = excluded_batches
-            .iter()
-            .map(BatchKey::from_info)
-            .collect::<HashSet<_>>();
-
-        let remaining_batches = self
-            .author_to_batches
-            .iter()
-            .flat_map(|(_, batches)| batches)
-            .filter(|(batch_sort_key, _)| {
-                !excluded_batch_keys.contains(&batch_sort_key.batch_key)
-                    && !pulled_proofs
-                        .iter()
-                        .any(|p| BatchKey::from_info(p.info()) == batch_sort_key.batch_key)
-            })
-            .filter_map(|(batch_sort_key, batch)| {
-                if self
-                    .items
-                    .get(&batch_sort_key.batch_key)
-                    .is_some_and(|item| item.proof.is_some())
-                {
-                    Some(batch)
-                } else {
-                    None
-                }
-            });
-
-        for batch in remaining_batches {
-            num_proofs_remaining_after_pull += 1;
-            num_txns_remaining_after_pull += batch.num_txns();
-        }
-
         let pulled_txns = pulled_proofs.iter().map(|p| p.num_txns()).sum::<u64>();
+        let num_proofs_remaining = self
+            .remaining_proofs
+            .saturating_sub(pulled_proofs.len() as u64);
+        let num_txns_remaining = self
+            .remaining_txns_with_duplicates
+            .saturating_sub(pulled_txns);
         info!(
             "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}, remaining_txns: {:?}",
             pulled_proofs.len(),
             pulled_txns,
-            num_proofs_remaining_after_pull,
-            num_txns_remaining_after_pull,
+            num_proofs_remaining,
+            num_txns_remaining,
         );
-        counters::NUM_PROOFS_IN_PROOF_QUEUE_AFTER_PULL
-            .observe(num_proofs_remaining_after_pull as f64);
-        counters::NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL.observe(num_txns_remaining_after_pull as f64);
+        counters::NUM_PROOFS_IN_PROOF_QUEUE_AFTER_PULL.observe(num_proofs_remaining as f64);
+        counters::NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL.observe(num_txns_remaining as f64);
     }
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
@@ -399,7 +415,7 @@ impl BatchProofQueue {
     // whether the proof queue is fully utilized.
     pub(crate) fn pull_proofs(
         &mut self,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
@@ -408,7 +424,7 @@ impl BatchProofQueue {
     ) -> (Vec<ProofOfStore<BatchInfoExt>>, PayloadTxnsSize, u64, bool) {
         let (result, all_txns, unique_txns, is_full) = self.pull_internal(
             false,
-            excluded_batches,
+            session,
             &HashSet::new(),
             max_txns,
             max_txns_after_filtering,
@@ -447,7 +463,7 @@ impl BatchProofQueue {
 
             counters::PROOF_SIZE_WHEN_PULL.observe(proof_of_stores.len() as f64);
             // Number of proofs remaining in proof queue after the pull
-            self.log_remaining_data_after_pull(excluded_batches, &proof_of_stores);
+            self.log_remaining_data_after_pull(&proof_of_stores);
         }
 
         (proof_of_stores, all_txns, unique_txns, !is_full)
@@ -455,7 +471,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches(
         &mut self,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -465,7 +481,7 @@ impl BatchProofQueue {
         minimum_batch_age_usecs: Option<u64>,
     ) -> (Vec<BatchInfoExt>, PayloadTxnsSize, u64) {
         let (result, pulled_txns, unique_txns, is_full) = self.pull_batches_internal(
-            excluded_batches,
+            session,
             exclude_authors,
             max_txns,
             max_txns_after_filtering,
@@ -488,7 +504,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches_internal(
         &mut self,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -499,7 +515,7 @@ impl BatchProofQueue {
     ) -> (Vec<BatchInfoExt>, PayloadTxnsSize, u64, bool) {
         let (result, all_txns, unique_txns, is_full) = self.pull_internal(
             true,
-            excluded_batches,
+            session,
             exclude_authors,
             max_txns,
             max_txns_after_filtering,
@@ -514,7 +530,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches_with_transactions(
         &mut self,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
@@ -526,7 +542,7 @@ impl BatchProofQueue {
         u64,
     ) {
         let (batches, pulled_txns, unique_txns, is_full) = self.pull_batches_internal(
-            excluded_batches,
+            session,
             &HashSet::new(),
             max_txns,
             max_txns_after_filtering,
@@ -561,7 +577,7 @@ impl BatchProofQueue {
     fn pull_internal(
         &mut self,
         batches_without_proofs: bool,
-        excluded_batches: &HashSet<BatchInfoExt>,
+        session: &mut PullSession,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -575,20 +591,6 @@ impl BatchProofQueue {
         let mut cur_all_txns = PayloadTxnsSize::zero();
         let mut excluded_txns = 0;
         let mut full = false;
-        // Set of all the excluded transactions and all the transactions included in the result
-        let mut filtered_txns = HashSet::new();
-        for batch_info in excluded_batches {
-            let batch_key = BatchKey::from_info(batch_info);
-            if let Some(txn_summaries) = self
-                .items
-                .get(&batch_key)
-                .and_then(|item| item.txn_summaries.as_ref())
-            {
-                for txn_summary in txn_summaries {
-                    filtered_txns.insert(*txn_summary);
-                }
-            }
-        }
 
         let max_batch_creation_ts_usecs = min_batch_age_usecs
             .map(|min_age| aptos_infallible::duration_since_epoch().as_micros() as u64 - min_age);
@@ -623,69 +625,71 @@ impl BatchProofQueue {
             iters.push(batch_iter);
         }
 
+        // Optimization 4: Shuffle once before the loop and use index-based round-robin
+        iters.shuffle(&mut thread_rng());
+        let mut idx = 0;
         while !iters.is_empty() {
-            iters.shuffle(&mut thread_rng());
-            iters.retain_mut(|iter| {
-                if full {
-                    return false;
-                }
-
-                if let Some((batch, item)) = iter.next() {
-                    if excluded_batches.contains(batch) {
-                        excluded_txns += batch.num_txns();
+            idx %= iters.len();
+            if let Some((batch, item)) = iters[idx].next() {
+                if session.excluded_batch_keys.contains(&BatchKey::from_info(batch)) {
+                    excluded_txns += batch.num_txns();
+                } else {
+                    // Calculate the number of unique transactions if this batch is included in the result
+                    let unique_txns = if let Some(ref txn_summaries) = item.txn_summaries {
+                        cur_unique_txns
+                            + txn_summaries
+                                .iter()
+                                .filter(|txn_summary| {
+                                    !session.filtered_txns.contains(txn_summary)
+                                        && block_timestamp.as_secs()
+                                            < txn_summary.expiration_timestamp_secs
+                                })
+                                .count() as u64
                     } else {
-                        // Calculate the number of unique transactions if this batch is included in the result
-                        let unique_txns = if let Some(ref txn_summaries) = item.txn_summaries {
-                            cur_unique_txns
-                                + txn_summaries
+                        cur_unique_txns + batch.num_txns()
+                    };
+                    if cur_all_txns + batch.size() > max_txns
+                        || unique_txns > max_txns_after_filtering
+                    {
+                        // Exceeded the limit for requested bytes or number of transactions.
+                        full = true;
+                        break;
+                    }
+                    cur_all_txns += batch.size();
+                    // Add this batch to filtered_txns and calculate the number of
+                    // unique transactions added in the result so far.
+                    cur_unique_txns +=
+                        item.txn_summaries
+                            .as_ref()
+                            .map_or(batch.num_txns(), |summaries| {
+                                summaries
                                     .iter()
-                                    .filter(|txn_summary| {
-                                        !filtered_txns.contains(txn_summary)
+                                    .filter(|summary| {
+                                        session.filtered_txns.insert(**summary)
                                             && block_timestamp.as_secs()
-                                                < txn_summary.expiration_timestamp_secs
+                                                < summary.expiration_timestamp_secs
                                     })
                                     .count() as u64
-                        } else {
-                            cur_unique_txns + batch.num_txns()
-                        };
-                        if cur_all_txns + batch.size() > max_txns
-                            || unique_txns > max_txns_after_filtering
-                        {
-                            // Exceeded the limit for requested bytes or number of transactions.
-                            full = true;
-                            return false;
-                        }
-                        cur_all_txns += batch.size();
-                        // Add this batch to filtered_txns and calculate the number of
-                        // unique transactions added in the result so far.
-                        cur_unique_txns +=
-                            item.txn_summaries
-                                .as_ref()
-                                .map_or(batch.num_txns(), |summaries| {
-                                    summaries
-                                        .iter()
-                                        .filter(|summary| {
-                                            filtered_txns.insert(**summary)
-                                                && block_timestamp.as_secs()
-                                                    < summary.expiration_timestamp_secs
-                                        })
-                                        .count() as u64
-                                });
-                        assert!(item.proof.is_none() == batches_without_proofs);
-                        result.push(item);
-                        if cur_all_txns == max_txns
-                            || cur_unique_txns == max_txns_after_filtering
-                            || cur_unique_txns >= soft_max_txns_after_filtering
-                        {
-                            full = true;
-                            return false;
-                        }
+                            });
+                    assert!(item.proof.is_none() == batches_without_proofs);
+                    // Add pulled batch to session's excluded keys
+                    session
+                        .excluded_batch_keys
+                        .insert(BatchKey::from_info(batch));
+                    result.push(item);
+                    if cur_all_txns == max_txns
+                        || cur_unique_txns == max_txns_after_filtering
+                        || cur_unique_txns >= soft_max_txns_after_filtering
+                    {
+                        full = true;
+                        break;
                     }
-                    true
-                } else {
-                    false
                 }
-            })
+                idx += 1;
+            } else {
+                let _ = iters.swap_remove(idx);
+                // don't increment idx since swap_remove puts a new iter at idx
+            }
         }
         info!(
             // before non full check
@@ -756,6 +760,12 @@ impl BatchProofQueue {
                         counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
                             .with_label_values(&["expired_proof"])
                             .inc();
+                    } else if !item.is_committed() {
+                        // batch without proof being expired
+                        self.num_batches_without_proof_count -= 1;
+                    } else {
+                        // committed item (proof was set to None via mark_committed)
+                        self.num_batches_without_proof_count -= 1;
                     }
                     claims::assert_some!(self.items.remove(&key.batch_key));
                 }
@@ -879,6 +889,8 @@ impl BatchProofQueue {
                             };
                         }
                     }
+                    // Had proof, now mark_committed sets proof to None → increment counter
+                    self.num_batches_without_proof_count += 1;
                 } else if !item.is_committed() {
                     counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
                         .with_label_values(&["committed_batch_without_proof"])
@@ -901,6 +913,8 @@ impl BatchProofQueue {
                     proof: None,
                     proof_insertion_time: None,
                 });
+                // New committed entry with proof=None → increment counter
+                self.num_batches_without_proof_count += 1;
             }
         }
         counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
