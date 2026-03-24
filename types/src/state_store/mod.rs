@@ -149,7 +149,7 @@ impl<K: Eq + Hash> MockStateView<K> {
         Self {
             data: data
                 .into_iter()
-                .map(|(k, v)| (k, StateSlot::from_db_get(Some((0, v)))))
+                .map(|(k, v)| (k, StateSlot::from_db_get(StateKey::raw(b""), Some((0, v)))))
                 .collect(),
         }
     }
@@ -168,7 +168,7 @@ impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
             .data
             .get(state_key)
             .cloned()
-            .unwrap_or(StateSlot::ColdVacant))
+            .unwrap_or_else(|| StateSlot::new(StateKey::raw(b""), StateSlotKind::ColdVacant)))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
