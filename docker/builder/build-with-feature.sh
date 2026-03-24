@@ -11,18 +11,17 @@ echo "PROFILE: $PROFILE"
 echo "FEATURES: $FEATURES"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
-BUILD_ENV=()
+PERF_FLAGS=()
 if [[ "$PROFILE" == "performance" ]]; then
-  source "$(dirname -- "${BASH_SOURCE[0]}")/performance_rustflags.sh"
-  BUILD_ENV=(RUSTFLAGS="${PERFORMANCE_RUSTFLAGS[*]}")
+  PERF_FLAGS=(--config .cargo/performance.toml)
 fi
 
 if [ -n "$FEATURES" ]; then
     echo "Building aptos-node with features ${FEATURES}"
-    env "${BUILD_ENV[@]}" cargo build --profile=$PROFILE --features=$FEATURES -p aptos-node "$@"
-    env "${BUILD_ENV[@]}" cargo build --locked --profile=$PROFILE -p aptos-debugger "$@"
+    cargo build --profile=$PROFILE --features=$FEATURES "${PERF_FLAGS[@]}" -p aptos-node "$@"
+    cargo build --locked --profile=$PROFILE "${PERF_FLAGS[@]}" -p aptos-debugger "$@"
 else
-    env "${BUILD_ENV[@]}" cargo build --locked --profile=$PROFILE \
+    cargo build --locked --profile=$PROFILE "${PERF_FLAGS[@]}" \
         -p aptos-node \
         -p aptos-debugger \
         "$@"
