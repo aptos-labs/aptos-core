@@ -6,8 +6,7 @@ use crate::{
     chunky::{
         test_utils::{ChunkyTestSetup, DummyNetworkSender},
         types::{
-            AggregatedSubtranscriptWithHashes, CertifiedAggregatedSubtranscript,
-            MissingTranscriptRequest,
+            CertifiedAggregatedSubtranscript, MissingTranscriptRequest,
         },
     },
     network::{DummyRpcResponseSender, IncomingRpcRequest},
@@ -164,7 +163,7 @@ async fn test_chunky_dkg_state_transition() {
         .aggregate_signatures(sigs.iter())
         .unwrap();
     let certified = CertifiedAggregatedSubtranscript {
-        aggregated_subtranscript: agg_subtrx,
+        aggregated_subtranscript: Arc::new(agg_subtrx),
         aggregate_signature,
     };
     let result = manager
@@ -255,7 +254,7 @@ async fn test_close_and_notifications() {
         .aggregate_signatures(sigs.iter())
         .unwrap();
     let certified = CertifiedAggregatedSubtranscript {
-        aggregated_subtranscript: agg_subtrx,
+        aggregated_subtranscript: Arc::new(agg_subtrx),
         aggregate_signature,
     };
     manager

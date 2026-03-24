@@ -489,7 +489,7 @@ impl ChunkyDKGManager {
             start_time,
             self.my_addr,
             self.epoch_state.clone(),
-            (*aggregated_subtranscript).clone(),
+            aggregated_subtranscript.clone(),
             dealer_transcript_hashes,
             self.certified_subtrx_tx.clone(),
         );
@@ -539,9 +539,17 @@ impl ChunkyDKGManager {
         counters::observe_chunky_dkg_stage(start_time, self.my_addr, "agg_subtrx_certified");
 
         info!("[ChunkyDKG] deriving encryption key");
-        // Derive encryption key from subtranscript + DigestKey
-        let encryption_key_bytes =
-            aggregated_subtranscript.derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)?;
+        // Derive encryption key from subtranscript + DigestKey.
+        // Heavy pairing-based crypto — run off the main loop.
+        let (encryption_key_bytes, transcript_bytes) = tokio::task::spawn_blocking(move || {
+            let key =
+                aggregated_subtranscript.derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)?;
+            let bytes = bcs::to_bytes(&aggregated_subtranscript)
+                .map_err(|e| anyhow!("transcript serialization error: {e}"))?;
+            Ok::<_, anyhow::Error>((key, bytes))
+        })
+        .await
+        .map_err(|e| anyhow!("spawn_blocking join error: {e}"))??;
 
         info!("[ChunkyDKG] forming certified_transcript struct");
         let certified_transcript = CertifiedAggregatedChunkySubtranscript {
@@ -549,8 +557,7 @@ impl ChunkyDKGManager {
                 epoch: self.epoch_state.epoch,
                 author: self.my_addr,
             },
-            transcript_bytes: bcs::to_bytes(&aggregated_subtranscript)
-                .map_err(|e| anyhow!("transcript serialization error: {e}"))?,
+            transcript_bytes,
             signature: aggregate_signature,
         };
 

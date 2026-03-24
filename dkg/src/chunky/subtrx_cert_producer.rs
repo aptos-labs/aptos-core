@@ -30,7 +30,7 @@ pub fn start_chunky_subtranscript_certification(
     start_time: Duration,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
-    aggregated_subtranscript: AggregatedSubtranscript,
+    aggregated_subtranscript: Arc<AggregatedSubtranscript>,
     dealer_transcript_hashes: Vec<HashValue>,
     certified_agg_subtx_tx: Option<Sender<(), CertifiedAggregatedSubtranscript>>,
 ) -> AbortHandle {
@@ -46,7 +46,7 @@ pub fn start_chunky_subtranscript_certification(
         start_time,
         my_addr,
         epoch_state.clone(),
-        aggregated_subtranscript,
+        aggregated_subtranscript.clone(),
     ));
     let task = async move {
         let validated_trx = rb
@@ -86,7 +86,7 @@ pub struct ChunkySubtranscriptCertificationState {
     my_addr: AccountAddress,
     sig_aggregator: Mutex<ChunkySubtranscriptSignatureAggregator>,
     epoch_state: Arc<EpochState>,
-    aggregated_subtranscript: AggregatedSubtranscript,
+    aggregated_subtranscript: Arc<AggregatedSubtranscript>,
 }
 
 impl ChunkySubtranscriptCertificationState {
@@ -94,7 +94,7 @@ impl ChunkySubtranscriptCertificationState {
         start_time: Duration,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
-        aggregated_subtranscript: AggregatedSubtranscript,
+        aggregated_subtranscript: Arc<AggregatedSubtranscript>,
     ) -> Self {
         Self {
             start_time,
@@ -235,6 +235,7 @@ mod tests {
     use crate::chunky::test_utils::ChunkyTestSetup;
     use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
     use aptos_infallible::duration_since_epoch;
+    use std::sync::Arc;
 
     fn make_cert_state(
         setup: &ChunkyTestSetup,
@@ -244,7 +245,7 @@ mod tests {
             duration_since_epoch(),
             setup.addrs[0],
             setup.epoch_state.clone(),
-            agg_subtrx,
+            Arc::new(agg_subtrx),
         ))
     }
 

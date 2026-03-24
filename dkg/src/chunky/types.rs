@@ -13,6 +13,7 @@ use aptos_types::{
 };
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Once Chunky DKG starts, a validator should send this message to peers in order to collect Chunky DKG transcripts from peers.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -87,7 +88,7 @@ impl ChunkyDKGSubtranscriptSignatureResponse {
 /// A validated aggregated subtranscript with an aggregate signature that can verify it.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CertifiedAggregatedSubtranscript {
-    pub aggregated_subtranscript: AggregatedSubtranscript,
+    pub aggregated_subtranscript: Arc<AggregatedSubtranscript>,
     pub aggregate_signature: AggregateSignature,
 }
 
