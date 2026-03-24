@@ -320,12 +320,7 @@ impl BuiltPackage {
             generate_move_model: true,
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
-<<<<<<< HEAD
-            test_mode: false,
-=======
-            verify_mode: false,
             test_mode: options.with_test_mode,
->>>>>>> 3044960972 (Confidential assets v1.1 (#18973))
             override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,
