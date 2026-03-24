@@ -16,6 +16,11 @@ name = "move"
 path = "src/main.rs"
 required-features = ["binary"]
 
+[lib]
+name = "aptos_move_cli"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
@@ -67,6 +72,14 @@ tokio = { workspace = true }
 toml = { workspace = true }
 url = { workspace = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# getrandom 0.2.x uses "js" feature, but dependencies may pull in 0.3.x which needs "wasm_js"
+getrandom = { workspace = true, features = ["js"] }
+# Explicitly add getrandom 0.3 with wasm_js feature to handle transitive deps
+getrandom_v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
 
@@ -81,3 +94,4 @@ termcolor = { workspace = true }
 default = []
 binary = ["testing"]
 testing = ["aptos-vm/testing"]
+wasm-eval = []  # Evaluation feature flag for WASM compatibility testing

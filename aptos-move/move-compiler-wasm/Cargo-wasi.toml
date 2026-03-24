@@ -1,0 +1,26 @@
+[package]
+name = "move-compiler-wasi"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "move-compiler-wasi"
+path = "src/bin/wasi_main.rs"
+
+[dependencies]
+# Move compiler dependencies
+move-compiler-v2 = { path = "../../third_party/move/move-compiler-v2" }
+legacy-move-compiler = { path = "../../third_party/move/move-compiler-v2/legacy-move-compiler" }
+move-core-types = { path = "../../third_party/move/move-core/types" }
+move-binary-format = { path = "../../third_party/move/move-binary-format" }
+move-symbol-pool = { path = "../../third_party/move/move-symbol-pool" }
+codespan = "0.11"
+codespan-reporting = "0.11"
+anyhow = "1.0"
+serde_json = "1.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

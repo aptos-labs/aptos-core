@@ -1,0 +1,54 @@
+[package]
+name = "move-compiler-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "WebAssembly bindings for Move compiler - compile Move code in browsers and Node.js"
+
+# Standalone crate - not part of main workspace
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# WASM bindings
+wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Move compiler dependencies
+move-compiler-v2 = { path = "../../third_party/move/move-compiler-v2" }
+legacy-move-compiler = { path = "../../third_party/move/move-compiler-v2/legacy-move-compiler" }
+move-core-types = { path = "../../third_party/move/move-core/types" }
+move-binary-format = { path = "../../third_party/move/move-binary-format" }
+move-symbol-pool = { path = "../../third_party/move/move-symbol-pool" }
+codespan = "0.11"
+codespan-reporting = "0.11"
+
+# Error handling
+anyhow = "1.0"
+
+# Random for WASM
+getrandom = { version = "0.2", features = ["js"] }
+
+# Commented out due to cargo cache permission issues
+# [dependencies.console_error_panic_hook]
+# version = "0.1"
+# optional = true
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[features]
+default = []
+
+[profile.release]
+# Optimize for size
+opt-level = "z"     # Optimize for size
+lto = true          # Enable link-time optimization
+codegen-units = 1   # Better optimization
+strip = true        # Strip symbols
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false    # Disable wasm-opt due to bulk-memory issues

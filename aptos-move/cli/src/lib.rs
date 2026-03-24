@@ -29,6 +29,10 @@ mod transactions;
 #[cfg(test)]
 mod tests;
 
+// WASM API for browser/Node.js usage (evaluation only)
+#[cfg(target_arch = "wasm32")]
+pub mod wasm_api;
+
 // ── AptosContext trait for network operations ──
 
 use aptos_cli_common::{CliError, CliTypedResult, TransactionOptions, TransactionSummary};

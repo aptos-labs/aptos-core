@@ -13,6 +13,7 @@ pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
+pub mod sources;
 
 use crate::{
     diagnostics::Emitter,
@@ -307,6 +308,214 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     // Store options in env, for later access
     env.set_extension(options);
     Ok(env)
+}
+
+/// Run move compiler from in-memory sources (filesystem-free compilation).
+///
+/// This is the entry point for compiling Move code without requiring file system access.
+/// It's designed for WASM environments, testing, and other scenarios where sources are
+/// provided as strings rather than file paths.
+///
+/// # Arguments
+/// * `emitter` - Error/diagnostic emitter
+/// * `sources` - Target source files (modules to compile)
+/// * `deps` - Dependency source files (stdlib, libraries)
+/// * `named_address_mapping` - Named address mappings (e.g., "std" -> "0x1")
+/// * `options` - Compiler options
+///
+/// # Returns
+/// GlobalEnv and compiled bytecode units, or compilation errors
+///
+/// # Example
+/// ```ignore
+/// use move_compiler_v2::{run_move_compiler_from_sources, sources::SourceMap, Options};
+///
+/// let mut sources = SourceMap::new();
+/// sources.add_file("test.move", "module 0x1::Test { public fun hello(): u64 { 42 } }");
+///
+/// let mut stderr = std::io::stderr();
+/// let mut emitter = options.error_emitter(&mut stderr);
+/// let (env, units) = run_move_compiler_from_sources(
+///     &mut emitter,
+///     sources,
+///     SourceMap::new(),
+///     Default::default(),
+///     options,
+/// )?;
+/// ```
+pub fn run_move_compiler_from_sources<E>(
+    emitter: &mut E,
+    sources: crate::sources::SourceMap,
+    deps: crate::sources::SourceMap,
+    named_address_mapping: Vec<(String, move_core_types::account_address::AccountAddress)>,
+    options: Options,
+) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)>
+where
+    E: Emitter + ?Sized,
+{
+    use legacy_move_compiler::{
+        parser::parse_program_from_sources,
+        shared::{CompilationEnv, Flags, NamedAddressMap, NamedAddressMaps, NumericalAddress},
+    };
+    use move_command_line_common::parser::NumberFormat;
+    use move_model::{
+        from_ast::run_model_builder_from_ast,
+        options::ModelBuilderOptions,
+    };
+
+    logging::setup_logging(None);
+    info!("Move Compiler v2 (filesystem-free mode)");
+
+    // Step 1: Convert SourceMap to FilesSourceText and parse
+    let targets = sources.to_files_source_text();
+    let deps_files = deps.to_files_source_text();
+
+    // Setup named address maps
+    let mut named_address_map = NamedAddressMap::new();
+    for (name, addr) in named_address_mapping {
+        named_address_map.insert(
+            Symbol::from(name),
+            NumericalAddress::new(addr.into_bytes(), NumberFormat::Hex),
+        );
+    }
+
+    let mut maps = NamedAddressMaps::new();
+    let map_idx = maps.insert(named_address_map.clone());
+
+    // Build parser flags with correct language version
+    let parse_flags = Flags::model_compilation()
+        .set_skip_attribute_checks(options.skip_attribute_checks)
+        .set_keep_testing_functions(options.compile_test_code)
+        .set_language_version(options.language_version.unwrap_or_default().into());
+
+    // Use all known attributes when none are specified (same as run_checker path)
+    let known_attrs = if !options.skip_attribute_checks && options.known_attributes.is_empty() {
+        KnownAttribute::get_all_attribute_names().clone()
+    } else {
+        options.known_attributes.clone()
+    };
+
+    // Parse the program from sources
+    let mut compilation_env = CompilationEnv::new(
+        parse_flags,
+        known_attrs,
+    );
+
+    let (files, pprog_res) = parse_program_from_sources(
+        &mut compilation_env,
+        maps.clone(),
+        targets,
+        map_idx,
+        deps_files,
+    )?;
+
+    let (pprog, _comments) = match pprog_res {
+        Ok(res) => res,
+        Err(diags) => {
+            // Parse errors - create empty env and add diagnostics
+            let mut env = GlobalEnv::new();
+            env.set_language_version(options.language_version.unwrap_or_default());
+            move_model::add_move_lang_diagnostics(&mut env, diags);
+            emitter.report_diag(&env, Severity::Error);
+            return Err(anyhow::anyhow!("parse errors"));
+        }
+    };
+
+    // Identify target file names (all files in sources are targets)
+    let target_file_names: BTreeSet<String> = files
+        .values()
+        .map(|(fname, _)| fname.to_string())
+        .collect();
+
+    // Step 2: Build the model from parsed AST (filesystem-free!)
+    let model_options = ModelBuilderOptions {
+        language_version: options.language_version.unwrap_or_default(),
+        compile_for_testing: options.compile_test_code,
+    };
+
+    let flags = Flags::model_compilation()
+        .set_warn_of_deprecation_use(options.warn_deprecated)
+        .set_warn_of_deprecation_use_in_aptos_libs(options.warn_of_deprecation_use_in_aptos_libs)
+        .set_skip_attribute_checks(options.skip_attribute_checks)
+        .set_keep_testing_functions(options.compile_test_code)
+        .set_language_version(options.language_version.unwrap_or_default().into());
+
+    let mut env = run_model_builder_from_ast(
+        pprog,
+        files,
+        maps,
+        target_file_names,
+        model_options,
+        flags,
+        &options.known_attributes,
+    )?;
+
+    // Store options in the environment
+    env.set_extension(options.clone());
+
+    // Store address aliases
+    let map = named_address_map
+        .into_iter()
+        .map(|(k, v)| (env.symbol_pool().make(k.as_str()), v.into_inner()))
+        .collect();
+    env.set_address_alias_map(map);
+
+    // Check for errors after model building
+    check_errors(&env, emitter, "type checking errors")?;
+
+    // Step 3: Run AST pipeline of checks and transforms
+    env_check_and_transform_pipeline(&options).run(&mut env);
+    check_errors(&env, emitter, "env checking errors")?;
+
+    if options.experiment_on(Experiment::STOP_BEFORE_STACKLESS_BYTECODE) {
+        std::process::exit(if env.has_warnings() { 1 } else { 0 })
+    }
+
+    // Step 4: Run stackless-bytecode generator
+    let mut targets = run_stackless_bytecode_gen(&env);
+    check_errors(&env, emitter, "stackless bytecode generation errors")?;
+
+    // Step 5: Run stackless bytecode checks
+    run_stackless_bytecode_pipeline(
+        &env,
+        stackless_bytecode_check_pipeline(&options),
+        &mut targets,
+    );
+    check_errors(&env, emitter, "stackless-bytecode checks failed")?;
+
+    // Step 6: AST-transforming optimizations
+    env_optimization_pipeline(&options).run(&mut env);
+    check_errors(&env, emitter, "env optimization errors")?;
+
+    // Step 7: Regenerate stackless bytecode after optimizations
+    let mut targets = run_stackless_bytecode_gen(&env);
+    check_errors(&env, emitter, "stackless bytecode generation errors")?;
+
+    // Step 8: Run stackless bytecode optimization passes
+    run_stackless_bytecode_pipeline(
+        &env,
+        stackless_bytecode_optimization_pipeline(&options),
+        &mut targets,
+    );
+    check_errors(&env, emitter, "stackless-bytecode optimization errors")?;
+
+    if options.experiment_on(Experiment::STOP_BEFORE_FILE_FORMAT) {
+        std::process::exit(if env.has_warnings() { 1 } else { 0 })
+    }
+
+    // Step 9: Generate file format bytecode
+    let modules_and_scripts = run_file_format_gen(&mut env, &targets);
+    check_errors(&env, emitter, "assembling errors")?;
+
+    // Step 10: Run bytecode verifier
+    let annotated_units = annotate_units(modules_and_scripts);
+    run_bytecode_verifier(&annotated_units, &mut env);
+    check_errors(&env, emitter, "bytecode verification errors")?;
+
+    // Mark as generated by v2
+    env.set_compiler_v2(true);
+
+    Ok((env, annotated_units))
 }
 
 /// Run the type checker, various required transforms (like inlining and lambda lifting),

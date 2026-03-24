@@ -5,6 +5,7 @@
 pub mod binary_module_loader;
 mod builtins;
 mod exp_builder;
+pub mod from_ast;
 mod macros;
 pub(crate) mod model_builder;
 pub(crate) mod module_builder;

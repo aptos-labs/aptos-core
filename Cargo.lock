@@ -3160,6 +3160,8 @@ dependencies = [
  "clap 4.5.60",
  "colored",
  "futures",
+ "getrandom 0.2.11",
+ "getrandom 0.3.3",
  "hex",
  "itertools 0.13.0",
  "legacy-move-compiler",
@@ -3190,6 +3192,8 @@ dependencies = [
  "tokio",
  "toml 0.7.8",
  "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

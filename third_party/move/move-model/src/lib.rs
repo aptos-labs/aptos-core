@@ -35,6 +35,7 @@ use std::{
 
 pub mod ast;
 mod builder;
+pub use builder::from_ast;
 pub mod code_writer;
 pub mod constant_folder;
 pub mod exp_builder;
@@ -315,7 +316,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     Ok(env)
 }
 
-fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
+pub(crate) fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
     let mut builder = ModelBuilder::new(env);
     for (module_count, (module_id, module_def)) in program
         .modules
@@ -441,14 +442,14 @@ fn check_and_update_friend_info(mut builder: ModelBuilder) {
 }
 
 /// Helper struct to collect the dependency closure of an implicit module
-struct ImplicitModuleDeps<'a> {
+pub(crate) struct ImplicitModuleDeps<'a> {
     target_module_name: &'a str,
     seen: bool,
     dep_closure: BTreeSet<ModuleIdent_>,
 }
 
 impl<'a> ImplicitModuleDeps<'a> {
-    fn new(target_module_name: &'a str) -> Self {
+    pub(crate) fn new(target_module_name: &'a str) -> Self {
         Self {
             target_module_name,
             seen: false,
@@ -457,7 +458,7 @@ impl<'a> ImplicitModuleDeps<'a> {
     }
 
     /// Check if the given module is in the dependency closure of the target module.
-    fn contains(&self, module_ident: &ModuleIdent_) -> bool {
+    pub(crate) fn contains(&self, module_ident: &ModuleIdent_) -> bool {
         self.dep_closure.contains(module_ident)
     }
 
@@ -468,7 +469,7 @@ impl<'a> ImplicitModuleDeps<'a> {
     }
 
     /// Process a module, and if it matches the target module, collect its dependencies recursively.
-    fn process(
+    pub(crate) fn process(
         &mut self,
         mident: &ModuleIdent_,
         modules: &UniqueMap<ModuleIdent, E::ModuleDefinition>,
@@ -481,7 +482,7 @@ impl<'a> ImplicitModuleDeps<'a> {
     }
 }
 
-fn collect_related_modules_recursive<'a>(
+pub(crate) fn collect_related_modules_recursive<'a>(
     mident: &'a ModuleIdent_,
     modules: &'a UniqueMap<ModuleIdent, E::ModuleDefinition>,
     visited_modules: &mut BTreeSet<ModuleIdent_>,

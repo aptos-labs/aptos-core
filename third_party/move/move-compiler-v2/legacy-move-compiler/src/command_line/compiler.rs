@@ -252,6 +252,18 @@ impl<'a, const P: Pass> SteppedCompiler<'a, P> {
 macro_rules! ast_stepped_compilers {
     ($(($pass:ident, $mod:ident, $result:ident, $at_ast:ident, $new:ident)),*) => {
         impl<'a> SteppedCompiler<'a, EMPTY_COMPILER> {
+            /// Create a new empty compiler for use with filesystem-free compilation
+            pub fn new(
+                compilation_env: CompilationEnv,
+                pre_compiled_lib: Option<&'a FullyCompiledProgram>,
+            ) -> Self {
+                Self {
+                    compilation_env,
+                    pre_compiled_lib,
+                    program: None,
+                }
+            }
+
             $(
                 pub fn $at_ast(self, ast: $mod::ast::Program) -> SteppedCompiler<'a, {$pass}> {
                     let Self {

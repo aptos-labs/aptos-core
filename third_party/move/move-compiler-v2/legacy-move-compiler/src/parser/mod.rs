@@ -13,7 +13,7 @@ pub mod syntax;
 use crate::{
     diagnostics::{codes::Severity, Diagnostics, FilesSourceText},
     parser::{self, ast::PackageDefinition, syntax::parse_file_string},
-    shared::{CompilationEnv, IndexedPackagePath, NamedAddressMaps},
+    shared::{CompilationEnv, IndexedPackagePath, NamedAddressMapIndex, NamedAddressMaps},
 };
 use anyhow::anyhow;
 use comments::*;
@@ -189,4 +189,134 @@ fn parse_file(
     };
     files.insert(file_hash, (fname, source_buffer));
     Ok((defs, comments, diags, file_hash))
+}
+
+/// Parse Move source files from in-memory strings (no filesystem access)
+///
+/// This is the source-based equivalent of `parse_program()`. Instead of
+/// discovering and reading files from the filesystem, it uses pre-loaded
+/// source content provided in `FilesSourceText` format.
+///
+/// # Arguments
+/// * `compilation_env` - Compilation environment for error reporting
+/// * `named_address_maps` - Named address mappings for all packages
+/// * `targets` - Target source files to compile (keyed by content hash)
+/// * `deps` - Dependency source files (not compiled as targets)
+///
+/// # Returns
+/// Tuple of:
+/// - FilesSourceText: Combined map of all file hashes to (name, content)
+/// - Result of parsed program or diagnostics
+pub fn parse_program_from_sources(
+    compilation_env: &mut CompilationEnv,
+    named_address_maps: NamedAddressMaps,
+    targets: FilesSourceText,
+    named_address_map_index: NamedAddressMapIndex,
+    deps: FilesSourceText,
+) -> anyhow::Result<(
+    FilesSourceText,
+    Result<(parser::ast::Program, CommentMap), Diagnostics>,
+)> {
+    // Combine targets and deps into single source map for lookups
+    let mut all_files = targets.clone();
+    all_files.extend(deps.clone());
+
+    // Check for duplicates between targets and deps (by content hash)
+    ensure_targets_deps_dont_intersect_sources(&targets, &deps)?;
+
+    let mut source_definitions = Vec::new();
+    let mut source_comments = CommentMap::new();
+    let mut lib_definitions = Vec::new();
+    let mut diags: Diagnostics = Diagnostics::new();
+
+    // Parse target files
+    for (file_hash, (_file_name, source_content)) in targets.iter() {
+        match parse_file_string(compilation_env, *file_hash, source_content) {
+            Ok((defs, comments)) => {
+                // All files use the same named address map (index 0)
+                // In a real multi-package scenario, this would be more complex
+                source_definitions.extend(defs.into_iter().map(|def| PackageDefinition {
+                    package: None,
+                    named_address_map: named_address_map_index,
+                    def,
+                }));
+                source_comments.insert(*file_hash, comments);
+            }
+            Err(ds) => {
+                diags.extend(ds);
+            }
+        }
+    }
+
+    // Parse dependency files
+    for (file_hash, (_file_name, source_content)) in deps.iter() {
+        match parse_file_string(compilation_env, *file_hash, source_content) {
+            Ok((defs, _comments)) => {
+                lib_definitions.extend(defs.into_iter().map(|def| PackageDefinition {
+                    package: None,
+                    named_address_map: named_address_map_index,
+                    def,
+                }));
+            }
+            Err(ds) => {
+                diags.extend(ds);
+            }
+        }
+    }
+
+    // Check for compilation environment errors
+    let env_result = compilation_env.check_diags_at_or_above_severity(Severity::BlockingError);
+    if let Err(env_diags) = env_result {
+        diags.extend(env_diags)
+    }
+
+    // Build result
+    let res = if diags.is_empty() {
+        let pprog = parser::ast::Program {
+            named_address_maps,
+            source_definitions,
+            lib_definitions,
+        };
+        Ok((pprog, source_comments))
+    } else {
+        Err(diags)
+    };
+
+    Ok((all_files, res))
+}
+
+/// Check that targets and deps don't intersect (source-based version)
+///
+/// Unlike the file-based version which canonicalizes paths, this version
+/// checks by content hash. If the same content appears in both targets
+/// and deps, it's an error.
+fn ensure_targets_deps_dont_intersect_sources(
+    targets: &FilesSourceText,
+    deps: &FilesSourceText,
+) -> anyhow::Result<()> {
+    use std::collections::BTreeSet;
+
+    let target_hashes: BTreeSet<_> = targets.keys().collect();
+    let dep_hashes: BTreeSet<_> = deps.keys().collect();
+
+    let intersection: Vec<_> = target_hashes
+        .intersection(&dep_hashes)
+        .collect();
+
+    if !intersection.is_empty() {
+        let duplicate_files: Vec<_> = intersection
+            .iter()
+            .map(|hash| {
+                let (name, _) = targets.get(hash).or_else(|| deps.get(hash)).unwrap();
+                name.as_str()
+            })
+            .collect();
+
+        anyhow::bail!(
+            "The following files were marked as both targets and dependencies:\n{}",
+            duplicate_files.join("\n")
+        );
+    }
+
+    Ok(())
 }
