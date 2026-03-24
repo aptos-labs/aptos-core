@@ -12654,6 +12654,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "fxhash",
  "mono-move-alloc",
+ "move-asm",
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.1",

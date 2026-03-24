@@ -134,6 +134,18 @@ pub struct ExecutableId {
     name: GlobalArenaPtr<str>,
 }
 
+impl ExecutableId {
+    /// Returns executable's address.
+    pub(super) fn address(&self) -> &AccountAddress {
+        &self.address
+    }
+
+    /// Returns the pointer to the executable's name.
+    pub(super) fn name(&self) -> &GlobalArenaPtr<str> {
+        &self.name
+    }
+}
+
 #[allow(private_interfaces)]
 impl<'ctx> ExecutionGuard<'ctx> {
     pub(super) fn intern_address_name_internal(
@@ -191,8 +203,9 @@ impl PartialEq for ExecutableIdInternerKey {
         unsafe {
             let this_id = self.0.as_ref_unchecked();
             let other_id = other.0.as_ref_unchecked();
-            this_id.address == other_id.address
-                && this_id.name.as_ref_unchecked() == other_id.name.as_ref_unchecked()
+            // SAFETY: Names are already canonical pointers, so we can use
+            // pointer equality for them.
+            this_id.address == other_id.address && this_id.name == other_id.name
         }
     }
 }

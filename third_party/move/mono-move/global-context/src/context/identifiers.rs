@@ -92,14 +92,14 @@ impl<'ctx> ExecutionGuard<'ctx> {
         //   or ensure no speculative data even for names ever get on-chain, we
         //   limit interned set to the on-chain data, so for DoS one actually
         //   has to publish modules (expensive).
-        let str = identifier.as_str();
 
         // SAFETY: All existing keys/values are valid pointers because the map
         // is guaranteed to be cleared on arena's reset.
-        if let Some(entry) = self.ctx.identifiers.get(&LookupKey(str)) {
+        if let Some(entry) = self.ctx.identifiers.get(identifier) {
             return *entry.value();
         }
 
+        let str = identifier.as_str();
         let ptr = self.global_arena.alloc_str(str);
 
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
@@ -121,10 +121,6 @@ impl<'ctx> ExecutionGuard<'ctx> {
 /// safely dereferenced.
 pub(super) struct IdentifierInternerKey(GlobalArenaPtr<str>);
 
-// Wrapper to avoid orphan rule.
-#[derive(Hash, PartialEq, Eq)]
-struct LookupKey<'a>(&'a str);
-
 impl Hash for IdentifierInternerKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // SAFETY: It is safe to dereference the pointer because the caller
@@ -145,11 +141,11 @@ impl PartialEq for IdentifierInternerKey {
 // PartialEq implementation above is a full equivalence relation.
 impl Eq for IdentifierInternerKey {}
 
-impl Equivalent<IdentifierInternerKey> for LookupKey<'_> {
+impl Equivalent<IdentifierInternerKey> for IdentStr {
     fn equivalent(&self, key: &IdentifierInternerKey) -> bool {
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
         let key = unsafe { key.0.as_ref_unchecked() };
-        self.0 == key
+        self.as_str() == key
     }
 }
