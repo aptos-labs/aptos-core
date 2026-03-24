@@ -1,0 +1,27 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/param_access.move:72:9
+   │
+72 │         ensures result == Data[addr].value * Index[addr].pos; // error: result is value + pos, not value * pos
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/param_access.move:65: test_reads_of_wrong
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/param_access.move:66: test_reads_of_wrong
+   =         result = <redacted>
+   =     at tests/sources/functional/state_labels/param_access.move:69: test_reads_of_wrong
+   =     at tests/sources/functional/state_labels/param_access.move:72: test_reads_of_wrong (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/param_access.move:129:9
+    │
+129 │         ensures result == 0; // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/param_access.move:119: test_writes_modifies_of_wrong
+    =         addr = <redacted>
+    =     at tests/sources/functional/state_labels/param_access.move:120: test_writes_modifies_of_wrong
+    =         result = <redacted>
+    =     at tests/sources/functional/state_labels/param_access.move:126: test_writes_modifies_of_wrong
+    =     at tests/sources/functional/state_labels/param_access.move:128: test_writes_modifies_of_wrong (spec)
+    =     at tests/sources/functional/state_labels/param_access.move:129: test_writes_modifies_of_wrong (spec)

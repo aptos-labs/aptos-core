@@ -52,18 +52,55 @@ pub struct SpecFunDecl {
     pub name: Symbol,
     pub type_params: Vec<TypeParameter>,
     pub params: Vec<Parameter>,
-    pub context_params: Option<Vec<(Symbol, bool)>>,
     pub result_type: Type,
     pub used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Resources accessed inside `old()` contexts (transitively).
+    /// These require dual-state parameters (pre and post) for verification.
+    pub old_memory: BTreeSet<QualifiedInstId<StructId>>,
     pub uninterpreted: bool,
     pub is_move_fun: bool,
     pub is_native: bool,
     pub body: Option<Exp>,
     pub callees: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub is_recursive: RefCell<Option<bool>>,
+    /// Whether this spec fun (or any callee transitively) uses `old()` expressions
+    /// or has `&mut` parameters. Computed during the spec_rewriter pass.
+    pub uses_old: bool,
+    /// User-declared frame specification (modifies/reads) on spec funs.
+    /// For uninterpreted funs: contributes to used_memory/old_memory.
+    /// For funs with body: validated against body, then overrides used_memory/old_memory.
+    pub frame_spec: Option<FrameSpec>,
     /// The instantiations for which this function is known to use generic type reflection.
     pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
+    /// Spec conditions (ensures, requires, aborts_if) for uninterpreted spec functions
+    /// derived from lambdas with imperative bodies that have spec blocks.
     pub spec: RefCell<Spec>,
+}
+
+/// Frame condition specification: which resources are modified and/or read.
+/// Used in `Spec` (function/lambda), `SpecFunDecl`, and `FunParamAccessOf`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct FrameSpec {
+    /// Modify target expressions (`Operation::Global` with address).
+    pub modifies_targets: Vec<Exp>,
+    /// Resource types that are read (resolved struct IDs).
+    pub reads_targets: BTreeSet<QualifiedInstId<StructId>>,
+}
+
+/// Combined reads/writes access for a function-typed parameter.
+/// Built from `modifies_of<param>(formals) targets;` and `reads_of<param> types;`.
+#[derive(Clone, Debug)]
+pub struct FunParamAccessOf {
+    pub loc: Loc,
+    pub fun_param: Symbol,
+    /// Formal parameters from `modifies_of` declaration, used in target expressions.
+    pub modifies_params: Vec<Parameter>,
+    /// Frame specification (modifies targets + reads types).
+    pub frame_spec: FrameSpec,
+    /// Resources accessed by this function parameter (modifies ∪ reads), derived.
+    pub used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Resources accessed in dual-state (write) context (modifies only), derived.
+    pub old_memory: BTreeSet<QualifiedInstId<StructId>>,
 }
 
 // =================================================================================================
@@ -112,7 +149,6 @@ pub enum ConditionKind {
     AbortsIf,
     AbortsWith,
     SucceedsIf,
-    Modifies,
     Emits,
     Ensures,
     Requires,
@@ -153,7 +189,6 @@ impl ConditionKind {
                 | SucceedsIf
                 | Emits
                 | Ensures
-                | Modifies
                 | FunctionInvariant
                 | LetPost(..)
                 | LetPre(..)
@@ -216,7 +251,6 @@ impl fmt::Display for ConditionKind {
             AbortsIf => write!(f, "aborts_if"),
             AbortsWith => write!(f, "aborts_with"),
             SucceedsIf => write!(f, "succeeds_if"),
-            Modifies => write!(f, "modifies"),
             Emits => write!(f, "emits"),
             Ensures => write!(f, "ensures"),
             Requires => write!(f, "requires"),
@@ -280,8 +314,6 @@ pub enum BehaviorKind {
     AbortsOf,
     /// `ensures_of<f>(args)` - the postcondition of function `f`
     EnsuresOf,
-    /// `modifies_of<f>(args)` - the modify clauses of function `f`
-    ModifiesOf,
     /// `result_of<f>(args)` - deterministic result selector based on `ensures_of`
     /// Semantics: `result_of<f>(x) == choose y where ensures_of<f>(x, y)`
     ResultOf,
@@ -294,7 +326,6 @@ impl fmt::Display for BehaviorKind {
             RequiresOf => write!(f, "requires_of"),
             AbortsOf => write!(f, "aborts_of"),
             EnsuresOf => write!(f, "ensures_of"),
-            ModifiesOf => write!(f, "modifies_of"),
             ResultOf => write!(f, "result_of"),
         }
     }
@@ -355,6 +386,8 @@ pub struct Spec {
     pub loc: Option<Loc>,
     /// The set of conditions associated with this item.
     pub conditions: Vec<Condition>,
+    /// Frame condition (modifies/reads) associated with this item.
+    pub frame_spec: Option<FrameSpec>,
     /// Any pragma properties associated with this item.
     pub properties: PropertyBag,
     /// If this is a function, specs associated with individual code points. Note: only used
@@ -638,6 +671,20 @@ pub enum AddressSpecifier {
     Address(Address),
     Parameter(Symbol),
     Call(QualifiedInstId<FunId>, Symbol),
+}
+
+/// Derived access kind for frame condition computation.
+/// Used to constrain the relationship between pre and post memory snapshots
+/// in behavioral predicates and spec functions with `uses_old`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FrameAccessKind {
+    /// Resource is only read: pre == post
+    Reads,
+    /// Resource may be written at any address: no frame constraint
+    WritesAll,
+    /// Resource may be written at specific addresses only.
+    /// Each Exp is an address expression (already substituted for call site).
+    WritesAt(Vec<Exp>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Hash, Default)]
@@ -1236,15 +1283,14 @@ impl ExpData {
                     let (mid, sid, sinst) = inst[0].require_struct();
                     result.insert((mid.qualified_inst(sid, sinst.to_owned()), label.to_owned()));
                 },
-                Call(id, SpecFunction(mid, fid, labels), _) => {
+                Call(id, SpecFunction(mid, fid, range), _) => {
                     let inst = &env.get_node_instantiation(*id);
                     let module = env.get_module(*mid);
                     let fun = module.get_spec_fun(*fid);
-                    for (i, mem) in fun.used_memory.iter().enumerate() {
-                        result.insert((
-                            mem.to_owned().instantiate(inst),
-                            labels.as_ref().map(|l| l[i]),
-                        ));
+                    for mem in fun.used_memory.iter() {
+                        // Use the post label from the range if available, otherwise pre
+                        let label = range.post.or(range.pre);
+                        result.insert((mem.to_owned().instantiate(inst), label));
                     }
                 },
                 _ => {},
@@ -1266,6 +1312,14 @@ impl ExpData {
                     let inst = &env.get_node_instantiation(*id);
                     let (mid, sid, sinst) = inst[0].require_struct();
                     result.insert(mid.qualified_inst(sid, sinst.to_owned()));
+                },
+                Call(id, SpecFunction(mid, fid, _range), _) => {
+                    let inst = &env.get_node_instantiation(*id);
+                    let module = env.get_module(*mid);
+                    let fun = module.get_spec_fun(*fid);
+                    for mem in fun.used_memory.iter() {
+                        result.insert(mem.to_owned().instantiate(inst));
+                    }
                 },
                 _ => {},
             }
@@ -2231,15 +2285,14 @@ pub enum Operation {
     TestVariants(ModuleId, StructId, /* variants */ Vec<Symbol>),
 
     // Specification specific
-    SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
+    SpecFunction(ModuleId, SpecFunId, MemoryRange),
     UpdateField(ModuleId, StructId, FieldId),
-    /// Behavior predicate for function values (requires_of, aborts_of, ensures_of, modifies_of).
+    /// Behavior predicate for function values (requires_of, aborts_of, ensures_of, result_of).
     /// args[0] is the function expression (Closure for global functions, Temporary for
     /// function parameters, LocalVar for spec function parameters).
     /// args[1..] are the predicate arguments.
-    /// The BehaviorState contains optional pre/post state labels for reasoning about
-    /// state at different program points.
-    Behavior(BehaviorKind, BehaviorState),
+    /// The `MemoryRange` defines the pre/post memory states for the predicate evaluation.
+    Behavior(BehaviorKind, MemoryRange),
     Result(usize),
     Index,
     Slice,
@@ -2336,24 +2389,25 @@ pub enum Operation {
 /// A label used for referring to a specific memory in Global and Exists expressions.
 pub type MemoryLabel = GlobalId;
 
-/// State labels for behavior predicates.
-/// Pre-label refers to state before an operation, post-label refers to state after.
-/// Label names are stored in GlobalEnv and can be looked up via `get_memory_label_name`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct BehaviorState {
-    /// Pre-state label - references another predicate's post-state
+/// Describes the memory state range for an operation that accesses global state.
+/// - `pre`: which memory snapshot `old()` references resolve to
+/// - `post`: which memory snapshot current-state references resolve to
+/// When `None`, the respective state is the default (current memory or saved pre-state).
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MemoryRange {
     pub pre: Option<MemoryLabel>,
-    /// Post-state label - defines this predicate's post-state
     pub post: Option<MemoryLabel>,
 }
 
-impl BehaviorState {
-    pub fn new(pre: Option<MemoryLabel>, post: Option<MemoryLabel>) -> Self {
-        Self { pre, post }
+impl MemoryRange {
+    /// Returns true if this range has no labels set.
+    pub fn is_default(&self) -> bool {
+        self.pre.is_none() && self.post.is_none()
     }
 
-    pub fn has_labels(&self) -> bool {
-        self.pre.is_some() || self.post.is_some()
+    /// Iterate over all labels in this range.
+    pub fn labels(&self) -> impl Iterator<Item = MemoryLabel> + '_ {
+        self.pre.iter().chain(self.post.iter()).copied()
     }
 }
 
@@ -4028,14 +4082,20 @@ impl fmt::Display for OperationDisplay<'_> {
                 let ty = self.env.get_node_type(self.node_id);
                 write!(f, "{:?}<{}>", self.oper, ty.display(self.get_tctx()))
             },
-            SpecFunction(mid, fid, labels_opt) => {
+            SpecFunction(mid, fid, range) => {
                 write!(f, "{}", self.fun_str(mid, fid))?;
-                if let Some(labels) = labels_opt {
-                    write!(
-                        f,
-                        "[{}]",
-                        labels.iter().map(|l| format!("{}", l)).join(", ")
-                    )?;
+                if !range.is_default() {
+                    write!(f, "[")?;
+                    if let Some(pre) = range.pre {
+                        write!(f, "pre={}", pre)?;
+                        if range.post.is_some() {
+                            write!(f, ",")?;
+                        }
+                    }
+                    if let Some(post) = range.post {
+                        write!(f, "post={}", post)?;
+                    }
+                    write!(f, "]")?;
                 }
                 Ok(())
             },
@@ -4102,13 +4162,20 @@ impl fmt::Display for OperationDisplay<'_> {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
             Result(t) => write!(f, "result{}", t),
-            Behavior(kind, state) => {
-                if let Some(pre) = &state.pre {
-                    write!(f, "{}@", pre.as_usize())?;
-                }
+            Behavior(kind, range) => {
                 write!(f, "{}", kind)?;
-                if let Some(post) = &state.post {
-                    write!(f, "@{}", post.as_usize())?;
+                if !range.is_default() {
+                    write!(f, "[")?;
+                    if let Some(pre) = range.pre {
+                        write!(f, "pre={}", pre)?;
+                        if range.post.is_some() {
+                            write!(f, ",")?;
+                        }
+                    }
+                    if let Some(post) = range.post {
+                        write!(f, "post={}", post)?;
+                    }
+                    write!(f, "]")?;
                 }
                 Ok(())
             },
@@ -4229,6 +4296,14 @@ impl fmt::Display for EnvDisplay<'_, Condition> {
 impl fmt::Display for EnvDisplay<'_, Spec> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "spec {{")?;
+        if let Some(frame) = &self.val.frame_spec {
+            for target in &frame.modifies_targets {
+                writeln!(f, "  modifies {};", target.display(self.env))?;
+            }
+            for target in &frame.reads_targets {
+                writeln!(f, "  reads {};", self.env.display(target))?;
+            }
+        }
         for cond in &self.val.conditions {
             writeln!(f, "  {}", self.env.display(cond))?
         }
@@ -4473,6 +4548,7 @@ mod tests {
         let spec1 = Spec {
             loc: None,
             conditions: vec![],
+            frame_spec: None,
             properties: BTreeMap::new(),
             on_impl: BTreeMap::new(),
             update_map: BTreeMap::from([
@@ -4483,6 +4559,7 @@ mod tests {
         let spec2 = Spec {
             loc: None,
             conditions: vec![],
+            frame_spec: None,
             properties: BTreeMap::new(),
             on_impl: BTreeMap::new(),
             update_map: BTreeMap::from([

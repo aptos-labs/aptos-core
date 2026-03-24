@@ -8,7 +8,9 @@ module 0x42::globals {
         exists<Counter>(addr)
     }
     spec has_counter(addr: address): bool {
+        pragma opaque = true;
         ensures [inferred] result == exists<Counter>(addr);
+        aborts_if [inferred] false;
     }
 
 
@@ -19,7 +21,8 @@ module 0x42::globals {
         Counter[addr].value
     }
     spec get_value(addr: address): u64 {
-        ensures [inferred] result == global<Counter>(addr).value;
+        pragma opaque = true;
+        ensures [inferred] result == Counter[addr].value;
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -31,10 +34,11 @@ module 0x42::globals {
         move_from<Counter>(addr)
     }
     spec remove_counter(addr: address): Counter {
-        ensures [inferred] result == global<Counter>(addr);
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] result == old(Counter[addr]);
         ensures [inferred] !exists<Counter>(addr);
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -43,10 +47,11 @@ module 0x42::globals {
         move_to(account, Counter { value: 0 });
     }
     spec create_counter(account: &signer) {
+        pragma opaque = true;
+        modifies Counter[0x1::signer::address_of(account)];
         ensures [inferred] exists<Counter>(0x1::signer::address_of(account));
-        ensures [inferred] global<Counter>(0x1::signer::address_of(account)) == Counter{value: 0};
+        ensures [inferred] Counter[0x1::signer::address_of(account)] == Counter{value: 0};
         aborts_if [inferred] exists<Counter>(0x1::signer::address_of(account));
-        modifies [inferred] global<Counter>(0x1::signer::address_of(account));
     }
 
 
@@ -56,7 +61,8 @@ module 0x42::globals {
         counter_ref.value
     }
     spec read_counter(addr: address): u64 {
-        ensures [inferred] result == global<Counter>(addr).value;
+        pragma opaque = true;
+        ensures [inferred] result == Counter[addr].value;
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -70,9 +76,10 @@ module 0x42::globals {
         counter_ref.value = new_value;
     }
     spec update_counter(addr: address, new_value: u64) {
-        ensures [inferred] global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, new_value);
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, new_value);
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -85,10 +92,11 @@ module 0x42::globals {
         move_to(account, Counter { value: init_value });
     }
     spec create_with_value(account: &signer, init_value: u64) {
+        pragma opaque = true;
+        modifies Counter[0x1::signer::address_of(account)];
         ensures [inferred] exists<Counter>(0x1::signer::address_of(account));
-        ensures [inferred] global<Counter>(0x1::signer::address_of(account)) == Counter{value: init_value};
+        ensures [inferred] Counter[0x1::signer::address_of(account)] == Counter{value: init_value};
         aborts_if [inferred] exists<Counter>(0x1::signer::address_of(account));
-        modifies [inferred] global<Counter>(0x1::signer::address_of(account));
     }
 
 
@@ -99,10 +107,11 @@ module 0x42::globals {
         value
     }
     spec remove_value(addr: address): u64 {
-        ensures [inferred] result == global<Counter>(addr).value;
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] result == old(Counter[addr]).value;
         ensures [inferred] !exists<Counter>(addr);
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -117,11 +126,12 @@ module 0x42::globals {
         }
     }
     spec conditional_remove(cond: bool, addr: address): u64 {
-        ensures [inferred] cond ==> result == global<Counter>(addr).value;
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] cond ==> result == old(Counter[addr]).value;
         ensures [inferred] cond ==> !exists<Counter>(addr);
         ensures [inferred] !cond ==> result == 0;
         aborts_if [inferred] cond && !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 }

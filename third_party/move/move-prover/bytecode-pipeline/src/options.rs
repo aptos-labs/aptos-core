@@ -77,6 +77,9 @@ pub struct ProverOptions {
     /// Whether to run spec inference instead of verification.
     #[arg(skip)]
     pub inference: bool,
+    /// Whether to add `pragma opaque` to inferred specs.
+    #[arg(skip)]
+    pub inference_opaque: bool,
     /// Optional names of native methods (qualified with module name, e.g., m::foo) implementing
     /// mutable borrow semantics
     #[arg(skip)]
@@ -106,6 +109,7 @@ impl Default for ProverOptions {
             for_interpretation: false,
             skip_loop_analysis: false,
             inference: false,
+            inference_opaque: true,
             borrow_natives: vec![],
             verify_exclude: vec![],
         }

@@ -925,12 +925,7 @@ impl TransactionPayload {
     }
 
     pub fn replay_protection_nonce(&self) -> Option<u64> {
-        match self {
-            Self::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
-                extra_config.replay_protection_nonce()
-            },
-            _ => None,
-        }
+        self.extra_config().replay_protection_nonce()
     }
 
     pub fn executable(&self) -> Result<TransactionExecutable> {

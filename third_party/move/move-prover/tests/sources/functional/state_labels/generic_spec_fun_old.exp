@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/generic_spec_fun_old.move:57:9
+   │
+57 │         ensures balance_increased<EUR>(addr); // error: wrong type
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/generic_spec_fun_old.move:52: increment_usd_claim_eur
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/generic_spec_fun_old.move:53: increment_usd_claim_eur
+   =     at tests/sources/functional/state_labels/generic_spec_fun_old.move:54: increment_usd_claim_eur
+   =     at tests/sources/functional/state_labels/generic_spec_fun_old.move:57: increment_usd_claim_eur (spec)

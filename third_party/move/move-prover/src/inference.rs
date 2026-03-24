@@ -45,7 +45,7 @@ use std::{
     time::Instant,
 };
 
-#[derive(Debug, Clone, Default, clap::Args)]
+#[derive(Debug, Clone, clap::Args)]
 pub struct InferenceOptions {
     /// Run spec inference instead of verification.
     #[arg(short = 'i', long)]
@@ -56,6 +56,18 @@ pub struct InferenceOptions {
     /// Output directory for generated spec files (used with file output mode).
     #[arg(long)]
     pub inference_output_dir: Option<String>,
+    /// File suffix for unified output mode (default: "enriched.move").
+    #[arg(long, default_value = "enriched.move")]
+    pub inference_unified_suffix: String,
+}
+
+impl Default for InferenceOptions {
+    fn default() -> Self {
+        use clap::{Command, FromArgMatches};
+        let cmd = <Self as clap::Args>::augment_args(Command::new(""));
+        let matches = cmd.get_matches_from(std::iter::empty::<String>());
+        <Self as FromArgMatches>::from_arg_matches(&matches).unwrap()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, clap::ValueEnum)]
@@ -326,8 +338,8 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
             if fun.is_native() || fun.is_intrinsic() {
                 return false;
             }
-            fun.get_spec()
-                .conditions
+            let spec = fun.get_spec();
+            spec.conditions
                 .iter()
                 .any(|c| c.properties.contains_key(&inferred_sym))
         });
@@ -350,13 +362,14 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
             if fun.is_native() || fun.is_intrinsic() {
                 continue;
             }
-            // Check for inferred conditions without keeping the Ref alive,
+            // Check for inferred conditions/frame_spec without keeping the Ref alive,
             // since helper functions below need get_mut_spec().
-            let has_inferred = fun
-                .get_spec()
-                .conditions
-                .iter()
-                .any(|c| c.properties.contains_key(&inferred_sym));
+            let has_inferred = {
+                let spec = fun.get_spec();
+                spec.conditions
+                    .iter()
+                    .any(|c| c.properties.contains_key(&inferred_sym))
+            };
             if !has_inferred {
                 continue;
             }
@@ -464,13 +477,14 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
         let stem = source_path
             .file_stem()
             .expect("source file should have a stem");
+        let suffix = &options.inference.inference_unified_suffix;
         let output_path = if let Some(ref dir) = options.inference.inference_output_dir {
-            PathBuf::from(dir).join(format!("{}.enriched.move", stem.to_string_lossy()))
+            PathBuf::from(dir).join(format!("{}.{}", stem.to_string_lossy(), suffix))
         } else {
             let source_dir = source_path
                 .parent()
                 .expect("source file should have a parent directory");
-            source_dir.join(format!("{}.enriched.move", stem.to_string_lossy()))
+            source_dir.join(format!("{}.{}", stem.to_string_lossy(), suffix))
         };
 
         if let Some(parent) = output_path.parent() {
@@ -506,7 +520,7 @@ fn generate_inferred_conditions(
 ) -> String {
     let sourcifier = Sourcifier::new(env, true);
 
-    // Filter to only inferred conditions and new properties, print, then restore.
+    // Filter to only inferred conditions, properties, and frame_spec; print; then restore.
     let (original_conditions, original_properties) = {
         let mut spec = fun.get_mut_spec();
         let orig_conds = std::mem::take(&mut spec.conditions);
