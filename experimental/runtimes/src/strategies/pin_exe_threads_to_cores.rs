@@ -8,13 +8,14 @@ use crate::{
 use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;
 use libc::CPU_SET;
 use rayon::ThreadPool;
+use std::sync::Arc;
 
 pub(crate) struct PinExeThreadsToCoresThreadManager {
-    exe_threads: ThreadPool,
-    non_exe_threads: ThreadPool,
-    high_pri_io_threads: ThreadPool,
-    io_threads: ThreadPool,
-    background_threads: ThreadPool,
+    exe_threads: Arc<ThreadPool>,
+    non_exe_threads: Arc<ThreadPool>,
+    high_pri_io_threads: Arc<ThreadPool>,
+    io_threads: Arc<ThreadPool>,
+    background_threads: Arc<ThreadPool>,
 }
 
 impl PinExeThreadsToCoresThreadManager {
@@ -31,35 +32,35 @@ impl PinExeThreadsToCoresThreadManager {
             unsafe { CPU_SET(core_id.id, &mut non_exe_cpu_set) };
         }
 
-        let exe_threads = spawn_rayon_thread_pool_with_start_hook(
+        let exe_threads = Arc::new(spawn_rayon_thread_pool_with_start_hook(
             "exe".into(),
             Some(num_exe_cpu),
             pin_cpu_set(exe_cpu_set),
-        );
+        ));
 
-        let non_exe_threads = spawn_rayon_thread_pool_with_start_hook(
+        let non_exe_threads = Arc::new(spawn_rayon_thread_pool_with_start_hook(
             "non_exe".into(),
             Some(core_ids.len() - num_exe_cpu),
             pin_cpu_set(non_exe_cpu_set),
-        );
+        ));
 
-        let high_pri_io_threads = spawn_rayon_thread_pool_with_start_hook(
+        let high_pri_io_threads = Arc::new(spawn_rayon_thread_pool_with_start_hook(
             "io_high".into(),
             Some(32),
             pin_cpu_set(exe_cpu_set),
-        );
+        ));
 
-        let io_threads = spawn_rayon_thread_pool_with_start_hook(
+        let io_threads = Arc::new(spawn_rayon_thread_pool_with_start_hook(
             "io_low".into(),
             Some(64),
             pin_cpu_set(non_exe_cpu_set),
-        );
+        ));
 
-        let background_threads = spawn_rayon_thread_pool_with_start_hook(
+        let background_threads = Arc::new(spawn_rayon_thread_pool_with_start_hook(
             "background".into(),
             Some(32),
             pin_cpu_set(non_exe_cpu_set),
-        );
+        ));
 
         Self {
             exe_threads,
@@ -72,23 +73,23 @@ impl PinExeThreadsToCoresThreadManager {
 }
 
 impl<'a> ThreadManager<'a> for PinExeThreadsToCoresThreadManager {
-    fn get_exe_cpu_pool(&'a self) -> &'a ThreadPool {
+    fn get_exe_cpu_pool(&'a self) -> &'a Arc<ThreadPool> {
         &self.exe_threads
     }
 
-    fn get_non_exe_cpu_pool(&'a self) -> &'a ThreadPool {
+    fn get_non_exe_cpu_pool(&'a self) -> &'a Arc<ThreadPool> {
         &self.non_exe_threads
     }
 
-    fn get_io_pool(&'a self) -> &'a ThreadPool {
+    fn get_io_pool(&'a self) -> &'a Arc<ThreadPool> {
         &self.io_threads
     }
 
-    fn get_high_pri_io_pool(&'a self) -> &'a ThreadPool {
+    fn get_high_pri_io_pool(&'a self) -> &'a Arc<ThreadPool> {
         &self.high_pri_io_threads
     }
 
-    fn get_background_pool(&'a self) -> &'a ThreadPool {
+    fn get_background_pool(&'a self) -> &'a Arc<ThreadPool> {
         &self.background_threads
     }
 }
