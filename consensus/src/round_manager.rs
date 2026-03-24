@@ -854,11 +854,14 @@ impl RoundManager {
         network: Arc<NetworkSender>,
         sync_info: SyncInfo,
         proposal_generator: Arc<ProposalGenerator>,
-        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        _proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proxy_hooks: Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>,
     ) -> anyhow::Result<()> {
+        // Use fast path: minimal QS pull without payload filter, backpressure,
+        // or opt QS params. Avoids contending with the regular proposal's QS
+        // pull on the shared ProofManager (~3x reduction in QS pull load).
         let (validator_txns, payload, timestamp) = proposal_generator
-            .generate_opt_proposal_payload(round, parent.id(), proposer_election)
+            .generate_opt_proposal_payload_fast(round, parent.id())
             .await?;
 
         let opt_block_data = proxy_hooks.transform_opt_proposal(
@@ -1899,6 +1902,7 @@ impl RoundManager {
         if self.proxy_event_tx.is_some() {
             return Ok(());
         }
+
 
         ensure!(
             !self.proposal_generator.is_proposal_under_backpressure(),

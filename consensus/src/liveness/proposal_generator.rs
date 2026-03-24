@@ -557,13 +557,11 @@ impl ProposalGenerator {
 
     /// Fast-path proposal generation for proxy consensus.
     ///
-    /// Skips the expensive parts of `generate_proposal_inner`:
-    /// - No PayloadFilter construction (iterating all pending blocks' payloads)
-    /// - No backpressure calculation (already disabled for proxy via no_backoff configs)
-    /// - No path_from_ordered_root traversal
-    /// - Minimal payload pull parameters (no opt QS params)
-    ///
-    /// This reduces overhead from ~5ms to <0.5ms, leaving only the QS pull latency.
+    /// Keeps payload filter (essential for dedup) but skips:
+    /// - Backpressure calculation (already disabled for proxy via no_backoff configs)
+    /// - Opt QS params (avoids expensive pull_batches in ProofManager)
+    /// - Voting power ratio / max block size recalculation
+    /// - proposal_delay sleep
     pub async fn generate_proposal_fast(
         &self,
         round: Round,
@@ -591,10 +589,43 @@ impl ProposalGenerator {
                 }
             }
 
-            let timestamp = self.time_service.get_current_timestamp();
+            let parent_id = hqc.certified_block().id();
 
-            // Minimal pull: no payload filter (ProxyBudgetPayloadClient handles dedup),
-            // no opt QS params, no backpressure adjustment.
+            // Build payload filter from pending blocks (essential for dedup)
+            let mut pending_blocks = self
+                .block_store
+                .path_from_commit_root(parent_id)
+                .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?;
+            pending_blocks.push(self.block_store.commit_root());
+
+            let exclude_payload: Vec<_> = pending_blocks
+                .iter()
+                .flat_map(|block| block.payload())
+                .collect();
+            let payload_filter = PayloadFilter::from(&exclude_payload);
+            let payload_filter = match payload_filter {
+                PayloadFilter::InQuorumStore(mut set) => {
+                    let committed = self.block_store.committed_batch_infos();
+                    if !committed.is_empty() {
+                        set.extend(committed);
+                    }
+                    PayloadFilter::InQuorumStore(set)
+                },
+                other => other,
+            };
+
+            let pending_ordering = self
+                .block_store
+                .path_from_ordered_root(parent_id)
+                .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?
+                .iter()
+                .any(|block| !block.payload().is_none_or(|txns| txns.is_empty()));
+
+            let timestamp = self.time_service.get_current_timestamp();
+            let maybe_optqs_payload_pull_params =
+                self.opt_qs_payload_param_provider.get_params();
+
+            // Skip backpressure and proposal_delay only.
             let (validator_txns, payload) = self
                 .payload_client
                 .pull_payload(
@@ -604,9 +635,9 @@ impl ProposalGenerator {
                         max_txns_after_filtering: self.max_block_txns_after_filtering,
                         soft_max_txns_after_filtering: self.max_block_txns_after_filtering,
                         max_inline_txns: self.max_inline_txns,
-                        maybe_optqs_payload_pull_params: None,
-                        user_txn_filter: PayloadFilter::Empty,
-                        pending_ordering: true,
+                        maybe_optqs_payload_pull_params,
+                        user_txn_filter: payload_filter,
+                        pending_ordering,
                         pending_uncommitted_blocks: 0,
                         recent_max_fill_fraction: 0.0,
                         block_timestamp: timestamp,
@@ -905,6 +936,103 @@ impl ProposalGenerator {
         };
 
         Ok((validator_txns, payload, timestamp))
+    }
+
+    /// Fast-path opt proposal payload for proxy consensus.
+    ///
+    /// Keeps payload filter (essential for dedup) but skips backpressure and
+    /// opt QS params to reduce ProofManager contention.
+    pub async fn generate_opt_proposal_payload_fast(
+        &self,
+        round: Round,
+        parent_id: HashValue,
+    ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload, u64)> {
+        let hqc = self.ensure_highest_quorum_cert(round)?;
+
+        ensure!(
+            hqc.certified_block().round() + 2 == round,
+            "[OptProposal] Given round {} is not equal to hqc round {} + 2",
+            round,
+            hqc.certified_block().round()
+        );
+
+        if hqc.certified_block().has_reconfiguration() {
+            bail!("[OptProposal] HQC has reconfiguration!");
+        }
+
+        // Track last_round_generated
+        {
+            let mut last_round_generated = self.last_round_generated.lock();
+            if *last_round_generated < round {
+                *last_round_generated = round;
+            } else {
+                bail!("Already proposed in the round {}", round);
+            }
+        }
+
+        // Build payload filter from pending blocks (essential for dedup)
+        let mut pending_blocks = self
+            .block_store
+            .path_from_commit_root(parent_id)
+            .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?;
+        pending_blocks.push(self.block_store.commit_root());
+
+        let exclude_payload: Vec<_> = pending_blocks
+            .iter()
+            .flat_map(|block| block.payload())
+            .collect();
+        let payload_filter = PayloadFilter::from(&exclude_payload);
+        let payload_filter = match payload_filter {
+            PayloadFilter::InQuorumStore(mut set) => {
+                let committed = self.block_store.committed_batch_infos();
+                if !committed.is_empty() {
+                    set.extend(committed);
+                }
+                PayloadFilter::InQuorumStore(set)
+            },
+            other => other,
+        };
+
+        let pending_ordering = self
+            .block_store
+            .path_from_ordered_root(parent_id)
+            .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?
+            .iter()
+            .any(|block| !block.payload().is_none_or(|txns| txns.is_empty()));
+
+        let timestamp = self.time_service.get_current_timestamp();
+        let maybe_optqs_payload_pull_params =
+            self.opt_qs_payload_param_provider.get_params();
+
+        // Skip backpressure only.
+        let (validator_txns, payload) = self
+            .payload_client
+            .pull_payload(
+                PayloadPullParameters {
+                    max_poll_time: self.quorum_store_poll_time,
+                    max_txns: self.max_block_txns,
+                    max_txns_after_filtering: self.max_block_txns_after_filtering,
+                    soft_max_txns_after_filtering: self.max_block_txns_after_filtering,
+                    max_inline_txns: self.max_inline_txns,
+                    maybe_optqs_payload_pull_params,
+                    user_txn_filter: payload_filter,
+                    pending_ordering,
+                    pending_uncommitted_blocks: 0,
+                    recent_max_fill_fraction: 0.0,
+                    block_timestamp: timestamp,
+                },
+                vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
+            )
+            .await
+            .context("Fail to retrieve payload")?;
+
+        let validator_txns = if self.vtxn_config.enabled() {
+            validator_txns
+        } else {
+            vec![]
+        };
+
+        Ok((validator_txns, payload, timestamp.as_micros() as u64))
     }
 
     pub async fn generate_opt_proposal(
