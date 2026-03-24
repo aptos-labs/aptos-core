@@ -23,7 +23,7 @@ use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
 use aptos_types::{
     dkg::{
         chunky_dkg::{
-            AggregatedSubtranscript, ChunkyDKGConfig, ChunkyDKGTranscript, ChunkySubtranscript,
+            AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGTranscript, ChunkySubtranscript,
             ChunkyTranscript, DealerPublicKey,
         },
         DKGTranscriptMetadata,
@@ -48,7 +48,7 @@ pub fn start_subtranscript_aggregation(
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     epoch_state: Arc<EpochState>,
     my_addr: AccountAddress,
-    dkg_config: Arc<ChunkyDKGConfig>,
+    dkg_config: Arc<ChunkyDKGSession>,
     spks: Vec<DealerPublicKey>,
     start_time: Duration,
     agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
@@ -109,7 +109,7 @@ impl InnerState {
 pub struct ChunkyTranscriptAggregationState {
     epoch_state: Arc<EpochState>,
     my_addr: AccountAddress,
-    dkg_config: Arc<ChunkyDKGConfig>,
+    dkg_config: Arc<ChunkyDKGSession>,
     signing_pubkeys: Vec<DealerPublicKey>,
     start_time: Duration,
     received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
@@ -120,7 +120,7 @@ impl ChunkyTranscriptAggregationState {
     pub fn new(
         epoch_state: Arc<EpochState>,
         my_addr: AccountAddress,
-        dkg_config: Arc<ChunkyDKGConfig>,
+        dkg_config: Arc<ChunkyDKGSession>,
         signing_pubkeys: Vec<DealerPublicKey>,
         start_time: Duration,
         agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,

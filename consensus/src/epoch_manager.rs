@@ -88,7 +88,7 @@ use aptos_types::{
     account_address::AccountAddress,
     dkg::{
         chunky_dkg::{
-            AggregatedSubtranscript, ChunkyDKG, ChunkyDKGState, ChunkyDecryptPrivKey,
+            AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGState, ChunkyDecryptPrivKey,
             TEST_DIGEST_KEY,
         },
         real_dkg::maybe_dk_from_bls_sk,
@@ -1174,7 +1174,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             return Err(NoSecretSharingReason::CompletedSessionTooOld);
         }
 
-        let dkg_config = ChunkyDKG::generate_config(&dkg_session.metadata);
+        let dkg_config = ChunkyDKGSession::generate_config(&dkg_session.metadata);
         let my_index = new_epoch_state
             .verifier
             .address_to_validator_index()
@@ -1207,7 +1207,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             digest_key,
             msk_share,
             verification_keys,
-            dkg_config.threshold_config,
+            dkg_config.threshold_config.clone(),
             encryption_key,
         ))
     }

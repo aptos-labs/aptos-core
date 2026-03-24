@@ -4,7 +4,7 @@
 use anyhow::{anyhow, ensure, Context};
 use aptos_dkg::pvss::traits::transcript::{HasAggregatableSubtranscript, Transcript};
 use aptos_types::{
-    dkg::chunky_dkg::{ChunkyDKGConfig, ChunkyTranscript, DealerPublicKey},
+    dkg::chunky_dkg::{ChunkyDKGSession, ChunkyTranscript, DealerPublicKey},
     epoch_state::EpochState,
 };
 use move_core_types::account_address::AccountAddress;
@@ -19,7 +19,7 @@ use rand::{CryptoRng, RngCore};
 pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
     sender: AccountAddress,
     transcript_bytes: &[u8],
-    dkg_config: &ChunkyDKGConfig,
+    dkg_config: &ChunkyDKGSession,
     signing_pubkeys: &[DealerPublicKey],
     epoch_state: &EpochState,
     rng: &mut R,

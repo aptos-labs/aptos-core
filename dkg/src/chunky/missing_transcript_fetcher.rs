@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_logger::warn;
 use aptos_types::{
-    dkg::chunky_dkg::{ChunkyDKGConfig, ChunkyTranscript, DealerPublicKey},
+    dkg::chunky_dkg::{ChunkyDKGSession, ChunkyTranscript, DealerPublicKey},
     epoch_state::EpochState,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
@@ -32,7 +32,7 @@ pub struct TranscriptFetcher {
     epoch: u64,
     missing_dealers: Vec<AccountAddress>,
     rpc_timeout: Duration,
-    dkg_config: Arc<ChunkyDKGConfig>,
+    dkg_config: Arc<ChunkyDKGSession>,
     epoch_state: Arc<EpochState>,
 }
 
@@ -49,7 +49,11 @@ impl TranscriptFetcher {
         epoch: u64,
         missing_dealers: Vec<AccountAddress>,
         rpc_timeout: Duration,
+<<<<<<< HEAD
         dkg_config: Arc<ChunkyDKGConfig>,
+=======
+        dkg_config: ChunkyDKGSession,
+>>>>>>> 3c6305ff1f ([dkg] Delete redundant ChunkyDKG struct, rename ChunkyDKGConfig to ChunkyDKGSession)
         epoch_state: Arc<EpochState>,
     ) -> Self {
         Self {

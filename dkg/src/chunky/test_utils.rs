@@ -10,7 +10,7 @@ use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_types::{
     dkg::chunky_dkg::{
-        AggregatedSubtranscript, ChunkyDKG, ChunkyDKGConfig, ChunkyDKGSessionMetadata,
+        AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionMetadata,
         ChunkyDKGTranscript, ChunkyInputSecret, ChunkyTranscript, DealerPublicKey,
     },
     epoch_state::EpochState,
@@ -30,7 +30,7 @@ pub struct ChunkyTestSetup {
     pub voting_powers: Vec<u64>,
     pub epoch_state: Arc<EpochState>,
     pub session_metadata: ChunkyDKGSessionMetadata,
-    pub dkg_config: Arc<ChunkyDKGConfig>,
+    pub dkg_config: Arc<ChunkyDKGSession>,
 }
 
 impl ChunkyTestSetup {
@@ -69,7 +69,7 @@ impl ChunkyTestSetup {
             dealer_validator_set: validator_consensus_info_move_structs.clone(),
             target_validator_set: validator_consensus_info_move_structs,
         };
-        let dkg_config = ChunkyDKG::generate_config(&session_metadata);
+        let dkg_config = ChunkyDKGSession::generate_config(&session_metadata);
 
         Self {
             private_keys,
@@ -97,8 +97,7 @@ impl ChunkyTestSetup {
             id: validator_index,
         };
 
-        let trx = ChunkyDKG::deal(
-            &self.dkg_config,
+        let trx = self.dkg_config.deal(
             &self.private_keys[validator_index],
             &self.public_keys[validator_index],
             &input_secret,

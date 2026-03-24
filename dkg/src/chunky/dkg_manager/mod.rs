@@ -31,7 +31,7 @@ use aptos_types::{
     dkg::{
         chunky_dkg::{
             AggregatedSubtranscript, CertifiedAggregatedChunkySubtranscript,
-            CertifiedChunkyDKGOutput, ChunkyDKG, ChunkyDKGConfig, ChunkyDKGSessionMetadata,
+            CertifiedChunkyDKGOutput, ChunkyDKGSession, ChunkyDKGSessionMetadata,
             ChunkyDKGSessionState, ChunkyDKGStartEvent, ChunkyDKGTranscript, ChunkyInputSecret,
             ChunkySubtranscript, ChunkyTranscript, DealerPrivateKey, DealerPublicKey,
         },
@@ -61,14 +61,14 @@ enum InnerState {
     AwaitSubtranscriptAggregation {
         start_time: Duration,
         my_transcript: Arc<ChunkyDKGTranscript>,
-        dkg_config: Arc<ChunkyDKGConfig>,
+        dkg_config: Arc<ChunkyDKGSession>,
         _abort_guard: DropGuard,
     },
     AwaitAggregatedSubtranscriptCertification {
         start_time: Duration,
         my_transcript: Arc<ChunkyDKGTranscript>,
         aggregated_subtranscript: Arc<AggregatedSubtranscript>,
-        dkg_config: Arc<ChunkyDKGConfig>,
+        dkg_config: Arc<ChunkyDKGSession>,
         _abort_guard: DropGuard,
     },
     Finished {
@@ -379,7 +379,7 @@ impl ChunkyDKGManager {
             "[ChunkyDKG] Deal transcript started.",
         );
 
-        let dkg_config = ChunkyDKG::generate_config(dkg_session_metadata);
+        let dkg_config = ChunkyDKGSession::generate_config(dkg_session_metadata);
         let dkg_config_clone = dkg_config.clone();
         let ssk_clone = self.ssk.clone();
         let spk_clone = self.spk.clone();
@@ -393,8 +393,7 @@ impl ChunkyDKGManager {
             let dealer = Player { id: my_index };
             let session_id = dkg_session_metadata_clone;
 
-            ChunkyDKG::deal(
-                &dkg_config_clone,
+            dkg_config_clone.deal(
                 &ssk_clone,
                 &spk_clone,
                 &input_secret,
@@ -803,7 +802,7 @@ impl ChunkyDKGManager {
         sender: AccountAddress,
         req: ChunkyDKGSubtranscriptSignatureRequest,
         local_aggregated_transcript: Arc<AggregatedSubtranscript>,
-        dkg_config: Arc<ChunkyDKGConfig>,
+        dkg_config: Arc<ChunkyDKGSession>,
         ssk: Arc<DealerPrivateKey>,
         _my_addr: AccountAddress,
         received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,

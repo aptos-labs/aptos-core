@@ -24,10 +24,7 @@ use aptos_dkg::pvss::{
         DecryptPrivKey, EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
-    traits::{
-        transcript::{Aggregatable, HasAggregatableSubtranscript, Transcript},
-        TranscriptCore,
-    },
+    traits::{transcript::Transcript, TranscriptCore},
     Player,
 };
 use ark_ec::AffineRepr;
@@ -115,78 +112,16 @@ impl ChunkyDKGTranscript {
 }
 
 #[derive(Clone, Debug)]
-pub struct ChunkyDKGConfig {
+pub struct ChunkyDKGSession {
     pub threshold_config: ChunkyDKGThresholdConfig,
     pub public_parameters: ChunkyDKGPublicParameters,
     pub session_metadata: ChunkyDKGSessionMetadata,
     pub eks: Vec<ChunkyEncryptPubKey>,
 }
 
-/// Reflection of `0x1::dkg::DKGSessionMetadata` in rust for Chunky DKG.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ChunkyDKGSessionMetadata {
-    pub dealer_epoch: u64,
-    pub chunky_dkg_config: ChunkyDKGConfigMoveStruct,
-    pub dealer_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
-    pub target_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
-}
-
-impl ChunkyDKGSessionMetadata {
-    pub fn target_validator_consensus_infos_cloned(&self) -> Vec<ValidatorConsensusInfo> {
-        self.target_validator_set
-            .clone()
-            .into_iter()
-            .map(|obj| obj.try_into().unwrap())
-            .collect()
-    }
-
-    pub fn dealer_consensus_infos_cloned(&self) -> Vec<ValidatorConsensusInfo> {
-        self.dealer_validator_set
-            .clone()
-            .into_iter()
-            .map(|obj| obj.try_into().unwrap())
-            .collect()
-    }
-
-    pub fn into_on_chain_chunky_dkg_config(&self) -> Option<OnChainChunkyDKGConfig> {
-        OnChainChunkyDKGConfig::try_from(self.chunky_dkg_config.clone()).ok()
-    }
-}
-
-/// Reflection of `0x1::chunky_dkg::ChunkyDKGStartEvent` in rust for Chunky DKG.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChunkyDKGStartEvent {
-    pub session_metadata: ChunkyDKGSessionMetadata,
-    pub start_time_us: u64,
-}
-
-impl MoveStructType for ChunkyDKGStartEvent {
-    const MODULE_NAME: &'static IdentStr = ident_str!("chunky_dkg");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("ChunkyDKGStartEvent");
-}
-
-pub static CHUNKY_DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
-    Lazy::new(|| TypeTag::Struct(Box::new(ChunkyDKGStartEvent::struct_tag())));
-
-pub struct ChunkyDKG {
-    threshold_config: ChunkyDKGThresholdConfig,
-    public_parameters: PublicParameters<Pairing>,
-}
-
-// TODO(ibalajiarun): make the APIs consistent. Is this struct event necessary?
-impl ChunkyDKG {
-    pub fn new(
-        secret_sharing_config: ChunkyDKGThresholdConfig,
-        public_parameters: PublicParameters<Pairing>,
-    ) -> Self {
-        Self {
-            threshold_config: secret_sharing_config,
-            public_parameters,
-        }
-    }
-
+impl ChunkyDKGSession {
     pub fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
-        dkg_config: &ChunkyDKGConfig,
+        &self,
         ssk: &DealerPrivateKey,
         spk: &DealerPublicKey,
         s: &ChunkyInputSecret,
@@ -195,11 +130,11 @@ impl ChunkyDKG {
         rng: &mut R,
     ) -> ChunkyTranscript {
         ChunkyTranscript::deal(
-            &dkg_config.threshold_config,
-            &dkg_config.public_parameters,
+            &self.threshold_config,
+            &self.public_parameters,
             ssk,
             spk,
-            &dkg_config.eks,
+            &self.eks,
             s,
             sid,
             dealer,
@@ -207,37 +142,11 @@ impl ChunkyDKG {
         )
     }
 
-    pub fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
-        &self,
-        transcript: &ChunkyTranscript,
-        spks: &[DealerPublicKey],
-        eks: &[ChunkyEncryptPubKey],
-        sid: &A,
-        rng: &mut R,
-    ) -> Result<()> {
-        transcript.verify(
-            &self.threshold_config,
-            &self.public_parameters,
-            spks,
-            eks,
-            sid,
-            rng,
-        )
-    }
-
-    pub fn sub_aggregate(
-        &self,
-        sub_transcripts: &[ChunkySubtranscript],
-    ) -> Result<ChunkySubtranscript> {
-        // Do all aggregations in projective form, then normalize to affine
-        ChunkySubtranscript::aggregate(&self.threshold_config, sub_transcripts.to_vec())
-    }
-
     /// Generate secret sharing config and public parameters from DKG session metadata.
     /// Similar to `RealDKG::new_public_params` but returns the config components directly.
     pub fn generate_config(
         dkg_session_metadata: &ChunkyDKGSessionMetadata,
-    ) -> Arc<ChunkyDKGConfig> {
+    ) -> Arc<ChunkyDKGSession> {
         let onchain_config = dkg_session_metadata
             .into_on_chain_chunky_dkg_config()
             .unwrap_or_else(OnChainChunkyDKGConfig::default_disabled);
@@ -298,7 +207,7 @@ impl ChunkyDKG {
             &mut rng_aptos,
         );
 
-        Arc::new(ChunkyDKGConfig {
+        Arc::new(ChunkyDKGSession {
             threshold_config,
             public_parameters,
             session_metadata: dkg_session_metadata.clone(),
@@ -307,10 +216,51 @@ impl ChunkyDKG {
     }
 }
 
-/// Wrapper so that transcript bytes can be used with verify_multi_signatures (requires CryptoHash).
-/// BCS(TranscriptBytesForSigning(bytes)) equals BCS(bytes), so the hash matches what was signed.
-#[derive(Clone, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct TranscriptBytesForSigning(#[serde(with = "serde_bytes")] pub Vec<u8>);
+/// Reflection of `0x1::dkg::DKGSessionMetadata` in rust for Chunky DKG.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ChunkyDKGSessionMetadata {
+    pub dealer_epoch: u64,
+    pub chunky_dkg_config: ChunkyDKGConfigMoveStruct,
+    pub dealer_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
+    pub target_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
+}
+
+impl ChunkyDKGSessionMetadata {
+    pub fn target_validator_consensus_infos_cloned(&self) -> Vec<ValidatorConsensusInfo> {
+        self.target_validator_set
+            .clone()
+            .into_iter()
+            .map(|obj| obj.try_into().unwrap())
+            .collect()
+    }
+
+    pub fn dealer_consensus_infos_cloned(&self) -> Vec<ValidatorConsensusInfo> {
+        self.dealer_validator_set
+            .clone()
+            .into_iter()
+            .map(|obj| obj.try_into().unwrap())
+            .collect()
+    }
+
+    pub fn into_on_chain_chunky_dkg_config(&self) -> Option<OnChainChunkyDKGConfig> {
+        OnChainChunkyDKGConfig::try_from(self.chunky_dkg_config.clone()).ok()
+    }
+}
+
+/// Reflection of `0x1::chunky_dkg::ChunkyDKGStartEvent` in rust for Chunky DKG.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ChunkyDKGStartEvent {
+    pub session_metadata: ChunkyDKGSessionMetadata,
+    pub start_time_us: u64,
+}
+
+impl MoveStructType for ChunkyDKGStartEvent {
+    const MODULE_NAME: &'static IdentStr = ident_str!("chunky_dkg");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("ChunkyDKGStartEvent");
+}
+
+pub static CHUNKY_DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::Struct(Box::new(ChunkyDKGStartEvent::struct_tag())));
 
 /// A validated aggregated transcript with metadata, similar to DKGTranscript but for Chunky DKG.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -338,7 +288,7 @@ pub struct CertifiedChunkyDKGOutput {
     pub encryption_key: Vec<u8>,
 }
 
-/// Reflection of Move type `0x1::dkg::DKGSessionState`.
+/// Reflection of Move type `0x1::chunky_dkg::ChunkyDKGSessionState`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChunkyDKGSessionState {
     pub metadata: ChunkyDKGSessionMetadata,
@@ -352,7 +302,7 @@ impl ChunkyDKGSessionState {
     }
 }
 
-/// Reflection of Move type `0x1::dkg::DKGState`.
+/// Reflection of Move type `0x1::chunky_dkg::ChunkyDKGState`.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChunkyDKGState {
     pub last_completed: Option<ChunkyDKGSessionState>,
