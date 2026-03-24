@@ -32,7 +32,7 @@ pub struct TranscriptFetcher {
     epoch: u64,
     missing_dealers: Vec<AccountAddress>,
     rpc_timeout: Duration,
-    dkg_config: ChunkyDKGConfig,
+    dkg_config: Arc<ChunkyDKGConfig>,
     epoch_state: Arc<EpochState>,
 }
 
@@ -49,7 +49,7 @@ impl TranscriptFetcher {
         epoch: u64,
         missing_dealers: Vec<AccountAddress>,
         rpc_timeout: Duration,
-        dkg_config: ChunkyDKGConfig,
+        dkg_config: Arc<ChunkyDKGConfig>,
         epoch_state: Arc<EpochState>,
     ) -> Self {
         Self {

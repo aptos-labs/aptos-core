@@ -887,7 +887,7 @@ impl ChunkyDKGManager {
                 req.dealer_epoch,
                 mismatched_dealers,
                 Duration::from_secs(10),
-                (*dkg_config).clone(),
+                Arc::clone(&dkg_config),
                 epoch_state.clone(),
             );
 
