@@ -64,7 +64,7 @@ CARGO_MACHETE_VERSION=0.9.1
 
 # cargo-nextest -- faster Rust test runner with better output and retries
 # (https://crates.io/crates/cargo-nextest)
-CARGO_NEXTEST_VERSION=0.9.128
+CARGO_NEXTEST_VERSION=0.9.130
 
 # grcov -- Rust source-code coverage aggregator (https://github.com/mozilla/grcov)
 GRCOV_VERSION=0.10.5
@@ -650,11 +650,20 @@ install_clang() {
             $_sudo apt-get install -y bash gnupg lsb-release software-properties-common wget || \
                 die "Failed to install prerequisites for the LLVM apt repository." \
                     "Ensure apt sources are configured and network is available."
-            # The upstream LLVM install script uses bash-specific syntax
+            # Download the LLVM install script to a temp file so we can
+            # detect download failures (curl|sh masks wget exit codes).
+            _llvm_tmp="$(make_tmp_dir)"
+            _CLEANUP_DIRS="$_CLEANUP_DIRS $_llvm_tmp"
+            wget -O "${_llvm_tmp}/llvm.sh" https://apt.llvm.org/llvm.sh || \
+                die "Failed to download LLVM install script from https://apt.llvm.org/llvm.sh"
+            if [ ! -s "${_llvm_tmp}/llvm.sh" ]; then
+                die "Downloaded LLVM script is empty -- network issue or site unavailable."
+            fi
             # shellcheck disable=SC2086
-            $_sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "$_version" || \
+            $_sudo bash "${_llvm_tmp}/llvm.sh" "$_version" || \
                 die "Failed to run the LLVM apt setup script for Clang $_version." \
                     "Check https://apt.llvm.org/ for supported distro/version combinations."
+            rm -rf "$_llvm_tmp"
         fi
         # Always ensure clang/clang++ symlinks via update-alternatives,
         # even when clang was pre-installed (CI AMIs may not have them).
@@ -690,10 +699,18 @@ install_rustup() {
         log_info "Rustup already installed: $_ver"
     else
         log_info "Downloading rustup installer from https://sh.rustup.rs"
-        curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable || \
+        _rustup_tmp="$(make_tmp_dir)"
+        _CLEANUP_DIRS="$_CLEANUP_DIRS $_rustup_tmp"
+        curl https://sh.rustup.rs -sSf -o "${_rustup_tmp}/rustup-init.sh" || \
+            die "Failed to download rustup installer." \
+                "Check your network connection and try again."
+        if [ ! -s "${_rustup_tmp}/rustup-init.sh" ]; then
+            die "Downloaded rustup installer is empty -- network issue."
+        fi
+        sh "${_rustup_tmp}/rustup-init.sh" -y --default-toolchain stable || \
             die "Failed to install rustup." \
-                "Check your network connection and try again." \
                 "Manual install: https://rustup.rs/"
+        rm -rf "$_rustup_tmp"
         if [ -n "${CARGO_HOME}" ]; then
             PATH="${CARGO_HOME}/bin:${PATH}"
             export PATH
