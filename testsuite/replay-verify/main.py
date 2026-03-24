@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 def construct_humio_url(
     labels_run: str, pod_name: str, start_time: float, end_time: float
 ) -> str:
-    query = f'#k8s.cluster = "devinfra-usce1-0" | k8s.labels.run = "{labels_run}" | "k8s.pod_name" = "{pod_name}"'
+    query = f'#k8s.cluster = "devinfra-usce1-0" | "k8s.pod_name" = "{pod_name}"'
 
     params = {
         "live": "false",
@@ -387,7 +387,7 @@ class ReplayScheduler:
         return f"{self.id}-{self.network}"
 
     def humio_hash_mismatch_url(self, start_time: float, end_time: float) -> str:
-        query = f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
+        query = f'"k8s.pod_name" = "{self.get_label()}-replay-verify-*" | "TransactionOutput does not match"'
 
         params = {
             "live": "false",
@@ -505,11 +505,14 @@ class ReplayScheduler:
         pvc = self.create_one_pvc_from_snapshot(snapshot_name)
         self.pvcs = [pvc]
         # Wait for the PVC to be bound before creating other PVCs
-        logger.info(f"Waiting for the PVC {pvc} to be bound...")
+        logger.info(
+            f"Waiting for the PVC {pvc} to be bound. "
+            "This involves cloning a large disk volume from a snapshot and may take several minutes..."
+        )
         bound_status = self.get_pvc_bound_status()
         while not self.get_pvc_bound_status()[0]:
             time.sleep(QUERY_DELAY)
-        logger.info(f"PVC {pvc} has been bound...")
+        logger.info(f"PVC {pvc} is now bound. Proceeding to clone additional PVCs...")
         self.create_pvc_from_existing(snapshot_name, pvc)
 
     def create_one_pvc_from_snapshot(self, snapshot_name: str) -> str:
