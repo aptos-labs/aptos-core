@@ -5,7 +5,7 @@ use crate::{
     aggregate_signature::AggregateSignature,
     dkg::{
         real_dkg::rounding::{
-            DKGRounding, DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
+            DKGRoundingProfile, DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
         },
         DKGTranscriptMetadata,
     },
@@ -38,7 +38,10 @@ use move_core_types::{
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
+use std::{
+    fmt::{Debug, Formatter},
+    sync::Arc,
+};
 
 pub type ChunkyTranscript = SignedWeightedTranscript<Pairing>;
 pub type ChunkySubtranscript = WeightedSubtranscript<Pairing>;
@@ -232,7 +235,9 @@ impl ChunkyDKG {
 
     /// Generate secret sharing config and public parameters from DKG session metadata.
     /// Similar to `RealDKG::new_public_params` but returns the config components directly.
-    pub fn generate_config(dkg_session_metadata: &ChunkyDKGSessionMetadata) -> ChunkyDKGConfig {
+    pub fn generate_config(
+        dkg_session_metadata: &ChunkyDKGSessionMetadata,
+    ) -> Arc<ChunkyDKGConfig> {
         let onchain_config = dkg_session_metadata
             .into_on_chain_chunky_dkg_config()
             .unwrap_or_else(OnChainChunkyDKGConfig::default_disabled);
@@ -252,14 +257,20 @@ impl ChunkyDKG {
             .map(|vi| (&vi.public_key).into())
             .collect();
 
-        // Use the same rounding logic as RealDKG to compute weights
-        // TODO(ibalajiarun): Just compute profile instead of doing Blss things with DKGRounding
-        let DKGRounding { profile, .. } = DKGRounding::new(
+        let profile = DKGRoundingProfile::new(
             &validator_stakes,
             secrecy_threshold,
             reconstruct_threshold,
             None,
-        );
+        )
+        .unwrap_or_else(|_| {
+            DKGRoundingProfile::infallible(
+                &validator_stakes,
+                secrecy_threshold,
+                reconstruct_threshold,
+                None,
+            )
+        });
 
         // Create WeightedConfigArkworks<Fr> from the computed weights
         let threshold_config = ChunkyDKGThresholdConfig::new(
@@ -287,12 +298,12 @@ impl ChunkyDKG {
             &mut rng_aptos,
         );
 
-        ChunkyDKGConfig {
+        Arc::new(ChunkyDKGConfig {
             threshold_config,
             public_parameters,
             session_metadata: dkg_session_metadata.clone(),
             eks,
-        }
+        })
     }
 }
 
