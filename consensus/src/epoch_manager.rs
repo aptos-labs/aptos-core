@@ -1332,13 +1332,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         });
 
         // Create proxy NetworkSender with proxy-only verifier (proposals/votes among proxies)
-        let proxy_network_sender = Arc::new(NetworkSender::new_for_proxy(
+        let mut proxy_network_sender = NetworkSender::new_for_proxy(
             self.author,
             self.network_sender.clone(),
             self.self_sender.clone(),
             proxy_epoch_state.verifier.clone(),
             epoch_state.verifier.clone(), // primary verifier for block retrieval
-        ));
+        );
 
         // Create broadcast NetworkSender with full verifier (OrderedProxyBlocksMsg to ALL)
         let broadcast_network_sender = Arc::new(NetworkSender::new_for_proxy(
@@ -1477,6 +1477,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         let (proxy_opt_proposal_loopback_tx, proxy_opt_proposal_loopback_rx) =
             aptos_channels::new_unbounded(&counters::OP_COUNTERS.gauge("proxy_opt_proposal_queue"));
+
+        // Wire up direct self-delivery: proxy NetworkSender pushes votes/timeouts
+        // directly to proxy_rm_tx, bypassing self_sender → epoch_manager.
+        proxy_network_sender.set_proxy_self_sender(proxy_rm_tx.clone());
+        let proxy_network_sender = Arc::new(proxy_network_sender);
 
         // 10. Create the proxy RoundManager with proxy_hooks
         let mut proxy_local_config = self.config.clone();
@@ -2719,6 +2724,118 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .await;
     }
 
+    /// Fast-path routing for proxy consensus messages.
+    /// Bypasses the full process_message/check_epoch path — does epoch check inline
+    /// and pushes directly to the proxy RoundManager channels.
+    fn route_proxy_message(&mut self, peer_id: AccountAddress, msg: ConsensusMsg) {
+        match msg {
+            ConsensusMsg::ProxyProposalMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    return;
+                }
+                if let Some(ref mut tx) = self.proxy_buffered_proposal_tx {
+                    let sync_info = Self::proxy_sync_info_to_sync_info(msg.sync_info());
+                    let proposal_msg = aptos_consensus_types::proposal_msg::ProposalMsg::new(
+                        msg.proposal().clone(),
+                        sync_info,
+                    );
+                    let event = VerifiedEvent::ProposalMsg(Box::new(proposal_msg));
+                    if let Err(e) = tx.push(peer_id, event) {
+                        warn!("Failed to fast-route proxy proposal: {:?}", e);
+                    }
+                }
+            },
+            ConsensusMsg::OptProxyProposalMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    return;
+                }
+                if let Some(ref mut tx) = self.proxy_buffered_proposal_tx {
+                    let sync_info = Self::proxy_sync_info_to_sync_info(msg.sync_info());
+                    let opt_proposal_msg =
+                        aptos_consensus_types::opt_proposal_msg::OptProposalMsg::new(
+                            (*msg).take_block_data(),
+                            sync_info,
+                        );
+                    let event = VerifiedEvent::OptProposalMsg(Box::new(opt_proposal_msg));
+                    if let Err(e) = tx.push(peer_id, event) {
+                        warn!("Failed to fast-route opt proxy proposal: {:?}", e);
+                    }
+                }
+            },
+            ConsensusMsg::ProxyVoteMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    return;
+                }
+                if let Some(ref mut tx) = self.proxy_round_manager_tx {
+                    let sync_info = Self::proxy_sync_info_to_sync_info(msg.sync_info());
+                    let vote_msg = aptos_consensus_types::vote_msg::VoteMsg::new(
+                        msg.vote().clone(),
+                        sync_info,
+                    );
+                    let event = VerifiedEvent::VoteMsg(Box::new(vote_msg));
+                    if let Err(e) = tx.push(
+                        (peer_id, discriminant(&event)),
+                        (peer_id, event),
+                    ) {
+                        warn!("Failed to fast-route proxy vote: {:?}", e);
+                    }
+                }
+            },
+            ConsensusMsg::ProxyOrderVoteMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    return;
+                }
+                if let Some(ref mut tx) = self.proxy_round_manager_tx {
+                    let order_vote_msg = aptos_consensus_types::order_vote_msg::OrderVoteMsg::new(
+                        msg.order_vote().clone(),
+                        msg.quorum_cert().clone(),
+                    );
+                    let event = VerifiedEvent::OrderVoteMsg(Box::new(order_vote_msg));
+                    if let Err(e) = tx.push(
+                        (peer_id, discriminant(&event)),
+                        (peer_id, event),
+                    ) {
+                        warn!("Failed to fast-route proxy order vote: {:?}", e);
+                    }
+                }
+            },
+            ConsensusMsg::ProxyRoundTimeoutMsg(msg) => {
+                if msg.round_timeout().epoch() != self.epoch() {
+                    return;
+                }
+                if let Some(ref mut tx) = self.proxy_round_manager_tx {
+                    let round_timeout_msg = (*msg).into_round_timeout();
+                    let event = VerifiedEvent::RoundTimeoutMsg(Box::new(round_timeout_msg));
+                    if let Err(e) = tx.push(
+                        (peer_id, discriminant(&event)),
+                        (peer_id, event),
+                    ) {
+                        warn!("Failed to fast-route proxy round timeout: {:?}", e);
+                    }
+                }
+            },
+            ConsensusMsg::ProxySyncInfo(msg) => {
+                if msg.epoch() != self.epoch() {
+                    return;
+                }
+                if let Some(ref mut tx) = self.proxy_round_manager_tx {
+                    let sync_info = Self::proxy_sync_info_to_sync_info(&msg);
+                    let event = VerifiedEvent::UnverifiedSyncInfo(Box::new(sync_info));
+                    if let Err(e) = tx.push(
+                        (peer_id, discriminant(&event)),
+                        (peer_id, event),
+                    ) {
+                        warn!("Failed to fast-route proxy sync info: {:?}", e);
+                    }
+                }
+            },
+            _ => {
+                // Non-proxy message on proxy channel — should not happen
+                warn!("Unexpected non-proxy message on proxy channel: {}", msg.name());
+            },
+        }
+    }
+
     pub async fn start(
         mut self,
         mut round_timeout_sender_rx: aptos_channels::Receiver<Round>,
@@ -2739,6 +2856,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     });
+                },
+                // Fast path for proxy consensus messages — bypasses process_message()
+                // to avoid queueing behind primary consensus and QS processing.
+                (peer, msg) = network_receivers.proxy_messages.select_next_some() => {
+                    monitor!("epoch_manager_route_proxy_message",
+                    self.route_proxy_message(peer, msg));
                 },
                 (peer, request) = network_receivers.rpc_rx.select_next_some() => {
                     monitor!("epoch_manager_process_rpc",

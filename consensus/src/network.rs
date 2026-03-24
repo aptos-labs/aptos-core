@@ -13,6 +13,7 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
+    round_manager::VerifiedEvent,
     rand::{
         rand_gen::{
             network_messages::{RandGenMessage, RandMessage},
@@ -202,6 +203,13 @@ pub struct NetworkReceivers {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
+    /// Dedicated channel for proxy consensus messages (ProxyProposalMsg, ProxyVoteMsg, etc.).
+    /// Bypasses the main consensus_messages channel so proxy vote delivery is not delayed
+    /// by primary consensus or QS message processing in the epoch_manager event loop.
+    pub proxy_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     pub rpc_rx: aptos_channel::Receiver<
         (AccountAddress, Discriminant<IncomingRpcRequest>),
         (AccountAddress, IncomingRpcRequest),
@@ -263,6 +271,13 @@ pub struct NetworkSender {
     /// Proxy blocks may contain primary consensus proofs (QC/TC with bitvec for N validators),
     /// which cannot be verified with the proxy-only verifier.
     primary_verifier: Option<Arc<ValidatorVerifier>>,
+    /// Direct channel to proxy RoundManager for self-delivery bypass.
+    /// When set, proxy self-messages skip the self_sender → epoch_manager path
+    /// and push directly to the proxy RM, eliminating contention with primary events.
+    proxy_self_sender: Option<aptos_channel::Sender<
+        (AccountAddress, std::mem::Discriminant<VerifiedEvent>),
+        (AccountAddress, VerifiedEvent),
+    >>,
 }
 
 impl NetworkSender {
@@ -280,6 +295,7 @@ impl NetworkSender {
             time_service: aptos_time_service::TimeService::real(),
             proxy_mode: false,
             primary_verifier: None,
+            proxy_self_sender: None,
         }
     }
 
@@ -303,7 +319,109 @@ impl NetworkSender {
             time_service: aptos_time_service::TimeService::real(),
             proxy_mode: true,
             primary_verifier: Some(primary_verifier),
+            proxy_self_sender: None,
         }
+    }
+
+    /// Set the direct proxy RM channel for self-delivery bypass.
+    /// When set, proxy broadcast self-messages push directly to the proxy RM
+    /// instead of going through self_sender → epoch_manager → proxy_rm_tx.
+    pub fn set_proxy_self_sender(
+        &mut self,
+        tx: aptos_channel::Sender<
+            (AccountAddress, std::mem::Discriminant<VerifiedEvent>),
+            (AccountAddress, VerifiedEvent),
+        >,
+    ) {
+        self.proxy_self_sender = Some(tx);
+    }
+
+    /// Deliver a proxy ConsensusMsg directly to the proxy RoundManager channel,
+    /// bypassing the self_sender → epoch_manager path.
+    /// Returns true if the message was delivered, false if it's not a recognized proxy type.
+    fn proxy_self_deliver(
+        &self,
+        msg: &ConsensusMsg,
+        proxy_tx: &aptos_channel::Sender<
+            (AccountAddress, std::mem::Discriminant<VerifiedEvent>),
+            (AccountAddress, VerifiedEvent),
+        >,
+    ) -> bool {
+        let author = self.author;
+        match msg {
+            ConsensusMsg::ProxyVoteMsg(vote_msg) => {
+                let sync_info = Self::sync_info_to_proxy_then_back(vote_msg.sync_info());
+                let std_vote = aptos_consensus_types::vote_msg::VoteMsg::new(
+                    vote_msg.vote().clone(),
+                    sync_info,
+                );
+                let event = VerifiedEvent::VoteMsg(Box::new(std_vote));
+                if let Err(e) = proxy_tx.push(
+                    (author, std::mem::discriminant(&event)),
+                    (author, event),
+                ) {
+                    warn!("Failed proxy self-deliver vote: {:?}", e);
+                }
+                true
+            },
+            ConsensusMsg::ProxyRoundTimeoutMsg(timeout_msg) => {
+                let round_timeout = timeout_msg.clone().into_round_timeout();
+                let event = VerifiedEvent::RoundTimeoutMsg(Box::new(round_timeout));
+                if let Err(e) = proxy_tx.push(
+                    (author, std::mem::discriminant(&event)),
+                    (author, event),
+                ) {
+                    warn!("Failed proxy self-deliver timeout: {:?}", e);
+                }
+                true
+            },
+            ConsensusMsg::ProxyOrderVoteMsg(order_vote_msg) => {
+                let std_msg = aptos_consensus_types::order_vote_msg::OrderVoteMsg::new(
+                    order_vote_msg.order_vote().clone(),
+                    order_vote_msg.quorum_cert().clone(),
+                );
+                let event = VerifiedEvent::OrderVoteMsg(Box::new(std_msg));
+                if let Err(e) = proxy_tx.push(
+                    (author, std::mem::discriminant(&event)),
+                    (author, event),
+                ) {
+                    warn!("Failed proxy self-deliver order vote: {:?}", e);
+                }
+                true
+            },
+            ConsensusMsg::ProxySyncInfo(sync_info) => {
+                let std_sync = Self::sync_info_to_proxy_then_back(sync_info);
+                let event = VerifiedEvent::UnverifiedSyncInfo(Box::new(std_sync));
+                if let Err(e) = proxy_tx.push(
+                    (author, std::mem::discriminant(&event)),
+                    (author, event),
+                ) {
+                    warn!("Failed proxy self-deliver sync info: {:?}", e);
+                }
+                true
+            },
+            // ProxyProposalMsg self-delivery goes through buffered_proposal channel,
+            // which is a different channel type — use normal self_sender path for proposals.
+            _ => false,
+        }
+    }
+
+    /// Helper: convert ProxySyncInfo back to standard SyncInfo.
+    /// This duplicates the logic in EpochManager::proxy_sync_info_to_sync_info
+    /// to avoid circular dependency.
+    fn sync_info_to_proxy_then_back(
+        proxy_sync: &aptos_consensus_types::proxy_sync_info::ProxySyncInfo,
+    ) -> aptos_consensus_types::sync_info::SyncInfo {
+        let ordered_cert = proxy_sync
+            .highest_proxy_ordered_cert()
+            .cloned()
+            .unwrap_or_else(|| proxy_sync.highest_proxy_qc().clone().into_wrapped_ledger_info());
+        aptos_consensus_types::sync_info::SyncInfo::new_decoupled(
+            proxy_sync.highest_proxy_qc().clone(),
+            ordered_cert,
+            proxy_sync.highest_proxy_commit_cert().clone(),
+            proxy_sync.highest_proxy_timeout_cert().cloned(),
+        )
     }
 
     /// Convert a SyncInfo to a ProxySyncInfo for proxy message wrapping.
@@ -432,11 +550,37 @@ impl NetworkSender {
     /// out.
     async fn broadcast(&self, msg: ConsensusMsg) {
         fail_point!("consensus::send::any", |_| ());
-        // Directly send the message to ourself without going through network.
-        let self_msg = Event::Message(self.author, msg.clone());
-        let mut self_sender = self.self_sender.clone();
-        if let Err(err) = self_sender.send(self_msg).await {
-            error!("Error broadcasting to self: {:?}", err);
+
+        // For proxy mode with direct self-sender: bypass the self_sender → epoch_manager
+        // path entirely. Convert the proxy message to a VerifiedEvent and push directly
+        // to the proxy RoundManager channel. This eliminates contention with primary
+        // consensus and QS message processing in the epoch_manager event loop.
+        if self.proxy_mode {
+            if let Some(ref proxy_tx) = self.proxy_self_sender {
+                let delivered = self.proxy_self_deliver(&msg, proxy_tx);
+                if !delivered {
+                    // Fallback to self_sender for messages we can't direct-deliver
+                    let self_msg = Event::Message(self.author, msg.clone());
+                    let mut self_sender = self.self_sender.clone();
+                    if let Err(err) = self_sender.send(self_msg).await {
+                        error!("Error broadcasting to self: {:?}", err);
+                    }
+                }
+            } else {
+                // No proxy_self_sender set — use normal self_sender path
+                let self_msg = Event::Message(self.author, msg.clone());
+                let mut self_sender = self.self_sender.clone();
+                if let Err(err) = self_sender.send(self_msg).await {
+                    error!("Error broadcasting to self: {:?}", err);
+                }
+            }
+        } else {
+            // Non-proxy: standard self_sender path
+            let self_msg = Event::Message(self.author, msg.clone());
+            let mut self_sender = self.self_sender.clone();
+            if let Err(err) = self_sender.send(self_msg).await {
+                error!("Error broadcasting to self: {:?}", err);
+            }
         }
 
         #[cfg(feature = "failpoints")]
@@ -948,6 +1092,10 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
+    proxy_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     rpc_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<IncomingRpcRequest>),
         (AccountAddress, IncomingRpcRequest),
@@ -972,6 +1120,14 @@ impl NetworkTask {
             50,
             Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
         );
+        // Dedicated channel for proxy consensus messages. Buffer size matches
+        // consensus_messages — proxy rounds are fast (100ms) so messages arrive
+        // frequently but are processed quickly (just epoch check + channel push).
+        let (proxy_messages_tx, proxy_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            10,
+            Some(&counters::CONSENSUS_CHANNEL_MSGS),
+        );
         let (rpc_tx, rpc_rx) =
             aptos_channel::new(QueueStyle::FIFO, 10, Some(&counters::RPC_CHANNEL_MSGS));
 
@@ -992,12 +1148,14 @@ impl NetworkTask {
             NetworkTask {
                 consensus_messages_tx,
                 quorum_store_messages_tx,
+                proxy_messages_tx,
                 rpc_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
                 quorum_store_messages,
+                proxy_messages,
                 rpc_rx,
             },
         )
@@ -1070,6 +1228,18 @@ impl NetworkTask {
                                 warn!(error = ?e, "aptos channel closed");
                             };
                         },
+                        // Proxy consensus messages → dedicated fast channel
+                        // Bypasses the main consensus channel to avoid delay from
+                        // primary consensus and QS message processing.
+                        // OrderedProxyBlocksMsg stays on consensus channel (goes to primary RM).
+                        proxy_msg @ (ConsensusMsg::ProxyProposalMsg(_)
+                        | ConsensusMsg::OptProxyProposalMsg(_)
+                        | ConsensusMsg::ProxyVoteMsg(_)
+                        | ConsensusMsg::ProxyOrderVoteMsg(_)
+                        | ConsensusMsg::ProxyRoundTimeoutMsg(_)
+                        | ConsensusMsg::ProxySyncInfo(_)) => {
+                            Self::push_msg(peer_id, proxy_msg, &self.proxy_messages_tx);
+                        },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::OptProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
@@ -1078,14 +1248,7 @@ impl NetworkTask {
                         | ConsensusMsg::SyncInfo(_)
                         | ConsensusMsg::EpochRetrievalRequest(_)
                         | ConsensusMsg::EpochChangeProof(_)
-                        // Proxy Primary Consensus Messages
-                        | ConsensusMsg::ProxyProposalMsg(_)
-                        | ConsensusMsg::OptProxyProposalMsg(_)
-                        | ConsensusMsg::ProxyVoteMsg(_)
-                        | ConsensusMsg::ProxyOrderVoteMsg(_)
-                        | ConsensusMsg::ProxyRoundTimeoutMsg(_)
-                        | ConsensusMsg::OrderedProxyBlocksMsg(_)
-                        | ConsensusMsg::ProxySyncInfo(_)) => {
+                        | ConsensusMsg::OrderedProxyBlocksMsg(_)) => {
                             if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
                                 observe_block(
                                     proposal.proposal().timestamp_usecs(),
