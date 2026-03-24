@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+#[cfg(any(test, feature = "testing"))]
+use crate::state_store::state_slot::StateSlotKind;
 use crate::{
     account_address::AccountAddress,
     state_store::{
@@ -145,17 +147,36 @@ impl<K: Eq + Hash> MockStateView<K> {
         }
     }
 
+    /// Create a MockStateView from (key, value) pairs. When `K = StateKey`, the
+    /// embedded state key in each slot is the real key; for other key types a
+    /// placeholder is used (the embedded key is irrelevant for these tests).
     pub fn new(data: std::collections::HashMap<K, StateValue>) -> Self {
         Self {
             data: data
                 .into_iter()
-                .map(|(k, v)| (k, StateSlot::from_db_get(Some((0, v)))))
+                .map(|(k, v)| (k, StateSlot::from_db_get(StateKey::raw(b""), Some((0, v)))))
                 .collect(),
         }
     }
 
     pub fn new_with_state_slot(data: std::collections::HashMap<K, StateSlot>) -> Self {
         Self { data }
+    }
+}
+
+/// Specialization for `StateKey`: uses the real key in the embedded slot.
+#[cfg(any(test, feature = "testing"))]
+impl MockStateView<StateKey> {
+    pub fn new_with_real_keys(data: std::collections::HashMap<StateKey, StateValue>) -> Self {
+        Self {
+            data: data
+                .into_iter()
+                .map(|(k, v)| {
+                    let slot = StateSlot::from_db_get(k.clone(), Some((0, v)));
+                    (k, slot)
+                })
+                .collect(),
+        }
     }
 }
 
@@ -168,7 +189,7 @@ impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
             .data
             .get(state_key)
             .cloned()
-            .unwrap_or(StateSlot::ColdVacant))
+            .unwrap_or_else(|| StateSlot::new(StateKey::raw(b""), StateSlotKind::ColdVacant)))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

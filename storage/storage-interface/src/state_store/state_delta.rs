@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::state::State;
+use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::{
     state_store::{state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS},
@@ -20,7 +21,7 @@ use std::sync::Arc;
 pub struct StateDelta {
     pub base: State,
     pub current: State,
-    pub shards: Arc<[LayeredMap<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    pub shards: Arc<[LayeredMap<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
 }
 
 impl StateDelta {
@@ -49,14 +50,14 @@ impl StateDelta {
     /// Get the state update for a given state key.
     /// `None` indicates the key is not updated in the delta.
     pub fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
-        self.shards[state_key.get_shard_id()].get(state_key)
+        self.shards[state_key.get_shard_id()].get(state_key.crypto_hash_ref())
     }
 
-    pub fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+    pub fn latest_hot_key(&self, shard_id: usize) -> Option<HashValue> {
         self.current.latest_hot_key(shard_id)
     }
 
-    pub fn oldest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+    pub fn oldest_hot_key(&self, shard_id: usize) -> Option<HashValue> {
         self.current.oldest_hot_key(shard_id)
     }
 }
