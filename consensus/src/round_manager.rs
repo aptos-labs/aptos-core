@@ -1198,7 +1198,7 @@ impl RoundManager {
                 .is_valid_proposer(self.proposal_generator.author(), next_round);
 
             if is_qc_ready
-                && is_next_proposer
+                && !is_next_proposer
                 && next_round > self.round_state.current_round()
                 && self.waiting_for_extra_votes.is_none()
             {
