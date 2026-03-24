@@ -1490,7 +1490,7 @@ impl SignedTransaction {
         &mut self.raw_txn.payload
     }
 
-    /// Converts a SignedTransaction with an EncryptedPayload into a variant that uses
+    /// Converts a SignedTransaction with an EncryptedPayload into a variant that uses dummy
     /// TransactionExecutable::Encrypted for signature verification.
     /// This is needed because signatures are verified over the executable, not the encrypted ciphertext.
     pub fn into_encrypted_variant(self) -> Self {
