@@ -379,7 +379,7 @@ impl ChunkyDKGManager {
             "[ChunkyDKG] Deal transcript started.",
         );
 
-        let dkg_config = ChunkyDKGSession::generate_config(dkg_session_metadata);
+        let dkg_config = ChunkyDKGSession::new(dkg_session_metadata);
         let dkg_config_clone = dkg_config.clone();
         let ssk_clone = self.ssk.clone();
         let spk_clone = self.spk.clone();

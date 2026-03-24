@@ -69,7 +69,7 @@ impl ChunkyTestSetup {
             dealer_validator_set: validator_consensus_info_move_structs.clone(),
             target_validator_set: validator_consensus_info_move_structs,
         };
-        let dkg_config = ChunkyDKGSession::generate_config(&session_metadata);
+        let dkg_config = ChunkyDKGSession::new(&session_metadata);
 
         Self {
             private_keys,

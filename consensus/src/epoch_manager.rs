@@ -1174,7 +1174,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             return Err(NoSecretSharingReason::CompletedSessionTooOld);
         }
 
-        let dkg_config = ChunkyDKGSession::generate_config(&dkg_session.metadata);
+        let dkg_config = ChunkyDKGSession::new(&dkg_session.metadata);
         let my_index = new_epoch_state
             .verifier
             .address_to_validator_index()

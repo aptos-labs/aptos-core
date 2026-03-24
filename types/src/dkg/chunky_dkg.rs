@@ -144,7 +144,7 @@ impl ChunkyDKGSession {
 
     /// Generate secret sharing config and public parameters from DKG session metadata.
     /// Similar to `RealDKG::new_public_params` but returns the config components directly.
-    pub fn generate_config(
+    pub fn new(
         dkg_session_metadata: &ChunkyDKGSessionMetadata,
     ) -> Arc<ChunkyDKGSession> {
         let onchain_config = dkg_session_metadata

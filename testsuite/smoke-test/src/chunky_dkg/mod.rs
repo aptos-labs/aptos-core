@@ -61,7 +61,7 @@ fn verify_chunky_dkg_transcript(session: &ChunkyDKGSessionState) -> AggregatedSu
     );
 
     // Validate metadata consistency by generating a config from the session metadata.
-    let _config = ChunkyDKGSession::generate_config(&session.metadata);
+    let _config = ChunkyDKGSession::new(&session.metadata);
 
     subtranscript
 }
