@@ -10,8 +10,11 @@ use aptos_framework::natives::code::PackageMetadata;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewId, StateViewResult, TStateView,
+        state_key::StateKey,
+        state_slot::{StateSlot, StateSlotKind},
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+        StateViewId, StateViewResult, TStateView,
     },
     transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
 };
@@ -162,11 +165,11 @@ impl DebuggerStateView {
             .unwrap();
         let result = rx.recv()?;
         result.map(|s| match s {
-            None => StateSlot::ColdVacant,
-            Some(value) => StateSlot::ColdOccupied {
+            None => StateSlot::new(state_key.clone(), StateSlotKind::ColdVacant),
+            Some(value) => StateSlot::new(state_key.clone(), StateSlotKind::ColdOccupied {
                 value_version: version,
                 value,
-            },
+            }),
         })
     }
 }

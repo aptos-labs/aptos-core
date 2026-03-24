@@ -66,13 +66,14 @@ impl HotStateValue {
     }
 
     pub fn clone_from_slot(slot: &StateSlot) -> Self {
-        match slot {
-            StateSlot::HotOccupied {
+        use crate::state_store::state_slot::StateSlotKind;
+        match &slot.kind {
+            StateSlotKind::HotOccupied {
                 value,
                 hot_since_version,
                 ..
             } => Self::new(Some(value.clone()), *hot_since_version),
-            StateSlot::HotVacant {
+            StateSlotKind::HotVacant {
                 hot_since_version, ..
             } => Self::new(None, *hot_since_version),
             _ => panic!("Must be hot slot"),
@@ -97,13 +98,14 @@ impl<'a> HotStateValueRef<'a> {
     }
 
     pub fn from_slot(slot: &'a StateSlot) -> Self {
-        match slot {
-            StateSlot::HotOccupied {
+        use crate::state_store::state_slot::StateSlotKind;
+        match &slot.kind {
+            StateSlotKind::HotOccupied {
                 value,
                 hot_since_version,
                 ..
             } => Self::new(Some(value), *hot_since_version),
-            StateSlot::HotVacant {
+            StateSlotKind::HotVacant {
                 hot_since_version, ..
             } => Self::new(None, *hot_since_version),
             _ => panic!("Must be hot slot"),
