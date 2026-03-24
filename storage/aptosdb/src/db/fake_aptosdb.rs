@@ -462,6 +462,10 @@ impl DbWriter for FakeAptosDB {
 }
 
 impl DbReader for FakeAptosDB {
+    fn get_read_delegatee(&self) -> &dyn DbReader {
+        &self.inner as &dyn DbReader
+    }
+
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
