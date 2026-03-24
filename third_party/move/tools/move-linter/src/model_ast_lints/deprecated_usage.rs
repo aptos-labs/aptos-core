@@ -47,6 +47,21 @@ fn is_deprecated(env: &GlobalEnv, attrs: &[Attribute]) -> bool {
     Attribute::has(attrs, |a| is_deprecated_attr(env, a))
 }
 
+/// Check if attributes contain `#[lint::skip(deprecated_usage)]`.
+fn has_lint_skip_deprecated(env: &GlobalEnv, attrs: &[Attribute]) -> bool {
+    let pool = env.symbol_pool();
+    Attribute::has(attrs, |attr| {
+        if let Attribute::Apply(_, name, args) = attr {
+            pool.string(*name).as_str() == "lint::skip"
+                && args.iter().any(|a| {
+                    pool.string(a.name()).as_str() == CHECKER_NAME
+                })
+        } else {
+            false
+        }
+    })
+}
+
 fn is_function_deprecated(env: &GlobalEnv, mid: ModuleId, fid: FunId) -> bool {
     let module_env = env.get_module(mid);
     is_deprecated(env, module_env.get_function(fid).get_attributes())
@@ -326,23 +341,31 @@ impl StructChecker for DeprecatedUsageInFields {
 pub struct DeprecatedUsageOfConstants;
 
 impl DeprecatedUsageOfConstants {
-    /// Returns the location and deprecation status of a constant's user.
-    fn user_loc_and_is_deprecated(env: &GlobalEnv, user: &UserId) -> Option<(Loc, bool)> {
+    /// Returns the location of a constant's user and whether warnings should be
+    /// suppressed (because the user or its module is deprecated or has
+    /// `#[lint::skip(deprecated_usage)]`).
+    fn user_loc_and_should_suppress(env: &GlobalEnv, user: &UserId) -> Option<(Loc, bool)> {
         match user {
             UserId::Function(qfid) => {
                 let func_env = env.get_function(*qfid);
-                let user_deprecated = is_function_deprecated(env, qfid.module_id, qfid.id);
-                Some((func_env.get_id_loc(), user_deprecated))
+                let suppress = is_function_deprecated(env, qfid.module_id, qfid.id)
+                    || has_lint_skip_deprecated(env, func_env.get_attributes())
+                    || has_lint_skip_deprecated(env, func_env.module_env.get_attributes());
+                Some((func_env.get_id_loc(), suppress))
             },
             UserId::Struct(qsid) => {
                 let struct_env = env.get_struct(*qsid);
-                let user_deprecated = is_struct_deprecated(env, qsid.module_id, qsid.id);
-                Some((struct_env.get_loc(), user_deprecated))
+                let suppress = is_struct_deprecated(env, qsid.module_id, qsid.id)
+                    || has_lint_skip_deprecated(env, struct_env.get_attributes())
+                    || has_lint_skip_deprecated(env, struct_env.module_env.get_attributes());
+                Some((struct_env.get_loc(), suppress))
             },
             UserId::Constant(qcid) => {
                 let const_env = env.get_module(qcid.module_id).into_named_constant(qcid.id);
-                let user_deprecated = is_constant_deprecated(env, &const_env);
-                Some((const_env.get_loc(), user_deprecated))
+                let suppress = is_constant_deprecated(env, &const_env)
+                    || has_lint_skip_deprecated(env, const_env.get_attributes())
+                    || has_lint_skip_deprecated(env, const_env.module_env.get_attributes());
+                Some((const_env.get_loc(), suppress))
             },
         }
     }
@@ -364,15 +387,20 @@ impl ConstantChecker for DeprecatedUsageOfConstants {
         let module_name = const_env.module_env.get_full_name_str();
 
         for user in const_env.get_users() {
-            if let Some((user_loc, user_deprecated)) = Self::user_loc_and_is_deprecated(env, user)
-                && !user_deprecated
+            if let Some((user_loc, suppress)) = Self::user_loc_and_should_suppress(env, user)
+                && !suppress
             {
+                let item_kind = match user {
+                    UserId::Function(_) => "function",
+                    UserId::Struct(_) => "struct",
+                    UserId::Constant(_) => "constant",
+                };
                 self.report(
                     env,
                     &user_loc,
                     &format!(
-                        "use of deprecated constant `{}::{}`",
-                        module_name, const_name,
+                        "this {} uses deprecated constant `{}::{}`",
+                        item_kind, module_name, const_name,
                     ),
                 );
             }

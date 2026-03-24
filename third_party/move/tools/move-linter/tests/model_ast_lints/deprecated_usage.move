@@ -248,6 +248,12 @@ module 0xc0ffee::m {
         DEPRECATED_CONST
     }
 
+    // #[lint::skip(deprecated_usage)] suppresses constant usage warnings -> NO warn
+    #[lint::skip(deprecated_usage)]
+    public fun test_skip_deprecated_const(): u64 {
+        DEPRECATED_CONST
+    }
+
     // Using a non-deprecated constant -> NO warn
     public fun test_use_good_const(): u64 {
         GOOD_CONST
