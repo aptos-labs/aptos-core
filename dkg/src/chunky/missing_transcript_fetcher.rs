@@ -49,11 +49,7 @@ impl TranscriptFetcher {
         epoch: u64,
         missing_dealers: Vec<AccountAddress>,
         rpc_timeout: Duration,
-<<<<<<< HEAD
-        dkg_config: Arc<ChunkyDKGConfig>,
-=======
-        dkg_config: ChunkyDKGSession,
->>>>>>> 3c6305ff1f ([dkg] Delete redundant ChunkyDKG struct, rename ChunkyDKGConfig to ChunkyDKGSession)
+        dkg_config: Arc<ChunkyDKGSession>,
         epoch_state: Arc<EpochState>,
     ) -> Self {
         Self {

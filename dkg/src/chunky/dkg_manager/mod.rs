@@ -404,10 +404,15 @@ impl ChunkyDKGManager {
         })
         .await?;
 
+        let transcript_bytes =
+            bcs::to_bytes(&trx).map_err(|e| anyhow!("transcript serialization error: {e}"))?;
+        counters::CHUNKY_DKG_OBJECT_SIZE_BYTES
+            .with_label_values(&["dealer_transcript"])
+            .observe(transcript_bytes.len() as f64);
         let my_transcript = Arc::new(ChunkyDKGTranscript::new(
             self.epoch_state.epoch,
             self.my_addr,
-            bcs::to_bytes(&trx).map_err(|e| anyhow!("transcript serialization error: {e}"))?,
+            transcript_bytes,
         ));
 
         let deal_finish = duration_since_epoch();
@@ -545,12 +550,21 @@ impl ChunkyDKGManager {
                 aggregated_subtranscript.derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)?;
             let bytes = bcs::to_bytes(&aggregated_subtranscript)
                 .map_err(|e| anyhow!("transcript serialization error: {e}"))?;
+            counters::CHUNKY_DKG_OBJECT_SIZE_BYTES
+                .with_label_values(&["aggregated_subtranscript"])
+                .observe(bytes.len() as f64);
+            counters::CHUNKY_DKG_OBJECT_SIZE_BYTES
+                .with_label_values(&["encryption_key"])
+                .observe(key.len() as f64);
             Ok::<_, anyhow::Error>((key, bytes))
         })
         .await
         .map_err(|e| anyhow!("spawn_blocking join error: {e}"))??;
 
         info!("[ChunkyDKG] forming certified_transcript struct");
+        counters::CHUNKY_DKG_OBJECT_SIZE_BYTES
+            .with_label_values(&["certified_transcript"])
+            .observe(transcript_bytes.len() as f64);
         let certified_transcript = CertifiedAggregatedChunkySubtranscript {
             metadata: DKGTranscriptMetadata {
                 epoch: self.epoch_state.epoch,

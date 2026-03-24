@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::counters;
 use anyhow::{anyhow, ensure, Context};
 use aptos_dkg::pvss::traits::transcript::{HasAggregatableSubtranscript, Transcript};
 use aptos_types::{
@@ -25,6 +26,9 @@ pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
     rng: &mut R,
 ) -> anyhow::Result<ChunkyTranscript> {
     // Deserialize transcript
+    counters::CHUNKY_DKG_OBJECT_SIZE_BYTES
+        .with_label_values(&["received_transcript"])
+        .observe(transcript_bytes.len() as f64);
     let transcript: ChunkyTranscript = bcs::from_bytes(transcript_bytes)
         .map_err(|e| anyhow!("[ChunkyDKG] Unable to deserialize chunky transcript: {e}"))?;
 
