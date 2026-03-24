@@ -726,6 +726,22 @@ pub(crate) fn process_committed_transactions(
     };
 
     for transaction in transactions {
+        // Record MempoolCommit tracing stage and finalize trace before removal
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.is_enabled() {
+                if let Some(txn) =
+                    pool.transactions.get(&transaction.sender, transaction.replay_protector)
+                {
+                    let hash = txn.committed_hash();
+                    store.record_stage(
+                        &hash,
+                        aptos_transaction_tracing::types::TransactionStage::MempoolCommit,
+                    );
+                    store.finalize_trace(&hash);
+                }
+            }
+        }
         pool.log_commit_transaction(
             &transaction.sender,
             transaction.replay_protector,
@@ -755,6 +771,16 @@ pub(crate) fn process_rejected_transactions(
             &transaction.hash,
             &transaction.reason,
         );
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.is_enabled() {
+                store.record_stage(
+                    &transaction.hash,
+                    aptos_transaction_tracing::types::TransactionStage::MempoolReject,
+                );
+                store.finalize_trace(&transaction.hash);
+            }
+        }
     }
 }
 

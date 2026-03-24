@@ -344,6 +344,16 @@ impl ProofCoordinator {
                     )?
                     .elapsed();
                 counters::BATCH_TO_POS_DURATION.observe_duration(duration);
+                {
+                    let store =
+                        aptos_transaction_tracing::store::TransactionTraceStore::global();
+                    if store.is_enabled() {
+                        store.record_batch_stage(
+                            proof.info().digest(),
+                            aptos_transaction_tracing::types::TransactionStage::QsProofOfStore,
+                        );
+                    }
+                }
                 return Ok(Some(proof));
             }
         } else {

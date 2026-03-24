@@ -233,6 +233,19 @@ where
                 };
 
                 let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
+                // Record ExecutionStart for traced transactions
+                {
+                    let store =
+                        aptos_transaction_tracing::store::TransactionTraceStore::global();
+                    if store.is_enabled() {
+                        for txn in transactions.txns() {
+                            store.record_stage(
+                                &txn.hash(),
+                                aptos_transaction_tracing::types::TransactionStage::ExecutionStart,
+                            );
+                        }
+                    }
+                }
                 fail_point!("executor::block_executor_execute_block", |_| {
                     Err(ExecutorError::from(anyhow::anyhow!(
                         "Injected error in block_executor_execute_block"
