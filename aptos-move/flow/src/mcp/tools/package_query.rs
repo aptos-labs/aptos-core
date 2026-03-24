@@ -19,13 +19,15 @@ use std::collections::{BTreeMap, BTreeSet};
 struct MovePackageQueryParams {
     /// Path to the Move package directory.
     package_path: String,
-    /// The query to run.
-    query: MovePackageQuery,
+    /// Query type.
+    query: QueryType,
+    /// Function to query (required for "function_usage"), in the form "module_name::function_name".
+    function: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
-enum MovePackageQuery {
+enum QueryType {
     /// Returns a map from each module to the modules it depends on.
     DepGraph,
     /// Returns a summary of each module's constants, structs, and functions.
@@ -33,10 +35,8 @@ enum MovePackageQuery {
     /// Returns a function-level call graph as a map from each function to the functions it calls.
     CallGraph,
     /// Returns direct and transitive calls/uses by a given function.
-    FunctionUsage {
-        /// Function to query, as "module_name::function_name".
-        function: String,
-    },
+    /// "called" = direct calls; "used" = direct calls + closure captures.
+    FunctionUsage,
 }
 
 // ========== MCP Tool ==========
@@ -68,12 +68,12 @@ impl FlowSession {
         let data = pkg.lock().map_err(|_| mcp_err("package lock poisoned"))?;
 
         match params.query {
-            MovePackageQuery::DepGraph => {
+            QueryType::DepGraph => {
                 let result = build_dep_graph(data.env());
                 log::info!("move_package_query dep_graph: {} module(s)", result.len());
                 Ok(into_call_tool_result(&result))
             },
-            MovePackageQuery::ModuleSummary => {
+            QueryType::ModuleSummary => {
                 let result = build_module_summary(data.env());
                 log::info!(
                     "move_package_query module_summary: {} module(s)",
@@ -81,7 +81,7 @@ impl FlowSession {
                 );
                 Ok(into_call_tool_result(&result))
             },
-            MovePackageQuery::CallGraph => {
+            QueryType::CallGraph => {
                 let result = build_call_graph(data.env());
                 log::info!(
                     "move_package_query call_graph: {} function(s)",
@@ -89,7 +89,10 @@ impl FlowSession {
                 );
                 Ok(into_call_tool_result(&result))
             },
-            MovePackageQuery::FunctionUsage { function } => {
+            QueryType::FunctionUsage => {
+                let function = params.function.ok_or_else(|| {
+                    mcp_err("\"function\" parameter is required for function_usage query")
+                })?;
                 let result = build_function_usage(data.env(), &function)?;
                 log::info!("move_package_query function_usage({})", function);
                 Ok(into_call_tool_result(&result))

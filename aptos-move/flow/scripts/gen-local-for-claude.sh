@@ -6,9 +6,9 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-OUTPUT_DIR="$SCRIPT_DIR/gen/claude"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CRATE_DIR="$REPO_ROOT/aptos-move/flow"
+OUTPUT_DIR="$CRATE_DIR/gen/claude"
 
 # Parse arguments
 LOG_ARGS=()
@@ -32,10 +32,11 @@ done
 
 # Install move-flow
 echo "Installing move-flow ..."
-cargo install --path "$SCRIPT_DIR" --locked "${PROFILE_ARGS[@]}"
+cargo install --path "$CRATE_DIR" --locked "${PROFILE_ARGS[@]}"
 
 # Generate plugin output
 echo "Generating plugin files in $OUTPUT_DIR..."
 move-flow plugin "$OUTPUT_DIR" "${LOG_ARGS[@]}"
 
-echo "Done."
+echo "Done. Run Claude with:"
+echo "  claude --plugin $OUTPUT_DIR"
