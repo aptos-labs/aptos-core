@@ -38,6 +38,11 @@ pub(crate) fn mcp_err_chain(prefix: &str, e: &anyhow::Error) -> rmcp::ErrorData 
     mcp_err(format!("{}: {}", prefix, format_error_chain(e)))
 }
 
+/// Call `f`, catching any panic and converting it to an MCP error with `msg`.
+pub(crate) fn try_call<T>(msg: &str, f: impl FnOnce() -> T) -> Result<T, rmcp::ErrorData> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).map_err(|_| mcp_err(msg))
+}
+
 /// Shorthand for creating an `rmcp::ErrorData` invalid params error.
 pub(crate) fn mcp_invalid(msg: impl Into<String>) -> rmcp::ErrorData {
     rmcp::ErrorData::invalid_params(msg.into(), None)

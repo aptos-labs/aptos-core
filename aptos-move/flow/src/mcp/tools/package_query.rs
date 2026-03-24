@@ -4,7 +4,7 @@
 //! Move package query tools.
 
 use super::super::{
-    common::{mcp_err, resolve_function, tool_error},
+    common::{mcp_err, resolve_function, tool_error, try_call},
     session::{into_call_tool_result, FlowSession},
 };
 use move_model::model::{FunId, GlobalEnv, QualifiedId};
@@ -251,8 +251,14 @@ fn build_function_usage(env: &GlobalEnv, function: &str) -> Result<FunctionUsage
 
     let called = func.get_called_functions().cloned().unwrap_or_default();
     let used = func.get_used_functions().cloned().unwrap_or_default();
-    let called_transitive = func.get_transitive_closure_of_called_functions();
-    let used_transitive = func.get_transitive_closure_of_used_functions();
+    // These methods panic if any function in the BFS lacks call info.
+    // Guard with try_call to return a clean error instead of crashing.
+    let called_transitive = try_call("failed to compute transitive called functions", || {
+        func.get_transitive_closure_of_called_functions()
+    })?;
+    let used_transitive = try_call("failed to compute transitive used functions", || {
+        func.get_transitive_closure_of_used_functions()
+    })?;
 
     Ok(FunctionUsage {
         called: qids_to_names(env, &called),

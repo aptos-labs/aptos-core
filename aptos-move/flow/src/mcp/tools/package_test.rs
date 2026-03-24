@@ -216,7 +216,10 @@ impl FlowSession {
         log::info!(
             "move_package_coverage: path=`{}`{}",
             params.package_path,
-            params.function.as_deref().map_or(String::new(), |f| format!(", function=`{}`", f))
+            params
+                .function
+                .as_deref()
+                .map_or(String::new(), |f| format!(", function=`{}`", f))
         );
 
         let pkg_path = PathBuf::from(&params.package_path);

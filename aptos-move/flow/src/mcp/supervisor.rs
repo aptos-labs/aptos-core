@@ -64,6 +64,18 @@ pub async fn run_supervised() -> Result<()> {
             return Ok(());
         }
 
+        // Only restart when the child was killed by a signal (e.g. SIGSEGV,
+        // SIGABRT from a panic). Normal non-zero exits (bad config, permission
+        // errors) should propagate immediately rather than looping.
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            if status.signal().is_none() {
+                // Not signal-killed — propagate the exit code.
+                std::process::exit(status.code().unwrap_or(1));
+            }
+        }
+
         crashes += 1;
         if crashes >= MAX_CRASHES {
             log::error!("MCP server crashed {MAX_CRASHES} times, giving up");
