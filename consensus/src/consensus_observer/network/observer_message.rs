@@ -570,6 +570,14 @@ impl<T: TBatchInfo> TransactionsWithProof<T> {
         }
     }
 
+    pub fn into_transactions(self) -> Vec<SignedTransaction> {
+        match self {
+            TransactionsWithProof::TransactionsWithProofAndLimits(payload) => {
+                payload.payload_with_proof.transactions
+            },
+        }
+    }
+
     pub fn proofs(&self) -> Vec<ProofOfStore<T>> {
         match self {
             TransactionsWithProof::TransactionsWithProofAndLimits(payload) => {
@@ -800,6 +808,22 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
             | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transactions(),
             BlockTransactionPayload::OptQuorumStoreV2(payload, _) => payload.transactions(),
+        }
+    }
+
+    /// Returns the transactions in the payload, consuming self to avoid cloning
+    pub fn into_transactions(self) -> Vec<SignedTransaction> {
+        match self {
+            BlockTransactionPayload::DeprecatedInQuorumStore(payload) => payload.transactions,
+            BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
+                payload.payload_with_proof.transactions
+            },
+            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
+                payload.payload_with_proof.transactions
+            },
+            BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.into_transactions(),
+            BlockTransactionPayload::OptQuorumStoreV2(payload, _) => payload.into_transactions(),
         }
     }
 
@@ -1057,6 +1081,11 @@ impl BlockPayload {
     /// Returns a reference to the block transaction payload
     pub fn transaction_payload(&self) -> &BlockTransactionPayload {
         &self.transaction_payload
+    }
+
+    /// Consumes self and returns the block transaction payload
+    pub fn into_transaction_payload(self) -> BlockTransactionPayload {
+        self.transaction_payload
     }
 
     /// Verifies the block payload digests and returns an error if the data is invalid

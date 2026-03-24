@@ -397,11 +397,9 @@ impl TPayloadManager for QuorumStorePayloadManager {
             consensus_publisher.publish_message(message);
         }
 
-        Ok((
-            transaction_payload.transactions(),
-            transaction_payload.transaction_limit(),
-            transaction_payload.gas_limit(),
-        ))
+        let limit = transaction_payload.transaction_limit();
+        let gas = transaction_payload.gas_limit();
+        Ok((transaction_payload.into_transactions(), limit, gas))
     }
 }
 
