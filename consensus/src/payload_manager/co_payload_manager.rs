@@ -58,21 +58,19 @@ async fn get_transactions_for_observer(
     };
 
     // If the payload is valid, publish it to any downstream observers
-    let transaction_payload = block_payload.transaction_payload();
     if let Some(consensus_publisher) = consensus_publisher {
         let message = ConsensusObserverMessage::new_block_payload_message(
             block.gen_block_info(HashValue::zero(), 0, None),
-            transaction_payload.clone(),
+            block_payload.transaction_payload().clone(),
         );
         consensus_publisher.publish_message(message);
     }
 
     // Return the transactions and the transaction limit
-    Ok((
-        transaction_payload.transactions(),
-        transaction_payload.transaction_limit(),
-        transaction_payload.gas_limit(),
-    ))
+    let transaction_payload = block_payload.into_transaction_payload();
+    let limit = transaction_payload.transaction_limit();
+    let gas = transaction_payload.gas_limit();
+    Ok((transaction_payload.into_transactions(), limit, gas))
 }
 
 pub struct ConsensusObserverPayloadManager {
