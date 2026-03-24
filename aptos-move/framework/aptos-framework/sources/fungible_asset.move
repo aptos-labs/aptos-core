@@ -656,20 +656,10 @@ module aptos_framework::fungible_asset {
         exists<ConcurrentFungibleBalance>(store)
     }
 
-    /// Return the underlying metadata object
-    public fun metadata_from_asset(self: &FungibleAsset): Object<Metadata> {
-        self.metadata
-    }
-
     #[view]
     /// Return the underlying metadata object.
     public fun store_metadata<T: key>(store: Object<T>): Object<Metadata> acquires FungibleStore {
         borrow_store_resource(&store).metadata
-    }
-
-    /// Return the `amount` of a given fungible asset.
-    public fun amount(fa: &FungibleAsset): u64 {
-        fa.amount
     }
 
     #[view]
@@ -842,6 +832,19 @@ module aptos_framework::fungible_asset {
         }
     }
 
+    /// Return the `amount` of a given fungible asset.
+    public fun amount(self: &FungibleAsset): u64 {
+        self.amount
+    }
+
+    #[deprecated]
+    /// Return the underlying metadata object
+    /// Duplicate of `asset_metadata`
+    public fun metadata_from_asset(self: &FungibleAsset): Object<Metadata> {
+        self.metadata
+    }
+
+    /// Return the underlying metadata object from the `FungibleAsset`.
     public fun asset_metadata(self: &FungibleAsset): Object<Metadata> {
         self.metadata
     }
@@ -1077,7 +1080,7 @@ module aptos_framework::fungible_asset {
     /// Burns a fungible asset
     public fun burn(self: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
         assert!(
-            self.metadata == fa.metadata_from_asset(),
+            self.metadata == fa.asset_metadata(),
             error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH)
         );
         fa.burn_internal();

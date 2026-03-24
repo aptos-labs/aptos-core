@@ -603,7 +603,7 @@ the same amount of fund in the future.
         <a href="fungible_asset.md#0x1_fungible_asset_amount">fungible_asset::amount</a>(&fa),
         <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>(
             <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner),
-            fa.metadata_from_asset(),
+            fa.asset_metadata(),
         )
     );
     <b>let</b> metadata = fa.asset_metadata();

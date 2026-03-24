@@ -477,7 +477,7 @@ Lifetime: transient
 
 Whether generic algebra basic operation support in <code>crypto_algebra.<b>move</b></code> are enabled.
 
-Lifetime: transient
+Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>: u64 = 12;
