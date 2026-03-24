@@ -9,14 +9,7 @@ use crate::{
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use legacy_move_compiler::{
-    command_line as cli,
-    shared::{
-        move_compiler_warn_of_deprecation_use_env_var,
-        warn_of_deprecation_use_in_aptos_libs_env_var,
-    },
-};
-use move_command_line_common::env::{bool_to_str, read_env_var};
+use move_command_line_common::env::read_env_var;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use once_cell::sync::Lazy;
 use std::{
@@ -96,18 +89,6 @@ pub struct Options {
     /// Move.toml---but a specific subdirectory such as `sources`).
     #[clap(skip)]
     pub sources_deps: Vec<String>,
-
-    /// Warn about use of deprecated functions, modules, etc.
-    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
-           default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
-    pub warn_deprecated: bool,
-
-    /// Show warnings about use of deprecated usage in the Aptos libraries,
-    /// which we should generally not bother users with.
-    /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(hide(true), long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
-           default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
-    pub warn_of_deprecation_use_in_aptos_libs: bool,
 
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
@@ -220,20 +201,6 @@ impl Options {
     pub fn set_compile_verify_code(self, value: bool) -> Self {
         Self {
             compile_verify_code: value,
-            ..self
-        }
-    }
-
-    pub fn set_warn_deprecated(self, value: bool) -> Self {
-        Self {
-            warn_deprecated: value,
-            ..self
-        }
-    }
-
-    pub fn set_warn_of_deprecation_use_in_aptos_libs(self, value: bool) -> Self {
-        Self {
-            warn_of_deprecation_use_in_aptos_libs: value,
             ..self
         }
     }
