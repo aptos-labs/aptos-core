@@ -12,7 +12,7 @@ use crate::{
     alloc::{GlobalArenaPtr, LeakedBoxPtr},
     context::{executable::Executable, executable_ids::ExecutableId},
 };
-use dashmap::{DashMap, Entry};
+use dashmap::DashMap;
 
 /// Concurrent long-living executable cache.
 ///
@@ -41,13 +41,10 @@ impl ExecutableCache {
         key: GlobalArenaPtr<ExecutableId>,
         executable: Box<Executable>,
     ) -> LeakedBoxPtr<Executable> {
-        match self.inner.entry(key) {
-            Entry::Occupied(e) => *e.get(),
-            Entry::Vacant(entry) => {
-                let ptr = LeakedBoxPtr::from_box(executable);
-                *entry.insert(ptr)
-            },
-        }
+        *self
+            .inner
+            .entry(key)
+            .or_insert_with(|| LeakedBoxPtr::from_box(executable))
     }
 
     /// Returns the leaked pointer for the given key, if present.

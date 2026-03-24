@@ -21,7 +21,7 @@
 //! to dereference any arena-based pointers stored in the map.
 
 use crate::{alloc::GlobalArenaPtr, context::ArenaRef, ExecutionGuard};
-use dashmap::{Entry, Equivalent};
+use dashmap::Equivalent;
 use move_core_types::identifier::IdentStr;
 use std::hash::{Hash, Hasher};
 
@@ -104,11 +104,11 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
         // valid pointers because the map is cleared on arena's reset.
-        let key = IdentifierInternerKey(ptr);
-        match self.ctx.identifiers.entry(key) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => *entry.insert(ptr),
-        }
+        *self
+            .ctx
+            .identifiers
+            .entry(IdentifierInternerKey(ptr))
+            .or_insert(ptr)
     }
 }
 

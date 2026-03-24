@@ -274,7 +274,10 @@ impl<'ctx> ExecutionGuard<'ctx> {
         key: ArenaRef<'guard, ExecutableId>,
         executable: Box<Executable>,
     ) -> &'guard Executable {
-        let ptr = self.ctx.executable_cache.insert(key.ptr, executable);
+        let ptr = self
+            .ctx
+            .executable_cache
+            .insert(key.into_global_arena_ptr(), executable);
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in

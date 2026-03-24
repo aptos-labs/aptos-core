@@ -22,7 +22,7 @@
 //! any arena-based pointers stored in the map.
 
 use crate::{alloc::GlobalArenaPtr, context::ArenaRef, ExecutionGuard};
-use dashmap::{Entry, Equivalent};
+use dashmap::Equivalent;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
@@ -154,11 +154,11 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
         // valid pointers because the map is cleared on arena's reset.
-        let key = ExecutableIdInternerKey(ptr);
-        match self.ctx.executable_ids.entry(key) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => *entry.insert(ptr),
-        }
+        *self
+            .ctx
+            .executable_ids
+            .entry(ExecutableIdInternerKey(ptr))
+            .or_insert(ptr)
     }
 }
 

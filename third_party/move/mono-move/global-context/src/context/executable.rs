@@ -35,6 +35,7 @@ impl<T> ExecutableArenaPtr<T> {
     }
 }
 
+// This type can be duplicated using bitwise copy.
 impl<T> Copy for ExecutableArenaPtr<T> {}
 
 impl<T> Clone for ExecutableArenaPtr<T> {
