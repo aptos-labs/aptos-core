@@ -555,6 +555,102 @@ impl ProposalGenerator {
         Ok(block)
     }
 
+    /// Fast-path proposal generation for proxy consensus.
+    ///
+    /// Skips the expensive parts of `generate_proposal_inner`:
+    /// - No PayloadFilter construction (iterating all pending blocks' payloads)
+    /// - No backpressure calculation (already disabled for proxy via no_backoff configs)
+    /// - No path_from_ordered_root traversal
+    /// - Minimal payload pull parameters (no opt QS params)
+    ///
+    /// This reduces overhead from ~5ms to <0.5ms, leaving only the QS pull latency.
+    pub async fn generate_proposal_fast(
+        &self,
+        round: Round,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+    ) -> anyhow::Result<BlockData> {
+        let hqc = self.ensure_highest_quorum_cert(round)?;
+
+        let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+            (
+                vec![],
+                Payload::empty(
+                    self.quorum_store_enabled,
+                    self.allow_batches_without_pos_in_proposal,
+                ),
+                hqc.certified_block().timestamp_usecs(),
+            )
+        } else {
+            // Track last_round_generated to prevent double proposals
+            {
+                let mut last_round_generated = self.last_round_generated.lock();
+                if *last_round_generated < round {
+                    *last_round_generated = round;
+                } else {
+                    bail!("Already proposed in the round {}", round);
+                }
+            }
+
+            let timestamp = self.time_service.get_current_timestamp();
+
+            // Minimal pull: no payload filter (ProxyBudgetPayloadClient handles dedup),
+            // no opt QS params, no backpressure adjustment.
+            let (validator_txns, payload) = self
+                .payload_client
+                .pull_payload(
+                    PayloadPullParameters {
+                        max_poll_time: self.quorum_store_poll_time,
+                        max_txns: self.max_block_txns,
+                        max_txns_after_filtering: self.max_block_txns_after_filtering,
+                        soft_max_txns_after_filtering: self.max_block_txns_after_filtering,
+                        max_inline_txns: self.max_inline_txns,
+                        maybe_optqs_payload_pull_params: None,
+                        user_txn_filter: PayloadFilter::Empty,
+                        pending_ordering: true,
+                        pending_uncommitted_blocks: 0,
+                        recent_max_fill_fraction: 0.0,
+                        block_timestamp: timestamp,
+                    },
+                    vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
+                )
+                .await
+                .context("Fail to retrieve payload")?;
+
+            (validator_txns, payload, timestamp.as_micros() as u64)
+        };
+
+        let quorum_cert = hqc.as_ref().clone();
+        let failed_authors = self.compute_failed_authors(
+            round,
+            quorum_cert.certified_block().round(),
+            false,
+            proposer_election,
+        );
+
+        let block = if self.vtxn_config.enabled() {
+            BlockData::new_proposal_ext(
+                validator_txns,
+                payload,
+                self.author,
+                failed_authors,
+                round,
+                timestamp,
+                quorum_cert,
+            )
+        } else {
+            BlockData::new_proposal(
+                payload,
+                self.author,
+                failed_authors,
+                round,
+                timestamp,
+                quorum_cert,
+            )
+        };
+
+        Ok(block)
+    }
+
     /// Generate a primary proposal using pre-aggregated proxy payload.
     ///
     /// Unlike `generate_proposal()`, this skips `payload_client.pull_payload()`.

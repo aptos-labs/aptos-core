@@ -347,7 +347,14 @@ impl ProofManager {
         loop {
             let _timer = counters::PROOF_MANAGER_MAIN_LOOP.start_timer();
 
+            // biased: prioritize proposal pull requests over batch/proof commands.
+            // Under high TPS, ReceiveBatches/ReceiveProofs flood proof_rx (~100+/sec).
+            // Without biased, pull requests wait behind these commands, adding 10-30ms
+            // latency to proxy block creation (100ms timeout budget). With biased,
+            // pull requests are processed first whenever ready, reducing QS pull
+            // latency to ~1-2ms (just processing time, no queueing).
             tokio::select! {
+                    biased;
                     Some(msg) = proposal_rx.next() => monitor!("proof_manager_handle_proposal", {
                         self.handle_proposal_request(msg);
 

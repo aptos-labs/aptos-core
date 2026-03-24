@@ -998,9 +998,10 @@ impl RoundManager {
     ) -> anyhow::Result<ProposalMsg> {
         let consensus_type = if proxy_hooks.is_some() { "proxy" } else { "primary" };
         let proposal = if let Some(hooks) = proxy_hooks {
-            // Proxy RoundManager: transform proposal into proxy block format
+            // Proxy RoundManager: use fast-path proposal generation that skips
+            // expensive payload filter construction and backpressure calculations.
             let original = proposal_generator
-                .generate_proposal(new_round_event.round, proposer_election)
+                .generate_proposal_fast(new_round_event.round, proposer_election)
                 .await?;
             let author = original.author().expect("Proposal must have author");
             let payload = original.payload().cloned().unwrap_or_else(|| {
