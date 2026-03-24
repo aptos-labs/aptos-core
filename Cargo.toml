@@ -207,6 +207,7 @@ members = [
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",
+    "third_party/move/mono-move/alloc",
     "third_party/move/mono-move/gas",
     "third_party/move/mono-move/global-context",
     "third_party/move/mono-move/micro-ops",
@@ -877,6 +878,7 @@ x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cd
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
+mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
 mono-move-gas = { path = "third_party/move/mono-move/gas" }
 mono-move-micro-ops = { path = "third_party/move/mono-move/micro-ops" }
 mono-move-programs = { path = "third_party/move/mono-move/programs" }

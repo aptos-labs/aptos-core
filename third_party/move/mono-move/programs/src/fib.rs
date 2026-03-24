@@ -40,8 +40,8 @@ pub fn native_fib(n: u64) -> u64 {
 #[cfg(feature = "micro-op")]
 mod micro_op {
     use mono_move_runtime::{
-        CodeOffset as CO, FrameOffset as FO, Function, MicroOp::*, ObjectDescriptor,
-        FRAME_METADATA_SIZE,
+        CodeOffset as CO, FrameOffset as FO, Function, GlobalArenaPtr, MicroOp::*,
+        ObjectDescriptor, FRAME_METADATA_SIZE,
     };
 
     pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
@@ -75,6 +75,7 @@ mod micro_op {
         ];
 
         let func = Function {
+            name: GlobalArenaPtr::from_static("fib"),
             code,
             args_size: 8,
             args_and_locals_size: args_and_locals_size as usize,

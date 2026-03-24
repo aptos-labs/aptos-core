@@ -31,7 +31,7 @@
 //! - **Calling convention**: the VM uses a single flat linear buffer as its
 //!   call stack. Each frame contains slots followed by a
 //!   [`FRAME_METADATA_SIZE`]-byte metadata section `(saved_pc, saved_fp,
-//!   func_id)`.
+//!   saved_func_ptr)`.
 //!
 //!   ```text
 //!                 caller frame                           callee frame
@@ -39,16 +39,17 @@
 //!     │                        │ saved  ││   │                              │
 //!     │  caller slots          │  pc    ││   │  arg slots  │  other slots   │
 //!     │                        │  fp    ││   │                              │
-//!     │                        │func_id ││   │                              │
+//!     │                        │func_ptr││   │                              │
 //!     └──────────────────────────────────┘   └──────────────────────────────┘
 //!                              ▲             ▲
 //!                         metadata (24B)     fp
 //!   ```
 //!
 //!   **Call**: the compiler emits explicit micro-ops to place arguments
-//!   into the callee's frame slots. The `CallFunc` instruction itself
-//!   implicitly writes the metadata `(pc, fp, func_id)` at the end of
-//!   the caller frame and sets `fp` to the callee frame.
+//!   into the callee's frame slots. The `CallFunc`/`CallLocalFunc`
+//!   instruction itself implicitly writes the metadata `(pc, fp,
+//!   func_ptr)` at the end of the caller frame and sets `fp` to the
+//!   callee frame.
 //!   **Return**: the compiler emits explicit micro-ops to write return
 //!   values at the start of the callee's frame (potentially overwriting
 //!   arg slots). The `Return` instruction itself implicitly restores
@@ -113,6 +114,9 @@
 //! - **Vector** `{ elem_size, elem_ptr_offsets }` — variable-length array;
 //!   `elem_ptr_offsets` lists byte offsets *within each element* that hold
 //!   heap pointers.
+
+use crate::Function;
+use std::ptr::NonNull;
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -270,10 +274,14 @@ pub enum MicroOp {
     //======================================================================
     /// Call function `func_id`. The compiler has already emitted micro-ops
     /// to place arguments into the callee's frame. This instruction
-    /// implicitly writes the metadata `(pc, fp, func_id)` at
+    /// implicitly writes the metadata `(pc, fp, func_ptr)` at
     /// `current_fp + args_and_locals_size` and sets `fp` to
     /// `current_fp + args_and_locals_size + FRAME_METADATA_SIZE`.
     CallFunc { func_id: u32 },
+
+    /// Call a function via direct pointer. Same calling convention as
+    /// `CallFunc`.
+    CallLocalFunc { ptr: NonNull<Function> },
 
     /// Return from the current function call. The compiler has already
     /// emitted micro-ops to write return values at the start of the

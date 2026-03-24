@@ -2,8 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use mono_move_runtime::{
-    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, InterpreterContext, MicroOp,
-    ObjectDescriptor,
+    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr,
+    InterpreterContext, MicroOp, ObjectDescriptor,
 };
 
 /// Data segment (48 bytes):
@@ -44,6 +44,7 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
     ];
 
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,

@@ -21,8 +21,9 @@
 //! when the arena backing the allocation is reset. It is safe to dereference
 //! any arena-based pointers stored in the map.
 
-use crate::{alloc::GlobalArenaPtr, context::ArenaRef, ExecutionGuard};
+use crate::{context::ArenaRef, ExecutionGuard};
 use dashmap::Equivalent;
+use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };

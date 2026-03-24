@@ -16,6 +16,36 @@ pub mod nested_loop;
 pub mod testing;
 
 // ---------------------------------------------------------------------------
+// Call resolution (benchmark / test utility)
+// ---------------------------------------------------------------------------
+
+/// Post-processes a slice of functions, replacing every [`MicroOp::CallFunc`]
+/// (index-based dispatch) with [`MicroOp::CallLocalFunc`] (direct pointer
+/// dispatch). This avoids the function-table lookup at runtime.
+///
+/// # Safety contract
+///
+/// The returned `NonNull<Function>` pointers point into the `functions` slice.
+/// Callers must not reallocate or move the slice after calling this function.
+#[cfg(feature = "micro-op")]
+pub fn resolve_calls(functions: &mut [mono_move_runtime::Function]) {
+    use mono_move_runtime::MicroOp;
+    use std::ptr::NonNull;
+
+    let ptrs: Vec<NonNull<mono_move_runtime::Function>> =
+        functions.iter_mut().map(NonNull::from).collect();
+    for func in functions.iter_mut() {
+        for op in &mut func.code {
+            if let MicroOp::CallFunc { func_id } = *op {
+                *op = MicroOp::CallLocalFunc {
+                    ptr: ptrs[func_id as usize],
+                };
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Move compilation helper
 // ---------------------------------------------------------------------------
 

@@ -16,7 +16,8 @@ mod micro_op {
     use mono_move_runtime::InterpreterContext;
 
     fn run(n: u64) -> u64 {
-        let (functions, descriptors) = micro_op_fib();
+        let (mut functions, descriptors) = micro_op_fib();
+        mono_move_programs::resolve_calls(&mut functions);
         let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
         ctx.set_root_arg(0, &n.to_le_bytes());
         ctx.run().unwrap();

@@ -4,8 +4,8 @@
 //! Tests for the static verifier (`verify_program`).
 
 use mono_move_runtime::{
-    verify_program, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp,
-    ObjectDescriptor,
+    verify_program, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr,
+    MicroOp, ObjectDescriptor,
 };
 
 fn trivial_descriptors() -> Vec<ObjectDescriptor> {
@@ -15,6 +15,7 @@ fn trivial_descriptors() -> Vec<ObjectDescriptor> {
 /// A minimal well-formed function: one `Return`, args_and_locals_size 8.
 fn minimal_func() -> Function {
     Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![MicroOp::Return],
         args_size: 0,
         args_and_locals_size: 8,
@@ -48,6 +49,7 @@ fn valid_with_arithmetic_and_jumps() {
     ];
 
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 16,
@@ -73,6 +75,7 @@ fn valid_with_vec_and_pointer_slots() {
     ];
 
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 32,
@@ -92,6 +95,7 @@ fn valid_with_vec_and_pointer_slots() {
 fn frame_bounds_store_u64() {
     use MicroOp::*;
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![StoreImm8 { dst: FO(8), imm: 0 }, Return],
         args_and_locals_size: 8,
         extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
@@ -112,6 +116,7 @@ fn frame_bounds_store_u64() {
 fn frame_bounds_mov() {
     use MicroOp::*;
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![
             Move {
                 dst: FO(8),
@@ -137,6 +142,7 @@ fn frame_bounds_mov() {
 fn frame_bounds_fat_ptr_write() {
     use MicroOp::*;
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![
             StoreImm8 { dst: FO(0), imm: 0 },
             SlotBorrow {
@@ -163,6 +169,7 @@ fn frame_bounds_callfunc_metadata() {
     use MicroOp::*;
     let callee = minimal_func();
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![CallFunc { func_id: 1 }, Return],
         args_and_locals_size: 8,
         extended_frame_size: 16, // args_and_locals_size 8 + 24 = 32 > 16
@@ -184,6 +191,7 @@ fn frame_bounds_callfunc_metadata() {
 #[test]
 fn pointer_slots_offset_out_of_bounds() {
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![MicroOp::Return],
         args_size: 0,
         args_and_locals_size: 8,
@@ -201,6 +209,7 @@ fn pointer_slots_offset_out_of_bounds() {
 #[test]
 fn pointer_slots_overlaps_metadata() {
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![MicroOp::Return],
         args_size: 0,
         args_and_locals_size: 8,
@@ -218,6 +227,7 @@ fn pointer_slots_overlaps_metadata() {
 #[test]
 fn args_size_exceeds_data_size() {
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![MicroOp::Return],
         args_and_locals_size: 8,
         extended_frame_size: 32,
@@ -238,6 +248,7 @@ fn args_size_exceeds_data_size() {
 fn invalid_jump_target() {
     use MicroOp::*;
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![
             Jump { target: CO(5) }, // only 2 instructions -> 5 >= 2
             Return,
@@ -257,6 +268,7 @@ fn invalid_jump_target() {
 fn invalid_conditional_jump_target() {
     use MicroOp::*;
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![
             StoreImm8 { dst: FO(0), imm: 0 },
             JumpNotZeroU64 {
@@ -284,6 +296,7 @@ fn invalid_conditional_jump_target() {
 fn invalid_callfunc_func_id() {
     use MicroOp::*;
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![CallFunc { func_id: 42 }, Return],
         args_size: 0,
         args_and_locals_size: 0,
@@ -305,6 +318,7 @@ fn invalid_descriptor_id() {
     use MicroOp::*;
 
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![
             VecNew { dst: FO(0) },
             SlotBorrow {
@@ -342,6 +356,7 @@ fn invalid_descriptor_id() {
 fn zero_size_mov() {
     use MicroOp::*;
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![
             Move {
                 dst: FO(0),
@@ -366,6 +381,7 @@ fn zero_elem_size_vec_push() {
     use MicroOp::*;
 
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![
             VecNew { dst: FO(0) },
             SlotBorrow {
@@ -402,6 +418,7 @@ fn zero_elem_size_vec_push() {
 #[test]
 fn empty_code() {
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![],
         args_size: 0,
         args_and_locals_size: 8,
@@ -417,6 +434,7 @@ fn empty_code() {
 #[test]
 fn zero_frame_size() {
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![MicroOp::Return],
         args_size: 0,
         args_and_locals_size: 0,
@@ -437,6 +455,7 @@ fn zero_frame_size() {
 fn multiple_errors_collected() {
     use MicroOp::*;
     let func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: vec![
             StoreImm8 {
                 dst: FO(100),

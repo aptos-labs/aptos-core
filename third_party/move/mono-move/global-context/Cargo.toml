@@ -15,9 +15,9 @@ rust-version = { workspace = true }
 ahash = { workspace = true }
 anyhow = { workspace = true }
 bumpalo = { workspace = true }
-crossbeam-utils = { workspace = true }
 dashmap = { workspace = true }
 fxhash = { workspace = true }
+mono-move-alloc = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 parking_lot = { workspace = true }

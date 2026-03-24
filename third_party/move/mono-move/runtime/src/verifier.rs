@@ -181,6 +181,7 @@ impl FunctionVerifier<'_> {
                     self.err(Some(pc), format!("func_id {} out of bounds", func_id));
                 }
             },
+            MicroOp::CallLocalFunc { .. } => {},
 
             // ----- VecNew -----
             MicroOp::VecNew { dst } => {

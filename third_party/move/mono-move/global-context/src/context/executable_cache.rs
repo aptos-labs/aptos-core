@@ -8,11 +8,9 @@
 //! cached executables are freed before the global arena (which backs the keys)
 //! is reset.
 
-use crate::{
-    alloc::{GlobalArenaPtr, LeakedBoxPtr},
-    context::{executable::Executable, executable_ids::ExecutableId},
-};
+use crate::context::{executable::Executable, executable_ids::ExecutableId};
 use dashmap::DashMap;
+use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
 
 /// Concurrent long-living executable cache.
 ///

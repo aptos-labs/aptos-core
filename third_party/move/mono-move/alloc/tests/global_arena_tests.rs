@@ -3,7 +3,7 @@
 
 //! Integration tests for [`GlobalArenaPool`] and [`GlobalArenaPtr`].
 
-use mono_move_global_context::GlobalArenaPool;
+use mono_move_alloc::GlobalArenaPool;
 
 #[test]
 fn test_alloc() {

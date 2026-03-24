@@ -32,12 +32,9 @@
 //!   - Duplicate allocations leak but are bounded (interning converges).
 //!   - Trade-off: minor memory waste for lower lock contention.
 
-use crate::{
-    alloc::{GlobalArenaPtr, GlobalArenaShard},
-    maintenance_config::MaintenanceConfig,
-    GlobalArenaPool,
-};
+use crate::{maintenance_config::MaintenanceConfig, GlobalArenaPool};
 use dashmap::DashMap;
+use mono_move_alloc::{GlobalArenaPtr, GlobalArenaShard};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},

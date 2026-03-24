@@ -266,8 +266,8 @@ pub fn native_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
 #[cfg(feature = "micro-op")]
 mod micro_op {
     use mono_move_runtime::{
-        CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp as Op, MicroOp::*,
-        ObjectDescriptor, FRAME_METADATA_SIZE,
+        CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr, MicroOp as Op,
+        MicroOp::*, ObjectDescriptor, FRAME_METADATA_SIZE,
     };
 
     const NULL: u64 = u64::MAX;
@@ -338,6 +338,7 @@ mod micro_op {
         ];
 
         Function {
+            name: GlobalArenaPtr::from_static("new"),
             code,
             args_size: 0,
             args_and_locals_size: 24,
@@ -400,6 +401,7 @@ mod micro_op {
         ];
 
         Function {
+            name: GlobalArenaPtr::from_static("get"),
             code,
             args_size: 16,
             args_and_locals_size: 96,
@@ -507,6 +509,7 @@ mod micro_op {
         ];
 
         Function {
+            name: GlobalArenaPtr::from_static("insert"),
             code,
             args_size: 24,
             args_and_locals_size: args_and_locals_size as usize,
@@ -577,6 +580,7 @@ mod micro_op {
         ];
 
         Function {
+            name: GlobalArenaPtr::from_static("alloc_node"),
             code,
             args_size: 24,
             args_and_locals_size: 120,
@@ -671,6 +675,7 @@ mod micro_op {
         ];
 
         Function {
+            name: GlobalArenaPtr::from_static("remove"),
             code,
             args_size: 16,
             args_and_locals_size: args_and_locals_size as usize,
@@ -775,6 +780,7 @@ mod micro_op {
         ];
 
         Function {
+            name: GlobalArenaPtr::from_static("remove_node"),
             code,
             args_size: 16,
             args_and_locals_size: 136,
@@ -864,6 +870,7 @@ mod micro_op {
         ];
 
         Function {
+            name: GlobalArenaPtr::from_static("run_ops"),
             code,
             args_size: 8,
             args_and_locals_size: args_and_locals_size as usize,

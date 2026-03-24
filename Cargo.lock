@@ -12632,6 +12632,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-alloc"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+ "crossbeam-utils",
+ "parking_lot 0.12.1",
+]
+
+[[package]]
 name = "mono-move-gas"
 version = "0.1.0"
 
@@ -12642,9 +12651,9 @@ dependencies = [
  "ahash 0.8.12",
  "anyhow",
  "bumpalo",
- "crossbeam-utils",
  "dashmap 7.0.0-rc2",
  "fxhash",
+ "mono-move-alloc",
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.1",
@@ -12654,6 +12663,7 @@ dependencies = [
 name = "mono-move-micro-ops"
 version = "0.1.0"
 dependencies = [
+ "mono-move-alloc",
  "mono-move-gas",
 ]
 

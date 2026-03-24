@@ -11,13 +11,14 @@ use crate::{
     interpreter::InterpreterContext,
     memory::{read_ptr, read_u32, read_u64, write_ptr, write_u32, write_u64, MemoryRegion},
     types::{
-        DescriptorId, ObjectDescriptor, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FORWARDED_MARKER,
-        FRAME_METADATA_SIZE, HEADER_DESCRIPTOR_OFFSET, HEADER_SIZE_OFFSET, META_SAVED_FP_OFFSET,
-        META_SAVED_FUNC_ID_OFFSET, OBJECT_HEADER_SIZE, SENTINEL_FUNC_ID, STRUCT_DATA_OFFSET,
+        DescriptorId, Function, ObjectDescriptor, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+        FORWARDED_MARKER, FRAME_METADATA_SIZE, HEADER_DESCRIPTOR_OFFSET, HEADER_SIZE_OFFSET,
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
         VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use anyhow::{bail, Result};
+use std::ptr::NonNull;
 
 const MAX_SINGLE_ALLOCATION_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
 
@@ -197,7 +198,7 @@ impl InterpreterContext<'_> {
     /// Correctness relies on the following invariants maintained by the
     /// interpreter and the micro-op verifier:
     ///
-    /// - **Frame metadata integrity**: each frame's saved `fp`, `func_id`,
+    /// - **Frame metadata integrity**: each frame's saved `fp`, `func_ptr`,
     ///   and `pc` are written by `CallFunc`/`Return` and never modified by
     ///   user-visible micro-ops. A corrupted saved `fp` leads to
     ///   out-of-bounds stack reads (UB).
@@ -217,14 +218,15 @@ impl InterpreterContext<'_> {
 
         // Phase 1: scan roots from the call stack.
         let mut fp = self.frame_ptr;
-        let mut fid = self.func_id;
+        let mut func_ptr = self.current_func;
 
         loop {
-            let pointer_offsets = &self.functions[fid].pointer_offsets;
-            // SAFETY: `fp` points into the interpreter stack at a valid frame
-            // boundary. `pointer_offsets` offsets are within the frame's data
-            // segment (verified by the micro-op verifier). `fp.sub` retrieves
-            // saved metadata written by the call protocol.
+            // SAFETY: func_ptr is always a valid, non-null pointer — set from
+            // `self.functions[]` or from `CallLocalFunc`, and saved/restored
+            // via frame metadata. `pointer_offsets` offsets are within the
+            // frame's data segment (verified by the micro-op verifier).
+            // `fp.sub` retrieves saved metadata written by the call protocol.
+            let pointer_offsets = unsafe { &func_ptr.as_ref().pointer_offsets };
             unsafe {
                 for &offset in pointer_offsets {
                     let old_ptr = read_ptr(fp, offset);
@@ -235,12 +237,14 @@ impl InterpreterContext<'_> {
                 }
 
                 let meta = fp.sub(FRAME_METADATA_SIZE);
-                let saved_func_id = read_u64(meta, META_SAVED_FUNC_ID_OFFSET);
-                if saved_func_id == SENTINEL_FUNC_ID {
+                let saved_func_ptr = read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
+                if saved_func_ptr.is_null() {
                     break;
                 }
                 fp = read_ptr(meta, META_SAVED_FP_OFFSET);
-                fid = saved_func_id as usize;
+                // SAFETY: saved_func_ptr is non-null — we checked for the
+                // null sentinel above and would have broken out of the loop.
+                func_ptr = NonNull::new_unchecked(saved_func_ptr as *mut Function);
             }
         }
 
