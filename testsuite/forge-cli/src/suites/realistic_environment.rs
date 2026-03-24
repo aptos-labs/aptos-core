@@ -50,7 +50,7 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
-        "realistic_env_max_load_encrypted" => realistic_env_max_load_encrypted_test(duration),
+        "realistic_env_max_load_encrypted" => realistic_env_max_load_encrypted_test(duration, test_cmd),
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
