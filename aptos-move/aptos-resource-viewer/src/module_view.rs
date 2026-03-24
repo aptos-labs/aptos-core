@@ -377,24 +377,28 @@ mod tests {
             .set_default_version();
         assert_ne!(&a, &a_new);
 
+        let key_a = StateKey::module_id(&a_new.self_id());
+        let key_d = StateKey::module_id(&d.self_id());
+        let key_b = StateKey::module_id(&b.self_id());
+        let key_c = StateKey::module_id(&c.self_id());
         let new_state_view = MockStateView::new_with_state_slot(HashMap::from([
             // New code:
             (
-                StateKey::module_id(&a_new.self_id()),
-                StateSlot::from_db_get(Some((1, module_state_value(a_new.clone())))),
+                key_a.clone(),
+                StateSlot::from_db_get(key_a, Some((1, module_state_value(a_new.clone())))),
             ),
             (
-                StateKey::module_id(&d.self_id()),
-                StateSlot::from_db_get(Some((0, module_state_value(d.clone())))),
+                key_d.clone(),
+                StateSlot::from_db_get(key_d, Some((0, module_state_value(d.clone())))),
             ),
             // Old code:
             (
-                StateKey::module_id(&b.self_id()),
-                StateSlot::from_db_get(Some((0, module_state_value(b.clone())))),
+                key_b.clone(),
+                StateSlot::from_db_get(key_b, Some((0, module_state_value(b.clone())))),
             ),
             (
-                StateKey::module_id(&c.self_id()),
-                StateSlot::from_db_get(Some((0, module_state_value(c.clone())))),
+                key_c.clone(),
+                StateSlot::from_db_get(key_c, Some((0, module_state_value(c.clone())))),
             ),
         ]));
         state.reset_state_view(new_state_view);
