@@ -404,6 +404,31 @@ impl DbWriter for FakeAptosDB {
             .finalize_state_snapshot(version, output_with_proof, ledger_infos)
     }
 
+    fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
+        self.save_transactions(chunk, None, sync_commit)
+    }
+
+    fn commit_ledger(
+        &self,
+        _version: Version,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        chunk_opt: Option<ChunkToCommit>,
+    ) -> Result<()> {
+        if let Some(chunk) = chunk_opt {
+            self.save_transactions(chunk, ledger_info_with_sigs, false)
+        } else if let Some(li) = ledger_info_with_sigs {
+            self.inner
+                .ledger_db
+                .metadata_db()
+                .set_latest_ledger_info(li.clone());
+            LEDGER_VERSION.set(li.ledger_info().version() as i64);
+            NEXT_BLOCK_EPOCH.set(li.ledger_info().next_block_epoch() as i64);
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+
     fn save_transactions(
         &self,
         chunk: ChunkToCommit,
