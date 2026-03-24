@@ -376,6 +376,42 @@ impl Parser {
             &mut persisted_auxiliary_infos,
         );
 
+        // Record Executed stage with Keep/Retry/Discard metadata for traced transactions
+        {
+            use aptos_transaction_tracing::{
+                store::TransactionTraceStore,
+                types::{ExecutionStatus, StageMetadata, TransactionStage},
+            };
+            let store = TransactionTraceStore::global();
+            if store.is_enabled() {
+                // to_commit (Keep)
+                for txn in &transactions {
+                    store.record_stage_with_metadata(
+                        &txn.committed_hash(),
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Keep),
+                    );
+                }
+                // to_retry
+                for txn in &to_retry.transactions {
+                    store.record_stage_with_metadata(
+                        &txn.committed_hash(),
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Retry),
+                    );
+                    store.mark_retry(&txn.committed_hash());
+                }
+                // to_discard
+                for txn in &to_discard.transactions {
+                    store.record_stage_with_metadata(
+                        &txn.committed_hash(),
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Discard),
+                    );
+                }
+            }
+        }
+
         let mut block_end_info = None;
         if is_block {
             if let Some(Transaction::BlockEpilogue(payload)) = transactions.last() {
