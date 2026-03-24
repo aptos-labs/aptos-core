@@ -229,11 +229,13 @@ async fn call_grpc_manager(
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+        let outgoing_ctx =
+            trace_context_from_current_otel_span().unwrap_or_else(|| trace_ctx.new_child());
         let mut grpc_manager_request =
             tonic::Request::new(GetDataServiceForRequestRequest { user_request });
         aptos_indexer_grpc_utils::trace_context::inject_trace_context_into_request(
             &mut grpc_manager_request,
-            trace_ctx,
+            &outgoing_ctx,
         );
 
         let response: GetDataServiceForRequestResponse = client
