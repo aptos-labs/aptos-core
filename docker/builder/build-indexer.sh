@@ -10,14 +10,13 @@ echo "PROFILE: $PROFILE"
 
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
-BUILD_ENV=()
+PERF_FLAGS=()
 if [[ "$PROFILE" == "performance" ]]; then
-  source "$(dirname -- "${BASH_SOURCE[0]}")/performance_rustflags.sh"
-  BUILD_ENV=(RUSTFLAGS="${PERFORMANCE_RUSTFLAGS[*]}")
+  PERF_FLAGS=(--config .cargo/performance.toml)
 fi
 
 # Build all the rust binaries
-env "${BUILD_ENV[@]}" cargo build --locked --profile=$PROFILE \
+cargo build --locked --profile=$PROFILE "${PERF_FLAGS[@]}" \
     -p aptos-indexer-grpc-cache-worker \
     -p aptos-indexer-grpc-file-store \
     -p aptos-indexer-grpc-data-service \
