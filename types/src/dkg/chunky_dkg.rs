@@ -142,8 +142,7 @@ impl ChunkyDKGSession {
         )
     }
 
-    /// Generate secret sharing config and public parameters from DKG session metadata.
-    /// Similar to `RealDKG::new_public_params` but returns the config components directly.
+    /// Create a new DKG session from on-chain session metadata.
     pub fn new(
         dkg_session_metadata: &ChunkyDKGSessionMetadata,
     ) -> Arc<ChunkyDKGSession> {
@@ -216,7 +215,7 @@ impl ChunkyDKGSession {
     }
 }
 
-/// Reflection of `0x1::dkg::DKGSessionMetadata` in rust for Chunky DKG.
+/// Reflection of `0x1::chunky_dkg::DKGSessionMetadata` in rust.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChunkyDKGSessionMetadata {
     pub dealer_epoch: u64,
