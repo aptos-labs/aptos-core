@@ -170,7 +170,7 @@ module std::features {
 
     /// Whether generic algebra basic operation support in `crypto_algebra.move` are enabled.
     ///
-    /// Lifetime: transient
+    /// Lifetime: permanent
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
 
     public fun get_cryptography_algebra_natives_feature(): u64 {

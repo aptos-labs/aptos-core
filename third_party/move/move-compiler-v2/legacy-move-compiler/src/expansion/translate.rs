@@ -1961,7 +1961,6 @@ fn spec_condition_kind(
         P::SpecConditionKind_::AbortsIf => (E::SpecConditionKind_::AbortsIf, None),
         P::SpecConditionKind_::AbortsWith => (E::SpecConditionKind_::AbortsWith, None),
         P::SpecConditionKind_::SucceedsIf => (E::SpecConditionKind_::SucceedsIf, None),
-        P::SpecConditionKind_::Modifies => (E::SpecConditionKind_::Modifies, None),
         P::SpecConditionKind_::Emits => (E::SpecConditionKind_::Emits, None),
         P::SpecConditionKind_::Ensures => (E::SpecConditionKind_::Ensures, None),
         P::SpecConditionKind_::Requires => (E::SpecConditionKind_::Requires, None),
@@ -2031,17 +2030,45 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
             name,
             uninterpreted,
             signature,
+            modifies,
+            reads,
             body,
         } => {
             let (old_aliases, signature) = function_signature(context, signature);
+            let modifies = modifies.into_iter().map(|e| exp_(context, e)).collect();
+            let reads = reads.into_iter().map(|t| type_(context, t)).collect();
             let body = function_body(context, body);
             context.set_to_outer_scope(old_aliases);
             EM::Function {
                 uninterpreted,
                 name,
                 signature,
+                modifies,
+                reads,
                 body,
             }
+        },
+        PM::ModifiesOf {
+            fun_param,
+            params,
+            targets,
+        } => EM::ModifiesOf {
+            fun_param,
+            params: params
+                .into_iter()
+                .map(|(v, t)| (v, type_(context, t)))
+                .collect(),
+            targets: targets.into_iter().map(|e| exp_(context, e)).collect(),
+        },
+        PM::ReadsOf { fun_param, types } => EM::ReadsOf {
+            fun_param,
+            types: types.into_iter().map(|t| type_(context, t)).collect(),
+        },
+        PM::Modifies { targets } => EM::Modifies {
+            targets: targets.into_iter().map(|e| exp_(context, e)).collect(),
+        },
+        PM::Reads { types } => EM::Reads {
+            types: types.into_iter().map(|t| type_(context, t)).collect(),
         },
         PM::Variable {
             is_global,
@@ -2806,7 +2833,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             } = unbound_names;
             EE::Spec(spec_id, unbound_vars, unbound_func_ptrs)
         },
-        PE::Behavior(kind, pre_label, fn_name, type_args, sp!(args_loc, args), post_label) => {
+        PE::Behavior(kind, fn_name, type_args, sp!(args_loc, args)) => {
             if !context.in_spec_context {
                 context.env.add_diag(diag!(
                     Syntax::SpecContextRestricted,
@@ -2826,48 +2853,25 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 let e_type_args = optional_types(context, type_args);
                 let e_args = sp(args_loc, exps(context, args));
                 if let Some(fn_access) = e_fn_name {
-                    EE::Behavior(kind, pre_label, fn_access, e_type_args, e_args, post_label)
+                    EE::Behavior(kind, fn_access, e_type_args, e_args)
                 } else {
                     EE::UnresolvedError
                 }
             }
         },
-        PE::LabeledCall(label, name, type_args, sp!(args_loc, args)) => {
+        PE::StateLabeled(pre_label, inner, post_label) => {
             if !context.in_spec_context {
                 context.env.add_diag(diag!(
                     Syntax::SpecContextRestricted,
                     (
                         loc,
-                        "labeled resource access only allowed in specifications"
+                        "state-labeled expression only allowed in specifications"
                     )
                 ));
                 EE::UnresolvedError
             } else {
-                let e_name =
-                    name_access_chain(context, Access::Term, name, Some(DeprecatedItem::Function));
-                let e_type_args = optional_types(context, type_args);
-                let e_args = sp(args_loc, exps(context, args));
-                if let Some(name_access) = e_name {
-                    EE::LabeledCall(label, name_access, e_type_args, e_args)
-                } else {
-                    EE::UnresolvedError
-                }
-            }
-        },
-        PE::LabeledIndex(label, target, index) => {
-            if !context.in_spec_context {
-                context.env.add_diag(diag!(
-                    Syntax::SpecContextRestricted,
-                    (
-                        loc,
-                        "labeled resource access only allowed in specifications"
-                    )
-                ));
-                EE::UnresolvedError
-            } else {
-                let e_target = exp_(context, *target);
-                let e_index = exp_(context, *index);
-                EE::LabeledIndex(label, Box::new(e_target), Box::new(e_index))
+                let e_inner = exp_(context, *inner);
+                EE::StateLabeled(pre_label, Box::new(e_inner), post_label)
             }
         },
         PE::UnresolvedError => panic!("ICE error should have been thrown"),
@@ -3378,7 +3382,11 @@ fn unbound_names_spec_block_member(unbound: &mut UnboundNames, sp!(_, m_): &E::S
         | M::Let { .. }
         | M::Include { .. }
         | M::Apply { .. }
-        | M::Pragma { .. } => (),
+        | M::Pragma { .. }
+        | M::ModifiesOf { .. }
+        | M::ReadsOf { .. }
+        | M::Modifies { .. }
+        | M::Reads { .. } => (),
     }
 }
 
@@ -3488,7 +3496,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
             unbound.vars.extend(unbound_vars);
             unbound.func_ptrs.extend(unbound_func_ptrs);
         },
-        EE::Behavior(_, _, fn_name, _type_args, sp!(_, args), _) => {
+        EE::Behavior(_, fn_name, _type_args, sp!(_, args)) => {
             match &fn_name.value {
                 E::ModuleAccess_::Name(n) => {
                     unbound.func_ptrs.insert(*n);
@@ -3497,12 +3505,8 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
             }
             unbound_names_exps(unbound, args);
         },
-        EE::LabeledCall(_, _, _, sp!(_, args)) => {
-            unbound_names_exps(unbound, args);
-        },
-        EE::LabeledIndex(_, target, index) => {
-            unbound_names_exp(unbound, target);
-            unbound_names_exp(unbound, index);
+        EE::StateLabeled(_, inner, _) => {
+            unbound_names_exp(unbound, inner);
         },
     }
 }

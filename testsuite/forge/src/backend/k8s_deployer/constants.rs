@@ -13,7 +13,7 @@ pub const INDEXER_GRPC_DOCKER_IMAGE_REPO: &str =
 
 /// The version of the forge deployer image to use.
 pub const DEFAULT_FORGE_DEPLOYER_IMAGE_TAG: &str =
-    "release_e72a2bd62ade8dec1be5263632001cab0bc05599"; // latest stable build (2026-03-21)
+    "release_08d94a461f8b08c3f5a47b45303d5ea6ffcd6bc6"; // latest stable build (2026-03-23)
 
 /// This is the service account name that the deployer will use to deploy the forge components. It may require extra permissions and additonal setup
 pub const FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME: &str = "forge";

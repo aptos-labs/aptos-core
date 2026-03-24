@@ -178,20 +178,20 @@ fun Test::incr_twice() {
 
 fun Test::get_and_incr[baseline]
 spec {
+  modifies global<0x42::Test::R>($t0);
   requires Neq<address>($t0, 0x0);
   aborts_if Not(exists<0x42::Test::R>($t0));
   aborts_if Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615);
-  modifies global<0x42::Test::R>($t0);
   ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(Old<0x42::Test::R>(global<0x42::Test::R>($t0))), 1));
   ensures Eq<u64>(result0(), select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)));
 }
 
 fun Test::get_and_incr[verification]
 spec {
+  modifies global<0x42::Test::R>($t0);
   requires Neq<address>($t0, 0x0);
   aborts_if Not(exists<0x42::Test::R>($t0));
   aborts_if Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615);
-  modifies global<0x42::Test::R>($t0);
   ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(Old<0x42::Test::R>(global<0x42::Test::R>($t0))), 1));
   ensures Eq<u64>(result0(), select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)));
 }

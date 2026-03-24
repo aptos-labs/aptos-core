@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        Condition, Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryLabel, Operation, Pattern,
-        Spec, SpecBlockTarget, TempIndex, Value,
+        Condition, Exp, ExpData, FrameSpec, LambdaCaptureKind, MatchArm, MemoryLabel, Operation,
+        Pattern, Spec, SpecBlockTarget, TempIndex, Value,
     },
     model::{GlobalEnv, Loc, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -698,9 +698,29 @@ pub trait ExpRewriterFunctions {
             changed |= this_changed
         }
 
+        // Rewrite frame_spec modifies targets
+        let frame_spec = spec.frame_spec.as_ref().map(|fs| {
+            let new_targets: Vec<_> = fs
+                .modifies_targets
+                .iter()
+                .map(|t| {
+                    let new_t = self.rewrite_exp(t.clone());
+                    changed |= !ExpData::ptr_eq(&new_t, t);
+                    new_t
+                })
+                .collect();
+            FrameSpec {
+                modifies_targets: new_targets,
+                // reads_targets are QualifiedInstId<StructId> (not Exps), so no
+                // expression rewriting needed — just clone the set.
+                reads_targets: fs.reads_targets.clone(),
+            }
+        });
+
         let new_spec = Spec {
             loc: spec.loc.clone(),
             conditions,
+            frame_spec,
             properties: spec.properties.clone(),
             on_impl,
             update_map,

@@ -8353,7 +8353,7 @@ dependencies = [
  "pq-sys",
  "r2d2",
  "serde_json",
- "uuid 0.8.2",
+ "uuid 1.11.0",
 ]
 
 [[package]]
@@ -8694,6 +8694,7 @@ dependencies = [
  "serde",
  "sha3 0.9.1",
  "test-case",
+ "thousands",
  "tokio",
 ]
 
@@ -9537,7 +9538,7 @@ checksum = "e29e5681dc8556fb9df1409e95eae050e12e8776394313da3546dcb8cf390c73"
 dependencies = [
  "az",
  "bytemuck",
- "half 1.8.2",
+ "half 2.2.1",
  "typenum",
 ]
 
@@ -13229,6 +13230,7 @@ dependencies = [
  "move-stackless-bytecode",
  "move-stackless-bytecode-test-utils",
  "num 0.4.1",
+ "petgraph 0.6.5",
  "serde",
  "shell-words",
  "tempfile",
@@ -18761,6 +18763,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "thousands"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf63baf9f5039dadc247375c29eb13706706cfde997d0330d05aa63a77d8820"
+
+[[package]]
 name = "thread-id"
 version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19979,7 +19987,7 @@ dependencies = [
  "errno",
  "js-sys",
  "libc",
- "rustix 0.37.27",
+ "rustix 0.38.28",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
  "winapi 0.3.9",

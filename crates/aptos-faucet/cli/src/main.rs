@@ -81,8 +81,6 @@ impl FaucetCliArgs {
 
         // Build the txn submission config for the funder.
         let transaction_submission_config = TransactionSubmissionConfig::new(
-            None, // maximum_amount
-            None, // maximum_amount_with_bypass
             30,   // gas_unit_price_ttl_secs
             None, // gas_unit_price_override
             self.max_gas_amount,

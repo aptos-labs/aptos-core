@@ -163,6 +163,7 @@ module aptos_std::crypto_algebra {
     ///
     /// Abort with code `std::error::invalid_argument(E_NON_EQUAL_LENGTHS)` if the sizes of `elements` and `scalars` do not match.
     public fun multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
+        abort_unless_cryptography_algebra_natives_enabled();
         let element_handles = handles_from_elements(elements);
         let scalar_handles = handles_from_elements(scalars);
         Element<G> {
