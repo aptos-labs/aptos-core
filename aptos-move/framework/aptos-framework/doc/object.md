@@ -2357,6 +2357,10 @@ Note: intentionally not using <code>self</code> as first argument, as a.owns(b) 
         };
 
         <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address);
+        <b>if</b> (<a href="object.md#0x1_object">object</a>.owner == current_address) {
+            // hit a self-owned <a href="object.md#0x1_object">object</a>, no need <b>to</b> <b>continue</b>
+            <b>return</b> <b>false</b>;
+        };
         current_address = <a href="object.md#0x1_object">object</a>.owner;
     };
     <b>true</b>
@@ -2388,7 +2392,11 @@ to determine the identity of the starting point of ownership.
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> obj_owner = self.<a href="object.md#0x1_object_owner">owner</a>();
     <b>while</b> (<a href="object.md#0x1_object_is_object">is_object</a>(obj_owner)) {
-        obj_owner = <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_owner).<a href="object.md#0x1_object_owner">owner</a>();
+        <b>let</b> parent = <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_owner).<a href="object.md#0x1_object_owner">owner</a>();
+        <b>if</b> (parent == obj_owner) {
+            <b>return</b> obj_owner;
+        };
+        obj_owner = parent;
     };
     obj_owner
 }

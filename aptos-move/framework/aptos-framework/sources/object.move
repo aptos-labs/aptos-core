@@ -690,6 +690,10 @@ module aptos_framework::object {
             };
 
             let object = borrow_global<ObjectCore>(current_address);
+            if (object.owner == current_address) {
+                // hit a self-owned object, no need to continue
+                return false;
+            };
             current_address = object.owner;
         };
         true
@@ -701,7 +705,11 @@ module aptos_framework::object {
     public fun root_owner<T: key>(self: Object<T>): address acquires ObjectCore {
         let obj_owner = self.owner();
         while (is_object(obj_owner)) {
-            obj_owner = address_to_object<ObjectCore>(obj_owner).owner();
+            let parent = address_to_object<ObjectCore>(obj_owner).owner();
+            if (parent == obj_owner) {
+                return obj_owner;
+            };
+            obj_owner = parent;
         };
         obj_owner
     }
@@ -984,6 +992,15 @@ module aptos_framework::object {
     }
 
     #[test(creator = @0x123)]
+    fun self_ownership_allowed(creator: &signer) {
+        let obj = create_simple_object(creator, b"1");
+        transfer(creator, obj, obj.object_address());
+
+        assert!(!owns(obj, signer::address_of(creator)));
+        assert!(owns(obj, obj.object_address()));
+    }
+
+    #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_exceeding_maximum_object_nesting_owns_should_fail(creator: &signer) acquires ObjectCore {
         let obj1 = create_simple_object(creator, b"1");
@@ -1058,8 +1075,10 @@ module aptos_framework::object {
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_cyclic_ownership_owns_should_fail(creator: &signer) acquires ObjectCore {
         let obj1 = create_simple_object(creator, b"1");
+        let obj2 = create_simple_object(creator, b"2");
         // This creates a cycle (self-loop) in ownership.
-        transfer(creator, obj1, obj1.object_address());
+        transfer(creator, obj1, obj2.object_address());
+        transfer(creator, obj2, obj1.object_address());
         // This should fails as the ownership is cyclic.
         let _ = owns(obj1, signer::address_of(creator));
     }
