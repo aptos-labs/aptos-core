@@ -35,10 +35,6 @@ pub struct TransactionTraceStore {
     /// Batch digest → traced txn hashes only. Non-traced batches are not registered,
     /// making `record_batch_stage()` a DashMap miss (no-op) for them.
     batch_txns: DashMap<HashValue, Vec<HashValue>>,
-    /// Block ID → traced txn hashes. Registered at BlockProposed time so that
-    /// later stages (BlockOrdered, Certified, PreCommit, Committed) can record
-    /// stages via `record_block_stage(block_id)` without re-iterating the payload.
-    block_txns: DashMap<HashValue, Vec<HashValue>>,
     /// Filter controlling which senders to trace. Updated via ArcSwap for
     /// lock-free reads and atomic swaps (e.g., from admin API).
     filter: ArcSwap<TransactionFilter>,
@@ -52,7 +48,6 @@ impl TransactionTraceStore {
         Self {
             traces: DashMap::new(),
             batch_txns: DashMap::new(),
-            block_txns: DashMap::new(),
             filter: ArcSwap::new(Arc::new(TransactionFilter::default())),
             last_gc_usecs: AtomicU64::new(0),
         }
@@ -86,7 +81,7 @@ impl TransactionTraceStore {
         now_usecs: u64,
     ) -> bool {
         let filter = self.filter.load();
-        if !filter.should_trace(&sender, &hash) {
+        if !filter.should_trace(&sender) {
             return false;
         }
         let mut trace = TransactionTrace::new(hash, sender, now_usecs);
@@ -230,46 +225,6 @@ impl TransactionTraceStore {
         }
     }
 
-    /// Register block_id → traced txn hashes from the given batch digests.
-    /// Called at BlockProposed time. Collects traced hashes from `batch_txns`
-    /// for each digest, deduplicates, and stores the mapping so later stages
-    /// can use `record_block_stage()` without re-iterating the payload.
-    pub fn register_block(&self, block_id: HashValue, batch_digests: &[HashValue]) {
-        let mut traced: Vec<HashValue> = Vec::new();
-        for digest in batch_digests {
-            if let Some(hashes) = self.batch_txns.get(digest) {
-                traced.extend(hashes.value().iter());
-            }
-        }
-        if !traced.is_empty() {
-            traced.sort_unstable();
-            traced.dedup();
-            self.block_txns.insert(block_id, traced);
-        }
-    }
-
-    /// Record a stage for all traced txns in a block (by block ID).
-    /// O(1) lookup + iterate only traced txns — no payload iteration needed.
-    pub fn record_block_stage(&self, block_id: &HashValue, stage: TransactionStage) {
-        self.record_block_stage_at(block_id, stage, now_usecs());
-    }
-
-    /// Record a stage for all traced txns in a block with explicit timestamp.
-    pub fn record_block_stage_at(
-        &self,
-        block_id: &HashValue,
-        stage: TransactionStage,
-        timestamp_usecs: u64,
-    ) {
-        let txn_hashes: Option<Vec<HashValue>> =
-            self.block_txns.get(block_id).map(|r| r.value().clone());
-        if let Some(hashes) = txn_hashes {
-            for hash in &hashes {
-                self.record_stage_at(hash, stage, timestamp_usecs);
-            }
-        }
-    }
-
     /// Check if a transaction hash has an active trace.
     pub fn is_traced(&self, hash: &HashValue) -> bool {
         self.traces.contains_key(hash)
@@ -374,27 +329,14 @@ impl TransactionTraceStore {
         for digest in &stale_batches {
             self.batch_txns.remove(digest);
         }
-        // Clean up block mappings with no live traced txns.
-        let stale_blocks: Vec<HashValue> = self
-            .block_txns
-            .iter()
-            .filter(|entry| entry.value().iter().all(|h| !self.traces.contains_key(h)))
-            .map(|entry| *entry.key())
-            .collect();
-        let block_evicted = stale_blocks.len();
-        for block_id in &stale_blocks {
-            self.block_txns.remove(block_id);
-        }
-        if evicted > 0 || batch_evicted > 0 || block_evicted > 0 {
+        if evicted > 0 || batch_evicted > 0 {
             info!(
-                "TxnTrace GC: evicted {} orphaned traces, {} stale batch mappings, {} stale block mappings. \
-                 Remaining: {} traces, {} batch mappings, {} block mappings.",
+                "TxnTrace GC: evicted {} orphaned traces, {} stale batch mappings. \
+                 Remaining: {} traces, {} batch mappings.",
                 evicted,
                 batch_evicted,
-                block_evicted,
                 self.traces.len(),
                 self.batch_txns.len(),
-                self.block_txns.len(),
             );
         }
     }
@@ -655,7 +597,11 @@ mod tests {
         // Enable with sender in allowlist
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
+<<<<<<< HEAD
         store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+=======
+        store.update_filter(TransactionFilter::new(true, allowlist));
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
 
         assert!(store.maybe_start_trace(hash, sender, 1000));
         assert!(store.traces.contains_key(&hash));
@@ -674,7 +620,11 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
+<<<<<<< HEAD
         store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+=======
+        store.update_filter(TransactionFilter::new(true, allowlist));
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
         store.maybe_start_trace(hash, sender, 1000);
 
         store.record_stage_at(&hash, TransactionStage::QsBatchPull, 1500);
@@ -698,7 +648,11 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
+<<<<<<< HEAD
         store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+=======
+        store.update_filter(TransactionFilter::new(true, allowlist));
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
         store.maybe_start_trace(traced_hash, sender, 1000);
 
         store.register_batch(batch_digest, &[traced_hash, untraced_hash]);
@@ -725,7 +679,11 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
+<<<<<<< HEAD
         store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+=======
+        store.update_filter(TransactionFilter::new(true, allowlist));
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
         store.maybe_start_trace(hash, sender, 1000);
 
         assert_eq!(store.get_trace(&hash).unwrap().current_attempt, 1);
@@ -741,7 +699,11 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
+<<<<<<< HEAD
         store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+=======
+        store.update_filter(TransactionFilter::new(true, allowlist));
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
         store.maybe_start_trace(hash, sender, 1000);
 
         assert!(store.get_trace(&hash).is_some());
@@ -758,7 +720,11 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
+<<<<<<< HEAD
         store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+=======
+        store.update_filter(TransactionFilter::new(true, allowlist));
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
 
         // Old trace (insertion at t=1000)
         store.maybe_start_trace(old_hash, sender, 1000);

@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_crypto::HashValue;
 use aptos_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+<<<<<<< HEAD
 /// Filter that determines which transactions to trace based on sender address
 /// and two-level probabilistic sampling.
 ///
@@ -16,10 +16,14 @@ use std::collections::HashSet;
 /// within a sampled round are actually traced.
 ///
 /// Effective rate = batch_sample_rate × txn_sample_rate.
+=======
+/// Filter that determines which transactions to trace based on sender address.
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionFilter {
     pub enabled: bool,
     pub sender_allowlist: HashSet<AccountAddress>,
+<<<<<<< HEAD
     /// Fraction of QS pull rounds that perform tracing (0.0–1.0).
     pub batch_sample_rate: f64,
     /// Fraction of allowlisted txns to trace within a sampled round (0.0–1.0).
@@ -38,6 +42,15 @@ impl TransactionFilter {
             sender_allowlist,
             batch_sample_rate,
             txn_sample_rate,
+=======
+}
+
+impl TransactionFilter {
+    pub fn new(enabled: bool, sender_allowlist: HashSet<AccountAddress>) -> Self {
+        Self {
+            enabled,
+            sender_allowlist,
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
         }
     }
 
@@ -45,8 +58,11 @@ impl TransactionFilter {
         Self {
             enabled: false,
             sender_allowlist: HashSet::new(),
+<<<<<<< HEAD
             batch_sample_rate: 0.0,
             txn_sample_rate: 0.0,
+=======
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
         }
     }
 
@@ -55,6 +71,7 @@ impl TransactionFilter {
         self.enabled && !self.sender_allowlist.is_empty()
     }
 
+<<<<<<< HEAD
     /// Returns true if the transaction should be traced at mempool insertion.
     /// Checks: enabled → sender in allowlist → txn passes txn-level sampling.
     pub fn should_trace(&self, sender: &AccountAddress, hash: &HashValue) -> bool {
@@ -69,6 +86,12 @@ impl TransactionFilter {
         self.enabled
             && !self.sender_allowlist.is_empty()
             && sample_accepts(self.batch_sample_rate, &pull_round.to_le_bytes())
+=======
+    /// Returns true if the sender should be traced.
+    /// Requires both enabled=true and the sender to be in a non-empty allowlist.
+    pub fn should_trace(&self, sender: &AccountAddress) -> bool {
+        self.enabled && self.sender_allowlist.contains(sender)
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
     }
 }
 
@@ -96,6 +119,7 @@ impl Default for TransactionFilter {
         Self::disabled()
     }
 }
+<<<<<<< HEAD
 
 #[cfg(test)]
 mod tests {
@@ -153,3 +177,5 @@ mod tests {
         );
     }
 }
+=======
+>>>>>>> 81ead34797 ([tracing] Add aptos-transaction-tracing crate)
