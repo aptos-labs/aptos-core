@@ -4765,6 +4765,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transaction-tracing"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "arc-swap",
+ "dashmap 7.0.0-rc2",
+ "once_cell",
+ "serde",
+ "strum_macros 0.27.1",
+]
+
+[[package]]
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
