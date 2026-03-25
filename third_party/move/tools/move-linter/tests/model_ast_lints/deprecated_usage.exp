@@ -1,0 +1,328 @@
+
+Diagnostics:
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+   ┌─ tests/model_ast_lints/deprecated_usage.move:63:9
+   │
+63 │         inner: DeprecatedStruct,
+   │         ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+   ┌─ tests/model_ast_lints/deprecated_usage.move:75:15
+   │
+75 │         Bad { inner: DeprecatedStruct },
+   │               ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] enum `HoldsDeprecatedEnum` is unused
+   ┌─ tests/model_ast_lints/deprecated_usage.move:73:5
+   │
+73 │ ╭     enum HoldsDeprecatedEnum has drop {
+74 │ │         Good { value: u64 },
+75 │ │         Bad { inner: DeprecatedStruct },
+76 │ │     }
+   │ ╰─────^
+   │
+   = Remove it (if not published), or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_struct)]` (if for spec-only or otherwise needed).
+
+warning: [lint] use of deprecated struct `0xc0ffee::other::CrossDeprecatedStruct`
+   ┌─ tests/model_ast_lints/deprecated_usage.move:80:9
+   │
+80 │         inner: 0xc0ffee::other::CrossDeprecatedStruct,
+   │         ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] struct `HoldsCrossDeprecated` is unused
+   ┌─ tests/model_ast_lints/deprecated_usage.move:79:5
+   │
+79 │ ╭     struct HoldsCrossDeprecated has drop {
+80 │ │         inner: 0xc0ffee::other::CrossDeprecatedStruct,
+81 │ │     }
+   │ ╰─────^
+   │
+   = Remove it (if not published), or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_struct)]` (if for spec-only or otherwise needed).
+
+warning: [lint] use of deprecated function `0xc0ffee::m::deprecated_fun`
+   ┌─ tests/model_ast_lints/deprecated_usage.move:87:9
+   │
+87 │         deprecated_fun()
+   │         ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated function `0xc0ffee::deprecated_module::foo`
+   ┌─ tests/model_ast_lints/deprecated_usage.move:92:9
+   │
+92 │         0xc0ffee::deprecated_module::foo()
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated function `0xc0ffee::other::cross_deprecated_fun`
+   ┌─ tests/model_ast_lints/deprecated_usage.move:97:9
+   │
+97 │         0xc0ffee::other::cross_deprecated_fun()
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated function `0xc0ffee::m::deprecated_fun`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:107:9
+    │
+107 │         deprecated_fun
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated function `0xc0ffee::all_deprecated::doubly_deprecated_fun`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:112:9
+    │
+112 │         0xc0ffee::all_deprecated::doubly_deprecated_fun()
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated function `0xc0ffee::all_deprecated::inherited_deprecated_fun`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:117:9
+    │
+117 │         0xc0ffee::all_deprecated::inherited_deprecated_fun()
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:123:47
+    │
+123 │     public fun test_pack_deprecated_struct(): DeprecatedStruct {
+    │                                               ^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:124:9
+    │
+124 │         DeprecatedStruct { value: 42 }
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:128:46
+    │
+128 │     public fun test_select_deprecated_struct(s: &DeprecatedStruct): u64 {
+    │                                              ^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:129:9
+    │
+129 │         s.value
+    │         ^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedEnum`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:133:48
+    │
+133 │     public fun test_select_variants_deprecated(e: &DeprecatedEnum): u64 {
+    │                                                ^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedEnum`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:134:9
+    │
+134 │         e.value
+    │         ^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedEnum`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:138:46
+    │
+138 │     public fun test_test_variants_deprecated(e: DeprecatedEnum): u64 {
+    │                                              ^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedEnum`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:140:13
+    │
+140 │             DeprecatedEnum::A { value } => value,
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedEnum`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:141:13
+    │
+141 │             DeprecatedEnum::B { value } => value,
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:149:9
+    │
+149 │         exists<DeprecatedStruct>(addr)
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:154:9
+    │
+154 │         borrow_global<DeprecatedStruct>(addr).value
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:154:9
+    │
+154 │         borrow_global<DeprecatedStruct>(addr).value
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:159:20
+    │
+159 │         move_to(s, DeprecatedStruct { value: 0 });
+    │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:159:9
+    │
+159 │         move_to(s, DeprecatedStruct { value: 0 });
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:163:65
+    │
+163 │     public fun test_move_from_deprecated_struct(addr: address): DeprecatedStruct acquires DeprecatedStruct {
+    │                                                                 ^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:164:9
+    │
+164 │         move_from<DeprecatedStruct>(addr)
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:170:37
+    │
+170 │     public fun test_let_destructure(s: DeprecatedStruct): u64 {
+    │                                     ^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:171:13
+    │
+171 │         let DeprecatedStruct { value } = s;
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:203:38
+    │
+203 │     public fun test_param_deprecated(_s: DeprecatedStruct): u64 {
+    │                                      ^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:208:42
+    │
+208 │     public fun test_return_deprecated(): DeprecatedStruct {
+    │                                          ^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::m::DeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:209:9
+    │
+209 │         DeprecatedStruct { value: 0 }
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::other::CrossDeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:213:41
+    │
+213 │     public fun test_cross_module_struct(_s: 0xc0ffee::other::CrossDeprecatedStruct): u64 {
+    │                                         ^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::deprecated_module::DepModStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:218:51
+    │
+218 │     public fun test_struct_from_deprecated_module(_s: 0xc0ffee::deprecated_module::DepModStruct): u64 {
+    │                                                   ^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] use of deprecated struct `0xc0ffee::all_deprecated::DoublyDeprecatedStruct`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:223:46
+    │
+223 │     public fun test_doubly_deprecated_struct(_s: 0xc0ffee::all_deprecated::DoublyDeprecatedStruct): u64 {
+    │                                              ^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.
+
+warning: [lint] this function uses deprecated constant `0xc0ffee::m::DEPRECATED_CONST`
+    ┌─ tests/model_ast_lints/deprecated_usage.move:247:16
+    │
+247 │     public fun test_use_deprecated_const(): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(deprecated_usage)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#deprecated_usage.

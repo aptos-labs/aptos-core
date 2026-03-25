@@ -12,7 +12,6 @@ use crate::{
     txn_commit_hook::TransactionCommitHook,
     types::ReadWriteSummary,
 };
-use aptos_infallible::Mutex;
 use aptos_logger::error;
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
@@ -29,6 +28,7 @@ use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::{execution_tracing::Trace, Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use parking_lot::Mutex;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Debug,
