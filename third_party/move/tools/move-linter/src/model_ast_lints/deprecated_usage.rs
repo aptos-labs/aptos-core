@@ -375,6 +375,10 @@ impl ConstantChecker for DeprecatedUsageOfConstants {
         CHECKER_NAME.to_string()
     }
 
+    /// Note: this checker reports warnings at *user* sites, which may be in other modules.
+    /// If the defining module has `#[lint::skip(deprecated_usage)]`, the lint framework will
+    /// not call this method at all, which means cross-module warnings are also suppressed.
+    /// This is acceptable: the module author is explicitly opting out of this lint.
     fn check_constant(&self, const_env: &NamedConstantEnv) {
         let env = const_env.module_env.env;
 
