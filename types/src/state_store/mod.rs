@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+#[cfg(any(test, feature = "testing"))]
+use crate::state_store::state_slot::StateSlotKind;
 use crate::{
     account_address::AccountAddress,
     state_store::{
@@ -145,11 +147,14 @@ impl<K: Eq + Hash> MockStateView<K> {
         }
     }
 
+    // TODO(HotState): StateSlot now embeds a StateKey, but the generic MockStateView
+    // doesn't know how to derive one from K. Uses a placeholder for now; will be
+    // cleaned up when StateSlot.state_key becomes Option<StateKey>.
     pub fn new(data: std::collections::HashMap<K, StateValue>) -> Self {
         Self {
             data: data
                 .into_iter()
-                .map(|(k, v)| (k, StateSlot::from_db_get(Some((0, v)))))
+                .map(|(k, v)| (k, StateSlot::from_db_get(StateKey::raw(b""), Some((0, v)))))
                 .collect(),
         }
     }
@@ -168,7 +173,7 @@ impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
             .data
             .get(state_key)
             .cloned()
-            .unwrap_or(StateSlot::ColdVacant))
+            .unwrap_or_else(|| StateSlot::new(StateKey::raw(b""), StateSlotKind::ColdVacant)))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

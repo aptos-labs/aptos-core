@@ -108,19 +108,19 @@ impl StateSnapshotCommitter {
                             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hash_jmt_updates"]);
                             let mut hot_updates = Vec::new();
                             let mut all_updates = Vec::new();
-                            for (key, slot) in updates.iter() {
+                            for (key_hash, slot) in updates.iter() {
                                 if slot.is_hot() {
                                     hot_updates.push((
-                                        CryptoHash::hash(&key),
+                                        key_hash,
                                         Some((
                                             HotStateValueRef::from_slot(&slot).hash(),
-                                            key.clone(),
+                                            slot.state_key().clone(),
                                         )),
                                     ));
                                 } else {
-                                    hot_updates.push((CryptoHash::hash(&key), None));
+                                    hot_updates.push((key_hash, None));
                                 }
-                                if let Some(value) = slot.maybe_update_jmt(key, min_version) {
+                                if let Some(value) = slot.maybe_update_jmt(min_version) {
                                     all_updates.push(value);
                                 }
                             }
