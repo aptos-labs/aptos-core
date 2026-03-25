@@ -108,6 +108,10 @@ pub struct ConsensusConfig {
     // Number of tokio worker theads to use for the Consensus runtime.
     // If set to 0, it will be minimum of num_cpus/2 and DEFAULT_WORKER_THREADS.
     pub num_tokio_worker_threads: u16,
+    /// When true, scale active-validator weights in LeaderReputation by their historical
+    /// round-time performance so that validators that commit quorums faster are elected
+    /// as leaders proportionally more often.
+    pub use_latency_weighted_leader: bool,
 }
 
 /// Deprecated
@@ -399,6 +403,7 @@ impl Default for ConsensusConfig {
             enable_optimistic_proposal_rx: true,
             enable_optimistic_proposal_tx: true,
             num_tokio_worker_threads: 0,
+            use_latency_weighted_leader: false,
         }
     }
 }

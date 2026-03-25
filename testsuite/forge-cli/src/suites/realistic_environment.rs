@@ -563,6 +563,7 @@ pub(crate) fn realistic_env_p90_latency_test(
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.base.enable_validator_pfn_connections = true;
+            config.consensus.use_latency_weighted_leader = true;
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config
