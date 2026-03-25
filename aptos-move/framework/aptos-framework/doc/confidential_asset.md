@@ -1597,10 +1597,11 @@ Called once when this module is first published on-chain.
     <b>assert</b>!(pend_balance_upper_bound &lt;= <a href="confidential_asset.md#0x1_confidential_asset_MAX_NUM_BITS_IN_SCALAR_FIELD">MAX_NUM_BITS_IN_SCALAR_FIELD</a>);
 
     <b>let</b> deployer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(deployer);
+    <b>let</b> <a href="chain_id.md#0x1_chain_id">chain_id</a> = <a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>();
     <b>move_to</b>(
         deployer,
         GlobalConfig::V1 {
-            allow_list_enabled: <a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="confidential_asset.md#0x1_confidential_asset_MAINNET_CHAIN_ID">MAINNET_CHAIN_ID</a>,
+            allow_list_enabled: <a href="chain_id.md#0x1_chain_id">chain_id</a> == <a href="confidential_asset.md#0x1_confidential_asset_MAINNET_CHAIN_ID">MAINNET_CHAIN_ID</a> || <a href="chain_id.md#0x1_chain_id">chain_id</a> == <a href="confidential_asset.md#0x1_confidential_asset_TESTNET_CHAIN_ID">TESTNET_CHAIN_ID</a>,
             global_auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 },
             // DO NOT CHANGE: using long syntax until framework change is released <b>to</b> mainnet
             extend_ref: <a href="object.md#0x1_object_create_object">object::create_object</a>(deployer_address).generate_extend_ref()

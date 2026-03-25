@@ -316,10 +316,11 @@ module aptos_framework::confidential_asset {
         assert!(pend_balance_upper_bound <= MAX_NUM_BITS_IN_SCALAR_FIELD);
 
         let deployer_address = signer::address_of(deployer);
+        let chain_id = chain_id::get();
         move_to(
             deployer,
             GlobalConfig::V1 {
-                allow_list_enabled: chain_id::get() == MAINNET_CHAIN_ID,
+                allow_list_enabled: chain_id == MAINNET_CHAIN_ID || chain_id == TESTNET_CHAIN_ID,
                 global_auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 },
                 // DO NOT CHANGE: using long syntax until framework change is released to mainnet
                 extend_ref: object::create_object(deployer_address).generate_extend_ref()
