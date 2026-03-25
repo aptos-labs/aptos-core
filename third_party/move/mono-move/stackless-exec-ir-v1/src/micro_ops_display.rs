@@ -245,5 +245,8 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
         MicroOp::ForceGC => {
             write!(f, "ForceGC")
         },
+        MicroOp::Charge { cost } => {
+            write!(f, "Charge {}", cost)
+        },
     }
 }
