@@ -5,9 +5,7 @@ use super::ChunkyDKGManager;
 use crate::{
     chunky::{
         test_utils::{ChunkyTestSetup, DummyNetworkSender},
-        types::{
-            CertifiedAggregatedSubtranscript, MissingTranscriptRequest,
-        },
+        types::{CertifiedAggregatedSubtranscript, MissingTranscriptRequest},
     },
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::DKGMessage,

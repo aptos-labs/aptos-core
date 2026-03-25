@@ -6,7 +6,9 @@ use aptos_forge::LocalSwarm;
 use aptos_rest_client::Client;
 use aptos_types::{
     decryption::PerEpochEncryptionKeyResource,
-    dkg::chunky_dkg::{AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionState, ChunkyDKGState},
+    dkg::chunky_dkg::{
+        AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionState, ChunkyDKGState,
+    },
     on_chain_config::{FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainRandomnessConfig},
 };
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};

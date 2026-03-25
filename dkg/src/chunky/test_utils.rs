@@ -10,8 +10,8 @@ use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_types::{
     dkg::chunky_dkg::{
-        AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionMetadata,
-        ChunkyDKGTranscript, ChunkyInputSecret, ChunkyTranscript, DealerPublicKey,
+        AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionMetadata, ChunkyDKGTranscript,
+        ChunkyInputSecret, ChunkyTranscript, DealerPublicKey,
     },
     epoch_state::EpochState,
     on_chain_config::OnChainChunkyDKGConfig,
@@ -27,7 +27,6 @@ pub struct ChunkyTestSetup {
     pub private_keys: Vec<Arc<PrivateKey>>,
     pub public_keys: Vec<PublicKey>,
     pub addrs: Vec<AccountAddress>,
-    pub voting_powers: Vec<u64>,
     pub epoch_state: Arc<EpochState>,
     pub session_metadata: ChunkyDKGSessionMetadata,
     pub dkg_config: Arc<ChunkyDKGSession>,
@@ -75,7 +74,6 @@ impl ChunkyTestSetup {
             private_keys,
             public_keys,
             addrs,
-            voting_powers,
             epoch_state,
             session_metadata,
             dkg_config,
