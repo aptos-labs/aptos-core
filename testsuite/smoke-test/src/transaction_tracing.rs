@@ -41,7 +41,8 @@ async fn test_transaction_tracing() {
               config: &mut aptos_config::config::NodeConfig,
               _vfn: &mut aptos_config::config::NodeConfig| {
             config.transaction_tracing.enabled = true;
-            config.transaction_tracing.sample_rate = 1.0; // trace all matching in tests
+            config.transaction_tracing.batch_sample_rate = 1.0;
+            config.transaction_tracing.txn_sample_rate = 1.0;
             config.transaction_tracing.sender_allowlist = addrs.iter().cloned().collect();
         },
     );
