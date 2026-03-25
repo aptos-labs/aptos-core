@@ -457,7 +457,7 @@ module aptos_framework::confidential_asset {
 
         event::emit(Deposited::V1 { addr, amount, asset_type, new_pending_balance: ca_store.pending_balance });
 
-        // Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
+        // Abundantly-paranoid: Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
         assert!(amount == fungible_asset::balance(pool_fa_store) - before, error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
     }
 
@@ -596,7 +596,7 @@ module aptos_framework::confidential_asset {
         let old_balance = get_available_balance(from, asset_type);
 
         // Note: Sender's amount in `TransferProof::compressed_amount::compressed_R_sender` is not used here; only included so it can be indexed for dapps that need it
-        let (compressed_new_balance, recipient_amount, amount, ek_volun_auds) =
+        let (compressed_new_balance, amount, compressed_amount, ek_volun_auds) =
             assert_valid_transfer_proof(
                 sender, to, asset_type,
                 &ek_sender, &ek_recip,
@@ -606,7 +606,7 @@ module aptos_framework::confidential_asset {
 
         // Update recipient's confidential store
         let recip_ca_store = borrow_confidential_store_mut(to, asset_type);
-        let new_pending_balance = add_assign_pending(&mut recip_ca_store.pending_balance, &recipient_amount);
+        let new_pending_balance = add_assign_pending(&mut recip_ca_store.pending_balance, &amount);
         recip_ca_store.transfers_received += 1;
 
         assert!(
@@ -621,7 +621,7 @@ module aptos_framework::confidential_asset {
         sender_ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
 
         event::emit(Transferred::V1 {
-            from, to, asset_type, amount, ek_volun_auds,
+            from, to, asset_type, amount: compressed_amount, ek_volun_auds,
             sender_auditor_hint: sender_ca_store.auditor_hint,
             new_sender_available_balance: compressed_new_balance,
             new_recip_pending_balance: new_pending_balance,
@@ -1275,14 +1275,14 @@ module aptos_framework::confidential_asset {
         let num_volun_auditors = compressed_ek_volun_auds.length();
 
         // Auditor count checks are performed inside new_transfer_statement
-        let (stmt, new_balance_P, recip_pending) = sigma_protocol_transfer::new_transfer_statement(
+        let (stmt, new_balance_P, amount) = sigma_protocol_transfer::new_transfer_statement(
             *compressed_ek_sender, *compressed_ek_recip,
             compressed_old_balance, &compressed_new_balance,
             &compressed_amount,
             compressed_ek_eff_aud, &compressed_ek_volun_auds,
         );
 
-        confidential_range_proofs::assert_valid_range_proof(recip_pending.get_P(), &zkrp_amount);
+        confidential_range_proofs::assert_valid_range_proof(amount.get_P(), &zkrp_amount);
         confidential_range_proofs::assert_valid_range_proof(&new_balance_P, &zkrp_new_balance);
 
         let session = sigma_protocol_transfer::new_session(
@@ -1290,7 +1290,7 @@ module aptos_framework::confidential_asset {
         );
         session.assert_verifies(&stmt, &sigma);
 
-        (compressed_new_balance, recip_pending, compressed_amount, compressed_ek_volun_auds)
+        (compressed_new_balance, amount, compressed_amount, compressed_ek_volun_auds)
     }
 
     fun assert_valid_key_rotation_proof(

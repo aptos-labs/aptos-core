@@ -315,8 +315,8 @@ module aptos_framework::sigma_protocol_transfer {
 
         let stmt = b.build();
         assert_transfer_statement_is_well_formed(&stmt, has_eff, num_volun);
-        let recip_pending = new_pending_from_p_and_r(amount_P, recip_R);
-        (stmt, new_balance_P, recip_pending)
+        let amount = new_pending_from_p_and_r(amount_P, recip_R);
+        (stmt, new_balance_P, amount)
     }
 
     /// The combined homomorphism $\psi$ for the transfer relation (see module-level doc for full definition).
