@@ -395,65 +395,16 @@ impl BufferManager {
             self.buffer.len() + 1,
         );
 
-        // Record BlockProposed (with batch inclusion type) and BlockOrdered tracing stages
-        if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
-            use aptos_consensus_types::{
-                common::Payload,
-                payload::OptQuorumStorePayload,
-                proof_of_store::TBatchInfo,
-            };
-            use aptos_transaction_tracing::{
-                store::TransactionTraceStore,
-                types::{BatchInclusionType, StageMetadata, TransactionStage},
-            };
-
-            let store = TransactionTraceStore::global();
-            for block in &ordered_blocks {
-                let block_ts = block.timestamp_usecs();
-                if let Some(payload) = block.payload() {
-                    // Collect all (digest, inclusion_type) pairs from the payload.
-                    // V1 and V2 share the same accessor interface but different type params.
-                    macro_rules! collect_batches {
-                        ($p:expr, $out:expr) => {{
-                            for b in $p.inline_batches().iter() {
-                                $out.push((*b.info().digest(), BatchInclusionType::Inline));
-                            }
-                            for b in $p.opt_batches().iter() {
-                                $out.push((*b.digest(), BatchInclusionType::Opt));
-                            }
-                            for b in $p.proof_with_data().iter() {
-                                $out.push((*b.info().digest(), BatchInclusionType::Proof));
-                            }
-                        }};
-                    }
-                    let mut batch_digests: Vec<(HashValue, BatchInclusionType)> = Vec::new();
-                    match payload {
-                        Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
-                            collect_batches!(p, batch_digests);
-                        },
-                        Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
-                            collect_batches!(p, batch_digests);
-                        },
-                        _ => {},
-                    }
-                    // Record BlockProposed with inclusion type metadata per batch,
-                    // and collect traced txn hashes for block-level stage tracking.
-                    let mut block_traced_txns: Vec<HashValue> = Vec::new();
-                    for (digest, inclusion) in &batch_digests {
-                        store.record_batch_stage_with_metadata_at(
-                            digest,
-                            TransactionStage::BlockProposed,
-                            StageMetadata::BatchInclusion(*inclusion),
-                            block_ts,
-                        );
-                        // Collect traced txn hashes from this batch for block-level tracking.
-                        if let Some(txn_hashes) = store.get_batch_traced_txns(digest) {
-                            block_traced_txns.extend(txn_hashes.iter());
-                        }
-                    }
-                    // Register block → traced txn hashes so later stages use record_block_stage()
-                    store.register_block(block.id(), block_traced_txns);
-                    store.record_block_stage(&block.id(), TransactionStage::BlockOrdered);
+        // Record BlockOrdered stage. BlockProposed + register_block are done
+        // earlier in round_manager::process_proposal (before execution starts).
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.is_enabled() {
+                for block in &ordered_blocks {
+                    store.record_block_stage(
+                        &block.id(),
+                        aptos_transaction_tracing::types::TransactionStage::BlockOrdered,
+                    );
                 }
             }
         }

@@ -214,6 +214,19 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
+
+        // Record ExecutionStart for traced transactions.
+        // block_txns is populated at proposal time (round_manager::process_proposal).
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.is_enabled() {
+                store.record_block_stage(
+                    &block_id,
+                    aptos_transaction_tracing::types::TransactionStage::ExecutionStart,
+                );
+            }
+        }
+
         let execution_output =
             if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
                 // ignore reconfiguration suffix, even if the block is non-empty
@@ -233,17 +246,6 @@ where
                 };
 
                 let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
-                // Record ExecutionStart for traced transactions.
-                // block_txns is populated at BlockProposed time via register_block().
-                {
-                    let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-                    if store.is_enabled() {
-                        store.record_block_stage(
-                            &block_id,
-                            aptos_transaction_tracing::types::TransactionStage::ExecutionStart,
-                        );
-                    }
-                }
                 fail_point!("executor::block_executor_execute_block", |_| {
                     Err(ExecutorError::from(anyhow::anyhow!(
                         "Injected error in block_executor_execute_block"

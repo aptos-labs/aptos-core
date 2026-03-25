@@ -1265,6 +1265,63 @@ impl RoundManager {
             .await
             .context("[RoundManager] Failed to insert the block into BlockStore")?;
 
+        // Register block → traced txn hashes at proposal time (before execution).
+        // This ensures block_txns is populated for ExecutionStart and Executed stages.
+        if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
+            use aptos_consensus_types::{
+                common::Payload,
+                payload::OptQuorumStorePayload,
+                proof_of_store::TBatchInfo,
+            };
+            use aptos_transaction_tracing::{
+                store::TransactionTraceStore,
+                types::{BatchInclusionType, StageMetadata, TransactionStage},
+            };
+
+            let store = TransactionTraceStore::global();
+            let block_ts = proposal.timestamp_usecs();
+            if let Some(payload) = proposal.payload() {
+                macro_rules! collect_batches {
+                    ($p:expr, $out:expr) => {{
+                        for b in $p.inline_batches().iter() {
+                            $out.push((*b.info().digest(), BatchInclusionType::Inline));
+                        }
+                        for b in $p.opt_batches().iter() {
+                            $out.push((*b.digest(), BatchInclusionType::Opt));
+                        }
+                        for b in $p.proof_with_data().iter() {
+                            $out.push((*b.info().digest(), BatchInclusionType::Proof));
+                        }
+                    }};
+                }
+                let mut batch_digests: Vec<(aptos_crypto::HashValue, BatchInclusionType)> =
+                    Vec::new();
+                match payload {
+                    Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
+                        collect_batches!(p, batch_digests);
+                    },
+                    Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+                        collect_batches!(p, batch_digests);
+                    },
+                    _ => {},
+                }
+                // Record BlockProposed per batch and collect traced txn hashes.
+                let mut block_traced_txns: Vec<aptos_crypto::HashValue> = Vec::new();
+                for (digest, inclusion) in &batch_digests {
+                    store.record_batch_stage_with_metadata_at(
+                        digest,
+                        TransactionStage::BlockProposed,
+                        StageMetadata::BatchInclusion(*inclusion),
+                        block_ts,
+                    );
+                    if let Some(txn_hashes) = store.get_batch_traced_txns(digest) {
+                        block_traced_txns.extend(txn_hashes.iter());
+                    }
+                }
+                store.register_block(proposal.id(), block_traced_txns);
+            }
+        }
+
         let block_store = self.block_store.clone();
         if block_store.check_payload(&proposal).is_err() {
             debug!("Payload not available locally for block: {}", proposal.id());
