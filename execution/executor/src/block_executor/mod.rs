@@ -233,11 +233,10 @@ where
                 };
 
                 let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
-                // Record ExecutionStart for traced transactions using block-level
-                // mapping (O(traced_count) instead of O(block_size)).
+                // Record ExecutionStart for traced transactions.
+                // block_txns is populated at BlockProposed time via register_block().
                 {
-                    let store =
-                        aptos_transaction_tracing::store::TransactionTraceStore::global();
+                    let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
                     if store.is_enabled() {
                         store.record_block_stage(
                             &block_id,
@@ -271,39 +270,50 @@ where
                 };
                 let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
 
-                // Default: all traced txns in this block are Executed(Keep).
-                if let Some(hashes) = store.get_block_traced_txns(&block_id) {
-                    for hash in &hashes {
-                        store.record_stage_with_metadata_at(
-                            hash,
-                            TransactionStage::Executed,
-                            StageMetadata::Execution(ExecutionStatus::Keep),
-                            now,
-                        );
-                    }
-                }
+                // Collect retried/discarded txn hashes for exclusion from Keep.
+                let mut non_keep: std::collections::HashSet<HashValue> =
+                    std::collections::HashSet::new();
 
-                // Override retried txns: Executed(Retry) + mark_retry.
+                // Record Executed(Retry) + mark_retry for retried txns.
                 for txn in execution_output.to_retry.transactions.iter() {
                     let hash = txn.committed_hash();
                     if store.is_traced(&hash) {
-                        // Replace the Keep stage we just recorded with Retry.
-                        store.replace_last_stage_metadata(
+                        store.record_stage_with_metadata_at(
                             &hash,
+                            TransactionStage::Executed,
                             StageMetadata::Execution(ExecutionStatus::Retry),
+                            now,
                         );
                         store.mark_retry(&hash);
+                        non_keep.insert(hash);
                     }
                 }
 
-                // Override discarded txns: Executed(Discard).
+                // Record Executed(Discard) for discarded txns.
                 for txn in execution_output.to_discard.transactions.iter() {
                     let hash = txn.committed_hash();
                     if store.is_traced(&hash) {
-                        store.replace_last_stage_metadata(
+                        store.record_stage_with_metadata_at(
                             &hash,
+                            TransactionStage::Executed,
                             StageMetadata::Execution(ExecutionStatus::Discard),
+                            now,
                         );
+                        non_keep.insert(hash);
+                    }
+                }
+
+                // Record Executed(Keep) for remaining traced txns in this block.
+                if let Some(hashes) = store.get_block_traced_txns(&block_id) {
+                    for hash in &hashes {
+                        if !non_keep.contains(hash) {
+                            store.record_stage_with_metadata_at(
+                                hash,
+                                TransactionStage::Executed,
+                                StageMetadata::Execution(ExecutionStatus::Keep),
+                                now,
+                            );
+                        }
                     }
                 }
             }
