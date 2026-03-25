@@ -726,7 +726,6 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
- "arc-swap",
  "bcs 0.1.4",
  "bytes",
  "cfg-if",
