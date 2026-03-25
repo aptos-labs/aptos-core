@@ -2,9 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes,
-    MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType,
-    MoveValue, VerifyInput, VerifyInputWithRecursion, U64,
+    Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64, VerifyInput, VerifyInputWithRecursion
 };
 use anyhow::{bail, Context as AnyhowContext, Result};
 use aptos_crypto::{
@@ -21,21 +19,16 @@ use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{
-        chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript, DKGTranscriptMetadata,
+        DKGTranscript, DKGTranscriptMetadata, chunky_dkg::CertifiedAggregatedChunkySubtranscript
     },
     function_info::FunctionInfo,
-    jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
+    jwks::{ProviderJWKs, QuorumCertifiedUpdate, jwk::JWK},
     keyless,
     secret_sharing::Ciphertext,
     transaction::{
-        authenticator::{
-            AbstractAuthenticator, AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey,
-            MultiKeyAuthenticator, SingleKeyAuthenticator, TransactionAuthenticator,
-            MAX_NUM_OF_SIGS,
-        },
-        encrypted_payload::PayloadAssociatedData,
-        webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
-        Script, SignedTransaction, TransactionOutput, TransactionWithProof,
+        Script, SignedTransaction, TransactionOutput, TransactionWithProof, authenticator::{
+            AbstractAuthenticator, AccountAuthenticator, AnyPublicKey, AnySignature, MAX_NUM_OF_SIGS, MultiKey, MultiKeyAuthenticator, SingleKeyAuthenticator, TransactionAuthenticator
+        }, encrypted_payload::PayloadAssociatedData, webauthn::{MAX_WEBAUTHN_SIGNATURE_BYTES, PartialAuthenticatorAssertionResponse}
     },
 };
 use bcs::to_bytes;
@@ -1187,12 +1180,21 @@ pub enum EncryptedTransactionPayload {
     Decrypted(DecryptedPayload),
 }
 
+/// An encrypted payload's claim about the entry function. Specifies at least the module address,
+/// and optionally the specific entry funtion.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ClaimedEntryFunction {
+    pub module: MoveModuleId,
+    pub name: Option<IdentifierWrapper>,
+}
+
 /// Payload is still encrypted and cannot be read.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct EncryptedPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
 }
 
 /// Decryption was attempted but failed.
@@ -1201,6 +1203,7 @@ pub struct FailedDecryptionPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
 }
 
 /// Payload has been successfully decrypted.
@@ -1209,6 +1212,7 @@ pub struct DecryptedPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
     pub decrypted_payload: EncryptedTransactionInnerPayload,
     pub decryption_nonce: U64,
 }

@@ -49,7 +49,6 @@ impl PayloadAssociatedData {
 impl AssociatedData for PayloadAssociatedData {}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-<<<<<<< Updated upstream
 pub enum DecryptionFailureReason {
     /// Cryptographic decryption failed (e.g., invalid ciphertext, key mismatch).
     CryptoFailure,
@@ -60,25 +59,29 @@ pub enum DecryptionFailureReason {
     ConfigUnavailable,
     /// The decryption key is not available.
     DecryptionKeyUnavailable,
-=======
-pub struct ClaimedEntryFun {
-    module: ModuleId,
-    function: Option<Identifier>,
->>>>>>> Stashed changes
+    /// The claimed entry function does not match the one in the decrypted payload
+    ClaimedEntryFunctionMismatch,
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ClaimedEntryFunction {
+    pub module: ModuleId,
+    pub name: Option<Identifier>,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptedPayload {
     Encrypted {
-        claimed_entry_fun: Option<ClaimedEntryFun>,
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
     },
     FailedDecryption {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
         eval_proof: Option<EvalProof>,
         reason: DecryptionFailureReason,
     },
@@ -86,6 +89,7 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
         eval_proof: EvalProof,
 
         // decrypted things
@@ -150,6 +154,7 @@ impl EncryptedPayload {
             ciphertext,
             extra_config,
             payload_hash,
+            claimed_entry_fun,
         } = self
         else {
             bail!("Payload is not in Encrypted state");
@@ -159,10 +164,41 @@ impl EncryptedPayload {
             ciphertext: ciphertext.clone(),
             extra_config: extra_config.clone(),
             payload_hash: *payload_hash,
+            claimed_entry_fun: claimed_entry_fun.clone(),
             eval_proof,
             executable,
             decryption_nonce: nonce,
         };
+        Ok(())
+    }
+
+    pub fn fail_if_claimed_entry_fun_mismatch(
+        &mut self,
+    ) -> anyhow::Result<()> {
+        let Self::Decrypted {
+            claimed_entry_fun,
+            eval_proof,
+            executable,
+            ..
+        } = self.clone()
+        else {
+            bail!("Payload is not in Decrypted state");
+        };
+
+        if let Some(claim) = claimed_entry_fun {
+            // If there is a claim about this payload, the payload executable must be an entry
+            // function
+            if let TransactionExecutable::EntryFunction(entry_fun) = executable {
+                if *entry_fun.module() != claim.module {
+                    self.into_failed_decryption_with_reason(Some(eval_proof), DecryptionFailureReason::ClaimedEntryFunctionMismatch)?;
+                } else if let Some(claimed_function_id) = claim.name
+                && entry_fun.function() != claimed_function_id.as_ident_str() {
+                    self.into_failed_decryption_with_reason(Some(eval_proof), DecryptionFailureReason::ClaimedEntryFunctionMismatch)?;
+                }
+            } else {
+                self.into_failed_decryption_with_reason(Some(eval_proof), DecryptionFailureReason::ClaimedEntryFunctionMismatch)?;
+            }
+        }
         Ok(())
     }
 
@@ -175,6 +211,7 @@ impl EncryptedPayload {
             ciphertext,
             extra_config,
             payload_hash,
+            claimed_entry_fun,
         } = self
         else {
             bail!("Payload is not in Encrypted state");
@@ -185,6 +222,7 @@ impl EncryptedPayload {
             ciphertext: ciphertext.clone(),
             extra_config: extra_config.clone(),
             payload_hash: *payload_hash,
+            claimed_entry_fun: claimed_entry_fun.clone(),
             eval_proof,
             reason,
         };

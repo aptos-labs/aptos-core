@@ -371,6 +371,7 @@ async fn decrypt_validator_path(
                                     .expect("must happen")
                             })
                             .expect("must exist");
+
                         txn
                     },
                     Err(e) => {
