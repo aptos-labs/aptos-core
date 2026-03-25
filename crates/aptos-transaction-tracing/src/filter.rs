@@ -60,34 +60,40 @@ impl TransactionFilter {
     pub fn should_trace(&self, sender: &AccountAddress, hash: &HashValue) -> bool {
         self.enabled
             && self.sender_allowlist.contains(sender)
-            && sample_accepts(self.txn_sample_rate, hash.as_ref())
+            && txn_sample_accepts(self.txn_sample_rate, hash)
     }
 
     /// Returns true if this QS pull round should do tracing work.
     /// Uses pull_round as deterministic coin — no RNG, no locks.
+    /// Returns true if this QS pull round should do tracing work.
+    /// Simple modulo: every Nth round where N = 1/batch_sample_rate.
+    /// E.g., rate=0.1 → every 10th round.
     pub fn should_sample_batch(&self, pull_round: u64) -> bool {
-        self.enabled
-            && !self.sender_allowlist.is_empty()
-            && sample_accepts(self.batch_sample_rate, &pull_round.to_le_bytes())
+        if !self.enabled || self.sender_allowlist.is_empty() {
+            return false;
+        }
+        if self.batch_sample_rate >= 1.0 {
+            return true;
+        }
+        if self.batch_sample_rate <= 0.0 {
+            return false;
+        }
+        let interval = (1.0 / self.batch_sample_rate) as u64;
+        pull_round % interval == 0
     }
 }
 
-/// Deterministic, stateless sampling. Uses the first 8 bytes of `seed` as a
-/// uniform u64, compares against a threshold derived from `rate`.
+/// Deterministic, stateless sampling for txn-level filtering.
+/// Uses the txn hash (already uniformly distributed) compared against a threshold.
 /// O(1), ~2ns, no RNG or atomic state.
-fn sample_accepts(rate: f64, seed: &[u8]) -> bool {
+fn txn_sample_accepts(rate: f64, hash: &HashValue) -> bool {
     if rate >= 1.0 {
         return true;
     }
     if rate <= 0.0 {
         return false;
     }
-    let mut buf = [0u8; 8];
-    let len = seed.len().min(8);
-    buf[..len].copy_from_slice(&seed[..len]);
-    let h = u64::from_le_bytes(buf);
-    // Mix bits for short seeds (e.g., pull_round) to avoid patterns
-    let h = h.wrapping_mul(0x517CC1B727220A95);
+    let h = u64::from_le_bytes(hash.as_ref()[0..8].try_into().unwrap());
     h <= (rate * u64::MAX as f64) as u64
 }
 
@@ -102,24 +108,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sample_accepts_rate_1() {
+    fn test_txn_sample_rate_1() {
         for i in 0..100u64 {
-            assert!(sample_accepts(1.0, &i.to_le_bytes()));
+            let hash = HashValue::sha3_256_of(&i.to_le_bytes());
+            assert!(txn_sample_accepts(1.0, &hash));
         }
     }
 
     #[test]
-    fn test_sample_accepts_rate_0() {
+    fn test_txn_sample_rate_0() {
         for i in 0..100u64 {
-            assert!(!sample_accepts(0.0, &i.to_le_bytes()));
+            let hash = HashValue::sha3_256_of(&i.to_le_bytes());
+            assert!(!txn_sample_accepts(0.0, &hash));
         }
     }
 
     #[test]
-    fn test_sample_accepts_rate_half() {
+    fn test_txn_sample_rate_half() {
         let mut accepted = 0;
         for i in 0..10000u64 {
-            if sample_accepts(0.5, &i.to_le_bytes()) {
+            let hash = HashValue::sha3_256_of(&i.to_le_bytes());
+            if txn_sample_accepts(0.5, &hash) {
                 accepted += 1;
             }
         }
@@ -132,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn test_should_sample_batch_rate_tenth() {
+    fn test_should_sample_batch_every_10th() {
         let filter = TransactionFilter::new(
             true,
             vec![AccountAddress::ONE].into_iter().collect(),
@@ -145,11 +154,7 @@ mod tests {
                 sampled += 1;
             }
         }
-        // Allow 7%-13% range
-        assert!(
-            (700..=1300).contains(&sampled),
-            "Expected ~10% batch sampling, got {}/10000",
-            sampled
-        );
+        // rate=0.1 → every 10th round → exactly 1000
+        assert_eq!(sampled, 1000, "Expected exactly 1000/10000 sampled");
     }
 }
