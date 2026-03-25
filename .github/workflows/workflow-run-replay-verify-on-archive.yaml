@@ -157,10 +157,10 @@ jobs:
             CMD="$CMD --end ${{ inputs.END_VERSION }}"
           fi
           if [ -n "${{ inputs.START_TIME }}" ]; then
-            CMD="$CMD --start-time ${{ inputs.START_TIME }}"
+            CMD="$CMD --start-time '${{ inputs.START_TIME }}'"
           fi
           if [ -n "${{ inputs.END_TIME }}" ]; then
-            CMD="$CMD --end-time ${{ inputs.END_TIME }}"
+            CMD="$CMD --end-time '${{ inputs.END_TIME }}'"
           fi
 
           if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
