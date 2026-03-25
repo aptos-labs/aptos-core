@@ -17,6 +17,7 @@ const ROUND_DURATION_BUCKETS: &[f64] = &[
 ///   "round1" — Vote1 broadcast → QC1 formation
 ///   "round2" — Vote2 broadcast → QC2 formation
 ///   "round3" — Vote3 broadcast → QC3 formation
+///
 pub static SPC_ROUND_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "pc_spc_round_duration_s",
