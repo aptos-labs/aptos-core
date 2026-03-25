@@ -59,6 +59,9 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
         MicroOp::CallFunc { func_id } => {
             write!(f, "CallFunc #{}", func_id)
         },
+        MicroOp::CallLocalFunc { ptr } => {
+            write!(f, "CallLocalFunc {:p}", ptr)
+        },
         MicroOp::Return => {
             write!(f, "Return")
         },
