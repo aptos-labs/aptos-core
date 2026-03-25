@@ -427,7 +427,10 @@ fn now_usecs() -> u64 {
 fn is_block_finalization(stage: TransactionStage) -> bool {
     matches!(
         stage,
-        TransactionStage::Certified | TransactionStage::PreCommit | TransactionStage::Committed
+        TransactionStage::BlockOrdered
+            | TransactionStage::Certified
+            | TransactionStage::PreCommit
+            | TransactionStage::Committed
     )
 }
 
@@ -569,6 +572,17 @@ fn log_trace(trace: &TransactionTrace) {
     let mut prev_stage_usecs = base;
     // Track whether we've already shown wait() for this attempt.
     let mut shown_wait_for_attempt: u32 = 0;
+    // Find the first QsBatchPull for each attempt (for wait() summary).
+    // Pre-scan so we can emit wait() at the start of the attempt, not just before QsBatchPull.
+    let mut first_pull_per_attempt: std::collections::HashMap<u32, &crate::types::BatchPullInfo> =
+        std::collections::HashMap::new();
+    for record in &sorted_stages {
+        if record.stage == TransactionStage::QsBatchPull {
+            if let Some(StageMetadata::BatchPull(info)) = &record.metadata {
+                first_pull_per_attempt.entry(record.attempt).or_insert(info);
+            }
+        }
+    }
     for record in &sorted_stages {
         // Start a new attempt group when we see a higher attempt on a stage that
         // isn't block finalization (those trail the previous attempt's execution).
@@ -582,23 +596,31 @@ fn log_trace(trace: &TransactionTrace) {
             if max_attempt > 1 {
                 stage_parts.push(format!("[attempt_{}]", display_attempt));
             }
-        }
-
-        // For the first QsBatchPull of each attempt, emit a wait() summary.
-        if record.stage == TransactionStage::QsBatchPull && display_attempt > shown_wait_for_attempt
-        {
-            shown_wait_for_attempt = display_attempt;
-            if let Some(StageMetadata::BatchPull(info)) = &record.metadata {
-                stage_parts.push(build_wait_summary(
-                    info,
-                    prev_stage_usecs,
-                    record.timestamp_usecs,
-                ));
+            // Emit wait() at the start of the new attempt (using the first
+            // QsBatchPull's metadata), before whatever stage comes first.
+            if display_attempt > shown_wait_for_attempt {
+                if let Some(info) = first_pull_per_attempt.get(&display_attempt) {
+                    // Find the QsBatchPull timestamp for this attempt.
+                    if let Some(pull_record) = sorted_stages.iter().find(|r| {
+                        r.stage == TransactionStage::QsBatchPull
+                            && r.attempt == display_attempt
+                    }) {
+                        stage_parts.push(build_wait_summary(
+                            info,
+                            prev_stage_usecs,
+                            pull_record.timestamp_usecs,
+                        ));
+                    }
+                    shown_wait_for_attempt = display_attempt;
+                }
             }
         }
 
-        let delta_usecs = record.timestamp_usecs as i64 - prev_stage_usecs as i64;
-        let delta_ms = delta_usecs / 1000;
+        // Skip emitting wait() again when we reach the actual QsBatchPull stage
+        // (it was already emitted at the attempt marker above).
+
+        // Absolute time from MempoolInsert (base).
+        let abs_ms = (record.timestamp_usecs as i64 - base as i64) / 1000;
         let stage_str = match &record.metadata {
             Some(StageMetadata::Execution(status)) => {
                 format!("{}({})", record.stage.as_ref(), status.as_ref())
@@ -619,7 +641,7 @@ fn log_trace(trace: &TransactionTrace) {
             },
             None => record.stage.as_ref().to_string(),
         };
-        stage_parts.push(format!("{}=+{}ms", stage_str, delta_ms));
+        stage_parts.push(format!("{}={}ms", stage_str, abs_ms));
         prev_stage_usecs = record.timestamp_usecs;
     }
 
