@@ -9,6 +9,33 @@ The rest of this document is for MoveFlow developers.
 
 ## Development Setup
 
+**Quick Install (Pre-built Binaries):**
+
+For the easiest installation, use our one-line installer:
+
+```bash
+# Unix/Linux/macOS
+curl -fsSL https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/binary_release/install_binary.sh | sh -s -- move-flow
+
+# Windows (PowerShell)
+iwr https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/binary_release/install_binary.ps1 -OutFile install.ps1; .\install.ps1 -BinaryName move-flow
+
+# Using cargo-binstall (if published to crates.io)
+cargo binstall aptos-move-flow
+```
+
+**Build from Source:**
+
+```bash
+cargo install --path aptos-move/flow --locked --profile ci
+```
+
+This puts `move-flow` on your `$PATH`. You can also set `$MOVE_FLOW` to point
+to a custom binary location; the generated `.mcp.json` will respect it.
+
+For more installation options and release information, see [RELEASE.md](RELEASE.md).
+
+### Generate a Plugin
 Generate a local plugin directory and start Claude with it:
 
 ```bash

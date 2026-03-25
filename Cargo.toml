@@ -956,6 +956,14 @@ lto = "thin"
 strip = true
 codegen-units = 1
 
+[profile.tool]
+inherits = "release"
+debug = false
+opt-level = "z"
+lto = "thin"
+strip = true
+codegen-units = 1
+
 [profile.ci]
 inherits = "release"
 debug = "line-tables-only"
