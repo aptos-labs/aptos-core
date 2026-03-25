@@ -65,10 +65,10 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 fn copy_propagation(func: &mut FunctionIR) {
     let blocks = split_into_blocks(&func.instrs);
 
-    for (start, end) in blocks {
+    for block in blocks {
         let mut subst: BTreeMap<Slot, Slot> = BTreeMap::new();
 
-        for i in start..end {
+        for i in block.clone() {
             apply_subst_to_sources(&mut func.instrs[i], &subst);
 
             // MutBorrowLoc kill: the borrowed slot may be silently written
@@ -114,8 +114,8 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
     // Pre-scan: identify slots that appear in more than one block.
     let mut slot_block: BTreeMap<Slot, usize> = BTreeMap::new();
     let mut cross_block_slots: BTreeSet<Slot> = BTreeSet::new();
-    for (block_id, &(start, end)) in blocks.iter().enumerate() {
-        for i in start..end {
+    for (block_id, block) in blocks.iter().enumerate() {
+        for i in block.clone() {
             let (dsts, srcs) = get_defs_uses(&func.instrs[i]);
             for r in dsts.into_iter().chain(srcs) {
                 match slot_block.get(&r) {
@@ -133,10 +133,10 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
 
     let mut dead_indices: BTreeSet<usize> = BTreeSet::new();
 
-    for (start, end) in blocks {
+    for block in blocks {
         let mut live: BTreeSet<Slot> = BTreeSet::new();
 
-        for i in (start..end).rev() {
+        for i in block.rev() {
             let (dsts, srcs) = get_defs_uses(&func.instrs[i]);
 
             let is_removable = match &func.instrs[i] {
@@ -175,7 +175,7 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
 /// Pre: after DCE (some slots may be unused).
 /// Post: Params keep indices 0..num_params-1 (calling-convention-visible).
 ///       Surviving locals and temps are compacted contiguously starting at num_params.
-///       `num_locals`, `num_home_slots`, and `slot_types` are updated.
+///       `num_locals`, `num_home_slots`, and `home_slot_types` are updated.
 fn renumber_slots(func: &mut FunctionIR) {
     let num_params = func.num_params;
 
@@ -210,13 +210,13 @@ fn renumber_slots(func: &mut FunctionIR) {
         remap_instr(instr, &remap);
     }
 
-    // Build new slot_types. Bool placeholder — every entry is overwritten below:
+    // Build new home_slot_types. Bool placeholder — every entry is overwritten below:
     // params are always copied (calling convention requires correct types even if
     // unused in the body), and non-param slots are copied from the remap.
     let mut new_slot_types = vec![Type::Bool; next_slot as usize];
     for i in 0..num_params {
-        if (i as usize) < func.slot_types.len() {
-            new_slot_types[i as usize] = func.slot_types[i as usize].clone();
+        if (i as usize) < func.home_slot_types.len() {
+            new_slot_types[i as usize] = func.home_slot_types[i as usize].clone();
         }
     }
     // Non-param slots: copy types according to remap. Params are skipped
@@ -224,12 +224,12 @@ fn renumber_slots(func: &mut FunctionIR) {
     for (&old, &new) in &remap {
         if let (Slot::Home(old_i), Slot::Home(new_i)) = (old, new)
             && old_i >= num_params
-            && (old_i as usize) < func.slot_types.len()
+            && (old_i as usize) < func.home_slot_types.len()
         {
-            new_slot_types[new_i as usize] = func.slot_types[old_i as usize].clone();
+            new_slot_types[new_i as usize] = func.home_slot_types[old_i as usize].clone();
         }
     }
-    func.slot_types = new_slot_types;
+    func.home_slot_types = new_slot_types;
 
     func.num_locals = num_surviving_locals;
     func.num_home_slots = next_slot;

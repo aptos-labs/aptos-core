@@ -21,7 +21,7 @@ pub(crate) struct AllocatedFunction {
     pub instrs: Vec<Instr>,
     pub num_home_slots: u16,
     pub num_xfer_slots: u16,
-    pub slot_types: Vec<Type>,
+    pub home_slot_types: Vec<Type>,
 }
 
 /// Map SSA `Vid`s to real slots across all blocks.
@@ -41,8 +41,8 @@ pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
         real_slot_types.insert(Slot::Home(i as u16), ty.clone());
     }
 
-    for (start, end) in blocks {
-        let block_instrs = &ssa.instrs[start..end];
+    for block in blocks {
+        let block_instrs = &ssa.instrs[block.clone()];
         let analysis = BlockAnalysis::analyze(block_instrs);
         let (allocated, block_max, block_xfer_slots, returned_pool) = allocate_block(
             block_instrs,
@@ -63,9 +63,9 @@ pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
         result.extend(allocated);
     }
 
-    let mut slot_types = Vec::with_capacity(global_next_slot as usize);
+    let mut home_slot_types = Vec::with_capacity(global_next_slot as usize);
     for i in 0..global_next_slot {
-        slot_types.push(
+        home_slot_types.push(
             real_slot_types
                 .get(&Slot::Home(i))
                 .cloned()
@@ -77,7 +77,7 @@ pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
         instrs: result,
         num_home_slots: global_next_slot,
         num_xfer_slots: global_num_xfer_slots,
-        slot_types,
+        home_slot_types,
     })
 }
 

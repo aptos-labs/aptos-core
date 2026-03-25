@@ -215,13 +215,13 @@ pub enum Instr {
     CallClosure(Vec<Slot>, SignatureIndex, Vec<Slot>),
 
     // --- Vector ---
-    VecPack(Slot, SignatureIndex, u64, Vec<Slot>),
+    VecPack(Slot, SignatureIndex, u16, Vec<Slot>),
     VecLen(Slot, SignatureIndex, Slot),
     VecImmBorrow(Slot, SignatureIndex, Slot, Slot),
     VecMutBorrow(Slot, SignatureIndex, Slot, Slot),
     VecPushBack(SignatureIndex, Slot, Slot),
     VecPopBack(Slot, SignatureIndex, Slot),
-    VecUnpack(Vec<Slot>, SignatureIndex, u64, Slot),
+    VecUnpack(Vec<Slot>, SignatureIndex, u16, Slot),
     VecSwap(SignatureIndex, Slot, Slot, Slot),
 
     // --- Control flow ---
@@ -252,7 +252,7 @@ pub struct FunctionIR {
     pub instrs: Vec<Instr>,
     /// Type of each Home slot (indexed by Home slot index, 0..num_home_slots-1).
     /// Xfer slots have no entry here — their types are inferred from call signatures.
-    pub slot_types: Vec<Type>,
+    pub home_slot_types: Vec<Type>,
 }
 
 /// IR for a module (wraps the original CompiledModule for pool access).

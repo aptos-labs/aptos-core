@@ -45,7 +45,7 @@ fn main() -> Result<()> {
         print_stats(&module_ir);
     }
 
-    let output = format!("{}", module_ir.display());
+    let output = format!("{}", module_ir);
 
     let out_path = args.input.with_extension("mseir");
     std::fs::write(&out_path, &output)

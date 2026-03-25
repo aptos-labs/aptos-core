@@ -18,20 +18,9 @@ use move_binary_format::{
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::fmt;
 
-/// A display wrapper for ModuleIR.
-pub struct ModuleIRDisplay<'a> {
-    module_ir: &'a ModuleIR,
-}
-
-impl ModuleIR {
-    pub fn display(&self) -> ModuleIRDisplay<'_> {
-        ModuleIRDisplay { module_ir: self }
-    }
-}
-
-impl fmt::Display for ModuleIRDisplay<'_> {
+impl fmt::Display for ModuleIR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let module = &self.module_ir.module;
+        let module = &self.module;
         let self_handle = module.module_handle_at(module.self_module_handle_idx);
         let addr = module.address_identifier_at(self_handle.address);
         let name = module.identifier_at(self_handle.name);
@@ -42,7 +31,7 @@ impl fmt::Display for ModuleIRDisplay<'_> {
             name
         )?;
 
-        for func_ir in &self.module_ir.functions {
+        for func_ir in &self.functions {
             writeln!(f)?;
             display_function(f, module, func_ir)?;
         }
@@ -97,7 +86,7 @@ fn display_function(
 
     // Display slot declarations with types
     for i in 0..func.num_home_slots {
-        let ty = &func.slot_types[i as usize];
+        let ty = &func.home_slot_types[i as usize];
         write!(f, "    r{}: ", i)?;
         display_type(f, module, ty)?;
         writeln!(f)?;

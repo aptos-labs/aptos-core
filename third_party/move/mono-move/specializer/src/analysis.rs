@@ -74,12 +74,17 @@ impl BlockAnalysis {
             }
         }
 
-        // Call positions (Call/CallGeneric only, not CallClosure).
+        // Call positions — any instruction that clobbers xfer slots.
         // Already sorted since we iterate in order.
         let call_positions: Vec<usize> = instrs
             .iter()
             .enumerate()
-            .filter(|(_, ins)| matches!(ins, Instr::Call(..) | Instr::CallGeneric(..)))
+            .filter(|(_, ins)| {
+                matches!(
+                    ins,
+                    Instr::Call(..) | Instr::CallGeneric(..) | Instr::CallClosure(..)
+                )
+            })
             .map(|(i, _)| i)
             .collect();
 

@@ -35,7 +35,7 @@ struct LoweringState<'a> {
     /// Indices into ops that need target patching
     branch_fixups: Vec<usize>,
     call_site_cursor: usize,
-    slot_types: &'a [Type],
+    home_slot_types: &'a [Type],
     /// Per-position slot info for Xfer slots, updated lazily.
     active_xfer_slots: Vec<SlotInfo>,
     /// Per-position types for Xfer slots, updated lazily.
@@ -76,7 +76,7 @@ impl<'a> LoweringState<'a> {
             label_map: vec![None; max_label],
             branch_fixups: Vec::new(),
             call_site_cursor: 0,
-            slot_types: &func_ir.slot_types,
+            home_slot_types: &func_ir.home_slot_types,
             active_xfer_slots,
             active_xfer_types,
         }
@@ -132,7 +132,7 @@ impl<'a> LoweringState<'a> {
 
     fn slot_type(&self, slot: Slot) -> &Type {
         match slot {
-            Slot::Home(i) => &self.slot_types[i as usize],
+            Slot::Home(i) => &self.home_slot_types[i as usize],
             Slot::Xfer(j) => &self.active_xfer_types[j as usize],
             Slot::Vid(_) => unreachable!("Vid slot in post-allocation IR"),
         }
@@ -166,7 +166,6 @@ impl<'a> LoweringState<'a> {
             // --- Labels ---
             Instr::Label(Label(l)) => {
                 self.label_map[*l as usize] = Some(self.ops.len() as u32);
-                return Ok(false);
             },
 
             // --- Loads ---

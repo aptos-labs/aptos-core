@@ -3,101 +3,108 @@
 
 //! Instruction utilities for the pipeline.
 //!
-//! Helpers used by `ssa_conversion`, `slot_alloc`, and `optimize`.
+//! Helpers used by `[ssa_conversion]`, `[slot_alloc]`, and `[optimize]`.
 
 use crate::ir::{BinaryOp, ImmValue, Instr, Slot};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::Range};
 
 /// Get named slots defined (written) and used (read) by an instruction.
 pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Slot>, Vec<Slot>) {
     match instr {
-        Instr::LdConst(d, _)
-        | Instr::LdTrue(d)
-        | Instr::LdFalse(d)
-        | Instr::LdU8(d, _)
-        | Instr::LdU16(d, _)
-        | Instr::LdU32(d, _)
-        | Instr::LdU64(d, _)
-        | Instr::LdU128(d, _)
-        | Instr::LdU256(d, _)
-        | Instr::LdI8(d, _)
-        | Instr::LdI16(d, _)
-        | Instr::LdI32(d, _)
-        | Instr::LdI64(d, _)
-        | Instr::LdI128(d, _)
-        | Instr::LdI256(d, _) => (vec![*d], vec![]),
+        Instr::LdConst(dst, _)
+        | Instr::LdTrue(dst)
+        | Instr::LdFalse(dst)
+        | Instr::LdU8(dst, _)
+        | Instr::LdU16(dst, _)
+        | Instr::LdU32(dst, _)
+        | Instr::LdU64(dst, _)
+        | Instr::LdU128(dst, _)
+        | Instr::LdU256(dst, _)
+        | Instr::LdI8(dst, _)
+        | Instr::LdI16(dst, _)
+        | Instr::LdI32(dst, _)
+        | Instr::LdI64(dst, _)
+        | Instr::LdI128(dst, _)
+        | Instr::LdI256(dst, _) => (vec![*dst], vec![]),
 
-        Instr::Copy(d, s) | Instr::Move(d, s) => (vec![*d], vec![*s]),
+        Instr::Copy(dst, src) | Instr::Move(dst, src) => (vec![*dst], vec![*src]),
 
-        Instr::UnaryOp(d, _, s) => (vec![*d], vec![*s]),
-        Instr::BinaryOp(d, _, l, r) => (vec![*d], vec![*l, *r]),
-        Instr::BinaryOpImm(d, _, l, _) => (vec![*d], vec![*l]),
+        Instr::UnaryOp(dst, _, src) => (vec![*dst], vec![*src]),
+        Instr::BinaryOp(dst, _, lhs, rhs) => (vec![*dst], vec![*lhs, *rhs]),
+        Instr::BinaryOpImm(dst, _, lhs, _) => (vec![*dst], vec![*lhs]),
 
-        Instr::Pack(d, _, fields) | Instr::PackGeneric(d, _, fields) => (vec![*d], fields.to_vec()),
-        Instr::Unpack(ds, _, s) | Instr::UnpackGeneric(ds, _, s) => (ds.to_vec(), vec![*s]),
-
-        Instr::PackVariant(d, _, fields) | Instr::PackVariantGeneric(d, _, fields) => {
-            (vec![*d], fields.to_vec())
+        Instr::Pack(dst, _, fields) | Instr::PackGeneric(dst, _, fields) => {
+            (vec![*dst], fields.to_vec())
         },
-        Instr::UnpackVariant(ds, _, s) | Instr::UnpackVariantGeneric(ds, _, s) => {
-            (ds.to_vec(), vec![*s])
+        Instr::Unpack(dsts, _, src) | Instr::UnpackGeneric(dsts, _, src) => {
+            (dsts.to_vec(), vec![*src])
         },
-        Instr::TestVariant(d, _, s) | Instr::TestVariantGeneric(d, _, s) => (vec![*d], vec![*s]),
 
-        Instr::ImmBorrowLoc(d, s) | Instr::MutBorrowLoc(d, s) => (vec![*d], vec![*s]),
-        Instr::ImmBorrowField(d, _, s)
-        | Instr::MutBorrowField(d, _, s)
-        | Instr::ImmBorrowFieldGeneric(d, _, s)
-        | Instr::MutBorrowFieldGeneric(d, _, s)
-        | Instr::ImmBorrowVariantField(d, _, s)
-        | Instr::MutBorrowVariantField(d, _, s)
-        | Instr::ImmBorrowVariantFieldGeneric(d, _, s)
-        | Instr::MutBorrowVariantFieldGeneric(d, _, s) => (vec![*d], vec![*s]),
-        Instr::ReadRef(d, s) => (vec![*d], vec![*s]),
-        Instr::WriteRef(r, v) => (vec![], vec![*r, *v]),
+        Instr::PackVariant(dst, _, fields) | Instr::PackVariantGeneric(dst, _, fields) => {
+            (vec![*dst], fields.to_vec())
+        },
+        Instr::UnpackVariant(dsts, _, src) | Instr::UnpackVariantGeneric(dsts, _, src) => {
+            (dsts.to_vec(), vec![*src])
+        },
+        Instr::TestVariant(dst, _, src) | Instr::TestVariantGeneric(dst, _, src) => {
+            (vec![*dst], vec![*src])
+        },
 
-        Instr::ReadField(d, _, s)
-        | Instr::ReadFieldGeneric(d, _, s)
-        | Instr::ReadVariantField(d, _, s)
-        | Instr::ReadVariantFieldGeneric(d, _, s) => (vec![*d], vec![*s]),
-        Instr::WriteField(_, r, v)
-        | Instr::WriteFieldGeneric(_, r, v)
-        | Instr::WriteVariantField(_, r, v)
-        | Instr::WriteVariantFieldGeneric(_, r, v) => (vec![], vec![*r, *v]),
+        Instr::ImmBorrowLoc(dst, src) | Instr::MutBorrowLoc(dst, src) => (vec![*dst], vec![*src]),
+        Instr::ImmBorrowField(dst, _, src)
+        | Instr::MutBorrowField(dst, _, src)
+        | Instr::ImmBorrowFieldGeneric(dst, _, src)
+        | Instr::MutBorrowFieldGeneric(dst, _, src)
+        | Instr::ImmBorrowVariantField(dst, _, src)
+        | Instr::MutBorrowVariantField(dst, _, src)
+        | Instr::ImmBorrowVariantFieldGeneric(dst, _, src)
+        | Instr::MutBorrowVariantFieldGeneric(dst, _, src) => (vec![*dst], vec![*src]),
+        Instr::ReadRef(dst, src) => (vec![*dst], vec![*src]),
+        Instr::WriteRef(dst_ref, val) => (vec![], vec![*dst_ref, *val]),
 
-        Instr::Exists(d, _, a)
-        | Instr::ExistsGeneric(d, _, a)
-        | Instr::MoveFrom(d, _, a)
-        | Instr::MoveFromGeneric(d, _, a) => (vec![*d], vec![*a]),
-        Instr::MoveTo(_, s, v) | Instr::MoveToGeneric(_, s, v) => (vec![], vec![*s, *v]),
-        Instr::ImmBorrowGlobal(d, _, a)
-        | Instr::ImmBorrowGlobalGeneric(d, _, a)
-        | Instr::MutBorrowGlobal(d, _, a)
-        | Instr::MutBorrowGlobalGeneric(d, _, a) => (vec![*d], vec![*a]),
+        Instr::ReadField(dst, _, src)
+        | Instr::ReadFieldGeneric(dst, _, src)
+        | Instr::ReadVariantField(dst, _, src)
+        | Instr::ReadVariantFieldGeneric(dst, _, src) => (vec![*dst], vec![*src]),
+        Instr::WriteField(_, dst_ref, val)
+        | Instr::WriteFieldGeneric(_, dst_ref, val)
+        | Instr::WriteVariantField(_, dst_ref, val)
+        | Instr::WriteVariantFieldGeneric(_, dst_ref, val) => (vec![], vec![*dst_ref, *val]),
+
+        Instr::Exists(dst, _, addr)
+        | Instr::ExistsGeneric(dst, _, addr)
+        | Instr::MoveFrom(dst, _, addr)
+        | Instr::MoveFromGeneric(dst, _, addr) => (vec![*dst], vec![*addr]),
+        Instr::MoveTo(_, signer, val) | Instr::MoveToGeneric(_, signer, val) => {
+            (vec![], vec![*signer, *val])
+        },
+        Instr::ImmBorrowGlobal(dst, _, addr)
+        | Instr::ImmBorrowGlobalGeneric(dst, _, addr)
+        | Instr::MutBorrowGlobal(dst, _, addr)
+        | Instr::MutBorrowGlobalGeneric(dst, _, addr) => (vec![*dst], vec![*addr]),
 
         Instr::Call(rets, _, args) | Instr::CallGeneric(rets, _, args) => {
             (rets.to_vec(), args.to_vec())
         },
-        Instr::PackClosure(d, _, _, captured) | Instr::PackClosureGeneric(d, _, _, captured) => {
-            (vec![*d], captured.to_vec())
-        },
+        Instr::PackClosure(dst, _, _, captured)
+        | Instr::PackClosureGeneric(dst, _, _, captured) => (vec![*dst], captured.to_vec()),
         Instr::CallClosure(rets, _, args) => (rets.to_vec(), args.to_vec()),
 
-        Instr::VecPack(d, _, _, elems) => (vec![*d], elems.to_vec()),
-        Instr::VecLen(d, _, s) => (vec![*d], vec![*s]),
-        Instr::VecImmBorrow(d, _, v, i) | Instr::VecMutBorrow(d, _, v, i) => {
-            (vec![*d], vec![*v, *i])
+        Instr::VecPack(dst, _, _, elems) => (vec![*dst], elems.to_vec()),
+        Instr::VecLen(dst, _, src) => (vec![*dst], vec![*src]),
+        Instr::VecImmBorrow(dst, _, vec_ref, idx) | Instr::VecMutBorrow(dst, _, vec_ref, idx) => {
+            (vec![*dst], vec![*vec_ref, *idx])
         },
-        Instr::VecPushBack(_, v, val) => (vec![], vec![*v, *val]),
-        Instr::VecPopBack(d, _, s) => (vec![*d], vec![*s]),
-        Instr::VecUnpack(ds, _, _, s) => (ds.to_vec(), vec![*s]),
-        Instr::VecSwap(_, v, i, j) => (vec![], vec![*v, *i, *j]),
+        Instr::VecPushBack(_, vec_ref, val) => (vec![], vec![*vec_ref, *val]),
+        Instr::VecPopBack(dst, _, src) => (vec![*dst], vec![*src]),
+        Instr::VecUnpack(dsts, _, _, src) => (dsts.to_vec(), vec![*src]),
+        Instr::VecSwap(_, vec_ref, idx_a, idx_b) => (vec![], vec![*vec_ref, *idx_a, *idx_b]),
 
         Instr::Label(_) | Instr::Branch(_) => (vec![], vec![]),
-        Instr::BrTrue(_, c) | Instr::BrFalse(_, c) => (vec![], vec![*c]),
+        Instr::BrTrue(_, cond) | Instr::BrFalse(_, cond) => (vec![], vec![*cond]),
         Instr::Ret(rets) => (vec![], rets.to_vec()),
-        Instr::Abort(c) => (vec![], vec![*c]),
-        Instr::AbortMsg(c, m) => (vec![], vec![*c, *m]),
+        Instr::Abort(code) => (vec![], vec![*code]),
+        Instr::AbortMsg(code, msg) => (vec![], vec![*code, *msg]),
     }
 }
 
@@ -427,15 +434,15 @@ pub(crate) fn apply_subst_to_sources(instr: &mut Instr, subst: &BTreeMap<Slot, S
 }
 
 /// Split instructions into basic blocks (label to branch/label).
-/// Returns (start, end) index pairs (exclusive end).
-pub(crate) fn split_into_blocks(instrs: &[Instr]) -> Vec<(usize, usize)> {
+/// Returns half-open `start..end` ranges.
+pub(crate) fn split_into_blocks(instrs: &[Instr]) -> Vec<Range<usize>> {
     let mut blocks = Vec::new();
     let mut start = 0;
 
     for (i, instr) in instrs.iter().enumerate() {
         match instr {
             Instr::Label(_) if i > start => {
-                blocks.push((start, i));
+                blocks.push(start..i);
                 start = i;
             },
             Instr::Branch(_)
@@ -444,7 +451,7 @@ pub(crate) fn split_into_blocks(instrs: &[Instr]) -> Vec<(usize, usize)> {
             | Instr::Ret(_)
             | Instr::Abort(_)
             | Instr::AbortMsg(_, _) => {
-                blocks.push((start, i + 1));
+                blocks.push(start..i + 1);
                 start = i + 1;
             },
             _ => {},
@@ -452,7 +459,7 @@ pub(crate) fn split_into_blocks(instrs: &[Instr]) -> Vec<(usize, usize)> {
     }
 
     if start < instrs.len() {
-        blocks.push((start, instrs.len()));
+        blocks.push(start..instrs.len());
     }
 
     blocks

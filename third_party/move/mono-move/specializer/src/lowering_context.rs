@@ -133,7 +133,7 @@ fn try_build_context_inner(
     // 1. Compute home slot layout
     let mut home_slots = Vec::with_capacity(func_ir.num_home_slots as usize);
     let mut offset: u32 = 0;
-    for slot_ty in &func_ir.slot_types {
+    for slot_ty in &func_ir.home_slot_types {
         let size = type_size(slot_ty)? as u32;
         home_slots.push(SlotInfo { offset, size });
         offset += size;

@@ -21,6 +21,10 @@ pub(crate) struct SSAFunction {
 
 impl SSAFunction {
     /// Fuse consecutive borrow+deref patterns into combined field access instructions.
+    ///
+    /// Safety: relies on the SSA single-use invariant — each `Vid` produced by a
+    /// borrow instruction is consumed exactly once by the immediately following
+    /// `ReadRef`/`WriteRef`. This holds for verified stack-machine bytecode.
     pub(crate) fn fuse_field_access_instrs(&mut self) {
         let instrs = &self.instrs;
         let mut result = Vec::with_capacity(instrs.len());
@@ -109,14 +113,14 @@ impl SSAFunction {
             }
 
             // Advance to the current block.
-            while block_idx < blocks.len() && i >= blocks[block_idx].1 {
+            while block_idx < blocks.len() && i >= blocks[block_idx].end {
                 block_idx += 1;
             }
 
             // Only fuse within the same basic block.
             if i + 1 < instrs.len()
                 && block_idx < blocks.len()
-                && i + 1 < blocks[block_idx].1
+                && i + 1 < blocks[block_idx].end
                 && let Some((tmp, imm)) = extract_imm_value(&instrs[i])
             {
                 let fused = match &instrs[i + 1] {
@@ -131,11 +135,11 @@ impl SSAFunction {
                 if let Some(fused_instr) = fused {
                     debug_assert!(
                         {
-                            let (bstart, bend) = blocks[block_idx];
-                            instrs[bstart..bend]
+                            let block = &blocks[block_idx];
+                            instrs[block.clone()]
                                 .iter()
                                 .enumerate()
-                                .filter(|&(j, _)| bstart + j != i + 1)
+                                .filter(|&(j, _)| block.start + j != i + 1)
                                 .all(|(_, ins)| {
                                     let (_, uses) = get_defs_uses(ins);
                                     !uses.contains(&tmp)

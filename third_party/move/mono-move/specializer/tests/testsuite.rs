@@ -92,7 +92,7 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
     let table = make_struct_name_table(&module);
 
     let ir = destack(module, &table).map_err(|e| format!("{:#}", e))?;
-    let mut output = format!("{}", ir.display());
+    let mut output = format!("{}", ir);
     output.push_str("\n=== micro-ops ===\n");
     output.push_str(&format_micro_ops(&ir));
     let baseline_path = path.with_extension(EXP_EXT);
@@ -149,7 +149,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         let masm_output = move_asm::disassembler::disassemble_module(String::new(), module)
             .map_err(|e| format!("disassembly failed: {:#}", e))?;
         let module_ir = destack(module.clone(), &table).map_err(|e| format!("{:#}", e))?;
-        let ir_output = format!("{}", module_ir.display());
+        let ir_output = format!("{}", module_ir);
         output.push_str("=== masm ===\n");
         output.push_str(&masm_output);
         output.push_str("\n=== specializer ===\n");

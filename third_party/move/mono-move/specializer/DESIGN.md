@@ -5,7 +5,7 @@ execution. It is made of two phases:
 1. a "destack" pipeline converting Move bytecode to a stackless execution IR
    (stackless here refers to the removal of the implicit operand stack)
 2. a "lowering" pipeline converting the stackless execution IR to monomorphized
-   micro-ops, once all the type sizes and layout are known
+   micro-ops, once all the type sizes and layouts are known
 
 ## Goals
 
@@ -19,7 +19,7 @@ The destack pipeline should:
 - keep conversion close to linear time
 - preserve polymorphism until later monomorphization
 - make dataflow explicit for optimizations
-- do as much as work to make the later lowering pipeline very fast
+- do as much work as possible to make the later lowering pipeline very fast
 - remain simple enough that correctness is easy to reason about
 
 The lowering pipeline should:
@@ -59,7 +59,7 @@ outgoing call argument if:
 - it is a temp SSA value
 - it has a single reaching def in the same block
 - there is no intervening call between def and use
-- its last use is that call argument
+- its last use is that call instruction
 - it is not already committed to a conflicting coalescing decision
 
 A call result may stay in `Xfer(i)` if:

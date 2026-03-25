@@ -88,7 +88,7 @@ pub fn translate_module(
                     num_home_slots: alloc.num_home_slots,
                     num_xfer_slots: alloc.num_xfer_slots,
                     instrs: alloc.instrs,
-                    slot_types: alloc.slot_types,
+                    home_slot_types: alloc.home_slot_types,
                 })
             })
         })
