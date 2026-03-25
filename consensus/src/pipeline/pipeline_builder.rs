@@ -1226,6 +1226,7 @@ impl PipelineBuilder {
         }
 
         tracker.start_working();
+        let block_id = block.id();
         tokio::task::spawn_blocking(move || {
             executor
                 .pre_commit_block(block.id())
@@ -1233,6 +1234,16 @@ impl PipelineBuilder {
         })
         .await
         .expect("spawn blocking failed")?;
+        // Record PreCommit tracing stage after storage pre-write completes.
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.is_enabled() {
+                store.record_block_stage(
+                    &block_id,
+                    aptos_transaction_tracing::types::TransactionStage::PreCommit,
+                );
+            }
+        }
         Ok(compute_result)
     }
 
@@ -1256,6 +1267,7 @@ impl PipelineBuilder {
         }
 
         tracker.start_working();
+        let block_id = block.id();
         let ledger_info_with_sigs_clone = ledger_info_with_sigs.clone();
         tokio::task::spawn_blocking(move || {
             executor
@@ -1264,6 +1276,16 @@ impl PipelineBuilder {
         })
         .await
         .expect("spawn blocking failed")?;
+        // Record Committed tracing stage after ledger commit completes.
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.is_enabled() {
+                store.record_block_stage(
+                    &block_id,
+                    aptos_transaction_tracing::types::TransactionStage::Committed,
+                );
+            }
+        }
         Ok(Some(ledger_info_with_sigs))
     }
 

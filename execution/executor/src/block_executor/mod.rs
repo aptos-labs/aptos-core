@@ -233,6 +233,18 @@ where
                 };
 
                 let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
+                // Record ExecutionStart for traced transactions using block-level
+                // mapping (O(traced_count) instead of O(block_size)).
+                {
+                    let store =
+                        aptos_transaction_tracing::store::TransactionTraceStore::global();
+                    if store.is_enabled() {
+                        store.record_block_stage(
+                            &block_id,
+                            aptos_transaction_tracing::types::TransactionStage::ExecutionStart,
+                        );
+                    }
+                }
                 fail_point!("executor::block_executor_execute_block", |_| {
                     Err(ExecutorError::from(anyhow::anyhow!(
                         "Injected error in block_executor_execute_block"
@@ -249,6 +261,53 @@ where
                     TransactionSliceMetadata::block(parent_block_id, block_id),
                 )?
             };
+
+        // Record Executed stage with Keep/Retry/Discard status for traced txns.
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.is_enabled() {
+                use aptos_transaction_tracing::types::{
+                    ExecutionStatus, StageMetadata, TransactionStage,
+                };
+                let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
+
+                // Default: all traced txns in this block are Executed(Keep).
+                if let Some(hashes) = store.get_block_traced_txns(&block_id) {
+                    for hash in &hashes {
+                        store.record_stage_with_metadata_at(
+                            hash,
+                            TransactionStage::Executed,
+                            StageMetadata::Execution(ExecutionStatus::Keep),
+                            now,
+                        );
+                    }
+                }
+
+                // Override retried txns: Executed(Retry) + mark_retry.
+                for txn in execution_output.to_retry.transactions.iter() {
+                    let hash = txn.committed_hash();
+                    if store.is_traced(&hash) {
+                        // Replace the Keep stage we just recorded with Retry.
+                        store.replace_last_stage_metadata(
+                            &hash,
+                            StageMetadata::Execution(ExecutionStatus::Retry),
+                        );
+                        store.mark_retry(&hash);
+                    }
+                }
+
+                // Override discarded txns: Executed(Discard).
+                for txn in execution_output.to_discard.transactions.iter() {
+                    let hash = txn.committed_hash();
+                    if store.is_traced(&hash) {
+                        store.replace_last_stage_metadata(
+                            &hash,
+                            StageMetadata::Execution(ExecutionStatus::Discard),
+                        );
+                    }
+                }
+            }
+        }
 
         let output = PartialStateComputeResult::new(execution_output);
         let _ = self
