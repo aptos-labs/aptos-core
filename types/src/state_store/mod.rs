@@ -147,14 +147,19 @@ impl<K: Eq + Hash> MockStateView<K> {
         }
     }
 
-    // TODO(HotState): StateSlot now embeds a StateKey, but the generic MockStateView
-    // doesn't know how to derive one from K. Uses a placeholder for now; will be
-    // cleaned up when StateSlot.state_key becomes Option<StateKey>.
     pub fn new(data: std::collections::HashMap<K, StateValue>) -> Self {
         Self {
             data: data
                 .into_iter()
-                .map(|(k, v)| (k, StateSlot::from_db_get(StateKey::raw(b""), Some((0, v)))))
+                .map(|(k, v)| {
+                    (
+                        k,
+                        StateSlot::new_without_state_key(StateSlotKind::ColdOccupied {
+                            value_version: 0,
+                            value: v,
+                        }),
+                    )
+                })
                 .collect(),
         }
     }
@@ -173,7 +178,7 @@ impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
             .data
             .get(state_key)
             .cloned()
-            .unwrap_or_else(|| StateSlot::new(StateKey::raw(b""), StateSlotKind::ColdVacant)))
+            .unwrap_or_else(|| StateSlot::new_without_state_key(StateSlotKind::ColdVacant)))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
