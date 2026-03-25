@@ -259,9 +259,9 @@ impl BatchGenerator {
         counters::CREATED_BATCHES_COUNT.inc();
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
 
-        // Collect hashes before txns are consumed, only when tracing is active.
+        // Collect hashes before txns are consumed, only for sampled batch rounds.
         let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-        let txn_hashes: Option<Vec<_>> = if store.is_enabled() {
+        let txn_hashes: Option<Vec<_>> = if store.should_sample_batch(self.pull_round) {
             Some(txns.iter().map(|t| t.committed_hash()).collect())
         } else {
             None
@@ -483,11 +483,11 @@ impl BatchGenerator {
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
         // Record QsBatchPull with context for traced transactions.
-        // Gate behind is_enabled() so the entire block is skipped when tracing is
-        // off — zero overhead on the hot path (single lock-free ArcSwap load).
+        // Two-level gating: should_sample_batch() skips ~90% of pull rounds (~5ns),
+        // then per-txn is_traced() skips non-traced txns within sampled rounds.
         {
             let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-            if store.is_enabled() {
+            if store.should_sample_batch(self.pull_round) {
                 use std::sync::Arc;
                 let mut pull_info: Option<Arc<aptos_transaction_tracing::types::BatchPullInfo>> =
                     None;
@@ -538,37 +538,24 @@ impl BatchGenerator {
         }
         counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
 
-        // Compute gas bucket breakdown and record batch creation for tracing.
-        // Only runs when tracing is active — zero cost otherwise.
-        let tracing_active = aptos_transaction_tracing::store::TransactionTraceStore::global()
-            .is_enabled();
-        let pulled_count = pulled_txns.len() as u64;
-        let gas_bucket_txn_counts: Option<Vec<(u64, u64)>> = if tracing_active {
-            let buckets = &self.config.batch_buckets;
-            let mut counts = vec![0u64; buckets.len()];
-            for txn in pulled_txns.iter() {
-                let gas = txn.gas_unit_price();
-                let idx = buckets.partition_point(|&b| b <= gas).saturating_sub(1);
-                counts[idx] += 1;
-            }
-            Some(
-                buckets
-                    .iter()
-                    .zip(counts.iter())
-                    .filter(|(_, c)| **c > 0)
-                    .map(|(b, c)| (*b, *c))
-                    .collect(),
-            )
-        } else {
-            None
-        };
-
         let bucket_compute_start = Instant::now();
+        let pulled_count = pulled_txns.len() as u64;
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
         self.total_batches_created += batches.len() as u64;
-        if tracing_active && !batches.is_empty() {
+
+        // Always record BatchCreationRecord when tracing is enabled (cheap: ~50ns).
+        // Gas bucket info comes from the batches themselves — O(num_batches), no per-txn iteration.
+        // This keeps wait() summary accurate even when batch sampling skips the per-txn loop.
+        if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled()
+            && !batches.is_empty()
+        {
+            use aptos_consensus_types::proof_of_store::TBatchInfo;
+            let gas_bucket_txn_counts: Vec<(u64, u64)> = batches
+                .iter()
+                .map(|b| (b.batch_info().gas_bucket_start(), b.batch_info().num_txns()))
+                .collect();
             let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
             self.recent_batch_records
                 .push_back(aptos_transaction_tracing::types::BatchCreationRecord {
@@ -578,7 +565,7 @@ impl BatchGenerator {
                     pull_max_txn: max_count,
                     bp_txn: self.back_pressure.txn_count,
                     bp_proof: self.back_pressure.proof_count,
-                    gas_bucket_txn_counts: gas_bucket_txn_counts.unwrap_or_default(),
+                    gas_bucket_txn_counts,
                     bucket_boundaries: self.config.batch_buckets.clone(),
                 });
             while self.recent_batch_records.len() > 500 {
