@@ -745,6 +745,9 @@ pub(crate) fn realistic_env_p90_latency_test() -> ForgeConfig {
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.use_latency_weighted_leader = true;
+        }))
         .with_success_criteria(
             SuccessCriteria::new(3000)
                 .add_no_restarts()
