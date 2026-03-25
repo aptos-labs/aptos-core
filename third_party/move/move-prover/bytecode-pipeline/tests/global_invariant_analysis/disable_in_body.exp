@@ -14,6 +14,21 @@ fun DisableInv::foo($t0|s: &signer) {
 
 ============ after pipeline `global_invariant_analysis` ================
 
+[variant baseline]
+fun DisableInv::foo($t0|s: signer) {
+     var $t1: bool
+     var $t2: 0x1::DisableInv::R2
+     var $t3: num
+  0: $t1 := false
+  1: $t2 := pack 0x1::DisableInv::R2($t1)
+  2: move_to<0x1::DisableInv::R2>($t0, $t2) on_abort goto 5 with $t3
+  3: label L1
+  4: return ()
+  5: label L2
+  6: abort($t3)
+}
+
+
 [variant verification]
 fun DisableInv::foo($t0|s: signer) {
      var $t1: bool

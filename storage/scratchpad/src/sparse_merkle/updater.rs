@@ -11,17 +11,7 @@ use crate::{
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
-use aptos_vm::AptosVM;
-use once_cell::sync::Lazy;
 use std::cmp::Ordering;
-
-static POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(AptosVM::get_num_proof_reading_threads())
-        .thread_name(|index| format!("smt_update_{}", index))
-        .build()
-        .unwrap()
-});
 
 type Result<T> = std::result::Result<T, UpdateError>;
 
@@ -328,7 +318,7 @@ where
                     && left.updates.len() >= MIN_PARALLELIZABLE_SIZE
                     && right.updates.len() >= MIN_PARALLELIZABLE_SIZE
                 {
-                    POOL.join(|| left.run(proof_reader), || right.run(proof_reader))
+                    rayon::join(|| left.run(proof_reader), || right.run(proof_reader))
                 } else {
                     (left.run(proof_reader), right.run(proof_reader))
                 };

@@ -62,8 +62,13 @@
           "type": "string"
         },
         "query": {
-          "description": "The query to run.",
-          "$ref": "#/$defs/MovePackageQuery"
+          "description": "Query type.",
+          "$ref": "#/$defs/QueryType"
+        },
+        "function": {
+          "description": "Function to query (required for \"function_usage\"), in the form \"module_name::function_name\".",
+          "type": "string",
+          "nullable": true
         }
       },
       "required": [
@@ -71,7 +76,7 @@
         "query"
       ],
       "$defs": {
-        "MovePackageQuery": {
+        "QueryType": {
           "oneOf": [
             {
               "description": "Returns a map from each module to the modules it depends on.",
@@ -89,26 +94,9 @@
               "const": "call_graph"
             },
             {
-              "description": "Returns direct and transitive calls/uses by a given function.",
-              "type": "object",
-              "properties": {
-                "function_usage": {
-                  "type": "object",
-                  "properties": {
-                    "function": {
-                      "description": "Function to query, as \"module_name::function_name\".",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "function"
-                  ]
-                }
-              },
-              "required": [
-                "function_usage"
-              ],
-              "additionalProperties": false
+              "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
+              "type": "string",
+              "const": "function_usage"
             }
           ]
         }

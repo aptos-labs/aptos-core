@@ -159,6 +159,26 @@ public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
 
 ============ after pipeline `spec_instrumentation` ================
 
+[variant baseline]
+public fun A::mutate_at($t0|addr: address) {
+     var $t1|s: &mut 0x0::A::S [unused]
+     var $t2: &mut 0x0::A::S
+     var $t3: num
+     var $t4: u64
+     var $t5: &mut u64
+  0: $t2 := borrow_global<0x0::A::S>($t0) on_abort goto 8 with $t3
+  1: $t4 := 2
+  2: $t5 := borrow_field<0x0::A::S>.x($t2)
+  3: write_ref($t5, $t4)
+  4: write_back[Reference($t2).x (u64)]($t5)
+  5: write_back[0x0::A::S@]($t2)
+  6: label L1
+  7: return ()
+  8: label L2
+  9: abort($t3)
+}
+
+
 [variant verification]
 public fun A::mutate_at($t0|addr: address) {
      var $t1|s: &mut 0x0::A::S
@@ -189,24 +209,77 @@ public fun A::mutate_at($t0|addr: address) {
 }
 
 
+[variant baseline]
+public fun A::read_at($t0|addr: address): u64 {
+     var $t1: 0x0::A::S
+     var $t2: num
+     var $t3: u64
+  0: $t1 := get_global<0x0::A::S>($t0) on_abort goto 4 with $t2
+  1: $t3 := get_field<0x0::A::S>.x($t1)
+  2: label L1
+  3: return $t3
+  4: label L2
+  5: abort($t2)
+}
+
+
 [variant verification]
 public fun A::read_at($t0|addr: address): u64 {
      var $t1: 0x0::A::S
      var $t2: num
      var $t3: u64
-  0: @1 := save_mem(A::S)
+  0: @2 := save_mem(A::S)
   1: $t1 := get_global<0x0::A::S>($t0) on_abort goto 7 with $t2
   2: $t3 := get_field<0x0::A::S>.x($t1)
   3: label L1
      # VC: function does not abort under this condition at tests/spec_instrumentation/modifies.move:13:9+27
-  4: assert exists[@1]<0x0::A::S>($t0)
+  4: assert exists[@2]<0x0::A::S>($t0)
      # VC: post-condition does not hold at tests/spec_instrumentation/modifies.move:14:9+36
   5: assert Eq<u64>($t3, select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)))
   6: return $t3
   7: label L2
      # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/modifies.move:11:5+131
-  8: assert Not(exists[@1]<0x0::A::S>($t0))
+  8: assert Not(exists[@2]<0x0::A::S>($t0))
   9: abort($t2)
+}
+
+
+[variant baseline]
+public fun B::move_from_test_incorrect($t0|addr1: address, $t1|addr2: address): 0x0::B::T {
+     var $t2|x0: u64 [unused]
+     var $t3|x1: u64 [unused]
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: 0x0::B::T
+     var $t8: u64
+     var $t9: bool
+  0: $t4 := opaque begin: A::read_at($t1)
+  1: assume Identical($t5, Not(exists<0x0::A::S>($t1)))
+  2: if ($t5) goto 3 else goto 6
+  3: label L4
+  4: trace_abort($t6)
+  5: goto 24
+  6: label L3
+  7: assume WellFormed($t4)
+  8: assume Eq<u64>($t4, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+  9: $t4 := opaque end: A::read_at($t1)
+ 10: $t7 := move_from<0x0::B::T>($t0) on_abort goto 24 with $t6
+ 11: $t8 := opaque begin: A::read_at($t1)
+ 12: assume Identical($t9, Not(exists<0x0::A::S>($t1)))
+ 13: if ($t9) goto 14 else goto 17
+ 14: label L6
+ 15: trace_abort($t6)
+ 16: goto 24
+ 17: label L5
+ 18: assume WellFormed($t8)
+ 19: assume Eq<u64>($t8, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+ 20: $t8 := opaque end: A::read_at($t1)
+ 21: assert Eq<u64>($t4, $t8)
+ 22: label L1
+ 23: return $t7
+ 24: label L2
+ 25: abort($t6)
 }
 
 
@@ -247,6 +320,48 @@ public fun B::move_from_test_incorrect($t0|addr1: address, $t1|addr2: address): 
  23: assert Eq<u64>($t4, $t8)
  24: label L1
  25: return $t7
+ 26: label L2
+ 27: abort($t6)
+}
+
+
+[variant baseline]
+public fun B::move_to_test_incorrect($t0|account: signer, $t1|addr2: address) {
+     var $t2|x0: u64 [unused]
+     var $t3|x1: u64 [unused]
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: u64
+     var $t8: 0x0::B::T
+     var $t9: u64
+     var $t10: bool
+  0: $t4 := opaque begin: A::read_at($t1)
+  1: assume Identical($t5, Not(exists<0x0::A::S>($t1)))
+  2: if ($t5) goto 3 else goto 6
+  3: label L4
+  4: trace_abort($t6)
+  5: goto 26
+  6: label L3
+  7: assume WellFormed($t4)
+  8: assume Eq<u64>($t4, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+  9: $t4 := opaque end: A::read_at($t1)
+ 10: $t7 := 2
+ 11: $t8 := pack 0x0::B::T($t7)
+ 12: move_to<0x0::B::T>($t0, $t8) on_abort goto 26 with $t6
+ 13: $t9 := opaque begin: A::read_at($t1)
+ 14: assume Identical($t10, Not(exists<0x0::A::S>($t1)))
+ 15: if ($t10) goto 16 else goto 19
+ 16: label L6
+ 17: trace_abort($t6)
+ 18: goto 26
+ 19: label L5
+ 20: assume WellFormed($t9)
+ 21: assume Eq<u64>($t9, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+ 22: $t9 := opaque end: A::read_at($t1)
+ 23: assert Eq<u64>($t4, $t9)
+ 24: label L1
+ 25: return ()
  26: label L2
  27: abort($t6)
 }
@@ -294,6 +409,55 @@ public fun B::move_to_test_incorrect($t0|account: signer, $t1|addr2: address) {
  27: return ()
  28: label L2
  29: abort($t6)
+}
+
+
+[variant baseline]
+public fun B::mutate_S_test1_incorrect($t0|addr1: address, $t1|addr2: address) {
+     var $t2|x0: u64 [unused]
+     var $t3|x1: u64 [unused]
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: bool
+     var $t8: u64
+     var $t9: bool
+  0: assume Neq<address>($t0, $t1)
+  1: $t4 := opaque begin: A::read_at($t1)
+  2: assume Identical($t5, Not(exists<0x0::A::S>($t1)))
+  3: if ($t5) goto 4 else goto 7
+  4: label L4
+  5: trace_abort($t6)
+  6: goto 34
+  7: label L3
+  8: assume WellFormed($t4)
+  9: assume Eq<u64>($t4, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+ 10: $t4 := opaque end: A::read_at($t1)
+ 11: opaque begin: A::mutate_at($t0)
+ 12: assume Identical($t7, Not(exists<0x0::A::S>($t0)))
+ 13: if ($t7) goto 14 else goto 17
+ 14: label L6
+ 15: trace_abort($t6)
+ 16: goto 34
+ 17: label L5
+ 18: modifies global<0x0::A::S>($t0)
+ 19: assume Eq<u64>(select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)), 2)
+ 20: opaque end: A::mutate_at($t0)
+ 21: $t8 := opaque begin: A::read_at($t1)
+ 22: assume Identical($t9, Not(exists<0x0::A::S>($t1)))
+ 23: if ($t9) goto 24 else goto 27
+ 24: label L8
+ 25: trace_abort($t6)
+ 26: goto 34
+ 27: label L7
+ 28: assume WellFormed($t8)
+ 29: assume Eq<u64>($t8, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+ 30: $t8 := opaque end: A::read_at($t1)
+ 31: assert Eq<u64>($t4, $t8)
+ 32: label L1
+ 33: return ()
+ 34: label L2
+ 35: abort($t6)
 }
 
 
@@ -349,6 +513,54 @@ public fun B::mutate_S_test1_incorrect($t0|addr1: address, $t1|addr2: address) {
 }
 
 
+[variant baseline]
+public fun B::mutate_S_test2_incorrect($t0|addr: address) {
+     var $t1|x0: u64 [unused]
+     var $t2|x1: u64 [unused]
+     var $t3: u64
+     var $t4: bool
+     var $t5: num
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+  0: $t3 := opaque begin: A::read_at($t0)
+  1: assume Identical($t4, Not(exists<0x0::A::S>($t0)))
+  2: if ($t4) goto 3 else goto 6
+  3: label L4
+  4: trace_abort($t5)
+  5: goto 33
+  6: label L3
+  7: assume WellFormed($t3)
+  8: assume Eq<u64>($t3, select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)))
+  9: $t3 := opaque end: A::read_at($t0)
+ 10: opaque begin: A::mutate_at($t0)
+ 11: assume Identical($t6, Not(exists<0x0::A::S>($t0)))
+ 12: if ($t6) goto 13 else goto 16
+ 13: label L6
+ 14: trace_abort($t5)
+ 15: goto 33
+ 16: label L5
+ 17: modifies global<0x0::A::S>($t0)
+ 18: assume Eq<u64>(select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)), 2)
+ 19: opaque end: A::mutate_at($t0)
+ 20: $t7 := opaque begin: A::read_at($t0)
+ 21: assume Identical($t8, Not(exists<0x0::A::S>($t0)))
+ 22: if ($t8) goto 23 else goto 26
+ 23: label L8
+ 24: trace_abort($t5)
+ 25: goto 33
+ 26: label L7
+ 27: assume WellFormed($t7)
+ 28: assume Eq<u64>($t7, select A::S.x<0x0::A::S>(global<0x0::A::S>($t0)))
+ 29: $t7 := opaque end: A::read_at($t0)
+ 30: assert Eq<u64>($t3, $t7)
+ 31: label L1
+ 32: return ()
+ 33: label L2
+ 34: abort($t5)
+}
+
+
 [variant verification]
 public fun B::mutate_S_test2_incorrect($t0|addr: address) {
      var $t1|x0: u64
@@ -397,6 +609,53 @@ public fun B::mutate_S_test2_incorrect($t0|addr: address) {
  34: return ()
  35: label L2
  36: abort($t5)
+}
+
+
+[variant baseline]
+public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
+     var $t2|x0: u64 [unused]
+     var $t3|t: &mut 0x0::B::T [unused]
+     var $t4|x1: u64 [unused]
+     var $t5: u64
+     var $t6: bool
+     var $t7: num
+     var $t8: &mut 0x0::B::T
+     var $t9: u64
+     var $t10: &mut u64
+     var $t11: u64
+     var $t12: bool
+  0: $t5 := opaque begin: A::read_at($t1)
+  1: assume Identical($t6, Not(exists<0x0::A::S>($t1)))
+  2: if ($t6) goto 3 else goto 6
+  3: label L4
+  4: trace_abort($t7)
+  5: goto 29
+  6: label L3
+  7: assume WellFormed($t5)
+  8: assume Eq<u64>($t5, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+  9: $t5 := opaque end: A::read_at($t1)
+ 10: $t8 := borrow_global<0x0::B::T>($t0) on_abort goto 29 with $t7
+ 11: $t9 := 2
+ 12: $t10 := borrow_field<0x0::B::T>.x($t8)
+ 13: write_ref($t10, $t9)
+ 14: write_back[Reference($t8).x (u64)]($t10)
+ 15: write_back[0x0::B::T@]($t8)
+ 16: $t11 := opaque begin: A::read_at($t1)
+ 17: assume Identical($t12, Not(exists<0x0::A::S>($t1)))
+ 18: if ($t12) goto 19 else goto 22
+ 19: label L6
+ 20: trace_abort($t7)
+ 21: goto 29
+ 22: label L5
+ 23: assume WellFormed($t11)
+ 24: assume Eq<u64>($t11, select A::S.x<0x0::A::S>(global<0x0::A::S>($t1)))
+ 25: $t11 := opaque end: A::read_at($t1)
+ 26: assert Eq<u64>($t5, $t11)
+ 27: label L1
+ 28: return ()
+ 29: label L2
+ 30: abort($t7)
 }
 
 

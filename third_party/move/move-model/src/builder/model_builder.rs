@@ -96,6 +96,10 @@ pub(crate) struct ModelBuilder<'env> {
     pub intrinsics: Vec<IntrinsicDecl>,
     /// A module lookup table from names to their ids.
     pub module_table: BTreeMap<ModuleName, ModuleId>,
+    /// A global lemma lookup table mapping qualified names to (ModuleId, index, params).
+    /// Pre-populated during a first scan so cross-module references resolve regardless
+    /// of module processing order.
+    pub lemma_decl_table: BTreeMap<QualifiedSymbol, (ModuleId, usize, Vec<Parameter>)>,
 }
 
 /// A declaration of a specification function or operator in the builders state.
@@ -275,6 +279,7 @@ impl<'env> ModelBuilder<'env> {
             const_table: BTreeMap::new(),
             intrinsics: Vec::new(),
             module_table: BTreeMap::new(),
+            lemma_decl_table: BTreeMap::new(),
         };
         builtins::declare_builtins(&mut translator);
         translator

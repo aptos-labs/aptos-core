@@ -10,13 +10,13 @@ use crate::{
     types::{
         DescriptorId, Function, ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE,
         DEFAULT_STACK_SIZE, FRAME_METADATA_SIZE, HEADER_SIZE_OFFSET, META_SAVED_FP_OFFSET,
-        META_SAVED_FUNC_ID_OFFSET, META_SAVED_PC_OFFSET, SENTINEL_FUNC_ID, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
+        META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use anyhow::{bail, Result};
 use mono_move_micro_ops::MicroOp;
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::ptr::{null, NonNull};
 
 // ---------------------------------------------------------------------------
 // Runtime state
@@ -30,7 +30,8 @@ pub struct InterpreterContext<'a> {
     pub(crate) descriptors: &'a [ObjectDescriptor],
 
     pub(crate) pc: usize,
-    pub(crate) func_id: usize,
+    /// Pointer to the currently executing function.
+    pub(crate) current_func: NonNull<Function>,
     /// Absolute pointer into the linear stack memory. Operand accesses are a
     /// single addition (`fp + offset`). Recomputed only on `CallFunc` and `Return`.
     pub(crate) frame_ptr: *mut u8,
@@ -81,14 +82,14 @@ impl<'a> InterpreterContext<'a> {
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
             write_u64(base, META_SAVED_FP_OFFSET, 0);
-            write_u64(base, META_SAVED_FUNC_ID_OFFSET, SENTINEL_FUNC_ID);
+            write_ptr(base, META_SAVED_FUNC_PTR_OFFSET, null());
         }
 
         Self {
             functions,
             descriptors,
             pc: 0,
-            func_id,
+            current_func: NonNull::from(&functions[func_id]),
             frame_ptr,
             stack,
             heap: Heap::new(heap_size),
@@ -121,13 +122,13 @@ impl<'a> InterpreterContext<'a> {
         // Reset execution state to root frame.
         self.frame_ptr = unsafe { base.add(FRAME_METADATA_SIZE) };
         self.pc = 0;
-        self.func_id = func_id;
+        self.current_func = NonNull::from(func);
 
         // Re-write sentinel metadata so Return from root triggers Done.
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
             write_u64(base, META_SAVED_FP_OFFSET, 0);
-            write_u64(base, META_SAVED_FUNC_ID_OFFSET, SENTINEL_FUNC_ID);
+            write_ptr(base, META_SAVED_FUNC_PTR_OFFSET, null());
         }
 
         // Zero everything beyond args (locals, metadata, callee arg/return
@@ -193,12 +194,15 @@ impl<'a> InterpreterContext<'a> {
 impl InterpreterContext<'_> {
     #[inline(always)]
     pub fn step(&mut self) -> Result<StepResult> {
-        let func = &self.functions[self.func_id];
+        // SAFETY: current_func is always a valid, non-null pointer either
+        // derived from `self.functions[]` or from a `CallLocalFunc` pointer
+        // (which is itself non-null and a valid reference).
+        let func = unsafe { self.current_func.as_ref() };
         if self.pc >= func.code.len() {
             bail!(
                 "pc out of bounds: pc={} but function {} has {} instructions",
                 self.pc,
-                self.func_id,
+                unsafe { func.name.as_ref_unchecked() },
                 func.code.len()
             );
         }
@@ -215,27 +219,10 @@ impl InterpreterContext<'_> {
                 MicroOp::CallFunc { func_id } => {
                     let func_id = func_id as usize;
                     let callee = &self.functions[func_id];
-                    let new_fp = fp.add(func.args_and_locals_size + FRAME_METADATA_SIZE);
-                    let stack_end = self.stack.as_ptr().add(self.stack.len());
-                    if new_fp.add(callee.extended_frame_size) > stack_end {
-                        bail!("stack overflow");
-                    }
-                    // Zero everything beyond args (locals, metadata, callee
-                    // arg/return region) so pointer slots start as null.
-                    // The argument region (0..args_size) was already written
-                    // by the caller.
-                    if callee.zero_frame {
-                        let zero_size = callee.extended_frame_size - callee.args_size;
-                        std::ptr::write_bytes(new_fp.add(callee.args_size), 0, zero_size);
-                    }
-                    let meta = fp.add(func.args_and_locals_size);
-                    write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
-                    write_ptr(meta, META_SAVED_FP_OFFSET, fp);
-                    write_u64(meta, META_SAVED_FUNC_ID_OFFSET, self.func_id as u64);
-                    self.frame_ptr = new_fp;
-                    self.pc = 0;
-                    self.func_id = func_id;
-                    return Ok(StepResult::Continue);
+                    return self.call(func, fp, callee);
+                },
+                MicroOp::CallLocalFunc { ptr } => {
+                    return self.call(func, fp, ptr.as_ref());
                 },
 
                 MicroOp::JumpNotZeroU64 { target, src } => {
@@ -299,13 +286,18 @@ impl InterpreterContext<'_> {
 
                 MicroOp::Return => {
                     let meta = fp.sub(FRAME_METADATA_SIZE);
-                    let saved_func_id = read_u64(meta, META_SAVED_FUNC_ID_OFFSET);
-                    if saved_func_id == SENTINEL_FUNC_ID {
+
+                    let saved_func_ptr =
+                        read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
+                    if saved_func_ptr.is_null() {
                         return Ok(StepResult::Done);
                     }
+                    // SAFETY: We have just checked that the saved function
+                    // pointer is non-null.
+                    self.current_func = NonNull::new_unchecked(saved_func_ptr as *mut Function);
+
                     self.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
                     self.frame_ptr = read_ptr(meta, META_SAVED_FP_OFFSET);
-                    self.func_id = saved_func_id as usize;
                     return Ok(StepResult::Continue);
                 },
 
@@ -653,8 +645,50 @@ impl InterpreterContext<'_> {
         Ok(StepResult::Continue)
     }
 
-    // TODO: Hoist pc, fp, and func_id into local variables in the run loop
-    // instead of reading/writing self.pc, self.frame_ptr, self.func_id each
+    /// Implementation of call opcodes.
+    ///
+    /// # Safety
+    ///
+    /// `callee` must point to a valid, live `Function`. `fp` must be the
+    /// current frame pointer and `func` the currently executing function.
+    #[inline(always)]
+    unsafe fn call(
+        &mut self,
+        caller: &Function,
+        fp: *mut u8,
+        callee: &Function,
+    ) -> Result<StepResult> {
+        unsafe {
+            let new_fp = fp.add(caller.args_and_locals_size + FRAME_METADATA_SIZE);
+            let stack_end = self.stack.as_ptr().add(self.stack.len());
+            if new_fp.add(callee.extended_frame_size) > stack_end {
+                bail!("stack overflow");
+            }
+            // Zero everything beyond args (locals, metadata, callee
+            // arg/return region) so pointer slots start as null.
+            // The argument region (0..args_size) was already written
+            // by the caller.
+            if callee.zero_frame {
+                let zero_size = callee.extended_frame_size - callee.args_size;
+                std::ptr::write_bytes(new_fp.add(callee.args_size), 0, zero_size);
+            }
+            let meta = fp.add(caller.args_and_locals_size);
+            write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
+            write_ptr(meta, META_SAVED_FP_OFFSET, fp);
+            write_ptr(
+                meta,
+                META_SAVED_FUNC_PTR_OFFSET,
+                self.current_func.as_ptr() as *const u8,
+            );
+            self.frame_ptr = new_fp;
+        }
+        self.pc = 0;
+        self.current_func = NonNull::from(callee);
+        Ok(StepResult::Continue)
+    }
+
+    // TODO: Hoist pc, fp, and current_func into local variables in the run loop
+    // instead of reading/writing self.pc, self.frame_ptr, self.current_func each
     // iteration. LLVM can't keep them in registers because heap operations
     // (VecPushBack, etc.) take &mut self, which may alias these fields.
     // Write back only on CallFunc/Return.

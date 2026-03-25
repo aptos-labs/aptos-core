@@ -37,8 +37,11 @@ impl FunctionTargetProcessor for CleanAndOptimizeProcessor {
         mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if func_env.is_native() {
-            // Nothing to do
+        if !func_env.is_compiled() {
+            // Skip non-compiled functions (native, inline, lemma).
+            // Use `is_compiled` (not `no_verified_bytecode`) because this is an
+            // early bytecode pass: intrinsic functions still have real bytecode
+            // that needs optimization even though verification skips them later.
             return data;
         }
 

@@ -3,9 +3,10 @@
 
 //! Placeholder types for executables (compiled modules / scripts).
 
-use crate::{alloc::GlobalArenaPtr, ArenaRef, ExecutableId, ExecutionGuard};
+use crate::{ArenaRef, ExecutableId, ExecutionGuard};
 use bumpalo::Bump;
 use fxhash::FxBuildHasher;
+use mono_move_alloc::GlobalArenaPtr;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use parking_lot::Mutex;
 use std::{collections::HashMap, ptr::NonNull};

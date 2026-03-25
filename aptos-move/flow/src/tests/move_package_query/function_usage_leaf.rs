@@ -16,7 +16,8 @@ async fn move_package_query_function_usage_leaf() {
         "move_package_query",
         serde_json::json!({
             "package_path": dir,
-            "query": { "function_usage": { "function": "leaf::value" } }
+            "query": "function_usage",
+            "function": "leaf::value"
         }),
     )
     .await;

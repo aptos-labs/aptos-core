@@ -1,0 +1,27 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/if_else.move:17:13
+   │
+17 │             assume [trusted] true;
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/if_else.move:24:13
+   │
+24 │             assume [trusted] true;
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+error: proof assertion not satisfied
+    ┌─ tests/sources/functional/proof/if_else.move:159:18
+    │
+159 │             post assert result == a;  // error: result == b, not a
+    │                  ^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/if_else.move:149: min
+    =         a = <redacted>
+    =         b = <redacted>
+    =     at tests/sources/functional/proof/if_else.move:150: min
+    =         result = <redacted>
+    =     at tests/sources/functional/proof/if_else.move:151: min
+    =     at tests/sources/functional/proof/if_else.move:157: min (spec)
+    =     at tests/sources/functional/proof/if_else.move:159: min (spec)

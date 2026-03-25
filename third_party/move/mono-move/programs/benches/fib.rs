@@ -23,7 +23,8 @@ fn bench_fib(c: &mut Criterion) {
             b.iter(|| black_box(native_fib(N)));
         });
 
-        let (functions, descriptors) = micro_op_fib();
+        let (mut functions, descriptors) = micro_op_fib();
+        mono_move_programs::resolve_calls(&mut functions);
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {

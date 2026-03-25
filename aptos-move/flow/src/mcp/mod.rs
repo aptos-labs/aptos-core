@@ -61,8 +61,8 @@ pub struct McpArgs {
     pub bytecode_version: Option<u32>,
 
     /// Move language version.
-    #[arg(long, value_parser = clap::value_parser!(LanguageVersion))]
-    pub language_version: Option<LanguageVersion>,
+    #[arg(long, value_parser = clap::value_parser!(LanguageVersion), default_value_t = LanguageVersion::latest())]
+    pub language_version: LanguageVersion,
 
     /// Compiler experiments to enable.
     #[arg(long)]
@@ -70,7 +70,7 @@ pub struct McpArgs {
 }
 
 fn setup() {
-    move_compiler_v2::logging::setup_logging(None);
+    move_compiler_v2::logging::setup_logging_with_timestamps(None);
 
     // Register Aptos package hooks to recognize custom fields like upgrade_policy.
     register_package_hooks(Box::new(MoveFlowPackageHooks));
@@ -85,7 +85,8 @@ fn setup() {
     // log file with location info rather than silently crashing the process.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        log::error!("panic: {}", info);
+        let bt = std::backtrace::Backtrace::force_capture();
+        log::error!("panic: {}\nBacktrace:\n{}", info, bt);
         default_hook(info);
     }));
 }
@@ -98,6 +99,13 @@ fn setup() {
 /// handshake would deadlock.
 pub async fn run(args: &McpArgs, global: &GlobalOpts, restart: bool) -> Result<()> {
     setup();
+
+    log::info!(
+        "move-flow MCP server v{} starting (tools: {})",
+        env!("CARGO_PKG_VERSION"),
+        FlowSession::tool_names().join(", ")
+    );
+
     let session = FlowSession::new(args.clone(), global.clone());
     if restart {
         let service = rmcp::service::serve_directly(session, stdio(), None);

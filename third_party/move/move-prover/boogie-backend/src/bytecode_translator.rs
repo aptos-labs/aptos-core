@@ -3102,6 +3102,7 @@ impl FunctionTranslator<'_> {
             fun_target.data.variant,
             fun_target.get_loc().display(env)
         );
+
         self.generate_function_sig();
         self.generate_function_body();
         self.parent.spec_translator.clear_current_fun_qid();
@@ -3132,7 +3133,7 @@ impl FunctionTranslator<'_> {
 
                 let suffix = match flavor {
                     VerificationFlavor::Regular => "$verify".to_string(),
-                    VerificationFlavor::Instantiated(_) => {
+                    VerificationFlavor::Instantiated(_) | VerificationFlavor::Split(..) => {
                         format!("$verify_{}", flavor)
                     },
                     VerificationFlavor::Inconsistency(_) => {

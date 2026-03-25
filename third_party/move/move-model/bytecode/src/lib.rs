@@ -61,7 +61,7 @@ pub fn print_targets_with_annotations_for_test(
             continue;
         }
         for func_env in module_env.get_functions() {
-            if func_env.is_inline() {
+            if func_env.is_inline() || func_env.is_lemma() {
                 continue;
             }
             for (variant, target) in targets.get_targets(&func_env) {

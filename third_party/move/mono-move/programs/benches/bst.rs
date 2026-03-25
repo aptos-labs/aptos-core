@@ -27,7 +27,8 @@ fn bench_bst(c: &mut Criterion) {
             b.iter(|| native_run_ops(black_box(&ops)));
         });
 
-        let (functions, descriptors) = micro_op_bst();
+        let (mut functions, descriptors) = micro_op_bst();
+        mono_move_programs::resolve_calls(&mut functions);
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {

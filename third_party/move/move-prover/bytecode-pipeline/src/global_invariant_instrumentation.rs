@@ -115,7 +115,7 @@ impl FunctionTargetProcessor for GlobalInvariantInstrumentationProcessor {
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if fun_env.is_native() || fun_env.is_intrinsic() {
+        if fun_env.no_verified_bytecode() {
             // nothing to do
             return data;
         }
@@ -126,6 +126,7 @@ impl FunctionTargetProcessor for GlobalInvariantInstrumentationProcessor {
         debug_assert!(matches!(
             data.variant,
             FunctionVariant::Verification(VerificationFlavor::Regular)
+                | FunctionVariant::Verification(VerificationFlavor::Split(..))
         ));
 
         // retrieve and transpose the analysis result

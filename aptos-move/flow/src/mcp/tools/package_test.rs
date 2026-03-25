@@ -390,7 +390,7 @@ fn make_test_build_config(pkg_path: &Path, args: &McpArgs) -> BuildConfig {
     let compiler_config = CompilerConfig {
         known_attributes: extended_checks::get_all_attribute_names().clone(),
         bytecode_version: args.bytecode_version,
-        language_version: args.language_version,
+        language_version: Some(args.language_version),
         experiments: args.experiments.clone(),
         ..Default::default()
     };
@@ -483,7 +483,7 @@ fn load_coverage_map(path: &Path) -> anyhow::Result<CoverageMap> {
 
 /// Ensure bytecode is available and return the model environment.
 fn ensure_env(pkg_data: &mut PackageData) -> anyhow::Result<&GlobalEnv> {
-    if !pkg_data.has_bytecode() {
+    if !pkg_data.built_with_bytecode() {
         pkg_data.rebuild_with_bytecode()?;
     }
     Ok(pkg_data.env())

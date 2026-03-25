@@ -146,8 +146,6 @@ mod tests {
         // Verify some expected files exist
         assert!(output_dir.path().join("agents/move-verify.md").exists());
         assert!(output_dir.path().join("agents/move-inf.md").exists());
-        assert!(output_dir.path().join("agents/move-inf-v2.md").exists());
-        assert!(!output_dir.path().join("agents/move-dev.md").exists());
         assert!(output_dir.path().join("skills/move/SKILL.md").exists());
         assert!(output_dir
             .path()
@@ -156,10 +154,6 @@ mod tests {
         assert!(output_dir
             .path()
             .join("skills/move-prove/SKILL.md")
-            .exists());
-        assert!(output_dir
-            .path()
-            .join("skills/move-inf-v2/SKILL.md")
             .exists());
         assert!(output_dir.path().join("hooks/hooks.json").exists());
 

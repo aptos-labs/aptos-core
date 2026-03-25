@@ -21,7 +21,8 @@ async fn move_package_query_function_usage_closure() {
         "move_package_query",
         serde_json::json!({
             "package_path": dir,
-            "query": { "function_usage": { "function": "ops::run" } }
+            "query": "function_usage",
+            "function": "ops::run"
         }),
     )
     .await;

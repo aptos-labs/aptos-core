@@ -46,6 +46,7 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::ModU64 { .. }
             | MicroOp::Return
             | MicroOp::CallFunc { .. }
+            | MicroOp::CallLocalFunc { .. }
             | MicroOp::VecNew { .. }
             | MicroOp::VecLen { .. }
             | MicroOp::VecPushBack { .. }
@@ -122,6 +123,7 @@ impl RemapTargets for MicroOp {
             | MicroOp::ModU64 { .. }
             | MicroOp::Return
             | MicroOp::CallFunc { .. }
+            | MicroOp::CallLocalFunc { .. }
             | MicroOp::VecNew { .. }
             | MicroOp::VecLen { .. }
             | MicroOp::VecPushBack { .. }
@@ -173,7 +175,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::ModU64 { .. } => 5,
 
             // --- Control flow ---
-            MicroOp::CallFunc { .. } => 10,
+            MicroOp::CallFunc { .. } | MicroOp::CallLocalFunc { .. } => 10,
             MicroOp::Return => 2,
             MicroOp::Jump { .. } => 2,
             MicroOp::JumpNotZeroU64 { .. }

@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         Condition, Exp, ExpData, FrameSpec, LambdaCaptureKind, MatchArm, MemoryLabel, Operation,
-        Pattern, Spec, SpecBlockTarget, TempIndex, Value,
+        Pattern, Proof, Spec, SpecBlockTarget, TempIndex, Value,
     },
     model::{GlobalEnv, Loc, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -724,6 +724,11 @@ pub trait ExpRewriterFunctions {
             properties: spec.properties.clone(),
             on_impl,
             update_map,
+            proof: spec.proof.as_ref().map(|p| {
+                let (p_changed, new_p) = self.internal_rewrite_proof(p);
+                changed |= p_changed;
+                new_p
+            }),
         };
 
         if let Some(new_spec) = self.rewrite_spec(target, &new_spec) {
@@ -783,6 +788,116 @@ pub trait ExpRewriterFunctions {
             Some(resvec)
         } else {
             None
+        }
+    }
+
+    fn internal_rewrite_proof(&mut self, proof: &Proof) -> (bool, Proof) {
+        match proof {
+            Proof::Let(loc, sym, exp) => {
+                let (changed, new_exp) = self.internal_rewrite_exp(exp);
+                (changed, Proof::Let(loc.clone(), *sym, new_exp))
+            },
+            Proof::Assert(loc, exp) => {
+                let (changed, new_exp) = self.internal_rewrite_exp(exp);
+                (changed, Proof::Assert(loc.clone(), new_exp))
+            },
+            Proof::Assume(loc, exp) => {
+                let (changed, new_exp) = self.internal_rewrite_exp(exp);
+                (changed, Proof::Assume(loc.clone(), new_exp))
+            },
+            Proof::Split(loc, exp) => {
+                let (changed, new_exp) = self.internal_rewrite_exp(exp);
+                (changed, Proof::Split(loc.clone(), new_exp))
+            },
+            Proof::IfElse(loc, cond, then_branch, else_branch) => {
+                let (mut changed, new_cond) = self.internal_rewrite_exp(cond);
+                let (t_changed, new_then) = self.internal_rewrite_proof(then_branch);
+                changed |= t_changed;
+                let new_else = else_branch.as_ref().map(|eb| {
+                    let (e_changed, new_eb) = self.internal_rewrite_proof(eb);
+                    changed |= e_changed;
+                    Box::new(new_eb)
+                });
+                (
+                    changed,
+                    Proof::IfElse(loc.clone(), new_cond, Box::new(new_then), new_else),
+                )
+            },
+            Proof::Block(loc, stmts) => {
+                let mut changed = false;
+                let new_stmts: Vec<_> = stmts
+                    .iter()
+                    .map(|s| {
+                        let (s_changed, new_s) = self.internal_rewrite_proof(s);
+                        changed |= s_changed;
+                        new_s
+                    })
+                    .collect();
+                (changed, Proof::Block(loc.clone(), new_stmts))
+            },
+            Proof::Apply(loc, lemma_id, args) => {
+                let mut changed = false;
+                let new_args: Vec<_> = args
+                    .iter()
+                    .map(|a| {
+                        let (a_changed, new_a) = self.internal_rewrite_exp(a);
+                        changed |= a_changed;
+                        new_a
+                    })
+                    .collect();
+                (changed, Proof::Apply(loc.clone(), *lemma_id, new_args))
+            },
+            Proof::ForallApply(loc, bindings, patterns, lemma_id, args) => {
+                let mut changed = false;
+                let new_patterns: Vec<Vec<_>> = patterns
+                    .iter()
+                    .map(|group| {
+                        group
+                            .iter()
+                            .map(|e| {
+                                let (e_changed, new_e) = self.internal_rewrite_exp(e);
+                                changed |= e_changed;
+                                new_e
+                            })
+                            .collect()
+                    })
+                    .collect();
+                let new_args: Vec<_> = args
+                    .iter()
+                    .map(|a| {
+                        let (a_changed, new_a) = self.internal_rewrite_exp(a);
+                        changed |= a_changed;
+                        new_a
+                    })
+                    .collect();
+                (
+                    changed,
+                    Proof::ForallApply(
+                        loc.clone(),
+                        bindings.clone(),
+                        new_patterns,
+                        *lemma_id,
+                        new_args,
+                    ),
+                )
+            },
+            Proof::Calc(loc, steps) => {
+                let mut changed = false;
+                let new_steps: Vec<_> = steps
+                    .iter()
+                    .map(|(lhs, op, rhs)| {
+                        let (l_changed, new_lhs) = self.internal_rewrite_exp(lhs);
+                        let (r_changed, new_rhs) = self.internal_rewrite_exp(rhs);
+                        changed |= l_changed || r_changed;
+                        (new_lhs, op.clone(), new_rhs)
+                    })
+                    .collect();
+                (changed, Proof::Calc(loc.clone(), new_steps))
+            },
+            Proof::Post(loc, inner) => {
+                let (changed, new_inner) = self.internal_rewrite_proof(inner);
+                (changed, Proof::Post(loc.clone(), Box::new(new_inner)))
+            },
         }
     }
 

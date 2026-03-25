@@ -4,8 +4,9 @@
 //! Tests for Move struct support (both inline and heap-allocated).
 
 use mono_move_runtime::{
-    read_ptr, read_u64, DescriptorId, FrameOffset as FO, Function, InterpreterContext, MicroOp,
-    ObjectDescriptor, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr,
+    InterpreterContext, MicroOp, ObjectDescriptor, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET,
+    VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,7 @@ fn struct_inline() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
@@ -69,6 +71,7 @@ fn struct_inline_borrow() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 40,
@@ -109,6 +112,7 @@ fn struct_heap_basic() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
@@ -153,6 +157,7 @@ fn struct_heap_survives_gc() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
@@ -213,6 +218,7 @@ fn struct_with_vector_field() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 64,
@@ -275,6 +281,7 @@ fn struct_borrow_field() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
@@ -325,6 +332,7 @@ fn struct_borrow_survives_gc() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,

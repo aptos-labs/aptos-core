@@ -11,4 +11,5 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+mono-move-alloc = { workspace = true }
 mono-move-gas = { path = "../gas" }

@@ -36,7 +36,7 @@ impl<'a> SummaryCache<'a> {
         self.targets
             .get_data(&fun_id, variant)
             .and_then(|fun_data| {
-                if fun_env.is_native_or_intrinsic() {
+                if fun_env.no_verified_bytecode() {
                     None
                 } else {
                     fun_data.annotations.get::<Summary>()

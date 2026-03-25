@@ -23,6 +23,8 @@ set -x
 # Its important to run optimized build otherwise compilation
 # very slow. We use --profile=ci which is optimized with debug info
 cargo run --profile=ci -p aptos-framework -- update-cached-packages
+# Format the generated SDK builder files so they pass `cargo +nightly fmt --check`.
+cargo +nightly fmt -- aptos-move/framework/cached-packages/src/*.rs
 if [ -n "$CHECK_ARG" ]; then
     if [ -n "$(git status --porcelain -uno aptos-move)" ]; then
       git diff

@@ -8,6 +8,7 @@ use once_cell::sync::Lazy;
 pub(crate) static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("mempool_io_{}", index))
+        .num_threads(16)
         .build()
         .unwrap()
 });
@@ -15,6 +16,7 @@ pub(crate) static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 pub(crate) static VALIDATION_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("mempool_vali_{}", index))
+        .num_threads(16)
         .build()
         .unwrap()
 });

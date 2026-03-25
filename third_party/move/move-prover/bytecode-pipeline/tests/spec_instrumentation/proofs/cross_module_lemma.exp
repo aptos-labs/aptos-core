@@ -1,0 +1,61 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun LemmaConsumer::commutative_add($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: $t4 := +($t2, $t3)
+  3: return $t4
+}
+
+============ after pipeline `proofs` ================
+
+[variant baseline]
+fun LemmaConsumer::commutative_add($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le(Add($t0, $t1), 18446744073709551615)
+  1: assume Eq<num>(Add($t0, $t1), Add($t1, $t0))
+  2: $t2 := +($t0, $t1) on_abort goto 5 with $t3
+  3: label L1
+  4: return $t2
+  5: label L2
+  6: abort($t3)
+}
+
+
+[variant verification]
+fun LemmaConsumer::commutative_add($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le(Add($t0, $t1), 18446744073709551615)
+  1: assume Eq<num>(Add($t0, $t1), Add($t1, $t0))
+  2: $t2 := +($t0, $t1) on_abort goto 6 with $t3
+  3: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/cross_module_lemma.move:22:9+24
+  4: assert Eq<u64>($t2, Add($t1, $t0))
+  5: return $t2
+  6: label L2
+  7: abort($t3)
+}
+
+
+
+==== spec-instrumenter input specs ====
+
+fun LemmaConsumer::commutative_add[baseline]
+spec {
+  requires Le(Add($t0, $t1), 18446744073709551615);
+  ensures Eq<u64>(result0(), Add($t1, $t0));
+}
+
+fun LemmaConsumer::commutative_add[verification]
+spec {
+  requires Le(Add($t0, $t1), 18446744073709551615);
+  ensures Eq<u64>(result0(), Add($t1, $t0));
+}
+
+============ Diagnostics ================
