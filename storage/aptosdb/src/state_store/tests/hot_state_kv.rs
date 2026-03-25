@@ -173,19 +173,20 @@ fn test_put_hot_state_updates_integration() {
 
     // key1: occupied insertion at hot_since_version=100, value_version=50
     shards[key1.get_shard_id()].insertions.insert(
-        key1.clone(),
+        *key1.crypto_hash_ref(),
         (HotStateValue::new(Some(val1.clone()), 100), Some(50)),
     );
 
     // key2: vacant insertion at hot_since_version=200
-    shards[key2.get_shard_id()]
-        .insertions
-        .insert(key2.clone(), (HotStateValue::new(None, 200), None));
+    shards[key2.get_shard_id()].insertions.insert(
+        *key2.crypto_hash_ref(),
+        (HotStateValue::new(None, 200), None),
+    );
 
     // key3: eviction at version=300
     shards[key3.get_shard_id()]
         .evictions
-        .insert(key3.clone(), 300);
+        .insert(*key3.crypto_hash_ref(), 300);
 
     let hot_state_updates = HotStateUpdates {
         for_last_checkpoint: Some(shards),
