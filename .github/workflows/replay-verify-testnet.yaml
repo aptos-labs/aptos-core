@@ -23,7 +23,7 @@ on:
       START_TIME:
         required: false
         type: string
-        description: 'Optional start time (e.g. "2h ago", "2026-03-19", "2026-03-19 10:00", "2026-03-19T10:00:00Z"). UTC assumed. Mutually exclusive with START_VERSION.'
+        description: 'Optional start time (e.g. "2 hours ago", "2026-03-19", "2026-03-19 10:00"). UTC assumed. Mutually exclusive with START_VERSION.'
       END_TIME:
         required: false
         type: string

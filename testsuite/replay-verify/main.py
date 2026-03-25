@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import dateparser
 from enum import Enum
 from google.cloud import storage
 import json
@@ -7,7 +8,6 @@ from kubernetes import client, config as KubernetesConfig
 from kubernetes.client.rest import ApiException
 import logging
 import os
-import re
 import sys
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 import time
@@ -738,45 +738,17 @@ def timestamp_to_version(network: str, target_usecs: int, lo: int, hi: int) -> i
 def parse_timestamp(s: str) -> int:
     """Parse a timestamp string into microseconds since epoch.
 
-    Supported formats (all interpreted as UTC unless a timezone is specified):
-      - Relative:  "2h ago", "30m ago", "1d ago"
+    Uses the dateparser library which supports a wide range of formats including:
+      - Relative:  "2 hours ago", "30 minutes ago", "1 day ago"
       - Date only: "2026-03-19"
       - Date+time: "2026-03-19 10:00", "2026-03-19 10:00:00"
       - ISO 8601:  "2026-03-19T10:00:00Z", "2026-03-19T10:00:00+00:00"
-      - Unix:      "1742554800"
+      - And many more natural language formats.
+    All inputs without explicit timezone are interpreted as UTC.
     """
-    s = s.strip()
-
-    # Relative durations: "2h ago", "30m ago", "1d ago"
-    relative_match = re.match(r"^(\d+)\s*(d|h|m)\s+ago$", s, re.IGNORECASE)
-    if relative_match:
-        amount = int(relative_match.group(1))
-        unit = relative_match.group(2).lower()
-        delta = {"d": datetime.timedelta(days=amount),
-                 "h": datetime.timedelta(hours=amount),
-                 "m": datetime.timedelta(minutes=amount)}[unit]
-        dt = datetime.datetime.now(datetime.timezone.utc) - delta
-        return int(dt.timestamp() * 1_000_000)
-
-    # Pure digits: Unix timestamp in seconds
-    if s.isdigit():
-        return int(s) * 1_000_000
-
-    # Date only: "2026-03-19"
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
-        dt = datetime.datetime.strptime(s, "%Y-%m-%d").replace(
-            tzinfo=datetime.timezone.utc
-        )
-        return int(dt.timestamp() * 1_000_000)
-
-    # Date + time without T: "2026-03-19 10:00" or "2026-03-19 10:00:00"
-    if re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$", s):
-        s = s.replace(" ", "T")
-
-    # ISO 8601 (with or without timezone)
-    dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    dt = dateparser.parse(s, settings={"TIMEZONE": "UTC", "RETURN_AS_TIMEZONE_AWARE": True})
+    if dt is None:
+        raise ValueError(f"Unable to parse timestamp: {s!r}")
     return int(dt.timestamp() * 1_000_000)
 
 
@@ -792,8 +764,9 @@ def parse_args() -> argparse.Namespace:
         "--start-time",
         required=False,
         type=str,
-        help='Start time. Accepts: relative ("2h ago", "1d ago"), date ("2026-03-19"), '
-             'datetime ("2026-03-19 10:00"), ISO 8601, or Unix timestamp. UTC assumed. '
+        help='Start time. Accepts any format supported by dateparser: relative '
+             '("2 hours ago", "1 day ago"), date ("2026-03-19"), datetime '
+             '("2026-03-19 10:00"), ISO 8601, etc. UTC assumed. '
              "Mutually exclusive with --start.",
     )
     parser.add_argument(
