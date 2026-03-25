@@ -164,6 +164,7 @@ impl WeightedBIBEVerificationKey {
             })
             .zip(&dk_share.1)
             .try_for_each(|(vk, dk_share)| {
+                // TODO could use a multipairing to do this more quickly
                 vk.verify_decryption_key_share(digest, &(self.weighted_player, dk_share.clone()))
             })
     }

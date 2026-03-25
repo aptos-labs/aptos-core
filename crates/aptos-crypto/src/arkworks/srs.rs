@@ -10,7 +10,7 @@
 use std::ops::Sub;
 
 use crate::utils;
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_ec::CurveGroup;
 use ark_ff::Field;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{
@@ -180,7 +180,7 @@ where C::Affine: Sub<Output = C>
         .into_iter()
         .map(|elt| C::from(*elt))
         .collect();
-    eval_dom.fft(&powers_of_tau_projective)
+    eval_dom.ifft(&powers_of_tau_projective)
         .into_iter()
         .map(|elt| C::Affine::from(elt))
         .collect()
@@ -206,6 +206,22 @@ mod tests {
 
         let pot : Vec<G1Affine> = powers_of_tau(G1Projective::generator(), tau, n);
         let lagrange : Vec<G1Affine> = lagrange_basis(G1Projective::generator(), tau, n, eval_domain);
+        let lagrange_converted : Vec<G1Affine> = convert_to_lagrange_basis::<G1Projective>(&pot, eval_domain);
+        assert_eq!(lagrange_converted.len(), lagrange.len());
+        assert_eq!(lagrange_converted, lagrange);
+    }
+
+    #[test]
+    fn test_pot_lagrange_basis_equivalence_random_generator() {
+        let n = 8;
+        let mut rng = thread_rng();
+        let tau = Fr::rand(&mut rng);
+        let eval_domain = Radix2EvaluationDomain::new(n).unwrap();
+
+        let generator = G1Projective::rand(&mut rng);
+
+        let pot : Vec<G1Affine> = powers_of_tau(generator, tau, n);
+        let lagrange : Vec<G1Affine> = lagrange_basis(generator, tau, n, eval_domain);
         let lagrange_converted : Vec<G1Affine> = convert_to_lagrange_basis::<G1Projective>(&pot, eval_domain);
         assert_eq!(lagrange_converted.len(), lagrange.len());
         assert_eq!(lagrange_converted, lagrange);
