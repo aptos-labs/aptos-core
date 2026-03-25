@@ -1900,7 +1900,7 @@ fn translate_proof(context: &mut Context, sp!(loc, proof_): P::Proof) -> E::Proo
             E::Proof_::Assume(props, exp_(context, pexp))
         },
         P::Proof_::Apply(chain, pargs) => {
-            let access = name_access_chain(context, Access::Term, chain, None);
+            let access = name_access_chain(context, Access::Term, chain);
             match access {
                 Some(access) => {
                     let args = pargs.into_iter().map(|e| exp_(context, e)).collect();
@@ -1920,7 +1920,7 @@ fn translate_proof(context: &mut Context, sp!(loc, proof_): P::Proof) -> E::Proo
                 .into_iter()
                 .map(|group| group.into_iter().map(|e| exp_(context, e)).collect())
                 .collect();
-            let elemma = name_access_chain(context, Access::Term, lemma, None);
+            let elemma = name_access_chain(context, Access::Term, lemma);
             let eargs = args.into_iter().map(|e| exp_(context, e)).collect();
             match (ebindings, elemma) {
                 (Some(ebindings), Some(elemma)) => E::Proof_::ForallApply {
