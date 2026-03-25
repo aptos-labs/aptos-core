@@ -28,6 +28,7 @@ use aptos_dkg::pvss::{
     Player,
 };
 use ark_ec::AffineRepr;
+use fixed::types::U64F64;
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::TypeTag,
     move_resource::MoveStructType,
@@ -36,6 +37,7 @@ use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
+    cmp::max,
     fmt::{Debug, Formatter},
     sync::Arc,
 };
@@ -143,9 +145,7 @@ impl ChunkyDKGSession {
     }
 
     /// Create a new DKG session from on-chain session metadata.
-    pub fn new(
-        dkg_session_metadata: &ChunkyDKGSessionMetadata,
-    ) -> Arc<ChunkyDKGSession> {
+    pub fn new(dkg_session_metadata: &ChunkyDKGSessionMetadata) -> Arc<ChunkyDKGSession> {
         let onchain_config = dkg_session_metadata
             .into_on_chain_chunky_dkg_config()
             .unwrap_or_else(OnChainChunkyDKGConfig::default_disabled);
@@ -155,6 +155,7 @@ impl ChunkyDKGSession {
         let reconstruct_threshold = onchain_config
             .reconstruct_threshold()
             .unwrap_or_else(|| *DEFAULT_RECONSTRUCT_THRESHOLD);
+        let reconstruct_threshold = max(reconstruct_threshold, secrecy_threshold + U64F64::DELTA);
 
         let target_validators = dkg_session_metadata.target_validator_consensus_infos_cloned();
         let validator_stakes: Vec<u64> =
