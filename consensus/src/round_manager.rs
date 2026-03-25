@@ -731,7 +731,7 @@ impl RoundManager {
         // Primary RM: spawn as before — 1000ms timeout has plenty of slack.
         if is_proxy_rm {
             if let Err(e) = monitor!(
-                "generate_and_send_proposal",
+                "proxy_generate_and_send_proposal",
                 Self::generate_and_send_proposal(
                     epoch_state,
                     new_round_event,
@@ -750,7 +750,7 @@ impl RoundManager {
         } else {
             tokio::spawn(async move {
                 if let Err(e) = monitor!(
-                    "generate_and_send_proposal",
+                    "primary_generate_and_send_proposal",
                     Self::generate_and_send_proposal(
                         epoch_state,
                         new_round_event,
