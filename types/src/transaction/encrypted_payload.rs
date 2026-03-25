@@ -191,20 +191,20 @@ impl EncryptedPayload {
             if let TransactionExecutable::EntryFunction(entry_fun) = executable {
                 if *entry_fun.module() != claim.module {
                     self.into_failed_decryption_with_reason(
-                        Some(eval_proof),
+                        None,
                         DecryptionFailureReason::ClaimedEntryFunctionMismatch,
                     )?;
                 } else if let Some(claimed_function_id) = claim.name
                     && entry_fun.function() != claimed_function_id.as_ident_str()
                 {
                     self.into_failed_decryption_with_reason(
-                        Some(eval_proof),
+                        None,
                         DecryptionFailureReason::ClaimedEntryFunctionMismatch,
                     )?;
                 }
             } else {
                 self.into_failed_decryption_with_reason(
-                    Some(eval_proof),
+                    None,
                     DecryptionFailureReason::ClaimedEntryFunctionMismatch,
                 )?;
             }
@@ -217,26 +217,46 @@ impl EncryptedPayload {
         eval_proof: Option<EvalProof>,
         reason: DecryptionFailureReason,
     ) -> anyhow::Result<()> {
-        let Self::Encrypted {
+        if let Self::Encrypted {
             ciphertext,
             extra_config,
             payload_hash,
             claimed_entry_fun,
-        } = self
-        else {
-            bail!("Payload is not in Encrypted state");
-        };
+        } = self {
+            *self = Self::FailedDecryption {
+                ciphertext: ciphertext.clone(),
+                extra_config: extra_config.clone(),
+                payload_hash: *payload_hash,
+                claimed_entry_fun: claimed_entry_fun.clone(),
+                eval_proof,
+                reason,
+            };
+            Ok(())
+        } else if let Self::Decrypted {
+            ciphertext,
+            extra_config,
+            payload_hash,
+            claimed_entry_fun,
+            eval_proof: eval_proof_in_self,
+            ..
+        } = self {
+            if eval_proof.is_some() {
+                bail!("Eval proof given but we already have it");
+            }
 
+            *self = Self::FailedDecryption {
+                ciphertext: ciphertext.clone(),
+                extra_config: extra_config.clone(),
+                payload_hash: *payload_hash,
+                claimed_entry_fun: claimed_entry_fun.clone(),
+                eval_proof: Some(eval_proof_in_self.clone()),
+                reason,
+            };
+            Ok(())
+        } else {
+            bail!("Payload is already in FailedDecryption state");
+        }
         // TODO(ibalajiarun): Avoid the clone
-        *self = Self::FailedDecryption {
-            ciphertext: ciphertext.clone(),
-            extra_config: extra_config.clone(),
-            payload_hash: *payload_hash,
-            claimed_entry_fun: claimed_entry_fun.clone(),
-            eval_proof,
-            reason,
-        };
-        Ok(())
     }
 
     pub fn verify(&self, sender: AccountAddress) -> anyhow::Result<()> {
