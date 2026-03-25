@@ -368,7 +368,9 @@ async fn decrypt_validator_path(
                             .as_encrypted_payload_mut()
                             .map(|p| {
                                 p.into_decrypted(eval_proof, executable, nonce)
-                                    .expect("must happen")
+                                    .expect("must happen");
+                                p.fail_if_claimed_entry_fun_mismatch()
+                                    .expect("must happen");
                             })
                             .expect("must exist");
 

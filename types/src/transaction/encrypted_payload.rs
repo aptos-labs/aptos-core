@@ -9,7 +9,9 @@ use anyhow::{bail, Result};
 use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::{account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -172,9 +174,7 @@ impl EncryptedPayload {
         Ok(())
     }
 
-    pub fn fail_if_claimed_entry_fun_mismatch(
-        &mut self,
-    ) -> anyhow::Result<()> {
+    pub fn fail_if_claimed_entry_fun_mismatch(&mut self) -> anyhow::Result<()> {
         let Self::Decrypted {
             claimed_entry_fun,
             eval_proof,
@@ -190,13 +190,23 @@ impl EncryptedPayload {
             // function
             if let TransactionExecutable::EntryFunction(entry_fun) = executable {
                 if *entry_fun.module() != claim.module {
-                    self.into_failed_decryption_with_reason(Some(eval_proof), DecryptionFailureReason::ClaimedEntryFunctionMismatch)?;
+                    self.into_failed_decryption_with_reason(
+                        Some(eval_proof),
+                        DecryptionFailureReason::ClaimedEntryFunctionMismatch,
+                    )?;
                 } else if let Some(claimed_function_id) = claim.name
-                && entry_fun.function() != claimed_function_id.as_ident_str() {
-                    self.into_failed_decryption_with_reason(Some(eval_proof), DecryptionFailureReason::ClaimedEntryFunctionMismatch)?;
+                    && entry_fun.function() != claimed_function_id.as_ident_str()
+                {
+                    self.into_failed_decryption_with_reason(
+                        Some(eval_proof),
+                        DecryptionFailureReason::ClaimedEntryFunctionMismatch,
+                    )?;
                 }
             } else {
-                self.into_failed_decryption_with_reason(Some(eval_proof), DecryptionFailureReason::ClaimedEntryFunctionMismatch)?;
+                self.into_failed_decryption_with_reason(
+                    Some(eval_proof),
+                    DecryptionFailureReason::ClaimedEntryFunctionMismatch,
+                )?;
             }
         }
         Ok(())
