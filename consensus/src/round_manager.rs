@@ -1420,9 +1420,14 @@ impl RoundManager {
             return Ok(());
         };
 
+        // Allow optimistic proposals under mild backpressure (≤100ms delay).
+        // Only block them for heavy backpressure, since disabling optimistic proposals
+        // forces a fallback to regular proposals which adds an extra network hop (~100-200ms).
         ensure!(
-            !self.proposal_generator.is_proposal_under_backpressure(),
-            "Cannot start next opt round due to backpressure"
+            !self
+                .proposal_generator
+                .is_proposal_under_heavy_backpressure(Duration::from_millis(100)),
+            "Cannot start next opt round due to heavy backpressure"
         );
 
         let parent = parent_vote.vote_data().proposed().clone();

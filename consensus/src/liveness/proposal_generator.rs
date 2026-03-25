@@ -407,7 +407,8 @@ pub struct ProposalGenerator {
     vtxn_config: ValidatorTxnConfig,
     opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
 
-    proposal_under_backpressure: Mutex<bool>,
+    /// The current backpressure proposal delay. Zero means no backpressure.
+    backpressure_proposal_delay: Mutex<Duration>,
 }
 
 impl ProposalGenerator {
@@ -448,7 +449,7 @@ impl ProposalGenerator {
             quorum_store_enabled,
             vtxn_config,
             opt_qs_payload_param_provider,
-            proposal_under_backpressure: Mutex::new(false),
+            backpressure_proposal_delay: Mutex::new(Duration::ZERO),
         }
     }
 
@@ -477,8 +478,12 @@ impl ProposalGenerator {
         *self.last_round_generated.lock() < round
     }
 
-    pub fn is_proposal_under_backpressure(&self) -> bool {
-        *self.proposal_under_backpressure.lock()
+    /// Returns true only when backpressure delay exceeds the given threshold.
+    /// This allows optimistic proposals to proceed under mild backpressure,
+    /// avoiding the cost of an extra network hop (~100-200ms) when pipeline
+    /// latency is only slightly elevated.
+    pub fn is_proposal_under_heavy_backpressure(&self, threshold: Duration) -> bool {
+        *self.backpressure_proposal_delay.lock() > threshold
     }
 
     /// The function generates a new proposal block: the returned future is fulfilled when the
@@ -847,7 +852,7 @@ impl ProposalGenerator {
             "Proposal generation backpressure details",
         );
 
-        *self.proposal_under_backpressure.lock() = !proposal_delay.is_zero();
+        *self.backpressure_proposal_delay.lock() = proposal_delay;
 
         (
             max_block_size,
