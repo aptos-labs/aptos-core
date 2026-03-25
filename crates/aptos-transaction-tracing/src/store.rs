@@ -70,8 +70,15 @@ impl TransactionTraceStore {
         self.filter.load().is_active()
     }
 
-    /// Called at mempool insertion. Checks if sender is in allowlist, creates
-    /// trace if matched. Returns true if trace was started.
+    /// Returns true if this QS pull round should do tracing work.
+    /// Batch-level sampling: only `batch_sample_rate` fraction of rounds proceed.
+    /// 90% of rounds return false (~5ns), skipping all per-txn work.
+    pub fn should_sample_batch(&self, pull_round: u64) -> bool {
+        self.filter.load().should_sample_batch(pull_round)
+    }
+
+    /// Called at mempool insertion. Checks if sender is in allowlist + txn sampling,
+    /// creates trace if matched. Returns true if trace was started.
     pub fn maybe_start_trace(
         &self,
         hash: HashValue,
@@ -648,7 +655,7 @@ mod tests {
         // Enable with sender in allowlist
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
 
         assert!(store.maybe_start_trace(hash, sender, 1000));
         assert!(store.traces.contains_key(&hash));
@@ -667,7 +674,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
         store.maybe_start_trace(hash, sender, 1000);
 
         store.record_stage_at(&hash, TransactionStage::QsBatchPull, 1500);
@@ -691,7 +698,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
         store.maybe_start_trace(traced_hash, sender, 1000);
 
         store.register_batch(batch_digest, &[traced_hash, untraced_hash]);
@@ -718,7 +725,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
         store.maybe_start_trace(hash, sender, 1000);
 
         assert_eq!(store.get_trace(&hash).unwrap().current_attempt, 1);
@@ -734,7 +741,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
         store.maybe_start_trace(hash, sender, 1000);
 
         assert!(store.get_trace(&hash).is_some());
@@ -751,7 +758,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
 
         // Old trace (insertion at t=1000)
         store.maybe_start_trace(old_hash, sender, 1000);
