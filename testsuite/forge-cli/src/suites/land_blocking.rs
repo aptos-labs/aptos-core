@@ -123,6 +123,7 @@ pub(crate) fn transaction_tracing_test(duration: Duration, test_cmd: &TestComman
         // → measures the overhead of the filter check on untraced traffic.
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.transaction_tracing.enabled = true;
+            config.transaction_tracing.sample_rate = 1.0; // trace all matching in tests
             config.transaction_tracing.sender_allowlist =
                 transaction_tracing_test::traced_account_addresses()
                     .into_iter()
