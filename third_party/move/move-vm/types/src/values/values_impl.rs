@@ -4791,6 +4791,108 @@ pub mod debug {
         Ok(())
     }
 
+    /// Extended locals printer that shows separate Parameters / Locals sections
+    /// with optional variable names and optional per-local struct field names.
+    ///
+    /// * `param_count`        – how many of the first locals are parameters.
+    /// * `names`              – combined parameter + local names (may be shorter
+    ///                          than the actual local count; missing entries fall
+    ///                          back to `_`).
+    /// * `struct_field_names` – for each local index, an optional ordered list
+    ///                          of field names to use when the value is a struct.
+    ///                          Pass `None` (or an empty/short slice) to skip
+    ///                          field-name annotation for all locals.
+    pub fn print_locals_with_info<B: Write>(
+        buf: &mut B,
+        locals: &Locals,
+        compact: bool,
+        param_count: usize,
+        names: Option<&[String]>,
+        struct_field_names: Option<&[Option<Vec<String>>]>,
+    ) -> PartialVMResult<()> {
+        let locals_ref = locals.0.borrow();
+        let total = locals_ref.len();
+
+        // ── Parameters section ────────────────────────────────────────────────
+        let mut printed_header = false;
+        for idx in 0..param_count.min(total) {
+            let val = &locals_ref[idx];
+            if compact && matches!(val, Value::Invalid) {
+                continue;
+            }
+            if !printed_header {
+                debug_writeln!(buf, "        Parameters:")?;
+                printed_header = true;
+            }
+            let name = names
+                .and_then(|n| n.get(idx))
+                .map(|s| s.as_str())
+                .unwrap_or("_");
+            debug_write!(buf, "            [{}] {}: ", idx, name)?;
+            print_value_with_optional_field_names(
+                buf,
+                val,
+                struct_field_names
+                    .and_then(|s| s.get(idx))
+                    .and_then(|o| o.as_deref()),
+            )?;
+            debug_writeln!(buf)?;
+        }
+
+        // ── Locals section ────────────────────────────────────────────────────
+        printed_header = false;
+        for idx in param_count..total {
+            let val = &locals_ref[idx];
+            if compact && matches!(val, Value::Invalid) {
+                continue;
+            }
+            if !printed_header {
+                debug_writeln!(buf, "        Locals:")?;
+                printed_header = true;
+            }
+            let name = names
+                .and_then(|n| n.get(idx))
+                .map(|s| s.as_str())
+                .unwrap_or("_");
+            debug_write!(buf, "            [{}] {}: ", idx, name)?;
+            print_value_with_optional_field_names(
+                buf,
+                val,
+                struct_field_names
+                    .and_then(|s| s.get(idx))
+                    .and_then(|o| o.as_deref()),
+            )?;
+            debug_writeln!(buf)?;
+        }
+
+        Ok(())
+    }
+
+    /// Print `val`, using `field_names` to annotate `Container::Struct` fields
+    /// when provided.  Nested struct values are still printed positionally.
+    fn print_value_with_optional_field_names<B: Write>(
+        buf: &mut B,
+        val: &Value,
+        field_names: Option<&[String]>,
+    ) -> PartialVMResult<()> {
+        match (val, field_names) {
+            (Value::Container(Container::Struct(r)), Some(names)) if !names.is_empty() => {
+                debug_write!(buf, "{{ ")?;
+                let fields = r.borrow();
+                for (i, field_val) in fields.iter().enumerate() {
+                    if i > 0 {
+                        debug_write!(buf, ", ")?;
+                    }
+                    let fname = names.get(i).map(|s| s.as_str()).unwrap_or("_");
+                    debug_write!(buf, "{}: ", fname)?;
+                    print_value_impl(buf, field_val)?;
+                }
+                debug_write!(buf, " }}")
+            },
+            _ => print_value_impl(buf, val),
+        }
+    }
+
     pub fn print_value<B: Write>(buf: &mut B, val: &Value) -> PartialVMResult<()> {
         print_value_impl(buf, val)
     }

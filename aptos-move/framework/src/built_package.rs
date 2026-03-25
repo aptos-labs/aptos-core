@@ -92,6 +92,10 @@ pub struct BuildOptions {
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
+    /// Named addresses that unconditionally win over conflicting package-level assignments.
+    /// Used by `aptos move replay --named-address`.
+    #[clap(skip)]
+    pub forced_named_addresses: BTreeMap<String, AccountAddress>,
     /// Whether to override the standard library with the given version.
     #[clap(long, value_parser)]
     pub override_std: Option<StdVersion>,
@@ -131,6 +135,7 @@ impl Default for BuildOptions {
             with_docs: false,
             install_dir: None,
             named_addresses: Default::default(),
+            forced_named_addresses: Default::default(),
             override_std: None,
             docgen_options: None,
             // This is false by default, because it could accidentally pull new dependencies
@@ -263,6 +268,7 @@ fn make_model_build_config(
     Ok(BuildConfig {
         dev_mode,
         additional_named_addresses,
+        forced_named_addresses: BTreeMap::new(),
         generate_abis: false,
         generate_docs: false,
         generate_move_model: false,
@@ -322,6 +328,7 @@ impl BuiltPackage {
         Ok(BuildConfig {
             dev_mode: options.dev,
             additional_named_addresses: options.named_addresses.clone(),
+            forced_named_addresses: options.forced_named_addresses.clone(),
             generate_abis: options.with_abis,
             generate_docs: false,
             generate_move_model: true,

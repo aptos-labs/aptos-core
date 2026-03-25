@@ -21,6 +21,7 @@ mod resource_account;
 mod script_compile;
 mod show;
 mod sim;
+pub mod source_locator;
 pub mod stored_package;
 pub(crate) mod struct_arg_parser;
 mod tool_paths;
@@ -231,6 +232,18 @@ impl TStateView for DynStateView {
 pub trait MoveDebugger: Send + Sync + 'static {
     /// Get a state view at a specific chain version (for local VM execution).
     fn state_view_at_version(&self, version: u64) -> DynStateView;
+
+    /// Like [`state_view_at_version`] but with local module overrides applied.
+    ///
+    /// The default implementation ignores the overrides; the full
+    /// `AptosDebugger` implementation respects them.
+    fn state_view_at_version_with_overrides(
+        &self,
+        version: u64,
+        _overrides: std::sync::Arc<aptos_validator_interface::LocalModuleOverrides>,
+    ) -> DynStateView {
+        self.state_view_at_version(version)
+    }
 
     /// Execute a transaction with gas profiling enabled.
     fn execute_transaction_at_version_with_gas_profiler(

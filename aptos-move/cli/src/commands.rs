@@ -2476,6 +2476,35 @@ pub struct Replay {
     #[clap(long)]
     pub(crate) node_api_key: Option<String>,
 
+    /// Override one or more on-chain packages with a locally compiled version.
+    ///
+    /// Format: `<path_to_move_package>` (may be repeated).
+    ///
+    /// The local package is compiled, and every module it defines replaces the
+    /// corresponding on-chain module during replay.  Use this to add debug
+    /// logging, insert assertions, or test patches without deploying.
+    ///
+    /// Example:
+    ///   --use-local-package ./my-package  --use-local-package ./other-package
+    #[clap(long, value_name = "PATH")]
+    pub(crate) use_local_package: Vec<PathBuf>,
+
+    /// Override named addresses when compiling local packages.
+    ///
+    /// Format: `<name>=<address>` (may be repeated).
+    ///
+    /// Use this when the local Move.toml has dev addresses that differ from the
+    /// on-chain addresses, or when dependencies disagree on an address value.
+    ///
+    /// Example:
+    ///   --named-address my_module=0x<address>  --named-address other=0x<address>
+    #[clap(
+        long = "named-address",
+        value_parser = aptos_cli_common::parse_map::<String, MoveManifestAccountWrapper>,
+        default_value = ""
+    )]
+    pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
+
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
 }
@@ -2535,6 +2564,79 @@ impl CliCommand<TransactionSummary> for Replay {
 
         let hash = txn.committed_hash();
 
+        // Build local overrides and source locator when --use-local-package is set.
+        let (local_overrides, source_locator) = if !self.use_local_package.is_empty() {
+            let mut overrides = aptos_validator_interface::LocalModuleOverrides::new();
+            let mut locator = crate::source_locator::AptosSourceLocator::new();
+
+            // Resolve --named-address flags into the map BuildOptions expects.
+            let named_addresses: BTreeMap<String, AccountAddress> = self
+                .named_addresses
+                .iter()
+                .filter_map(|(k, v)| v.account_address.map(|a| (k.clone(), a)))
+                .collect();
+
+            for pkg_path in &self.use_local_package {
+                let built = BuiltPackage::build(pkg_path.clone(), BuildOptions {
+                    with_srcs: true,
+                    with_source_maps: true,
+                    forced_named_addresses: named_addresses.clone(),
+                    ..BuildOptions::default()
+                })
+                .map_err(|e| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to build local package at {}: {}",
+                        pkg_path.display(),
+                        e
+                    ))
+                })?;
+
+                for unit in built.package.root_modules() {
+                    if let legacy_move_compiler::compiled_unit::CompiledUnit::Module(ref named) =
+                        unit.unit
+                    {
+                        let module = &named.module;
+                        let mut bytes = vec![];
+                        module.serialize(&mut bytes).map_err(|e| {
+                            CliError::UnexpectedError(format!(
+                                "Failed to serialize module {}: {}",
+                                module.self_id(),
+                                e
+                            ))
+                        })?;
+                        let module_id = module.self_id();
+                        overrides.add_module(&module_id, bytes);
+
+                        let sm_bytes = unit.unit.serialize_source_map();
+                        let source_text = std::fs::read_to_string(&unit.source_path)
+                            .unwrap_or_else(|e| {
+                                eprintln!(
+                                    "Warning: could not read source file {}: {}",
+                                    unit.source_path.display(),
+                                    e
+                                );
+                                String::new()
+                            });
+                        let filename = unit.source_path.to_string_lossy().into_owned();
+                        if let Err(e) =
+                            locator.add_local_module(module, &sm_bytes, &source_text, &filename)
+                        {
+                            eprintln!(
+                                "Warning: could not load source map for {}: {}",
+                                module_id, e
+                            );
+                        }
+                    }
+                }
+            }
+
+            let locator_arc: Arc<dyn move_vm_runtime::source_locator::SourceLocator> =
+                Arc::new(locator);
+            (Some(Arc::new(overrides)), Some(locator_arc))
+        } else {
+            (None, None)
+        };
+
         // Execute the transaction.
         let (vm_status, vm_output) = if self.profile_gas {
             println!("Profiling transaction...");
@@ -2554,6 +2656,16 @@ impl CliCommand<TransactionSummary> for Replay {
                 txn.clone(),
                 hash,
                 aux_info,
+            )?
+        } else if let Some(overrides) = local_overrides {
+            println!("Replaying transaction with local package override(s)...");
+            local_simulation::run_transaction_with_local_overrides(
+                &*debugger,
+                self.txn_id,
+                txn.clone(),
+                aux_info,
+                overrides,
+                source_locator,
             )?
         } else {
             println!("Replaying transaction...");
@@ -2579,7 +2691,11 @@ impl CliCommand<TransactionSummary> for Replay {
                 ))
             })?;
 
-        if !self.skip_comparison {
+        // When local package overrides are in use the replayed code diverges from
+        // what was originally executed on-chain (different instructions, gas, etc.),
+        // so output comparison is meaningless and is automatically skipped.
+        let skip_comparison = self.skip_comparison || !self.use_local_package.is_empty();
+        if !skip_comparison {
             txn_output
                 .ensure_match_transaction_info(self.txn_id, &txn_info, None, None)
                 .map_err(|msg| CliError::UnexpectedError(msg.to_string()))?;

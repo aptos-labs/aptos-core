@@ -23,6 +23,7 @@ pub mod config;
 pub mod module_traversal;
 
 mod debug;
+pub mod source_locator;
 
 mod access_control;
 mod frame;
