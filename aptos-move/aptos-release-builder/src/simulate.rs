@@ -415,7 +415,7 @@ pub async fn simulate_multistep_proposal(
     print!("Creating and funding sender account.. ");
     std::io::stdout().flush()?;
     let mut rng = aptos_keygen::KeyGen::from_seed([0; 32]);
-    let balance = 100 * 1_0000_0000; // 100 APT
+    let balance = 1000 * 1_0000_0000; // 1000 APT
     let account = AccountData::new_from_seed(&mut rng, balance, 0);
     state_view.apply_write_set(&account.to_writeset())?;
     // TODO: should update coin info (total supply)
@@ -484,7 +484,7 @@ pub async fn simulate_multistep_proposal(
             .chain_id(chain_id.chain_id())
             .sequence_number(script_idx as u64)
             .gas_unit_price(gas_params.vm.txn.min_price_per_gas_unit.into())
-            .max_gas_amount(100000)
+            .max_gas_amount(5_000_000) // 5 million gas units => 5 APT max at 100 Octa/gas unit
             .ttl(u64::MAX)
             .sign();
 
