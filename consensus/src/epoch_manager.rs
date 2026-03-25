@@ -14,7 +14,7 @@ use crate::{
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
-            extract_epoch_to_proposers, AptosDBBackend, LeaderReputation, MetadataBackend,
+            extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
             ProposerAndVoterHeuristic, ReputationHeuristic,
         },
         proposal_generator::{
@@ -22,9 +22,7 @@ use crate::{
         },
         proposal_status_tracker::{ExponentialWindowFailureTracker, OptQSPullParamsProvider},
         proposer_election::ProposerElection,
-        rotating_proposer_election::{
-            choose_latency_optimal_leader, choose_leader, RotatingProposer,
-        },
+        rotating_proposer_election::{choose_leader, RotatingProposer},
         round_proposer_election::RoundProposer,
         round_state::{ExponentialTimeInterval, RoundState},
     },
@@ -310,29 +308,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ProposerElectionType::RotatingProposer(contiguous_rounds) => {
                 Arc::new(RotatingProposer::new(proposers, *contiguous_rounds))
             },
-            // Fixed proposer: always the same leader, chosen as the validator with the lowest
-            // median round time in recent history (i.e. closest to quorum). Falls back to
-            // min-PeerId if there is insufficient history.
+            // We don't really have a fixed proposer!
             ProposerElectionType::FixedProposer(contiguous_rounds) => {
-                // Fetch ~20 rounds per proposer worth of history to estimate round latency.
-                let window = proposers.len() * 20;
-                let backend = AptosDBBackend::new(window, 10, self.storage.aptos_db());
-                let (history, _) = backend.get_block_metadata(epoch_state.epoch, u64::MAX);
-                let proposer =
-                    choose_latency_optimal_leader(&proposers, &history).unwrap_or_else(|| {
-                        info!(
-                            "Insufficient history ({} blocks) for latency-optimal leader \
-                             selection; falling back to min-PeerId",
-                            history.len()
-                        );
-                        choose_leader(proposers.clone())
-                    });
-                info!(
-                    "FixedProposer: selected {:?} as latency-optimal leader \
-                     from {} blocks of history",
-                    proposer,
-                    history.len()
-                );
+                let proposer = choose_leader(proposers);
                 Arc::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
             },
             ProposerElectionType::LeaderReputation(leader_reputation_type) => {
