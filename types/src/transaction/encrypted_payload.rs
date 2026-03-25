@@ -9,7 +9,7 @@ use anyhow::{bail, Result};
 use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId};
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -49,6 +49,7 @@ impl PayloadAssociatedData {
 impl AssociatedData for PayloadAssociatedData {}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+<<<<<<< Updated upstream
 pub enum DecryptionFailureReason {
     /// Cryptographic decryption failed (e.g., invalid ciphertext, key mismatch).
     CryptoFailure,
@@ -59,11 +60,17 @@ pub enum DecryptionFailureReason {
     ConfigUnavailable,
     /// The decryption key is not available.
     DecryptionKeyUnavailable,
+=======
+pub struct ClaimedEntryFun {
+    module: ModuleId,
+    function: Option<Identifier>,
+>>>>>>> Stashed changes
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptedPayload {
     Encrypted {
+        claimed_entry_fun: Option<ClaimedEntryFun>,
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
