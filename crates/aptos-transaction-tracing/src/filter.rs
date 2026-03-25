@@ -7,28 +7,37 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// Filter that determines which transactions to trace based on sender address
-/// and optional probabilistic sampling.
+/// and two-level probabilistic sampling.
+///
+/// Level 1 (batch): `batch_sample_rate` controls what fraction of QS pull rounds
+/// do any tracing work. 90% of rounds skip entirely (~5ns cost).
+///
+/// Level 2 (txn): `txn_sample_rate` controls what fraction of allowlisted txns
+/// within a sampled round are actually traced.
+///
+/// Effective rate = batch_sample_rate × txn_sample_rate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionFilter {
     pub enabled: bool,
     pub sender_allowlist: HashSet<AccountAddress>,
-    /// Fraction of allowlisted transactions to trace (0.0–1.0).
-    /// 1.0 = trace all matching (default), 0.01 = trace ~1%.
-    /// Uses the txn hash for deterministic, stateless sampling.
-    #[serde(default = "default_sample_rate")]
-    pub sample_rate: f64,
-}
-
-fn default_sample_rate() -> f64 {
-    0.01
+    /// Fraction of QS pull rounds that perform tracing (0.0–1.0).
+    pub batch_sample_rate: f64,
+    /// Fraction of allowlisted txns to trace within a sampled round (0.0–1.0).
+    pub txn_sample_rate: f64,
 }
 
 impl TransactionFilter {
-    pub fn new(enabled: bool, sender_allowlist: HashSet<AccountAddress>, sample_rate: f64) -> Self {
+    pub fn new(
+        enabled: bool,
+        sender_allowlist: HashSet<AccountAddress>,
+        batch_sample_rate: f64,
+        txn_sample_rate: f64,
+    ) -> Self {
         Self {
             enabled,
             sender_allowlist,
-            sample_rate,
+            batch_sample_rate,
+            txn_sample_rate,
         }
     }
 
@@ -36,7 +45,8 @@ impl TransactionFilter {
         Self {
             enabled: false,
             sender_allowlist: HashSet::new(),
-            sample_rate: 0.0,
+            batch_sample_rate: 0.0,
+            txn_sample_rate: 0.0,
         }
     }
 
@@ -45,25 +55,40 @@ impl TransactionFilter {
         self.enabled && !self.sender_allowlist.is_empty()
     }
 
-    /// Returns true if the transaction should be traced.
-    /// Checks: enabled → sender in allowlist → passes sampling.
+    /// Returns true if the transaction should be traced at mempool insertion.
+    /// Checks: enabled → sender in allowlist → txn passes txn-level sampling.
     pub fn should_trace(&self, sender: &AccountAddress, hash: &HashValue) -> bool {
-        self.enabled && self.sender_allowlist.contains(sender) && self.sample_accepts(hash)
+        self.enabled
+            && self.sender_allowlist.contains(sender)
+            && sample_accepts(self.txn_sample_rate, hash.as_ref())
     }
 
-    /// Deterministic, stateless sampling using the txn hash.
-    /// The hash is already uniformly distributed, so we just compare
-    /// the first 8 bytes against a threshold derived from sample_rate.
-    fn sample_accepts(&self, hash: &HashValue) -> bool {
-        if self.sample_rate >= 1.0 {
-            return true;
-        }
-        if self.sample_rate <= 0.0 {
-            return false;
-        }
-        let h = u64::from_le_bytes(hash.as_ref()[0..8].try_into().unwrap());
-        h <= (self.sample_rate * u64::MAX as f64) as u64
+    /// Returns true if this QS pull round should do tracing work.
+    /// Uses pull_round as deterministic coin — no RNG, no locks.
+    pub fn should_sample_batch(&self, pull_round: u64) -> bool {
+        self.enabled
+            && !self.sender_allowlist.is_empty()
+            && sample_accepts(self.batch_sample_rate, &pull_round.to_le_bytes())
     }
+}
+
+/// Deterministic, stateless sampling. Uses the first 8 bytes of `seed` as a
+/// uniform u64, compares against a threshold derived from `rate`.
+/// O(1), ~2ns, no RNG or atomic state.
+fn sample_accepts(rate: f64, seed: &[u8]) -> bool {
+    if rate >= 1.0 {
+        return true;
+    }
+    if rate <= 0.0 {
+        return false;
+    }
+    let mut buf = [0u8; 8];
+    let len = seed.len().min(8);
+    buf[..len].copy_from_slice(&seed[..len]);
+    let h = u64::from_le_bytes(buf);
+    // Mix bits for short seeds (e.g., pull_round) to avoid patterns
+    let h = h.wrapping_mul(0x517CC1B727220A95);
+    h <= (rate * u64::MAX as f64) as u64
 }
 
 impl Default for TransactionFilter {
@@ -78,43 +103,23 @@ mod tests {
 
     #[test]
     fn test_sample_accepts_rate_1() {
-        let filter = TransactionFilter::new(true, HashSet::new(), 1.0);
-        // rate=1.0 should accept everything
         for i in 0..100u64 {
-            let hash = HashValue::from_slice(&{
-                let mut buf = [0u8; 32];
-                buf[0..8].copy_from_slice(&i.to_le_bytes());
-                buf
-            })
-            .unwrap();
-            assert!(filter.sample_accepts(&hash));
+            assert!(sample_accepts(1.0, &i.to_le_bytes()));
         }
     }
 
     #[test]
     fn test_sample_accepts_rate_0() {
-        let filter = TransactionFilter::new(true, HashSet::new(), 0.0);
-        // rate=0.0 should reject everything
         for i in 0..100u64 {
-            let hash = HashValue::from_slice(&{
-                let mut buf = [0u8; 32];
-                buf[0..8].copy_from_slice(&i.to_le_bytes());
-                buf
-            })
-            .unwrap();
-            assert!(!filter.sample_accepts(&hash));
+            assert!(!sample_accepts(0.0, &i.to_le_bytes()));
         }
     }
 
     #[test]
     fn test_sample_accepts_rate_half() {
-        let filter = TransactionFilter::new(true, HashSet::new(), 0.5);
-        // With uniform hash distribution, ~50% should be accepted.
-        // Use enough samples to be statistically stable.
         let mut accepted = 0;
         for i in 0..10000u64 {
-            let hash = HashValue::sha3_256_of(&i.to_le_bytes());
-            if filter.sample_accepts(&hash) {
+            if sample_accepts(0.5, &i.to_le_bytes()) {
                 accepted += 1;
             }
         }
@@ -123,6 +128,28 @@ mod tests {
             (4500..=5500).contains(&accepted),
             "Expected ~50% acceptance, got {}/10000",
             accepted
+        );
+    }
+
+    #[test]
+    fn test_should_sample_batch_rate_tenth() {
+        let filter = TransactionFilter::new(
+            true,
+            vec![AccountAddress::ONE].into_iter().collect(),
+            0.1,
+            1.0,
+        );
+        let mut sampled = 0;
+        for round in 0..10000u64 {
+            if filter.should_sample_batch(round) {
+                sampled += 1;
+            }
+        }
+        // Allow 7%-13% range
+        assert!(
+            (700..=1300).contains(&sampled),
+            "Expected ~10% batch sampling, got {}/10000",
+            sampled
         );
     }
 }
