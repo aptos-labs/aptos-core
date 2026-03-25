@@ -438,6 +438,9 @@ impl BufferManager {
                         },
                         _ => {},
                     }
+                    // Record BlockProposed with inclusion type metadata per batch
+                    let plain_digests: Vec<HashValue> =
+                        batch_digests.iter().map(|(d, _)| *d).collect();
                     for (digest, inclusion) in &batch_digests {
                         store.record_batch_stage_with_metadata_at(
                             digest,
@@ -445,8 +448,10 @@ impl BufferManager {
                             StageMetadata::BatchInclusion(*inclusion),
                             block_ts,
                         );
-                        store.record_batch_stage(digest, TransactionStage::BlockOrdered);
                     }
+                    // Register block → traced txns so later stages use record_block_stage()
+                    store.register_block(block.id(), &plain_digests);
+                    store.record_block_stage(&block.id(), TransactionStage::BlockOrdered);
                 }
             }
         }
@@ -565,50 +570,15 @@ impl BufferManager {
                     .expect("executed_blocks should be not empty")
                     .block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
-                // Record Certified tracing stage (2f+1 commit votes aggregated)
+                // Record Certified tracing stage — uses block_txns mapping (no payload iteration)
                 if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
-                    use aptos_consensus_types::{
-                        common::Payload,
-                        payload::OptQuorumStorePayload,
-                        proof_of_store::TBatchInfo,
-                    };
                     let store =
                         aptos_transaction_tracing::store::TransactionTraceStore::global();
                     for eb in &aggregated_item.executed_blocks {
-                        if let Some(payload) = eb.payload() {
-                            let mut digests: Vec<HashValue> = Vec::new();
-                            match payload {
-                                Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
-                                    for b in p.inline_batches().iter() {
-                                        digests.push(*b.info().digest());
-                                    }
-                                    for b in p.opt_batches().iter() {
-                                        digests.push(*b.digest());
-                                    }
-                                    for b in p.proof_with_data().iter() {
-                                        digests.push(*b.info().digest());
-                                    }
-                                },
-                                Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
-                                    for b in p.inline_batches().iter() {
-                                        digests.push(*b.info().digest());
-                                    }
-                                    for b in p.opt_batches().iter() {
-                                        digests.push(*b.digest());
-                                    }
-                                    for b in p.proof_with_data().iter() {
-                                        digests.push(*b.info().digest());
-                                    }
-                                },
-                                _ => {},
-                            }
-                            for d in &digests {
-                                store.record_batch_stage(
-                                    d,
-                                    aptos_transaction_tracing::types::TransactionStage::Certified,
-                                );
-                            }
-                        }
+                        store.record_block_stage(
+                            &eb.id(),
+                            aptos_transaction_tracing::types::TransactionStage::Certified,
+                        );
                     }
                 }
                 // As all the validators broadcast commit votes directly to all other validators,
