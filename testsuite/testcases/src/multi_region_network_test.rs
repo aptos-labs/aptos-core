@@ -285,7 +285,12 @@ impl MultiRegionNetworkEmulationTest {
     ) -> SwarmNetEm {
         let (all_validators, all_vfns) = {
             let swarm = swarm.read().await;
-            let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+            // Sort validators by PeerId so region assignment is deterministic: the first
+            // region (eu-west2 in four-region config) always contains the lowest PeerIds.
+            // This ensures that FixedProposer (which picks min PeerId via choose_leader)
+            // always selects a node in the lowest-latency region.
+            let mut all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+            all_validators.sort();
             let all_vfns = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
             (all_validators, all_vfns)
         };

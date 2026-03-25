@@ -19,8 +19,9 @@ use aptos_forge::{
     EmitJobMode, EmitJobRequest, ForgeConfig, NetworkTest, NodeResourceOverride,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainConsensusConfig,
-    OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
+    BlockGasLimitType, ConsensusAlgorithmConfig, ConsensusConfigV1, FeatureFlag, Features,
+    OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+    OnChainRandomnessConfig, ProposerElectionType, TransactionShufflerType, ValidatorTxnConfig,
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
@@ -516,11 +517,11 @@ pub(crate) fn realistic_env_p90_latency_test(
     num_pfns: usize,
 ) -> ForgeConfig {
     let _ = test_cmd; // Unused, but kept for signature parity with realistic_env_max_load_test
-    // Calibrated to match mainnet execution profile:
-    // - Mainnet: ~17 blocks/sec, ~20ms per-block execution, ~80 mixed TPS
-    // - Land-blocking: ~11 blocks/sec, ~70ms per-block execution, ~12.5k TPS
-    // - Scaling: 12500 * (20ms / 70ms) ≈ 3500 TPS of p2p transfers gives
-    //   ~320 txns/block at 11 blocks/sec → ~20ms per-block execution.
+                      // Calibrated to match mainnet execution profile:
+                      // - Mainnet: ~17 blocks/sec, ~20ms per-block execution, ~80 mixed TPS
+                      // - Land-blocking: ~11 blocks/sec, ~70ms per-block execution, ~12.5k TPS
+                      // - Scaling: 12500 * (20ms / 70ms) ≈ 3500 TPS of p2p transfers gives
+                      //   ~320 txns/block at 11 blocks/sec → ~20ms per-block execution.
     let target_tps = 3500;
     let success_criteria = SuccessCriteria::new(target_tps * 9 / 10)
         .add_no_restarts()
@@ -554,9 +555,23 @@ pub(crate) fn realistic_env_p90_latency_test(
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            // Use FixedProposer so the latency-optimal leader (closest to quorum) is always
+            // the proposer, eliminating per-round leader-switch overhead.
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(OnChainConsensusConfig::V5 {
+                    alg: ConsensusAlgorithmConfig::JolteonV2 {
+                        main: ConsensusConfigV1 {
+                            proposer_election_type: ProposerElectionType::FixedProposer(1),
+                            ..ConsensusConfigV1::default()
+                        },
+                        quorum_store_enabled: true,
+                        order_vote_enabled: true,
+                    },
+                    vtxn: ValidatorTxnConfig::default_for_genesis(),
+                    window_size: None,
+                    rand_check_enabled: true,
+                })
+                .expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
