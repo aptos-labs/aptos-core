@@ -316,18 +316,6 @@ pub fn debug_compiler_env_var() -> bool {
     *DEBUG_COMPILER
 }
 
-pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
-    static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE));
-    *WARN_OF_DEPRECATION
-}
-
-pub fn warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
-    static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS));
-    *WARN_OF_DEPRECATION
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct Flags {
     /// Compile in test mode
@@ -368,18 +356,6 @@ pub struct Flags {
     #[clap(long = cli::DEBUG_FLAG, default_value=bool_to_str(debug_compiler_env_var()))]
     debug: bool,
 
-    /// Show warnings about use of deprecated functions, modules, constants, etc.
-    /// Note that current value of this constant is "Wdeprecation"
-    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
-           default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
-    warn_of_deprecation_use: bool,
-
-    /// Show warnings about use of deprecated usage in the Aptos libraries,
-    /// which we should generally not bother users with.
-    /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
-    warn_of_deprecation_use_in_aptos_libs: bool,
-
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
@@ -403,8 +379,6 @@ impl Flags {
             keep_testing_functions: false,
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
-            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
-            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
             warn_unused: false,
             lang_v2: false,
             language_version: LanguageVersion::V1,
@@ -494,28 +468,6 @@ impl Flags {
     pub fn set_skip_attribute_checks(self, new_value: bool) -> Self {
         Self {
             skip_attribute_checks: new_value,
-            ..self
-        }
-    }
-
-    pub fn warn_of_deprecation_use(&self) -> bool {
-        self.warn_of_deprecation_use
-    }
-
-    pub fn set_warn_of_deprecation_use(self, new_value: bool) -> Self {
-        Self {
-            warn_of_deprecation_use: new_value,
-            ..self
-        }
-    }
-
-    pub fn warn_of_deprecation_use_in_aptos_libs(&self) -> bool {
-        self.warn_of_deprecation_use_in_aptos_libs
-    }
-
-    pub fn set_warn_of_deprecation_use_in_aptos_libs(self, new_value: bool) -> Self {
-        Self {
-            warn_of_deprecation_use_in_aptos_libs: new_value,
             ..self
         }
     }

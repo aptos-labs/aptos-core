@@ -654,7 +654,6 @@ fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
     logging::setup_logging_for_testing(None);
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
-    options.warn_deprecated = path_str.contains("/deprecated/");
     options.compile_verify_code = path_str.contains("/verification/verify/");
     options.sources_deps = extract_test_directives(path, "// dep:")?;
     options.sources = vec![path_str.clone()];

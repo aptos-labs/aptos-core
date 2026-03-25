@@ -6,7 +6,7 @@ use super::aliases::{AliasMapBuilder, OldAliasMap};
 use crate::{
     command_line::SKIP_ATTRIBUTE_CHECKS,
     diag,
-    diagnostics::{codes::DeprecatedItem, Diagnostic},
+    diagnostics::Diagnostic,
     expansion::{
         aliases::{AliasMap, AliasSet},
         ast::{
@@ -34,7 +34,6 @@ use move_command_line_common::parser::{
 };
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
-use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     iter::IntoIterator,
@@ -48,15 +47,11 @@ use str;
 type ModuleMembers = BTreeMap<Name, ModuleMemberInfo>;
 struct Context<'env, 'map> {
     module_members: UniqueMap<ModuleIdent, ModuleMembers>,
-    module_deprecation_attribute_locs: BTreeMap<ModuleIdent, Loc>, // if any
     named_address_mapping: Option<&'map NamedAddressMap>,
     address: Option<Address>,
-    current_module: Option<ModuleIdent>,
     aliases: AliasMap,
     is_source_definition: bool,
     in_spec_context: bool,
-    in_deprecated_code: bool,
-    in_aptos_libs: bool,
     exp_specs: BTreeMap<SpecId, E::SpecBlock>,
     env: &'env mut CompilationEnv,
 }
@@ -64,57 +59,21 @@ impl<'env> Context<'env, '_> {
     fn new(
         compilation_env: &'env mut CompilationEnv,
         module_members: UniqueMap<ModuleIdent, ModuleMembers>,
-        module_deprecation_attribute_locs: BTreeMap<ModuleIdent, Loc>,
     ) -> Self {
         Self {
             module_members,
-            module_deprecation_attribute_locs,
             env: compilation_env,
             named_address_mapping: None,
             address: None,
-            current_module: None,
             aliases: AliasMap::new(),
             is_source_definition: false,
             in_spec_context: false,
-            in_deprecated_code: false,
-            in_aptos_libs: false,
             exp_specs: BTreeMap::new(),
         }
     }
 
     fn cur_address(&self) -> &Address {
         self.address.as_ref().unwrap()
-    }
-
-    fn set_current_module(&mut self, module: Option<ModuleIdent>) {
-        self.in_deprecated_code = match &module {
-            Some(m) => self.module_deprecation_attribute_locs.contains_key(m),
-            None => false,
-        };
-        self.current_module = module;
-    }
-
-    fn current_module(&self) -> Option<&ModuleIdent> {
-        self.current_module.as_ref()
-    }
-
-    /// Returns previous state: whether we were already in deprecated code
-    fn enter_possibly_deprecated_member(&mut self, name: &Name) -> bool {
-        let was_in_deprecated_code = self.in_deprecated_code;
-        if let Some(moduleid) = self.current_module() {
-            if let Some(member_info_map) = self.module_members.get(moduleid) {
-                if let Some(member_info) = member_info_map.get(name) {
-                    if member_info.deprecation.is_some() {
-                        self.in_deprecated_code = true;
-                    }
-                }
-            }
-        };
-        was_in_deprecated_code
-    }
-
-    fn set_in_deprecated_code(&mut self, was_deprecated: bool) {
-        self.in_deprecated_code = was_deprecated;
     }
 
     /// Resets the alias map and reports errors for aliases that were unused
@@ -153,18 +112,14 @@ pub fn program(
     pre_compiled_lib: Option<&FullyCompiledProgram>,
     prog: P::Program,
 ) -> E::Program {
-    let mut module_deprecation_attribute_locs = BTreeMap::new();
-
     // Process all members from program source, lib, and pre-compiled libs,
-    // recording just module->SpannedSymbol->ModuleMemberInfo for each,
-    // plus per-module deprecation info in module_deprecation_attribute_locs.
+    // recording just module->SpannedSymbol->ModuleMemberInfo for each.
     let module_members = {
         let mut members = UniqueMap::new();
         all_module_members(
             compilation_env,
             &prog.named_address_maps,
             &mut members,
-            &mut module_deprecation_attribute_locs,
             true,
             &prog.source_definitions,
         );
@@ -172,7 +127,6 @@ pub fn program(
             compilation_env,
             &prog.named_address_maps,
             &mut members,
-            &mut module_deprecation_attribute_locs,
             true,
             &prog.lib_definitions,
         );
@@ -182,7 +136,6 @@ pub fn program(
                 compilation_env,
                 &pre_compiled.parser.named_address_maps,
                 &mut members,
-                &mut module_deprecation_attribute_locs,
                 false,
                 &pre_compiled.parser.source_definitions,
             );
@@ -190,11 +143,7 @@ pub fn program(
         members
     };
 
-    let mut context = Context::new(
-        compilation_env,
-        module_members,
-        module_deprecation_attribute_locs,
-    );
+    let mut context = Context::new(compilation_env, module_members);
 
     let mut source_module_map = UniqueMap::new();
     let mut lib_module_map = UniqueMap::new();
@@ -427,8 +376,6 @@ fn module(
         duplicate_module(context, module_map, mident, old_loc)
     }
     context.address = None;
-    context.current_module = None;
-    context.in_deprecated_code = false;
 }
 
 fn set_sender_address(
@@ -452,50 +399,6 @@ fn set_sender_address(
             Address::Numerical(None, sp(loc, NumericalAddress::DEFAULT_ERROR_ADDRESS))
         },
     })
-}
-
-// This is a hack to recognize APTOS StdLib, Framework, and Token libs to avoid warnings on some old errors.
-// This will be removed after library attributes are cleaned up.
-// (See https://github.com/aptos-labs/aptos-core/issues/9410)
-fn module_is_in_aptos_libs(module_address: Option<Spanned<Address>>) -> bool {
-    const APTOS_STDLIB_NAME: &str = "aptos_std";
-    static APTOS_STDLIB_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
-        Lazy::new(|| NumericalAddress::parse_str("0x1").unwrap());
-    const APTOS_FRAMEWORK_NAME: &str = "aptos_framework";
-    static APTOS_FRAMEWORK_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
-        Lazy::new(|| NumericalAddress::parse_str("0x1").unwrap());
-    const APTOS_TOKEN_NAME: &str = "aptos_token";
-    static APTOS_TOKEN_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
-        Lazy::new(|| NumericalAddress::parse_str("0x3").unwrap());
-    const APTOS_TOKEN_OBJECTS_NAME: &str = "aptos_token_objects";
-    static APTOS_TOKEN_OBJECTS_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
-        Lazy::new(|| NumericalAddress::parse_str("0x4").unwrap());
-    match &module_address {
-        Some(spanned_address) => {
-            let address = spanned_address.value;
-            match address {
-                Address::Numerical(optional_name, spanned_numerical_address) => match optional_name
-                {
-                    Some(spanned_symbol) => {
-                        ((&spanned_symbol.value as &str) == APTOS_STDLIB_NAME
-                            && (spanned_numerical_address.value == *APTOS_STDLIB_NUMERICAL_ADDRESS))
-                            || ((&spanned_symbol.value as &str) == APTOS_FRAMEWORK_NAME
-                                && (spanned_numerical_address.value
-                                    == *APTOS_FRAMEWORK_NUMERICAL_ADDRESS))
-                            || ((&spanned_symbol.value as &str) == APTOS_TOKEN_NAME
-                                && (spanned_numerical_address.value
-                                    == *APTOS_TOKEN_NUMERICAL_ADDRESS))
-                            || ((&spanned_symbol.value as &str) == APTOS_TOKEN_OBJECTS_NAME
-                                && (spanned_numerical_address.value
-                                    == *APTOS_TOKEN_OBJECTS_NUMERICAL_ADDRESS))
-                    },
-                    None => false,
-                },
-                Address::NamedUnassigned(_) => false,
-            }
-        },
-        None => false,
-    }
 }
 
 fn module_(
@@ -530,17 +433,6 @@ fn module_(
 
     let name_loc = name.0.loc;
     let current_module = sp(name_loc, ModuleIdent_::new(*context.cur_address(), name));
-    if context
-        .module_deprecation_attribute_locs
-        .contains_key(&current_module)
-    {
-        context.in_deprecated_code = true;
-    }
-    if context.env.flags().warn_of_deprecation_use_in_aptos_libs() {
-        context.in_aptos_libs = false;
-    } else {
-        context.in_aptos_libs = module_is_in_aptos_libs(module_address);
-    }
 
     let mut new_scope = AliasMapBuilder::new();
     module_self_aliases(&mut new_scope, &current_module);
@@ -567,7 +459,6 @@ fn module_(
         old_aliases.is_empty(),
         "ICE there should be no aliases entering a module"
     );
-    context.set_current_module(Some(current_module));
     let mut friends = UniqueMap::new();
     let mut functions = UniqueMap::new();
     let mut constants = UniqueMap::new();
@@ -636,9 +527,6 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
         old_aliases.is_empty(),
         "ICE there should be no aliases entering a script"
     );
-    context.set_current_module(None);
-    context.in_aptos_libs = false;
-
     let mut constants = UniqueMap::new();
     for c in pconstants {
         // TODO remove after Self rework
@@ -689,25 +577,6 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
         specs,
         use_decls: puses,
     }
-}
-
-/// If attributes contains a `#[deprecated]` attribute, then returns the location of the attribute.
-fn deprecated_attribute_location(attributes: &[P::Attributes]) -> Option<Loc> {
-    attributes
-        .iter()
-        .flat_map(|attrs| &attrs.value)
-        .filter_map(|attr| {
-            let sp!(nloc, sym) = match &attr.value {
-                P::Attribute_::Name(n)
-                | P::Attribute_::Assigned(n, _)
-                | P::Attribute_::Parameterized(n, _) => *n,
-            };
-            match KnownAttribute::resolve(sym) {
-                Some(KnownAttribute::Deprecation(_dep)) => Some(nloc),
-                _ => None,
-            }
-        })
-        .next()
 }
 
 fn flatten_attributes(
@@ -839,9 +708,7 @@ fn check_module_name(context: &mut Context, ident_loc: &Loc, mident: &ModuleIden
                 (*ident_loc, format!("Unbound module '{}'", mident))
             ));
         },
-        Some(_module) => {
-            check_for_deprecated_module_use(context, mident);
-        },
+        Some(_module) => {},
     }
 }
 
@@ -867,7 +734,6 @@ fn can_be_resolved_as_module(
         let mident = sp(full_loc, ModuleIdent_::new(addr, ModuleName(module_name)));
         // Is `addr::module_name` a resolvable module? If so, return it.
         if context.module_members.contains_key(&mident) {
-            check_for_deprecated_module_use(context, &mident);
             Some(mident)
         } else {
             None
@@ -913,12 +779,7 @@ fn attribute_value(
             };
             match value {
                 Some(mident) => EV::Module(mident),
-                None => EV::ModuleAccess(name_access_chain(
-                    context,
-                    Access::Type,
-                    ma,
-                    Some(DeprecatedItem::Module),
-                )?),
+                None => EV::ModuleAccess(name_access_chain(context, Access::Type, ma)?),
             }
         },
     }))
@@ -930,13 +791,11 @@ fn attribute_value(
 
 /// Process the PackageDefinition refs provided by the defs iterator,
 /// adding all symbol definitions to members, which records
-/// moduleId->SpannedSymbol->ModuleMemberInfo.  Also add a record
-/// for each deprecated module to module_deprecation_attribute_locs.
+/// moduleId->SpannedSymbol->ModuleMemberInfo.
 fn all_module_members<'a>(
     compilation_env: &mut CompilationEnv,
     named_addr_maps: &NamedAddressMaps,
     members: &mut UniqueMap<ModuleIdent, ModuleMembers>,
-    module_deprecation_attribute_locs: &mut BTreeMap<ModuleIdent, Loc>,
     always_add: bool,
     defs: impl IntoIterator<Item = &'a P::PackageDefinition>,
 ) {
@@ -965,9 +824,6 @@ fn all_module_members<'a>(
                 };
                 let mident = sp(m.name.loc(), ModuleIdent_::new(addr, m.name));
                 module_members(members, always_add, m, &mident);
-                if let Some(loc) = deprecated_attribute_location(&m.attributes) {
-                    module_deprecation_attribute_locs.insert(mident, loc);
-                }
             },
             P::Definition::Address(addr_def) => {
                 let addr = address_(
@@ -979,11 +835,6 @@ fn all_module_members<'a>(
                 for m in &addr_def.modules {
                     let mident = sp(m.name.loc(), ModuleIdent_::new(addr, m.name));
                     module_members(members, always_add, m, &mident);
-                    if let Some(loc) = deprecated_attribute_location(&addr_def.attributes) {
-                        module_deprecation_attribute_locs.insert(mident, loc);
-                    } else if let Some(loc) = deprecated_attribute_location(&m.attributes) {
-                        module_deprecation_attribute_locs.insert(mident, loc);
-                    }
                 }
             },
             P::Definition::Script(_) => (),
@@ -991,31 +842,13 @@ fn all_module_members<'a>(
     }
 }
 
-/// Record ModuleMemberInfo about a specified member name, including
-/// info about any deprecation found in attributes.
+/// Record ModuleMemberInfo about a specified member name.
 fn record_module_member_info(
     cur_members: &mut BTreeMap<Spanned<Symbol>, ModuleMemberInfo>,
     name: &Spanned<Symbol>,
-    attributes: &[P::Attributes],
     member_kind: ModuleMemberKind,
 ) {
-    cur_members.insert(*name, ModuleMemberInfo {
-        kind: member_kind,
-        deprecation: deprecated_attribute_location(attributes),
-    });
-}
-
-/// Record ModuleMemberInfo about a specified member name, skipping
-/// deprecation info (as for a spec member).
-fn record_module_member_info_without_deprecation(
-    cur_members: &mut BTreeMap<Spanned<Symbol>, ModuleMemberInfo>,
-    name: &Spanned<Symbol>,
-    member_kind: ModuleMemberKind,
-) {
-    cur_members.insert(*name, ModuleMemberInfo {
-        kind: member_kind,
-        deprecation: None,
-    });
+    cur_members.insert(*name, ModuleMemberInfo { kind: member_kind });
 }
 
 /// Specified module with identifier mident and definition m,
@@ -1037,28 +870,13 @@ fn module_members(
         use P::{SpecBlockMember_ as SBM, SpecBlockTarget_ as SBT, SpecBlock_ as SB};
         match mem {
             P::ModuleMember::Function(f) => {
-                record_module_member_info(
-                    &mut cur_members,
-                    &f.name.0,
-                    &f.attributes,
-                    ModuleMemberKind::Function,
-                );
+                record_module_member_info(&mut cur_members, &f.name.0, ModuleMemberKind::Function);
             },
             P::ModuleMember::Constant(c) => {
-                record_module_member_info(
-                    &mut cur_members,
-                    &c.name.0,
-                    &c.attributes,
-                    ModuleMemberKind::Constant,
-                );
+                record_module_member_info(&mut cur_members, &c.name.0, ModuleMemberKind::Constant);
             },
             P::ModuleMember::Struct(s) => {
-                record_module_member_info(
-                    &mut cur_members,
-                    &s.name.0,
-                    &s.attributes,
-                    ModuleMemberKind::Struct,
-                );
+                record_module_member_info(&mut cur_members, &s.name.0, ModuleMemberKind::Struct);
             },
             P::ModuleMember::Spec(
                 sp!(_, SB {
@@ -1068,16 +886,12 @@ fn module_members(
                 }),
             ) => match &target.value {
                 SBT::Schema(n, _) => {
-                    record_module_member_info_without_deprecation(
-                        &mut cur_members,
-                        n,
-                        ModuleMemberKind::Schema,
-                    );
+                    record_module_member_info(&mut cur_members, n, ModuleMemberKind::Schema);
                 },
                 SBT::Module => {
                     for sp!(_, smember_) in members {
                         if let SBM::Function { name, .. } = smember_ {
-                            record_module_member_info_without_deprecation(
+                            record_module_member_info(
                                 &mut cur_members,
                                 &name.0,
                                 ModuleMemberKind::Function,
@@ -1185,94 +999,6 @@ fn warn_about_unbound_module_use(context: &mut Context, mident: &ModuleIdent) {
     ));
 }
 
-fn module_has_deprecated_annotation(context: &mut Context, mident: &ModuleIdent) -> Option<Loc> {
-    context
-        .module_deprecation_attribute_locs
-        .get(mident)
-        .copied()
-}
-
-fn member_has_deprecated_annotation(
-    context: &mut Context,
-    mident: &ModuleIdent,
-    member: &Spanned<Symbol>,
-) -> Option<Loc> {
-    context
-        .module_members
-        .get(mident)
-        .and_then(|members| members.get(member))
-        .and_then(|member_info| member_info.deprecation)
-}
-
-fn check_for_deprecated_module_use(context: &mut Context, mident: &ModuleIdent) -> bool {
-    let warn_deprecation = &context.env.flags().warn_of_deprecation_use();
-    if !warn_deprecation || context.in_deprecated_code || context.in_aptos_libs {
-        return false;
-    }
-    if let Some(loc) = module_has_deprecated_annotation(context, mident) {
-        context.env.add_diag(diag!(
-            NameResolution::DeprecatedModule,
-            (
-                mident.loc,
-                format!("Use of deprecated module '{}'", mident.value),
-            ),
-            (loc, format!("Module '{}' deprecated here", mident.value),),
-        ));
-        true
-    } else {
-        false
-    }
-}
-
-fn check_for_deprecated_member_use(
-    context: &mut Context,
-    mident_in: Option<&ModuleIdent>,
-    member: &Spanned<Symbol>,
-    deprecated_item: DeprecatedItem,
-) {
-    let warn_deprecation = &context.env.flags().warn_of_deprecation_use();
-    if !warn_deprecation || context.in_deprecated_code || context.in_aptos_libs {
-        return;
-    }
-    let mident = match mident_in {
-        None => {
-            if let Some(mident) = context.current_module() {
-                *mident
-            } else {
-                // No module, we must be in a script.
-                return;
-            }
-        },
-        Some(mident) => {
-            check_for_deprecated_module_use(context, mident);
-            *mident
-        },
-    };
-    if let Some(loc) = member_has_deprecated_annotation(context, &mident, member) {
-        context.env.add_diag(diag!(
-            deprecated_item.get_code(),
-            (
-                member.loc,
-                format!(
-                    "Use of deprecated {} '{}' from module '{}'",
-                    deprecated_item.get_string(),
-                    member,
-                    mident
-                )
-            ),
-            (
-                loc,
-                format!(
-                    "{} '{}' in module '{}' deprecated here",
-                    deprecated_item.get_capitalized_string(),
-                    member,
-                    mident
-                )
-            ),
-        ));
-    }
-}
-
 fn use_(context: &mut Context, acc: &mut AliasMapBuilder, u: P::UseDecl) {
     let P::UseDecl {
         use_: u,
@@ -1299,7 +1025,7 @@ fn use_(context: &mut Context, acc: &mut AliasMapBuilder, u: P::UseDecl) {
                 warn_about_unbound_module_use(context, &mident);
                 return;
             };
-            check_for_deprecated_module_use(context, &mident);
+
             add_module_alias!(mident, alias_opt.map(|m| m.0))
         },
         P::Use::Members(pmident, sub_uses) => {
@@ -1308,7 +1034,7 @@ fn use_(context: &mut Context, acc: &mut AliasMapBuilder, u: P::UseDecl) {
                 warn_about_unbound_module_use(context, &mident);
                 return;
             }
-            check_for_deprecated_module_use(context, &mident);
+
             let members = context.module_members.get(&mident).unwrap();
             let mloc = *context.module_members.get_loc(&mident).unwrap();
             let sub_uses_kinds = sub_uses
@@ -1341,20 +1067,6 @@ fn use_(context: &mut Context, acc: &mut AliasMapBuilder, u: P::UseDecl) {
                     },
                     Some(m) => m,
                 };
-                let deprecated_item_kind = match member_kind {
-                    ModuleMemberKind::Constant => DeprecatedItem::Constant,
-                    ModuleMemberKind::Function => DeprecatedItem::Function,
-
-                    ModuleMemberKind::Struct => DeprecatedItem::Struct,
-                    _ => DeprecatedItem::Member,
-                };
-                check_for_deprecated_member_use(
-                    context,
-                    Some(&mident),
-                    &member,
-                    deprecated_item_kind,
-                );
-
                 let alias = alias_opt.unwrap_or(member);
 
                 let alias = match check_valid_module_member_alias(context, member_kind, alias) {
@@ -1435,7 +1147,7 @@ fn struct_def_(
         layout: pfields,
         visibility: pvisibility,
     } = pstruct;
-    let was_in_deprecated_code = context.enter_possibly_deprecated_member(&name.0);
+
     let attributes = flatten_attributes(context, AttributePosition::Struct, attributes);
     let type_parameters = struct_type_parameters(context, pty_params);
     let old_aliases = context
@@ -1453,7 +1165,7 @@ fn struct_def_(
         visibility,
     };
     context.set_to_outer_scope(old_aliases);
-    context.set_in_deprecated_code(was_in_deprecated_code);
+
     (name, sdef)
 }
 
@@ -1593,7 +1305,7 @@ fn constant_(context: &mut Context, pconstant: P::Constant) -> (ConstantName, E:
         signature: psignature,
         value: pvalue,
     } = pconstant;
-    let was_in_deprecated_code = context.enter_possibly_deprecated_member(&name.0);
+
     let attributes = flatten_attributes(context, AttributePosition::Constant, pattributes);
     let signature = type_(context, psignature);
     let value = exp_(context, pvalue);
@@ -1604,7 +1316,7 @@ fn constant_(context: &mut Context, pconstant: P::Constant) -> (ConstantName, E:
         signature,
         value,
     };
-    context.set_in_deprecated_code(was_in_deprecated_code);
+
     (name, constant)
 }
 
@@ -1636,7 +1348,7 @@ fn function_(context: &mut Context, pfunction: P::Function) -> (FunctionName, E:
         access_specifiers,
     } = pfunction;
     assert!(context.exp_specs.is_empty());
-    let was_in_deprecated_code = context.enter_possibly_deprecated_member(&name.0);
+
     let attributes = flatten_attributes(context, AttributePosition::Function, pattributes);
     let visibility = visibility(pvisibility);
     let (old_aliases, signature) = function_signature(context, psignature);
@@ -1656,7 +1368,7 @@ fn function_(context: &mut Context, pfunction: P::Function) -> (FunctionName, E:
         specs,
     };
     context.set_to_outer_scope(old_aliases);
-    context.set_in_deprecated_code(was_in_deprecated_code);
+
     (name, fdef)
 }
 
@@ -1830,12 +1542,7 @@ fn address_specifier(context: &mut Context, specifier: P::AddressSpecifier) -> E
         AddressSpecifier_::Literal(addr) => E::AddressSpecifier_::Literal(addr),
         AddressSpecifier_::Name(name) => E::AddressSpecifier_::Name(name),
         AddressSpecifier_::Call(chain, type_args, name) => {
-            if let Some(maccess) = name_access_chain(
-                context,
-                Access::ApplyPositional,
-                chain,
-                Some(DeprecatedItem::Function),
-            ) {
+            if let Some(maccess) = name_access_chain(context, Access::ApplyPositional, chain) {
                 E::AddressSpecifier_::Call(maccess, optional_types(context, type_args), name)
             } else {
                 debug_assert!(context.env.has_errors());
@@ -2193,7 +1900,7 @@ fn translate_proof(context: &mut Context, sp!(loc, proof_): P::Proof) -> E::Proo
             E::Proof_::Assume(props, exp_(context, pexp))
         },
         P::Proof_::Apply(chain, pargs) => {
-            let access = name_access_chain(context, Access::Term, chain, None);
+            let access = name_access_chain(context, Access::Term, chain);
             match access {
                 Some(access) => {
                     let args = pargs.into_iter().map(|e| exp_(context, e)).collect();
@@ -2213,7 +1920,7 @@ fn translate_proof(context: &mut Context, sp!(loc, proof_): P::Proof) -> E::Proo
                 .into_iter()
                 .map(|group| group.into_iter().map(|e| exp_(context, e)).collect())
                 .collect();
-            let elemma = name_access_chain(context, Access::Term, lemma, None);
+            let elemma = name_access_chain(context, Access::Term, lemma);
             let eargs = args.into_iter().map(|e| exp_(context, e)).collect();
             match (ebindings, elemma) {
                 (Some(ebindings), Some(elemma)) => E::Proof_::ForallApply {
@@ -2250,7 +1957,7 @@ fn pragma_value(context: &mut Context, pv: P::PragmaValue) -> Option<E::PragmaVa
     match pv {
         P::PragmaValue::Literal(v) => value(context, v).map(E::PragmaValue::Literal),
         P::PragmaValue::Ident(ma) => {
-            name_access_chain(context, Access::Term, ma, None).map(E::PragmaValue::Ident)
+            name_access_chain(context, Access::Term, ma).map(E::PragmaValue::Ident)
         },
     }
 }
@@ -2309,7 +2016,7 @@ fn type_(context: &mut Context, sp!(loc, pt_): P::Type) -> E::Type {
         PT::Multiple(ts) => ET::Multiple(types(context, ts)),
         PT::Apply(pn, ptyargs) => {
             let tyargs = types(context, ptyargs);
-            match name_access_chain(context, Access::Type, *pn, Some(DeprecatedItem::Struct)) {
+            match name_access_chain(context, Access::Type, *pn) {
                 None => {
                     assert!(context.env.has_errors());
                     ET::UnresolvedError
@@ -2344,15 +2051,10 @@ enum Access {
     Term,
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Copy)]
-enum DeprecatedMemberKind {}
-
 fn name_access_chain(
     context: &mut Context,
     access: Access,
     sp!(loc, ptn_): P::NameAccessChain,
-    deprecated_item_kind: Option<DeprecatedItem>,
 ) -> Option<E::ModuleAccess> {
     use E::ModuleAccess_ as EN;
     use P::{LeadingNameAccess_ as LN, NameAccessChain_ as PN};
@@ -2427,17 +2129,6 @@ fn name_access_chain(
         },
     };
 
-    if let Some(deprecated_item_kind) = deprecated_item_kind {
-        match &tn_ {
-            EN::ModuleAccess(mident, n, _) => {
-                check_for_deprecated_member_use(context, Some(mident), n, deprecated_item_kind);
-            },
-            EN::Name(n) => {
-                check_for_deprecated_member_use(context, None, n, deprecated_item_kind);
-            },
-        };
-    };
-
     Some(sp(loc, tn_))
 }
 
@@ -2455,10 +2146,7 @@ fn name_access_chain_to_module_ident(
                 ));
                 None
             },
-            Some(mident) => {
-                check_for_deprecated_module_use(context, &mident); // name
-                Some(mident)
-            },
+            Some(mident) => Some(mident),
         },
         PN::Two(ln, n) => {
             let pmident_ = P::ModuleIdent_ {
@@ -2602,7 +2290,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             EE::UnresolvedError
         },
         PE::Name(pn, ptys_opt) => {
-            let en_opt = name_access_chain(context, Access::Term, pn, Some(DeprecatedItem::Member));
+            let en_opt = name_access_chain(context, Access::Term, pn);
             let tys_opt = optional_types(context, ptys_opt);
             match en_opt {
                 Some(en) => EE::Name(en, tys_opt),
@@ -2616,12 +2304,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             let tys_opt = optional_types(context, ptys_opt);
             let ers = sp(rloc, exps(context, prs));
             let en_opt = if kind != CallKind::Receiver {
-                name_access_chain(
-                    context,
-                    Access::ApplyPositional,
-                    pn,
-                    Some(DeprecatedItem::Function),
-                )
+                name_access_chain(context, Access::ApplyPositional, pn)
             } else {
                 // Skip resolution for receiver calls, which are expected to use a single name
                 let P::NameAccessChain_::One(name) = pn.value else {
@@ -2643,12 +2326,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             EE::ExpCall(e_fexp, e_args)
         },
         PE::Pack(pn, ptys_opt, pfields) => {
-            let en_opt = name_access_chain(
-                context,
-                Access::ApplyNamed,
-                pn,
-                Some(DeprecatedItem::Struct),
-            );
+            let en_opt = name_access_chain(context, Access::ApplyNamed, pn);
             let tys_opt = optional_types(context, ptys_opt);
             let efields_vec = pfields
                 .into_iter()
@@ -2897,7 +2575,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 // If it is a name, call `name_access_chain` to avoid
                 // the unused alias warning
                 if let PE::Name(pn, _) = e.value {
-                    let _ = name_access_chain(context, Access::Term, pn, None);
+                    let _ = name_access_chain(context, Access::Term, pn);
                 }
                 context.env.add_diag(diag!(
                     Syntax::UnsupportedLanguageItem,
@@ -2936,12 +2614,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 ));
                 EE::UnresolvedError
             } else {
-                let e_fn_name = name_access_chain(
-                    context,
-                    Access::Term,
-                    fn_name,
-                    Some(DeprecatedItem::Function),
-                );
+                let e_fn_name = name_access_chain(context, Access::Term, fn_name);
                 let e_type_args = optional_types(context, type_args);
                 let e_args = sp(args_loc, exps(context, args));
                 if let Some(fn_access) = e_fn_name {
@@ -3221,12 +2894,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
         },
         PB::Unpack(ptn, ptys_opt, pfields) => {
             // check for type use
-            let tn = name_access_chain(
-                context,
-                Access::ApplyNamed,
-                *ptn,
-                Some(DeprecatedItem::Struct),
-            )?;
+            let tn = name_access_chain(context, Access::ApplyNamed, *ptn)?;
             let tys_opt = optional_types(context, ptys_opt);
             let mut dotdot = None;
             let mut vfields = vec![];
@@ -3252,12 +2920,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             EL::Unpack(tn, tys_opt, fields, dotdot)
         },
         PB::PositionalUnpack(ptn, ptys_opt, pargs) => {
-            let tn = name_access_chain(
-                context,
-                Access::ApplyPositional,
-                *ptn,
-                Some(DeprecatedItem::Struct),
-            )?;
+            let tn = name_access_chain(context, Access::ApplyPositional, *ptn)?;
             let tys_opt = optional_types(context, ptys_opt);
             let mut dot_seen = false;
             let fields: Option<Vec<E::LValueOrDotDot>> = pargs
@@ -3345,7 +3008,7 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
                 .add_diag(diag!(Syntax::SpecContextRestricted, (loc, msg)));
 
             // For unused alias warnings and unbound modules
-            name_access_chain(context, Access::Term, n, None);
+            name_access_chain(context, Access::Term, n);
 
             return None;
         },
@@ -3364,12 +3027,12 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
                 .add_diag(diag!(Syntax::SpecContextRestricted, (loc, msg)));
 
             // For unused alias warnings and unbound modules
-            name_access_chain(context, Access::Term, n, None);
+            name_access_chain(context, Access::Term, n);
 
             return None;
         },
         PE::Name(pn, ptys_opt) => {
-            let en = name_access_chain(context, Access::Term, pn, Some(DeprecatedItem::Struct))?;
+            let en = name_access_chain(context, Access::Term, pn)?;
             match &en.value {
                 E::ModuleAccess_::ModuleAccess(m, n, _) if !context.in_spec_context => {
                     let msg = format!(
@@ -3390,12 +3053,7 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
             }
         },
         PE::Pack(pn, ptys_opt, pfields) => {
-            let en = name_access_chain(
-                context,
-                Access::ApplyNamed,
-                pn,
-                Some(DeprecatedItem::Struct),
-            )?;
+            let en = name_access_chain(context, Access::ApplyNamed, pn)?;
             let tys_opt = optional_types(context, ptys_opt);
             let efields = assign_unpack_fields(context, loc, pfields)?;
             // we have not implemented .. in the LHS of an assignment
@@ -3818,7 +3476,6 @@ fn check_valid_local_name(context: &mut Context, v: &Var) {
 #[derive(Copy, Clone, Debug)]
 struct ModuleMemberInfo {
     pub kind: ModuleMemberKind,
-    pub deprecation: Option<Loc>, // Some(loc) if member is deprecated at loc
 }
 
 #[derive(Copy, Clone, Debug)]
