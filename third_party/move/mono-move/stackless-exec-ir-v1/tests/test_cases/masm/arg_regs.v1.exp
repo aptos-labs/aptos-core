@@ -1,0 +1,412 @@
+=== Module 0x66::arg_regs ===
+
+fun identity(r0): u64 {
+  slots: params(1), locals(0), temps(0)
+    r0: u64
+  code:
+    0: ret [r0]
+}
+
+fun add_two(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun swap(r0, r1): u64 * u64 {
+  slots: params(2), locals(0), temps(0)
+    r0: u64
+    r1: u64
+  code:
+    0: ret [r1, r0]
+}
+
+fun three_args(r0, r1, r2): u64 {
+  slots: params(3), locals(0), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+  code:
+    0: r4 := add r0, r1
+    1: r3 := add r4, r2
+    2: ret [r3]
+}
+
+fun simple_promotion(): u64 {
+  slots: params(0), locals(0), temps(0), args(1)
+  code:
+    0: a0 := ld_u64 42
+    1: [a0] := call identity, [a0]
+    2: ret [a0]
+}
+
+fun multi_arg(): u64 {
+  slots: params(0), locals(0), temps(0), args(2)
+  code:
+    0: a0 := ld_u64 1
+    1: a1 := ld_u64 2
+    2: [a0] := call add_two, [a0, a1]
+    3: ret [a0]
+}
+
+fun nested_fg(): u64 {
+  slots: params(0), locals(0), temps(1), args(1)
+    r0: u64
+  code:
+    0: r0 := ld_u64 7
+    1: [a0] := call identity, [r0]
+    2: [r0] := call identity, [a0]
+    3: ret [r0]
+}
+
+fun two_inner_calls(): u64 {
+  slots: params(0), locals(0), temps(2), args(2)
+    r0: u64
+    r1: u64
+  code:
+    0: r0 := ld_u64 10
+    1: [r1] := call identity, [r0]
+    2: r0 := ld_u64 20
+    3: [a1] := call identity, [r0]
+    4: [r0] := call add_two, [r1, a1]
+    5: ret [r0]
+}
+
+fun computed_arg(r0): u64 {
+  slots: params(1), locals(0), temps(0), args(1)
+    r0: u64
+  code:
+    0: a0 := add r0, #1
+    1: [a0] := call identity, [a0]
+    2: ret [a0]
+}
+
+fun partial_promotion(r0): u64 {
+  slots: params(1), locals(0), temps(0), args(2)
+    r0: u64
+  code:
+    0: a1 := add r0, #1
+    1: [a0] := call add_two, [r0, a1]
+    2: ret [a0]
+}
+
+fun call_with_param(r0): u64 {
+  slots: params(1), locals(0), temps(0), args(1)
+    r0: u64
+  code:
+    0: [a0] := call identity, [r0]
+    1: ret [a0]
+}
+
+fun arg_live_after_call(r0): u64 {
+  slots: params(1), locals(1), temps(0), args(1)
+    r0: u64
+    r1: u64
+  code:
+    0: [a0] := call identity, [r0]
+    1: r1 := move a0
+    2: r1 := add r0, r1
+    3: ret [r1]
+}
+
+fun ret_used_past_next_call(): u64 {
+  slots: params(0), locals(1), temps(1), args(1)
+    r0: u64
+    r1: u64
+  code:
+    0: r0 := ld_u64 10
+    1: [r1] := call identity, [r0]
+    2: r0 := move r1
+    3: r1 := ld_u64 20
+    4: [a0] := call identity, [r1]
+    5: r0 := add a0, r0
+    6: ret [r0]
+}
+
+fun multi_ret(): u64 {
+  slots: params(0), locals(0), temps(1), args(2)
+    r0: u64
+  code:
+    0: a0 := ld_u64 3
+    1: r0 := ld_u64 4
+    2: [a0, a1] := call swap, [a0, r0]
+    3: [r0] := call add_two, [a0, a1]
+    4: ret [r0]
+}
+
+fun width_from_max(): u64 {
+  slots: params(0), locals(0), temps(3), args(3)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+    0: r0 := ld_u64 1
+    1: [r1] := call identity, [r0]
+    2: r0 := ld_u64 10
+    3: a1 := ld_u64 20
+    4: r2 := ld_u64 30
+    5: [a0] := call three_args, [r0, a1, r2]
+    6: r2 := add r1, a0
+    7: ret [r2]
+}
+
+fun call_in_loop(r0): u64 {
+  slots: params(1), locals(1), temps(1), args(1)
+    r0: u64
+    r1: u64
+    r2: bool
+  code:
+    0: r1 := ld_u64 0
+  L2:
+    1: r2 := gt r0, #0
+    2: br_false L0, r2
+  L1:
+    3: [a0] := call identity, [r0]
+    4: r1 := add a0, r1
+    5: r0 := sub r0, #1
+    6: branch L2
+  L0:
+    7: ret [r1]
+}
+
+fun mixed_at_callsite(r0): u64 {
+  slots: params(1), locals(0), temps(0), args(3)
+    r0: u64
+  code:
+    0: a0 := ld_u64 10
+    1: a2 := ld_u64 30
+    2: [a0] := call three_args, [a0, r0, a2]
+    3: ret [a0]
+}
+
+fun mixed_intervening_call(): u64 {
+  slots: params(0), locals(0), temps(2), args(3)
+    r0: u64
+    r1: u64
+  code:
+    0: r0 := ld_u64 10
+    1: [r1] := call identity, [r0]
+    2: r0 := ld_u64 20
+    3: [a1] := call identity, [r0]
+    4: r0 := ld_u64 30
+    5: [a0] := call three_args, [r1, a1, r0]
+    6: ret [a0]
+}
+
+fun no_calls(): u64 {
+  slots: params(0), locals(0), temps(1)
+    r0: u64
+  code:
+    0: r0 := ld_u64 99
+    1: ret [r0]
+}
+
+=== micro-ops ===
+=== Module 0x66::arg_regs ===
+
+fun identity() {
+  frame_data_size: 8
+  code:
+    0: Return
+}
+
+fun add_two() {
+  frame_data_size: 24
+  code:
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun swap() {
+  frame_data_size: 16
+  code:
+    0: Move8 [0] <- [8]
+    1: Move8 [8] <- [0]
+    2: Return
+}
+
+fun three_args() {
+  frame_data_size: 40
+  code:
+    0: AddU64 [32] <- [0] + [8]
+    1: AddU64 [24] <- [32] + [16]
+    2: Move8 [0] <- [24]
+    3: Return
+}
+
+fun simple_promotion() {
+  frame_data_size: 0
+  code:
+    0: StoreImm8 [24] <- #42
+    1: CallFunc #0
+    2: Move8 [0] <- [24]
+    3: Return
+}
+
+fun multi_arg() {
+  frame_data_size: 0
+  code:
+    0: StoreImm8 [24] <- #1
+    1: StoreImm8 [32] <- #2
+    2: CallFunc #1
+    3: Move8 [0] <- [24]
+    4: Return
+}
+
+fun nested_fg() {
+  frame_data_size: 8
+  code:
+    0: StoreImm8 [0] <- #7
+    1: Move8 [32] <- [0]
+    2: CallFunc #0
+    3: CallFunc #0
+    4: Move8 [0] <- [32]
+    5: Return
+}
+
+fun two_inner_calls() {
+  frame_data_size: 16
+  code:
+    0: StoreImm8 [0] <- #10
+    1: Move8 [40] <- [0]
+    2: CallFunc #0
+    3: Move8 [8] <- [40]
+    4: StoreImm8 [0] <- #20
+    5: Move8 [40] <- [0]
+    6: CallFunc #0
+    7: Move8 [48] <- [40]
+    8: Move8 [40] <- [8]
+    9: CallFunc #1
+    10: Move8 [0] <- [40]
+    11: Return
+}
+
+fun computed_arg() {
+  frame_data_size: 8
+  code:
+    0: AddU64Imm [32] <- [0] + #1
+    1: CallFunc #0
+    2: Move8 [0] <- [32]
+    3: Return
+}
+
+fun partial_promotion() {
+  frame_data_size: 8
+  code:
+    0: AddU64Imm [40] <- [0] + #1
+    1: Move8 [32] <- [0]
+    2: CallFunc #1
+    3: Move8 [0] <- [32]
+    4: Return
+}
+
+fun call_with_param() {
+  frame_data_size: 8
+  code:
+    0: Move8 [32] <- [0]
+    1: CallFunc #0
+    2: Move8 [0] <- [32]
+    3: Return
+}
+
+fun arg_live_after_call() {
+  frame_data_size: 16
+  code:
+    0: Move8 [40] <- [0]
+    1: CallFunc #0
+    2: Move8 [8] <- [40]
+    3: AddU64 [8] <- [0] + [8]
+    4: Move8 [0] <- [8]
+    5: Return
+}
+
+fun ret_used_past_next_call() {
+  frame_data_size: 16
+  code:
+    0: StoreImm8 [0] <- #10
+    1: Move8 [40] <- [0]
+    2: CallFunc #0
+    3: Move8 [8] <- [40]
+    4: Move8 [0] <- [8]
+    5: StoreImm8 [8] <- #20
+    6: Move8 [40] <- [8]
+    7: CallFunc #0
+    8: AddU64 [0] <- [40] + [0]
+    9: Return
+}
+
+fun multi_ret() {
+  frame_data_size: 8
+  code:
+    0: StoreImm8 [32] <- #3
+    1: StoreImm8 [0] <- #4
+    2: Move8 [40] <- [0]
+    3: CallFunc #2
+    4: CallFunc #1
+    5: Move8 [0] <- [32]
+    6: Return
+}
+
+fun width_from_max() {
+  frame_data_size: 24
+  code:
+    0: StoreImm8 [0] <- #1
+    1: Move8 [48] <- [0]
+    2: CallFunc #0
+    3: Move8 [8] <- [48]
+    4: StoreImm8 [0] <- #10
+    5: StoreImm8 [56] <- #20
+    6: StoreImm8 [16] <- #30
+    7: Move8 [48] <- [0]
+    8: Move8 [64] <- [16]
+    9: CallFunc #3
+    10: AddU64 [16] <- [8] + [48]
+    11: Move8 [0] <- [16]
+    12: Return
+}
+
+fun call_in_loop(): skipped (lowering: BinaryOpImm Gt for u64-sized type not yet lowered)
+
+fun mixed_at_callsite() {
+  frame_data_size: 8
+  code:
+    0: StoreImm8 [32] <- #10
+    1: StoreImm8 [48] <- #30
+    2: Move8 [40] <- [0]
+    3: CallFunc #3
+    4: Move8 [0] <- [32]
+    5: Return
+}
+
+fun mixed_intervening_call() {
+  frame_data_size: 16
+  code:
+    0: StoreImm8 [0] <- #10
+    1: Move8 [40] <- [0]
+    2: CallFunc #0
+    3: Move8 [8] <- [40]
+    4: StoreImm8 [0] <- #20
+    5: Move8 [40] <- [0]
+    6: CallFunc #0
+    7: Move8 [48] <- [40]
+    8: StoreImm8 [0] <- #30
+    9: Move8 [40] <- [8]
+    10: Move8 [56] <- [0]
+    11: CallFunc #3
+    12: Move8 [0] <- [40]
+    13: Return
+}
+
+fun no_calls() {
+  frame_data_size: 8
+  code:
+    0: StoreImm8 [0] <- #99
+    1: Return
+}

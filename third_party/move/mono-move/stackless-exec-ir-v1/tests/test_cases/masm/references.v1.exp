@@ -1,0 +1,49 @@
+=== Module 0x66::test ===
+
+fun read_field_val(r0): u8 {
+  slots: params(1), locals(0), temps(2)
+    r0: S
+    r1: &S
+    r2: u8
+  code:
+    0: r1 := imm_borrow_loc r0
+    1: r2 := read_field S::_2, r1
+    2: ret [r2]
+}
+
+fun read_and_add(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: &u64
+    r1: u64
+    r2: u64
+  code:
+    0: r1 := read_ref r0
+    1: r2 := add r1, #1
+    2: ret [r2]
+}
+
+fun read_field_ref_twice(r0): u64 {
+  slots: params(1), locals(1), temps(4)
+    r0: S
+    r1: &u64
+    r2: &S
+    r3: u64
+    r4: u64
+    r5: u64
+  code:
+    0: r2 := imm_borrow_loc r0
+    1: r1 := imm_borrow_field S::_1, r2
+    2: r3 := read_ref r1
+    3: r4 := read_ref r1
+    4: r5 := add r3, r4
+    5: ret [r5]
+}
+
+=== micro-ops ===
+=== Module 0x66::test ===
+
+fun read_field_val(): skipped (not all types are concrete)
+
+fun read_and_add(): skipped (lowering: instruction ReadRef(Home(1), Home(0)) not yet lowered)
+
+fun read_field_ref_twice(): skipped (not all types are concrete)

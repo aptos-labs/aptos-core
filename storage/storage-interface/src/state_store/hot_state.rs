@@ -47,16 +47,20 @@ impl<'a> HotStateLRU<'a> {
         }
     }
 
-    pub fn insert(&mut self, key: &StateKey, slot: StateSlot) {
+    pub fn insert(&mut self, key: &StateKey, mut slot: StateSlot) {
         assert!(
             slot.is_hot(),
             "Should not insert cold slots into hot state."
         );
-        assert_eq!(
-            key,
-            slot.state_key(),
+        assert!(
+            slot.state_key().is_none_or(|sk| key == sk),
             "Map key and embedded state_key must match."
         );
+        // Ensure state_key is populated. Slots loaded from the hot state DB don't carry
+        // the full key (only the hash), so patch it here while we have the key available.
+        if slot.state_key().is_none() {
+            slot.set_state_key(key.clone());
+        }
         let key_hash = *key.crypto_hash_ref();
         if self.delete(&key_hash).is_none() {
             self.num_items += 1;

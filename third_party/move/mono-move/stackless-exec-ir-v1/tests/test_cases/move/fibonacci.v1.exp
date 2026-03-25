@@ -1,0 +1,67 @@
+=== masm ===
+// Bytecode version v10
+module 0x42::fibonacci
+// Function definition at index 0
+fun fib(l0: u64): u64
+    copy_loc l0
+    ld_u64 1
+    le
+    br_false l0
+    move_loc l0
+    // @5
+    ret
+l0: copy_loc l0
+    ld_u64 1
+    sub
+    call fib
+    // @10
+    move_loc l0
+    ld_u64 2
+    sub
+    call fib
+    add
+    // @15
+    ret
+
+
+=== stackless-exec-ir ===
+=== Module 0x42::fibonacci ===
+
+fun fib(r0): u64 {
+  slots: params(1), locals(0), temps(3), args(1)
+    r0: u64
+    r1: bool
+    r2: u64
+    r3: u64
+  code:
+    0: r1 := le r0, #1
+    1: br_false L0, r1
+  L1:
+    2: ret [r0]
+  L0:
+    3: a0 := sub r0, #1
+    4: [r2] := call fib, [a0]
+    5: r3 := sub r0, #2
+    6: [a0] := call fib, [r3]
+    7: r3 := add r2, a0
+    8: ret [r3]
+}
+
+=== micro-ops ===
+=== Module 0x42::fibonacci ===
+
+fun fib() {
+  frame_data_size: 32
+  code:
+    0: JumpGreaterEqualU64Imm @2 [0] >= #2
+    1: Return
+    2: SubU64Imm [56] <- [0] - #1
+    3: CallFunc #0
+    4: Move8 [16] <- [56]
+    5: SubU64Imm [24] <- [0] - #2
+    6: Move8 [56] <- [24]
+    7: CallFunc #0
+    8: AddU64 [24] <- [16] + [56]
+    9: Move8 [0] <- [24]
+    10: Return
+}
