@@ -590,7 +590,7 @@ mod tests {
         // Enable with sender in allowlist
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
 
         assert!(store.maybe_start_trace(hash, sender, 1000));
         assert!(store.traces.contains_key(&hash));
@@ -609,7 +609,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
         store.maybe_start_trace(hash, sender, 1000);
 
         store.record_stage_at(&hash, TransactionStage::QsBatchPull, 1500);
@@ -633,7 +633,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
         store.maybe_start_trace(traced_hash, sender, 1000);
 
         store.register_batch(batch_digest, &[traced_hash, untraced_hash]);
@@ -660,7 +660,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
         store.maybe_start_trace(hash, sender, 1000);
 
         assert_eq!(store.get_trace(&hash).unwrap().current_attempt, 1);
@@ -676,7 +676,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
         store.maybe_start_trace(hash, sender, 1000);
 
         assert!(store.get_trace(&hash).is_some());
@@ -693,7 +693,7 @@ mod tests {
 
         let mut allowlist = std::collections::HashSet::new();
         allowlist.insert(sender);
-        store.update_filter(TransactionFilter::new(true, allowlist));
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0));
 
         // Old trace (insertion at t=1000)
         store.maybe_start_trace(old_hash, sender, 1000);

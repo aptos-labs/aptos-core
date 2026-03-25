@@ -20,15 +20,15 @@ pub struct TransactionFilter {
 }
 
 fn default_sample_rate() -> f64 {
-    1.0
+    0.01
 }
 
 impl TransactionFilter {
-    pub fn new(enabled: bool, sender_allowlist: HashSet<AccountAddress>) -> Self {
+    pub fn new(enabled: bool, sender_allowlist: HashSet<AccountAddress>, sample_rate: f64) -> Self {
         Self {
             enabled,
             sender_allowlist,
-            sample_rate: 1.0,
+            sample_rate,
         }
     }
 
@@ -36,7 +36,7 @@ impl TransactionFilter {
         Self {
             enabled: false,
             sender_allowlist: HashSet::new(),
-            sample_rate: 1.0,
+            sample_rate: 0.0,
         }
     }
 
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_sample_accepts_rate_1() {
-        let filter = TransactionFilter::new(true, HashSet::new());
+        let filter = TransactionFilter::new(true, HashSet::new(), 1.0);
         // rate=1.0 should accept everything
         for i in 0..100u64 {
             let hash = HashValue::from_slice(&{
@@ -93,8 +93,7 @@ mod tests {
 
     #[test]
     fn test_sample_accepts_rate_0() {
-        let mut filter = TransactionFilter::new(true, HashSet::new());
-        filter.sample_rate = 0.0;
+        let filter = TransactionFilter::new(true, HashSet::new(), 0.0);
         // rate=0.0 should reject everything
         for i in 0..100u64 {
             let hash = HashValue::from_slice(&{
@@ -109,8 +108,7 @@ mod tests {
 
     #[test]
     fn test_sample_accepts_rate_half() {
-        let mut filter = TransactionFilter::new(true, HashSet::new());
-        filter.sample_rate = 0.5;
+        let filter = TransactionFilter::new(true, HashSet::new(), 0.5);
         // With uniform hash distribution, ~50% should be accepted.
         // Use enough samples to be statistically stable.
         let mut accepted = 0;
