@@ -3,19 +3,31 @@
 
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::Zero;
-use ark_serialize::{CanonicalSerialize, SerializationError};
+use ark_serialize::{CanonicalSerialize, Compress};
 use std::collections::HashMap;
+
+/// Maximum compressed point size we support as an inline HashMap key.
+/// BLS12-381 G1 compressed = 48 bytes, BN254 G1 compressed = 32 bytes.
+const MAX_COMPRESSED_POINT_SIZE: usize = 48;
+
+/// Fixed-size inline key for the baby-step table, stored directly in the HashMap
+/// without per-entry heap allocations.
+type PointKey = [u8; MAX_COMPRESSED_POINT_SIZE];
 
 /// Baby-step table plus precomputed giant-step term: holds points j*G for j in [0, m),
 /// and stores G, table_size, and the precomputed -table_size*G for the giant-step loop.
-/// Points are stored as compressed-serialized bytes (CanonicalSerialize with Compress::Yes).
+///
+/// Compressed points are stored as fixed-size inline byte arrays in the HashMap,
+/// avoiding millions of individual heap allocations.
 #[allow(non_snake_case)]
 #[derive(Clone)]
 pub struct BabyStepTable<A: AffineRepr> {
     /// Base point for baby steps (point = j*G).
     pub G: A,
     /// Baby steps: compressed(point) -> exponent j (so that point = affinisation of j*G).
-    table: HashMap<Vec<u8>, u32>,
+    table: HashMap<PointKey, u32>,
+    /// Actual number of bytes used in each key (may be less than MAX_COMPRESSED_POINT_SIZE).
+    key_size: usize,
     /// Number of baby steps (table length).
     pub table_size: u32,
     /// Precomputed -table_size*G for giant steps.
@@ -26,26 +38,41 @@ impl<A: AffineRepr> BabyStepTable<A> {
     /// Builds the baby-step table and precomputes `table_size` and `G_neg_table_size`.
     ///
     /// Computes all points [0, G, 2*G, ...] in projective form, batch-normalizes once,
-    /// then inserts each affine point into the table using compressed serialization.
+    /// then inserts each compressed point into the table using a fixed-size inline key.
     #[allow(non_snake_case)]
     pub fn new(G: A, table_size: u32) -> Self {
         let table_size_as_usize = table_size as usize;
+        let key_size = G.compressed_size();
+        assert!(
+            key_size <= MAX_COMPRESSED_POINT_SIZE,
+            "compressed point size ({key_size}) exceeds MAX_COMPRESSED_POINT_SIZE ({MAX_COMPRESSED_POINT_SIZE})"
+        );
+
+        // 1. Compute all multiples in projective form.
         let mut points: Vec<A::Group> = Vec::with_capacity(table_size_as_usize);
         let mut current = A::Group::zero();
         for _ in 0..table_size {
             points.push(current);
             current += G;
         }
+
+        // 2. Batch normalize to affine.
         let normalized = A::Group::normalize_batch(&points);
+        // Free the projective points before building the table.
+        drop(points);
+
+        // 3. Insert compressed points into the HashMap with inline keys.
         let mut table = HashMap::with_capacity(table_size_as_usize);
         for (j, aff) in normalized.into_iter().enumerate() {
-            let key = compressed_bytes(&aff).expect("baby-step table: serialization failed");
+            let key = compress_to_key(&aff, key_size);
             table.insert(key, j as u32);
         }
+
         let G_neg_table_size = (G * -A::ScalarField::from(table_size)).into_affine();
         Self {
             G,
             table,
+            key_size,
             table_size,
             G_neg_table_size,
         }
@@ -53,22 +80,26 @@ impl<A: AffineRepr> BabyStepTable<A> {
 
     /// Look up an affine point in the table; returns the exponent j if point = j*G.
     pub fn get(&self, point: &A) -> Option<u32> {
-        let key = compressed_bytes(point).ok()?;
+        let key = compress_to_key(point, self.key_size);
         self.table.get(&key).copied()
     }
 
-    /// Approximate memory size of the table in gigabytes (compressed key + value bytes; HashMap overhead not included).
+    /// Approximate memory size of the table in gigabytes (inline key + value bytes; HashMap overhead not included).
     pub fn size_gb(&self) -> f64 {
-        let key_size = self.G.compressed_size();
-        let bytes_approx = self.table.len() * (key_size + std::mem::size_of::<u32>());
+        let bytes_approx =
+            self.table.len() * (MAX_COMPRESSED_POINT_SIZE + std::mem::size_of::<u32>());
         bytes_approx as f64 / 1e9
     }
 }
 
-fn compressed_bytes<A: CanonicalSerialize>(value: &A) -> Result<Vec<u8>, SerializationError> {
-    let mut bytes = Vec::with_capacity(value.compressed_size());
-    value.serialize_compressed(&mut bytes)?;
-    Ok(bytes)
+/// Serialize an affine point into a fixed-size inline key, zero-padded if the
+/// compressed representation is shorter than `MAX_COMPRESSED_POINT_SIZE`.
+fn compress_to_key<A: CanonicalSerialize>(point: &A, key_size: usize) -> PointKey {
+    let mut key = [0u8; MAX_COMPRESSED_POINT_SIZE];
+    point
+        .serialize_with_mode(&mut key[..key_size], Compress::Yes)
+        .expect("baby-step table: serialization failed");
+    key
 }
 
 #[cfg(test)]
