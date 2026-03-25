@@ -12,7 +12,6 @@ use crate::{
     txn_commit_hook::TransactionCommitHook,
     types::ReadWriteSummary,
 };
-use aptos_infallible::Mutex;
 use aptos_logger::error;
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
@@ -23,13 +22,13 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
     write_set::WriteOp,
 };
-use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::{execution_tracing::Trace, Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use parking_lot::Mutex;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Debug,
@@ -210,7 +209,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
 }
 
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>> {
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input (read set).
+    inputs: Vec<CachePadded<Mutex<Option<Arc<TxnInput<T>>>>>>, // txn_idx -> input (read set).
 
     output_wrappers: Vec<CachePadded<Mutex<OutputWrapper<T, O>>>>,
     // Used to record if the latest incarnation of a txn was a failure due to the
@@ -224,7 +223,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
-                .map(|_| CachePadded::new(ArcSwapOption::empty()))
+                .map(|_| CachePadded::new(Mutex::new(None)))
                 .collect(),
             output_wrappers: (0..num_txns)
                 .map(|_| {
@@ -254,7 +253,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             block_gas_limit_type,
             user_txn_bytes_len,
         )?;
-        self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
+        *self.inputs[txn_idx as usize].lock() = Some(Arc::new(input));
 
         Ok(())
     }
@@ -268,30 +267,25 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         key: &T::Key,
         txn_idx: TxnIndex,
     ) -> Result<(TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>), PanicError> {
-        self.inputs[txn_idx as usize].load().as_ref().map_or_else(
-            || {
-                Err(code_invariant_error(
-                    "Read must be recorded before fetching exchanged data".to_string(),
-                ))
-            },
-            |input| {
-                let data_read = input.get_by_kind(key, None, ReadKind::Value);
-                if let Some(DataRead::Versioned(_, value, Some(layout))) = data_read {
-                    Ok((value, layout))
-                } else {
-                    Err(code_invariant_error(format!(
-                        "Read value needing exchange {:?} not in Exchanged format",
-                        data_read
-                    )))
-                }
-            },
-        )
+        let guard = self.inputs[txn_idx as usize].lock();
+        let input = guard.as_ref().ok_or_else(|| {
+            code_invariant_error("Read must be recorded before fetching exchanged data".to_string())
+        })?;
+        let data_read = input.get_by_kind(key, None, ReadKind::Value);
+        if let Some(DataRead::Versioned(_, value, Some(layout))) = data_read {
+            Ok((value, layout))
+        } else {
+            Err(code_invariant_error(format!(
+                "Read value needing exchange {:?} not in Exchanged format",
+                data_read
+            )))
+        }
     }
 
     // Alongside the latest read set, returns the indicator of whether the latest
     // incarnation of the txn resulted in a speculative failure.
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<(Arc<TxnInput<T>>, bool)> {
-        let input = self.inputs[txn_idx as usize].load_full()?;
+        let input = Arc::clone(self.inputs[txn_idx as usize].lock().as_ref()?);
         let speculative_failure =
             self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed);
         Some((input, speculative_failure))
