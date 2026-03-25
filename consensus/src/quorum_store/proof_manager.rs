@@ -115,7 +115,9 @@ impl ProofManager {
             .unwrap_or_default();
 
         // Create PullSession once — accumulates state across all 3 pulls
-        let mut session = self.batch_proof_queue.create_pull_session(&excluded_batches);
+        let mut session = self
+            .batch_proof_queue
+            .create_pull_session(&excluded_batches);
 
         let (
             proof_block,

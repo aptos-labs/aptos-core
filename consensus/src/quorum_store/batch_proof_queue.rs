@@ -7,7 +7,7 @@ use super::{
 };
 use crate::quorum_store::counters;
 use aptos_consensus_types::{
-    common::{Author, TransactionSummary, TxnSummaryWithExpiration},
+    common::{Author, TxnSummaryWithExpiration},
     payload_pull_params::PerBatchKindTxnLimits,
     proof_of_store::{BatchInfoExt, BatchKind, ProofOfStore, TBatchInfo},
     utils::PayloadTxnsSize,
@@ -62,16 +62,16 @@ impl QueueItem {
 
 /// Accumulates state across the 3 sequential pulls (proofs, opt-batches, inline-batches)
 /// to avoid redundant work.
-pub(crate) struct PullSession {
+pub(crate) struct PullSession<'a> {
     pub(crate) excluded_batch_keys: HashSet<BatchKey>,
-    pub(crate) filtered_txns: HashSet<TransactionSummary>,
+    pub(crate) filtered_txns: HashSet<&'a TxnSummaryWithExpiration>,
     pub(crate) cur_txns_per_kind: HashMap<BatchKind, u64>,
 }
 
-impl PullSession {
+impl<'a> PullSession<'a> {
     fn new(
         excluded_batches: &HashSet<BatchInfoExt>,
-        items: &HashMap<BatchKey, QueueItem>,
+        items: &'a HashMap<BatchKey, QueueItem>,
     ) -> Self {
         let mut excluded_batch_keys = HashSet::with_capacity(excluded_batches.len());
         let mut filtered_txns = HashSet::new();
@@ -81,9 +81,7 @@ impl PullSession {
                 .get(&batch_key)
                 .and_then(|item| item.txn_summaries.as_ref())
             {
-                filtered_txns.extend(txn_summaries.iter().map(|s| {
-                    TransactionSummary::new(s.sender, s.replay_protector, s.hash)
-                }));
+                filtered_txns.extend(txn_summaries.iter());
             }
             excluded_batch_keys.insert(batch_key);
         }
@@ -98,7 +96,7 @@ impl PullSession {
     fn add_pulled_batches(
         &mut self,
         pulled: &[BatchInfoExt],
-        items: &HashMap<BatchKey, QueueItem>,
+        items: &'a HashMap<BatchKey, QueueItem>,
     ) {
         for info in pulled {
             let batch_key = BatchKey::from_info(info);
@@ -106,9 +104,7 @@ impl PullSession {
                 .get(&batch_key)
                 .and_then(|item| item.txn_summaries.as_ref())
             {
-                self.filtered_txns.extend(txn_summaries.iter().map(|s| {
-                    TransactionSummary::new(s.sender, s.replay_protector, s.hash)
-                }));
+                self.filtered_txns.extend(txn_summaries.iter());
             }
             self.excluded_batch_keys.insert(batch_key);
         }
@@ -118,7 +114,7 @@ impl PullSession {
     fn add_pulled_proofs(
         &mut self,
         pulled: &[ProofOfStore<BatchInfoExt>],
-        items: &HashMap<BatchKey, QueueItem>,
+        items: &'a HashMap<BatchKey, QueueItem>,
     ) {
         for proof in pulled {
             let batch_key = BatchKey::from_info(proof.info());
@@ -126,9 +122,7 @@ impl PullSession {
                 .get(&batch_key)
                 .and_then(|item| item.txn_summaries.as_ref())
             {
-                self.filtered_txns.extend(txn_summaries.iter().map(|s| {
-                    TransactionSummary::new(s.sender, s.replay_protector, s.hash)
-                }));
+                self.filtered_txns.extend(txn_summaries.iter());
             }
             self.excluded_batch_keys.insert(batch_key);
         }
@@ -248,7 +242,7 @@ impl BatchProofQueue {
     pub(crate) fn create_pull_session(
         &self,
         excluded_batches: &HashSet<BatchInfoExt>,
-    ) -> PullSession {
+    ) -> PullSession<'_> {
         PullSession::new(excluded_batches, &self.items)
     }
 
@@ -495,15 +489,14 @@ impl BatchProofQueue {
         });
     }
 
-    fn log_remaining_data_after_pull(
-        &self,
-        pulled_proofs: &[ProofOfStore<BatchInfoExt>],
-    ) {
+    fn log_remaining_data_after_pull(&self, pulled_proofs: &[ProofOfStore<BatchInfoExt>]) {
         let pulled_txns = pulled_proofs.iter().map(|p| p.num_txns()).sum::<u64>();
-        let num_proofs_remaining_after_pull =
-            self.remaining_proofs.saturating_sub(pulled_proofs.len() as u64);
-        let num_txns_remaining_after_pull =
-            self.remaining_txns_with_duplicates.saturating_sub(pulled_txns);
+        let num_proofs_remaining_after_pull = self
+            .remaining_proofs
+            .saturating_sub(pulled_proofs.len() as u64);
+        let num_txns_remaining_after_pull = self
+            .remaining_txns_with_duplicates
+            .saturating_sub(pulled_txns);
 
         debug!(
             "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}, remaining_txns: {:?}",
@@ -524,9 +517,9 @@ impl BatchProofQueue {
     // this flag is set false.
     // Returns the proofs, the number of unique transactions in the proofs, and a flag indicating
     // whether the proof queue is fully utilized.
-    pub(crate) fn pull_proofs(
-        &mut self,
-        session: &mut PullSession,
+    pub(crate) fn pull_proofs<'a>(
+        &'a self,
+        session: &mut PullSession<'a>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
@@ -599,9 +592,9 @@ impl BatchProofQueue {
         )
     }
 
-    pub fn pull_batches(
-        &mut self,
-        session: &mut PullSession,
+    pub fn pull_batches<'a>(
+        &'a self,
+        session: &mut PullSession<'a>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -649,9 +642,9 @@ impl BatchProofQueue {
         (result, pulled_txns, unique_txns, cur_txns_per_kind)
     }
 
-    fn pull_batches_internal(
-        &mut self,
-        session: &mut PullSession,
+    fn pull_batches_internal<'a>(
+        &'a self,
+        session: &mut PullSession<'a>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -685,9 +678,9 @@ impl BatchProofQueue {
         (batches, all_txns, unique_txns, is_full, cur_txns_per_kind)
     }
 
-    pub fn pull_batches_with_transactions(
-        &mut self,
-        session: &mut PullSession,
+    pub fn pull_batches_with_transactions<'a>(
+        &'a self,
+        session: &mut PullSession<'a>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
@@ -735,10 +728,10 @@ impl BatchProofQueue {
         (result, pulled_txns, unique_txns)
     }
 
-    fn pull_internal(
-        &mut self,
+    fn pull_internal<'a>(
+        &'a self,
         batches_without_proofs: bool,
-        session: &mut PullSession,
+        session: &mut PullSession<'a>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -749,7 +742,7 @@ impl BatchProofQueue {
         per_kind_txn_limits: &PerBatchKindTxnLimits,
         pull_kind: &str,
     ) -> (
-        Vec<&QueueItem>,
+        Vec<&'a QueueItem>,
         PayloadTxnsSize,
         u64,
         bool,
@@ -764,7 +757,7 @@ impl BatchProofQueue {
         // Defer session mutation: collect pending txns locally so that if the pull
         // is discarded (return_non_full == false && !full), we don't pollute the
         // session's filtered_txns for subsequent pulls.
-        let mut pending_filtered_txns: HashSet<TransactionSummary> = HashSet::new();
+        let mut pending_filtered_txns: HashSet<&TxnSummaryWithExpiration> = HashSet::new();
 
         let max_batch_creation_ts_usecs = min_batch_age_usecs
             .map(|min_age| aptos_infallible::duration_since_epoch().as_micros() as u64 - min_age);
@@ -776,22 +769,19 @@ impl BatchProofQueue {
             &self.author_to_proof_batches
         };
 
+        let items = &self.items;
+        let batch_expiry_gap = self.batch_expiry_gap_when_init_usecs;
+
         let mut iters = vec![];
         for (_, batches) in author_map
             .iter()
             .filter(|(author, _)| !exclude_authors.contains(author))
         {
-            let batch_iter = batches.iter().rev().filter_map(|(sort_key, info)| {
-                if let Some(item) = self.items.get(&sort_key.batch_key) {
-                    // No need to check is_committed() or proof status — split maps handle that
+            let batch_iter = batches.iter().rev().filter_map(|(sort_key, _info)| {
+                if let Some(item) = items.get(&sort_key.batch_key) {
+                    let batch_create_ts_usecs =
+                        item.info.expiration().saturating_sub(batch_expiry_gap);
 
-                    let batch_create_ts_usecs = item
-                        .info
-                        .expiration()
-                        .saturating_sub(self.batch_expiry_gap_when_init_usecs);
-
-                    // Ensure that the batch was created at least `min_batch_age_usecs` ago to
-                    // reduce the chance of inline fetches.
                     if max_batch_creation_ts_usecs
                         .is_some_and(|max_create_ts| batch_create_ts_usecs > max_create_ts)
                     {
@@ -801,20 +791,23 @@ impl BatchProofQueue {
                         return None;
                     }
 
-                    return Some((info, item));
+                    return Some((&item.info, item));
                 }
                 None
             });
             iters.push(batch_iter);
         }
 
-        // Single shuffle then round-robin (Optimization 6)
+        // Single shuffle then round-robin
         iters.shuffle(&mut thread_rng());
         let mut idx = 0;
         while !iters.is_empty() && !full {
             match iters[idx].next() {
                 Some((batch, item)) => {
-                    if session.excluded_batch_keys.contains(&BatchKey::from_info(batch)) {
+                    if session
+                        .excluded_batch_keys
+                        .contains(&BatchKey::from_info(batch))
+                    {
                         excluded_txns += batch.num_txns();
                     } else {
                         // Check per-kind txn limit
@@ -831,22 +824,19 @@ impl BatchProofQueue {
 
                         // Calculate unique txns (Optimization 5: single pass)
                         let new_unique =
-                            item.txn_summaries.as_ref().map_or(batch.num_txns(), |summaries| {
-                                summaries
-                                    .iter()
-                                    .filter(|txn_summary| {
-                                        let summary = TransactionSummary::new(
-                                            txn_summary.sender,
-                                            txn_summary.replay_protector,
-                                            txn_summary.hash,
-                                        );
-                                        !session.filtered_txns.contains(&summary)
-                                            && !pending_filtered_txns.contains(&summary)
-                                            && block_timestamp.as_secs()
-                                                < txn_summary.expiration_timestamp_secs
-                                    })
-                                    .count() as u64
-                            });
+                            item.txn_summaries
+                                .as_ref()
+                                .map_or(batch.num_txns(), |summaries| {
+                                    summaries
+                                        .iter()
+                                        .filter(|txn_summary| {
+                                            !session.filtered_txns.contains(txn_summary)
+                                                && !pending_filtered_txns.contains(txn_summary)
+                                                && block_timestamp.as_secs()
+                                                    < txn_summary.expiration_timestamp_secs
+                                        })
+                                        .count() as u64
+                                });
 
                         let unique_txns = cur_unique_txns + new_unique;
                         if cur_all_txns + batch.size() > max_txns
@@ -865,9 +855,7 @@ impl BatchProofQueue {
                         // Accept — bulk insert summaries into pending set (deferred)
                         cur_unique_txns += new_unique;
                         if let Some(ref summaries) = item.txn_summaries {
-                            pending_filtered_txns.extend(summaries.iter().map(|s| {
-                                TransactionSummary::new(s.sender, s.replay_protector, s.hash)
-                            }));
+                            pending_filtered_txns.extend(summaries.iter());
                         }
 
                         assert!(item.proof.is_none() == batches_without_proofs);
@@ -1114,11 +1102,23 @@ impl BatchProofQueue {
                 let is_committed = item.is_committed();
                 let gas_bucket = item.proof.as_ref().map(|p| p.gas_bucket_start());
                 let insertion_elapsed = item.proof_insertion_time.map(|t| t.elapsed());
-                (had_proof, had_summaries, is_committed, gas_bucket, insertion_elapsed)
+                (
+                    had_proof,
+                    had_summaries,
+                    is_committed,
+                    gas_bucket,
+                    insertion_elapsed,
+                )
             });
 
             match item_state {
-                Some((had_proof, had_summaries, is_already_committed, gas_bucket, insertion_elapsed)) => {
+                Some((
+                    had_proof,
+                    had_summaries,
+                    is_already_committed,
+                    gas_bucket,
+                    insertion_elapsed,
+                )) => {
                     if had_proof {
                         if let (Some(bucket), Some(elapsed)) = (gas_bucket, insertion_elapsed) {
                             counters::pos_to_commit(bucket, elapsed.as_secs_f64());
