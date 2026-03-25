@@ -114,7 +114,7 @@ impl StateSnapshotCommitter {
                                         key_hash,
                                         Some((
                                             HotStateValueRef::from_slot(&slot).hash(),
-                                            slot.state_key().clone(),
+                                            slot.expect_state_key().clone(),
                                         )),
                                     ));
                                 } else {
