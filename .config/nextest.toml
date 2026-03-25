@@ -24,10 +24,12 @@ terminate-after = 1
 
 [profile.smoke-test]
 # like profile.ci
-status-level = "skip"
+status-level = "retry"
+final-status-level = "flaky"
 failure-output = "immediate-final"
 fail-fast = true
 # different than ci
 test-threads = 6
 retries = 3
 slow-timeout = { period = "1800s", terminate-after = 1 }
+junit = { path = "junit.xml" }

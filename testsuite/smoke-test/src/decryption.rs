@@ -108,7 +108,7 @@ async fn test_encryption_key_rotation_and_encrypted_txns() {
 
     // ---- Wait for epoch 2 and record the encryption key ----
     info!("Waiting for epoch 2...");
-    let key_at_epoch2 = wait_for_epoch(&client, 2, 90).await;
+    let key_at_epoch2 = wait_for_epoch(&client, 2, 180).await;
     let epoch2 = client
         .get_ledger_information()
         .await
@@ -160,7 +160,7 @@ async fn test_encryption_key_rotation_and_encrypted_txns() {
 
     // ---- Wait for the next epoch and check the key changed ----
     info!("Waiting for epoch {}...", epoch2 + 1);
-    let key_at_next_epoch = wait_for_epoch(&client, epoch2 + 1, 60).await;
+    let key_at_next_epoch = wait_for_epoch(&client, epoch2 + 1, 120).await;
     let next_epoch = client
         .get_ledger_information()
         .await

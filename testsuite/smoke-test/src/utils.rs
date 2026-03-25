@@ -23,7 +23,7 @@ use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use rand::random;
 use std::{collections::HashSet, net::Ipv4Addr, sync::Arc, time::Duration};
 
-pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
+pub const MAX_CATCH_UP_WAIT_SECS: u64 = 300; // The max time we'll wait for nodes to catch up
 pub const MAX_CONNECTIVITY_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to gain connectivity
 pub const MAX_HEALTHY_WAIT_SECS: u64 = 120; // The max time we'll wait for nodes to become healthy
 

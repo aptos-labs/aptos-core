@@ -109,8 +109,8 @@ jobs:
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-  # Run all rust smoke tests. This is a PR required job.
-  rust-smoke-tests:
+  # Build for smoke tests
+  rust-smoke-test-build:
     needs: file_change_determinator
     if: | # Only run on each PR once an appropriate event occurs
       (
@@ -124,11 +124,78 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-      - name: Run rust smoke tests
-        uses: ./.github/actions/rust-smoke-tests
+      # Archive first: builds smoke-test deps, establishing the cache.
+      # App binaries second: reuse that cache; aptos-node adds failpoints on top.
+      - name: Create nextest archive
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        run: cargo nextest archive --release --package smoke-test --archive-file smoke-test-archive.tar.zst
+      - name: Build aptos-node, CLI, and debugger
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        run: cargo build --locked --release --package aptos-node --features=failpoints,smoke-test --package aptos --package aptos-debugger
+      - name: Strip binaries
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        run: strip --strip-unneeded target/release/aptos-node target/release/aptos target/release/aptos-debugger
+      - name: Upload build artifacts
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        uses: actions/upload-artifact@v4
         with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          name: smoke-test-build
+          path: |
+            smoke-test-archive.tar.zst
+            target/release/aptos-node
+            target/release/aptos
+            target/release/aptos-debugger
+          retention-days: 1
+
+  # Run smoke test shards in parallel
+  rust-smoke-test-shard:
+    needs: [file_change_determinator, rust-smoke-test-build]
+    if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: smoke-test-build
+      - name: Make binaries executable
+        run: chmod +x target/release/aptos-node target/release/aptos target/release/aptos-debugger
+      - name: Run postgres database
+        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - name: Run smoke tests (shard ${{ matrix.partition }}/3)
+        env:
+          SMOKE_TEST_PREBUILD: ${{ github.workspace }}/target/release
+        run: |
+          cargo nextest run --archive-file smoke-test-archive.tar.zst --profile smoke-test \
+            --partition hash:${{ matrix.partition }}/3
+      - name: Upload smoke test logs
+        if: ${{ failure() || success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-smoke-test-logs-${{ matrix.partition }}
+          include-hidden-files: true
+          path: |
+            /tmp/.tmp*
+            !/tmp/.tmp*/**/db/
+          retention-days: 14
+
+  # Aggregator — keeps the PR-required job name so no branch protection changes needed
+  rust-smoke-tests:
+    needs: [file_change_determinator, rust-smoke-test-shard]
+    if: always()
+    runs-on: 2cpu-gh-ubuntu24-x64
+    steps:
+      - run: |
+          if [[ "${{ needs.rust-smoke-test-shard.result }}" == "success" || "${{ needs.rust-smoke-test-shard.result }}" == "skipped" ]]; then
+            echo "Smoke tests passed (or skipped)"
+          else
+            echo "Smoke tests failed"
+            exit 1
+          fi
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 

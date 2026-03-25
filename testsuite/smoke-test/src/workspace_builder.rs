@@ -17,7 +17,17 @@ const WORKSPACE_BUILD_ERROR_MSG: &str = r#"
 "#;
 
 // Global flag indicating if all binaries in the workspace have been built.
+// When SMOKE_TEST_PREBUILD is set, binaries are assumed to be pre-built (e.g. in CI sharded runs).
 static WORKSPACE_BUILT: Lazy<bool> = Lazy::new(|| {
+    if env::var("SMOKE_TEST_PREBUILD")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .is_some()
+    {
+        info!("Skipping workspace build: SMOKE_TEST_PREBUILD is set, using pre-built binaries");
+        return true;
+    }
+
     info!("Building project binaries");
     let mut args = cargo_build_common_args();
     args.append(&mut vec!["--all", "--bins", "--exclude", "aptos-node"]);
@@ -47,8 +57,13 @@ pub fn workspace_root() -> PathBuf {
 }
 
 // Path to the directory where build artifacts live.
-//TODO maybe add an Environment Variable which points to built binaries
+// When SMOKE_TEST_PREBUILD is set to a directory path, use that directory directly.
+// Otherwise, derive from current_exe().
 fn build_dir() -> PathBuf {
+    if let Ok(dir) = env::var("SMOKE_TEST_PREBUILD") {
+        return PathBuf::from(dir);
+    }
+
     env::current_exe()
         .ok()
         .map(|mut path| {

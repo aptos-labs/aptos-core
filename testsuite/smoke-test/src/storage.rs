@@ -10,7 +10,7 @@ use crate::{
     workspace_builder,
     workspace_builder::workspace_root,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use aptos_backup_cli::metadata::view::BackupStorageState;
 use aptos_forge::{reconfig, AptosPublicInfo, Node, NodeExt, Swarm, SwarmExt};
 use aptos_logger::{error, info};
@@ -20,7 +20,7 @@ use itertools::Itertools;
 use std::{
     fs,
     path::Path,
-    process::Command,
+    process::{Command, Output, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -29,6 +29,32 @@ use std::{
 };
 
 const LINE: &str = "----------";
+
+/// Maximum time to wait for any single aptos-debugger subprocess to complete.
+const DEBUGGER_TIMEOUT: Duration = Duration::from_secs(120);
+/// Maximum total time to wait for the backup coordinator to produce the needed artifacts.
+const BACKUP_WAIT_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// Run a command with a timeout, capturing stdout/stderr.
+/// Returns an error if the process times out or fails to start.
+fn run_command_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<Output> {
+    use std::sync::mpsc;
+    let child = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("failed to spawn command")?;
+    // Drain pipes and wait in a separate thread so we don't deadlock if the child
+    // fills the OS pipe buffer.
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(child.wait_with_output());
+    });
+    match rx.recv_timeout(timeout) {
+        Ok(result) => result.context("failed to collect output"),
+        Err(_) => bail!("command timed out after {}s", timeout.as_secs()),
+    }
+}
 
 #[tokio::test]
 async fn test_db_restore() {
@@ -193,19 +219,17 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         cmd.arg(w.to_string());
     });
 
-    let status = cmd
-        .args([
-            "--metadata-cache-dir",
-            metadata_cache_path.path().to_str().unwrap(),
-            "--concurrent-downloads",
-            "4",
-            "--local-fs-dir",
-            backup_path.to_str().unwrap(),
-        ])
-        .current_dir(workspace_root())
-        .status()
-        .unwrap();
-    assert!(status.success(), "{}", status);
+    cmd.args([
+        "--metadata-cache-dir",
+        metadata_cache_path.path().to_str().unwrap(),
+        "--concurrent-downloads",
+        "4",
+        "--local-fs-dir",
+        backup_path.to_str().unwrap(),
+    ])
+    .current_dir(workspace_root());
+    let output = run_command_with_timeout(&mut cmd, DEBUGGER_TIMEOUT).unwrap();
+    assert!(output.status.success(), "{}", output.status);
     info!("Backup verified in {} seconds.", now.elapsed().as_secs());
 }
 
@@ -225,20 +249,18 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         cmd.arg(w.to_string());
     });
 
-    let replay = cmd
-        .args([
-            "--metadata-cache-dir",
-            metadata_cache_path.path().to_str().unwrap(),
-            "--concurrent-downloads",
-            "4",
-            "--target-db-dir",
-            target_db_dir.path().to_str().unwrap(),
-            "--local-fs-dir",
-            backup_path.to_str().unwrap(),
-        ])
-        .current_dir(workspace_root())
-        .output()
-        .unwrap();
+    cmd.args([
+        "--metadata-cache-dir",
+        metadata_cache_path.path().to_str().unwrap(),
+        "--concurrent-downloads",
+        "4",
+        "--target-db-dir",
+        target_db_dir.path().to_str().unwrap(),
+        "--local-fs-dir",
+        backup_path.to_str().unwrap(),
+    ])
+    .current_dir(workspace_root());
+    let replay = run_command_with_timeout(&mut cmd, DEBUGGER_TIMEOUT).unwrap();
     assert!(
         replay.status.success(),
         "{}, {}",
@@ -261,7 +283,10 @@ fn wait_for_backups(
     backup_path: &Path,
     trusted_waypoints: &[Waypoint],
 ) -> Result<Version> {
-    for i in 0..120 {
+    let deadline = now + BACKUP_WAIT_TIMEOUT;
+    let mut i = 0;
+    let mut verified_non_empty_backup = false;
+    while Instant::now() < deadline {
         info!(
             "{}th wait for the backup to reach epoch {}, version {}.",
             i, target_epoch, target_version,
@@ -283,16 +308,21 @@ fn wait_for_backups(
             return Ok(snapshot_version);
         }
         info!("Backup storage state: {}", state);
-        if state.latest_transaction_version.is_some() {
-            // the verify should always succeed unless backup storage is completely empty.
+        if !verified_non_empty_backup && state.latest_transaction_version.is_some() {
+            // Verifying a non-empty backup is expensive; doing it on every poll turns
+            // this retry loop into an hours-long wait under failure.
             db_backup_verify(backup_path, trusted_waypoints);
+            verified_non_empty_backup = true;
         }
         std::thread::sleep(Duration::from_secs(1));
+        i += 1;
     }
 
     error!(
-        "Timed out waiting for backup to reach epoch {}, version {}.",
-        target_epoch, target_version
+        "Timed out after {}s waiting for backup to reach epoch {}, version {}.",
+        BACKUP_WAIT_TIMEOUT.as_secs(),
+        target_epoch,
+        target_version
     );
     bail!("Failed to create backup.");
 }
@@ -302,23 +332,21 @@ fn get_backup_storage_state(
     metadata_cache_path: &Path,
     backup_path: &Path,
 ) -> Result<BackupStorageState> {
-    let output = Command::new(bin_path)
-        .current_dir(workspace_root())
-        .args([
-            "aptos-db",
-            "backup",
-            "query",
-            "backup-storage-state",
-            "--metadata-cache-dir",
-            metadata_cache_path.to_str().unwrap(),
-            "--concurrent-downloads",
-            "4",
-            "--local-fs-dir",
-            backup_path.to_str().unwrap(),
-        ])
-        .output()?
-        .stdout;
-    std::str::from_utf8(&output)?.parse()
+    let mut cmd = Command::new(bin_path);
+    cmd.current_dir(workspace_root()).args([
+        "aptos-db",
+        "backup",
+        "query",
+        "backup-storage-state",
+        "--metadata-cache-dir",
+        metadata_cache_path.to_str().unwrap(),
+        "--concurrent-downloads",
+        "4",
+        "--local-fs-dir",
+        backup_path.to_str().unwrap(),
+    ]);
+    let output = run_command_with_timeout(&mut cmd, Duration::from_secs(30))?;
+    std::str::from_utf8(&output.stdout)?.parse()
 }
 
 #[allow(clippy::zombie_processes)]
@@ -380,27 +408,25 @@ pub(crate) fn db_backup(
     );
 
     // start the backup compaction
-    let compaction = Command::new(bin_path.as_path())
-        .current_dir(workspace_root())
-        .args([
-            "aptos-db",
-            "backup-maintenance",
-            "compact",
-            "--epoch-ending-file-compact-factor",
-            "2",
-            "--state-snapshot-file-compact-factor",
-            "2",
-            "--transaction-file-compact-factor",
-            "2",
-            "--metadata-cache-dir",
-            metadata_cache_path1.path().to_str().unwrap(),
-            "--concurrent-downloads",
-            "4",
-            "--local-fs-dir",
-            backup_path.path().to_str().unwrap(),
-        ])
-        .output()
-        .unwrap();
+    let mut compaction_cmd = Command::new(bin_path.as_path());
+    compaction_cmd.current_dir(workspace_root()).args([
+        "aptos-db",
+        "backup-maintenance",
+        "compact",
+        "--epoch-ending-file-compact-factor",
+        "2",
+        "--state-snapshot-file-compact-factor",
+        "2",
+        "--transaction-file-compact-factor",
+        "2",
+        "--metadata-cache-dir",
+        metadata_cache_path1.path().to_str().unwrap(),
+        "--concurrent-downloads",
+        "4",
+        "--local-fs-dir",
+        backup_path.path().to_str().unwrap(),
+    ]);
+    let compaction = run_command_with_timeout(&mut compaction_cmd, DEBUGGER_TIMEOUT).unwrap();
     assert!(
         compaction.status.success(),
         "{}",
@@ -438,21 +464,19 @@ pub(crate) fn db_restore(
         cmd.arg(version.to_string());
     }
 
-    let status = cmd
-        .args([
-            "--target-db-dir",
-            db_path.to_str().unwrap(),
-            "--concurrent-downloads",
-            "4",
-            "--metadata-cache-dir",
-            metadata_cache_path.path().to_str().unwrap(),
-            "--local-fs-dir",
-            backup_path.to_str().unwrap(),
-        ])
-        .current_dir(workspace_root())
-        .status()
-        .unwrap();
-    assert!(status.success(), "{}", status);
+    cmd.args([
+        "--target-db-dir",
+        db_path.to_str().unwrap(),
+        "--concurrent-downloads",
+        "4",
+        "--metadata-cache-dir",
+        metadata_cache_path.path().to_str().unwrap(),
+        "--local-fs-dir",
+        backup_path.to_str().unwrap(),
+    ])
+    .current_dir(workspace_root());
+    let output = run_command_with_timeout(&mut cmd, DEBUGGER_TIMEOUT).unwrap();
+    assert!(output.status.success(), "{}", output.status);
     info!("Backup restored in {} seconds.", now.elapsed().as_secs());
 }
 

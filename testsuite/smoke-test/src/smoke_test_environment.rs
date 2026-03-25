@@ -13,7 +13,7 @@ use aptos_logger::prelude::*;
 use aptos_types::chain_id::ChainId;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
-use std::{num::NonZeroUsize, sync::Arc};
+use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 use tokio::task::JoinHandle;
 
 const SWARM_BUILD_NUM_RETRIES: u8 = 3;
@@ -81,13 +81,20 @@ impl SwarmBuilder {
     // Gas is not enabled with this setup, it's enabled via forge instance.
     pub async fn build_inner(&mut self) -> anyhow::Result<LocalSwarm> {
         ::aptos_logger::Logger::new().init();
-        env_logger::init();
+        let _ = env_logger::try_init();
         info!("Preparing to finish compiling");
         // TODO change to return Swarm trait
         // Add support for forge
         assert!(self.local);
-        static FACTORY: Lazy<LocalFactory> =
-            Lazy::new(|| LocalFactory::from_workspace(None).unwrap());
+        static FACTORY: Lazy<LocalFactory> = Lazy::new(|| {
+            if let Ok(dir) = std::env::var("SMOKE_TEST_PREBUILD") {
+                let binary_path = PathBuf::from(dir).join("aptos-node");
+                info!("Using pre-built aptos-node binary: {:?}", binary_path);
+                LocalFactory::from_binary(binary_path, None).unwrap()
+            } else {
+                LocalFactory::from_workspace(None).unwrap()
+            }
+        });
         let version = FACTORY.versions().max().unwrap();
         info!("Node finished compiling");
 

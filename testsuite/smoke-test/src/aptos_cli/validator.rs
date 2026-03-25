@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos::{
     account::create::DEFAULT_FUNDED_COINS,
-    common::types::TransactionSummary,
+    common::types::{CliTypedResult, TransactionSummary},
     node::analyze::{
         analyze_validators::{AnalyzeValidators, EpochStats},
         fetch_metadata::FetchMetadata,
@@ -39,6 +39,26 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+
+/// Retry a CLI operation that may fail with ERECONFIGURATION_IN_PROGRESS.
+/// This is a transient error that occurs when a validator set change is attempted
+/// during an in-progress reconfiguration.
+async fn retry_on_reconfig<F, Fut>(f: F) -> CliTypedResult<TransactionSummary>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = CliTypedResult<TransactionSummary>>,
+{
+    for _ in 0..10 {
+        match f().await {
+            Err(e) if e.to_string().contains("ERECONFIGURATION_IN_PROGRESS") => {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                continue;
+            },
+            result => return result,
+        }
+    }
+    f().await
+}
 
 #[tokio::test]
 async fn test_analyze_validators() {
@@ -593,7 +613,7 @@ async fn test_large_total_stake() {
     .await
     .unwrap();
 
-    cli.join_validator_set(validator_cli_index, None)
+    retry_on_reconfig(|| cli.join_validator_set(validator_cli_index, None))
         .await
         .unwrap();
 
@@ -742,7 +762,7 @@ async fn test_nodes_rewards() {
         .await
         .unwrap();
 
-    cli.leave_validator_set(validator_cli_indices[3], None)
+    retry_on_reconfig(|| cli.leave_validator_set(validator_cli_indices[3], None))
         .await
         .unwrap();
 
@@ -1153,7 +1173,7 @@ async fn test_join_and_leave_validator() {
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
 
     gas_used += get_gas(
-        cli.join_validator_set(validator_cli_index, None)
+        retry_on_reconfig(|| cli.join_validator_set(validator_cli_index, None))
             .await
             .unwrap(),
     );
@@ -1177,7 +1197,7 @@ async fn test_join_and_leave_validator() {
     .await;
 
     gas_used += get_gas(
-        cli.leave_validator_set(validator_cli_index, None)
+        retry_on_reconfig(|| cli.leave_validator_set(validator_cli_index, None))
             .await
             .unwrap(),
     );
@@ -1387,7 +1407,7 @@ async fn test_owner_create_and_delegate_flow() {
         .await;
     println!("after5");
 
-    cli.join_validator_set(operator_cli_index, Some(owner_cli_index))
+    retry_on_reconfig(|| cli.join_validator_set(operator_cli_index, Some(owner_cli_index)))
         .await
         .unwrap();
 
@@ -1434,7 +1454,7 @@ async fn test_owner_create_and_delegate_flow() {
     .await
     .unwrap();
 
-    cli.leave_validator_set(new_operator_cli_index, Some(owner_cli_index))
+    retry_on_reconfig(|| cli.leave_validator_set(new_operator_cli_index, Some(owner_cli_index)))
         .await
         .unwrap();
 

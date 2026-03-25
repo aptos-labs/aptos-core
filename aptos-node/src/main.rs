@@ -3,14 +3,18 @@
 
 #![deny(unsafe_code)]
 
-use aptos_node::{utils::ERROR_MSG_BAD_FEATURE_FLAGS, AptosNodeArgs};
+#[cfg(not(feature = "smoke-test"))]
+use aptos_node::utils::ERROR_MSG_BAD_FEATURE_FLAGS;
+use aptos_node::AptosNodeArgs;
 use clap::Parser;
 
 #[cfg(unix)]
 aptos_jemalloc::setup_jemalloc!();
 
 fn main() {
-    // Check that we are not including any Move test natives
+    // Check that we are not including any Move test natives.
+    // Skip in smoke-test builds where cargo feature unification may leak the `testing` feature.
+    #[cfg(not(feature = "smoke-test"))]
     aptos_vm::natives::assert_no_test_natives(ERROR_MSG_BAD_FEATURE_FLAGS);
 
     // Start the node
