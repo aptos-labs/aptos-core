@@ -714,7 +714,7 @@ def fullnode_api_url(network: str) -> str:
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_fixed(2),
-    retry=retry_if_exception_type(urllib.error.HTTPError),
+    retry=retry_if_exception_type((urllib.error.HTTPError, urllib.error.URLError)),
 )
 def get_txn_timestamp_usecs(network: str, version: int) -> int:
     """Get the timestamp (in microseconds) of a transaction by version."""
