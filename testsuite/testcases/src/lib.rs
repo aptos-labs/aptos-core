@@ -20,6 +20,7 @@ pub mod quorum_store_onchain_enable_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod three_region_simulation_test;
+pub mod transaction_tracing_test;
 pub mod twin_validator_test;
 pub mod two_traffics_test;
 pub mod validator_join_leave_test;

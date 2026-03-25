@@ -289,12 +289,11 @@ impl Node for K8sNode {
             })
     }
 
-    // TODO: verify this still works
     fn inspection_service_endpoint(&self) -> Url {
         Url::parse(&format!(
             "http://{}:{}",
             &self.service_name(),
-            self.rest_api_port()
+            NODE_METRIC_PORT
         ))
         .unwrap()
     }

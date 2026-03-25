@@ -99,7 +99,6 @@ pub fn get_ungrouped_test(test_name: &str, duration: Duration) -> Option<ForgeCo
         "gather_metrics" => Some(gather_metrics()),
         "setup_test" => Some(setup_test()),
         "config" => Some(reconfiguration_test()),
-
         // Db
         "large_db_simple_test" => Some(large_db_simple_test()),
 
