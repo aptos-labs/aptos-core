@@ -7,8 +7,8 @@ publish = false
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-move-asm = { workspace = true }
 mono-move-micro-ops = { workspace = true }
+move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
