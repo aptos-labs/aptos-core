@@ -52,9 +52,8 @@ impl<'a> HotStateLRU<'a> {
             slot.is_hot(),
             "Should not insert cold slots into hot state."
         );
-        assert_eq!(
-            key,
-            slot.state_key(),
+        assert!(
+            slot.state_key().is_none_or(|sk| key == sk),
             "Map key and embedded state_key must match."
         );
         let key_hash = *key.crypto_hash_ref();
