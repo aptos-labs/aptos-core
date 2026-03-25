@@ -2922,15 +2922,9 @@ impl ExpTranslator<'_, '_, '_> {
                 // node the original (possibly reference) type for AST consistency.
                 let inner_expected = expected_type.skip_reference();
                 if let Some((value, ty)) = self.translate_value(val, inner_expected, context) {
-                    self.check_type_with_order(
-                        expected_order,
-                        loc,
-                        &ty,
-                        inner_expected,
-                        context,
-                    );
-                    let pat_ty = if expected_type.is_reference() {
-                        expected_type.clone()
+                    let ty = self.check_type(loc, &ty, inner_expected, context);
+                    let pat_ty = if let Type::Reference(kind, _) = expected_type {
+                        Type::Reference(*kind, Box::new(ty))
                     } else {
                         ty
                     };
@@ -3300,18 +3294,9 @@ impl ExpTranslator<'_, '_, '_> {
             EA::Value_::InferredNum(x) => {
                 self.translate_number(&loc, BigInt::from(*x), None, expected_type, context)
             },
-            EA::Value_::Bool(x) => {
-                let ty = self.check_type(
-                    &loc,
-                    &Type::new_prim(PrimitiveType::Bool),
-                    expected_type,
-                    context,
-                );
-                Some((Value::Bool(*x), ty))
-            },
+            EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
             EA::Value_::Bytearray(x) => {
-                let actual_ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
-                let ty = self.check_type(&loc, &actual_ty, expected_type, context);
+                let ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
                 Some((Value::ByteArray(x.clone()), ty))
             },
         }
