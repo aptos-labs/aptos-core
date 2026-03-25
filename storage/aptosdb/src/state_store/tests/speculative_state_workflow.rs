@@ -23,7 +23,7 @@ use aptos_types::{
     state_store::{
         hot_state::{HotStateValueRef, LRUEntry},
         state_key::StateKey,
-        state_slot::StateSlot,
+        state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
         state_value::StateValue,
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
@@ -210,10 +210,10 @@ impl VersionState {
             let shard_id = k.get_shard_id();
             match v_opt {
                 None => {
-                    let slot = StateSlot::HotVacant {
+                    let slot = StateSlot::new(k.clone(), StateSlotKind::HotVacant {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
-                    };
+                    });
                     hot_smt_updates
                         .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
@@ -221,12 +221,12 @@ impl VersionState {
                     state.remove(k);
                 },
                 Some(v) => {
-                    let slot = StateSlot::HotOccupied {
+                    let slot = StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
                         value_version: version,
                         value: v.clone(),
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
-                    };
+                    });
                     hot_smt_updates
                         .push((k.hash(), Some(HotStateValueRef::from_slot(&slot).hash())));
                     hot_state[shard_id].put(k.clone(), slot);
@@ -250,16 +250,18 @@ impl VersionState {
                 }
             } else {
                 let slot = match state.get(k) {
-                    Some((value_version, value)) => StateSlot::HotOccupied {
-                        value_version: *value_version,
-                        value: value.clone(),
+                    Some((value_version, value)) => {
+                        StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
+                            value_version: *value_version,
+                            value: value.clone(),
+                            hot_since_version: version,
+                            lru_info: LRUEntry::uninitialized(),
+                        })
+                    },
+                    None => StateSlot::new(k.clone(), StateSlotKind::HotVacant {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
-                    },
-                    None => StateSlot::HotVacant {
-                        hot_since_version: version,
-                        lru_info: LRUEntry::uninitialized(),
-                    },
+                    }),
                 };
                 hot_value_hash = Some(HotStateValueRef::from_slot(&slot).hash());
                 hot_state[shard_id].put(k.clone(), slot);
@@ -306,7 +308,7 @@ impl TStateView for VersionState {
     type Key = StateKey;
 
     fn get_state_slot(&self, key: &Self::Key) -> StateViewResult<StateSlot> {
-        let from_cold = StateSlot::from_db_get(self.state.get(key).cloned());
+        let from_cold = StateSlot::from_db_get(key.clone(), self.state.get(key).cloned());
         let shard_id = key.get_shard_id();
         let slot = match self.hot_state[shard_id].peek(key) {
             Some(slot) => {
@@ -364,25 +366,26 @@ impl StateByVersion {
     }
 
     fn assert_state_slot(slot1: &StateSlot, slot2: &StateSlot) {
-        match (slot1, slot2) {
+        assert_eq!(slot1.state_key(), slot2.state_key());
+        match (slot1.kind(), slot2.kind()) {
             (
-                StateSlot::HotVacant {
+                StateSlotKind::HotVacant {
                     hot_since_version: v1,
                     ..
                 },
-                StateSlot::HotVacant {
+                StateSlotKind::HotVacant {
                     hot_since_version: v2,
                     ..
                 },
             ) => assert_eq!(v1, v2),
             (
-                StateSlot::HotOccupied {
+                StateSlotKind::HotOccupied {
                     value_version: vv1,
                     value: v1,
                     hot_since_version: h1,
                     ..
                 },
-                StateSlot::HotOccupied {
+                StateSlotKind::HotOccupied {
                     value_version: vv2,
                     value: v2,
                     hot_since_version: h2,
@@ -393,7 +396,7 @@ impl StateByVersion {
                 assert_eq!(v1, v2);
                 assert_eq!(h1, h2);
             },
-            (s1, s2) => assert_eq!(s1, s2),
+            (k1, k2) => assert_eq!(k1, k2),
         }
     }
 
@@ -439,7 +442,7 @@ impl StateByVersion {
             .shards
             .iter()
             .flat_map(|shard| shard.iter())
-            .filter_map(|(key, slot)| slot.maybe_update_jmt(key, last_snapshot.next_version()))
+            .filter_map(|(_key_hash, slot)| slot.maybe_update_jmt(last_snapshot.next_version()))
             .map(|(key_hash, value_opt)| (key_hash, value_opt.map(|(val_hash, _key)| val_hash)))
             .collect_vec();
 

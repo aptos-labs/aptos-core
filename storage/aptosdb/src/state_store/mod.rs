@@ -68,7 +68,7 @@ use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
-        state_slot::StateSlot,
+        state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueByKeyHashIndex, StateValue, StateValueChunkWithProof},
         NUM_STATE_SHARDS,
@@ -853,7 +853,7 @@ impl StateStore {
                 .par_iter_mut()
                 .zip_eq(shard_updates.par_iter())
                 .try_for_each(|(batch, shard)| {
-                    for (key, (hot_val, value_version_opt)) in &shard.insertions {
+                    for (key_hash, (hot_val, value_version_opt)) in &shard.insertions {
                         let schema_value = match hot_val.value_opt() {
                             Some(value) => HotStateEntry::Occupied {
                                 value: value.clone(),
@@ -869,13 +869,13 @@ impl StateStore {
                             },
                         };
                         batch.put::<HotStateValueByKeyHashSchema>(
-                            &(CryptoHash::hash(key), hot_val.hot_since_version()),
+                            &(*key_hash, hot_val.hot_since_version()),
                             &Some(schema_value),
                         )?;
                     }
-                    for (key, eviction_version) in &shard.evictions {
+                    for (key_hash, eviction_version) in &shard.evictions {
                         batch.put::<HotStateValueByKeyHashSchema>(
-                            &(CryptoHash::hash(key), *eviction_version),
+                            &(*key_hash, *eviction_version),
                             &None,
                         )?;
                     }
@@ -1003,7 +1003,7 @@ impl StateStore {
                     .insert(
                         (*key).clone(),
                         update_to_cold
-                            .to_result_slot()
+                            .to_result_slot((*key).clone())
                             .expect("hot state ops should have been filtered out above"),
                     )
                     .unwrap_or_else(|| {
@@ -1011,7 +1011,7 @@ impl StateStore {
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
                         // is to allow some db tests without real execution layer to pass.
                         assert!(ignore_state_cache_miss, "Must cache read.");
-                        StateSlot::ColdVacant
+                        StateSlot::new((*key).clone(), StateSlotKind::ColdVacant)
                     });
 
                 let old_version = if old_entry.is_occupied() {
