@@ -48,9 +48,12 @@ mod executable_ids;
 pub use executable_ids::ExecutableId;
 use executable_ids::ExecutableIdInternerKey;
 mod executable;
-pub use executable::{Executable, Function};
+pub use executable::{Executable, ExecutableBuilder, Function};
 mod executable_cache;
 use executable_cache::ExecutableCache;
+mod types;
+use types::TypeInternerKey;
+pub use types::{FieldLayout, Type};
 
 /// Global execution context with a two-phase state machine.
 ///
@@ -86,6 +89,7 @@ struct Context {
     identifiers: DashMap<IdentifierInternerKey, GlobalArenaPtr<str>, ahash::RandomState>,
     executable_ids:
         DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
+    types: DashMap<TypeInternerKey, GlobalArenaPtr<Type>, ahash::RandomState>,
     executable_cache: ExecutableCache,
 }
 
@@ -176,6 +180,7 @@ impl GlobalContext {
             ctx: Context {
                 identifiers: DashMap::default(),
                 executable_ids: DashMap::default(),
+                types: DashMap::default(),
                 executable_cache: ExecutableCache::new(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
@@ -246,6 +251,11 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         self.ctx.executable_ids.len()
     }
 
+    /// Returns the number of entries in interner's map for types.
+    pub fn interned_types_count(&self) -> usize {
+        self.ctx.types.len()
+    }
+
     /// Resets all caches that store pointers to the arenas, and then resets
     /// the arenas as well.
     pub fn reset_arena_pool(&mut self) {
@@ -271,6 +281,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
         key: ArenaRef<'guard, ExecutableId>,
         executable: Box<Executable>,
     ) -> &'guard Executable {
+        // TODO: use ID stored inside executable instead.
         let ptr = self
             .ctx
             .executable_cache
@@ -323,11 +334,13 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         let Context {
             identifiers,
             executable_ids,
+            types,
             executable_cache,
         } = self.ctx;
 
         identifiers.clear();
         executable_ids.clear();
+        types.clear();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to executables
