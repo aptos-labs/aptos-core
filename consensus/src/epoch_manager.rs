@@ -1206,9 +1206,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffered_proposal_tx,
             self.consensus_txn_filter_config.clone(),
             self.config.clone(),
-            OnChainRandomnessConfig::default_disabled(), // Randomness disabled for proxy-primary
-            OnChainJWKConsensusConfig::default_disabled(), // JWK consensus disabled for proxy-primary
-            None, // fast_rand_config: disabled for proxy-primary
+            onchain_randomness_config,
+            onchain_jwk_consensus_config,
+            fast_rand_config,
             failures_tracker,
             opt_proposal_loopback_tx,
             proxy_event_tx,
@@ -1279,8 +1279,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_client: Arc<dyn PayloadClient>,
         proxy_fast_payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
-        _onchain_randomness_config: &OnChainRandomnessConfig,
-        _onchain_jwk_consensus_config: &OnChainJWKConsensusConfig,
+        onchain_randomness_config: &OnChainRandomnessConfig,
+        onchain_jwk_consensus_config: &OnChainJWKConsensusConfig,
         proxy_verifier: Arc<ValidatorVerifier>,
         primary_committed_proxy_round: Arc<std::sync::atomic::AtomicU64>,
     ) -> (
@@ -1435,8 +1435,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.quorum_store.enable_opt_qs_v2_payload_tx,
         ));
         // Wrap payload clients with budget tracking for proxy.
-        // inner: proxy_fast_payload_client (vtxns disabled, fast path for all pulls)
-        // inner_with_vtxns: payload_client (vtxns enabled, but never used — randomness disabled)
+        // inner: proxy_fast_payload_client (vtxns disabled, fast path for most pulls)
+        // inner_with_vtxns: payload_client (vtxns enabled, used every Nth pull)
         let proxy_payload_client: Arc<dyn PayloadClient> =
             Arc::new(crate::payload_client::ProxyBudgetPayloadClient::new(
                 proxy_fast_payload_client,
@@ -1444,7 +1444,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 proxy_block_store.clone(),
                 proxy_config.target_proxy_blocks_per_primary_round,
                 self.quorum_store_enabled,
-                0, // vtxn_pull_interval: 0 — never pull DKG vtxns (randomness disabled on proxy)
+                proxy_config.vtxn_pull_interval,
                 pipeline_state.clone(),
                 proxy_config.backpressure.clone(),
             ));
@@ -1522,15 +1522,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_buffered_proposal_tx.clone(),
             self.consensus_txn_filter_config.clone(),
             proxy_local_config,
-            OnChainRandomnessConfig::default_disabled(), // Proxy doesn't run randomness
-            OnChainJWKConsensusConfig::default_disabled(), // Proxy doesn't run JWK consensus
+            onchain_randomness_config.clone(),
+            onchain_jwk_consensus_config.clone(),
             None, // fast_rand_config: None for proxy
             failures_tracker,
             proxy_opt_proposal_loopback_tx,
             None, // proxy_event_tx: None (this IS the proxy, it doesn't send to another proxy)
             Some(proxy_hooks.clone() as Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>),
             None, // proxy_verifier: None (proxy RM doesn't receive ordered proxy blocks)
-            None, // vtxn_verifier: None — proxy doesn't verify DKG txns (randomness disabled)
+            Some(epoch_state.verifier.clone()), // vtxn_verifier: full primary verifier for DKG txn verification
         );
 
         info!(

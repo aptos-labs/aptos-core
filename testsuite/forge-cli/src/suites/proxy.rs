@@ -151,9 +151,9 @@ fn proxy_primary_remote_test() -> ForgeConfig {
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::V6 {
                     alg: ConsensusAlgorithmConfig::default_for_genesis(),
-                    vtxn: ValidatorTxnConfig::default_for_genesis(),
+                    vtxn: ValidatorTxnConfig::default_disabled(), // No DKG/randomness in proxy-primary
                     window_size: DEFAULT_WINDOW_SIZE,
-                    rand_check_enabled: true,
+                    rand_check_enabled: false, // No randomness in proxy-primary
                     proxy_validator_indices: proxy_indices.clone(),
                 })
                 .expect("must serialize");
@@ -211,9 +211,9 @@ fn proxy_primary_local_test() -> ForgeConfig {
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::V6 {
                     alg: ConsensusAlgorithmConfig::default_for_genesis(),
-                    vtxn: ValidatorTxnConfig::default_for_genesis(),
+                    vtxn: ValidatorTxnConfig::default_disabled(), // No DKG/randomness in proxy-primary
                     window_size: DEFAULT_WINDOW_SIZE,
-                    rand_check_enabled: true,
+                    rand_check_enabled: false, // No randomness in proxy-primary
                     proxy_validator_indices: proxy_indices.clone(),
                 })
                 .expect("must serialize");
