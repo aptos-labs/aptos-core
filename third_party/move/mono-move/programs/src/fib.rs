@@ -39,10 +39,11 @@ pub fn native_fib(n: u64) -> u64 {
 ///   [40] callee: n / callee_result
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_runtime::{
-        CodeOffset as CO, FrameOffset as FO, Function, GlobalArenaPtr, MicroOp::*,
-        ObjectDescriptor, FRAME_METADATA_SIZE,
+    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_core::{
+        CodeOffset as CO, FrameOffset as FO, Function, MicroOp::*, FRAME_METADATA_SIZE,
     };
+    use mono_move_runtime::ObjectDescriptor;
 
     pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
         let n = 0u32;

@@ -12673,6 +12673,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "legacy-move-compiler",
+ "mono-move-alloc",
  "mono-move-core",
  "mono-move-runtime",
  "move-binary-format",

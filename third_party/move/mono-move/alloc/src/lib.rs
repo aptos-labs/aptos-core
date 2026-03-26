@@ -33,7 +33,7 @@
 //! ## Safety model
 //!
 //! When executable is dropped, the arena is also invalidated. The following
-//! **unsafe** contacts must be enforced.
+//! **unsafe** contracts must be enforced.
 //!
 //! - [`ExecutableArenaPtr::as_ref_unchecked`] - caller must ensure the owning
 //!   executable (and therefore its arena) is still alive.
@@ -53,8 +53,6 @@
 //!   not yet been freed.
 //! - [`LeakedBoxPtr::free_unchecked`] - caller must ensure no other references
 //!   to the pointee exist, the pointer is freed at most once exclusively.
-//! - [`LeakedBoxPtr::as_ref_unchecked`] — caller must ensure the pointer has
-//!   not yet been freed.
 //!
 //! # Interaction with block execution
 //!
