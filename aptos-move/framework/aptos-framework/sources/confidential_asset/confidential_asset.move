@@ -84,6 +84,9 @@ module aptos_framework::confidential_asset {
     /// Allow listing is not enabled yet.
     const E_ALLOW_LISTING_IS_DISABLED: u64 = 17;
 
+    /// Pointlessly depositing zero into one's confidential balance would unncessarily increment the `transfers_received` counter.
+    const E_POINTLESSLY_DEPOSITING_ZERO: u64 = 18;
+
     /// An internal error occurred: there is either a bug or a misconfiguration in the contract.
     const E_INTERNAL_ERROR: u64 = 999;
 
@@ -431,6 +434,7 @@ module aptos_framework::confidential_asset {
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(addr, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
+        assert!(amount != 0, error::invalid_argument(E_POINTLESSLY_DEPOSITING_ZERO));
 
         // Note: Gets the "confidential asset pool" for this asset type, or sets it up if this asset type is veiled for the first time
         let pool_fa_store = ensure_pool_fa_store(asset_type);
