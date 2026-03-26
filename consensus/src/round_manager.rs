@@ -638,18 +638,26 @@ impl RoundManager {
                     );
                     Some((Vec::new(), Payload::empty(true, true), self.last_consumed_proxy_round, HashValue::zero()))
                 } else {
-                    let last_block = blocks_to_include.last().expect("blocks_to_include is non-empty");
-                    let last_proxy_round = last_block.round();
-                    let last_proxy_block_id = last_block.id();
-
-                    // Aggregate validator txns and payloads.
-                    // Cap vtxn count at the configured per-block limit to prevent
-                    // voters from rejecting the proposal. When aggregating multiple
-                    // proxy blocks, DKG vtxns can accumulate past the limit.
+                    // Aggregate validator txns and payloads with a cap on total txns.
+                    // After a timeout gap, pending_proxy_blocks can accumulate many blocks.
+                    // Including all of them in one primary block creates oversized blocks
+                    // (10K+ txns) that cause high Block-STM retry rates and pipeline stalls.
+                    // Cap at max_receiving_block_txns; deferred blocks stay in pending_proxy_blocks
+                    // for the next round (delay, not drop — per protocol safety rules).
+                    let max_txns = self.local_config.max_sending_block_txns as usize;
                     let vtxn_limit = self.vtxn_config.per_block_limit_txn_count() as usize;
                     let mut all_vtxns = Vec::new();
                     let mut sub_payloads = Vec::new();
+                    let mut total_txns: usize = 0;
+                    let mut last_included_round = 0u64;
+                    let mut last_included_id = HashValue::zero();
+                    let mut included_count = 0usize;
                     for block in &blocks_to_include {
+                        let block_txns = block.payload().map_or(0, |p| p.len());
+                        // Always include at least one block for liveness
+                        if included_count > 0 && total_txns + block_txns > max_txns {
+                            break;
+                        }
                         if let Some(vtxns) = block.validator_txns() {
                             let remaining = vtxn_limit.saturating_sub(all_vtxns.len());
                             if remaining > 0 {
@@ -658,10 +666,18 @@ impl RoundManager {
                         }
                         if let Some(p) = block.payload().cloned() {
                             if !p.is_empty() {
+                                total_txns += p.len();
                                 sub_payloads.push(p);
                             }
                         }
+                        last_included_round = block.round();
+                        last_included_id = block.id();
+                        included_count += 1;
                     }
+                    let deferred = blocks_to_include.len() - included_count;
+                    let last_proxy_round = last_included_round;
+                    let last_proxy_block_id = last_included_id;
+
                     let payload = match sub_payloads.len() {
                         0 => Payload::empty(true, true),
                         1 => sub_payloads.into_iter().next().unwrap(),
@@ -671,7 +687,7 @@ impl RoundManager {
                     // Update last_consumed_proxy_round
                     self.last_consumed_proxy_round = last_proxy_round;
 
-                    // Remove consumed blocks from the buffer
+                    // Remove consumed blocks from the buffer (deferred blocks remain)
                     let to_remove: Vec<Round> = self
                         .pending_proxy_blocks
                         .range(..=last_proxy_round)
@@ -684,9 +700,9 @@ impl RoundManager {
                     let payload_len = payload.len();
                     let payload_size = payload.size();
                     info!(
-                        "spawn_proposal_generation: aggregated {} proxy blocks, {} txns, {} bytes, \
+                        "spawn_proposal_generation: aggregated {} proxy blocks ({} deferred), {} txns, {} bytes, \
                          {} vtxns, last_proxy_round={}, last_consumed_proxy_round={}",
-                        blocks_to_include.len(), payload_len, payload_size, all_vtxns.len(),
+                        included_count, deferred, payload_len, payload_size, all_vtxns.len(),
                         last_proxy_round, self.last_consumed_proxy_round,
                     );
                     aptos_proxy_primary::proxy_metrics::PROXY_AGGREGATED_PAYLOAD_SIZE
