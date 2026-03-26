@@ -218,8 +218,9 @@ where
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<bool> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-        Ok(self.get_module_or_build_with(&id, self)?.is_some())
+        Ok(self
+            .get_module_or_build_with(&(address, module_name), self)?
+            .is_some())
     }
 
     fn unmetered_get_module_bytes(
@@ -227,9 +228,8 @@ where
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(&(address, module_name), self)?
             .map(|(module, _)| module.extension().bytes().clone()))
     }
 
@@ -238,9 +238,8 @@ where
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<([u8; 32], usize)>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(&(address, module_name), self)?
             .map(|(module, _)| {
                 (
                     *module.extension().hash(),
@@ -254,9 +253,8 @@ where
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(&(address, module_name), self)?
             .map(|(module, _)| module.extension().size_in_bytes()))
     }
 
@@ -265,9 +263,8 @@ where
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(&(address, module_name), self)?
             .map(|(module, _)| module.code().deserialized().clone()))
     }
 
@@ -276,14 +273,13 @@ where
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-
         // Look up the verified module in cache, if it is not there, or if the module is not yet
         // verified, we need to load & verify its transitive dependencies.
-        let (module, version) = match self.get_module_or_build_with(&id, self)? {
-            Some(module_and_version) => module_and_version,
-            None => return Ok(None),
-        };
+        let (module, version) =
+            match self.get_module_or_build_with(&(address, module_name), self)? {
+                Some(module_and_version) => module_and_version,
+                None => return Ok(None),
+            };
 
         if module.code().is_verified() {
             return Ok(Some(module.code().verified().clone()));
@@ -291,6 +287,7 @@ where
 
         let _timer =
             VM_TIMER.timer_with_label("unmetered_get_eagerly_verified_module [cache miss]");
+        let id = ModuleId::new(*address, module_name.to_owned());
         let mut visited = HashSet::new();
         visited.insert(id.clone());
         Ok(Some(visit_dependencies_and_verify(
@@ -308,13 +305,12 @@ where
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-
         // Look up the module in cache, if it is not there, we need to load it
-        let (module, version) = match self.get_module_or_build_with(&id, self)? {
-            Some(module_and_version) => module_and_version,
-            None => return Ok(None),
-        };
+        let (module, version) =
+            match self.get_module_or_build_with(&(address, module_name), self)? {
+                Some(module_and_version) => module_and_version,
+                None => return Ok(None),
+            };
 
         // If module is already verified, return it
         if module.code().is_verified() {
@@ -322,6 +318,7 @@ where
         }
 
         // Otherwise, load the module and its dependencies without verification
+        let id = ModuleId::new(*address, module_name.to_owned());
         let mut visited = HashSet::new();
         visited.insert(id.clone());
         Ok(Some(visit_dependencies_and_skip_verification(
@@ -425,10 +422,8 @@ where
     // non-local properties of the module.
     let mut verified_dependencies = vec![];
     for (addr, name) in locally_verified_code.immediate_dependencies_iter() {
-        let dependency_id = ModuleId::new(*addr, name.to_owned());
-
         let (dependency, dependency_version) = module_cache_with_context
-            .get_module_or_build_with(&dependency_id, module_cache_with_context)?
+            .get_module_or_build_with(&(addr, name), module_cache_with_context)?
             .ok_or_else(|| module_linker_error!(addr, name))?;
 
         // Dependency is already verified!
@@ -437,10 +432,11 @@ where
             continue;
         }
 
+        let dependency_id = ModuleId::new(*addr, name.to_owned());
         if visited.insert(dependency_id.clone()) {
             // Dependency is not verified, and we have not visited it yet.
             let verified_dependency = visit_dependencies_and_verify(
-                dependency_id.clone(),
+                dependency_id,
                 dependency,
                 dependency_version,
                 visited,
@@ -499,10 +495,8 @@ where
     // Step 2: Traverse and collect all immediate dependencies
     let mut loaded_dependencies = vec![];
     for (addr, name) in module.code().deserialized().immediate_dependencies_iter() {
-        let dependency_id = ModuleId::new(*addr, name.to_owned());
-
         let (dependency, dependency_version) = module_cache_with_context
-            .get_module_or_build_with(&dependency_id, module_cache_with_context)?
+            .get_module_or_build_with(&(addr, name), module_cache_with_context)?
             .ok_or_else(|| module_linker_error!(addr, name))?;
 
         // If dependency is already loaded, use it
@@ -511,10 +505,11 @@ where
             continue;
         }
 
+        let dependency_id = ModuleId::new(*addr, name.to_owned());
         if visited.insert(dependency_id.clone()) {
             // Dependency is not loaded, and we have not visited it yet
             let loaded_dependency = visit_dependencies_and_skip_verification(
-                dependency_id.clone(),
+                dependency_id,
                 dependency,
                 dependency_version,
                 visited,

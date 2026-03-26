@@ -644,7 +644,7 @@ google-cloud-storage = "0.13.0"
 group = "0.13"
 guppy = "0.17.5"
 handlebars = "4.2.2"
-hashbrown = "0.14.3"
+hashbrown = { version = "0.14.3", features = ["equivalent"] }
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hex-literal = "0.3.4"

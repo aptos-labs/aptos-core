@@ -7,7 +7,7 @@ use crate::code::Code;
 use ambassador::delegatable_trait;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
-use hashbrown::HashMap;
+use hashbrown::{Equivalent, HashMap};
 use move_binary_format::errors::VMResult;
 use std::{cell::RefCell, cmp::Ordering, hash::Hash, mem, ops::Deref, sync::Arc};
 
@@ -120,10 +120,11 @@ pub trait ModuleCache {
 
     /// Ensures that the entry in the module cache is initialized using the provided initializer,
     /// if it was not stored before. Returns the stored module, or [None] if it does not exist. If
-    /// initialization fails, returns the error.
-    fn get_module_or_build_with(
+    /// initialization fails, returns the error. Accepts a generic query type to avoid unnecessary
+    /// key allocation on cache hits.
+    fn get_module_or_build_with<Q>(
         &self,
-        key: &Self::Key,
+        key: &Q,
         builder: &dyn ModuleCodeBuilder<
             Key = Self::Key,
             Deserialized = Self::Deserialized,
@@ -135,7 +136,11 @@ pub trait ModuleCache {
             Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>,
             Self::Version,
         )>,
-    >;
+    >
+    where
+        Q: Hash + Equivalent<Self::Key>,
+        Self::Key: for<'a> From<&'a Q>,
+        Self: Sized;
 
     /// Returns the number of modules in cache.
     fn num_modules(&self) -> usize;
@@ -332,9 +337,9 @@ where
         }
     }
 
-    fn get_module_or_build_with(
+    fn get_module_or_build_with<Q>(
         &self,
-        key: &Self::Key,
+        key: &Q,
         builder: &dyn ModuleCodeBuilder<
             Key = Self::Key,
             Deserialized = Self::Deserialized,
@@ -346,16 +351,24 @@ where
             Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>,
             Self::Version,
         )>,
-    > {
-        use hashbrown::hash_map::Entry::*;
+    >
+    where
+        Q: Hash + Equivalent<Self::Key>,
+        Self::Key: for<'a> From<&'a Q>,
+    {
+        if let Some(v) = self.module_cache.borrow().get(key) {
+            return Ok(Some(v.as_module_code_and_version()));
+        }
 
-        Ok(match self.module_cache.borrow_mut().entry(key.clone()) {
-            Occupied(entry) => Some(entry.get().as_module_code_and_version()),
-            Vacant(entry) => builder.build(key)?.map(|module| {
-                entry
-                    .insert(VersionedModuleCode::new_with_default_version(module))
-                    .as_module_code_and_version()
-            }),
+        let key = Self::Key::from(key);
+        Ok(match builder.build(&key)? {
+            Some(m) => {
+                let m = VersionedModuleCode::new_with_default_version(m);
+                let result = m.as_module_code_and_version();
+                self.module_cache.borrow_mut().insert(key, m);
+                Some(result)
+            },
+            None => None,
         })
     }
 
@@ -486,9 +499,9 @@ where
         }
     }
 
-    fn get_module_or_build_with(
+    fn get_module_or_build_with<Q>(
         &self,
-        key: &Self::Key,
+        key: &Q,
         builder: &dyn ModuleCodeBuilder<
             Key = Self::Key,
             Deserialized = Self::Deserialized,
@@ -500,16 +513,23 @@ where
             Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>,
             Self::Version,
         )>,
-    > {
+    >
+    where
+        Q: Hash + Equivalent<Self::Key>,
+        Self::Key: for<'a> From<&'a Q>,
+    {
         use dashmap::mapref::entry::Entry::*;
 
+        // Fast path: equivalent lookup without key allocation.
         if let Some(v) = self.module_cache.get(key).as_deref() {
             return Ok(Some(v.as_module_code_and_version()));
         }
 
-        Ok(match self.module_cache.entry(key.clone()) {
+        // Slow path: allocate key for insertion.
+        let key = Self::Key::from(key);
+        Ok(match self.module_cache.entry(key) {
             Occupied(entry) => Some(entry.get().as_module_code_and_version()),
-            Vacant(entry) => builder.build(key)?.map(|module| {
+            Vacant(entry) => builder.build(entry.key())?.map(|module| {
                 entry
                     .insert(CachePadded::new(
                         VersionedModuleCode::new_with_default_version(module),
@@ -532,12 +552,21 @@ mod test {
     use move_binary_format::errors::{Location, PartialVMError};
     use move_core_types::vm_status::StatusCode;
 
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    struct TestKey(usize);
+
+    impl From<&TestKey> for TestKey {
+        fn from(key: &TestKey) -> Self {
+            key.clone()
+        }
+    }
+
     struct Unreachable;
 
     impl ModuleCodeBuilder for Unreachable {
         type Deserialized = MockDeserializedCode;
         type Extension = MockExtension;
-        type Key = usize;
+        type Key = TestKey;
         type Verified = MockVerifiedCode;
 
         fn build(
@@ -554,7 +583,7 @@ mod test {
     impl ModuleCodeBuilder for WithSomeValue {
         type Deserialized = MockDeserializedCode;
         type Extension = MockExtension;
-        type Key = usize;
+        type Key = TestKey;
         type Verified = MockVerifiedCode;
 
         fn build(
@@ -572,7 +601,7 @@ mod test {
     impl ModuleCodeBuilder for WithNone {
         type Deserialized = MockDeserializedCode;
         type Extension = MockExtension;
-        type Key = usize;
+        type Key = TestKey;
         type Verified = MockVerifiedCode;
 
         fn build(
@@ -589,7 +618,7 @@ mod test {
     impl ModuleCodeBuilder for WithError {
         type Deserialized = MockDeserializedCode;
         type Extension = MockExtension;
-        type Key = usize;
+        type Key = TestKey;
         type Verified = MockVerifiedCode;
 
         fn build(
@@ -603,7 +632,7 @@ mod test {
 
     fn insert_deserialized_test_case(
         module_cache: &impl ModuleCache<
-            Key = usize,
+            Key = TestKey,
             Deserialized = MockDeserializedCode,
             Verified = MockVerifiedCode,
             Extension = MockExtension,
@@ -612,13 +641,13 @@ mod test {
     ) {
         // New entries at version 0.
         assert_ok!(module_cache.insert_deserialized_module(
-            1,
+            TestKey(1),
             MockDeserializedCode::new(1),
             mock_extension(8),
             0
         ));
         assert_ok!(module_cache.insert_deserialized_module(
-            2,
+            TestKey(2),
             MockDeserializedCode::new(2),
             mock_extension(8),
             0
@@ -626,47 +655,47 @@ mod test {
 
         assert_eq!(module_cache.num_modules(), 2);
         let deserialized_module_1 = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&1, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(1), &Unreachable)
         ))
         .0;
         assert_eq!(deserialized_module_1.code().deserialized().value(), 1);
         let deserialized_module_2 = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&2, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(2), &Unreachable)
         ))
         .0;
         assert_eq!(deserialized_module_2.code().deserialized().value(), 2);
 
         // Module cache already stores deserialized code at the same version.
         assert_ok!(module_cache.insert_deserialized_module(
-            1,
+            TestKey(1),
             MockDeserializedCode::new(10),
             mock_extension(8),
             0
         ));
         assert_eq!(module_cache.num_modules(), 2);
         let deserialized_module = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&1, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(1), &Unreachable)
         ))
         .0;
         assert_eq!(deserialized_module.code().deserialized().value(), 1);
 
         // Module cache stores deserialized code at lower version, so it should be replaced.
         assert_ok!(module_cache.insert_deserialized_module(
-            1,
+            TestKey(1),
             MockDeserializedCode::new(100),
             mock_extension(8),
             10
         ));
         assert_eq!(module_cache.num_modules(), 2);
         let deserialized_module = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&1, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(1), &Unreachable)
         ))
         .0;
         assert_eq!(deserialized_module.code().deserialized().value(), 100);
 
         // We already have higher-versioned deserialized code stored.
         let result = module_cache.insert_deserialized_module(
-            1,
+            TestKey(1),
             MockDeserializedCode::new(100),
             mock_extension(8),
             5,
@@ -675,7 +704,7 @@ mod test {
 
         // Store verified module at version 10.
         assert_ok!(module_cache.insert_verified_module(
-            3,
+            TestKey(3),
             MockVerifiedCode::new(3),
             mock_extension(8),
             10
@@ -684,7 +713,7 @@ mod test {
 
         // Lower-version cannot replace this module.
         let result = module_cache.insert_deserialized_module(
-            3,
+            TestKey(3),
             MockDeserializedCode::new(30),
             mock_extension(8),
             0,
@@ -693,43 +722,43 @@ mod test {
 
         // Same version does not replace the stored module, so old value should be returned.
         assert_ok!(module_cache.insert_deserialized_module(
-            3,
+            TestKey(3),
             MockDeserializedCode::new(300),
             mock_extension(8),
             10
         ));
         assert_eq!(module_cache.num_modules(), 3);
         let deserialized_module = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&3, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(3), &Unreachable)
         ))
         .0;
         assert_eq!(deserialized_module.code().deserialized().value(), 3);
 
         // If the version is higher, we replace the module even though it was verified before.
         assert_ok!(module_cache.insert_deserialized_module(
-            3,
+            TestKey(3),
             MockDeserializedCode::new(3000),
             mock_extension(8),
             20
         ));
         assert_eq!(module_cache.num_modules(), 3);
         let deserialized_module = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&3, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(3), &Unreachable)
         ))
         .0;
         assert_eq!(deserialized_module.code().deserialized().value(), 3000);
 
         // Check states.
         let module_1 = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&1, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(1), &Unreachable)
         ))
         .0;
         let module_2 = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&2, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(2), &Unreachable)
         ))
         .0;
         let module_3 = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&3, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(3), &Unreachable)
         ))
         .0;
         assert!(matches!(module_1.code(), Code::Deserialized(s) if s.value() == 100));
@@ -739,7 +768,7 @@ mod test {
 
     fn insert_verified_test_case(
         module_cache: &impl ModuleCache<
-            Key = usize,
+            Key = TestKey,
             Deserialized = MockDeserializedCode,
             Verified = MockVerifiedCode,
             Extension = MockExtension,
@@ -748,13 +777,13 @@ mod test {
     ) {
         // New verified entries at version 10.
         let verified_module_1 = assert_ok!(module_cache.insert_verified_module(
-            1,
+            TestKey(1),
             MockVerifiedCode::new(1),
             mock_extension(8),
             10,
         ));
         let verified_module_2 = assert_ok!(module_cache.insert_verified_module(
-            2,
+            TestKey(2),
             MockVerifiedCode::new(2),
             mock_extension(8),
             10
@@ -768,19 +797,19 @@ mod test {
         // Module cache already stores verified code at the same version (10), so inserting new
         // code is a noop.
         assert_ok!(module_cache.insert_deserialized_module(
-            2,
+            TestKey(2),
             MockDeserializedCode::new(20),
             mock_extension(8),
             10
         ));
         assert_eq!(module_cache.num_modules(), 2);
         let deserialized_module = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&2, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(2), &Unreachable)
         ))
         .0;
         assert_eq!(deserialized_module.code().deserialized().value(), 2);
         let verified_module = assert_ok!(module_cache.insert_verified_module(
-            2,
+            TestKey(2),
             MockVerifiedCode::new(200),
             mock_extension(8),
             10
@@ -790,14 +819,14 @@ mod test {
 
         // Module cache does not add verified or deserialized code at lower versions (0).
         let result = module_cache.insert_deserialized_module(
-            1,
+            TestKey(1),
             MockDeserializedCode::new(10),
             mock_extension(8),
             0,
         );
         assert!(result.is_err());
         let result = module_cache.insert_verified_module(
-            1,
+            TestKey(1),
             MockVerifiedCode::new(100),
             mock_extension(8),
             0,
@@ -806,21 +835,21 @@ mod test {
 
         // Higher versions should be inserted, whether they are verified or deserialized.
         assert_ok!(module_cache.insert_deserialized_module(
-            1,
+            TestKey(1),
             MockDeserializedCode::new(1000),
             mock_extension(8),
             100
         ));
         assert_eq!(module_cache.num_modules(), 2);
         let deserialized_module = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&1, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(1), &Unreachable)
         ))
         .0;
         assert!(!deserialized_module.code().is_verified());
         assert_eq!(deserialized_module.code().deserialized().value(), 1000);
 
         let verified_module = assert_ok!(module_cache.insert_verified_module(
-            1,
+            TestKey(1),
             MockVerifiedCode::new(10_000),
             mock_extension(8),
             1000
@@ -831,11 +860,11 @@ mod test {
 
         // Check states.
         let module_1 = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&1, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(1), &Unreachable)
         ))
         .0;
         let module_2 = assert_some!(assert_ok!(
-            module_cache.get_module_or_build_with(&2, &Unreachable)
+            module_cache.get_module_or_build_with(&TestKey(2), &Unreachable)
         ))
         .0;
         assert!(matches!(module_1.code(), Code::Verified(s) if s.value() == 10_000));
@@ -844,7 +873,7 @@ mod test {
 
     fn get_module_or_initialize_with_test_case(
         module_cache: &impl ModuleCache<
-            Key = usize,
+            Key = TestKey,
             Deserialized = MockDeserializedCode,
             Verified = MockVerifiedCode,
             Extension = MockExtension,
@@ -852,49 +881,49 @@ mod test {
         >,
     ) {
         assert_ok!(module_cache.insert_deserialized_module(
-            1,
+            TestKey(1),
             MockDeserializedCode::new(1),
             mock_extension(8),
             0
         ));
         assert_ok!(module_cache.insert_verified_module(
-            2,
+            TestKey(2),
             MockVerifiedCode::new(2),
             mock_extension(8),
             0
         ));
 
         // Get existing deserialized module.
-        let result = module_cache.get_module_or_build_with(&1, &WithSomeValue(100));
+        let result = module_cache.get_module_or_build_with(&TestKey(1), &WithSomeValue(100));
         let module_1 = assert_some!(assert_ok!(result)).0;
         assert!(!module_1.code().is_verified());
         assert_eq!(module_1.code().deserialized().value(), 1);
 
         // Get existing verified module.
-        let result = module_cache.get_module_or_build_with(&2, &WithError);
+        let result = module_cache.get_module_or_build_with(&TestKey(2), &WithError);
         let module_2 = assert_some!(assert_ok!(result)).0;
         assert!(module_2.code().is_verified());
         assert_eq!(module_2.code().deserialized().value(), 2);
 
         // Error when initializing.
         assert!(module_cache
-            .get_module_or_build_with(&3, &WithError)
+            .get_module_or_build_with(&TestKey(3), &WithError)
             .is_err());
         assert_eq!(module_cache.num_modules(), 2);
 
         // Module does not exist.
-        let result = module_cache.get_module_or_build_with(&3, &WithNone);
+        let result = module_cache.get_module_or_build_with(&TestKey(3), &WithNone);
         assert!(assert_ok!(result).is_none());
         assert_eq!(module_cache.num_modules(), 2);
 
         // Successful initialization.
-        let result = module_cache.get_module_or_build_with(&3, &WithSomeValue(300));
+        let result = module_cache.get_module_or_build_with(&TestKey(3), &WithSomeValue(300));
         let module_3 = assert_some!(assert_ok!(result)).0;
         assert!(!module_3.code().is_verified());
         assert_eq!(module_3.code().deserialized().value(), 300);
         assert_eq!(module_cache.num_modules(), 3);
 
-        let result = module_cache.get_module_or_build_with(&3, &WithSomeValue(1000));
+        let result = module_cache.get_module_or_build_with(&TestKey(3), &WithSomeValue(1000));
         let module_3 = assert_some!(assert_ok!(result)).0;
         assert!(!module_3.code().is_verified());
         assert_eq!(module_3.code().deserialized().value(), 300);

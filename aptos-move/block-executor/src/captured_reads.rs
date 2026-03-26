@@ -33,6 +33,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use derivative::Derivative;
+use hashbrown::Equivalent;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
@@ -1036,10 +1037,13 @@ where
     }
 
     /// If the module has been previously read, returns it.
-    pub(crate) fn get_module_read(
+    pub(crate) fn get_module_read<Q>(
         &self,
-        key: &K,
-    ) -> CacheRead<Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>> {
+        key: &Q,
+    ) -> CacheRead<Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>>
+    where
+        Q: Hash + Equivalent<K>,
+    {
         match self.module_reads.get(key) {
             Some(ModuleRead::PerBlockCache(read)) => CacheRead::Hit(read.clone()),
             Some(ModuleRead::GlobalCache(read)) => {

@@ -3971,6 +3971,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-logging",
+ "hashbrown 0.14.3",
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
@@ -10478,6 +10479,7 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
  "ahash 0.8.12",
  "allocator-api2",
+ "equivalent",
 ]
 
 [[package]]

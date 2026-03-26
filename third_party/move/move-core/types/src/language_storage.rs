@@ -512,6 +512,18 @@ impl<'a> hashbrown::Equivalent<ModuleId> for (&'a AccountAddress, &'a IdentStr) 
     }
 }
 
+impl From<&ModuleId> for ModuleId {
+    fn from(id: &ModuleId) -> Self {
+        id.clone()
+    }
+}
+
+impl<'a> From<&(&'a AccountAddress, &'a IdentStr)> for ModuleId {
+    fn from(key: &(&'a AccountAddress, &'a IdentStr)) -> Self {
+        ModuleId::new(*key.0, key.1.to_owned())
+    }
+}
+
 impl Display for ModuleId {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         // Can't change, because it can be part of TransactionExecutionFailedEvent
