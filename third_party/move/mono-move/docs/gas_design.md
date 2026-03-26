@@ -5,15 +5,12 @@
 The current MoveVM gas metering charges per instruction inside the interpreter dispatch loop. While correct and simple, this design has several drawbacks:
 
 1. **Overhead on the hot path.** Per-instruction metering adds a subtraction and branch to every iteration of the interpreter dispatch loop. As the VM becomes more optimised and the cost of each dispatch iteration shrinks, the relative overhead of per-instruction metering will grow.
-2. **Performance coupling.** Gas metering logic is interleaved with instruction execution, preventing the VM from applying standard compiler optimisations such as instruction reordering, fusing, inlining, and IR lowering — all of which may change the number or identity of "instructions" that execute, risking a change in the observed gas cost.
-3. **JIT compilation barrier.** A per-instruction metering model assumes a 1:1 correspondence between bytecode instructions and executed operations. JIT compilation breaks this assumption, making it impossible to adopt JIT without redesigning the metering layer.
-4. **Cost model leaks implementation details.** While some coupling between gas costs and VM internals is unavoidable, the per-instruction metering model makes it easy for unnecessary implementation details to leak in — such as cache state, value representation, or runtime type structure — making it harder to evolve the VM without breaking gas semantics.
 
-### Design Goals
+Additionally, block-granularity metering makes it easier (though is not strictly required) to address several related design goals:
 
-- **Decouple metering from execution.** Gas is charged at basic-block granularity, freeing the VM to optimise the interior of each block arbitrarily.
-- **JIT-compatible.** Charge ops are part of the instruction sequence, so no per-dispatch metering hook is needed. A JIT compiler can emit gas checks at basic-block boundaries without special-casing the metering layer.
-- **Minimal hot-path overhead.** One subtract-and-branch per basic block rather than per instruction.
+2. **Decoupling metering from execution.** When gas metering is interleaved with instruction execution, compiler optimisations such as reordering, fusing, and inlining risk changing the observed gas cost. Block metering reduces this coupling by giving the VM freedom to optimise within each block.
+3. **JIT compatibility.** A JIT compiler can emit gas checks at block boundaries without special-casing the metering layer. Per-instruction metering does not preclude JIT, but block metering makes it more natural.
+4. **Cost model stability.** Per-instruction metering makes it easy for implementation details — cache state, value representation, runtime type structure — to leak into gas costs. Block metering encourages a cleaner separation, though the choice of instrumentation point (§3) ultimately determines how much leaks through.
 
 The current implementation instruments at the micro-op level using an ISA-agnostic framework — the metering pass has no dependency on any instruction set, and instruction sets plug in by implementing four traits. Gas costs are fully static (type costs are resolved during monomorphisation), but the choice of instrumentation point is not yet settled — see §3.
 
@@ -211,6 +208,30 @@ This total is the same regardless of whether `T = u64` or `T = A<A<u64>>`. The c
 A subtlety: when `foo<T>` calls `bar<T>()`, the caller-side cost at that call site is **1** (just the `T` node), *not* the depth of whatever `T` was concretely instantiated with. The original outer caller already paid for the concrete type's depth. Each level in the call chain pays only for the type structure *it introduces*.
 
 This means that if `caller()` invokes `foo<A<A<u64>>>()`, and `foo<T>` invokes `bar<T>()`, the cost of the concrete type `A<A<u64>>` is charged once (at the `caller` site), not again when it flows through as `T`.
+
+### 5.6 Substitution and Canonicalization Cost
+
+Type interning requires canonicalization after substitution. Consider:
+
+```
+vec<vec<vec<Bar<T>>>>   // generic type, node count N = 5
+T = Bar<u64>            // concrete argument, node count M = 2
+```
+
+Substituting `T = Bar<u64>` produces `vec<vec<vec<Bar<Bar<u64>>>>>`. The interner must then re-canonicalize — traversing from the substitution point up to the root — which is at most O(N) work. The substitution itself is at most O(M).
+
+Both costs are constants: the caller pays M for the concrete type argument, and the callee pays N for each generic type it constructs. This holds even when the same type parameter is used multiple times:
+
+```
+fun foo<T>() {
+    bar<Bar<T>>();   // callee-side cost: 2 (Bar, T)
+    bar<Bar<T>>();   // callee-side cost: 2
+    bar<Bar<T>>();   // callee-side cost: 2
+    ...              // 7 calls total
+}
+```
+
+The caller pays once for the concrete `T`. The callee pays 7 × 2 = 14 for the seven `Bar<T>` constructions it introduces, which covers the canonicalization work for each substitution. The cost of the inner `T` is absorbed — the monomorphizer pays for canonicalization of each generic type it builds, and that cost is function-local.
 
 ---
 
