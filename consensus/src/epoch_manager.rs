@@ -1206,9 +1206,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffered_proposal_tx,
             self.consensus_txn_filter_config.clone(),
             self.config.clone(),
-            onchain_randomness_config,
-            onchain_jwk_consensus_config,
-            fast_rand_config,
+            OnChainRandomnessConfig::default_disabled(), // Randomness disabled for proxy-primary
+            OnChainJWKConsensusConfig::default_disabled(), // JWK consensus disabled for proxy-primary
+            None, // fast_rand_config: disabled for proxy-primary
             failures_tracker,
             opt_proposal_loopback_tx,
             proxy_event_tx,
@@ -1279,8 +1279,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_client: Arc<dyn PayloadClient>,
         proxy_fast_payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
-        onchain_randomness_config: &OnChainRandomnessConfig,
-        onchain_jwk_consensus_config: &OnChainJWKConsensusConfig,
+        _onchain_randomness_config: &OnChainRandomnessConfig,
+        _onchain_jwk_consensus_config: &OnChainJWKConsensusConfig,
         proxy_verifier: Arc<ValidatorVerifier>,
         primary_committed_proxy_round: Arc<std::sync::atomic::AtomicU64>,
     ) -> (
@@ -1522,15 +1522,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_buffered_proposal_tx.clone(),
             self.consensus_txn_filter_config.clone(),
             proxy_local_config,
-            onchain_randomness_config.clone(),
-            onchain_jwk_consensus_config.clone(),
+            OnChainRandomnessConfig::default_disabled(), // Proxy doesn't run randomness
+            OnChainJWKConsensusConfig::default_disabled(), // Proxy doesn't run JWK consensus
             None, // fast_rand_config: None for proxy
             failures_tracker,
             proxy_opt_proposal_loopback_tx,
             None, // proxy_event_tx: None (this IS the proxy, it doesn't send to another proxy)
             Some(proxy_hooks.clone() as Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>),
             None, // proxy_verifier: None (proxy RM doesn't receive ordered proxy blocks)
-            Some(epoch_state.verifier.clone()), // vtxn_verifier: full primary verifier for DKG txn verification
+            None, // vtxn_verifier: None — proxy doesn't verify DKG txns (randomness disabled)
         );
 
         info!(
