@@ -3089,7 +3089,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "rand 0.7.3",
- "rayon",
  "serde",
  "thiserror 1.0.69",
  "tokio",
