@@ -4,9 +4,9 @@
 
 The current MoveVM gas metering charges per instruction inside the interpreter dispatch loop. While correct and simple, this design has several drawbacks:
 
-1. **Performance coupling.** Gas metering logic is interleaved with instruction execution, preventing the VM from applying standard compiler optimisations such as instruction reordering, fusing, inlining, and IR lowering — all of which may change the number or identity of "instructions" that execute, risking a change in the observed gas cost.
-2. **JIT compilation barrier.** A per-instruction metering model assumes a 1:1 correspondence between bytecode instructions and executed operations. JIT compilation breaks this assumption, making it impossible to adopt JIT without redesigning the metering layer.
-3. **Overhead on the hot path.** Per-instruction metering adds a subtraction and branch to every iteration of the interpreter dispatch loop. As the VM becomes more optimised and the cost of each dispatch iteration shrinks, the relative overhead of per-instruction metering will grow.
+1. **Overhead on the hot path.** Per-instruction metering adds a subtraction and branch to every iteration of the interpreter dispatch loop. As the VM becomes more optimised and the cost of each dispatch iteration shrinks, the relative overhead of per-instruction metering will grow.
+2. **Performance coupling.** Gas metering logic is interleaved with instruction execution, preventing the VM from applying standard compiler optimisations such as instruction reordering, fusing, inlining, and IR lowering — all of which may change the number or identity of "instructions" that execute, risking a change in the observed gas cost.
+3. **JIT compilation barrier.** A per-instruction metering model assumes a 1:1 correspondence between bytecode instructions and executed operations. JIT compilation breaks this assumption, making it impossible to adopt JIT without redesigning the metering layer.
 4. **Cost model leaks implementation details.** While some coupling between gas costs and VM internals is unavoidable, the per-instruction metering model makes it easy for unnecessary implementation details to leak in — such as cache state, value representation, or runtime type structure — making it harder to evolve the VM without breaking gas semantics.
 
 ### Design Goals
@@ -52,16 +52,17 @@ The instrumentation pass can be applied at any layer of the compiler pipeline. T
 ### Stackless execution IR
 
 **Pros:**
-- Types are concrete and sizes are known, enabling accurate static costs for size-dependent instructions without runtime probing.
 - More stable than micro-ops: insulated from low-level codegen decisions while still more accurate than raw bytecode.
 
 **Cons:**
 - Not a public or stable interface today. Gas semantics derived from it could still shift as the compiler pipeline evolves.
+- Generic code is not yet monomorphised: type sizes are unknown, making it impossible to give precise costs to instructions whose work scales with the size of their operands.
 
 ### Micro-ops
 
 **Pros:**
 - Maximally precise: costs reflect the actual operations the interpreter executes.
+- Types are concrete and sizes are known, enabling accurate static costs for size-dependent instructions without runtime probing.
 - Instrumenting micro-ops is structurally simple — the ISA is flat and frame-pointer-relative.
 
 **Cons:**
@@ -75,17 +76,17 @@ The ISA-agnostic design of `mono-move-gas` means the instrumentation pass itself
 
 ### 4.1 Overview
 
-`GasInstrumentor::run` takes a `Vec<I>` and returns a new `Vec<I>` with charge ops inserted. It runs once — the resulting instruction sequence is stored and executed by the interpreter without any further consultation of the gas schedule.
+The instrumentation pass takes a flat instruction sequence and returns a new sequence with charge ops inserted. It runs once — the resulting sequence is stored and executed by the interpreter without any further consultation of the gas schedule.
 
 The pass performs three steps:
 
-1. **CFG construction.** Call `compute_basic_blocks` to partition the instruction sequence into basic blocks. This uses `HasCfgInfo::branch_target` to identify leaders: instruction 0, every branch target, and every instruction immediately following a branch.
+1. **CFG construction.** Partition the instruction sequence into basic blocks by identifying leaders: instruction 0, every branch target, and every instruction immediately following a branch.
 
-2. **Cost computation.** Call `GasSchedule::cost` on every instruction to produce a `Vec<InstrCost<I>>`. Sum the `base` fields within each block to get the block's `Charge` cost. Count instructions with `dynamic: Some(_)` to know how many extra ops will be inserted.
+2. **Cost computation.** Look up the cost of every instruction in the gas schedule. Sum the static (base) costs within each block to get the block's charge amount. Identify instructions with a dynamic cost component that will need an extra charge op inserted after them.
 
-3. **Emission.** Walk the original instruction sequence. At each basic-block leader, prepend `I::charge(block_cost)`. For each instruction whose `InstrCost::dynamic` is `Some(op)`, append `op` immediately after the instruction. Remap all branch targets to account for the inserted ops (see §4.3).
+3. **Emission.** Walk the original instruction sequence. At each basic-block leader, prepend a `Charge` op with the block's total cost. For each instruction with a dynamic cost component, append a dynamic `Charge` op immediately after the instruction. Remap all branch targets to account for the inserted ops (see §4.3).
 
-For instructions with a runtime-variable cost, there are two options: emit a separate dynamic `Charge` instruction (via `InstrCost::dynamic`), or handle the variable charge inline in the interpreter for that specific instruction. The current design supports both — the ISA-level `GasSchedule` impl decides per instruction.
+For instructions with a runtime-variable cost, there are two options: emit a separate dynamic `Charge` instruction, or handle the variable charge inline in the interpreter for that specific instruction. The design supports both — the gas schedule decides per instruction.
 
 ### 4.2 Example
 
@@ -127,7 +128,7 @@ Inserting charge ops shifts every instruction index, so all branch targets must 
 
 ### 4.4 Constraint: No Dynamic Cost on Branch Instructions
 
-A branch instruction (where `HasCfgInfo::branch_target` returns `Some`) must not have `InstrCost::dynamic: Some(_)`. The dynamic charge op is inserted immediately after the instruction, so on the taken path execution jumps away and the charge is never reached. For unconditional branches it is completely unreachable.
+A branch instruction must not have a dynamic cost component. The dynamic charge op is inserted immediately after the instruction, so on the taken path execution jumps away and the charge is never reached. For unconditional branches it is completely unreachable.
 
 ### 4.5 Dead Code
 
@@ -135,52 +136,11 @@ The pass instruments every basic block, including unreachable ones. The compiler
 
 ---
 
-## 5. Types and Traits
-
-### 5.1 `InstrCost<I>`
-
-```rust
-pub struct InstrCost<I> {
-    /// Accumulated into the enclosing `Charge` op for the basic block.
-    pub base: u64,
-
-    /// A fully-formed gas charge instruction to insert immediately after
-    /// the instruction, if any.
-    pub dynamic: Option<I>,
-}
-```
-
-`InstrCost::constant(base)` is a convenience constructor for instructions with no dynamic component (currently all micro-ops).
-
-### 5.2 The Four Traits
-
-| Trait | Purpose |
-| --- | --- |
-| `HasCfgInfo` | `branch_target(&self) -> Option<usize>` — identifies branch targets for CFG construction |
-| `RemapTargets: HasCfgInfo` | `remap_targets(self, remap: impl Fn(usize) -> usize) -> Self` — rewrites branch targets after charge insertion |
-| `GasSchedule<I>` | `cost(&self, instr: &I) -> InstrCost<I>` — maps each instruction to its cost at instrumentation time |
-| `GasMeteredInstruction` | `charge(cost: u64) -> Self` — constructs a static `Charge` op within the ISA |
-
-The schedule is consulted only by the instrumentation pass; the interpreter never calls it at runtime.
-
-### 5.3 `GasMeter`
-
-```rust
-pub trait GasMeter {
-    fn charge(&mut self, amount: u64) -> Result<(), GasExhaustedError>;
-    fn balance(&self) -> u64;
-}
-```
-
-`SimpleGasMeter` is a flat-budget implementation backed by a `u64`. The interpreter calls `gas_meter.charge(cost)?` when it reaches a `Charge { cost }` op, returning `Err(GasExhaustedError)` if the budget is exhausted.
-
----
-
-## 8. Static Type Costing
+## 5. Load-Time Type Costing
 
 *Not yet implemented.*
 
-### 8.1 Problem
+### 5.1 Problem
 
 The current gas model charges for type construction and generic instantiation at runtime, which:
 
@@ -188,13 +148,13 @@ The current gas model charges for type construction and generic instantiation at
 - Couples metering to the VM's type cache and monomorphisation strategy.
 - Makes it impossible to pre-compute BB costs statically.
 
-### 8.2 Design Principle
+### 5.2 Design Principle
 
-**Type construction cost is separated from instruction cost and charged statically.**
+**Type construction cost is separated from instruction cost and charged at load time.**
 
 All instruction costs become constants, independent of type parameters. Type costs are charged once per unique instantiation, at the point where the type is first "mentioned" in a call chain, not when it is constructed at runtime. Both the per-call-site cost and the per-function-body cost are constants folded into BB costs by the instrumentation pass.
 
-### 8.3 Cost Decomposition: Caller vs. Callee
+### 5.3 Cost Decomposition: Caller vs. Callee
 
 The type cost is split between two sites, both computed at **code-loading time** (not at monomorphisation or execution time):
 
@@ -237,7 +197,7 @@ For the call `foo<A<A<u64>>>`:
 
 This total is the same regardless of whether `T = u64` or `T = A<A<u64>>`. The caller absorbs the complexity of the supplied type; the callee absorbs the complexity of what it builds on top.
 
-### 8.4 Why This Works
+### 5.4 Why This Works
 
 - **No runtime type inspection needed for gas.** Costs are constants derived from the code structure.
 - **Generic and non-generic code have identical instruction costs.** The type cost is a separate, additive charge.
@@ -246,7 +206,7 @@ This total is the same regardless of whether `T = u64` or `T = A<A<u64>>`. The c
 
 **Assumption: type interning.** This design assumes that types are interned, making type copying and comparison O(1) operations (pointer/index equality). Without interning, passing or copying a type like `A<A<A<u64>>>` would have cost proportional to its depth, reintroducing a runtime type-size dependency into instruction costs. Type interning is therefore a prerequisite for this cost model.
 
-### 8.5 Propagation Through Nested Calls
+### 5.5 Propagation Through Nested Calls
 
 A subtlety: when `foo<T>` calls `bar<T>()`, the caller-side cost at that call site is **1** (just the `T` node), *not* the depth of whatever `T` was concretely instantiated with. The original outer caller already paid for the concrete type's depth. Each level in the call chain pays only for the type structure *it introduces*.
 
@@ -254,13 +214,40 @@ This means that if `caller()` invokes `foo<A<A<u64>>>()`, and `foo<T>` invokes `
 
 ---
 
-## 9. Extensions
+## 6. GC and Memory Cost
 
-- **Recovery mode.** Per-block metering deducts the full BB cost before any instruction executes. This creates an ambiguity when execution fails mid-block: did the program run out of gas, or did it hit a trap (arithmetic overflow, division by zero, `abort`) at an instruction it had sufficient gas to reach? Recovery mode resolves this by restoring the budget and re-executing the block instruction-by-instruction to determine the correct outcome and precise gas consumed.
-- **Safe Per-Path (SPP) placement.** The per-block algorithm instruments every basic block. SPP [1] analyses the dominator structure of the CFG to find a minimal set of metering points that still cover every execution path. On real-world contracts it reduces instrumented blocks to ~30–37% and yields up to 2× runtime improvement over per-block metering on selected benchmarks.
+*Not yet designed.*
+
+### 6.1 Problem
+
+The MonoMove runtime uses a garbage-collected heap. A program can trigger unbounded memory allocation or expensive collection cycles, so a cost model is needed that charges for heap allocation and accounts for GC overhead without requiring per-object tracking at execution time.
 
 ---
 
-## References
+## 7. Storage Costs
 
-[1] G. Mitenkov, "Metering the Meter, or How to Efficiently and Deterministically Charge the Execution of Smart Contracts," Master Thesis, ETH Zürich, October 2023. https://doi.org/10.3929/ethz-b-000638680
+*TBD.*
+
+### 7.1 Problem
+
+Reading from and writing to global storage (e.g. `move_from`, `move_to`, `borrow_global`) involves IO and state-tree operations whose cost depends on factors like value size and proof path length. These costs are separate from instruction execution costs and need their own charging model.
+
+---
+
+## 8. Module Loading Cost
+
+*Not yet designed.*
+
+### 8.1 Problem
+
+Modules are cached, so the expensive work — deserialization, verification, and compilation — only happens on cache misses. Charging on every access overcharges cache hits, but charging only on misses makes gas costs depend on cache state.
+
+---
+
+## 9. Costs for Size Computation (Layouts)
+
+*Not yet designed.*
+
+### 9.1 Problem
+
+Certain operations need to know the serialized or in-memory size of a value (e.g. for storage cost calculations or bounds checks). Layouts are cached, so the traversal to compute them only happens on cache misses. As with module loading, charging on every access overcharges cache hits, but charging only on misses makes gas costs depend on cache state.
