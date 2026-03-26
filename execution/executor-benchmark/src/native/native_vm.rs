@@ -96,9 +96,13 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
             state_view,
             &AptosModuleCacheManager::new(),
             BlockExecutorConfig {
-                local: BlockExecutorLocalConfig::default_with_concurrency_level(
-                    NativeConfig::get_concurrency_level(),
-                ),
+                local: BlockExecutorLocalConfig {
+                    concurrency_level: NativeConfig::get_concurrency_level(),
+                    enable_pre_write: false,
+                    ..BlockExecutorLocalConfig::default_with_concurrency_level(
+                        NativeConfig::get_concurrency_level(),
+                    )
+                },
                 onchain: onchain_config,
             },
             transaction_slice_metadata,
