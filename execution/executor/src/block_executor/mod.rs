@@ -264,51 +264,49 @@ where
             };
 
         // Record Executed stage with Keep/Retry/Discard status for traced txns.
+        // Only does work when block_txns has traced txns for this block.
+        // Builds retry/discard hash sets once, then classifies each traced txn.
         {
             let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
             if store.is_enabled() {
-                use aptos_transaction_tracing::types::{
-                    ExecutionStatus, StageMetadata, TransactionStage,
-                };
-                let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
+                if let Some(traced_hashes) = store.get_block_traced_txns(&block_id) {
+                    use aptos_transaction_tracing::types::{
+                        ExecutionStatus, StageMetadata, TransactionStage,
+                    };
+                    let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
 
-                // Collect retried/discarded txn hashes for exclusion from Keep.
-                let mut non_keep: std::collections::HashSet<HashValue> =
-                    std::collections::HashSet::new();
+                    // Build retry/discard sets once. committed_hash() is cached
+                    // on Transaction so repeated calls are cheap (OnceLock).
+                    let retry_set: std::collections::HashSet<HashValue> = execution_output
+                        .to_retry
+                        .transactions
+                        .iter()
+                        .map(|t| t.committed_hash())
+                        .collect();
+                    let discard_set: std::collections::HashSet<HashValue> = execution_output
+                        .to_discard
+                        .transactions
+                        .iter()
+                        .map(|t| t.committed_hash())
+                        .collect();
 
-                // Record Executed(Retry) + mark_retry for retried txns.
-                for txn in execution_output.to_retry.transactions.iter() {
-                    let hash = txn.committed_hash();
-                    if store.is_traced(&hash) {
-                        store.record_stage_with_metadata_at(
-                            &hash,
-                            TransactionStage::Executed,
-                            StageMetadata::Execution(ExecutionStatus::Retry),
-                            now,
-                        );
-                        store.mark_retry(&hash);
-                        non_keep.insert(hash);
-                    }
-                }
-
-                // Record Executed(Discard) for discarded txns.
-                for txn in execution_output.to_discard.transactions.iter() {
-                    let hash = txn.committed_hash();
-                    if store.is_traced(&hash) {
-                        store.record_stage_with_metadata_at(
-                            &hash,
-                            TransactionStage::Executed,
-                            StageMetadata::Execution(ExecutionStatus::Discard),
-                            now,
-                        );
-                        non_keep.insert(hash);
-                    }
-                }
-
-                // Record Executed(Keep) for remaining traced txns in this block.
-                if let Some(hashes) = store.get_block_traced_txns(&block_id) {
-                    for hash in &hashes {
-                        if !non_keep.contains(hash) {
+                    for hash in &traced_hashes {
+                        if retry_set.contains(hash) {
+                            store.record_stage_with_metadata_at(
+                                hash,
+                                TransactionStage::Executed,
+                                StageMetadata::Execution(ExecutionStatus::Retry),
+                                now,
+                            );
+                            store.mark_retry(hash);
+                        } else if discard_set.contains(hash) {
+                            store.record_stage_with_metadata_at(
+                                hash,
+                                TransactionStage::Executed,
+                                StageMetadata::Execution(ExecutionStatus::Discard),
+                                now,
+                            );
+                        } else {
                             store.record_stage_with_metadata_at(
                                 hash,
                                 TransactionStage::Executed,

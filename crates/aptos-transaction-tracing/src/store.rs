@@ -247,11 +247,11 @@ impl TransactionTraceStore {
 
     /// Record a stage for all traced txns in a block. O(1) DashMap lookup
     /// instead of re-iterating the block payload.
-    /// Also triggers periodic GC so orphaned traces are cleaned up even when
-    /// finalize_trace is never called (e.g., discarded blocks).
+    /// Record a stage for all traced txns in a block. Does NOT trigger GC
+    /// to avoid adding latency to the execution/consensus hot path.
+    /// GC runs from finalize_trace (mempool commit) instead.
     pub fn record_block_stage(&self, block_id: &HashValue, stage: TransactionStage) {
         self.record_block_stage_at(block_id, stage, now_usecs());
-        self.maybe_gc();
     }
 
     /// Record a stage for all traced txns in a block with explicit timestamp.
