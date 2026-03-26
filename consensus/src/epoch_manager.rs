@@ -1087,6 +1087,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let proxy_enabled = !proxy_addresses.is_empty();
         let is_proxy_validator = proxy_enabled && proxy_addresses.contains(&self.author);
 
+        // Proxy-primary consensus does not use randomness. Disable it when proxy is enabled
+        // to prevent DKG vtxns from being generated and included in proposals.
+        let onchain_randomness_config = if proxy_enabled {
+            OnChainRandomnessConfig::default_disabled()
+        } else {
+            onchain_randomness_config
+        };
+
         info!(
             epoch = epoch,
             proxy_enabled = proxy_enabled,
