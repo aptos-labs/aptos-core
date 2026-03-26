@@ -758,16 +758,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.execution_client.end_epoch().await;
 
-        // Shutdown the proxy RoundManager (must happen before dropping channels)
-        if let Some(close_tx) = self.proxy_round_manager_close_tx.take() {
-            let (ack_tx, ack_rx) = oneshot::channel();
-            close_tx
-                .send(ack_tx)
-                .expect("[EpochManager] Fail to drop proxy round manager");
-            ack_rx
-                .await
-                .expect("[EpochManager] Fail to drop proxy round manager");
-        }
+        // Shutdown the proxy RoundManager. Unlike the primary RM, the proxy RM
+        // uses ProxySafetyRules (no shared state to release), so we don't need
+        // to block waiting for an ack. Drop the close_tx to signal shutdown;
+        // the proxy RM will break out of its select! loop when close_rx fires.
+        // Blocking here caused 10+ second delays when the proxy RM was stuck in
+        // block retrieval, which made the node fall behind in the next epoch.
+        drop(self.proxy_round_manager_close_tx.take());
         self.proxy_round_manager_tx = None;
         self.proxy_buffered_proposal_tx = None;
         self.proxy_ordered_blocks_tx = None;
