@@ -89,8 +89,8 @@ pub struct FieldLayout {
 pub struct StructLayout {
     /// Total size of the struct. Includes necessary padding based on the
     /// alignment requirements.
-    size: Size,
-    align: Alignment,
+    pub size: Size,
+    pub align: Alignment,
     fields: GlobalArenaPtr<[FieldLayout]>,
 }
 
@@ -130,6 +130,7 @@ pub enum Type {
     /// Named struct with its layout. Layout is only set for fully-instantiated
     /// structs.
     Struct {
+        // TODO: Make this a pointer to struct type struct which holds these pointers.
         executable_id: GlobalArenaPtr<ExecutableId>,
         name: GlobalArenaPtr<str>,
         ty_args: GlobalArenaPtr<[GlobalArenaPtr<Type>]>,
@@ -139,6 +140,7 @@ pub enum Type {
     /// variant can be added during module upgrade). Enum layouts are always
     /// resolved through the executable where they are defined.
     Enum {
+        // TODO: Make this a pointer to enum type struct which holds these pointers.
         executable_id: GlobalArenaPtr<ExecutableId>,
         name: GlobalArenaPtr<str>,
         ty_args: GlobalArenaPtr<[GlobalArenaPtr<Type>]>,
@@ -207,15 +209,11 @@ impl Type {
         })
     }
 
-    /// Returns the field layout slice for a struct type, or [`None`] for
-    /// non-struct types or generic structs without a computed layout.
-    ///
-    // TODO: This API is test-only for now, will change, so ignore safety.
-    pub fn field_layouts(&self) -> Option<&[FieldLayout]> {
+    /// Returns layout for a struct type, or [`None`] for non-struct types or
+    /// generic structs without a computed layout.
+    pub fn struct_layout(&self) -> Option<&StructLayout> {
         match self {
-            Type::Struct { layout, .. } => layout
-                .as_ref()
-                .map(|layout| unsafe { layout.fields.as_ref_unchecked() }),
+            Type::Struct { layout, .. } => layout.as_ref(),
             Type::Bool
             | Type::U8
             | Type::U16
@@ -237,6 +235,13 @@ impl Type {
             | Type::Enum { .. }
             | Type::TypeParam { .. } => None,
         }
+    }
+}
+
+impl StructLayout {
+    // TODO: This API is test-only for now, will change, so ignore safety.
+    pub fn field_layouts(&self) -> &[FieldLayout] {
+        unsafe { self.fields.as_ref_unchecked() }
     }
 }
 

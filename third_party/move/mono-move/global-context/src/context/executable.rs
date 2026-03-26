@@ -5,7 +5,8 @@
 
 use crate::{
     context::types::{
-        struct_info_at, try_as_primitive_type, FieldLayout, StructLayout, Type, EMPTY_LIST,
+        struct_info_at, try_as_primitive_type, Alignment, FieldLayout, FieldOffset, StructLayout,
+        Type, EMPTY_LIST,
     },
     ArenaRef, ExecutableId, ExecutionGuard,
 };
@@ -161,7 +162,7 @@ impl Executable {
             .get(&name.into_global_arena_ptr())
             .map(|ptr| {
                 // SAFETY: Types must be still valid
-                unsafe { ptr.as_ref_unchecked() }
+                unsafe { ptr.ty.as_ref_unchecked() }
             })
     }
 }
@@ -190,7 +191,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
         module: &'a CompiledModule,
     ) -> ExecutableBuilder<'a, 'guard, 'ctx>
     where
-        'guard: 'ctx,
+        'ctx: 'guard,
     {
         let struct_def_idx = module
             .struct_defs()
@@ -252,8 +253,9 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
     /// Resolves a struct or enum definition.
     ///
     /// For structs, computes layouts  **eagerly** by interning each field type
-    /// recursively and computing offsets inline. For enums, only variant field
-    /// types are interned (enum type-level size is always fixed).
+    /// recursively and computing offsets inline. For now, this implements
+    /// C-style struct layout. For enums, only variant field types are interned
+    /// (enum type-level size is always fixed).
     fn resolve_struct_def(
         &mut self,
         struct_def: &StructDefinition,
@@ -474,7 +476,9 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
 }
 
 /// Rounds the value up to the next multiple of alignment.
-fn align_up(offset: u32, align: u32) -> u32 {
+///
+/// **Pre-condition:** Align is non-zero and is a power of two.
+fn align_up(offset: FieldOffset, align: Alignment) -> Alignment {
     debug_assert!(align > 0 && align.is_power_of_two());
     (offset + align - 1) & !(align - 1)
 }

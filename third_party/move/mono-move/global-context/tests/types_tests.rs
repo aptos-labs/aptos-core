@@ -63,24 +63,35 @@ struct D
     );
 
     let name = guard.intern_identifier(ident_str!("B"));
-    let ty = executable.get_struct(name).unwrap();
-    assert_eq!(ty.size_and_align(), Some((96, 32)));
-    let offsets = ty
-        .field_layouts()
+    let layout = executable
+        .get_struct(name)
         .unwrap()
+        .struct_layout()
+        .unwrap();
+    assert_eq!(layout.size, 96);
+    assert_eq!(layout.align, 32);
+    let offsets = layout
+        .field_layouts()
         .iter()
         .map(|f| f.offset)
         .collect::<Vec<_>>();
     assert_eq!(offsets, vec![0, 32, 64]);
 
     let name = guard.intern_identifier(ident_str!("D"));
-    let ty = executable.get_struct(name).unwrap();
-    assert_eq!(ty.size_and_align(), Some((192, 32)));
-    let offsets = ty
-        .field_layouts()
+    let layout = executable
+        .get_struct(name)
         .unwrap()
+        .struct_layout()
+        .unwrap();
+    assert_eq!(layout.size, 192);
+    assert_eq!(layout.align, 32);
+    let offsets = layout
+        .field_layouts()
         .iter()
         .map(|f| f.offset)
         .collect::<Vec<_>>();
     assert_eq!(offsets, vec![0, 1, 8, 16, 32, 48, 64, 160]);
+
+    let name = guard.intern_identifier(ident_str!("E"));
+    assert!(executable.get_struct(name).is_none());
 }
