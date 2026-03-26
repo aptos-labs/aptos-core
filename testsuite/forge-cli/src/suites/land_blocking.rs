@@ -11,14 +11,14 @@ use aptos_forge::{
     },
     EmitJobMode, EmitJobRequest, ForgeConfig, NodeResourceOverride,
 };
-use aptos_sdk::types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
+use aptos_sdk::types::on_chain_config::{
+    BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig,
+};
 use aptos_testcases::{
-    compatibility_test::SimpleValidatorUpgrade,
-    framework_upgrade::FrameworkUpgrade,
-    multi_region_network_test::MultiRegionNetworkEmulationTest,
-    two_traffics_test::TwoTrafficsTest,
+    compatibility_test::SimpleValidatorUpgrade, framework_upgrade::FrameworkUpgrade,
+    multi_region_network_test::MultiRegionNetworkEmulationTest, transaction_tracing_test,
+    transaction_tracing_test::TransactionTracingTest, two_traffics_test::TwoTrafficsTest,
     CompositeNetworkTest,
-    transaction_tracing_test, transaction_tracing_test::TransactionTracingTest,
 };
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
@@ -75,10 +75,7 @@ pub(crate) fn framework_upgrade() -> ForgeConfig {
 /// Tracing layout for overhead comparison:
 ///   - Validator 0: receives 500 TPS traced traffic → produces TxnTrace entries
 ///   - Validators 1-6: no traced traffic → only is_enabled()/should_trace() overhead
-pub(crate) fn transaction_tracing_test(
-    duration: Duration,
-    test_cmd: &TestCommand,
-) -> ForgeConfig {
+pub(crate) fn transaction_tracing_test(duration: Duration, test_cmd: &TestCommand) -> ForgeConfig {
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
         k8s.enable_haproxy
     } else {
@@ -138,13 +135,15 @@ pub(crate) fn transaction_tracing_test(
         inner_traffic: EmitJobRequest::default()
             .mode(EmitJobMode::MaxLoad { mempool_backlog })
             .init_gas_price_multiplier(20),
-        inner_success_criteria: SuccessCriteria::new(if ha_proxy {
-            7000
-        } else if long_running {
-            11000
-        } else {
-            10000
-        }),
+        inner_success_criteria: SuccessCriteria::new(
+            if ha_proxy {
+                7000
+            } else if long_running {
+                11000
+            } else {
+                10000
+            },
+        ),
     };
     let tracing_test = TransactionTracingTest {
         inner: Box::new(inner_load_test),
@@ -163,9 +162,21 @@ pub(crate) fn transaction_tracing_test(
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
                     .expect("must serialize");
+            // Reduce block gas limit to force transaction retries, exercising
+            // the Executed(Retry) → mark_retry() path in transaction tracing.
+            let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
+            if let OnChainExecutionConfig::V7(ref mut config) = on_chain_execution_config {
+                if let BlockGasLimitType::ComplexLimitV1 {
+                    ref mut effective_block_gas_limit,
+                    ..
+                } = config.block_gas_limit_type
+                {
+                    // 25% of default (200000 → 50000) to force more frequent retries
+                    *effective_block_gas_limit = 50000;
+                }
+            }
             helm_values["chain"]["on_chain_execution_config"] =
-                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Same as land-blocking
