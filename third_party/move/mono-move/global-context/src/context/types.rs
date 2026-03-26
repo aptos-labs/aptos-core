@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Type interning and struct layout metadata.
+//! Type interning and layout metadata.
 //!
 //! A single **type graph** lives in the global arena: a DAG of [`Type`] nodes,
 //! deduplicated by interning so that pointer equality implies structural
@@ -14,35 +14,42 @@
 //! arena allocation needed. Layout, size and alignment can be deduced from the
 //! type.
 //!
-//! # Type parameters
+//! ## Type parameters
 //!
 //! Type parameters are interned and allocated in arena as [`GlobalArenaPtr`].
-//! During type substitution, pointers are replaced, but the whole type is re-
+//! During type substitution, pointers are replaced, and the whole type is re-
 //! canonicalized.
 //! TODO: This is currently not supported.
 //!
-//! # Vectors and references
+//! ## Vectors
 //!
-//! Vectors and references are arena-allocated composite types with their inner
-//! types interned recursively. In flat memory, vectors have 8-byte size and
-//! 8-byte alignment. Size of references is 16 bytes (fat pointers).
+//! Vectors are arena-allocated composite types with their inner
+//! types interned recursively.
 //!
-//! # Fully-instantiated structs
+//! In flat memory, vectors have 8-byte size and 8-byte alignment.
+//!
+//! ## References
+//!
+//! References are arena-allocated composite types with their inner
+//! pointee types interned recursively.
+//!
+//! Size of references is 16 bytes (fat pointers). Alignment is also 16 bytes.
+//!
+//! ## Fully-instantiated structs
 //!
 //! Struct types are arena-allocated, and store executable ID, name and type
 //! arguments that uniquely identify the type. Additionally, fully-instantiated
-//! structs store their layout in flat memory: total size, alignment and field
-//! offsets and types.
+//! structs cache their layout information (size, alignment and field offsets).
 //!
-//! # Enums
+//! ## Enums
 //!
-//! Enums are simply pointers to arena-allocated identifiers and type arguments
-//! that uniquely identify the type. Enum layouts are not cached in the type
-//! graph because enum definitions can change on module upgrade (new variants
-//! added). Instead, variant field layouts are stored per-executable and
-//! resolved at runtime.
+//! Enums are simply pointers to arena-allocated executable IDs, identifiers
+//! and type arguments that uniquely identify the type. Enum layouts are not
+//! cached in the type graph because enum definitions can change on module
+//! upgrade (new variants added). Instead, variant field layouts are stored
+//! per-executable and resolved at runtime.
 //!
-//! # Generic structs
+//! ## Generic structs
 //!
 //! TODO: support substitution
 
@@ -57,19 +64,22 @@ use move_binary_format::{
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 use std::hash::{Hash, Hasher};
 
-/// Stores size and alignment information (in bytes) of a [`Type`].
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct SizeAndAlign {
-    pub size: u32,
-    pub align: u16,
-}
+/// Total size of the type in flat memory including padding and any alignment.
+pub type Size = u32;
+
+/// When [`Type`] is stored in flat memory, the start address needs to be
+/// this many bytes aligned.
+pub type Alignment = u32;
+
+/// Offset in bytes of struct fields in flat memory.
+pub type FieldOffset = u32;
 
 /// Layout for struct fields:
 ///   - Offset of the field in flat memory representation.
 ///   - Pointer to the field's type for traversals (e.g., serialization).
 #[derive(Copy, Clone)]
 pub struct FieldLayout {
-    pub offset: u32,
+    pub offset: FieldOffset,
     #[allow(dead_code)]
     ty: GlobalArenaPtr<Type>,
 }
@@ -77,7 +87,10 @@ pub struct FieldLayout {
 /// Struct layout information: total size, alignment and information about the
 /// field layouts.
 pub struct StructLayout {
-    size_and_align: SizeAndAlign,
+    /// Total size of the struct. Includes necessary padding based on the
+    /// alignment requirements.
+    size: Size,
+    align: Alignment,
     fields: GlobalArenaPtr<[FieldLayout]>,
 }
 
@@ -102,12 +115,12 @@ pub enum Type {
     Signer,
     /// Immutable reference to a type; stores a pointer to canonicalized
     /// pointee type.
-    Ref {
+    ImmutRef {
         inner: GlobalArenaPtr<Type>,
     },
     /// Mutable reference to a type; stores a pointer to canonicalized pointee
     /// type.
-    RefMut {
+    MutRef {
         inner: GlobalArenaPtr<Type>,
     },
     /// Variable-length vector; stores a pointer to canonicalized element type.
@@ -129,10 +142,21 @@ pub enum Type {
         executable_id: GlobalArenaPtr<ExecutableId>,
         name: GlobalArenaPtr<str>,
         ty_args: GlobalArenaPtr<[GlobalArenaPtr<Type>]>,
+        // TODO: Optional layout for enums with fixed size (frozen).
     },
     // TODO: Support function types.
     /// Unresolved generic type parameter placeholder (index into the enclosing
-    /// type-argument list).
+    /// type-argument list). Note that pointer equality of type parameters does
+    /// not guarantee anything. For example, for
+    /// ```text
+    /// struct A<T> { } // T is 0.
+    ///
+    /// struct B<T1, T2> {
+    ///     x: A<T1>, // T1 is 0.
+    ///     y: A<T2>, // T2 is 1.
+    /// }
+    /// ```
+    /// `p: A<T>` and `q: B<T1, T2>` satisfy p == q.x, which is meaningless.
     TypeParam {
         idx: u16,
     },
@@ -144,39 +168,30 @@ impl Type {
     ///   - If the type is a generic struct.
     ///   - If the type is an unresolved type parameter.
     /// In both cases, type substitution must run first.
-    pub fn size_and_align(&self) -> Option<SizeAndAlign> {
+    pub fn size_and_align(&self) -> Option<(Size, Alignment)> {
         Some(match self {
             // Primitives.
-            Type::Bool | Type::U8 | Type::I8 => SizeAndAlign { size: 1, align: 1 },
-            Type::U16 | Type::I16 => SizeAndAlign { size: 2, align: 2 },
-            Type::U32 | Type::I32 => SizeAndAlign { size: 4, align: 4 },
-            Type::U64 | Type::I64 => SizeAndAlign { size: 8, align: 8 },
-            Type::U128 | Type::I128 => SizeAndAlign {
-                size: 16,
-                align: 16,
-            },
-            Type::U256 | Type::I256 | Type::Address | Type::Signer => SizeAndAlign {
-                size: 32,
-                align: 32,
-            },
+            Type::Bool | Type::U8 | Type::I8 => (1, 1),
+            Type::U16 | Type::I16 => (2, 2),
+            Type::U32 | Type::I32 => (4, 4),
+            Type::U64 | Type::I64 => (8, 8),
+            Type::U128 | Type::I128 => (16, 16),
+            Type::U256 | Type::I256 | Type::Address | Type::Signer => (32, 32),
 
             // Vectors: pointer to the heap which stores vector metadata such
             // as length, capacity.
-            Type::Vector { .. } => SizeAndAlign { size: 8, align: 8 },
+            Type::Vector { .. } => (8, 8),
 
             // References are 16-byte fat pointers.
-            Type::Ref { .. } | Type::RefMut { .. } => SizeAndAlign {
-                size: 16,
-                align: 16,
-            },
+            Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 16),
 
             // Enums: always heap pointers because of upgradability.
-            Type::Enum { .. } => SizeAndAlign { size: 8, align: 8 },
+            Type::Enum { .. } => (8, 8),
 
             // Structs: the layout must be pre-computed for all fields inline.
             Type::Struct { layout, .. } => {
                 match layout {
-                    Some(layout) => layout.size_and_align,
+                    Some(layout) => (layout.size, layout.align),
                     None => {
                         // INVARIANT: If layout is unset, this struct contains
                         // generic type arguments.
@@ -216,8 +231,8 @@ impl Type {
             | Type::I256
             | Type::Address
             | Type::Signer
-            | Type::Ref { .. }
-            | Type::RefMut { .. }
+            | Type::ImmutRef { .. }
+            | Type::MutRef { .. }
             | Type::Vector { .. }
             | Type::Enum { .. }
             | Type::TypeParam { .. } => None,
@@ -235,7 +250,7 @@ impl FieldLayout {
     /// # Safety
     ///
     /// The caller must ensure that the type pointer is valid.
-    pub(super) fn new(offset: u32, ty: GlobalArenaPtr<Type>) -> Self {
+    pub(super) fn new(offset: FieldOffset, ty: GlobalArenaPtr<Type>) -> Self {
         Self { offset, ty }
     }
 }
@@ -246,9 +261,10 @@ impl StructLayout {
     /// # Safety
     ///
     /// The caller must ensure that the field layouts pointer is valid.
-    pub(super) fn new(size: u32, align: u16, fields: GlobalArenaPtr<[FieldLayout]>) -> Self {
+    pub(super) fn new(size: Size, align: Alignment, fields: GlobalArenaPtr<[FieldLayout]>) -> Self {
         Self {
-            size_and_align: SizeAndAlign { size, align },
+            size,
+            align,
             fields,
         }
     }
@@ -348,8 +364,8 @@ pub(super) fn try_as_primitive_type(token: &SignatureToken) -> Option<GlobalAren
     }
 }
 
-/// Canonical discriminants for cross-format hashing. This ensures that **ALL**
-/// keys hash to the same value.
+/// Canonical discriminants for cross-format hashing. This ensures that type
+/// interner keys hash in the same way as signature tokens.
 mod type_discriminant {
     pub(super) const BOOL: u8 = 0;
     pub(super) const U8: u8 = 1;
@@ -438,11 +454,11 @@ impl Hash for TypeInternerKey {
             Signer => {
                 type_discriminant::SIGNER.hash(state);
             },
-            Ref { inner } => {
+            ImmutRef { inner } => {
                 type_discriminant::REFERENCE.hash(state);
                 Self(*inner).hash(state);
             },
-            RefMut { inner } => {
+            MutRef { inner } => {
                 type_discriminant::REFERENCE_MUT.hash(state);
                 Self(*inner).hash(state);
             },
@@ -516,8 +532,8 @@ impl PartialEq for TypeInternerKey {
             I256 => matches!(other, I256),
             Address => matches!(other, Address),
             Signer => matches!(other, Signer),
-            Ref { inner } => {
-                if let Ref { inner: other_inner } = other {
+            ImmutRef { inner } => {
+                if let ImmutRef { inner: other_inner } = other {
                     // SAFETY: Inner pointers are already canonical pointers,
                     // so it is safe to compare by pointer equality.
                     *inner == *other_inner
@@ -525,8 +541,8 @@ impl PartialEq for TypeInternerKey {
                     false
                 }
             },
-            RefMut { inner } => {
-                if let RefMut { inner: other_inner } = other {
+            MutRef { inner } => {
+                if let MutRef { inner: other_inner } = other {
                     // SAFETY: Inner pointers are already canonical pointers,
                     // so it is safe to compare by pointer equality.
                     *inner == *other_inner
@@ -724,14 +740,14 @@ impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
             Address => matches!(ty, Type::Address),
             Signer => matches!(ty, Type::Signer),
             Reference(inner) => {
-                if let Type::Ref { inner: other_inner } = ty {
+                if let Type::ImmutRef { inner: other_inner } = ty {
                     Self(inner.as_ref(), self.1).equivalent(&TypeInternerKey(*other_inner))
                 } else {
                     false
                 }
             },
             MutableReference(inner) => {
-                if let Type::RefMut { inner: other_inner } = ty {
+                if let Type::MutRef { inner: other_inner } = ty {
                     Self(inner.as_ref(), self.1).equivalent(&TypeInternerKey(*other_inner))
                 } else {
                     false
@@ -774,8 +790,8 @@ impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
                     | Type::I256
                     | Type::Address
                     | Type::Signer
-                    | Type::Ref { .. }
-                    | Type::RefMut { .. }
+                    | Type::ImmutRef { .. }
+                    | Type::MutRef { .. }
                     | Type::Vector { .. }
                     | Type::TypeParam { .. } => {
                         return false;
@@ -813,7 +829,7 @@ impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
 
 /// Returns struct information (module address, name and struct name) per given
 /// index. The index must come from the given compiled module.
-fn struct_info_at(
+pub(super) fn struct_info_at(
     module: &CompiledModule,
     idx: StructHandleIndex,
 ) -> (&AccountAddress, &IdentStr, &IdentStr) {

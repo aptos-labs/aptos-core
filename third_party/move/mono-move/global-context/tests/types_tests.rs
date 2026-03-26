@@ -3,7 +3,7 @@
 
 //! Integration tests for type interning and metadata resolution.
 
-use mono_move_global_context::{Executable, ExecutionGuard, GlobalContext, SizeAndAlign};
+use mono_move_global_context::{Executable, ExecutionGuard, GlobalContext};
 use move_asm::assembler;
 use move_core_types::ident_str;
 
@@ -64,13 +64,7 @@ struct D
 
     let name = guard.intern_identifier(ident_str!("B"));
     let ty = executable.get_struct(name).unwrap();
-    assert_eq!(
-        ty.size_and_align(),
-        Some(SizeAndAlign {
-            size: 96,
-            align: 32
-        })
-    );
+    assert_eq!(ty.size_and_align(), Some((96, 32)));
     let offsets = ty
         .field_layouts()
         .unwrap()
@@ -81,13 +75,7 @@ struct D
 
     let name = guard.intern_identifier(ident_str!("D"));
     let ty = executable.get_struct(name).unwrap();
-    assert_eq!(
-        ty.size_and_align(),
-        Some(SizeAndAlign {
-            size: 192,
-            align: 32
-        })
-    );
+    assert_eq!(ty.size_and_align(), Some((192, 32)));
     let offsets = ty
         .field_layouts()
         .unwrap()

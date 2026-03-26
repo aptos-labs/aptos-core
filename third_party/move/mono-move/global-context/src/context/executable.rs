@@ -4,10 +4,12 @@
 //! Placeholder types for executables (compiled modules / scripts).
 
 use crate::{
-    context::types::{try_as_primitive_type, FieldLayout, StructLayout, Type, EMPTY_LIST},
+    context::types::{
+        struct_info_at, try_as_primitive_type, FieldLayout, StructLayout, Type, EMPTY_LIST,
+    },
     ArenaRef, ExecutableId, ExecutionGuard,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use bumpalo::Bump;
 use fxhash::FxBuildHasher;
 use mono_move_alloc::GlobalArenaPtr;
@@ -92,6 +94,12 @@ impl Function {
     }
 }
 
+pub struct StructType {
+    /// Struct type signature. Invariant: stored type is always
+    /// [`Type::Struct`].
+    ty: GlobalArenaPtr<Type>,
+}
+
 pub struct EnumType {
     /// Enum type signature. Invariant: stored type is always
     /// [`Type::Enum`].
@@ -124,7 +132,7 @@ struct ExecutableData {
     id: GlobalArenaPtr<ExecutableId>,
     /// Non-generic struct definitions. Invariant: stored type is always
     /// [`Type::Struct`].
-    structs: HashMap<GlobalArenaPtr<str>, GlobalArenaPtr<Type>, FxBuildHasher>,
+    structs: HashMap<GlobalArenaPtr<str>, StructType, FxBuildHasher>,
     /// Non-generic enum definitions.
     enums: HashMap<GlobalArenaPtr<str>, EnumType, FxBuildHasher>,
     /// Non-generic functions.
@@ -259,7 +267,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             .guard
             .intern_identifier_internal(self.module.identifier_at(handle.name));
         match &struct_def.field_information {
-            StructFieldInformation::Native => unreachable!("Native fields are deprecated"),
+            StructFieldInformation::Native => bail!("Native fields are deprecated"),
             StructFieldInformation::Declared(field_defs) => {
                 // Check if already visited. For example, if we have structs:
                 //
@@ -269,7 +277,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 // we do not need to recompute A's type information and can use
                 // cached data.
                 if let Some(ptr) = self.data.structs.get(&name) {
-                    return Ok(*ptr);
+                    return Ok(ptr.ty);
                 }
 
                 // If not yet processed, it is possible that struct type is
@@ -280,14 +288,14 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                     .guard
                     .get_interned_type_pointer_internal(&tok, self.module)
                 {
-                    self.data.structs.insert(name, ptr);
+                    self.data.structs.insert(name, StructType { ty: ptr });
                     return Ok(ptr);
                 }
 
                 // Intern each field type and compute layout metadata inline.
                 let mut fields = Vec::with_capacity(field_defs.len());
-                let mut offset: u32 = 0;
-                let mut align: u16 = 1;
+                let mut offset = 0;
+                let mut align = 1;
 
                 for field in field_defs {
                     let field_ty = self.intern_signature_token(&field.signature.0)?;
@@ -296,17 +304,18 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                     // has not been reset during execution phase).
                     let field_ty_ref = unsafe { field_ty.as_ref_unchecked() };
 
-                    let field_size_and_align = field_ty_ref.size_and_align().ok_or_else(|| {
-                        anyhow!("Size and alignment is set for non-generic types")
-                    })?;
-                    offset = align_up(offset, field_size_and_align.align as u32);
-                    align = align.max(field_size_and_align.align);
+                    let (field_size, field_align) =
+                        field_ty_ref.size_and_align().ok_or_else(|| {
+                            anyhow!("Size and alignment is set for non-generic types")
+                        })?;
+                    offset = align_up(offset, field_align);
+                    align = align.max(field_align);
 
                     fields.push(FieldLayout::new(offset, field_ty));
-                    offset += field_size_and_align.size;
+                    offset += field_size;
                 }
 
-                let size = align_up(offset, align as u32);
+                let size = align_up(offset, align);
                 // Note: fields are not interned, but they are also not used
                 // for equality or hash - but simply cache layouts in-place.
                 let fields = self.guard.global_arena.alloc_slice_copy(&fields);
@@ -320,7 +329,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 });
                 let ptr = self.guard.insert_allocated_type_pointer_internal(ty);
 
-                self.data.structs.insert(name, ptr);
+                self.data.structs.insert(name, StructType { ty: ptr });
                 Ok(ptr)
             },
             StructFieldInformation::DeclaredVariants(variant_defs) => {
@@ -395,9 +404,13 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                     self.guard
                         .get_interned_type_pointer_internal(token, self.module)
                         .ok_or_else(|| {
+                            let (address, module_name, struct_name) = struct_info_at(self.module, *idx);
                             anyhow!(
-                            "Non-local type not yet interned (transitive dependency not loaded)"
-                        )
+                                "Non-local type not yet interned (transitive dependency not loaded): {}::{}::{}",
+                                address,
+                                module_name,
+                                struct_name
+                            )
                         })
                 },
             };
@@ -419,11 +432,11 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         let ptr = match token {
             SignatureToken::Reference(inner) => {
                 let inner = self.intern_signature_token(inner.as_ref())?;
-                self.guard.global_arena.alloc(Type::Ref { inner })
+                self.guard.global_arena.alloc(Type::ImmutRef { inner })
             },
             SignatureToken::MutableReference(inner) => {
                 let inner = self.intern_signature_token(inner.as_ref())?;
-                self.guard.global_arena.alloc(Type::RefMut { inner })
+                self.guard.global_arena.alloc(Type::MutRef { inner })
             },
             SignatureToken::Vector(elem_token) => {
                 let elem = self.intern_signature_token(elem_token.as_ref())?;

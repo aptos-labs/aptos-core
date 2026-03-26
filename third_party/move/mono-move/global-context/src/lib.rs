@@ -5,7 +5,7 @@ pub use mono_move_alloc::GlobalArenaPool;
 mod context;
 pub use context::{
     ArenaRef, Executable, ExecutableBuilder, ExecutableId, ExecutionGuard, FieldLayout, Function,
-    GlobalContext, MaintenanceGuard, SizeAndAlign, Type,
+    GlobalContext, MaintenanceGuard, Type,
 };
 pub use move_core_types::identifier::Identifier;
 pub mod maintenance_config;

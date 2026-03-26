@@ -53,7 +53,7 @@ mod executable_cache;
 use executable_cache::ExecutableCache;
 mod types;
 use types::TypeInternerKey;
-pub use types::{FieldLayout, SizeAndAlign, Type};
+pub use types::{FieldLayout, Type};
 
 /// Global execution context with a two-phase state machine.
 ///
