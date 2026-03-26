@@ -56,7 +56,7 @@ All data structures, algorithms, and resource consumption within the VM must be 
 - Memory consumption: stack, heap, and code regions.
 - Type name lengths and data layout sizes.
 - Cache sizes (for all caches in the global and per-transaction contexts).
-- All fields and structures within the binary format (note: existing limits are enforced by the deserializer, but these must be reviewed for completeness).
+- All items within the binary format (note: existing limits are enforced by the deserializer, but these must be reviewed for completeness).
 - Write set size.
 
 **Recursion bounds.** Recursion is particularly important and difficult to guard against. Three distinct sources of unbounded recursion must be addressed:
@@ -64,7 +64,7 @@ All data structures, algorithms, and resource consumption within the VM must be 
 1. ***Move-level recursion:*** The transaction must be aborted if stack memory is exhausted.
 2. ***Rust-level recursion:*** Any Rust algorithm that operates over deeply nested data is vulnerable to stack overflow.
     1. This includes `Drop` implementations on recursive types, which are especially dangerous because the programmer has limited control over when and how they are invoked.
-    2. `Clone` is similarly hazardous due to its prevalence — recursive clones can easily go unnoticed in otherwise innocuous code paths.
+    2. Derived traits (`Clone`, `Hash`, `Eq`, `PartialEq`, `Display`, `Debug`) on recursive types are similarly hazardous — they generate recursive implementations that can overflow the stack on deeply nested data, and can easily go unnoticed in otherwise innocuous code paths.
     3. The goal should be to eliminate recursive algorithms entirely, or at minimum to have a clear, documented mitigation plan before production.
 3. ***Recursive library calls:*** Any call into a library function that is internally recursive must also respect depth limits. Examples include topological sort and strongly connected component analysis.
 

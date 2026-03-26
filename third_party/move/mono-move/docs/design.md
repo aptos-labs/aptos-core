@@ -305,7 +305,7 @@ struct Executable {
 }
 ```
 
-A non-generic or monomorphized function is represented via `Function` struct. The runtime's current `Function` representation (in `mono-move-micro-ops`) is a post-monomorphization, type-erased form focused on execution:
+A non-generic or monomorphized function is represented via `Function` struct. The runtime's current `Function` representation (in `mono-move-core`) is a post-monomorphization, type-erased form focused on execution:
 
 ```rust
 pub struct Function {
@@ -439,9 +439,9 @@ impl GlobalExecutionContextGuard<'_> {
 
 ## 4.1 Runtime Instruction Set
 
-The runtime executes **micro-ops** — a low-level, flat instruction set produced by the recompiler from Move bytecode after monomorphization and destackification. Micro-ops operate on frame-relative byte offsets rather than a virtual operand stack. Categories include arithmetic, data movement, control flow (fused compare-and-branch), call/return, vector operations, heap object operations, reference operations, and gas metering.
+The runtime executes **micro-ops** — a low-level, flat instruction set produced by the specializer from Move bytecode after monomorphization and destackification. Micro-ops operate on frame-relative byte offsets rather than a virtual operand stack. Categories include arithmetic, data movement, control flow (fused compare-and-branch), call/return, vector operations, heap object operations, reference operations, and gas metering.
 
-See `docs/micro_ops.md` for the full design.
+The instruction set design (principles, addressing modes, naming conventions, open questions) is documented alongside the code in `mono-move-core/src/instruction/mod.rs`.
 
 ## 4.2 Stack Memory Model & Calling Convention
 

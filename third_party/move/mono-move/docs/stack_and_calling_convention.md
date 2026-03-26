@@ -88,7 +88,7 @@ If the `pointer_offsets` approach proves too restrictive — either because the 
 
 Stack maps record the type of every slot at GC safe points (allocation sites, call return sites). This gives the GC knowledge of the stack layout at different points of execution, but at a cost:
 
-- The recompiler must compute liveness at safe points and emit stack maps (including handling the "maybe alive" problem at control-flow merge points).
+- The specializer must compute liveness at safe points and emit stack maps (including handling the "maybe alive" problem at control-flow merge points).
 - Stack maps consume more memory than a single per-function list, though in practice they can likely be compressed significantly (e.g., sharing maps across safe points with identical layouts, delta-encoding, etc.).
 - GC root scanning must look up the correct map for the current safe point in each frame.
 

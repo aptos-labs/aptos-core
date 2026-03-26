@@ -4,9 +4,9 @@ Runtime for the MonoMove VM: a register-based interpreter with a unified linear 
 
 ## Overview
 
-This crate executes **micro-ops** — a low-level, flat instruction set that a recompiler produces from Move bytecode after monomorphization and destackification. It is not a general-purpose VM; it assumes its input has already been verified and lowered by the MonoMove compiler pipeline.
+This crate executes **micro-ops** — a low-level, flat instruction set that a specializer produces from Move bytecode after monomorphization and destackification. It is not a general-purpose VM; it assumes its input has already been verified and lowered by the MonoMove compiler pipeline.
 
-The runtime is at proof-of-concept stage. See `TODO.md` for the backlog of missing features (integer widths, global storage, abort, gas metering, natives, closures, deep copy, etc.).
+The runtime is at proof-of-concept stage. See `TODO.md` for the backlog of missing features.
 
 ## Architecture
 
@@ -22,7 +22,7 @@ The runtime is at proof-of-concept stage. See `TODO.md` for the backlog of missi
 
 ### Key concepts
 
-**Unified stack.** Call frames live in a single contiguous `MemoryRegion`. Each frame has: args (written by caller) -> locals -> 24-byte metadata (saved_pc, saved_fp, saved_func_ptr) -> callee arg/return slots. The frame pointer (`fp`) points past metadata, so operand access is a single `fp + offset`.
+**Unified stack.** Call frames live in a single contiguous `MemoryRegion`. See `docs/stack_and_calling_convention.md` for the frame layout diagram and full calling convention.
 
 **Bump-allocated heap with copying GC.** Heap objects (vectors, structs, enums) are bump-allocated. When the bump pointer hits the end, Cheney's copying GC runs: it walks the call stack using per-function `pointer_offsets` to find roots, then does a breadth-first copy of all reachable objects into a fresh to-space. Forwarding pointers handle cycles and double-scans.
 
@@ -48,7 +48,6 @@ Detailed design documents live in `../docs/`:
 
 | Doc | Covers |
 |---|---|
-| `micro_ops.md` | Instruction set design principles, categories, addressing modes, naming conventions, open questions |
 | `stack_and_calling_convention.md` | Frame layout, call/return protocol, unified vs separate stack, GC root discovery via `pointer_offsets`, security considerations |
 | `heap_and_gc.md` | Block/transaction memory management, bump allocator + Cheney's copying GC, GC design space analysis (four approaches), memory safety |
 | `value_representation.md` | Heap object header, primitive/struct/enum/vector layouts, fat pointer references, vector growth semantics |
@@ -77,3 +76,18 @@ Integration tests live in `tests/`:
 | `verifier_test.rs` | Verification error detection for malformed programs |
 
 Additional end-to-end tests and benchmarks live in the sibling `../programs` crate.
+
+## Coding Conventions
+
+- All `unsafe` blocks must have a `// SAFETY:` comment documenting the invariants they rely on
+- Bare `unwrap()` is banned in non-test code. `expect()` is only permitted when the property is local and can be proven easily. Otherwise, return an error (`bail!` for now; proper VM errors or invariant violations in the future). Tests may use `unwrap()` freely.
+- All arithmetic must be checked (no wrapping/overflowing) unless correctness is proven
+- Follow the naming conventions in `mono-move-core/src/instruction/` when adding new micro-ops
+
+## Pre-PR Checklist
+
+- [ ] `cargo +nightly fmt -- --check` passes
+- [ ] `cargo test -p mono-move-runtime` passes
+- [ ] If your change affects design docs (in `../docs/`) or this file, keep them up to date — check for stale descriptions, renamed files/modules, changed layouts, etc.
+- [ ] If your change implements something listed in `TODO.md`, update or remove the corresponding entry
+- [ ] Consider running tests and benchmarks in the `../programs` crate for broader coverage
