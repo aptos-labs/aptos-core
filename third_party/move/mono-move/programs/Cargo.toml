@@ -20,6 +20,7 @@ testing = ["move-bytecode", "move-core-types", "move-vm-runtime", "move-vm-test-
 
 [dependencies]
 legacy-move-compiler = { workspace = true, optional = true }
+mono-move-core = { workspace = true, optional = true }
 mono-move-runtime = { workspace = true, optional = true }
 move-binary-format = { workspace = true, optional = true }
 move-compiler-v2 = { workspace = true, optional = true }

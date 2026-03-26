@@ -12639,6 +12639,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-core"
+version = "0.1.0"
+dependencies = [
+ "mono-move-alloc",
+ "mono-move-gas",
+ "move-core-types",
+]
+
+[[package]]
 name = "mono-move-gas"
 version = "0.1.0"
 
@@ -12648,22 +12657,14 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
- "bumpalo",
  "dashmap 7.0.0-rc2",
  "fxhash",
  "mono-move-alloc",
+ "mono-move-core",
  "move-asm",
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.5",
-]
-
-[[package]]
-name = "mono-move-micro-ops"
-version = "0.1.0"
-dependencies = [
- "mono-move-alloc",
- "mono-move-gas",
 ]
 
 [[package]]
@@ -12672,6 +12673,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "legacy-move-compiler",
+ "mono-move-core",
  "mono-move-runtime",
  "move-binary-format",
  "move-compiler-v2",
@@ -12688,7 +12690,8 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "mono-move-micro-ops",
+ "mono-move-alloc",
+ "mono-move-core",
  "rand 0.7.3",
 ]
 
@@ -18213,7 +18216,7 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "legacy-move-compiler",
- "mono-move-micro-ops",
+ "mono-move-core",
  "move-asm",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -18295,7 +18298,7 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "legacy-move-compiler",
- "mono-move-micro-ops",
+ "mono-move-core",
  "move-asm",
  "move-binary-format",
  "move-bytecode-verifier",

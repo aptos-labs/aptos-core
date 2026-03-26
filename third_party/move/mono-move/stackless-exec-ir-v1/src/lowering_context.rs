@@ -8,7 +8,7 @@
 
 use crate::ir::{FunctionIR, Instr};
 use anyhow::Result;
-use mono_move_micro_ops::FRAME_METADATA_SIZE;
+use mono_move_core::FRAME_METADATA_SIZE;
 use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use move_vm_types::loaded_data::runtime_types::Type;
 

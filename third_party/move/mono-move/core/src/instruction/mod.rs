@@ -118,6 +118,10 @@
 use crate::Function;
 use std::ptr::NonNull;
 
+// Submodules for instruction.
+mod gas;
+pub use gas::MicroOpGasSchedule;
+
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FrameOffset(pub u32);
