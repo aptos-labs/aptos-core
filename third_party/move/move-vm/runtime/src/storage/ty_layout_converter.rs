@@ -481,15 +481,16 @@ where
 
         // METERING SAFETY:
         //   Module has already been loaded because we got the struct definition.
-        let module_hash = self
-            .struct_definition_loader
-            .unmetered_get_module_hash(
-                struct_identifier.module().address(),
-                struct_identifier.module().name(),
-            )
-            .map_err(|err| err.to_partial())?;
-
-        modules.insert(struct_identifier.module(), module_hash);
+        if !modules.contains(struct_identifier.module()) {
+            let (hash, size) = self
+                .struct_definition_loader
+                .unmetered_get_module_hash_and_size(
+                    struct_identifier.module().address(),
+                    struct_identifier.module().name(),
+                )
+                .map_err(|err| err.to_partial())?;
+            modules.insert(struct_identifier.module(), hash, size);
+        }
 
         let result = match &struct_definition.layout {
             // For enums, construct layouts for all possible variants. No special handling for

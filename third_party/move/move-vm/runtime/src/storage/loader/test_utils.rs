@@ -176,12 +176,12 @@ impl StructDefinitionLoader for MockStructDefinitionLoader {
         self.runtime_environment().vm_config().enable_lazy_loading
     }
 
-    fn unmetered_get_module_hash(
+    fn unmetered_get_module_hash_and_size(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> VMResult<[u8; 32]> {
-        Ok([0u8; 32])
+    ) -> VMResult<([u8; 32], usize)> {
+        Ok(([0u8; 32], 0))
     }
 
     fn load_struct_definition(

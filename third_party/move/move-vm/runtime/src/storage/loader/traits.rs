@@ -32,15 +32,15 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
     /// Returns true if the current loader is lazy, and false otherwise.
     fn is_lazy_loading_enabled(&self) -> bool;
 
-    /// Returns the hash of a module or an error if it does not exist or there
+    /// Returns the hash and size of a module or an error if it does not exist or there
     /// was an error fetching it.
     ///
     /// Note: this API is unmetered, use with caution.
-    fn unmetered_get_module_hash(
+    fn unmetered_get_module_hash_and_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<[u8; 32]>;
+    ) -> VMResult<([u8; 32], usize)>;
 
     /// Returns the struct definition corresponding to the specified index. The function may also
     /// charge gas for loading the module where the struct is defined. Returns an error if such

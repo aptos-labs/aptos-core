@@ -30,12 +30,12 @@ use triomphe::Arc as TriompheArc;
 /// using cached layout and constructing and charging gas on cache miss.
 ///
 /// Each entry also stores the SHA3-256 hash of the defining module's serialized bytes at the time
-/// the layout was computed. This allows stale layout entries from older module versions to be
-/// detected and evicted.
+/// the layout was computed, and the module size (also at the time layout was computed). This
+/// allows stale layout entries from older module versions to be detected and evicted.
 #[derive(Debug, Default)]
 pub struct DefiningModules {
     modules: HashSet<ModuleId>,
-    seen_modules: Vec<(ModuleId, [u8; 32])>,
+    seen_modules: Vec<(ModuleId, [u8; 32], usize)>,
 }
 
 impl DefiningModules {
@@ -47,17 +47,22 @@ impl DefiningModules {
         }
     }
 
-    /// If module is not in the set, adds it with its hash.
-    pub fn insert(&mut self, module_id: &ModuleId, hash: [u8; 32]) {
+    /// Returns true if the module is already in the set.
+    pub fn contains(&self, module_id: &ModuleId) -> bool {
+        self.modules.contains(module_id)
+    }
+
+    /// If module is not in the set, adds it with its hash and size.
+    pub fn insert(&mut self, module_id: &ModuleId, hash: [u8; 32], size: usize) {
         if !self.modules.contains(module_id) {
             self.modules.insert(module_id.clone());
             // Preserve the visited order: later traversal over the module set is deterministic.
-            self.seen_modules.push((module_id.clone(), hash))
+            self.seen_modules.push((module_id.clone(), hash, size))
         }
     }
 
-    /// Returns an iterator over (module_id, hash) pairs in their insertion order.
-    pub fn iter(&self) -> impl Iterator<Item = &(ModuleId, [u8; 32])> {
+    /// Returns an iterator over (module_id, hash, size) tuples in their insertion order.
+    pub fn iter(&self) -> impl Iterator<Item = &(ModuleId, [u8; 32], usize)> {
         self.seen_modules.iter()
     }
 }
