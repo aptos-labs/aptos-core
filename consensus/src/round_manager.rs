@@ -644,7 +644,7 @@ impl RoundManager {
                     // (10K+ txns) that cause high Block-STM retry rates and pipeline stalls.
                     // Cap at max_receiving_block_txns; deferred blocks stay in pending_proxy_blocks
                     // for the next round (delay, not drop — per protocol safety rules).
-                    let max_txns = self.local_config.max_sending_block_txns as usize;
+                    let max_txns = self.local_config.max_sending_block_txns_after_filtering as usize;
                     let vtxn_limit = self.vtxn_config.per_block_limit_txn_count() as usize;
                     let mut all_vtxns = Vec::new();
                     let mut sub_payloads = Vec::new();
