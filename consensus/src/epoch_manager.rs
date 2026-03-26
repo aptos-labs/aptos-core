@@ -1573,11 +1573,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         tokio::spawn(async move {
             while let Some(round) = proxy_timeout_rx.next().await {
                 let event = VerifiedEvent::LocalTimeout(round);
-                if let Err(e) = proxy_rm_tx_for_timeout.push(
+                if let Err(_e) = proxy_rm_tx_for_timeout.push(
                     (proxy_author, discriminant(&event)),
                     (proxy_author, event),
                 ) {
-                    error!("Failed to send proxy timeout to proxy RoundManager: {:?}", e);
+                    // Channel closed — proxy RM was shut down (e.g., epoch transition).
+                    // Exit the forwarding loop gracefully.
+                    info!("Proxy timeout forwarding task exiting: proxy RoundManager channel closed");
+                    break;
                 }
             }
         });
