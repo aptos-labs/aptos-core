@@ -1435,8 +1435,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.quorum_store.enable_opt_qs_v2_payload_tx,
         ));
         // Wrap payload clients with budget tracking for proxy.
-        // inner: proxy_fast_payload_client (vtxns disabled, fast path for most pulls)
-        // inner_with_vtxns: payload_client (vtxns enabled, used every Nth pull)
+        // inner: proxy_fast_payload_client (vtxns disabled, fast path for all pulls)
+        // inner_with_vtxns: payload_client (vtxns enabled, but never used — randomness disabled)
         let proxy_payload_client: Arc<dyn PayloadClient> =
             Arc::new(crate::payload_client::ProxyBudgetPayloadClient::new(
                 proxy_fast_payload_client,
@@ -1444,7 +1444,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 proxy_block_store.clone(),
                 proxy_config.target_proxy_blocks_per_primary_round,
                 self.quorum_store_enabled,
-                proxy_config.vtxn_pull_interval,
+                0, // vtxn_pull_interval: 0 — never pull DKG vtxns (randomness disabled on proxy)
                 pipeline_state.clone(),
                 proxy_config.backpressure.clone(),
             ));
