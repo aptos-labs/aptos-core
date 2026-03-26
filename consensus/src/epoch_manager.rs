@@ -199,6 +199,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // Channel to dispatch proxy block retrieval requests to proxy BlockStore
     proxy_block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
+    // Shutdown handle for the proxy RoundManager (mirrors round_manager_close_tx for primary)
+    proxy_round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -279,6 +281,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_buffered_proposal_tx: None,
             proxy_ordered_blocks_tx: None,
             proxy_block_retrieval_tx: None,
+            proxy_round_manager_close_tx: None,
         }
     }
 
@@ -755,6 +758,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.execution_client.end_epoch().await;
 
+        // Shutdown the proxy RoundManager (must happen before dropping channels)
+        if let Some(close_tx) = self.proxy_round_manager_close_tx.take() {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            close_tx
+                .send(ack_tx)
+                .expect("[EpochManager] Fail to drop proxy round manager");
+            ack_rx
+                .await
+                .expect("[EpochManager] Fail to drop proxy round manager");
+        }
+        self.proxy_round_manager_tx = None;
+        self.proxy_buffered_proposal_tx = None;
+        self.proxy_ordered_blocks_tx = None;
+
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
         self.proxy_block_retrieval_tx = None;
@@ -1122,7 +1139,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.proxy_ordered_blocks_tx = Some(proxy_to_primary_tx.clone());
 
             // Spawn the proxy RoundManager (second instance using standard Aptos BFT)
-            let (proxy_rm_tx, proxy_proposal_tx, proxy_block_store) = self
+            let (proxy_rm_tx, proxy_proposal_tx, proxy_block_store, proxy_close_tx) = self
                 .spawn_proxy_consensus(
                     epoch,
                     epoch_state.clone(),
@@ -1139,6 +1156,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     proxy_verifier.clone().expect("proxy_verifier must exist when proxy_enabled"),
                     primary_committed_proxy_round.clone(),
                 );
+            self.proxy_round_manager_close_tx = Some(proxy_close_tx);
 
             // Store the proxy RoundManager's event channels for routing incoming proxy messages
             self.proxy_round_manager_tx = Some(proxy_rm_tx);
@@ -1272,6 +1290,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         aptos_channel::Sender<Author, VerifiedEvent>,
         Arc<BlockStore>,
+        oneshot::Sender<oneshot::Sender<()>>,
     ) {
         // 1. Create ProxyLivenessStorage with the epoch's ledger info
         let latest_ledger_info = self
@@ -1564,12 +1583,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         });
 
         // 13. Initialize and spawn the proxy RoundManager
+        let (close_tx, close_rx) = oneshot::channel();
         tokio::spawn(async move {
             proxy_round_manager.init(last_vote).await;
-
-            let (close_tx, close_rx) = oneshot::channel();
-            // Keep close_tx alive until the proxy RM terminates (drop triggers shutdown)
-            let _close_tx = close_tx;
 
             proxy_round_manager
                 .start(
@@ -1582,7 +1598,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .await;
         });
 
-        (proxy_rm_tx, proxy_buffered_proposal_tx, proxy_block_store)
+        (proxy_rm_tx, proxy_buffered_proposal_tx, proxy_block_store, close_tx)
     }
 
     fn start_quorum_store(&mut self, quorum_store_builder: QuorumStoreBuilder) {
