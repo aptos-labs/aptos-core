@@ -51,7 +51,7 @@ $CARGO_SORT_VERSION    = "2.0.2"
 $CARGO_MACHETE_VERSION = "0.9.1"
 
 # cargo-nextest -- faster Rust test runner
-$CARGO_NEXTEST_VERSION = "0.9.128"
+$CARGO_NEXTEST_VERSION = "0.9.130"
 
 # .NET SDK -- runtime for the Boogie verifier
 $DOTNET_VERSION        = "8.0"
