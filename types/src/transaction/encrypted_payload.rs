@@ -177,7 +177,6 @@ impl EncryptedPayload {
     pub fn fail_if_claimed_entry_fun_mismatch(&mut self) -> anyhow::Result<()> {
         let Self::Decrypted {
             claimed_entry_fun,
-            eval_proof,
             executable,
             ..
         } = self.clone()
