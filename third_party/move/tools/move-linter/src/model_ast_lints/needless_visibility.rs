@@ -11,7 +11,7 @@
 //! - Friend functions in modules that declare no friends (friend visibility has
 //!   no effect)
 
-use super::unused_common::{has_cross_module_users, has_users, should_skip_function};
+use super::unused_common::{has_same_module_users_only, should_skip_function};
 use move_binary_format::file_format::Visibility;
 use move_compiler_v2::external_checks::FunctionChecker;
 use move_model::model::FunctionEnv;
@@ -42,16 +42,15 @@ fn check_needless(func: &FunctionEnv) -> Option<(String, String)> {
     }
 
     let name = func.get_name_str();
-    let same_module_only = || has_users(func) && !has_cross_module_users(func);
 
     match func.visibility() {
         Visibility::Public | Visibility::Private => None,
         Visibility::Friend => {
-            if func.has_package_visibility() && same_module_only() {
+            if func.has_package_visibility() && has_same_module_users_only(func) {
                 Some(same_module_warning("package", &name))
             } else if !func.has_package_visibility() && func.module_env.has_no_friends() {
                 Some(no_friends_warning(&name))
-            } else if !func.has_package_visibility() && same_module_only() {
+            } else if !func.has_package_visibility() && has_same_module_users_only(func) {
                 Some(same_module_warning("friend", &name))
             } else {
                 None

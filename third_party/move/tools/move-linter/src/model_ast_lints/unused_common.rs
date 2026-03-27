@@ -44,14 +44,24 @@ pub fn has_users(func: &FunctionEnv) -> bool {
     using_funs.iter().any(|user| *user != func_qfid)
 }
 
-/// Check if function has any users from a different module.
-pub fn has_cross_module_users(func: &FunctionEnv) -> bool {
+/// Returns true if the function has at least one non-self caller, and all
+/// callers are within the same module.
+pub fn has_same_module_users_only(func: &FunctionEnv) -> bool {
     let Some(using_funs) = func.get_using_functions() else {
         return false;
     };
+    let func_qfid = func.get_qualified_id();
     let func_module_id = func.module_env.get_id();
 
-    using_funs
-        .iter()
-        .any(|user| user.module_id != func_module_id)
+    let mut has_non_self_user = false;
+    for user in using_funs.iter() {
+        if *user == func_qfid {
+            continue;
+        }
+        has_non_self_user = true;
+        if user.module_id != func_module_id {
+            return false;
+        }
+    }
+    has_non_self_user
 }
