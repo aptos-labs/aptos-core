@@ -53,6 +53,9 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "realistic_env_max_load_encrypted" => realistic_env_max_load_encrypted_test(duration),
+        "realistic_env_p90_latency" => {
+            realistic_env_p90_latency_test(duration, test_cmd, 20, 10, 3)
+        },
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -499,6 +502,93 @@ pub(crate) fn realistic_env_max_load_test(
         .with_success_criteria(success_criteria)
         .with_validator_resource_override(resource_override)
         .with_fullnode_resource_override(resource_override)
+        .with_num_pfns(num_pfns)
+}
+
+/// A low-TPS test designed to measure and optimize p90 end-to-end consensus latency.
+/// Uses the same topology and config as `realistic_env_max_load_test` but at mainnet-like
+/// load (~100 TPS) so backpressure doesn't activate and we measure pure consensus latency.
+pub(crate) fn realistic_env_p90_latency_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_vfns: usize,
+    num_pfns: usize,
+) -> ForgeConfig {
+    let _ = test_cmd; // Unused, but kept for signature parity with realistic_env_max_load_test
+    // Calibrated to match mainnet execution profile:
+    // - Mainnet: ~17 blocks/sec, ~20ms per-block execution, ~80 mixed TPS
+    // - Land-blocking: ~11 blocks/sec, ~70ms per-block execution, ~12.5k TPS
+    // - Scaling: 12500 * (20ms / 70ms) ≈ 3500 TPS of p2p transfers gives
+    //   ~320 txns/block at 11 blocks/sec → ~20ms per-block execution.
+    let target_tps = 3500;
+    let success_criteria = SuccessCriteria::new(target_tps * 9 / 10)
+        .add_no_restarts()
+        .add_wait_for_catchup_s((duration.as_secs() / 10).max(60))
+        .add_latency_threshold(1.5, LatencyType::P50)
+        .add_latency_threshold(2.5, LatencyType::P90)
+        .add_latency_threshold(4.0, LatencyType::P99)
+        .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
+            vec![
+                (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 1.0),
+                (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.65),
+                (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.55),
+            ],
+            5,
+        ))
+        .add_chain_progress(StateProgressThreshold {
+            max_non_epoch_no_progress_secs: 15.0,
+            max_epoch_no_progress_secs: 16.0,
+            max_non_epoch_round_gap: 4,
+            max_epoch_round_gap: 4,
+        });
+
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_vfns)
+        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
+            inner_traffic: EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: target_tps })
+                .init_gas_price_multiplier(20),
+            inner_success_criteria: SuccessCriteria::new(target_tps * 9 / 10),
+        }))
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+        }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000;
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000;
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.consensus_observer.observer_enabled = true;
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000;
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000;
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(success_criteria)
         .with_num_pfns(num_pfns)
 }
 
