@@ -645,7 +645,7 @@ impl RoundManager {
                         start_after, self.last_consumed_proxy_round,
                     );
                     // Use start_after (parent's last_proxy_round) to maintain monotonicity
-                    Some((Vec::new(), Payload::empty(true, true), start_after, HashValue::zero()))
+                    Some((Vec::new(), Payload::empty(true, true), start_after, HashValue::zero(), Vec::new()))
                 } else {
                     // Aggregate validator txns and payloads with a cap on total txns.
                     // After a timeout gap, pending_proxy_blocks can accumulate many blocks.
@@ -726,7 +726,7 @@ impl RoundManager {
                     // Send updated pipeline state to proxy
                     self.send_pipeline_state_to_proxy();
 
-                    Some((all_vtxns, payload, last_proxy_round, last_proxy_block_id))
+                    Some((all_vtxns, payload, last_proxy_round, last_proxy_block_id, consumed_proxy_rounds))
                 }
             } else {
                 // No proxy blocks available. Use parent's last_proxy_round to maintain
@@ -742,7 +742,7 @@ impl RoundManager {
                      parent_last_proxy_round={}",
                     parent_lpr,
                 );
-                Some((Vec::new(), Payload::empty(true, true), parent_lpr, HashValue::zero()))
+                Some((Vec::new(), Payload::empty(true, true), parent_lpr, HashValue::zero(), Vec::new()))
             }
         } else if !self.pending_proxy_blocks.is_empty() {
             // This shouldn't happen (pending_proxy_blocks should only be non-empty
@@ -815,7 +815,7 @@ impl RoundManager {
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proxy_hooks: Option<Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>>,
-        proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload, Round, HashValue)>,
+        proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload, Round, HashValue, Vec<Round>)>,
     ) -> anyhow::Result<()> {
         let consensus_type = if proxy_hooks.is_some() { "proxy" } else { "primary" };
         let gen_start = std::time::Instant::now();
@@ -1033,7 +1033,7 @@ impl RoundManager {
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proxy_hooks: Option<Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>>,
-        proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload, Round, HashValue)>,
+        proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload, Round, HashValue, Vec<Round>)>,
     ) -> anyhow::Result<ProposalMsg> {
         let consensus_type = if proxy_hooks.is_some() { "proxy" } else { "primary" };
         let proposal = if let Some(hooks) = proxy_hooks {
@@ -1057,7 +1057,7 @@ impl RoundManager {
                 original.timestamp_usecs(),
                 original.quorum_cert().clone(),
             )
-        } else if let Some((vtxns, payload, last_proxy_round, last_proxy_block_id)) = proxy_payload {
+        } else if let Some((vtxns, payload, last_proxy_round, last_proxy_block_id, proxy_rounds)) = proxy_payload {
             // Primary RoundManager with proxy payload: use aggregated proxy transactions
             // Primary adds zero new transactions — block content comes entirely from proxy blocks
             info!(
@@ -1076,6 +1076,7 @@ impl RoundManager {
                     payload,
                     last_proxy_round,
                     last_proxy_block_id,
+                    proxy_rounds,
                 )
                 .await?
         } else {

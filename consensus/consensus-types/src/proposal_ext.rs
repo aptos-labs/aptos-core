@@ -88,6 +88,8 @@ pub enum ProposalExt {
         last_proxy_round: Round,
         /// Block ID of the last proxy block included in this aggregation.
         last_proxy_block_id: HashValue,
+        /// All proxy block rounds included in this aggregation (for diagnostics).
+        proxy_rounds: Vec<Round>,
     },
 }
 
@@ -136,6 +138,13 @@ impl ProposalExt {
             ProposalExt::ProxyAggregatedV0 { last_proxy_block_id, .. } => {
                 Some(*last_proxy_block_id)
             },
+            _ => None,
+        }
+    }
+
+    pub fn proxy_rounds(&self) -> Option<&Vec<Round>> {
+        match self {
+            ProposalExt::ProxyAggregatedV0 { proxy_rounds, .. } => Some(proxy_rounds),
             _ => None,
         }
     }

@@ -695,6 +695,7 @@ impl ProposalGenerator {
         proxy_payload: Payload,
         last_proxy_round: Round,
         last_proxy_block_id: aptos_crypto::HashValue,
+        proxy_rounds: Vec<Round>,
     ) -> anyhow::Result<BlockData> {
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
@@ -750,6 +751,7 @@ impl ProposalGenerator {
             quorum_cert,
             last_proxy_round,
             last_proxy_block_id,
+            proxy_rounds,
         );
 
         Ok(block)

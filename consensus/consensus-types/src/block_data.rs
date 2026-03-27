@@ -252,6 +252,14 @@ impl BlockData {
         }
     }
 
+    /// Returns all proxy block rounds for proxy aggregated blocks.
+    pub fn proxy_rounds(&self) -> Option<&Vec<Round>> {
+        match &self.block_type {
+            BlockType::ProposalExt(p) => p.proxy_rounds(),
+            _ => None,
+        }
+    }
+
     /// the list of consecutive proposers from the immediately preceeding
     /// rounds that didn't produce a successful block
     pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
@@ -522,6 +530,7 @@ impl BlockData {
         quorum_cert: QuorumCert,
         last_proxy_round: Round,
         last_proxy_block_id: HashValue,
+        proxy_rounds: Vec<Round>,
     ) -> Self {
         Self {
             epoch: quorum_cert.certified_block().epoch(),
@@ -535,6 +544,7 @@ impl BlockData {
                 failed_authors,
                 last_proxy_round,
                 last_proxy_block_id,
+                proxy_rounds,
             }),
         }
     }

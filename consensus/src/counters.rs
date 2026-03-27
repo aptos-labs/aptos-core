@@ -1406,21 +1406,18 @@ pub fn update_counters_for_committed_blocks(
         update_counters_for_block(block.block(), consensus_type);
         update_counters_for_compute_result(&block.compute_result());
     }
-    // [proxy-debug] Log proxy rounds of committed primary blocks (Q1: strictly incrementing?)
-    let proxy_rounds: Vec<(u64, Option<u64>)> = blocks_to_commit
-        .iter()
-        .filter_map(|b| {
-            let round = b.block().round();
-            let proxy_round = b.block().block_data().last_proxy_round();
-            // Only log proxy-aggregated blocks
-            proxy_round.map(|pr| (round, Some(pr)))
-        })
-        .collect();
-    if !proxy_rounds.is_empty() {
-        info!(
-            "[proxy-debug] Committed primary blocks proxy_rounds: {:?}",
-            proxy_rounds,
-        );
+    // [proxy-debug] Log committed primary blocks with all proxy rounds
+    for block in blocks_to_commit {
+        if let Some(proxy_rounds) = block.block().block_data().proxy_rounds() {
+            info!(
+                "[proxy-debug] Committed primary block: round={}, last_proxy_round={:?}, \
+                 proxy_rounds={:?}, total_txns={}",
+                block.block().round(),
+                block.block().block_data().last_proxy_round(),
+                proxy_rounds,
+                block.block().payload().map_or(0, |p| p.len()),
+            );
+        }
     }
 }
 
