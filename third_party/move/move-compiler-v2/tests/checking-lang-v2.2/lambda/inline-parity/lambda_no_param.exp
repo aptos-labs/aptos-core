@@ -34,7 +34,10 @@ module 0xdecafbad::m {
         foo(|| lambda__1__one());
     }
     public fun two(x: u64): u64 {
-        bar(|| lambda__1__two(x))
+        bar({
+            let __cap = x;
+            || lambda__1__two(__cap)
+        })
     }
     fun lambda__1__one() {
     }

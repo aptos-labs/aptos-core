@@ -197,6 +197,7 @@ pub fn run_move_compiler_for_analysis(
 pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<GlobalEnv> {
     options.whole_program = true;
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
+    options = options.set_experiment(Experiment::SPEC_REWRITE_PURE_FUNS, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
 
     // Type checking + AST transforms.

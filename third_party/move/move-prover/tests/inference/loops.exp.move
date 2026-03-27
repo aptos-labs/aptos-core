@@ -177,16 +177,16 @@ module 0x42::loops {
         pragma unroll = 3;
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] n == 3 ==> Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 3);
-        ensures [inferred] n == 2 ==> Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 2);
-        ensures [inferred] n == 1 ==> Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
-        ensures [inferred] n == 0 ==> Counter[addr] == old(Counter[addr]);
-        aborts_if [inferred] 3 < n && Counter[addr].value > MAX_U64 - 4;
-        aborts_if [inferred] 3 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 2 < n && Counter[addr].value > MAX_U64 - 3;
-        aborts_if [inferred] 2 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 1 < n && Counter[addr].value > MAX_U64 - 2;
-        aborts_if [inferred] 1 < n && !exists<Counter>(addr);
+        ensures [inferred] 3 < n ==> (S3.. |~ update<Counter>(addr, update_field(S3 |~ global<Counter>(addr), value, (S3 |~ global<Counter>(addr)).value + 1)));
+        ensures [inferred] 2 < n ==> (S2..S3 |~ update<Counter>(addr, update_field(S2 |~ global<Counter>(addr), value, (S2 |~ global<Counter>(addr)).value + 1)));
+        ensures [inferred] 1 < n ==> (S1..S2 |~ update<Counter>(addr, update_field(S1 |~ global<Counter>(addr), value, (S1 |~ global<Counter>(addr)).value + 1)));
+        ensures [inferred] 0 < n ==> (..S1 |~ update<Counter>(addr, update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1)));
+        aborts_if [inferred] 3 < n && (S3 |~ global<Counter>(addr)).value == MAX_U64;
+        aborts_if [inferred] S3 |~ 3 < n && !exists<Counter>(addr);
+        aborts_if [inferred] 2 < n && (S2 |~ global<Counter>(addr)).value == MAX_U64;
+        aborts_if [inferred] S2 |~ 2 < n && !exists<Counter>(addr);
+        aborts_if [inferred] 1 < n && (S1 |~ global<Counter>(addr)).value == MAX_U64;
+        aborts_if [inferred] S1 |~ 1 < n && !exists<Counter>(addr);
         aborts_if [inferred] 0 < n && Counter[addr].value == MAX_U64;
         aborts_if [inferred] 0 < n && !exists<Counter>(addr);
     }
@@ -207,8 +207,8 @@ module 0x42::loops {
     spec inc_global_with_invariant(addr: address, n: u64) {
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] Counter[addr] == Counter{value: old(Counter[addr]).value + n};
-        aborts_if [inferred] Counter[addr].value + n > MAX_U64;
+        ensures [inferred] Counter[addr].value == old(Counter[addr]).value ==> (forall x: u64, y: Counter: Counter[addr].value == old(Counter[addr]).value + x && x < n ==> update<Counter>(addr, update_field(y, value, y.value + 1)));
+        aborts_if [inferred] 0 < n;
         aborts_if [inferred] !exists<Counter>(addr);
     }
 

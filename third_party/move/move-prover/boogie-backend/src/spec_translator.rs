@@ -45,9 +45,19 @@ use move_prover_bytecode_pipeline::{
 };
 use std::{
     cell::RefCell,
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     rc::Rc,
 };
+
+/// Information about a state label defined by a two-state operation.
+/// Used to resolve which resource types are actually modified at each label.
+#[derive(Clone, Default, Debug)]
+pub struct LabelInfo {
+    /// The pre-state of this label's defining operation.
+    pub pre: Option<MemoryLabel>,
+    /// Resource types modified at this label.
+    pub modified_types: BTreeSet<QualifiedInstId<StructId>>,
+}
 
 #[derive(Clone)]
 pub struct SpecTranslator<'env> {
@@ -83,6 +93,9 @@ pub struct SpecTranslator<'env> {
     /// The qualified instantiated ID of the function currently being verified, if any.
     /// Used to resolve behavioral predicates on function-typed parameters.
     current_fun_qid: RefCell<Option<QualifiedInstId<FunId>>>,
+    /// Map from state labels to their defining operation info.
+    /// Used to resolve memory references at labeled states.
+    label_info: RefCell<BTreeMap<MemoryLabel, LabelInfo>>,
 }
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
@@ -120,6 +133,7 @@ impl<'env> SpecTranslator<'env> {
             lifted_choice_infos: Default::default(),
             arbitrary_values: Default::default(),
             current_fun_qid: RefCell::new(None),
+            label_info: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -131,6 +145,52 @@ impl<'env> SpecTranslator<'env> {
     /// Clears the current function being verified.
     pub fn clear_current_fun_qid(&self) {
         *self.current_fun_qid.borrow_mut() = None;
+    }
+
+    /// Sets the label info map for resolving memory references at labeled states.
+    pub fn set_label_info(&self, info: BTreeMap<MemoryLabel, LabelInfo>) {
+        *self.label_info.borrow_mut() = info;
+    }
+
+    /// Resolve the effective memory label for a resource type at a given state label.
+    /// If the type is modified at this label, returns Some(label).
+    /// Otherwise, walks back through the chain via pre-states until finding where
+    /// the type was modified, or returns None (old/entry state).
+    fn resolve_label_for_memory(
+        &self,
+        label: MemoryLabel,
+        memory: &QualifiedInstId<StructId>,
+    ) -> Option<MemoryLabel> {
+        let mut visited = BTreeSet::new();
+        self.resolve_label_for_memory_inner(label, memory, &mut visited)
+    }
+
+    fn resolve_label_for_memory_inner(
+        &self,
+        label: MemoryLabel,
+        memory: &QualifiedInstId<StructId>,
+        visited: &mut BTreeSet<MemoryLabel>,
+    ) -> Option<MemoryLabel> {
+        if !visited.insert(label) {
+            return None; // cycle detected — treat as entry state
+        }
+        let label_info = self.label_info.borrow();
+        if let Some(info) = label_info.get(&label) {
+            if info.modified_types.contains(memory) {
+                Some(label)
+            } else if let Some(pre) = info.pre {
+                drop(label_info); // must drop before recursive call
+                self.resolve_label_for_memory_inner(pre, memory, visited)
+            } else {
+                None // old/entry state
+            }
+        } else {
+            // Label not in label_info (e.g., SaveMem labels from opaque calls).
+            // Preserve as-is — the label has a corresponding Boogie variable
+            // from SaveMem. Resolving to None would incorrectly use old() (function
+            // entry state) instead of the saved pre-call state.
+            Some(label)
+        }
     }
 
     /// Sets the old-memory context for translating spec function bodies that use old().
@@ -602,6 +662,36 @@ impl SpecTranslator<'_> {
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();
+
+            // Collect intermediate state labels in the body that need existential binding.
+            // Only truly intermediate labels (those that resolve to themselves via
+            // label resolution) need wrapping. Labels resolving to None (pre/post state)
+            // are handled by old_aware_memory_name mapping to function parameters.
+            let body = fun.body.as_ref().unwrap();
+            let all_labels = self.collect_intermediate_labels_from_exp(body);
+            let intermediate_labels: BTreeSet<_> = all_labels
+                .into_iter()
+                .filter(|(label, mem)| self.resolve_label_for_memory(*label, mem) == Some(*label))
+                .collect();
+
+            // Emit existential prefix if there are intermediate labels
+            if !intermediate_labels.is_empty() {
+                emit!(self.writer, "(exists ");
+                for (i, (label, mem)) in intermediate_labels.iter().enumerate() {
+                    if i > 0 {
+                        emit!(self.writer, ", ");
+                    }
+                    let name = boogie_resource_memory_name(self.env, mem, &Some(*label));
+                    let ty = boogie_struct_name(
+                        &self.env.get_struct_qid(mem.to_qualified_id()),
+                        &mem.inst,
+                        false,
+                    );
+                    emit!(self.writer, "{}: $Memory {}", name, ty);
+                }
+                emit!(self.writer, " :: ");
+            }
+
             if fun.uses_old {
                 // Set up old-aware context for body translation
                 let mut trans = self.clone();
@@ -612,10 +702,16 @@ impl SpecTranslator<'_> {
                     .filter(|Parameter(_, ty, _)| ty.is_mutable_reference())
                     .map(|Parameter(name, _, _)| *name)
                     .collect();
-                trans.translate_exp(fun.body.as_ref().unwrap());
+                trans.translate_exp(body);
             } else {
-                self.translate_exp(fun.body.as_ref().unwrap());
+                self.translate_exp(body);
             }
+
+            // Close existential
+            if !intermediate_labels.is_empty() {
+                emit!(self.writer, ")");
+            }
+
             emitln!(self.writer);
             self.writer.unindent();
             emitln!(self.writer, "}");
@@ -1481,6 +1577,58 @@ impl SpecTranslator<'_> {
                     );
                 }
             },
+            Operation::SpecPublish(range) => {
+                // publish<R>(addr, value): post_mem == ResourceUpdate(pre_mem, addr, value)
+                //                          && !ResourceExists(pre_mem, addr)
+                let memory = &self.get_memory_inst_from_node(node_id);
+                let (pre_mem, post_mem) = self.mutation_pre_post_memory(memory, range);
+                emit!(
+                    self.writer,
+                    "({} == $ResourceUpdate({}, ",
+                    post_mem,
+                    pre_mem
+                );
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, ", ");
+                self.translate_exp(&args[1]); // value
+                emit!(self.writer, ") && !$ResourceExists({}, ", pre_mem);
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, "))");
+            },
+            Operation::SpecRemove(range) => {
+                // remove<R>(addr): post_mem == ResourceRemove(pre_mem, addr)
+                //                  && ResourceExists(pre_mem, addr)
+                let memory = &self.get_memory_inst_from_node(node_id);
+                let (pre_mem, post_mem) = self.mutation_pre_post_memory(memory, range);
+                emit!(
+                    self.writer,
+                    "({} == $ResourceRemove({}, ",
+                    post_mem,
+                    pre_mem
+                );
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, ") && $ResourceExists({}, ", pre_mem);
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, "))");
+            },
+            Operation::SpecUpdate(range) => {
+                // update<R>(addr, value): post_mem == ResourceUpdate(pre_mem, addr, value)
+                //                         && ResourceExists(pre_mem, addr)
+                let memory = &self.get_memory_inst_from_node(node_id);
+                let (pre_mem, post_mem) = self.mutation_pre_post_memory(memory, range);
+                emit!(
+                    self.writer,
+                    "({} == $ResourceUpdate({}, ",
+                    post_mem,
+                    pre_mem
+                );
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, ", ");
+                self.translate_exp(&args[1]); // value
+                emit!(self.writer, ") && $ResourceExists({}, ", pre_mem);
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, "))");
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
@@ -1578,7 +1726,9 @@ impl SpecTranslator<'_> {
             }
         }
 
-        // Emit memory args following the same dual-state pattern as build_memory_params
+        // Emit memory args following the same dual-state pattern as build_memory_params.
+        // Use resolve_memory_name to resolve labels through the label chain — when a
+        // resource type was not modified at a label, its memory resolves to the predecessor.
         let uses_old = !union_old_memory.is_empty();
         let current = match kind {
             BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
@@ -1591,17 +1741,17 @@ impl SpecTranslator<'_> {
                     emit!(self.writer, ", ");
                 }
                 first = false;
-                let pre_name = boogie_resource_memory_name(self.env, memory, pre);
+                let pre_name = self.resolve_memory_name(memory, *pre);
                 emit!(self.writer, &pre_name);
                 emit!(self.writer, ", ");
-                let current_name = boogie_resource_memory_name(self.env, memory, current);
+                let current_name = self.resolve_memory_name(memory, *current);
                 emit!(self.writer, &current_name);
             } else {
                 if !first {
                     emit!(self.writer, ", ");
                 }
                 first = false;
-                let mem_name = boogie_resource_memory_name(self.env, memory, current);
+                let mem_name = self.resolve_memory_name(memory, *current);
                 emit!(self.writer, &mem_name);
             }
         }
@@ -1708,24 +1858,25 @@ impl SpecTranslator<'_> {
                 // When pre is None (no explicit label) and we're in a procedure context
                 // (not a spec function body), use old() to reference entry state;
                 // without old(), the unlabeled memory name is the exit state in ensures.
+                // When pre is Some, resolve through label chain for non-modified types.
                 let pre_name = if pre.is_none() && self.fun_old_memory.is_none() {
                     format!(
                         "old({})",
                         boogie_resource_memory_name(self.env, memory, &pre)
                     )
                 } else {
-                    boogie_resource_memory_name(self.env, memory, &pre)
+                    self.resolve_memory_name(memory, pre)
                 };
                 emit!(self.writer, &pre_name);
                 emit!(self.writer, ", ");
-                let current_name = boogie_resource_memory_name(self.env, memory, &current);
+                let current_name = self.resolve_memory_name(memory, current);
                 emit!(self.writer, &current_name);
             } else {
                 if !first {
                     emit!(self.writer, ", ");
                 }
                 first = false;
-                let mem_name = boogie_resource_memory_name(self.env, memory, &current);
+                let mem_name = self.resolve_memory_name(memory, current);
                 emit!(self.writer, &mem_name);
             }
         }
@@ -1879,26 +2030,33 @@ impl SpecTranslator<'_> {
                 let memory = &memory.to_owned().instantiate(inst);
                 if inst_old.contains(memory) {
                     // Old-context resource: pass pre-state then post-state.
-                    // When pre is None (no explicit label) and we're in a procedure context
-                    // (not a spec function body), use old() to reference entry state;
-                    // without old(), the unlabeled memory name is the exit state in ensures.
+                    // Resolve labels through the predecessor chain so resources
+                    // not modified at a label get the correct earlier snapshot.
                     maybe_comma();
-                    let pre_name = if range.pre.is_none() && self.fun_old_memory.is_none() {
-                        format!(
-                            "old({})",
-                            boogie_resource_memory_name(self.env, memory, &range.pre)
-                        )
+                    let pre_name = if range.pre.is_none() {
+                        // Unlabeled pre: entry state — needs old() or old_ prefix.
+                        if self.fun_old_memory.is_some() {
+                            format!(
+                                "old_{}",
+                                boogie_resource_memory_name(self.env, memory, &None)
+                            )
+                        } else {
+                            format!(
+                                "old({})",
+                                boogie_resource_memory_name(self.env, memory, &None)
+                            )
+                        }
                     } else {
-                        boogie_resource_memory_name(self.env, memory, &range.pre)
+                        self.resolve_memory_name(memory, range.pre)
                     };
                     emit!(self.writer, &pre_name);
                     maybe_comma();
-                    let post_name = boogie_resource_memory_name(self.env, memory, &range.post);
+                    let post_name = self.resolve_memory_name(memory, range.post);
                     emit!(self.writer, &post_name);
                 } else {
-                    // Non-old resource: pass current (post) state
+                    // Non-old resource: pass current (post) state, resolved.
                     maybe_comma();
-                    let mem_name = boogie_resource_memory_name(self.env, memory, &range.post);
+                    let mem_name = self.resolve_memory_name(memory, range.post);
                     emit!(self.writer, &mem_name);
                 }
             }
@@ -1906,8 +2064,8 @@ impl SpecTranslator<'_> {
             for memory in &fun_decl.used_memory {
                 let memory = &memory.to_owned().instantiate(inst);
                 maybe_comma();
-                let memory = boogie_resource_memory_name(self.env, memory, &effective_label);
-                emit!(self.writer, &memory);
+                let mem_name = self.resolve_memory_name(memory, effective_label);
+                emit!(self.writer, &mem_name);
             }
         }
         // Finally add argument expressions
@@ -2119,18 +2277,169 @@ impl SpecTranslator<'_> {
             .error(loc, "type values not supported by this backend");
     }
 
+    /// Collect (label, memory_type) pairs from an expression for labels that need
+    /// existential quantification in Boogie function bodies.
+    pub fn collect_intermediate_labels_from_exp(
+        &self,
+        exp: &Exp,
+    ) -> BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> {
+        let env = self.env;
+        let type_inst = &self.type_inst;
+        let mut result = BTreeSet::new();
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(node_id, op, args) = e {
+                match op {
+                    Operation::Global(Some(label)) | Operation::Exists(Some(label)) => {
+                        let node_inst = env.get_node_instantiation(*node_id);
+                        let node_inst = Type::instantiate_slice(&node_inst, type_inst);
+                        let mem_ty = &node_inst[0];
+                        let (mid, sid, inst) = mem_ty.require_struct();
+                        result.insert((*label, mid.qualified_inst(sid, inst.to_owned())));
+                    },
+                    Operation::SpecPublish(range)
+                    | Operation::SpecRemove(range)
+                    | Operation::SpecUpdate(range) => {
+                        let node_inst = env.get_node_instantiation(*node_id);
+                        let node_inst = Type::instantiate_slice(&node_inst, type_inst);
+                        let mem_ty = &node_inst[0];
+                        let (mid, sid, inst) = mem_ty.require_struct();
+                        let mem = mid.qualified_inst(sid, inst.to_owned());
+                        for label in range.labels() {
+                            result.insert((label, mem.clone()));
+                        }
+                    },
+                    Operation::SpecFunction(mid, fid, range) if !range.is_default() => {
+                        let inst = env.get_node_instantiation(*node_id);
+                        let inst = Type::instantiate_slice(&inst, type_inst);
+                        let module = env.get_module(*mid);
+                        let fun = module.get_spec_fun(*fid);
+                        for mem in fun.used_memory.iter() {
+                            let mem = mem.clone().instantiate(&inst);
+                            for label in range.labels() {
+                                result.insert((label, mem.clone()));
+                            }
+                        }
+                    },
+                    Operation::Behavior(_, range) if !range.is_default() => {
+                        // Resolve the closure (first arg) to get the function's memory usage.
+                        if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
+                            args.first().map(|a| a.as_ref())
+                        {
+                            let inst = env.get_node_instantiation(*closure_id);
+                            let inst = Type::instantiate_slice(&inst, type_inst);
+                            let fun_env = env.get_function(mid.qualified(*fid));
+                            for mem in fun_env.get_spec_used_memory() {
+                                let mem = mem.clone().instantiate(&inst);
+                                for label in range.labels() {
+                                    result.insert((label, mem.clone()));
+                                }
+                            }
+                            for mem in fun_env.get_spec_old_memory() {
+                                let mem = mem.clone().instantiate(&inst);
+                                for label in range.labels() {
+                                    result.insert((label, mem.clone()));
+                                }
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            }
+            true
+        });
+        result
+    }
+
+    /// Core implementation for resolving a memory label and producing a Boogie variable name.
+    /// Resolves labels through the defining operation chain, and applies old()/old_ prefix
+    /// when the resolved label indicates function entry state.
+    ///
+    /// `in_old_context`: whether we're inside an explicit old() context (for Global/Exists).
+    /// For range-based operations (Behavior, SpecFunction), pass `false`.
+    fn resolve_memory_name_impl(
+        &self,
+        memory: &QualifiedInstId<StructId>,
+        label: Option<MemoryLabel>,
+        in_old_context: bool,
+    ) -> String {
+        let resolved = match label {
+            Some(l) if !self.label_info.borrow().is_empty() => {
+                self.resolve_label_for_memory(l, memory)
+            },
+            other => other,
+        };
+        // Need old() prefix when the label resolved to None (entry state) and either:
+        // - we're inside an old() context (Global/Exists in spec function bodies), or
+        // - the label was explicitly provided but resolved away (resource not modified)
+        let needs_old = resolved.is_none() && (in_old_context || label.is_some());
+        let base = boogie_resource_memory_name(self.env, memory, &resolved);
+        if needs_old {
+            if self.fun_old_memory.is_some() {
+                format!("old_{}", base)
+            } else {
+                format!("old({})", base)
+            }
+        } else {
+            base
+        }
+    }
+
     /// Returns the Boogie memory variable name, accounting for old() context in spec funs.
     fn old_aware_memory_name(
         &self,
         memory: &QualifiedInstId<StructId>,
         memory_label: &Option<MemoryLabel>,
     ) -> String {
-        let base = boogie_resource_memory_name(self.env, memory, memory_label);
-        if *self.in_old_context.borrow() && memory_label.is_none() {
-            format!("old_{}", base)
+        self.resolve_memory_name_impl(memory, *memory_label, *self.in_old_context.borrow())
+    }
+
+    /// Resolve a memory label from a MemoryRange pre/post field, returning the Boogie name.
+    fn resolve_memory_name(
+        &self,
+        memory: &QualifiedInstId<StructId>,
+        label: Option<MemoryLabel>,
+    ) -> String {
+        self.resolve_memory_name_impl(memory, label, false)
+    }
+
+    /// Resolve pre/post memory names for mutation builtins.
+    /// Mutations are two-state predicates: pre is the state before the mutation,
+    /// post is the state after. When unlabeled (None):
+    /// - pre: uses old() / old_ prefix (the function's entry state)
+    /// - post: uses current memory (the function's exit state)
+    /// When labeled: uses the labeled memory variable.
+    fn mutation_pre_post_memory(
+        &self,
+        memory: &QualifiedInstId<StructId>,
+        range: &MemoryRange,
+    ) -> (String, String) {
+        // Resolve pre-label through the label chain for this resource type.
+        // The mutation's pre-state might reference a label where this resource
+        // type wasn't modified, in which case it resolves further back.
+        let resolved_pre = match range.pre {
+            Some(label) if !self.label_info.borrow().is_empty() => {
+                self.resolve_label_for_memory(label, memory)
+            },
+            other => other,
+        };
+        let pre_mem = if resolved_pre.is_some() {
+            // Labeled pre-state (after resolution)
+            boogie_resource_memory_name(self.env, memory, &resolved_pre)
+        } else if self.fun_old_memory.is_some() {
+            // In spec function body: use old_ parameter name
+            format!(
+                "old_{}",
+                boogie_resource_memory_name(self.env, memory, &None)
+            )
         } else {
-            base
-        }
+            // In procedure body: use old() wrapper
+            format!(
+                "old({})",
+                boogie_resource_memory_name(self.env, memory, &None)
+            )
+        };
+        let post_mem = boogie_resource_memory_name(self.env, memory, &range.post);
+        (pre_mem, post_mem)
     }
 
     fn translate_resource_access(

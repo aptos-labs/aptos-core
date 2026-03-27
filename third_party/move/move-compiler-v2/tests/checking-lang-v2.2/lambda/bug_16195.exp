@@ -256,7 +256,10 @@ module 0xc0ffee::m {
         f()()()()() || a || b
     }
     public fun test_bug16195_OR_mix5(a: bool): bool {
-        let f = Bug16195_variant7(|| lambda__2__test_bug16195_OR_mix5(a));
+        let f = Bug16195_variant7({
+            let __cap = a;
+            || lambda__2__test_bug16195_OR_mix5(__cap)
+        });
         f()(true) || a
     }
     public fun test_bug16195_OR_mix6(a: bool): bool {
@@ -339,7 +342,10 @@ module 0xc0ffee::m {
         x || a
     }
     fun lambda__2__test_bug16195_OR_mix5(a: bool): |bool|bool {
-        |arg0| lambda__1__test_bug16195_OR_mix5(a, arg0)
+        {
+            let __cap = a;
+            |arg0| lambda__1__test_bug16195_OR_mix5(__cap, arg0)
+        }
     }
     fun lambda__1__test_bug16195_OR_mix6(x: bool): bool {
         x || true

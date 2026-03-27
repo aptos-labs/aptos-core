@@ -131,6 +131,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::SPEC_REWRITE_PURE_FUNS.to_string(),
+            description: "Derive spec functions for all pure Move functions (prover only)"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::LAMBDA_LIFTING_INLINE.to_string(),
             description: "Whether inline functions shall be included in lambda lifting".to_string(),
             default: Given(false),
@@ -350,6 +356,7 @@ impl Experiment {
     pub const SKIP_INLINING_INLINE_FUNS: &'static str = "skip-inlining-inline-funs";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
+    pub const SPEC_REWRITE_PURE_FUNS: &'static str = "spec-rewrite-pure-funs";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
     pub const STOP_AFTER_EXTENDED_CHECKS: &'static str = "stop-after-extended-checks";
     pub const STOP_BEFORE_EXTENDED_CHECKS: &'static str = "stop-before-extended-checks";
