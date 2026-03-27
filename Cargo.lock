@@ -646,6 +646,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
+ "axum 0.7.5",
  "bcs 0.1.4",
  "bytes",
  "hyper 0.14.28",
@@ -654,7 +655,6 @@ dependencies = [
  "serde",
  "tokio",
  "tokio-stream",
- "warp",
 ]
 
 [[package]]
