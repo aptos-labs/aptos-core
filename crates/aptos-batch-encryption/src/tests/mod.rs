@@ -15,6 +15,8 @@ pub mod fptx_succinct_smoke;
 pub mod fptx_weighted_smoke;
 #[cfg(test)]
 pub mod typescript;
+#[cfg(test)]
+mod digest_key_bench;
 
 pub fn prepare_all<T: BatchThresholdEncryption, P: Plaintext>(
     cts: &[T::Ciphertext],
