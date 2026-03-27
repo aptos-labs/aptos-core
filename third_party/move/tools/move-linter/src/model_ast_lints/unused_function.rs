@@ -58,6 +58,9 @@ fn check_unused(func: &FunctionEnv) -> Option<String> {
         return None;
     }
 
-    Some(format!("{}function `{}` is unused", visibility_prefix, func.get_name_str()))
+    Some(format!(
+        "{}function `{}` is unused",
+        visibility_prefix,
+        func.get_name_str()
+    ))
 }
-
