@@ -1459,16 +1459,26 @@ pub fn update_counters_for_committed_blocks(
                 }
             }
 
+            // Case 1: count SEQUENCE_NUMBER_TOO_OLD from execution result
+            let failed_duplicate = block.compute_result()
+                .compute_status_for_input_txns()
+                .iter()
+                .filter(|s| matches!(s, aptos_types::transaction::TransactionStatus::Discard(
+                    aptos_types::vm_status::DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD
+                )))
+                .count();
+
             info!(
                 "[proxy-debug] Committed primary block: round={}, proxy_rounds={:?}, \
-                 total_batches={}, dup_proxy_rounds(case3)={:?}, dup_batches(case2)={}, \
-                 total_txns={}",
+                 total_batches={}, total_txns={}, \
+                 dup_proxy_rounds(case3)={:?}, dup_batches(case2)={}, failed_dup(case1)={}",
                 block.block().round(),
                 proxy_rounds,
                 total_batches,
+                block.block().payload().map_or(0, |p| p.len()),
                 dup_proxy_rounds,
                 dup_batch_digests,
-                block.block().payload().map_or(0, |p| p.len()),
+                failed_duplicate,
             );
         }
     }
