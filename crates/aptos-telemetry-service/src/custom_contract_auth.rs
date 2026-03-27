@@ -7,7 +7,7 @@
 use crate::{
     context::Context,
     debug, error,
-    errors::{ServiceError, ServiceErrorCode},
+    errors::{json_rejection_to_service_error, ServiceError, ServiceErrorCode},
     jwt_auth::create_jwt_token,
     metrics::{record_custom_contract_error, CustomContractEndpoint, CustomContractErrorType},
     types::common::NodeType,
@@ -20,10 +20,12 @@ use aptos_crypto::{
 };
 use aptos_rest_client::Client as RestClient;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use reqwest::header::AUTHORIZATION;
+use axum::{
+    extract::{rejection::JsonRejection, Extension, Json},
+    http::HeaderMap,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use warp::{filters::BoxedFilter, reject, reply, Filter, Rejection, Reply};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChallengeRequest {
@@ -57,22 +59,23 @@ pub struct CustomAuthResponse {
     pub token: String,
 }
 
-/// Get authentication challenge endpoint
-pub fn auth_challenge(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("custom-contract" / String / "auth-challenge")
-        .and(warp::post())
-        .and(context.filter())
-        .and(warp::body::json())
-        .and_then(handle_auth_challenge)
-        .boxed()
+/// Handle authentication challenge request
+pub async fn post_auth_challenge(
+    axum::extract::Path(contract_name): axum::extract::Path<String>,
+    Extension(context): Extension<Context>,
+    body: Result<Json<ChallengeRequest>, JsonRejection>,
+) -> Result<Json<ChallengeResponse>, ServiceError> {
+    let Json(body) = body.map_err(json_rejection_to_service_error)?;
+    handle_auth_challenge(contract_name, context, body)
+        .await
+        .map(Json)
 }
 
-/// Handle authentication challenge request
 async fn handle_auth_challenge(
     contract_name: String,
     context: Context,
     body: ChallengeRequest,
-) -> Result<impl Reply, Rejection> {
+) -> Result<ChallengeResponse, ServiceError> {
     debug!(
         "received custom contract '{}' auth challenge request: {:?}",
         contract_name, body
@@ -86,12 +89,12 @@ async fn handle_auth_challenge(
             CustomContractEndpoint::AuthChallenge,
             CustomContractErrorType::ContractNotConfigured,
         );
-        return Err(reject::custom(ServiceError::forbidden(
+        return Err(ServiceError::forbidden(
             ServiceErrorCode::CustomContractAuthError(
                 format!("custom contract '{}' not configured", contract_name),
                 body.chain_id,
             ),
-        )));
+        ));
     }
 
     // Generate random challenge nonce
@@ -110,17 +113,16 @@ async fn handle_auth_challenge(
         expires_at,
     };
 
-    Ok(reply::json(&response))
+    Ok(response)
 }
 
-/// Custom contract authentication endpoint
-pub fn auth(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("custom-contract" / String / "auth")
-        .and(warp::post())
-        .and(context.filter())
-        .and(warp::body::json())
-        .and_then(handle_auth)
-        .boxed()
+pub async fn post_custom_auth(
+    axum::extract::Path(contract_name): axum::extract::Path<String>,
+    Extension(context): Extension<Context>,
+    body: Result<Json<CustomAuthRequest>, JsonRejection>,
+) -> Result<Json<CustomAuthResponse>, ServiceError> {
+    let Json(body) = body.map_err(json_rejection_to_service_error)?;
+    handle_auth(contract_name, context, body).await.map(Json)
 }
 
 /// Handle custom contract authentication request
@@ -128,7 +130,7 @@ async fn handle_auth(
     contract_name: String,
     context: Context,
     body: CustomAuthRequest,
-) -> Result<impl Reply, Rejection> {
+) -> Result<CustomAuthResponse, ServiceError> {
     debug!(
         "received custom contract '{}' auth request for address: {}",
         contract_name, body.address
@@ -142,11 +144,9 @@ async fn handle_auth(
             CustomContractEndpoint::Auth,
             CustomContractErrorType::ContractNotConfigured,
         );
-        reject::custom(ServiceError::forbidden(
-            ServiceErrorCode::CustomContractAuthError(
-                format!("custom contract '{}' not configured", contract_name),
-                body.chain_id,
-            ),
+        ServiceError::forbidden(ServiceErrorCode::CustomContractAuthError(
+            format!("custom contract '{}' not configured", contract_name),
+            body.chain_id,
         ))
     })?;
 
@@ -170,11 +170,9 @@ async fn handle_auth(
                 CustomContractEndpoint::Auth,
                 CustomContractErrorType::ChallengeFailed,
             );
-            reject::custom(ServiceError::bad_request(
-                ServiceErrorCode::CustomContractAuthError(
-                    format!("invalid or expired challenge: {}", e),
-                    body.chain_id,
-                ),
+            ServiceError::bad_request(ServiceErrorCode::CustomContractAuthError(
+                format!("invalid or expired challenge: {}", e),
+                body.chain_id,
             ))
         })?;
 
@@ -188,8 +186,9 @@ async fn handle_auth(
             CustomContractEndpoint::Auth,
             CustomContractErrorType::SignatureInvalid,
         );
-        reject::custom(ServiceError::bad_request(
-            ServiceErrorCode::CustomContractAuthError(e.to_string(), body.chain_id),
+        ServiceError::bad_request(ServiceErrorCode::CustomContractAuthError(
+            e.to_string(),
+            body.chain_id,
         ))
     })?;
 
@@ -237,7 +236,7 @@ async fn handle_auth(
                     CustomContractEndpoint::Auth,
                     CustomContractErrorType::NotInAllowlist,
                 );
-                return Err(reject::custom(ServiceError::forbidden(
+                return Err(ServiceError::forbidden(
                     ServiceErrorCode::CustomContractAuthError(
                         format!(
                             "address {} not in allowlist for contract '{}'",
@@ -245,7 +244,7 @@ async fn handle_auth(
                         ),
                         body.chain_id,
                     ),
-                )));
+                ));
             },
 
             AllowlistStatus::CacheMiss => {
@@ -255,7 +254,7 @@ async fn handle_auth(
                     CustomContractEndpoint::Auth,
                     CustomContractErrorType::NotInAllowlist,
                 );
-                return Err(reject::custom(ServiceError::forbidden(
+                return Err(ServiceError::forbidden(
                     ServiceErrorCode::CustomContractAuthError(
                         format!(
                             "allowlist not available for contract '{}' (cache miss)",
@@ -263,7 +262,7 @@ async fn handle_auth(
                         ),
                         body.chain_id,
                     ),
-                )));
+                ));
             },
         }
     };
@@ -283,12 +282,13 @@ async fn handle_auth(
     )
     .map_err(|e| {
         error!("unable to create jwt token: {}", e);
-        reject::custom(ServiceError::internal(
-            ServiceErrorCode::CustomContractAuthError(e.to_string(), body.chain_id),
+        ServiceError::internal(ServiceErrorCode::CustomContractAuthError(
+            e.to_string(),
+            body.chain_id,
         ))
     })?;
 
-    Ok(reply::json(&CustomAuthResponse { token }))
+    Ok(CustomAuthResponse { token })
 }
 
 /// Verify the Ed25519 signature over the challenge
@@ -664,29 +664,27 @@ fn get_rest_url_for_chain(chain_id: &ChainId) -> Result<reqwest::Url> {
     reqwest::Url::parse(url_str).map_err(|e| anyhow!("invalid default URL: {}", e))
 }
 
-/// Authorization filter for custom contract authenticated requests.
+/// Authorize a custom contract JWT from request headers.
 /// Returns (contract_name, peer_id, chain_id, is_trusted) from JWT claims.
-/// The contract_name is extracted from NodeType::Custom or NodeType::CustomUnknown.
-/// is_trusted is true for Custom (allowlisted), false for CustomUnknown.
-pub fn with_custom_contract_auth(
-    context: Context,
-) -> impl Filter<Extract = ((String, aptos_types::PeerId, ChainId, bool),), Error = Rejection> + Clone
-{
-    warp::header::optional(AUTHORIZATION.as_str())
-        .and_then(crate::jwt_auth::jwt_from_header)
-        .and(warp::any().map(move || context.clone()))
-        .and_then(authorize_custom_contract_jwt)
+pub async fn authorize_custom_contract_request(
+    context: &Context,
+    headers: &HeaderMap,
+) -> Result<(String, aptos_types::PeerId, ChainId, bool), ServiceError> {
+    use axum::http::header::AUTHORIZATION;
+
+    let auth_header = headers
+        .get(AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let token = crate::jwt_auth::jwt_from_header(auth_header).await?;
+    authorize_custom_contract_jwt(token, context.clone()).await
 }
 
 /// Authorize a custom contract JWT token.
-/// Returns (contract_name, peer_id, chain_id, is_trusted) from claims for use in data ingestion.
-/// The contract_name is stored in NodeType::Custom or NodeType::CustomUnknown to prevent
-/// cross-contract token reuse attacks.
-/// is_trusted indicates whether the node is in the on-chain allowlist (Custom) or not (CustomUnknown).
 async fn authorize_custom_contract_jwt(
     token: String,
     context: Context,
-) -> Result<(String, aptos_types::PeerId, ChainId, bool), Rejection> {
+) -> Result<(String, aptos_types::PeerId, ChainId, bool), ServiceError> {
     use crate::types::auth::Claims;
 
     let claims = context
@@ -694,11 +692,9 @@ async fn authorize_custom_contract_jwt(
         .decode::<Claims>(&token)
         .map_err(|e| {
             debug!("jwt decode error: {}", e);
-            reject::custom(ServiceError::unauthorized(
-                ServiceErrorCode::CustomContractAuthError(
-                    "invalid token".to_string(),
-                    ChainId::test(),
-                ),
+            ServiceError::unauthorized(ServiceErrorCode::CustomContractAuthError(
+                "invalid token".to_string(),
+                ChainId::test(),
             ))
         })?
         .claims;
@@ -710,12 +706,12 @@ async fn authorize_custom_contract_jwt(
         NodeType::Custom(name) => (name.clone(), true),
         NodeType::CustomUnknown(name) => (name.clone(), false),
         _ => {
-            return Err(reject::custom(ServiceError::forbidden(
+            return Err(ServiceError::forbidden(
                 ServiceErrorCode::CustomContractAuthError(
                     "token is not for a custom contract client".to_string(),
                     claims.chain_id,
                 ),
-            )));
+            ));
         },
     };
 

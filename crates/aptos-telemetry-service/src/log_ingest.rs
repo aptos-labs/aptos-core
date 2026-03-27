@@ -2,51 +2,55 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    auth::with_auth,
+    auth::authorize_request,
     clients::humio::{
         CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME,
         RUN_UUID_TAG_NAME,
     },
-    constants::{MAX_CONTENT_LENGTH, MAX_DECOMPRESSED_LENGTH},
+    constants::MAX_DECOMPRESSED_LENGTH,
     context::Context,
     debug, error,
     errors::{LogIngestError, ServiceError},
     metrics::LOG_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
 };
+use axum::{
+    body::Bytes,
+    extract::Extension,
+    http::{header::CONTENT_ENCODING, HeaderMap, StatusCode},
+};
 use flate2::bufread::GzDecoder;
-use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use std::{collections::HashMap, io::Read};
 use tokio::time::Instant;
-use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
-pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("ingest" / "logs")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(context, vec![
-            NodeType::Validator,
-            NodeType::ValidatorFullNode,
-            NodeType::PublicFullNode,
-            NodeType::UnknownFullNode,
-            NodeType::UnknownValidator,
-        ]))
-        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
-        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
-        .and(warp::body::aggregate())
-        .and_then(handle_log_ingest)
-        .boxed()
+pub async fn post_log_ingest(
+    Extension(context): Extension<Context>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<StatusCode, ServiceError> {
+    let claims = authorize_request(&context, &headers, &[
+        NodeType::Validator,
+        NodeType::ValidatorFullNode,
+        NodeType::PublicFullNode,
+        NodeType::UnknownFullNode,
+        NodeType::UnknownValidator,
+    ])
+    .await?;
+    let encoding = headers
+        .get(CONTENT_ENCODING)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    handle_log_ingest(context, claims, encoding, body).await
 }
 
 pub async fn handle_log_ingest(
     context: Context,
     claims: Claims,
     encoding: Option<String>,
-    body: impl Buf,
-) -> anyhow::Result<impl Reply, Rejection> {
+    body: Bytes,
+) -> Result<StatusCode, ServiceError> {
     debug!("handling log ingest");
 
-    // Apply rate limiting for unknown/untrusted nodes
     let is_unknown = matches!(
         claims.node_type,
         NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
@@ -56,25 +60,24 @@ pub async fn handle_log_ingest(
             "rate limit exceeded for unknown node logs: peer_id={}",
             claims.peer_id
         );
-        return Err(reject::custom(ServiceError::too_many_requests(
+        return Err(ServiceError::too_many_requests(
             LogIngestError::RateLimitExceeded.into(),
-        )));
+        ));
     }
 
-    // Standard log ingestion requires humio_ingest_config to be configured
     let log_clients = context.log_ingest_clients().ok_or_else(|| {
         error!("Standard log ingestion not configured - rejecting request");
-        reject::custom(ServiceError::new(
+        ServiceError::new(
             StatusCode::SERVICE_UNAVAILABLE,
             LogIngestError::IngestionError.into(),
-        ))
+        )
     })?;
 
     if let Some(blacklist) = &log_clients.blacklist {
         if blacklist.contains(&claims.peer_id) {
-            return Err(reject::custom(ServiceError::forbidden(
+            return Err(ServiceError::forbidden(
                 LogIngestError::Forbidden(claims.peer_id).into(),
-            )));
+            ));
         }
     }
 
@@ -87,20 +90,19 @@ pub async fn handle_log_ingest(
 
     let log_messages: Vec<String> = if let Some(encoding) = encoding {
         if encoding.eq_ignore_ascii_case("gzip") {
-            let decoder = GzDecoder::new(body.reader());
-            // Limit decompressed size to prevent decompression bomb attacks
+            let decoder = GzDecoder::new(&body[..]);
             let limited_reader = decoder.take(MAX_DECOMPRESSED_LENGTH as u64);
             serde_json::from_reader(limited_reader).map_err(|e| {
                 debug!("unable to decode and deserialize body: {}", e);
                 ServiceError::bad_request(LogIngestError::UnexpectedPayloadBody.into())
             })?
         } else {
-            return Err(reject::custom(ServiceError::bad_request(
+            return Err(ServiceError::bad_request(
                 LogIngestError::UnexpectedContentEncoding.into(),
-            )));
+            ));
         }
     } else {
-        serde_json::from_reader(body.reader()).map_err(|e| {
+        serde_json::from_slice(&body).map_err(|e| {
             error!("unable to deserialize body: {}", e);
             ServiceError::bad_request(LogIngestError::UnexpectedPayloadBody.into())
         })?
@@ -144,9 +146,9 @@ pub async fn handle_log_ingest(
                     "humio log ingestion failed: {}",
                     res.error_for_status().err().unwrap()
                 );
-                return Err(reject::custom(ServiceError::bad_request(
+                return Err(ServiceError::bad_request(
                     LogIngestError::IngestionError.into(),
-                )));
+                ));
             }
         },
         Err(err) => {
@@ -154,11 +156,11 @@ pub async fn handle_log_ingest(
                 .with_label_values(&["Unknown"])
                 .observe(start_timer.elapsed().as_secs_f64());
             error!("error sending log ingest request: {}", err);
-            return Err(reject::custom(ServiceError::bad_request(
+            return Err(ServiceError::bad_request(
                 LogIngestError::IngestionError.into(),
-            )));
+            ));
         },
     }
 
-    Ok(reply::with_status(reply::reply(), StatusCode::CREATED))
+    Ok(StatusCode::CREATED)
 }

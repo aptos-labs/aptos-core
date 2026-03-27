@@ -2,8 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    auth::with_auth,
-    constants::MAX_CONTENT_LENGTH,
+    auth::authorize_request,
     context::Context,
     debug, error,
     errors::{MetricsIngestError, ServiceError},
@@ -11,30 +10,35 @@ use crate::{
     types::{auth::Claims, common::NodeType},
 };
 use aptos_types::PeerId;
+use axum::{
+    body::Bytes,
+    extract::Extension,
+    http::{header::CONTENT_ENCODING, HeaderMap, StatusCode},
+};
 use rand::Rng;
-use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use std::{env, time::Duration};
 use tokio::time::Instant;
-use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
 const MAX_METRICS_POST_WAIT_DURATION_SECS: u64 = 5;
 
-pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("ingest" / "metrics")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(context, vec![
-            NodeType::Validator,
-            NodeType::ValidatorFullNode,
-            NodeType::PublicFullNode,
-            NodeType::UnknownValidator,
-            NodeType::UnknownFullNode,
-        ]))
-        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
-        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
-        .and(warp::body::bytes())
-        .and_then(handle_metrics_ingest)
-        .boxed()
+pub async fn post_metrics_ingest(
+    Extension(context): Extension<Context>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<StatusCode, ServiceError> {
+    let claims = authorize_request(&context, &headers, &[
+        NodeType::Validator,
+        NodeType::ValidatorFullNode,
+        NodeType::PublicFullNode,
+        NodeType::UnknownValidator,
+        NodeType::UnknownFullNode,
+    ])
+    .await?;
+    let encoding = headers
+        .get(CONTENT_ENCODING)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    handle_metrics_ingest(context, claims, encoding, body).await
 }
 
 pub async fn handle_metrics_ingest(
@@ -42,7 +46,7 @@ pub async fn handle_metrics_ingest(
     claims: Claims,
     encoding: Option<String>,
     metrics_body: Bytes,
-) -> anyhow::Result<impl Reply, Rejection> {
+) -> Result<StatusCode, ServiceError> {
     debug!("handling prometheus metrics ingest");
 
     // Apply rate limiting for unknown/untrusted nodes
@@ -60,9 +64,9 @@ pub async fn handle_metrics_ingest(
             "rate limit exceeded for unknown node metrics: peer_id={}",
             claims.peer_id
         );
-        return Err(reject::custom(ServiceError::too_many_requests(
+        return Err(ServiceError::too_many_requests(
             MetricsIngestError::RateLimitExceeded.into(),
-        )));
+        ));
     }
 
     let enable_location_labels = env::var("FEATURE_LOCATION_LABELS_ENABLED")
@@ -100,10 +104,10 @@ pub async fn handle_metrics_ingest(
     // Standard metrics ingestion requires metrics_endpoints_config to be configured
     let metrics_clients = context.metrics_client().ok_or_else(|| {
         error!("Standard metrics ingestion not configured - rejecting request");
-        reject::custom(ServiceError::new(
+        ServiceError::new(
             StatusCode::SERVICE_UNAVAILABLE,
             MetricsIngestError::IngestionError.into(),
-        ))
+        )
     })?;
 
     let client = match claims.node_type {
@@ -176,12 +180,12 @@ pub async fn handle_metrics_ingest(
         .iter()
         .all(|result| result.is_err())
     {
-        return Err(reject::custom(ServiceError::internal(
+        return Err(ServiceError::internal(
             MetricsIngestError::IngestionError.into(),
-        )));
+        ));
     }
 
-    Ok(reply::with_status(reply::reply(), StatusCode::CREATED))
+    Ok(StatusCode::CREATED)
 }
 
 fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<String> {

@@ -12,14 +12,17 @@ use aptos_crypto::{x25519, Uniform};
 use aptos_infallible::RwLock;
 use aptos_rest_client::aptos_api_types::mime_types;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use axum::{
+    body::{to_bytes, Body},
+    http::{
+        header::{AUTHORIZATION, CONTENT_TYPE},
+        Request, Response,
+    },
+};
 use rand::SeedableRng;
-use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
-use warp::{
-    http::{header::CONTENT_TYPE, Response},
-    hyper::body::Bytes,
-};
+use tower::ServiceExt;
 
 pub async fn new_test_context() -> TestContext {
     new_test_context_with_auth(None).await
@@ -28,7 +31,6 @@ pub async fn new_test_context() -> TestContext {
 pub async fn new_test_context_with_auth(
     on_chain_auth_config: Option<crate::OnChainAuthConfig>,
 ) -> TestContext {
-    // Wrap in a vec with default contract name
     let configs = on_chain_auth_config.map(|cfg| vec![("test_contract".to_string(), cfg)]);
     new_test_context_with_multiple_contracts(configs).await
 }
@@ -40,7 +42,6 @@ pub async fn new_test_context_with_multiple_contracts(
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let server_private_key = x25519::PrivateKey::generate(&mut rng);
 
-    // Convert to multi-contract format
     let custom_contract_configs = contract_configs
         .map(|configs| {
             configs
@@ -84,7 +85,7 @@ pub async fn new_test_context_with_multiple_contracts(
         metrics_endpoints_config: Some(MetricsEndpointsConfig::default_for_test()),
         humio_ingest_config: Some(LogIngestConfig::default_for_test()),
         custom_contract_configs,
-        allowlist_cache_ttl_secs: 10, // Short TTL for testing
+        allowlist_cache_ttl_secs: 10,
         unknown_metrics_rate_limit: UnknownTelemetryRateLimitConfig::default(),
         unknown_logs_rate_limit: UnknownTelemetryRateLimitConfig::default(),
     };
@@ -92,7 +93,6 @@ pub async fn new_test_context_with_multiple_contracts(
     let peers = PeerStoreTuple::default();
     let jwt_service = JsonWebTokenService::from_base64_secret(&base64::encode("jwt_secret_key"));
 
-    // Build custom contract clients if configured
     let custom_contract_clients = if !config.custom_contract_configs.is_empty() {
         let mut instances = HashMap::new();
         for cc_config in &config.custom_contract_configs {
@@ -119,16 +119,15 @@ pub async fn new_test_context_with_multiple_contracts(
         None
     };
 
-    // Create disabled rate limiters for tests (high burst capacity to avoid interfering with tests)
     let metrics_rate_limit_config = UnknownTelemetryRateLimitConfig {
         requests_per_second: 10000,
         burst_capacity: 100000,
-        enabled: false, // Disabled for tests
+        enabled: false,
     };
     let logs_rate_limit_config = UnknownTelemetryRateLimitConfig {
         requests_per_second: 10000,
         burst_capacity: 100000,
-        enabled: false, // Disabled for tests
+        enabled: false,
     };
 
     TestContext::new(
@@ -173,8 +172,6 @@ impl TestContext {
         }
     }
 
-    /// Pre-populate the allowlist cache with test addresses.
-    /// This is needed because tests don't run the AllowlistCacheUpdater background task.
     pub fn populate_allowlist_cache(
         &self,
         contract_name: &str,
@@ -199,40 +196,65 @@ impl TestContext {
     }
 
     pub async fn get(&self, path: &str) -> Value {
-        self.execute(
-            warp::test::request()
-                .header(AUTHORIZATION, format!("Bearer {}", self.bearer_token))
-                .method("GET")
-                .path(path),
-        )
-        .await
+        let req = Request::builder()
+            .method("GET")
+            .uri(path)
+            .header(AUTHORIZATION, format!("Bearer {}", self.bearer_token))
+            .body(Body::empty())
+            .expect("valid request");
+        self.execute(req).await
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Value {
-        self.execute(
-            warp::test::request()
-                .header(AUTHORIZATION, format!("Bearer {}", self.bearer_token))
-                .method("POST")
-                .path(path)
-                .json(&body),
-        )
-        .await
+        let req = Request::builder()
+            .method("POST")
+            .uri(path)
+            .header(AUTHORIZATION, format!("Bearer {}", self.bearer_token))
+            .header(CONTENT_TYPE, mime_types::JSON)
+            .body(Body::from(
+                serde_json::to_vec(&body).expect("serialize body"),
+            ))
+            .expect("valid request");
+        self.execute(req).await
     }
 
-    pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        req.reply(&index::routes(self.inner.clone())).await
+    pub async fn reply(&self, req: Request<Body>) -> Response<Body> {
+        index::routes(self.inner.clone())
+            .oneshot(req)
+            .await
+            .expect("router oneshot")
     }
 
-    pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
+    pub async fn execute(&self, req: Request<Body>) -> Value {
         let resp = self.reply(req).await;
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let body = resp.into_body();
+        let bytes = to_bytes(body, usize::MAX).await.expect("read body bytes");
 
-        let headers = resp.headers();
-        assert_eq!(headers[CONTENT_TYPE], mime_types::JSON);
+        if bytes.is_empty() {
+            assert_eq!(
+                self.expect_status_code,
+                status.as_u16(),
+                "empty body: status mismatch"
+            );
+            return Value::Null;
+        }
 
-        let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
+        assert_eq!(
+            headers
+                .get(CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_default(),
+            mime_types::JSON,
+            "\nresponse status: {}",
+            status
+        );
+
+        let body: Value = serde_json::from_slice(&bytes).expect("response body is JSON");
         assert_eq!(
             self.expect_status_code,
-            resp.status(),
+            status.as_u16(),
             "\nresponse: {}",
             pretty(&body)
         );

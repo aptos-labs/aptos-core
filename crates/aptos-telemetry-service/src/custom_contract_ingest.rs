@@ -10,9 +10,12 @@ use crate::{
     clients::humio::{PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME},
     constants::MAX_DECOMPRESSED_LENGTH,
     context::Context,
-    custom_contract_auth::with_custom_contract_auth,
+    custom_contract_auth::authorize_custom_contract_request,
     debug, error,
-    errors::{CustomEventIngestError, LogIngestError, ServiceError, ServiceErrorCode},
+    errors::{
+        json_rejection_to_service_error, CustomEventIngestError, LogIngestError, ServiceError,
+        ServiceErrorCode,
+    },
     metrics::{record_custom_contract_error, CustomContractEndpoint, CustomContractErrorType},
     types::{
         common::EventIdentity, common::NodeType, humio::UnstructuredLog, telemetry::TelemetryDump,
@@ -20,6 +23,11 @@ use crate::{
     warn,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
+use axum::{
+    body::Bytes,
+    extract::{rejection::JsonRejection, Extension, Json, Path},
+    http::{header::CONTENT_ENCODING, HeaderMap, StatusCode},
+};
 use flate2::read::GzDecoder;
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use std::{
@@ -27,18 +35,19 @@ use std::{
     io::Read,
 };
 use uuid::Uuid;
-use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
-/// Custom contract metrics ingest endpoint
-pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("custom-contract" / String / "ingest" / "metrics")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_custom_contract_auth(context.clone()))
-        .and(warp::header::optional("content-encoding"))
-        .and(warp::body::bytes())
-        .and_then(handle_metrics_ingest)
-        .boxed()
+pub async fn post_custom_contract_metrics(
+    Path(contract_name): Path<String>,
+    Extension(context): Extension<Context>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<StatusCode, ServiceError> {
+    let content_encoding = headers
+        .get(CONTENT_ENCODING)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let auth = authorize_custom_contract_request(&context, &headers).await?;
+    handle_metrics_ingest(contract_name, context, auth, content_encoding, body).await
 }
 
 /// Handle custom contract metrics ingestion
@@ -48,7 +57,7 @@ async fn handle_metrics_ingest(
     (jwt_contract_name, peer_id, chain_id, is_trusted): (String, PeerId, ChainId, bool),
     content_encoding: Option<String>,
     body: Bytes,
-) -> Result<impl Reply, Rejection> {
+) -> Result<StatusCode, ServiceError> {
     // Verify the JWT was issued for this specific contract (prevents cross-contract token reuse)
     if jwt_contract_name != contract_name {
         error!(
@@ -60,7 +69,7 @@ async fn handle_metrics_ingest(
             CustomContractEndpoint::MetricsIngest,
             CustomContractErrorType::TokenMismatch,
         );
-        return Err(reject::custom(ServiceError::forbidden(
+        return Err(ServiceError::forbidden(
             ServiceErrorCode::CustomContractAuthError(
                 format!(
                     "token issued for '{}' cannot be used for '{}'",
@@ -68,7 +77,7 @@ async fn handle_metrics_ingest(
                 ),
                 chain_id,
             ),
-        )));
+        ));
     }
 
     // Check if the peer is blacklisted for this contract
@@ -83,12 +92,12 @@ async fn handle_metrics_ingest(
                 CustomContractEndpoint::MetricsIngest,
                 CustomContractErrorType::NotInAllowlist,
             );
-            return Err(reject::custom(ServiceError::forbidden(
+            return Err(ServiceError::forbidden(
                 ServiceErrorCode::CustomContractAuthError(
                     format!("peer_id {} is blacklisted from this contract", peer_id),
                     chain_id,
                 ),
-            )));
+            ));
         }
     }
 
@@ -121,12 +130,12 @@ async fn handle_metrics_ingest(
                 CustomContractEndpoint::MetricsIngest,
                 CustomContractErrorType::RateLimitExceeded,
             );
-            return Err(reject::custom(ServiceError::too_many_requests(
+            return Err(ServiceError::too_many_requests(
                 ServiceErrorCode::CustomContractAuthError(
                     "rate limit exceeded for untrusted telemetry".to_string(),
                     chain_id,
                 ),
-            )));
+            ));
         }
     }
 
@@ -147,9 +156,7 @@ async fn handle_metrics_ingest(
             CustomContractEndpoint::MetricsIngest,
             CustomContractErrorType::ContractNotConfigured,
         );
-        reject::custom(ServiceError::internal(
-            LogIngestError::IngestionError.into(),
-        ))
+        ServiceError::internal(LogIngestError::IngestionError.into())
     })?;
 
     // Get the appropriate metrics clients based on whether node is trusted (allowlisted)
@@ -225,19 +232,21 @@ async fn handle_metrics_ingest(
         }
     }
 
-    Ok(reply::reply())
+    Ok(StatusCode::OK)
 }
 
-/// Custom contract logs ingest endpoint
-pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("custom-contract" / String / "ingest" / "logs")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_custom_contract_auth(context.clone()))
-        .and(warp::header::optional("content-encoding"))
-        .and(warp::body::bytes())
-        .and_then(handle_log_ingest)
-        .boxed()
+pub async fn post_custom_contract_logs(
+    Path(contract_name): Path<String>,
+    Extension(context): Extension<Context>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<StatusCode, ServiceError> {
+    let content_encoding = headers
+        .get(CONTENT_ENCODING)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let auth = authorize_custom_contract_request(&context, &headers).await?;
+    handle_log_ingest(contract_name, context, auth, content_encoding, body).await
 }
 
 /// Handle custom contract log ingestion
@@ -247,7 +256,7 @@ async fn handle_log_ingest(
     (jwt_contract_name, peer_id, chain_id, is_trusted): (String, PeerId, ChainId, bool),
     content_encoding: Option<String>,
     body: Bytes,
-) -> Result<impl Reply, Rejection> {
+) -> Result<StatusCode, ServiceError> {
     // Verify the JWT was issued for this specific contract (prevents cross-contract token reuse)
     if jwt_contract_name != contract_name {
         error!(
@@ -259,7 +268,7 @@ async fn handle_log_ingest(
             CustomContractEndpoint::LogsIngest,
             CustomContractErrorType::TokenMismatch,
         );
-        return Err(reject::custom(ServiceError::forbidden(
+        return Err(ServiceError::forbidden(
             ServiceErrorCode::CustomContractAuthError(
                 format!(
                     "token issued for '{}' cannot be used for '{}'",
@@ -267,7 +276,7 @@ async fn handle_log_ingest(
                 ),
                 chain_id,
             ),
-        )));
+        ));
     }
 
     // Check if the peer is blacklisted for this contract
@@ -282,12 +291,12 @@ async fn handle_log_ingest(
                 CustomContractEndpoint::LogsIngest,
                 CustomContractErrorType::NotInAllowlist,
             );
-            return Err(reject::custom(ServiceError::forbidden(
+            return Err(ServiceError::forbidden(
                 ServiceErrorCode::CustomContractAuthError(
                     format!("peer_id {} is blacklisted from this contract", peer_id),
                     chain_id,
                 ),
-            )));
+            ));
         }
     }
 
@@ -316,12 +325,12 @@ async fn handle_log_ingest(
                 CustomContractEndpoint::LogsIngest,
                 CustomContractErrorType::RateLimitExceeded,
             );
-            return Err(reject::custom(ServiceError::too_many_requests(
+            return Err(ServiceError::too_many_requests(
                 ServiceErrorCode::CustomContractAuthError(
                     "rate limit exceeded for untrusted telemetry".to_string(),
                     chain_id,
                 ),
-            )));
+            ));
         }
     }
 
@@ -348,9 +357,7 @@ async fn handle_log_ingest(
                     CustomContractEndpoint::LogsIngest,
                     CustomContractErrorType::InvalidPayload,
                 );
-                reject::custom(ServiceError::bad_request(
-                    LogIngestError::UnexpectedContentEncoding.into(),
-                ))
+                ServiceError::bad_request(LogIngestError::UnexpectedContentEncoding.into())
             })?;
         decompressed
     } else {
@@ -364,9 +371,7 @@ async fn handle_log_ingest(
             CustomContractEndpoint::LogsIngest,
             CustomContractErrorType::InvalidPayload,
         );
-        reject::custom(ServiceError::bad_request(
-            LogIngestError::UnexpectedPayloadBody.into(),
-        ))
+        ServiceError::bad_request(LogIngestError::UnexpectedPayloadBody.into())
     })?;
 
     debug!(
@@ -385,9 +390,7 @@ async fn handle_log_ingest(
             CustomContractEndpoint::LogsIngest,
             CustomContractErrorType::ContractNotConfigured,
         );
-        reject::custom(ServiceError::internal(
-            LogIngestError::IngestionError.into(),
-        ))
+        ServiceError::internal(LogIngestError::IngestionError.into())
     })?;
 
     // Get the appropriate log client based on whether node is trusted (allowlisted)
@@ -402,9 +405,7 @@ async fn handle_log_ingest(
             CustomContractEndpoint::LogsIngest,
             CustomContractErrorType::IngestionFailed,
         );
-        reject::custom(ServiceError::internal(
-            LogIngestError::IngestionError.into(),
-        ))
+        ServiceError::internal(LogIngestError::IngestionError.into())
     })?;
 
     // Prepare unstructured log with custom contract metadata
@@ -448,23 +449,21 @@ async fn handle_log_ingest(
                 CustomContractEndpoint::LogsIngest,
                 CustomContractErrorType::IngestionFailed,
             );
-            reject::custom(ServiceError::internal(
-                LogIngestError::IngestionError.into(),
-            ))
+            ServiceError::internal(LogIngestError::IngestionError.into())
         })?;
 
-    Ok(reply::reply())
+    Ok(StatusCode::OK)
 }
 
-/// Custom contract custom event ingest endpoint
-pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("custom-contract" / String / "ingest" / "custom-event")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_custom_contract_auth(context.clone()))
-        .and(warp::body::json())
-        .and_then(handle_custom_event_ingest)
-        .boxed()
+pub async fn post_custom_contract_custom_event(
+    Path(contract_name): Path<String>,
+    Extension(context): Extension<Context>,
+    headers: HeaderMap,
+    body: Result<Json<TelemetryDump>, JsonRejection>,
+) -> Result<StatusCode, ServiceError> {
+    let Json(body) = body.map_err(json_rejection_to_service_error)?;
+    let auth = authorize_custom_contract_request(&context, &headers).await?;
+    handle_custom_event_ingest(contract_name, context, auth, body).await
 }
 
 /// Handle custom contract custom event ingestion
@@ -473,7 +472,7 @@ async fn handle_custom_event_ingest(
     context: Context,
     (jwt_contract_name, peer_id, chain_id, is_trusted): (String, PeerId, ChainId, bool),
     body: TelemetryDump,
-) -> Result<impl Reply, Rejection> {
+) -> Result<StatusCode, ServiceError> {
     // Verify the JWT was issued for this specific contract (prevents cross-contract token reuse)
     if jwt_contract_name != contract_name {
         error!(
@@ -485,7 +484,7 @@ async fn handle_custom_event_ingest(
             CustomContractEndpoint::EventsIngest,
             CustomContractErrorType::TokenMismatch,
         );
-        return Err(reject::custom(ServiceError::forbidden(
+        return Err(ServiceError::forbidden(
             ServiceErrorCode::CustomContractAuthError(
                 format!(
                     "token issued for '{}' cannot be used for '{}'",
@@ -493,7 +492,7 @@ async fn handle_custom_event_ingest(
                 ),
                 chain_id,
             ),
-        )));
+        ));
     }
 
     // Check if the peer is blacklisted for this contract
@@ -508,12 +507,12 @@ async fn handle_custom_event_ingest(
                 CustomContractEndpoint::EventsIngest,
                 CustomContractErrorType::NotInAllowlist,
             );
-            return Err(reject::custom(ServiceError::forbidden(
+            return Err(ServiceError::forbidden(
                 ServiceErrorCode::CustomContractAuthError(
                     format!("peer_id {} is blacklisted from this contract", peer_id),
                     chain_id,
                 ),
-            )));
+            ));
         }
     }
 
@@ -542,12 +541,12 @@ async fn handle_custom_event_ingest(
                 CustomContractEndpoint::EventsIngest,
                 CustomContractErrorType::RateLimitExceeded,
             );
-            return Err(reject::custom(ServiceError::too_many_requests(
+            return Err(ServiceError::too_many_requests(
                 ServiceErrorCode::CustomContractAuthError(
                     "rate limit exceeded for untrusted telemetry".to_string(),
                     chain_id,
                 ),
-            )));
+            ));
         }
     }
 
@@ -567,9 +566,9 @@ async fn handle_custom_event_ingest(
             CustomContractEndpoint::EventsIngest,
             CustomContractErrorType::InvalidPayload,
         );
-        reject::custom(ServiceError::bad_request(
+        ServiceError::bad_request(
             CustomEventIngestError::InvalidEvent(body.user_id.clone(), peer_id).into(),
-        ))
+        )
     })?;
     if body_peer_id != peer_id {
         record_custom_contract_error(
@@ -577,9 +576,9 @@ async fn handle_custom_event_ingest(
             CustomContractEndpoint::EventsIngest,
             CustomContractErrorType::InvalidPayload,
         );
-        return Err(reject::custom(ServiceError::bad_request(
+        return Err(ServiceError::bad_request(
             CustomEventIngestError::InvalidEvent(body.user_id.clone(), peer_id).into(),
-        )));
+        ));
     }
 
     // Validate there are events
@@ -589,9 +588,9 @@ async fn handle_custom_event_ingest(
             CustomContractEndpoint::EventsIngest,
             CustomContractErrorType::InvalidPayload,
         );
-        return Err(reject::custom(ServiceError::bad_request(
+        return Err(ServiceError::bad_request(
             CustomEventIngestError::EmptyPayload.into(),
-        )));
+        ));
     }
 
     // Parse timestamp
@@ -601,9 +600,9 @@ async fn handle_custom_event_ingest(
             CustomContractEndpoint::EventsIngest,
             CustomContractErrorType::InvalidPayload,
         );
-        reject::custom(ServiceError::bad_request(
+        ServiceError::bad_request(
             CustomEventIngestError::InvalidTimestamp(body.timestamp_micros.clone()).into(),
-        ))
+        )
     })?;
 
     // Get the custom contract instance
@@ -614,9 +613,7 @@ async fn handle_custom_event_ingest(
             CustomContractEndpoint::EventsIngest,
             CustomContractErrorType::ContractNotConfigured,
         );
-        reject::custom(ServiceError::internal(
-            CustomEventIngestError::EmptyPayload.into(),
-        ))
+        ServiceError::internal(CustomEventIngestError::EmptyPayload.into())
     })?;
 
     // Get the BigQuery client for this custom contract
@@ -696,9 +693,7 @@ async fn handle_custom_event_ingest(
                     CustomContractEndpoint::EventsIngest,
                     CustomContractErrorType::IngestionFailed,
                 );
-                reject::custom(ServiceError::internal(
-                    CustomEventIngestError::from(e).into(),
-                ))
+                ServiceError::internal(CustomEventIngestError::from(e).into())
             })?;
         }
 
@@ -710,11 +705,9 @@ async fn handle_custom_event_ingest(
                 CustomContractEndpoint::EventsIngest,
                 CustomContractErrorType::IngestionFailed,
             );
-            reject::custom(ServiceError::internal(
-                CustomEventIngestError::from(e).into(),
-            ))
+            ServiceError::internal(CustomEventIngestError::from(e).into())
         })?;
     }
 
-    Ok(reply::reply())
+    Ok(StatusCode::OK)
 }

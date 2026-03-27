@@ -11,7 +11,6 @@ use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
 use jsonwebtoken::{errors::Error, TokenData};
 use uuid::Uuid;
-use warp::{reject, Rejection};
 
 const BEARER: &str = "BEARER ";
 
@@ -45,46 +44,42 @@ pub async fn authorize_jwt(
     token: String,
     context: Context,
     allow_roles: Vec<NodeType>,
-) -> anyhow::Result<Claims, Rejection> {
+) -> Result<Claims, ServiceError> {
     let decoded: TokenData<Claims> = context.jwt_service().decode(&token).map_err(|e| {
         error!("unable to authorize jwt token: {}", e);
-        reject::custom(ServiceError::unauthorized(
-            JwtAuthError::InvalidAuthToken.into(),
-        ))
+        ServiceError::unauthorized(JwtAuthError::InvalidAuthToken.into())
     })?;
     let claims = decoded.claims;
 
     let current_epoch = match context.peers().validators().read().get(&claims.chain_id) {
         Some(info) => info.0,
         None => {
-            return Err(reject::custom(ServiceError::unauthorized(
+            return Err(ServiceError::unauthorized(
                 JwtAuthError::ExpiredAuthToken.into(),
-            )));
+            ));
         },
     };
 
     if !allow_roles.contains(&claims.node_type) {
-        return Err(reject::custom(ServiceError::forbidden(
-            JwtAuthError::AccessDenied.into(),
-        )));
+        return Err(ServiceError::forbidden(JwtAuthError::AccessDenied.into()));
     }
 
     if claims.epoch == current_epoch && claims.exp > Utc::now().timestamp() as usize {
         Ok(claims)
     } else {
-        Err(reject::custom(ServiceError::unauthorized(
+        Err(ServiceError::unauthorized(
             JwtAuthError::ExpiredAuthToken.into(),
-        )))
+        ))
     }
 }
 
-pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<String, Rejection> {
+pub async fn jwt_from_header(auth_header: Option<String>) -> Result<String, ServiceError> {
     let auth_header = match auth_header {
         Some(v) => v,
         None => {
-            return Err(reject::custom(ServiceError::unauthorized(
+            return Err(ServiceError::unauthorized(
                 JwtAuthError::from("bearer token missing".to_owned()).into(),
-            )))
+            ));
         },
     };
     let auth_header = auth_header.split(',').next().unwrap_or_default();
@@ -93,9 +88,9 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
         .unwrap_or_default()
         .eq_ignore_ascii_case(BEARER)
     {
-        return Err(reject::custom(ServiceError::unauthorized(
+        return Err(ServiceError::unauthorized(
             JwtAuthError::from("malformed bearer token".to_owned()).into(),
-        )));
+        ));
     }
     Ok(auth_header
         .get(BEARER.len()..)
@@ -107,8 +102,8 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
 mod tests {
 
     use super::{super::tests::test_context, *};
+    use axum::http::StatusCode;
     use std::collections::HashMap;
-    use warp::hyper::StatusCode;
 
     #[tokio::test]
     async fn jwt_from_header_valid_bearer() {
@@ -182,8 +177,7 @@ mod tests {
         let result = authorize_jwt(token, test_context.inner, vec![NodeType::Validator]).await;
         assert!(result.is_err());
 
-        let rejection = result.err().unwrap();
-        let service_error = rejection.find::<ServiceError>().unwrap();
+        let service_error = result.err().unwrap();
         assert_eq!(service_error.http_status_code(), StatusCode::FORBIDDEN);
         assert_eq!(
             service_error.error_as_string(),

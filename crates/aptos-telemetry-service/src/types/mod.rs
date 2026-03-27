@@ -113,7 +113,7 @@ pub mod common {
 pub mod response {
     use crate::errors::ServiceError;
     use aptos_crypto::x25519;
-    use reqwest::StatusCode;
+    use axum::http::StatusCode;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]

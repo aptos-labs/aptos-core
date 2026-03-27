@@ -4536,8 +4536,10 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-rest-client",
  "aptos-types",
+ "axum 0.7.5",
  "base64 0.13.1",
  "bcs 0.1.4",
+ "bytes",
  "chrono",
  "claims",
  "clap 4.5.60",
@@ -4563,11 +4565,11 @@ dependencies = [
  "snap",
  "thiserror 1.0.69",
  "tokio",
+ "tower",
  "tracing",
  "url",
  "urlencoding",
  "uuid 1.11.0",
- "warp",
 ]
 
 [[package]]

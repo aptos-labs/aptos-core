@@ -910,11 +910,15 @@ async fn test_cross_contract_token_reuse_prevented() {
         .with_bearer_auth(token_for_contract_a.to_string())
         .expect_status_code(403)
         .reply(
-            warp::test::request()
-                .header("Authorization", format!("Bearer {}", token_for_contract_a))
+            axum::http::Request::builder()
                 .method("POST")
-                .path("/api/v1/custom-contract/contract_b/ingest/metrics")
-                .body("test_metric{label=\"value\"} 42"),
+                .uri("/api/v1/custom-contract/contract_b/ingest/metrics")
+                .header(
+                    axum::http::header::AUTHORIZATION,
+                    format!("Bearer {}", token_for_contract_a),
+                )
+                .body(axum::body::Body::from("test_metric{label=\"value\"} 42"))
+                .expect("valid request"),
         )
         .await;
 

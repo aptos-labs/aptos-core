@@ -13,14 +13,13 @@ use crate::{
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::RwLock;
 use aptos_types::{chain_id::ChainId, PeerId};
+use bytes::Bytes;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, TokenData, Validation};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    convert::Infallible,
     sync::Arc,
 };
-use warp::Filter;
 
 /// Metrics backend client - abstracts over VictoriaMetrics and Prometheus Remote Write
 #[derive(Clone, Debug)]
@@ -38,7 +37,7 @@ impl MetricsIngestClient {
     /// - PrometheusRemoteWrite: Parses text, converts to protobuf+snappy
     pub async fn post_prometheus_metrics(
         &self,
-        raw_metrics_body: warp::hyper::body::Bytes,
+        raw_metrics_body: Bytes,
         extra_labels: Vec<String>,
         encoding: String,
     ) -> Result<reqwest::Response, anyhow::Error> {
@@ -387,10 +386,6 @@ impl Context {
             contract_metrics_rate_limiters,
             contract_logs_rate_limiters,
         }
-    }
-
-    pub fn filter(self) -> impl Filter<Extract = (Context,), Error = Infallible> + Clone {
-        warp::any().map(move || self.clone())
     }
 
     pub fn noise_config(&self) -> Arc<noise::NoiseConfig> {

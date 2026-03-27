@@ -2,11 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    auth::with_auth,
+    auth::authorize_request,
     constants::IP_ADDRESS_KEY,
     context::Context,
     debug, error,
-    errors::{CustomEventIngestError, ServiceError},
+    errors::{json_rejection_to_service_error, CustomEventIngestError, ServiceError},
     metrics::BIG_QUERY_BACKEND_REQUEST_DURATION,
     types::{
         auth::Claims,
@@ -16,49 +16,53 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_types::PeerId;
+use axum::{
+    extract::{rejection::JsonRejection, Extension, Json},
+    http::{HeaderMap, StatusCode},
+};
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use serde_json::json;
 use std::{str::FromStr, time::Duration};
 use tokio::time::Instant;
-use warp::{filters::BoxedFilter, hyper::StatusCode, reject, reply, Filter, Rejection, Reply};
 
-pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("ingest" / "custom-event")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(context, vec![
-            NodeType::Validator,
-            NodeType::ValidatorFullNode,
-            NodeType::PublicFullNode,
-            NodeType::Unknown,
-            NodeType::UnknownValidator,
-            NodeType::UnknownFullNode,
-        ]))
-        .and(warp::body::json())
-        .and(warp::header::optional("X-Forwarded-For"))
-        .and_then(handle_custom_event)
-        .boxed()
+pub async fn post_custom_event(
+    Extension(context): Extension<Context>,
+    headers: HeaderMap,
+    body: Result<Json<TelemetryDump>, JsonRejection>,
+) -> Result<StatusCode, ServiceError> {
+    let Json(mut body) = body.map_err(json_rejection_to_service_error)?;
+    let claims = authorize_request(&context, &headers, &[
+        NodeType::Validator,
+        NodeType::ValidatorFullNode,
+        NodeType::PublicFullNode,
+        NodeType::Unknown,
+        NodeType::UnknownValidator,
+        NodeType::UnknownFullNode,
+    ])
+    .await?;
+    let forwarded_for = headers
+        .get("X-Forwarded-For")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    handle_custom_event(context, claims, &mut body, forwarded_for).await
 }
 
-fn validate_custom_event_body(
-    claims: &Claims,
-    body: &TelemetryDump,
-) -> anyhow::Result<(), Rejection> {
+fn validate_custom_event_body(claims: &Claims, body: &TelemetryDump) -> Result<(), ServiceError> {
     let body_peer_id = PeerId::from_str(&body.user_id).map_err(|_| {
-        reject::custom(ServiceError::bad_request(
+        ServiceError::bad_request(
             CustomEventIngestError::InvalidEvent(body.user_id.clone(), claims.peer_id).into(),
-        ))
+        )
     })?;
     if body_peer_id != claims.peer_id {
-        return Err(reject::custom(ServiceError::bad_request(
+        return Err(ServiceError::bad_request(
             CustomEventIngestError::InvalidEvent(body.user_id.clone(), claims.peer_id).into(),
-        )));
+        ));
     }
 
     if body.events.is_empty() {
-        return Err(reject::custom(ServiceError::bad_request(
+        return Err(ServiceError::bad_request(
             CustomEventIngestError::EmptyPayload.into(),
-        )));
+        ));
     }
 
     Ok(())
@@ -67,12 +71,11 @@ fn validate_custom_event_body(
 pub(crate) async fn handle_custom_event(
     context: Context,
     claims: Claims,
-    mut body: TelemetryDump,
+    body: &mut TelemetryDump,
     forwarded_for: Option<String>,
-) -> anyhow::Result<impl Reply, Rejection> {
-    validate_custom_event_body(&claims, &body)?;
+) -> Result<StatusCode, ServiceError> {
+    validate_custom_event_body(&claims, body)?;
 
-    // Apply rate limiting for unknown/untrusted nodes (use logs rate limiter since events are similar)
     let is_unknown = matches!(
         claims.node_type,
         NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
@@ -82,9 +85,9 @@ pub(crate) async fn handle_custom_event(
             "rate limit exceeded for unknown node events: peer_id={}",
             claims.peer_id
         );
-        return Err(reject::custom(ServiceError::too_many_requests(
+        return Err(ServiceError::too_many_requests(
             CustomEventIngestError::RateLimitExceeded.into(),
-        )));
+        ));
     }
 
     let mut insert_request = TableDataInsertAllRequest::new();
@@ -103,7 +106,6 @@ pub(crate) async fn handle_custom_event(
 
     let event_identity = EventIdentity::from(claims);
 
-    // Process all events in the batch (not just the first one)
     for telemetry_event in &mut body.events {
         telemetry_event
             .params
@@ -170,7 +172,7 @@ pub(crate) async fn handle_custom_event(
 
     debug!("inserted {} events successfully", body.events.len());
 
-    Ok(reply::with_status(reply::reply(), StatusCode::CREATED))
+    Ok(StatusCode::CREATED)
 }
 
 #[cfg(test)]
@@ -204,7 +206,7 @@ mod test {
             timestamp_micros: String::new(),
             events: Vec::new(),
         };
-        assert_eq!(format!("{:?}", validate_custom_event_body(&claims, &body)), "Err(Rejection(ServiceError { http_code: 400, error_code: CustomEventIngestError(InvalidEvent(\"0x1\", 0000000000000000000000000000000000000000000000000000000000001234)) }))");
+        assert_eq!(format!("{:?}", validate_custom_event_body(&claims, &body)), "Err(ServiceError { http_code: 400, error_code: CustomEventIngestError(InvalidEvent(\"0x1\", 0000000000000000000000000000000000000000000000000000000000001234)) })");
 
         let body = TelemetryDump {
             client_id: String::new(),

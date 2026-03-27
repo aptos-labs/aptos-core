@@ -23,7 +23,6 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    convert::Infallible,
     env,
     fs::File,
     io::Read,
@@ -32,8 +31,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tokio::net::TcpListener;
 use types::common::ChainCommonName;
-use warp::{Filter, Reply};
 
 mod allowlist_cache;
 mod auth;
@@ -332,22 +331,23 @@ impl AptosTelemetryServiceArgs {
         Self::serve(&config, routes(context)).await;
     }
 
-    async fn serve<F>(config: &TelemetryServiceConfig, routes: F)
-    where
-        F: Filter<Error = Infallible> + Clone + Sync + Send + 'static,
-        F::Extract: Reply,
-    {
+    async fn serve(config: &TelemetryServiceConfig, app: axum::Router) {
         match &config.tls_cert_path {
-            None => warp::serve(routes).bind(config.address).await,
-            Some(cert_path) => {
-                warp::serve(routes)
-                    .tls()
-                    .cert_path(cert_path)
-                    .key_path(config.tls_key_path.as_ref().unwrap())
-                    .bind(config.address)
+            None => {
+                let listener = TcpListener::bind(config.address)
                     .await
+                    .unwrap_or_else(|e| panic!("Failed to bind telemetry service listener: {}", e));
+                axum::serve(listener, app)
+                    .await
+                    .unwrap_or_else(|e| panic!("Telemetry service server error: {}", e));
             },
-        };
+            Some(_cert_path) => {
+                panic!(
+                    "TLS for aptos-telemetry-service is not yet supported with axum \
+                     (set tls_cert_path only after TLS support is added; same contract as aptos-warp-webserver)"
+                );
+            },
+        }
     }
 }
 

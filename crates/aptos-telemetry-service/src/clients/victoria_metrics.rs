@@ -2,12 +2,12 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::{anyhow, Result};
+use bytes::Bytes;
 use debug_ignore::DebugIgnore;
 use reqwest::{header::CONTENT_ENCODING, Client as ReqwestClient};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use url::Url;
-use warp::hyper::body::Bytes;
 
 #[derive(Clone, Debug)]
 pub enum AuthToken {

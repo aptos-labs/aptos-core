@@ -4,6 +4,7 @@
 use aptos_crypto::noise::NoiseError;
 use aptos_rest_client::error::RestError;
 use aptos_types::{chain_id::ChainId, PeerId};
+use axum::{extract::rejection::JsonRejection, http::StatusCode};
 use debug_ignore::DebugIgnore;
 use gcp_bigquery_client::{
     error::BQError,
@@ -11,7 +12,19 @@ use gcp_bigquery_client::{
 };
 use std::fmt::{self, Debug};
 use thiserror::Error as ThisError;
-use warp::{http::StatusCode, reject::Reject};
+
+/// Maps axum [`JsonRejection`] to a [`ServiceError`] with the same JSON error envelope as other API errors.
+pub fn json_rejection_to_service_error(err: JsonRejection) -> ServiceError {
+    let msg = err.to_string();
+    let status = match &err {
+        JsonRejection::MissingJsonContentType(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        JsonRejection::JsonDataError(_) | JsonRejection::JsonSyntaxError(_) => {
+            StatusCode::BAD_REQUEST
+        },
+        _ => StatusCode::BAD_REQUEST,
+    };
+    ServiceError::new(status, ServiceErrorCode::RequestParseError(msg))
+}
 
 #[derive(Debug, ThisError)]
 pub(crate) enum AuthError {
@@ -130,6 +143,8 @@ pub(crate) enum ValidatorCacheUpdateError {
 #[derive(Debug, ThisError)]
 #[allow(clippy::enum_variant_names)] // Variants intentionally use "Error" suffix for clarity
 pub(crate) enum ServiceErrorCode {
+    #[error("request parse error: {0}")]
+    RequestParseError(String),
     #[error("authentication error: {0}")]
     AuthError(AuthError, ChainId),
     #[error("custom event ingest error: {0}")]
@@ -191,8 +206,6 @@ impl ServiceError {
         &self.error_code
     }
 }
-
-impl Reject for ServiceError {}
 
 impl fmt::Display for ServiceError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

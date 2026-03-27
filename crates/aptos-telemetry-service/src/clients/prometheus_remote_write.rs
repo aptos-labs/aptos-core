@@ -29,6 +29,7 @@
 
 pub use super::victoria_metrics::AuthToken;
 use anyhow::{anyhow, Result};
+use bytes::Bytes;
 use debug_ignore::DebugIgnore;
 use flate2::read::GzDecoder;
 use prost::Message;
@@ -38,7 +39,6 @@ use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use snap::raw::Encoder as SnappyEncoder;
 use std::io::Read;
 use url::Url;
-use warp::hyper::body::Bytes;
 
 // ============================================================================
 // Prometheus Remote Write Protobuf Messages
