@@ -100,7 +100,7 @@ impl CompilationMetadata {
 /// The versioning scheme is `major.minor`, where for `major = 1` we do not
 /// distinguish a minor version. A major version change represents
 /// a different/largely refactored compiler. This we have versions `1, 2.0, 2.1, 2.2, .., `.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum CompilerVersion {
     /// The legacy v1 Move compiler, no longer supported.
     V1,
@@ -204,7 +204,7 @@ impl CompilerVersion {
 /// Typically, a major version change is given with an addition of larger new language
 /// features. There are no breaking changes expected with major version changes,
 /// however, there maybe some isolated exceptions.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum LanguageVersion {
     /// The version of Move at around the genesis of the Aptos network end
     /// of '22. This is the original Diem Move plus the extension of inline

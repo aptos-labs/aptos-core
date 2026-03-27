@@ -906,9 +906,9 @@ pub enum StatusCode {
     VALUE_DESERIALIZATION_ERROR = 3023,
     CODE_DESERIALIZATION_ERROR = 3024,
     INVALID_FLAG_BITS = 3025,
-    // Returned when a function value is trying to capture an option. This is not allowed
-    // until the feature flag ENABLE_CAPTURE_OPTION is on.
-    UNABLE_TO_CAPTURE_OPTION_TYPE = 3026,
+    // Was used when a function value was trying to capture an option. Feature is now permanently
+    // enabled, so this status code is no longer used.
+    _UNABLE_TO_CAPTURE_OPTION_TYPE = 3026,
 
     // Reserved error code for future use
     RESERVED_DESERIALIZAION_ERROR_1 = 3027,

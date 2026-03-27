@@ -62,7 +62,9 @@ static REGEX_HTML_ELEMENTS_TO_SKIP: Lazy<Regex> = Lazy::new(|| {
 
 /// The output format of the docgen
 /// If the format is MDX, generated doc is mdx-compatible
-#[derive(ValueEnum, Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    ValueEnum, Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Serialize, Deserialize,
+)]
 pub enum OutputFormat {
     MD,
     MDX,

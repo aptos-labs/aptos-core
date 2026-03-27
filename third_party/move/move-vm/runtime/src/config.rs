@@ -47,7 +47,6 @@ pub struct VMConfig {
     /// reference safety is maintained during execution. Note that the checks might be delayed and
     /// instead execution trace can be recorded (so that checks are done based on the trace later).
     pub paranoid_ref_checks: bool,
-    pub enable_capture_option: bool,
     pub enable_enum_option: bool,
     /// If true, Move VM will try to fetch layout from remote cache.
     pub enable_layout_caches: bool,
@@ -99,7 +98,6 @@ impl Default for VMConfig {
             enable_depth_checks: true,
             optimize_trusted_code: false,
             paranoid_ref_checks: false,
-            enable_capture_option: true,
             enable_enum_option: true,
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,

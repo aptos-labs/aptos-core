@@ -92,7 +92,7 @@ impl StdLib {
 }
 
 /// Represents a standard library version.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, ValueEnum)]
+#[derive(Clone, Debug, Hash, Deserialize, Serialize, PartialEq, Eq, PartialOrd, ValueEnum)]
 #[clap(rename_all = "lower")]
 pub enum StdVersion {
     Mainnet,

@@ -372,7 +372,6 @@ impl LazyLoadedFunction {
                         gas_meter,
                         traversal_context,
                         ty,
-                        true,
                     )?
                 } else {
                     let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
@@ -380,7 +379,6 @@ impl LazyLoadedFunction {
                         gas_meter,
                         traversal_context,
                         &ty,
-                        true,
                     )?
                 };
 
