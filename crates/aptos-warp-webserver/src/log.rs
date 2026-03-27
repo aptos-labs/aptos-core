@@ -1,52 +1,74 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_logger::{
-    debug, error,
-    prelude::{sample, SampleRate},
-    Schema,
+use axum::{
+    body::Body,
+    extract::MatchedPath,
+    http::{header, Request},
+    middleware::{from_fn, Next},
+    response::Response,
+    Router,
 };
-use std::time::Duration;
-use warp::{
-    http::header,
-    log::{custom, Info, Log},
-};
+use std::time::Instant;
 
-pub fn logger() -> Log<impl Fn(Info) + Copy> {
-    let func = move |info: Info| {
-        let status = info.status().as_u16();
-        let log = HttpRequestLog {
-            remote_addr: info.remote_addr(),
-            method: info.method().to_string(),
-            path: info.path().to_string(),
-            status,
-            referer: info.referer(),
-            user_agent: info.user_agent(),
-            elapsed: info.elapsed(),
-            forwarded: info
-                .request_headers()
-                .get(header::FORWARDED)
-                .and_then(|v| v.to_str().ok()),
-        };
-        if status >= 500 {
-            sample!(SampleRate::Duration(Duration::from_secs(1)), error!(log));
-        } else {
-            debug!(log);
-        }
-    };
-    custom(func)
+pub fn logger<S>(router: Router<S>) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    router.layer(from_fn(log_middleware))
 }
 
-#[derive(Schema)]
-pub struct HttpRequestLog<'a> {
-    #[schema(display)]
-    remote_addr: Option<std::net::SocketAddr>,
-    method: String,
-    path: String,
-    status: u16,
-    referer: Option<&'a str>,
-    user_agent: Option<&'a str>,
-    #[schema(debug)]
-    elapsed: std::time::Duration,
-    forwarded: Option<&'a str>,
+async fn log_middleware(request: Request<Body>, next: Next) -> Response {
+    let start = Instant::now();
+    let method = request.method().to_string();
+    let path = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|matched| matched.as_str().to_owned())
+        .unwrap_or_else(|| request.uri().path().to_owned());
+    let forwarded = request
+        .headers()
+        .get(header::FORWARDED)
+        .and_then(|v| v.to_str().ok())
+        .map(ToOwned::to_owned);
+    let user_agent = request
+        .headers()
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(ToOwned::to_owned);
+    let referer = request
+        .headers()
+        .get(header::REFERER)
+        .and_then(|v| v.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    let response = next.run(request).await;
+    let status = response.status().as_u16();
+    let elapsed = start.elapsed();
+
+    if status >= 500 {
+        aptos_logger::error!(
+            method = method,
+            path = path,
+            status = status,
+            elapsed = ?elapsed,
+            forwarded = forwarded,
+            user_agent = user_agent,
+            referer = referer,
+            "http request failed"
+        );
+    } else {
+        aptos_logger::debug!(
+            method = method,
+            path = path,
+            status = status,
+            elapsed = ?elapsed,
+            forwarded = forwarded,
+            user_agent = user_agent,
+            referer = referer,
+            "http request handled"
+        );
+    }
+
+    response
 }

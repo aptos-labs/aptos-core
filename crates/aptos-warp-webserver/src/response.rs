@@ -2,13 +2,20 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::Result;
+use axum::{
+    body::Body,
+    http::{
+        header::{CONTENT_TYPE, HeaderValue},
+        Response as HttpResponse,
+    },
+    response::{IntoResponse, Response as AxumResponse},
+};
 use aptos_api_types::{
     mime_types::{BCS, JSON},
     LedgerInfo, X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_EPOCH,
     X_APTOS_LEDGER_OLDEST_VERSION, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
     X_APTOS_OLDEST_BLOCK_HEIGHT,
 };
-use hyper::{header::CONTENT_TYPE, http::HeaderValue};
 use serde::Serialize;
 
 pub struct Response {
@@ -35,9 +42,9 @@ impl Response {
     }
 }
 
-impl warp::Reply for Response {
-    fn into_response(self) -> warp::reply::Response {
-        let mut res = warp::reply::Response::new(self.body.into());
+impl IntoResponse for Response {
+    fn into_response(self) -> AxumResponse {
+        let mut res = HttpResponse::new(Body::from(self.body));
         let headers = res.headers_mut();
 
         if self.is_bcs_response {
@@ -65,6 +72,6 @@ impl warp::Reply for Response {
             self.ledger_info.oldest_block_height.0.into(),
         );
 
-        res
+        res.into_response()
     }
 }

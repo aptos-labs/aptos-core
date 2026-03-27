@@ -27,12 +27,13 @@
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, find_fa_currency, get_account,
-        handle_request, native_coin, parse_coin_currency, with_context,
+        into_rosetta_response, native_coin, parse_coin_currency, RosettaResponse,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
     RosettaContext,
 };
+use axum::{extract::State, Json};
 use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     signing_message, ValidCryptoMaterialStringExt,
@@ -52,86 +53,61 @@ use std::{
     convert::TryFrom,
     time::{SystemTime, UNIX_EPOCH},
 };
-use warp::Filter;
 
-pub fn combine_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("construction" / "combine")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(construction_combine))
+pub async fn combine_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<ConstructionCombineRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(construction_combine(request, server_context).await)
 }
 
-pub fn derive_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("construction" / "derive")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(construction_derive))
+pub async fn derive_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<ConstructionDeriveRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(construction_derive(request, server_context).await)
 }
 
-pub fn hash_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("construction" / "hash")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(construction_hash))
+pub async fn hash_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<ConstructionHashRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(construction_hash(request, server_context).await)
 }
 
-pub fn metadata_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("construction" / "metadata")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(construction_metadata))
+pub async fn metadata_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<ConstructionMetadataRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(construction_metadata(request, server_context).await)
 }
 
-pub fn parse_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("construction" / "parse")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(construction_parse))
+pub async fn parse_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<ConstructionParseRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(construction_parse(request, server_context).await)
 }
 
-pub fn payloads_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("construction" / "payloads")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(construction_payloads))
+pub async fn payloads_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<ConstructionPayloadsRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(construction_payloads(request, server_context).await)
 }
 
-pub fn preprocess_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("construction" / "preprocess")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(construction_preprocess))
+pub async fn preprocess_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<ConstructionPreprocessRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(construction_preprocess(request, server_context).await)
 }
 
-pub fn submit_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("construction" / "submit")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(construction_submit))
+pub async fn submit_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<ConstructionSubmitRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(construction_submit(request, server_context).await)
 }
 
 /// Construction combine command (OFFLINE)

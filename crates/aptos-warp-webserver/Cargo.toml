@@ -17,8 +17,9 @@ anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-config = { workspace = true }
 aptos-logger = { workspace = true }
+axum = { workspace = true }
 bcs = { workspace = true }
 hyper = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-warp = { workspace = true }
+tokio = { workspace = true }

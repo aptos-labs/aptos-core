@@ -5,9 +5,13 @@ use crate::{types, types::ErrorDetails};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError};
 use hex::FromHexError;
 use move_core_types::account_address::AccountAddressParseError;
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
-use warp::{http::StatusCode, reply::Reply};
 
 /// Result for Rosetta API errors
 pub type ApiResult<T> = Result<T, ApiError>;
@@ -367,11 +371,8 @@ impl From<std::num::ParseIntError> for ApiError {
     }
 }
 
-// Must implement to ensure rejections are provided when returning errors
-impl warp::reject::Reject for ApiError {}
-
-impl Reply for ApiError {
-    fn into_response(self) -> warp::reply::Response {
-        warp::reply::json(&self.into_error()).into_response()
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        Json(self.into_error()).into_response()
     }
 }

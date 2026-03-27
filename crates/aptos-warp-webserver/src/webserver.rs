@@ -2,8 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_config::config::ApiConfig;
-use std::{convert::Infallible, net::SocketAddr};
-use warp::{Filter, Reply};
+use axum::Router;
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebServer {
@@ -31,21 +32,19 @@ impl WebServer {
         }
     }
 
-    pub async fn serve<F>(&self, routes: F)
+    pub async fn serve<S>(&self, routes: Router<S>)
     where
-        F: Filter<Error = Infallible> + Clone + Sync + Send + 'static,
-        F::Extract: Reply,
+        S: Clone + Send + Sync + 'static,
     {
-        match &self.tls_cert_path {
-            None => warp::serve(routes).bind(self.address).await,
-            Some(cert_path) => {
-                warp::serve(routes)
-                    .tls()
-                    .cert_path(cert_path)
-                    .key_path(self.tls_key_path.as_ref().unwrap())
-                    .bind(self.address)
-                    .await
-            },
-        }
+        assert!(
+            self.tls_cert_path.is_none() && self.tls_key_path.is_none(),
+            "TLS for aptos-warp-webserver is not yet supported with axum",
+        );
+        let listener = TcpListener::bind(self.address)
+            .await
+            .expect("Failed to bind aptos webserver listener");
+        axum::serve(listener, routes)
+            .await
+            .expect("aptos webserver terminated unexpectedly");
     }
 }

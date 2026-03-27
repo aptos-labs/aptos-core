@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    common::{check_network, handle_request, with_context, with_empty_request},
+    common::{check_network, into_rosetta_response, with_empty_request},
     error::ApiError,
     types::{
         Allow, MetadataRequest, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
@@ -11,36 +11,37 @@ use crate::{
     RosettaContext, NODE_VERSION, ROSETTA_VERSION,
 };
 use aptos_logger::{debug, trace};
-use warp::Filter;
+use axum::{
+    extract::{Json, State},
+    response::Response,
+    routing::post,
+    Router,
+};
 
-pub fn list_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("network" / "list")
-        .and(warp::post())
-        .and(with_empty_request())
-        .and(with_context(server_context))
-        .and_then(handle_request(network_list))
+pub fn routes(server_context: RosettaContext) -> Router<RosettaContext> {
+    Router::new()
+        .route("/network/list", post(network_list_route))
+        .route("/network/options", post(network_options_route))
+        .route("/network/status", post(network_status_route))
+        .with_state(server_context)
 }
 
-pub fn options_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("network" / "options")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(network_options))
+async fn network_list_route(State(context): State<RosettaContext>) -> Response {
+    into_rosetta_response(network_list(with_empty_request(), context).await)
 }
 
-pub fn status_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("network" / "status")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(network_status))
+async fn network_options_route(
+    State(context): State<RosettaContext>,
+    Json(request): Json<NetworkRequest>,
+) -> Response {
+    into_rosetta_response(network_options(request, context).await)
+}
+
+async fn network_status_route(
+    State(context): State<RosettaContext>,
+    Json(request): Json<NetworkRequest>,
+) -> Response {
+    into_rosetta_response(network_status(request, context).await)
 }
 
 /// List [`NetworkIdentifier`]s supported by this proxy aka [`ChainId`]s

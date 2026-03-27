@@ -9,18 +9,22 @@ use crate::{
     },
     RosettaContext,
 };
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
-use aptos_rest_client::{Account, Response};
+use aptos_rest_client::{Account, Response as RestResponse};
 use aptos_sdk::move_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
 };
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashSet, convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
-use warp::Filter;
+use std::{collections::HashSet, fmt::LowerHex, str::FromStr};
 
 /// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations
 pub const Y2K_MS: u64 = 946713600000;
@@ -45,63 +49,38 @@ pub fn check_network(
     }
 }
 
-/// Attaches RosettaContext to warp paths
-pub fn with_context(
-    context: RosettaContext,
-) -> impl Filter<Extract = (RosettaContext,), Error = Infallible> + Clone {
-    warp::any().map(move || context.clone())
+/// A JSON success / error response used by Rosetta handlers.
+pub type RosettaResponse = Response;
+
+pub fn with_empty_request() -> MetadataRequest {
+    MetadataRequest {}
 }
 
-/// Fills in an empty request for any REST API path that doesn't take any input body
-pub fn with_empty_request() -> impl Filter<Extract = (MetadataRequest,), Error = Infallible> + Clone
-{
-    warp::any().map(move || MetadataRequest {})
-}
-
-/// Handles a generic request to warp
-pub fn handle_request<'a, F, R, Req, Resp>(
-    handler: F,
-) -> impl Fn(
-    Req,
-    RosettaContext,
-) -> BoxFuture<'static, Result<warp::reply::WithStatus<warp::reply::Json>, Infallible>>
-       + Clone
-       + use<F, R, Req, Resp>
-where
-    F: FnOnce(Req, RosettaContext) -> R + Clone + Copy + Send + 'static,
-    R: Future<Output = Result<Resp, ApiError>> + Send,
-    Req: Deserialize<'a> + Send + 'static,
-    Resp: std::fmt::Debug + Serialize,
-{
-    move |request, options| {
-        let fut = async move {
-            match handler(request, options).await {
-                Ok(response) => {
-                    debug!("Response: {:?}", serde_json::to_string_pretty(&response));
-                    Ok(warp::reply::with_status(
-                        warp::reply::json(&response),
-                        warp::http::StatusCode::OK,
-                    ))
-                },
-                Err(api_error) => {
-                    debug!("Error: {:?}", api_error);
-                    let status = api_error.status_code();
-                    Ok(warp::reply::with_status(
-                        warp::reply::json(&api_error.into_error()),
-                        status,
-                    ))
-                },
-            }
-        };
-        Box::pin(fut)
+pub fn into_rosetta_response<Resp: std::fmt::Debug + Serialize>(
+    result: Result<Resp, ApiError>,
+) -> RosettaResponse {
+    match result {
+        Ok(response) => {
+            debug!("Response: {:?}", serde_json::to_string_pretty(&response));
+            (StatusCode::OK, Json(response)).into_response()
+        },
+        Err(api_error) => {
+            debug!("Error: {:?}", api_error);
+            let status = api_error.status_code();
+            (status, Json(api_error.into_error())).into_response()
+        },
     }
+}
+
+pub fn extract_context(State(context): State<RosettaContext>) -> RosettaContext {
+    context
 }
 
 /// Retrieves an account's information by its address
 pub async fn get_account(
     rest_client: &aptos_rest_client::Client,
     address: AccountAddress,
-) -> ApiResult<Response<Account>> {
+) -> ApiResult<RestResponse<Account>> {
     rest_client
         .get_account(address)
         .await

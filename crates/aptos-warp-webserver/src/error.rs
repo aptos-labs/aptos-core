@@ -7,7 +7,7 @@ use std::{
     convert::From,
     fmt::{self, Display},
 };
-use warp::{http::StatusCode, reject::Reject};
+use axum::http::StatusCode;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Error {
@@ -79,8 +79,6 @@ impl fmt::Display for Error {
     }
 }
 
-impl Reject for Error {}
-
 impl From<anyhow::Error> for Error {
     fn from(e: anyhow::Error) -> Self {
         Self::internal(e)
@@ -96,7 +94,7 @@ impl From<serde_json::error::Error> for Error {
 #[cfg(test)]
 mod tests {
     use crate::error::Error;
-    use warp::http::StatusCode;
+    use axum::http::StatusCode;
 
     #[test]
     fn test_to_string() {

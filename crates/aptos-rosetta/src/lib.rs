@@ -7,20 +7,25 @@
 
 use crate::{
     block::BlockRetriever,
-    common::{handle_request, native_coin, usdc_currency, usdc_testnet_currency, with_context},
+    common::{into_rosetta_response, native_coin, usdc_currency, usdc_testnet_currency},
     error::{ApiError, ApiResult},
     types::Currency,
 };
+use axum::{
+    extract::Query,
+    http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+    response::IntoResponse,
+    response::Response,
+    routing::{get, post},
+    Json,
+    Router,
+};
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use aptos_warp_webserver::{logger, Error, WebServer};
-use std::{collections::HashSet, convert::Infallible, sync::Arc};
+use aptos_types::chain_id::ChainId;
+use aptos_warp_webserver::WebServer;
+use std::{collections::HashSet, sync::Arc};
 use tokio::task::JoinHandle;
-use warp::{
-    http::{HeaderValue, Method, StatusCode},
-    reply, Filter, Rejection, Reply,
-};
 
 mod account;
 mod block;
@@ -93,7 +98,7 @@ impl RosettaContext {
     }
 }
 
-/// Creates HTTP server (warp-based) for Rosetta
+/// Creates HTTP server (axum-based) for Rosetta
 pub fn bootstrap(
     chain_id: ChainId,
     api_config: ApiConfig,
@@ -161,44 +166,41 @@ pub async fn bootstrap_async(
 }
 
 /// Collection of all routes for the server
-pub fn routes(
-    context: RosettaContext,
-) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
-    account::routes(context.clone())
-        .or(block::block_route(context.clone()))
-        .or(construction::combine_route(context.clone()))
-        .or(construction::derive_route(context.clone()))
-        .or(construction::hash_route(context.clone()))
-        .or(construction::metadata_route(context.clone()))
-        .or(construction::parse_route(context.clone()))
-        .or(construction::payloads_route(context.clone()))
-        .or(construction::preprocess_route(context.clone()))
-        .or(construction::submit_route(context.clone()))
-        .or(network::list_route(context.clone()))
-        .or(network::options_route(context.clone()))
-        .or(network::status_route(context.clone()))
-        .or(health_check_route(context))
-        .with(
-            warp::cors()
-                .allow_any_origin()
-                .allow_methods(vec![Method::GET, Method::POST])
-                .allow_headers(vec![warp::http::header::CONTENT_TYPE]),
+pub fn routes(context: RosettaContext) -> Router {
+    Router::new()
+        .route("/account/balance", post(account::account_balance_route))
+        .route("/block", post(block::block_route))
+        .route("/construction/combine", post(construction::combine_route))
+        .route("/construction/derive", post(construction::derive_route))
+        .route("/construction/hash", post(construction::hash_route))
+        .route(
+            "/construction/metadata",
+            post(construction::metadata_route),
         )
-        .with(logger())
-        .recover(handle_rejection)
-}
-
-/// Handle error codes from warp
-async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
-    debug!("Failed with: {:?}", err);
-    let body = reply::json(&Error::new(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        format!("unexpected error: {:?}", err),
-    ));
-    let mut rep = reply::with_status(body, StatusCode::INTERNAL_SERVER_ERROR).into_response();
-    rep.headers_mut()
-        .insert("access-control-allow-origin", HeaderValue::from_static("*"));
-    Ok(rep)
+        .route("/construction/parse", post(construction::parse_route))
+        .route(
+            "/construction/payloads",
+            post(construction::payloads_route),
+        )
+        .route(
+            "/construction/preprocess",
+            post(construction::preprocess_route),
+        )
+        .route("/construction/submit", post(construction::submit_route))
+        .route("/network/list", post(network::list_route))
+        .route("/network/options", post(network::options_route))
+        .route("/network/status", post(network::status_route))
+        .route("/-/healthy", get(health_check_route))
+        .layer(axum::middleware::from_fn(
+            |req: axum::extract::Request, next: axum::middleware::Next| async move {
+                let mut response = next.run(req).await;
+                response
+                    .headers_mut()
+                    .insert(ACCESS_CONTROL_ALLOW_ORIGIN, "*".parse().unwrap());
+                response
+            },
+        ))
+        .with_state(context)
 }
 
 /// These parameters are directly passed onto the underlying rest server for a healthcheck
@@ -210,14 +212,14 @@ struct HealthCheckParams {
 /// Default amount of time the fullnode is accepted to be behind (arbitrarily it's 5 minutes)
 const HEALTH_CHECK_DEFAULT_SECS: u64 = 300;
 
-pub fn health_check_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("-" / "healthy")
-        .and(warp::path::end())
-        .and(warp::query().map(move |params: HealthCheckParams| params))
-        .and(with_context(server_context))
-        .and_then(handle_request(health_check))
+pub async fn health_check_route(
+    Query(params): Query<HealthCheckParams>,
+    axum::extract::State(context): axum::extract::State<RosettaContext>,
+) -> Response {
+    match health_check(params, context).await {
+        Ok(body) => Json(body).into_response(),
+        Err(err) => into_rosetta_response::<&'static str>(Err(err)),
+    }
 }
 
 /// Calls the underlying REST health check

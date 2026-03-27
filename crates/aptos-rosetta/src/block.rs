@@ -3,26 +3,23 @@
 
 use crate::{
     common::{
-        check_network, get_block_index_from_request, get_timestamp, handle_request, with_context,
-        BlockHash, Y2K_MS,
+        check_network, get_block_index_from_request, get_timestamp, into_rosetta_response,
+        BlockHash, RosettaResponse, Y2K_MS,
     },
     error::ApiResult,
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
+use axum::{extract::State, Json};
 use aptos_logger::{debug, trace};
 use aptos_types::chain_id::ChainId;
 use std::sync::Arc;
-use warp::Filter;
 
-pub fn block_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("block")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_context(server_context))
-        .and_then(handle_request(block))
+pub async fn block_route(
+    State(server_context): State<RosettaContext>,
+    Json(request): Json<BlockRequest>,
+) -> RosettaResponse {
+    into_rosetta_response(block(request, server_context).await)
 }
 
 /// Retrieves a block (in this case a single transaction) given it's identifier.
