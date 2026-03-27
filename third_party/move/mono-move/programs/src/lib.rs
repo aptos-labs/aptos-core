@@ -28,11 +28,11 @@ pub mod testing;
 /// The returned `NonNull<Function>` pointers point into the `functions` slice.
 /// Callers must not reallocate or move the slice after calling this function.
 #[cfg(feature = "micro-op")]
-pub fn resolve_calls(functions: &mut [mono_move_runtime::Function]) {
-    use mono_move_runtime::MicroOp;
+pub fn resolve_calls(functions: &mut [mono_move_core::Function]) {
+    use mono_move_core::MicroOp;
     use std::ptr::NonNull;
 
-    let ptrs: Vec<NonNull<mono_move_runtime::Function>> =
+    let ptrs: Vec<NonNull<mono_move_core::Function>> =
         functions.iter_mut().map(NonNull::from).collect();
     for func in functions.iter_mut() {
         for op in &mut func.code {

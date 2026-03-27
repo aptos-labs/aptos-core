@@ -3,10 +3,9 @@
 
 //! Tests for the static verifier (`verify_program`).
 
-use mono_move_runtime::{
-    verify_program, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr,
-    MicroOp, ObjectDescriptor,
-};
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp};
+use mono_move_runtime::{verify_program, ObjectDescriptor};
 
 fn trivial_descriptors() -> Vec<ObjectDescriptor> {
     vec![ObjectDescriptor::Trivial]

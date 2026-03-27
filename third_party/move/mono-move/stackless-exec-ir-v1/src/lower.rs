@@ -8,7 +8,7 @@ use crate::{
     lowering_context::{LoweringContext, SlotInfo},
 };
 use anyhow::{bail, Result};
-use mono_move_micro_ops::{CodeOffset, FrameOffset, MicroOp};
+use mono_move_core::{CodeOffset, FrameOffset, MicroOp};
 use move_vm_types::loaded_data::runtime_types::Type;
 
 pub fn lower_function(func_ir: &FunctionIR, ctx: &LoweringContext) -> Result<Vec<MicroOp>> {

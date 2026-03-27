@@ -3,7 +3,7 @@
 
 //! Core types and constants for the interpreter runtime.
 
-pub use mono_move_micro_ops::{DescriptorId, Function};
+pub(crate) use mono_move_core::OBJECT_HEADER_SIZE;
 
 // ---------------------------------------------------------------------------
 // Object descriptors (for GC tracing)
@@ -67,11 +67,6 @@ pub enum StepResult {
 pub(crate) const DEFAULT_STACK_SIZE: usize = 1024 * 1024; // 1 MiB
 
 pub(crate) const DEFAULT_HEAP_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
-
-// Re-export layout constants from the micro-ops crate (canonical definitions).
-pub use mono_move_micro_ops::{
-    ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
-};
 
 /// Byte offset of the `descriptor_id` (u32) within any heap object header.
 pub(crate) const HEADER_DESCRIPTOR_OFFSET: usize = 0;

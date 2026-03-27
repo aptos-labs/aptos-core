@@ -1,10 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use mono_move_runtime::{
-    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr,
-    InterpreterContext, MicroOp, ObjectDescriptor,
-};
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp};
+use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 
 /// Data segment (48 bytes):
 ///   [fp + 0 ] : result (output) / scratch

@@ -11,13 +11,15 @@ use crate::{
     interpreter::InterpreterContext,
     memory::{read_ptr, read_u32, read_u64, write_ptr, write_u32, write_u64, MemoryRegion},
     types::{
-        DescriptorId, Function, ObjectDescriptor, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-        FORWARDED_MARKER, FRAME_METADATA_SIZE, HEADER_DESCRIPTOR_OFFSET, HEADER_SIZE_OFFSET,
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
-        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        ObjectDescriptor, FORWARDED_MARKER, HEADER_DESCRIPTOR_OFFSET, HEADER_SIZE_OFFSET,
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use anyhow::{bail, Result};
+use mono_move_core::{
+    DescriptorId, Function, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
+    OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
+};
 use std::ptr::NonNull;
 
 const MAX_SINGLE_ALLOCATION_SIZE: usize = 10 * 1024 * 1024; // 10 MiB

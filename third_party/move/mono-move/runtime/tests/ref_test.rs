@@ -4,10 +4,12 @@
 //! Tests for fat-pointer references (VecBorrow, SlotBorrow, ReadRef, WriteRef,
 //! HeapBorrow).
 
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{
+    DescriptorId, FrameOffset as FO, Function, MicroOp, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
+};
 use mono_move_runtime::{
-    read_ptr, read_u64, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr,
-    InterpreterContext, MicroOp, ObjectDescriptor, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
-    VEC_DATA_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET,
 };
 
 // ---------------------------------------------------------------------------

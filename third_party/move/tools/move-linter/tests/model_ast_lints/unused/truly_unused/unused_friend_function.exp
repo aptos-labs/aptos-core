@@ -1,0 +1,41 @@
+
+Diagnostics:
+warning: [lint] friend function `unused_friend_func` is unused
+  ┌─ tests/model_ast_lints/unused/truly_unused/unused_friend_function.move:6:16
+  │
+6 │     friend fun unused_friend_func(): u64 { 1 }
+  │                ^^^^^^^^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).
+
+warning: [lint] friend function `same_module_only_friend` is only called from the same module: friend visibility is not needed
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_friend_function.move:12:16
+   │
+12 │     friend fun same_module_only_friend(): u64 { 3 }
+   │                ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Consider removing the visibility modifier, or suppress with `#[lint::skip(needless_visibility)]`.
+
+warning: [lint] friend function `unreachable_friend` has needless visibility: module declares no friends
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_friend_function.move:30:16
+   │
+30 │     friend fun unreachable_friend(): u64 { 1 }
+   │                ^^^^^^^^^^^^^^^^^^
+   │
+   = This module declares no friends, so friend visibility is not needed. Remove this visibility, or add friend declarations. Suppress with `#[lint::skip(needless_visibility)]` if appropriate.
+
+warning: [lint] friend function `unreachable_friend` is unused
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_friend_function.move:30:16
+   │
+30 │     friend fun unreachable_friend(): u64 { 1 }
+   │                ^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).
+
+warning: [lint] friend function `internally_used` has needless visibility: module declares no friends
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_friend_function.move:33:16
+   │
+33 │     friend fun internally_used(): u64 { 2 }
+   │                ^^^^^^^^^^^^^^^
+   │
+   = This module declares no friends, so friend visibility is not needed. Remove this visibility, or add friend declarations. Suppress with `#[lint::skip(needless_visibility)]` if appropriate.

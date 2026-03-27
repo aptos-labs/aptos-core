@@ -18,6 +18,7 @@ mod needless_deref_ref;
 mod needless_ref_deref;
 mod needless_ref_in_field_access;
 mod needless_return;
+mod needless_visibility;
 mod nonminimal_bool;
 mod self_assignment;
 mod simpler_bool_expression;
@@ -112,8 +113,10 @@ pub fn get_default_struct_linter_pipeline(
 pub fn get_default_function_linter_pipeline(
     config: &BTreeMap<String, String>,
 ) -> Vec<Box<dyn FunctionChecker>> {
-    let mut checks: Vec<Box<dyn FunctionChecker>> =
-        vec![Box::<unused_function::UnusedFunction>::default()];
+    let mut checks: Vec<Box<dyn FunctionChecker>> = vec![
+        Box::<unused_function::UnusedFunction>::default(),
+        Box::<needless_visibility::NeedlessVisibility>::default(),
+    ];
     let checks_category = config.get("checks").map_or("default", |s| s.as_str());
     if checks_category == "strict" || checks_category == "experimental" {
         checks.push(Box::<deprecated_usage::DeprecatedUsageInSignatures>::default());

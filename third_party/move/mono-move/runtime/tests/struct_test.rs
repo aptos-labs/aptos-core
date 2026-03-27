@@ -3,10 +3,10 @@
 
 //! Tests for Move struct support (both inline and heap-allocated).
 
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{DescriptorId, FrameOffset as FO, Function, MicroOp, STRUCT_DATA_OFFSET};
 use mono_move_runtime::{
-    read_ptr, read_u64, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr,
-    InterpreterContext, MicroOp, ObjectDescriptor, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET,
-    VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
