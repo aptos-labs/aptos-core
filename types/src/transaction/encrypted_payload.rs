@@ -221,7 +221,8 @@ impl EncryptedPayload {
             extra_config,
             payload_hash,
             claimed_entry_fun,
-        } = self {
+        } = self
+        {
             *self = Self::FailedDecryption {
                 ciphertext: ciphertext.clone(),
                 extra_config: extra_config.clone(),
@@ -238,7 +239,8 @@ impl EncryptedPayload {
             claimed_entry_fun,
             eval_proof: eval_proof_in_self,
             ..
-        } = self {
+        } = self
+        {
             if eval_proof.is_some() {
                 bail!("Eval proof given but we already have it");
             }
