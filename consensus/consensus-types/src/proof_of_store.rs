@@ -653,7 +653,7 @@ where
             }
         }
         let result = validator
-            .verify_multi_signatures(&self.info, &self.multi_signature)
+            .verify_multi_signatures_with_threshold(&self.info, &self.multi_signature, false)
             .context(format!(
                 "Failed to verify ProofOfStore for batch: {:?}",
                 self.info

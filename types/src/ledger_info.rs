@@ -498,7 +498,15 @@ impl<T: Clone + Send + Sync + Serialize + CryptoHash> SignatureAggregator<T> {
         &mut self,
         verifier: &ValidatorVerifier,
     ) -> Result<AggregateSignature, VerifyError> {
-        self.check_voting_power(verifier, true)?;
+        self.try_aggregate_with_threshold(verifier, true)
+    }
+
+    fn try_aggregate_with_threshold(
+        &mut self,
+        verifier: &ValidatorVerifier,
+        check_super_majority: bool,
+    ) -> Result<AggregateSignature, VerifyError> {
+        self.check_voting_power(verifier, check_super_majority)?;
 
         let all_signatures = self
             .signatures
@@ -518,9 +526,17 @@ impl<T: Clone + Send + Sync + Serialize + CryptoHash> SignatureAggregator<T> {
         &mut self,
         verifier: &ValidatorVerifier,
     ) -> Result<(T, AggregateSignature), VerifyError> {
-        let aggregated_sig = self.try_aggregate(verifier)?;
+        self.aggregate_and_verify_with_threshold(verifier, true)
+    }
 
-        match verifier.verify_multi_signatures(&self.data, &aggregated_sig) {
+    pub fn aggregate_and_verify_with_threshold(
+        &mut self,
+        verifier: &ValidatorVerifier,
+        check_super_majority: bool,
+    ) -> Result<(T, AggregateSignature), VerifyError> {
+        let aggregated_sig = self.try_aggregate_with_threshold(verifier, check_super_majority)?;
+
+        match verifier.verify_multi_signatures_with_threshold(&self.data, &aggregated_sig, check_super_majority) {
             Ok(_) => {
                 // We are not marking all the signatures as "verified" here, as two malicious
                 // voters can collude and create a valid aggregated signature.
@@ -529,7 +545,7 @@ impl<T: Clone + Send + Sync + Serialize + CryptoHash> SignatureAggregator<T> {
             Err(_) => {
                 self.filter_invalid_signatures(verifier);
 
-                let aggregated_sig = self.try_aggregate(verifier)?;
+                let aggregated_sig = self.try_aggregate_with_threshold(verifier, check_super_majority)?;
                 Ok((self.data.clone(), aggregated_sig))
             },
         }

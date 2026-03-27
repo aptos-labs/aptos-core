@@ -80,13 +80,14 @@ impl BatchSignatureAggregator {
     pub fn aggregate_and_verify(
         &mut self,
         verifier: &ValidatorVerifier,
+        check_super_majority: bool,
     ) -> Result<(BatchInfoExt, AggregateSignature), VerifyError> {
         match self {
             Self::BatchInfo(aggregator) => {
-                let (batch_info, aggregate_sig) = aggregator.aggregate_and_verify(verifier)?;
+                let (batch_info, aggregate_sig) = aggregator.aggregate_and_verify_with_threshold(verifier, check_super_majority)?;
                 Ok((batch_info.into(), aggregate_sig))
             },
-            Self::BatchInfoExt(aggregator) => aggregator.aggregate_and_verify(verifier),
+            Self::BatchInfoExt(aggregator) => aggregator.aggregate_and_verify_with_threshold(verifier, check_super_majority),
         }
     }
 
@@ -213,7 +214,7 @@ impl IncrementalProofState {
         }
         match self
             .signature_aggregator
-            .aggregate_and_verify(validator_verifier)
+            .aggregate_and_verify(validator_verifier, false)
         {
             Ok((batch_info, aggregated_sig)) => {
                 self.completed = true;
@@ -327,7 +328,7 @@ impl ProofCoordinator {
             .get_mut(signed_batch_info.batch_info())
         {
             value.add_signature(&signed_batch_info, validator_verifier)?;
-            if !value.completed && value.check_voting_power(validator_verifier, true) {
+            if !value.completed && value.check_voting_power(validator_verifier, false) {
                 let proof = {
                     let _timer = counters::SIGNED_BATCH_INFO_VERIFY_DURATION.start_timer();
                     value.aggregate_and_verify(validator_verifier)?

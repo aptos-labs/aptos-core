@@ -347,6 +347,15 @@ impl ValidatorVerifier {
         message: &T,
         multi_signature: &AggregateSignature,
     ) -> std::result::Result<(), VerifyError> {
+        self.verify_multi_signatures_with_threshold(message, multi_signature, true)
+    }
+
+    pub fn verify_multi_signatures_with_threshold<T: CryptoHash + Serialize>(
+        &self,
+        message: &T,
+        multi_signature: &AggregateSignature,
+        check_super_majority: bool,
+    ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
         Self::check_num_of_voters(self.len() as u16, multi_signature.get_signers_bitvec())?;
         let mut pub_keys = vec![];
@@ -360,7 +369,7 @@ impl ValidatorVerifier {
             pub_keys.push(validator.public_key());
         }
         // Verify the quorum voting power of the authors
-        self.check_voting_power(authors.iter(), true)?;
+        self.check_voting_power(authors.iter(), check_super_majority)?;
         #[cfg(any(test, feature = "fuzzing"))]
         {
             if self.quorum_voting_power == 0 {
