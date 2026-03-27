@@ -2,10 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::on_chain_config::OnChainConfig;
-use move_binary_format::{
-    file_format_common,
-    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
-};
+use move_binary_format::{file_format_common, file_format_common::IDENTIFIER_SIZE_MAX};
 use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
@@ -55,7 +52,9 @@ pub enum FeatureFlag {
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
     AGGREGATOR_V2_DELAYED_FIELDS = 36,
     CONCURRENT_TOKEN_V2 = 37,
-    LIMIT_MAX_IDENTIFIER_LENGTH = 38,
+    /// Enabled on mainnet, cannot be disabled. Identifier length limits are now enforced
+    /// via DeserializerConfig in both binary format deserialization and payload validation.
+    _LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
     RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET = 41,
@@ -217,7 +216,7 @@ impl FeatureFlag {
             Self::FEE_PAYER_ACCOUNT_OPTIONAL,
             Self::AGGREGATOR_V2_DELAYED_FIELDS,
             Self::CONCURRENT_TOKEN_V2,
-            Self::LIMIT_MAX_IDENTIFIER_LENGTH,
+            Self::_LIMIT_MAX_IDENTIFIER_LENGTH,
             Self::OPERATOR_BENEFICIARY_CHANGE,
             Self::BN254_STRUCTURES,
             Self::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
@@ -498,11 +497,9 @@ impl Features {
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
-        if self.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
-            IDENTIFIER_SIZE_MAX
-        } else {
-            LEGACY_IDENTIFIER_SIZE_MAX
-        }
+        // The LIMIT_MAX_IDENTIFIER_LENGTH feature flag has been enabled on mainnet
+        // and cannot be disabled. Always return the tightened limit.
+        IDENTIFIER_SIZE_MAX
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {

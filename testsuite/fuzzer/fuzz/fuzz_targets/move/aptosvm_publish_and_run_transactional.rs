@@ -103,7 +103,11 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         &Features::default(),
         &timed_features,
     );
-    let deserializer_config = DeserializerConfig::new(BYTECODE_VERSION, 255);
+    let deserializer_config = DeserializerConfig {
+        max_binary_format_version: BYTECODE_VERSION,
+        max_identifier_size: 255,
+        ..DeserializerConfig::default()
+    };
 
     let mut dep_modules: Vec<CompiledModule> = vec![];
     // Collect dependency modules and later we will verify runs individually

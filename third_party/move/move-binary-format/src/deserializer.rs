@@ -20,7 +20,11 @@ use std::{collections::HashSet, convert::TryInto, io::Read};
 impl CompiledScript {
     /// Deserializes a &[u8] slice into a `CompiledScript` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig {
+            max_binary_format_version: VERSION_MAX,
+            max_identifier_size: IDENTIFIER_SIZE_MAX,
+            ..DeserializerConfig::default()
+        };
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -37,7 +41,11 @@ impl CompiledScript {
     // exposed as a public function to enable testing the deserializer
     #[doc(hidden)]
     pub fn deserialize_no_check_bounds(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig {
+            max_binary_format_version: VERSION_MAX,
+            max_identifier_size: LEGACY_IDENTIFIER_SIZE_MAX,
+            ..DeserializerConfig::default()
+        };
         deserialize_compiled_script(binary, &config)
     }
 }
@@ -45,7 +53,11 @@ impl CompiledScript {
 impl CompiledModule {
     /// Deserialize a &[u8] slice into a `CompiledModule` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig {
+            max_binary_format_version: VERSION_MAX,
+            max_identifier_size: IDENTIFIER_SIZE_MAX,
+            ..DeserializerConfig::default()
+        };
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -74,7 +86,11 @@ impl CompiledModule {
     // exposed as a public function to enable testing the deserializer
     #[doc(hidden)]
     pub fn deserialize_no_check_bounds(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig {
+            max_binary_format_version: VERSION_MAX,
+            max_identifier_size: LEGACY_IDENTIFIER_SIZE_MAX,
+            ..DeserializerConfig::default()
+        };
         deserialize_compiled_module(binary, &config)
     }
 }
@@ -82,23 +98,27 @@ impl CompiledModule {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct DeserializerConfig {
     pub max_binary_format_version: u32,
+    /// Maximum allowed identifier size in binaries or in entry function or
+    /// script payloads.
     pub max_identifier_size: u64,
-}
-
-impl DeserializerConfig {
-    pub fn new(max_binary_format_version: u32, max_identifier_size: u64) -> Self {
-        Self {
-            max_binary_format_version,
-            max_identifier_size,
-        }
-    }
+    /// Maximum number of type arguments allowed in an entry function or
+    /// a script.
+    pub max_entry_type_args_count: u64,
+    /// Maximum number of nodes allowed per individual type tag in entry
+    /// function ot script type arguments.
+    pub max_entry_type_tag_nodes: u64,
 }
 
 impl Default for DeserializerConfig {
     fn default() -> Self {
         // Note that here version max is used as a default version, as this how
         // it was previously defined in VM config.
-        Self::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
+        Self {
+            max_binary_format_version: VERSION_MAX,
+            max_identifier_size: IDENTIFIER_SIZE_MAX,
+            max_entry_type_args_count: 32,
+            max_entry_type_tag_nodes: 16,
+        }
     }
 }
 

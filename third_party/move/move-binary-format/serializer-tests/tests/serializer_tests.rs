@@ -28,7 +28,11 @@ proptest! {
 
         let deserialized_module = CompiledModule::deserialize_with_config(
                 &serialized,
-                &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
+                &DeserializerConfig {
+                max_binary_format_version: VERSION_MAX,
+                max_identifier_size: IDENTIFIER_SIZE_MAX,
+                ..DeserializerConfig::default()
+            }
         ).expect("deserialization should work");
 
         prop_assert_eq!(module, deserialized_module);
@@ -89,11 +93,13 @@ fn simple_generic_module_round_trip() {
     m.serialize_for_version(Some(VERSION_MAX), &mut serialized)
         .expect("serialization should work");
 
-    let deserialized_m = CompiledModule::deserialize_with_config(
-        &serialized,
-        &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
-    )
-    .expect("deserialization should work");
+    let deserialized_m =
+        CompiledModule::deserialize_with_config(&serialized, &DeserializerConfig {
+            max_binary_format_version: VERSION_MAX,
+            max_identifier_size: IDENTIFIER_SIZE_MAX,
+            ..DeserializerConfig::default()
+        })
+        .expect("deserialization should work");
 
     assert_eq!(m, deserialized_m);
 }
@@ -105,11 +111,13 @@ fn simple_script_round_trip() {
     s.serialize_for_version(Some(VERSION_MAX), &mut serialized)
         .expect("serialization should work");
 
-    let deserialized_s = CompiledScript::deserialize_with_config(
-        &serialized,
-        &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
-    )
-    .expect("deserialization should work");
+    let deserialized_s =
+        CompiledScript::deserialize_with_config(&serialized, &DeserializerConfig {
+            max_binary_format_version: VERSION_MAX,
+            max_identifier_size: IDENTIFIER_SIZE_MAX,
+            ..DeserializerConfig::default()
+        })
+        .expect("deserialization should work");
 
     assert_eq!(s, deserialized_s);
 }
@@ -189,10 +197,11 @@ fn test_borrow_field_attributes_round_trip() {
         .expect("serialization should work");
 
     // Deserialize and verify
-    let deserialized = CompiledModule::deserialize_with_config(
-        &serialized,
-        &DeserializerConfig::new(VERSION_10, IDENTIFIER_SIZE_MAX),
-    )
+    let deserialized = CompiledModule::deserialize_with_config(&serialized, &DeserializerConfig {
+        max_binary_format_version: VERSION_10,
+        max_identifier_size: IDENTIFIER_SIZE_MAX,
+        ..DeserializerConfig::default()
+    })
     .expect("deserialization should work");
 
     // Verify attributes preserved

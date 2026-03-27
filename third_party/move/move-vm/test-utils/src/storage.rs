@@ -116,7 +116,11 @@ impl CompiledModuleView for InMemoryStorage {
     fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
         Ok(match self.fetch_module_bytes(id.address(), id.name())? {
             Some(bytes) => {
-                let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+                let config = DeserializerConfig {
+                    max_binary_format_version: VERSION_MAX,
+                    max_identifier_size: IDENTIFIER_SIZE_MAX,
+                    ..DeserializerConfig::default()
+                };
                 Some(CompiledModule::deserialize_with_config(&bytes, &config)?)
             },
             None => None,

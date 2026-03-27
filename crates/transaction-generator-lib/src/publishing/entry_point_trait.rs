@@ -30,7 +30,11 @@ pub trait PreBuiltPackages: std::fmt::Debug + Sync + Send {
 
     fn package_modules(&self, package_name: &str) -> Vec<(String, CompiledModule, u32)> {
         let mut results = vec![];
-        let default_config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        let default_config = DeserializerConfig {
+            max_binary_format_version: VERSION_DEFAULT,
+            max_identifier_size: IDENTIFIER_SIZE_MAX,
+            ..DeserializerConfig::default()
+        };
 
         let modules = &self.package_bundle().get_package(package_name).modules;
         for (module_name, bytes) in modules {

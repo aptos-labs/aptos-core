@@ -5,7 +5,7 @@ pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
     gas_feature_versions::{
         RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
-        RELEASE_V1_45,
+        RELEASE_V1_45, RELEASE_V1_46,
     },
     AptosGasParameters,
 };
@@ -143,11 +143,26 @@ pub fn aptos_default_ty_builder(check_depth_on_type_counts_v2: bool) -> TypeBuil
 }
 
 /// Returns [DeserializerConfig] used by the Aptos blockchain in production.
-pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig {
-    DeserializerConfig::new(
-        features.get_max_binary_format_version(),
-        features.get_max_identifier_size(),
-    )
+pub fn aptos_prod_deserializer_config(
+    gas_feature_version: u64,
+    features: &Features,
+) -> DeserializerConfig {
+    if gas_feature_version >= RELEASE_V1_46 {
+        DeserializerConfig {
+            max_binary_format_version: features.get_max_binary_format_version(),
+            max_identifier_size: 128,
+            max_entry_type_args_count: 32,
+            max_entry_type_tag_nodes: 16,
+        }
+    } else {
+        DeserializerConfig {
+            max_binary_format_version: features.get_max_binary_format_version(),
+            max_identifier_size: features.get_max_identifier_size(),
+            // Irrelevant before 1.46.
+            max_entry_type_args_count: u64::MAX,
+            max_entry_type_tag_nodes: u64::MAX,
+        }
+    }
 }
 
 /// Returns [VerifierConfig] used by the Aptos blockchain in production.
@@ -239,7 +254,7 @@ pub fn aptos_prod_vm_config(
     let enable_layout_caches = get_layout_caches();
     let enable_debugging = get_debugging_enabled();
 
-    let deserializer_config = aptos_prod_deserializer_config(features);
+    let deserializer_config = aptos_prod_deserializer_config(gas_feature_version, features);
     let verifier_config = aptos_prod_verifier_config(gas_feature_version, features, timed_features);
     let enable_enum_option = features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION);
     let enable_framework_for_option = features.is_enabled(FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION);

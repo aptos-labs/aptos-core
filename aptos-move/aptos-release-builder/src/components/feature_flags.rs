@@ -303,7 +303,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS
             },
             FeatureFlag::ConcurrentTokenV2 => AptosFeatureFlag::CONCURRENT_TOKEN_V2,
-            FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+            FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::_LIMIT_MAX_IDENTIFIER_LENGTH,
             FeatureFlag::OperatorBeneficiaryChange => AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
             FeatureFlag::ResourceGroupsSplitInVmChangeSet => {
                 AptosFeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET
@@ -492,7 +492,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::AggregatorV2DelayedFields
             },
             AptosFeatureFlag::CONCURRENT_TOKEN_V2 => FeatureFlag::ConcurrentTokenV2,
-            AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
+            AptosFeatureFlag::_LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
             AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
             AptosFeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET => {
                 FeatureFlag::ResourceGroupsSplitInVmChangeSet

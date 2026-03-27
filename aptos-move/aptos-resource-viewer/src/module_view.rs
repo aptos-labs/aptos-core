@@ -41,7 +41,10 @@ pub struct ModuleView<'a, S> {
 impl<'a, S: StateView> ModuleView<'a, S> {
     pub fn new(state_view: &'a S) -> Self {
         let features = Features::fetch_config(state_view).unwrap_or_default();
-        let deserializer_config = aptos_prod_deserializer_config(&features);
+        // gas_feature_version=0 takes the pre-v1.46 path, which keeps
+        // max_identifier_size=255 and leaves payload limits at u64::MAX.
+        // This is correct: the resource viewer only deserializes modules.
+        let deserializer_config = aptos_prod_deserializer_config(0, &features);
 
         Self {
             module_cache: RefCell::new(HashMap::new()),

@@ -92,7 +92,11 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         &Features::default(),
         &timed_features,
     );
-    let deserializer_config = DeserializerConfig::new(BYTECODE_VERSION, 255);
+    let deserializer_config = DeserializerConfig {
+        max_binary_format_version: BYTECODE_VERSION,
+        max_identifier_size: 255,
+        ..DeserializerConfig::default()
+    };
 
     for m in input.dep_modules.iter_mut() {
         verify_module_fast(m, &verifier_config, &deserializer_config)?;

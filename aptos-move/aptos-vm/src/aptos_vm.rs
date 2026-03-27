@@ -25,6 +25,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
+    transaction_payload_validation::validate_transaction_payload,
     transaction_validation,
     verifier::{
         event_validation, native_validation, resource_groups, transaction_arg_validation,
@@ -42,7 +43,7 @@ use aptos_framework_natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
+    gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38, RELEASE_V1_46},
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
@@ -2001,6 +2002,10 @@ impl AptosVM {
             ));
         }
 
+        if self.gas_feature_version() >= RELEASE_V1_46 {
+            validate_transaction_payload(transaction.payload(), self.deserializer_config())?;
+        }
+
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
         // end up skipping validation.
@@ -3443,6 +3448,14 @@ impl VMValidator for AptosVM {
             && !self.features().is_encrypted_transactions_enabled()
         {
             return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+        }
+
+        if self.gas_feature_version() >= RELEASE_V1_46 {
+            if let Err(status) =
+                validate_transaction_payload(transaction.payload(), self.deserializer_config())
+            {
+                return VMValidatorResult::error(status.status_code());
+            }
         }
 
         let txn = match transaction.check_signature() {
