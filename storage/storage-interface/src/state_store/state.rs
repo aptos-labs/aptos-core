@@ -215,13 +215,14 @@ impl State {
                     let mut all_updates = per_version.iter();
                     let mut insertions = HashMap::new();
                     let mut evictions = HashMap::new();
+                    let mut superseded_versions = HashMap::new();
                     for ckpt_version in all_checkpoint_versions {
                         for (key, update) in
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
                         {
                             let key_hash = *key.crypto_hash_ref();
                             evictions.remove(&key_hash);
-                            if let Some(insertion) = Self::apply_one_update(
+                            if let Some((insertion, old_v)) = Self::apply_one_update(
                                 &mut lru,
                                 overlay,
                                 cache,
@@ -230,6 +231,13 @@ impl State {
                                 self.hot_state_config.refresh_interval_versions,
                             ) {
                                 insertions.insert(key_hash, insertion);
+                                // Record the old hot_since_version. Use Version::MAX as
+                                // sentinel for first writes (cold→hot) so that subsequent
+                                // updates to the same key in this block don't overwrite it
+                                // with an intermediate version that's never persisted.
+                                superseded_versions
+                                    .entry(key_hash)
+                                    .or_insert(old_v.unwrap_or(Version::MAX));
                             }
                         }
                         // Only evict at the checkpoints.
@@ -237,12 +245,15 @@ impl State {
                             insertions.remove(&key_hash);
                             assert!(slot.is_hot());
                             evictions.insert(key_hash, *ckpt_version);
+                            superseded_versions
+                                .entry(key_hash)
+                                .or_insert(slot.expect_hot_since_version());
                         }
                     }
                     for (key, update) in all_updates {
                         let key_hash = *key.crypto_hash_ref();
                         evictions.remove(&key_hash);
-                        if let Some(insertion) = Self::apply_one_update(
+                        if let Some((insertion, old_v)) = Self::apply_one_update(
                             &mut lru,
                             overlay,
                             cache,
@@ -251,6 +262,9 @@ impl State {
                             self.hot_state_config.refresh_interval_versions,
                         ) {
                             insertions.insert(key_hash, insertion);
+                            superseded_versions
+                                .entry(key_hash)
+                                .or_insert(old_v.unwrap_or(Version::MAX));
                         }
                     }
 
@@ -267,7 +281,7 @@ impl State {
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
                     (
                         ((new_layer, new_metadata), new_usage),
-                        HotStateShardUpdates::new(insertions, evictions),
+                        HotStateShardUpdates::new(insertions, evictions, superseded_versions),
                     )
                 },
             )
@@ -292,9 +306,10 @@ impl State {
         ))
     }
 
-    /// Applies the update and returns `(HotStateValue, Option<value_version>)` that will later
-    /// go into the hot state Merkle tree and DB. `None` if the op is `MakeHot` and it's
-    /// determined that refresh is not necessary.
+    /// Applies the update and returns `((HotStateValue, Option<value_version>), Option<old_hot_since_version>)`.
+    /// The outer `Option<Version>` is the old `hot_since_version` of the entry being replaced
+    /// (`None` if this is a first-time hot entry). Returns `None` entirely if the op is `MakeHot`
+    /// and refresh is not necessary.
     fn apply_one_update(
         lru: &mut HotStateLRU,
         overlay: &LayeredMap<HashValue, StateSlot>,
@@ -302,14 +317,17 @@ impl State {
         key: &StateKey,
         update: &StateUpdateRef,
         refresh_interval: Version,
-    ) -> Option<(HotStateValue, Option<Version>)> {
+    ) -> Option<((HotStateValue, Option<Version>), Option<Version>)> {
         let key_hash = *key.crypto_hash_ref();
         if let Some(state_value_opt) = update.state_op.as_state_value_opt() {
-            lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
+            let old_v = lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
             let value_version = state_value_opt.map(|_| update.version);
             return Some((
-                HotStateValue::new(state_value_opt.cloned(), update.version),
-                value_version,
+                (
+                    HotStateValue::new(state_value_opt.cloned(), update.version),
+                    value_version,
+                ),
+                old_v,
             ));
         }
 
@@ -328,8 +346,8 @@ impl State {
             if refreshed {
                 let value_version = slot_to_insert.value_version_opt();
                 let ret = HotStateValue::clone_from_slot(&slot_to_insert);
-                lru.insert(key, slot_to_insert);
-                Some((ret, value_version))
+                let old_v = lru.insert(key, slot_to_insert);
+                Some(((ret, value_version), old_v))
             } else {
                 None
             }
@@ -339,8 +357,8 @@ impl State {
             let value_version = slot.value_version_opt();
             let slot = slot.to_hot(update.version);
             let ret = HotStateValue::clone_from_slot(&slot);
-            lru.insert(key, slot);
-            Some((ret, value_version))
+            let old_v = lru.insert(key, slot);
+            Some(((ret, value_version), old_v))
         }
     }
 
