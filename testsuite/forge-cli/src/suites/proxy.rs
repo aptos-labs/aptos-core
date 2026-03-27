@@ -35,6 +35,11 @@ pub fn get_proxy_test(test_name: &str) -> Option<ForgeConfig> {
 /// since primary blocks aggregate multiple proxy blocks and are therefore larger.
 /// Proxy block limits match devnet's per-block settings (300/200).
 fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) {
+    // Disable randomness: force-override the on-chain randomness config seq num.
+    // This must be set at the node config level (not just consensus) because the DKG
+    // epoch manager runs independently and would otherwise still generate DKG vtxns.
+    config.randomness_override_seq_num = u64::MAX;
+
     // QuorumStore settings (shared by proxy and primary, needed for fast batch generation).
     // With 4 proxy validators each handling ~750 TPS, QS must drain mempool fast enough.
     config.consensus.quorum_store.enable_opt_quorum_store = true;
