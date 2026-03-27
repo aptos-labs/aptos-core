@@ -6,12 +6,12 @@
 //! Consumes `BlockAnalysis` from `analysis` and maps SSA temp `Vid`s to
 //! real `Home`/`Xfer` slots using liveness-driven type-keyed reuse.
 
-use crate::{
+use super::{
     analysis::BlockAnalysis,
     instr_utils::{get_defs_uses, remap_instr, split_into_blocks},
-    ir::{Instr, Slot},
     ssa_function::SSAFunction,
 };
+use crate::stackless_exec_ir::{Instr, Slot};
 use anyhow::{bail, Context, Result};
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::BTreeMap;
@@ -104,7 +104,7 @@ fn allocate_block(
     carry_pool: BTreeMap<Type, Vec<Slot>>,
     vid_types: &[Type],
     real_slot_types: &mut BTreeMap<Slot, Type>,
-    analysis: &crate::analysis::BlockAnalysis,
+    analysis: &BlockAnalysis,
 ) -> Result<(Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Slot>>)> {
     if instrs.is_empty() {
         return Ok((Vec::new(), start_slot, 0, carry_pool));

@@ -4,7 +4,7 @@
 //! Human-readable display for the stackless execution IR.
 //! Resolves pool indices using the CompiledModule for readable output.
 
-use crate::ir::{BinaryOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
+use super::{BinaryOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{

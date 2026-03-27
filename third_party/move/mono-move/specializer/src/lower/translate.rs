@@ -3,10 +3,8 @@
 
 //! Lowers stackless exec IR to micro-ops.
 
-use crate::{
-    ir::{BinaryOp, FunctionIR, ImmValue, Instr, Label, Slot},
-    lowering_context::{LoweringContext, SlotInfo},
-};
+use super::context::{LoweringContext, SlotInfo};
+use crate::stackless_exec_ir::{BinaryOp, FunctionIR, ImmValue, Instr, Label, Slot};
 use anyhow::{bail, Result};
 use mono_move_core::{CodeOffset, FrameOffset, MicroOp};
 use move_vm_types::loaded_data::runtime_types::Type;

@@ -10,10 +10,8 @@
 //! This is sound because Move's borrow checker guarantees that a local cannot
 //! be directly read or written while a mutable reference to it is outstanding.
 
-use crate::{
-    instr_utils::get_defs_uses,
-    ir::{Instr, Slot},
-};
+use super::instr_utils::get_defs_uses;
+use crate::stackless_exec_ir::{Instr, Slot};
 use std::collections::BTreeMap;
 
 /// Analysis results for a single basic block.

@@ -6,6 +6,8 @@
 //! This IR converts Move's stack-based bytecode into explicit named-slot form,
 //! eliminating the operand stack and allowing direct named-slot operands on each instruction.
 
+mod display;
+
 use move_binary_format::{
     file_format::{
         ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,

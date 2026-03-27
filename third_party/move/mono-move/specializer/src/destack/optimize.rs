@@ -8,10 +8,8 @@
 //! Pass: Dead instruction elimination
 //! Pass: Slot renumbering
 
-use crate::{
-    instr_utils::{apply_subst_to_sources, get_defs_uses, remap_instr, split_into_blocks},
-    ir::{FunctionIR, Instr, ModuleIR, Slot},
-};
+use super::instr_utils::{apply_subst_to_sources, get_defs_uses, remap_instr, split_into_blocks};
+use crate::stackless_exec_ir::{FunctionIR, Instr, ModuleIR, Slot};
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::{BTreeMap, BTreeSet};
 

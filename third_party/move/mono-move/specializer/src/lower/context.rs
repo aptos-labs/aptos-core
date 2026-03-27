@@ -6,7 +6,7 @@
 //! Builds frame layout information (slot offsets/sizes) needed by the lowerer.
 //! All lookups are O(1) via indexed Vecs — no maps.
 
-use crate::ir::{FunctionIR, Instr};
+use crate::stackless_exec_ir::{FunctionIR, Instr};
 use anyhow::Result;
 use mono_move_core::FRAME_METADATA_SIZE;
 use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};

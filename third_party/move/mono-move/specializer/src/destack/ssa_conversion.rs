@@ -7,11 +7,11 @@
 //! (pure SSA within each basic block). Locals (params + declared locals)
 //! are mutable across blocks and keep their original slot indices.
 
-use crate::{
-    ir::{BinaryOp, Instr, Label, Slot, UnaryOp},
+use super::{
     ssa_function::SSAFunction,
     type_conversion::{convert_sig_token, convert_sig_tokens},
 };
+use crate::stackless_exec_ir::{BinaryOp, Instr, Label, Slot, UnaryOp};
 use anyhow::{bail, ensure, Context, Result};
 use move_binary_format::{
     access::ModuleAccess,

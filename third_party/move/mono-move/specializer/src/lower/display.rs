@@ -3,7 +3,7 @@
 
 //! Display for lowered micro-ops in test baselines.
 
-use crate::lowering_context::LoweringContext;
+use super::context::LoweringContext;
 use mono_move_core::MicroOp;
 use std::fmt;
 

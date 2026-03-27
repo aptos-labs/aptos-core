@@ -3,11 +3,8 @@
 
 //! Conversion pipeline: Bytecode → SSA → instruction fusion → slot allocation.
 
-use crate::{
-    ir::{FunctionIR, ModuleIR},
-    ssa_conversion::SsaConverter,
-    type_conversion::convert_sig_tokens,
-};
+use super::{ssa_conversion::SsaConverter, type_conversion::convert_sig_tokens};
+use crate::stackless_exec_ir::{FunctionIR, ModuleIR};
 use anyhow::Result;
 use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
@@ -78,7 +75,7 @@ pub fn translate_module(
                 ssa.fuse_immediate_binops();
 
                 // Pass: Greedy Slot Allocation
-                let alloc = crate::slot_alloc::allocate_slots(&ssa)?;
+                let alloc = super::slot_alloc::allocate_slots(&ssa)?;
 
                 Ok(FunctionIR {
                     name_idx,

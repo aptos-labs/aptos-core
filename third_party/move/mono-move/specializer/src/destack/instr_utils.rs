@@ -5,7 +5,7 @@
 //!
 //! Helpers used by `[ssa_conversion]`, `[slot_alloc]`, and `[optimize]`.
 
-use crate::ir::{BinaryOp, ImmValue, Instr, Slot};
+use crate::stackless_exec_ir::{BinaryOp, ImmValue, Instr, Slot};
 use std::{collections::BTreeMap, ops::Range};
 
 /// Get named slots defined (written) and used (read) by an instruction.

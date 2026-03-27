@@ -3,10 +3,8 @@
 
 //! Intermediate SSA representation and pre-allocation fusion passes.
 
-use crate::{
-    instr_utils::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks},
-    ir::Instr,
-};
+use super::instr_utils::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
+use crate::stackless_exec_ir::Instr;
 use move_vm_types::loaded_data::runtime_types::Type;
 
 /// Intermediate SSA representation of a single function, before slot allocation.
