@@ -32,10 +32,7 @@ impl WebServer {
         }
     }
 
-    pub async fn serve<S>(&self, routes: Router<S>)
-    where
-        S: Clone + Send + Sync + 'static,
-    {
+    pub async fn serve(&self, routes: Router) {
         assert!(
             self.tls_cert_path.is_none() && self.tls_key_path.is_none(),
             "TLS for aptos-warp-webserver is not yet supported with axum",

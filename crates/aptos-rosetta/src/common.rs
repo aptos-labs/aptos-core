@@ -23,7 +23,7 @@ use aptos_sdk::move_types::{
     language_storage::{StructTag, TypeTag},
 };
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashSet, fmt::LowerHex, str::FromStr};
 
 /// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations

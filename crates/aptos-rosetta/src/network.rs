@@ -14,30 +14,20 @@ use aptos_logger::{debug, trace};
 use axum::{
     extract::{Json, State},
     response::Response,
-    routing::post,
-    Router,
 };
 
-pub fn routes(server_context: RosettaContext) -> Router<RosettaContext> {
-    Router::new()
-        .route("/network/list", post(network_list_route))
-        .route("/network/options", post(network_options_route))
-        .route("/network/status", post(network_status_route))
-        .with_state(server_context)
-}
-
-async fn network_list_route(State(context): State<RosettaContext>) -> Response {
+pub async fn network_list_route(State(context): State<RosettaContext>) -> Response {
     into_rosetta_response(network_list(with_empty_request(), context).await)
 }
 
-async fn network_options_route(
+pub async fn network_options_route(
     State(context): State<RosettaContext>,
     Json(request): Json<NetworkRequest>,
 ) -> Response {
     into_rosetta_response(network_options(request, context).await)
 }
 
-async fn network_status_route(
+pub async fn network_status_route(
     State(context): State<RosettaContext>,
     Json(request): Json<NetworkRequest>,
 ) -> Response {

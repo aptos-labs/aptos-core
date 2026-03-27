@@ -27,6 +27,8 @@ use aptos_warp_webserver::WebServer;
 use std::{collections::HashSet, sync::Arc};
 use tokio::task::JoinHandle;
 
+pub use aptos_types::account_address::AccountAddress;
+
 mod account;
 mod block;
 mod construction;
@@ -187,9 +189,9 @@ pub fn routes(context: RosettaContext) -> Router {
             post(construction::preprocess_route),
         )
         .route("/construction/submit", post(construction::submit_route))
-        .route("/network/list", post(network::list_route))
-        .route("/network/options", post(network::options_route))
-        .route("/network/status", post(network::status_route))
+        .route("/network/list", post(network::network_list_route))
+        .route("/network/options", post(network::network_options_route))
+        .route("/network/status", post(network::network_status_route))
         .route("/-/healthy", get(health_check_route))
         .layer(axum::middleware::from_fn(
             |req: axum::extract::Request, next: axum::middleware::Next| async move {
@@ -212,7 +214,7 @@ struct HealthCheckParams {
 /// Default amount of time the fullnode is accepted to be behind (arbitrarily it's 5 minutes)
 const HEALTH_CHECK_DEFAULT_SECS: u64 = 300;
 
-pub async fn health_check_route(
+async fn health_check_route(
     Query(params): Query<HealthCheckParams>,
     axum::extract::State(context): axum::extract::State<RosettaContext>,
 ) -> Response {
