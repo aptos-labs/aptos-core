@@ -214,7 +214,6 @@ members = [
     "third_party/move/mono-move/programs",
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
-    "third_party/move/mono-move/stackless-exec-ir-v1",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -810,7 +809,6 @@ shadow-rs = "0.16.2"
 smallbitvec = "2.5.1"
 smallvec = "1.8.0"
 specializer = { path = "third_party/move/mono-move/specializer" }
-stackless-exec-ir-v1 = { path = "third_party/move/mono-move/stackless-exec-ir-v1" }
 static_assertions = "1.1.0"
 status-line = "0.2.0"
 strum = "0.27.1"
