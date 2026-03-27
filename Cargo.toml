@@ -229,10 +229,7 @@ members = [
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-core/types",
     "third_party/move/move-examples",
-    "third_party/move/move-ir-compiler",
     "third_party/move/move-ir-compiler/move-bytecode-source-map",
-    "third_party/move/move-ir-compiler/move-ir-to-bytecode",
-    "third_party/move/move-ir-compiler/move-ir-to-bytecode/syntax",
     "third_party/move/move-ir/types",
     "third_party/move/move-model",
     "third_party/move/move-model/bytecode",
@@ -904,8 +901,6 @@ move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
-move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
-move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-bytecode" }
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
