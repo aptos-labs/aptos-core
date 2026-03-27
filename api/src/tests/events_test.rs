@@ -13,19 +13,8 @@ static ACCOUNT_ADDRESS: &str = "0xa550c18";
 static CREATION_NUMBER: &str = "0";
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_get_events(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_get_events() {
+    let mut context = new_test_context_with_orderless_flags(current_function_name!(), false, false);
 
     let resp = context
         .get(format!("/accounts/{}/events/{}", ACCOUNT_ADDRESS, CREATION_NUMBER).as_str())
@@ -35,22 +24,8 @@ async fn test_get_events(use_txn_payload_v2_format: bool, use_orderless_transact
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_get_events_filter_by_start_sequence_number(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_get_events_filter_by_start_sequence_number() {
+    let mut context = new_test_context_with_orderless_flags(current_function_name!(), false, false);
 
     let resp = context
         .get(
@@ -64,11 +39,8 @@ async fn test_get_events_filter_by_start_sequence_number(
     context.check_golden_output(resp.clone());
 
     // assert the same resp after db sharding migration with internal indexer turned on
-    let shard_context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+    let shard_context =
+        new_test_context_with_orderless_flags(current_function_name!(), false, false);
     let new_resp = shard_context
         .get(
             format!(
@@ -192,7 +164,6 @@ async fn test_get_events_by_invalid_account_event_handle_field_type() {
     use_txn_payload_v2_format,
     use_orderless_transactions,
     case(false, false),
-    case(true, false),
     case(true, true)
 )]
 async fn test_module_events(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {

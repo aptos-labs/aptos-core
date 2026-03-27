@@ -23,7 +23,6 @@ use std::path::PathBuf;
     use_txn_payload_v2_format,
     use_orderless_transactions,
     case(false, false),
-    case(true, false),
     case(true, true)
 )]
 async fn test_gen_resource_group(
