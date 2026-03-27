@@ -24,7 +24,7 @@ use aptos_bitvec::BitVec;
 use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
-    common::{Payload, Round},
+    common::Round,
     pipelined_block::{ExecutionSummary, OrderedBlockWindow, PipelinedBlock},
     proof_of_store::BatchInfoExt,
     quorum_cert::QuorumCert,
@@ -376,56 +376,14 @@ impl BlockStore {
             .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit, self.consensus_type);
 
-        // Proxy mode: advance commit_root lazily based on what primary has committed.
-        // The primary writes last_proxy_round to the shared atomic on commit; the proxy
-        // reads it here to advance commit_root, keeping blocks between commit_root and
-        // ordered_root in the tree for the proposal generator's exclusion set.
-        if self.consensus_type == "proxy" {
-            if let Some(atomic) = &self.primary_committed_proxy_round {
-                let committed_round = atomic.load(AtomicOrdering::Acquire);
-                let advance_info = {
-                    let tree = self.inner.read();
-                    if committed_round > tree.commit_root().round() {
-                        tree.find_block_id_by_round(committed_round)
-                            .map(|id| (id, tree.find_blocks_to_prune(id)))
-                    } else {
-                        None
-                    }
-                };
-                if let Some((new_commit_id, ids_to_remove)) = advance_info {
-                    // Notify QS mark_committed BEFORE pruning, matching the primary
-                    // consensus pattern. This ensures batches are queued for mark_committed
-                    // while still in the tree (protected by path_from_commit_root). After
-                    // pruning, the FIFO channel guarantees mark_committed is processed
-                    // before any subsequent QS pull, eliminating the re-pull gap.
-                    {
-                        let tree = self.inner.read();
-                        let payloads: Vec<Payload> = ids_to_remove
-                            .iter()
-                            .filter_map(|id| tree.get_block(id))
-                            .filter_map(|b| b.payload().cloned())
-                            .collect();
-                        if !payloads.is_empty() {
-                            // Use timestamp 0 — proxy blocks don't have meaningful
-                            // execution timestamps. The timestamp is only used for
-                            // QS batch expiry which is not relevant here.
-                            self.payload_manager.notify_commit(0, payloads);
-                        }
-                    }
-
-                    if let Err(e) = self
-                        .storage
-                        .prune_tree(ids_to_remove.clone().into_iter().collect())
-                    {
-                        warn!(error = ?e, "fail to delete block (proxy prune)");
-                    }
-                    let mut wlock = self.inner.write();
-                    wlock.process_pruned_blocks(ids_to_remove);
-                    wlock.update_commit_root(new_commit_id);
-                    wlock.update_window_root(new_commit_id);
-                }
-            }
-        }
+        // Proxy mode: do NOT prune the proxy tree. Keep all ordered proxy blocks
+        // in the tree so that path_from_commit_root always covers every batch ever
+        // ordered. This is the principled dedup mechanism: the PayloadFilter built
+        // from path_from_commit_root synchronously excludes all previously-ordered
+        // batches from QS pulls, with no race conditions.
+        //
+        // Memory cost is negligible: ~5 MB/hour of batch metadata at steady state.
+        // The tree is reset on epoch change.
 
         self.execution_client
             .finalize_order(blocks_to_commit, finality_proof.clone())
