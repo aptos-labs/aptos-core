@@ -53,9 +53,10 @@
 //!
 //! TODO: support substitution
 
-use crate::{ExecutableId, ExecutionGuard};
+use crate::ExecutionGuard;
 use dashmap::{Entry, Equivalent};
 use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::ExecutableId;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructHandleIndex},

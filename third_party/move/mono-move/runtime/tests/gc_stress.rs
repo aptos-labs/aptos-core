@@ -21,10 +21,12 @@
 //! At the end, walks the VM's outer vector via heap pointers and compares
 //! element-by-element against a pure-Rust simulation using the same seed.
 
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{
+    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp, STRUCT_DATA_OFFSET,
+};
 use mono_move_runtime::{
-    read_ptr, read_u64, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function,
-    GlobalArenaPtr, InterpreterContext, MicroOp, ObjectDescriptor, STRUCT_DATA_OFFSET,
-    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 

@@ -5,8 +5,9 @@
 //! that would otherwise cause undefined behavior at runtime: frame bounds,
 //! pointer slot validity, invalid jump targets, etc.
 
-use crate::{
-    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, ObjectDescriptor, FRAME_METADATA_SIZE,
+use crate::types::ObjectDescriptor;
+use mono_move_core::{
+    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 

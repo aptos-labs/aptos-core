@@ -265,10 +265,12 @@ pub fn native_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
 /// in sequence on the same heap.
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_runtime::{
-        CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, GlobalArenaPtr, MicroOp as Op,
-        MicroOp::*, ObjectDescriptor, FRAME_METADATA_SIZE,
+    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_core::{
+        CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp as Op, MicroOp::*,
+        FRAME_METADATA_SIZE,
     };
+    use mono_move_runtime::ObjectDescriptor;
 
     const NULL: u64 = u64::MAX;
     const NODE_SIZE: u32 = 32;

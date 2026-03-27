@@ -7,7 +7,7 @@
 //! This is the only place that knows about both the instruction set and the gas
 //! framework. Plug in a different ISA by writing an equivalent file.
 
-use crate::instruction::{CodeOffset, MicroOp};
+use super::{CodeOffset, MicroOp};
 use mono_move_gas::{GasMeteredInstruction, GasSchedule, HasCfgInfo, InstrCost, RemapTargets};
 
 // ---------------------------------------------------------------------------

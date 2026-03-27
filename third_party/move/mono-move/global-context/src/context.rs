@@ -32,9 +32,10 @@
 //!   - Duplicate allocations leak but are bounded (interning converges).
 //!   - Trade-off: minor memory waste for lower lock contention.
 
-use crate::{maintenance_config::MaintenanceConfig, GlobalArenaPool};
+use crate::maintenance_config::MaintenanceConfig;
 use dashmap::DashMap;
-use mono_move_alloc::{GlobalArenaPtr, GlobalArenaShard};
+use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
+use mono_move_core::ExecutableId;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},
@@ -45,7 +46,6 @@ use std::{
 mod identifiers;
 use identifiers::IdentifierInternerKey;
 mod executable_ids;
-pub use executable_ids::ExecutableId;
 use executable_ids::ExecutableIdInternerKey;
 mod executable;
 pub use executable::{Executable, ExecutableBuilder, Function};

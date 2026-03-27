@@ -4,7 +4,7 @@
 //! Display for lowered micro-ops in test baselines.
 
 use crate::lowering_context::LoweringContext;
-use mono_move_micro_ops::MicroOp;
+use mono_move_core::MicroOp;
 use std::fmt;
 
 pub struct MicroOpsFunctionDisplay<'a> {

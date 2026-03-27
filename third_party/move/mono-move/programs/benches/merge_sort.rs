@@ -41,7 +41,7 @@ fn bench_merge_sort(c: &mut Criterion) {
                 || {
                     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
                     let vec_ptr = ctx
-                        .alloc_u64_vec(mono_move_runtime::DescriptorId(0), &input)
+                        .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
                         .unwrap();
                     ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
                     ctx

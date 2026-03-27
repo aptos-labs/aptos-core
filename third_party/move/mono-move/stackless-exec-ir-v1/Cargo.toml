@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
-mono-move-micro-ops = { workspace = true }
+mono-move-core = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }

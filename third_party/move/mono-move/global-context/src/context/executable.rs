@@ -8,78 +8,24 @@ use crate::{
         struct_info_at, try_as_primitive_type, Alignment, FieldLayout, FieldOffset, StructLayout,
         Type, EMPTY_LIST,
     },
-    ArenaRef, ExecutableId, ExecutionGuard,
+    ArenaRef, ExecutionGuard,
 };
 use anyhow::{anyhow, bail};
-use bumpalo::Bump;
 use fxhash::FxBuildHasher;
-use mono_move_alloc::GlobalArenaPtr;
+use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_core::ExecutableId;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex},
     CompiledModule,
 };
 use parking_lot::Mutex;
-use std::{collections::HashMap, ptr::NonNull};
-
-/// A pointer into an executable's private [`Bump`] arena. The executable owns
-/// the arena, so the pointer is valid for the lifetime of the executable.
-///
-/// # Safety model
-///
-/// Dereferencing is **unsafe** - the caller must ensure the executable that
-/// owns the area allocation has not been dropped.
-#[repr(transparent)]
-pub struct ExecutableArenaPtr<T: ?Sized>(NonNull<T>);
-
-impl<T: ?Sized> ExecutableArenaPtr<T> {
-    /// Returns a shared reference to the pointee with the same lifetime as
-    /// executable.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure the executable's arena that owns the allocation
-    /// is alive and has not been reset or dropped.
-    #[allow(dead_code)]
-    pub unsafe fn as_ref_unchecked(&self) -> &T {
-        // SAFETY: The caller ensures the arena is still alive / not dropped.
-        unsafe { self.0.as_ref() }
-    }
-}
-
-// This type can be duplicated using bitwise copy.
-impl<T: ?Sized> Copy for ExecutableArenaPtr<T> {}
-
-impl<T: ?Sized> Clone for ExecutableArenaPtr<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-// SAFETY:
-//
-// Pointer acts as a shared reference when sent to other threads. It is
-// allocated in the executable's arena, and therefore is guaranteed to be
-// alive while the executable is alive. Because executables are never dropped
-// during concurrent execution, there is no need to require T to be `Send`.
-// However, T has to be `Sync` because global pointer does expose a shared
-// reference to T.
-unsafe impl<T: Sync + ?Sized> Send for ExecutableArenaPtr<T> {}
-
-// SAFETY:
-//
-// Pointer is `Sync` because it provides read-only access to pointee type when
-// shared between threads, which is safe if pointee is also `Sync`.
-unsafe impl<T: Sync + ?Sized> Sync for ExecutableArenaPtr<T> {}
+use std::collections::HashMap;
 
 /// Loaded function placeholder.
 pub struct Function {
     #[allow(dead_code)]
     name: GlobalArenaPtr<str>,
-    // TODO:
-    //   Need to move micro-ops to same crate or move global pointer out
-    //   to avoid circular dependency. Also cannot use function in micro
-    //   ops because of the same issue.
 }
 
 impl Function {
@@ -125,7 +71,7 @@ pub struct Executable {
     /// last field so that it is dropped after any data structure that holds
     /// pointers into it.
     #[allow(dead_code)]
-    arena: Mutex<Bump>,
+    arena: Mutex<ExecutableArena>,
 }
 
 struct ExecutableData {
@@ -178,7 +124,7 @@ pub struct ExecutableBuilder<'a, 'guard, 'ctx> {
     /// Stores data for executable that is being built.
     data: ExecutableData,
     /// Stores all allocations for this executable.
-    arena: Bump,
+    arena: ExecutableArena,
     /// Context for interning.
     guard: &'guard ExecutionGuard<'ctx>,
 }
@@ -212,7 +158,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
             module,
             struct_def_idx,
             data,
-            arena: Bump::new(),
+            arena: ExecutableArena::new(),
             guard: self,
         }
     }
@@ -230,7 +176,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             let identifier = self.module.identifier_at(handle.name);
             let name = self.guard.intern_identifier_internal(identifier);
             let function = Function { name };
-            let ptr = ExecutableArenaPtr(NonNull::from(self.arena.alloc(function)));
+            let ptr = self.arena.alloc(function);
             self.data.functions.insert(name, ptr);
         }
 
@@ -364,12 +310,10 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                         let field_ty = self.intern_signature_token(&field.signature.0)?;
                         fields.push(field_ty);
                     }
-                    let fields =
-                        ExecutableArenaPtr(NonNull::from(self.arena.alloc_slice_copy(&fields)));
+                    let fields = self.arena.alloc_slice_copy(&fields);
                     variants.push(VariantFields { fields });
                 }
-                let variants =
-                    ExecutableArenaPtr(NonNull::from(self.arena.alloc_slice_copy(&variants)));
+                let variants = self.arena.alloc_slice_copy(&variants);
                 self.data.enums.insert(name, EnumType { ty, variants });
                 Ok(ty)
             },

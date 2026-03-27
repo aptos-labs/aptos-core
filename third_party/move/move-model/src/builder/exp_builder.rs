@@ -2916,10 +2916,19 @@ impl ExpTranslator<'_, '_, '_> {
                 )
             },
             EA::LValue_::Literal(val) => {
-                // Translate literal value pattern (for primitive pattern matching)
-                if let Some((value, ty)) = self.translate_value(val, expected_type, context) {
-                    let id = self.new_node_id_with_type_loc(&ty, loc);
-                    self.check_type_with_order(expected_order, loc, &ty, expected_type, context);
+                // Translate literal value pattern (for primitive pattern matching).
+                // Strip reference from expected type so `translate_value` sees the
+                // base type (e.g. `u64` instead of `&u64`), then assign the pattern
+                // node the original (possibly reference) type for AST consistency.
+                let inner_expected = expected_type.skip_reference();
+                if let Some((value, ty)) = self.translate_value(val, inner_expected, context) {
+                    let ty = self.check_type(loc, &ty, inner_expected, context);
+                    let pat_ty = if let Type::Reference(kind, _) = expected_type {
+                        Type::Reference(*kind, Box::new(ty))
+                    } else {
+                        ty
+                    };
+                    let id = self.new_node_id_with_type_loc(&pat_ty, loc);
                     Pattern::LiteralValue(id, value)
                 } else {
                     self.new_error_pat(loc)

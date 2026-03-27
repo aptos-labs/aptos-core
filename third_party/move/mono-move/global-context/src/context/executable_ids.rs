@@ -24,6 +24,7 @@
 use crate::{context::ArenaRef, ExecutionGuard};
 use dashmap::Equivalent;
 use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::ExecutableId;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
@@ -35,7 +36,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         // SAFETY: The lifetime on this reference guarantees that the execution
         // guard is still alive, which guarantees that the arena allocation is
         // still valid and there were no deallocations.
-        unsafe { &self.ptr.as_ref_unchecked().address }
+        unsafe { self.ptr.as_ref_unchecked().address() }
     }
 
     /// Returns the name of this executable.
@@ -47,7 +48,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         // lifetime.
         unsafe {
             let id = self.ptr.as_ref_unchecked();
-            id.name.as_ref_unchecked()
+            id.name().as_ref_unchecked()
         }
     }
 }
@@ -122,30 +123,6 @@ impl<'ctx> ExecutionGuard<'ctx> {
 // Only private APIs below.
 // ------------------------
 
-/// Identifies an executable (module or script) by its address and name.
-///   - For modules, constructed from module address and name.
-///   - For scripts: TODO
-///
-/// # Safety
-///
-/// Must be created from a valid global arena pointer to executable's name.
-pub struct ExecutableId {
-    address: AccountAddress,
-    name: GlobalArenaPtr<str>,
-}
-
-impl ExecutableId {
-    /// Returns executable's address.
-    pub(super) fn address(&self) -> &AccountAddress {
-        &self.address
-    }
-
-    /// Returns the pointer to the executable's name.
-    pub(super) fn name(&self) -> &GlobalArenaPtr<str> {
-        &self.name
-    }
-}
-
 #[allow(private_interfaces)]
 impl<'ctx> ExecutionGuard<'ctx> {
     pub(super) fn intern_address_name_internal(
@@ -162,7 +139,10 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // SAFETY: Name pointer has been just interned - it is valid and can be
         // used safely for ID construction.
         let name = self.intern_identifier_internal(name);
-        let ptr = self.global_arena.alloc(ExecutableId { address, name });
+        // SAFETY: Name pointer has been just interned - it is valid.
+        let ptr = self
+            .global_arena
+            .alloc(unsafe { ExecutableId::new(address, name) });
 
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
@@ -190,8 +170,8 @@ impl Hash for ExecutableIdInternerKey {
         // ensures it remains valid during the lifetime of the key.
         unsafe {
             let id = self.0.as_ref_unchecked();
-            id.address.hash(state);
-            id.name.as_ref_unchecked().hash(state);
+            id.address().hash(state);
+            id.name().as_ref_unchecked().hash(state);
         }
     }
 }
@@ -205,7 +185,7 @@ impl PartialEq for ExecutableIdInternerKey {
             let other_id = other.0.as_ref_unchecked();
             // SAFETY: Names are already canonical pointers, so we can use
             // pointer equality for them.
-            this_id.address == other_id.address && this_id.name == other_id.name
+            this_id.address() == other_id.address() && this_id.name() == other_id.name()
         }
     }
 }
@@ -219,7 +199,7 @@ impl Equivalent<ExecutableIdInternerKey> for (&AccountAddress, &IdentStr) {
         // ensures it remains valid during the lifetime of the key.
         unsafe {
             let key = key.0.as_ref_unchecked();
-            self.0 == &key.address && self.1.as_str() == key.name.as_ref_unchecked()
+            self.0 == key.address() && self.1.as_str() == key.name().as_ref_unchecked()
         }
     }
 }

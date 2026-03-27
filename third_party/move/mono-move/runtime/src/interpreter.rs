@@ -8,13 +8,13 @@ use crate::{
     heap::Heap,
     memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
     types::{
-        DescriptorId, Function, ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE,
-        DEFAULT_STACK_SIZE, FRAME_METADATA_SIZE, HEADER_SIZE_OFFSET, META_SAVED_FP_OFFSET,
-        META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, HEADER_SIZE_OFFSET,
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
     },
 };
 use anyhow::{bail, Result};
-use mono_move_micro_ops::MicroOp;
+use mono_move_core::{DescriptorId, Function, MicroOp, FRAME_METADATA_SIZE};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 

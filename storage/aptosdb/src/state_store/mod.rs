@@ -28,7 +28,7 @@ use crate::{
         ShardedStateKvSchemaBatch,
     },
 };
-use aptos_config::config::{HotStateConfig, PrunerConfig};
+use aptos_config::config::{HotStateConfig, LedgerPrunerConfig, PrunerConfig};
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -104,6 +104,7 @@ pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 pub(crate) struct StatePruner {
     pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StaleNodeIndexSchema>>,
     pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>>,
+    pub hot_state_kv_pruner: Option<StateKvPrunerManager>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
     pub state_kv_pruner: StateKvPrunerManager,
@@ -113,6 +114,7 @@ impl StatePruner {
     pub fn new(
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
+        hot_state_kv_db: Option<Arc<StateKvDb>>,
         state_kv_db: Arc<StateKvDb>,
         config: PrunerConfig,
     ) -> Self {
@@ -121,6 +123,15 @@ impl StatePruner {
         });
         let hot_epoch_snapshot_pruner = hot_state_merkle_db.map(|db| {
             StateMerklePrunerManager::new(db, config.epoch_snapshot_pruner_config.into())
+        });
+        let hot_state_kv_pruner = hot_state_kv_db.map(|db| {
+            let kv_pruner_config = LedgerPrunerConfig {
+                enable: config.state_merkle_pruner_config.enable,
+                prune_window: config.state_merkle_pruner_config.prune_window,
+                batch_size: config.state_merkle_pruner_config.batch_size,
+                user_pruning_window_offset: 0,
+            };
+            StateKvPrunerManager::new(db, kv_pruner_config)
         });
         let state_merkle_pruner = StateMerklePrunerManager::new(
             Arc::clone(&state_merkle_db),
@@ -140,6 +151,7 @@ impl StatePruner {
         Self {
             hot_state_merkle_pruner,
             hot_epoch_snapshot_pruner,
+            hot_state_kv_pruner,
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
@@ -540,6 +552,7 @@ impl StateStore {
         let state_pruner = StatePruner::new(
             hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
+            hot_state_kv_db.clone(),
             Arc::clone(&state_kv_db),
             aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG,
         );
@@ -872,11 +885,45 @@ impl StateStore {
                             &(*key_hash, hot_val.hot_since_version()),
                             &Some(schema_value),
                         )?;
+                        // Write stale index entry for every insertion (including first writes
+                        // with NO_PREV_VERSION for truncation support).
+                        let old_v = shard
+                            .superseded_versions
+                            .get(key_hash)
+                            .copied()
+                            .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION);
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: hot_val.hot_since_version(),
+                                version: old_v,
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
                     }
                     for (key_hash, eviction_version) in &shard.evictions {
                         batch.put::<HotStateValueByKeyHashSchema>(
                             &(*key_hash, *eviction_version),
                             &None,
+                        )?;
+                        // Stale entry for the old hot entry superseded by eviction.
+                        let old_v = shard.superseded_versions[key_hash];
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: *eviction_version,
+                                version: old_v,
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
+                        // Self-referential stale entry for the eviction tombstone itself.
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: *eviction_version,
+                                version: *eviction_version,
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
                         )?;
                     }
                     Ok(())

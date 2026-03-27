@@ -14,10 +14,10 @@ rust-version = { workspace = true }
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
-bumpalo = { workspace = true }
 dashmap = { workspace = true }
 fxhash = { workspace = true }
 mono-move-alloc = { workspace = true }
+mono-move-core = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 parking_lot = { workspace = true }

@@ -94,6 +94,9 @@ impl StateMerkleBatchCommitter {
                     if let Some(pruner) = &self.state_db.state_pruner.hot_epoch_snapshot_pruner {
                         pruner.maybe_set_pruner_target_db_version(current_version);
                     }
+                    if let Some(pruner) = &self.state_db.state_pruner.hot_state_kv_pruner {
+                        pruner.maybe_set_pruner_target_db_version(current_version);
+                    }
                     self.state_db
                         .state_pruner
                         .state_merkle_pruner

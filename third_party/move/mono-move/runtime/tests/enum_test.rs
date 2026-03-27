@@ -3,10 +3,13 @@
 
 //! Tests for Move enum support (heap-allocated tagged unions).
 
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{
+    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp, ENUM_DATA_OFFSET,
+    ENUM_TAG_OFFSET,
+};
 use mono_move_runtime::{
-    read_ptr, read_u64, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function,
-    GlobalArenaPtr, InterpreterContext, MicroOp, ObjectDescriptor, ENUM_DATA_OFFSET,
-    ENUM_TAG_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
