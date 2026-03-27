@@ -25,16 +25,22 @@ pub struct HotStateShardUpdates {
     /// Each eviction carries the checkpoint version at which eviction happened.
     // TODO(HotState): per-block eviction tracking will be needed for cold-write elimination.
     pub evictions: HashMap<HashValue, Version>,
+    /// Maps key_hash to the old `hot_since_version` of the entry being superseded.
+    /// Entries absent from this map are first writes (no previous hot entry in DB).
+    /// Used to write stale index entries for the KV pruner.
+    pub superseded_versions: HashMap<HashValue, Version>,
 }
 
 impl HotStateShardUpdates {
     pub fn new(
         insertions: HashMap<HashValue, (HotStateValue, Option<Version>)>,
         evictions: HashMap<HashValue, Version>,
+        superseded_versions: HashMap<HashValue, Version>,
     ) -> Self {
         Self {
             insertions,
             evictions,
+            superseded_versions,
         }
     }
 }
