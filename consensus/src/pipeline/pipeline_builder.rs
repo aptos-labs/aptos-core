@@ -1129,6 +1129,71 @@ impl PipelineBuilder {
         update_counters_for_block(&block, "primary");
         update_counters_for_compute_result(&compute_result);
 
+        // [proxy-debug] Committed block diagnostic — identify dup source
+        if let Some(proxy_rounds) = block.block_data().proxy_rounds() {
+            use aptos_consensus_types::proof_of_store::TBatchInfo;
+            use std::collections::HashSet as StdHashSet;
+            use std::sync::Mutex as StdMutex;
+            use once_cell::sync::Lazy;
+
+            static SEEN_PROXY_ROUNDS: Lazy<StdMutex<StdHashSet<u64>>> =
+                Lazy::new(|| StdMutex::new(StdHashSet::new()));
+            static SEEN_BATCH_DIGESTS: Lazy<StdMutex<StdHashSet<aptos_crypto::HashValue>>> =
+                Lazy::new(|| StdMutex::new(StdHashSet::new()));
+
+            let mut dup_proxy_rounds = Vec::new();
+            {
+                let mut seen = SEEN_PROXY_ROUNDS.lock().unwrap();
+                for &pr in proxy_rounds {
+                    if !seen.insert(pr) {
+                        dup_proxy_rounds.push(pr);
+                    }
+                }
+            }
+
+            let mut dup_batch_digests = 0usize;
+            let mut total_batches = 0usize;
+            if let Some(payload) = block.payload() {
+                let batch_infos = match aptos_consensus_types::common::PayloadFilter::from(
+                    &vec![payload],
+                ) {
+                    aptos_consensus_types::common::PayloadFilter::InQuorumStore(set) => set,
+                    _ => StdHashSet::new(),
+                };
+                total_batches = batch_infos.len();
+                let mut seen = SEEN_BATCH_DIGESTS.lock().unwrap();
+                for bi in &batch_infos {
+                    if !seen.insert(*bi.digest()) {
+                        dup_batch_digests += 1;
+                    }
+                }
+            }
+
+            let failed_dup = compute_result
+                .compute_status_for_input_txns()
+                .iter()
+                .filter(|s| matches!(
+                    s,
+                    aptos_types::transaction::TransactionStatus::Discard(
+                        aptos_types::vm_status::DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD
+                    )
+                ))
+                .count();
+
+            info!(
+                "[proxy-debug] Committed primary block: round={}, proxy_rounds={:?}, \
+                 total_batches={}, total_txns={}, \
+                 dup_proxy_rounds(case3)={:?}, dup_batches(case2)={}, failed_dup(case1)={}",
+                block.round(),
+                proxy_rounds,
+                total_batches,
+                block.payload().map_or(0, |p| p.len()),
+                dup_proxy_rounds,
+                dup_batch_digests,
+                failed_dup,
+            );
+        }
+
         let payload = block.payload().cloned();
         let timestamp = block.timestamp_usecs();
         let payload_vec = payload.into_iter().collect();
