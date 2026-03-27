@@ -1406,15 +1406,68 @@ pub fn update_counters_for_committed_blocks(
         update_counters_for_block(block.block(), consensus_type);
         update_counters_for_compute_result(&block.compute_result());
     }
-    // [proxy-debug] Log committed primary blocks with all proxy rounds
+    // [proxy-debug] Committed-block dedup diagnostic.
+    // Uses static state so tracking is cumulative across calls (within one epoch).
+    use aptos_consensus_types::proof_of_store::TBatchInfo;
+    use std::collections::HashSet as StdHashSet;
+    use std::sync::Mutex as StdMutex;
+    static SEEN_PROXY_ROUNDS: Lazy<StdMutex<StdHashSet<u64>>> =
+        Lazy::new(|| StdMutex::new(StdHashSet::new()));
+    static SEEN_BATCH_DIGESTS: Lazy<StdMutex<StdHashSet<aptos_crypto::HashValue>>> =
+        Lazy::new(|| StdMutex::new(StdHashSet::new()));
+
     for block in blocks_to_commit {
         if let Some(proxy_rounds) = block.block().block_data().proxy_rounds() {
+            let mut dup_proxy_rounds = Vec::new();
+            let mut dup_batch_digests = 0usize;
+            let mut total_batches = 0usize;
+
+            // Case 3: check for proxy round overlap across committed primary blocks
+            {
+                let mut seen = SEEN_PROXY_ROUNDS.lock().unwrap();
+                for &pr in proxy_rounds {
+                    if !seen.insert(pr) {
+                        dup_proxy_rounds.push(pr);
+                    }
+                }
+            }
+
+            // Case 2: check for batch digest overlap across committed primary blocks
+            if let Some(payload) = block.block().payload() {
+                let batch_infos = match payload {
+                    aptos_consensus_types::common::Payload::OrderedPayloads(subs) => {
+                        let refs: Vec<&aptos_consensus_types::common::Payload> = subs.iter().collect();
+                        match aptos_consensus_types::common::PayloadFilter::from(&refs) {
+                            aptos_consensus_types::common::PayloadFilter::InQuorumStore(set) => set,
+                            _ => StdHashSet::new(),
+                        }
+                    },
+                    other => {
+                        let refs = vec![other];
+                        match aptos_consensus_types::common::PayloadFilter::from(&refs) {
+                            aptos_consensus_types::common::PayloadFilter::InQuorumStore(set) => set,
+                            _ => StdHashSet::new(),
+                        }
+                    },
+                };
+                total_batches = batch_infos.len();
+                let mut seen = SEEN_BATCH_DIGESTS.lock().unwrap();
+                for bi in &batch_infos {
+                    if !seen.insert(*bi.digest()) {
+                        dup_batch_digests += 1;
+                    }
+                }
+            }
+
             info!(
-                "[proxy-debug] Committed primary block: round={}, last_proxy_round={:?}, \
-                 proxy_rounds={:?}, total_txns={}",
+                "[proxy-debug] Committed primary block: round={}, proxy_rounds={:?}, \
+                 total_batches={}, dup_proxy_rounds(case3)={:?}, dup_batches(case2)={}, \
+                 total_txns={}",
                 block.block().round(),
-                block.block().block_data().last_proxy_round(),
                 proxy_rounds,
+                total_batches,
+                dup_proxy_rounds,
+                dup_batch_digests,
                 block.block().payload().map_or(0, |p| p.len()),
             );
         }

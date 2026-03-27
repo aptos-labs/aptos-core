@@ -627,7 +627,6 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 let mut all_txns = Vec::new();
                 let mut all_proofs = Vec::new();
                 let mut all_inline_batch_infos = Vec::new();
-                let mut sub_idx = 0usize;
                 for sub_payload in payloads {
                     match sub_payload {
                         Payload::QuorumStoreInlineHybrid(
@@ -730,7 +729,6 @@ impl TPayloadManager for QuorumStorePayloadManager {
                             sub_payload,
                         ),
                     }
-                    sub_idx += 1;
                 }
 
                 BlockTransactionPayload::new_quorum_store_inline_hybrid(
