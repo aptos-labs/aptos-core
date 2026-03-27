@@ -66,6 +66,13 @@ pub struct QuorumStorePayloadManager {
     ordered_authors: Vec<PeerId>,
     address_to_validator_index: HashMap<PeerId, usize>,
     enable_payload_v2: bool,
+    // [proxy-debug] Cumulative tracking across all proxy blocks to detect duplication.
+    // Maps batch_digest -> first proxy block index where it appeared.
+    seen_batches: std::sync::Mutex<HashMap<HashValue, usize>>,
+    // Maps txn_hash -> batch_digest of the first batch containing it.
+    seen_txns: std::sync::Mutex<HashMap<HashValue, HashValue>>,
+    // Counter of proxy blocks processed (used as proxy block index).
+    proxy_block_counter: std::sync::atomic::AtomicUsize,
 }
 
 impl QuorumStorePayloadManager {
@@ -84,6 +91,9 @@ impl QuorumStorePayloadManager {
             ordered_authors,
             address_to_validator_index,
             enable_payload_v2,
+            seen_batches: std::sync::Mutex::new(HashMap::new()),
+            seen_txns: std::sync::Mutex::new(HashMap::new()),
+            proxy_block_counter: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -628,6 +638,8 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 let mut all_proofs = Vec::new();
                 let mut all_inline_batch_infos = Vec::new();
                 let mut sub_idx = 0usize;
+                // [proxy-debug] Collect all batch digests across sub-payloads
+                let mut all_batch_digests: Vec<HashValue> = Vec::new();
                 for sub_payload in payloads {
                     match sub_payload {
                         Payload::QuorumStoreInlineHybrid(
@@ -699,7 +711,12 @@ impl TPayloadManager for QuorumStorePayloadManager {
                             )
                             .await?;
                             let inline_txns = p.inline_batches().transactions();
-                            // [proxy-debug] Log per-sub-payload txn composition
+                            all_batch_digests.extend(
+                                p.proof_with_data().batch_summary.iter().map(|b| *b.digest())
+                            );
+                            all_batch_digests.extend(
+                                p.opt_batches().batch_summary.iter().map(|b| *b.digest())
+                            );
                             info!(
                                 "[proxy-debug] OrderedPayloads sub[{}] OptQS_V1: proof_batches={} proof_txns={}, opt_batches={} opt_txns={}, inline_txns={}",
                                 sub_idx,
@@ -731,7 +748,12 @@ impl TPayloadManager for QuorumStorePayloadManager {
                             )
                             .await?;
                             let inline_txns = p.inline_batches().transactions();
-                            // [proxy-debug] Log per-sub-payload txn composition
+                            all_batch_digests.extend(
+                                p.proof_with_data().batch_summary.iter().map(|b| *b.digest())
+                            );
+                            all_batch_digests.extend(
+                                p.opt_batches().batch_summary.iter().map(|b| *b.digest())
+                            );
                             info!(
                                 "[proxy-debug] OrderedPayloads sub[{}] OptQS_V2: proof_batches={} proof_txns={}, opt_batches={} opt_txns={}, inline_txns={}",
                                 sub_idx,
@@ -752,11 +774,51 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     }
                     sub_idx += 1;
                 }
+
+                // [proxy-debug] Cumulative dedup analysis across ALL proxy blocks.
+                // Q2: do any two proxy blocks share the same QS batch?
+                // Q3: do any two QS batches share the same txn?
+                let proxy_block_idx = self.proxy_block_counter
+                    .fetch_add(sub_idx, std::sync::atomic::Ordering::Relaxed);
+                let total_batches = all_batch_digests.len();
+                let total_txns = all_txns.len();
+                let mut dup_batches = 0usize;
+                let mut dup_txns = 0usize;
+                {
+                    let mut seen_batches = self.seen_batches.lock().expect("seen_batches lock");
+                    let mut seen_txns = self.seen_txns.lock().expect("seen_txns lock");
+
+                    // Check each batch digest against all previously seen batches
+                    for (i, digest) in all_batch_digests.iter().enumerate() {
+                        let block_idx = proxy_block_idx + i; // approximate: 1 batch ≠ 1 block
+                        if seen_batches.insert(*digest, block_idx).is_some() {
+                            dup_batches += 1;
+                        }
+                    }
+
+                    // Check each txn hash against all previously seen txns.
+                    // Record (txn_hash -> first batch_digest that contained it).
+                    // If a txn was already seen in a DIFFERENT batch, it's a shared txn.
+                    // We pair txns with their batch by iterating sub-payloads' batch
+                    // digests in order; since we can't precisely map txns to individual
+                    // batches after merging, we just check global uniqueness here.
+                    for txn in &all_txns {
+                        let txn_hash = txn.committed_hash();
+                        if seen_txns.insert(txn_hash, HashValue::zero()).is_some() {
+                            dup_txns += 1;
+                        }
+                    }
+                }
+
                 info!(
-                    "[proxy-debug] OrderedPayloads round={}: sub_payloads={}, total_txns={}",
+                    "[proxy-debug] OrderedPayloads round={}: sub_payloads={}, \
+                     total_batches={}, total_txns={}, dup_batches={}, dup_txns={}",
                     block.block_data().round(),
                     sub_idx,
-                    all_txns.len(),
+                    total_batches,
+                    total_txns,
+                    dup_batches,
+                    dup_txns,
                 );
 
                 BlockTransactionPayload::new_quorum_store_inline_hybrid(

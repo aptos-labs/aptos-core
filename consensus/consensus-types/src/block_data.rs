@@ -222,11 +222,11 @@ impl BlockData {
     }
 
     pub fn is_proxy_block(&self) -> bool {
-        match &self.block_type {
-            BlockType::ProposalExt(ProposalExt::ProxyV0 { .. }) => true,
-            BlockType::OptimisticProposal(OptBlockBody::ProxyV0 { .. }) => true,
-            _ => false,
-        }
+        matches!(
+            &self.block_type,
+            BlockType::ProposalExt(ProposalExt::ProxyV0 { .. })
+                | BlockType::OptimisticProposal(OptBlockBody::ProxyV0 { .. })
+        )
     }
 
     pub fn is_proxy_aggregated(&self) -> bool {

@@ -10,7 +10,7 @@ use crate::{
 use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorError};
-use aptos_logger::prelude::warn;
+use aptos_logger::prelude::{info, warn};
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
     register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
@@ -1405,6 +1405,22 @@ pub fn update_counters_for_committed_blocks(
     for block in blocks_to_commit {
         update_counters_for_block(block.block(), consensus_type);
         update_counters_for_compute_result(&block.compute_result());
+    }
+    // [proxy-debug] Log proxy rounds of committed primary blocks (Q1: strictly incrementing?)
+    let proxy_rounds: Vec<(u64, Option<u64>)> = blocks_to_commit
+        .iter()
+        .filter_map(|b| {
+            let round = b.block().round();
+            let proxy_round = b.block().block_data().last_proxy_round();
+            // Only log proxy-aggregated blocks
+            proxy_round.map(|pr| (round, Some(pr)))
+        })
+        .collect();
+    if !proxy_rounds.is_empty() {
+        info!(
+            "[proxy-debug] Committed primary blocks proxy_rounds: {:?}",
+            proxy_rounds,
+        );
     }
 }
 

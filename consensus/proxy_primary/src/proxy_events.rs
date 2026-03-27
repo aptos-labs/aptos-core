@@ -50,6 +50,12 @@ pub struct AtomicPipelineState {
     last_update_ms: AtomicU64,
 }
 
+impl Default for AtomicPipelineState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AtomicPipelineState {
     pub fn new() -> Self {
         Self {

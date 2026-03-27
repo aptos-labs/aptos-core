@@ -708,11 +708,17 @@ impl RoundManager {
 
                     let payload_len = payload.len();
                     let payload_size = payload.size();
+                    // [proxy-debug] Q1: log all proxy rounds included in this primary block
+                    let consumed_proxy_rounds: Vec<u64> = blocks_to_include.iter()
+                        .take(included_count)
+                        .map(|b| b.round())
+                        .collect();
                     info!(
-                        "spawn_proposal_generation: aggregated {} proxy blocks ({} deferred), {} txns, {} bytes, \
-                         {} vtxns, last_proxy_round={}, last_consumed_proxy_round={}",
+                        "[proxy-debug] spawn_proposal_generation: aggregated {} proxy blocks ({} deferred), \
+                         {} txns, {} bytes, {} vtxns, last_proxy_round={}, \
+                         last_consumed_proxy_round={}, proxy_rounds={:?}",
                         included_count, deferred, payload_len, payload_size, all_vtxns.len(),
-                        last_proxy_round, self.last_consumed_proxy_round,
+                        last_proxy_round, self.last_consumed_proxy_round, consumed_proxy_rounds,
                     );
                     aptos_proxy_primary::proxy_metrics::PROXY_AGGREGATED_PAYLOAD_SIZE
                         .set(payload_len as i64);
