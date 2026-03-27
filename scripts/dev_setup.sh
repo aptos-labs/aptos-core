@@ -735,8 +735,7 @@ function install_libdw {
 }
 
 function install_lld {
-  # Right now, only install lld for linux
-  if [[ "$(uname)" == "Linux" ]]; then
+  if [[ "$(uname)" == "Linux" ]] || [[ "$(uname)" == "Darwin" ]]; then
     install_pkg lld "$PACKAGE_MANAGER"
   fi
 }
@@ -765,6 +764,7 @@ Build tools (since -t or no option was provided):
   * Rust (and the necessary components, e.g. rust-fmt, clippy)
   * CMake
   * Clang
+  * lld
   * grcov
   * lcov
   * pkg-config

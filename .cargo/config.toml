@@ -41,6 +41,11 @@ rustflags = [
   "target-cpu=x86-64-v3",
 ]
 
+[target.aarch64-apple-darwin]
+# Select linker via APTOS_LINKER: mold | lld | system.
+# If not set, it auto-detects in order: mold -> lld -> system linker.
+linker = "scripts/linker_wrapper.sh"
+
 [env]
 CC_x86_64_unknown_linux_gnu = "clang"
 CXX_x86_64_unknown_linux_gnu = "clang++"

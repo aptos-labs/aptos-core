@@ -11,14 +11,14 @@ set -euo pipefail
 #
 # If APTOS_LINKER is unset, auto-select in this order:
 #   1) mold (if available)
-#   2) lld  (if available)
+#   2) lld/ld.lld (if available)
 #   3) system linker
 if [[ -n "${APTOS_LINKER:-}" ]]; then
   LINKER_FLAVOR="${APTOS_LINKER}"
 else
   if command -v mold >/dev/null 2>&1; then
     LINKER_FLAVOR="mold"
-  elif command -v ld.lld >/dev/null 2>&1; then
+  elif command -v lld >/dev/null 2>&1 || command -v ld.lld >/dev/null 2>&1; then
     LINKER_FLAVOR="lld"
   else
     LINKER_FLAVOR="system"
