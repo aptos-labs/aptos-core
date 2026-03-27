@@ -43,7 +43,7 @@ where
     S: serde::Serializer,
 {
     let mut bytes = vec![];
-    a.serialize_with_mode(&mut bytes, Compress::Yes)
+    a.serialize_with_mode(&mut bytes, Compress::No)
         .map_err(serde::ser::Error::custom)?;
     s.serialize_bytes(&bytes)
 }
@@ -54,7 +54,7 @@ where
     D: serde::de::Deserializer<'de>,
 {
     let s: Bytes = serde::de::Deserialize::deserialize(data)?;
-    let a = A::deserialize_with_mode(s.reader(), Compress::Yes, Validate::No);
+    let a = A::deserialize_with_mode(s.reader(), Compress::No, Validate::No);
     a.map_err(serde::de::Error::custom)
 }
 
