@@ -724,20 +724,6 @@ function install_postgres {
   fi
 }
 
-function install_lld {
-  # Right now, only install lld for linux
-  if [[ "$(uname)" == "Linux" ]]; then
-    install_pkg lld "$PACKAGE_MANAGER"
-  fi
-}
-
-function install_mold {
-  # Right now, only install mold for linux
-  if [[ "$(uname)" == "Linux" ]]; then
-    install_pkg mold "$PACKAGE_MANAGER"
-  fi
-}
-
 function install_libdw {
   # Right now, only install libdw for linux
   if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman" ]]; then
@@ -777,8 +763,6 @@ Build tools (since -t or no option was provided):
   * pkg-config
   * libssl-dev
   * protoc (and related tools)
-  * lld (only for Linux)
-  * mold (only for Linux)
 EOF
   fi
 
@@ -1016,8 +1000,6 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
-  install_lld
-  install_mold
   install_libdw
 
   install_rustup "$BATCH_MODE"
