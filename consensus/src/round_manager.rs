@@ -612,13 +612,28 @@ impl RoundManager {
         let is_primary_with_proxy = self.proxy_verifier.is_some() && proxy_hooks.is_none();
         let proxy_payload = if is_primary_with_proxy {
             if !self.pending_proxy_blocks.is_empty() {
-                // Determine start: parent's last_proxy_round (if ProxyAggregatedV0) or 0
-                let parent_id = sync_info.highest_quorum_cert().certified_block().id();
-                let start_after = self
+                // Determine start: the actual parent block's last_proxy_round.
+                // With optimistic proposals, HQC certifies the grandparent (round R-1),
+                // not the parent (round R). Using HQC would give a stale start_after,
+                // causing proxy block overlap between consecutive primary blocks.
+                // Instead, walk backwards from the current round to find the actual
+                // parent block in the block store.
+                let current_round = new_round_event.round;
+                let hqc_parent_proxy_round = self
                     .block_store
-                    .get_block(parent_id)
+                    .get_block(sync_info.highest_quorum_cert().certified_block().id())
                     .and_then(|b| b.block().block_data().last_proxy_round())
                     .unwrap_or(0);
+                let mut start_after = hqc_parent_proxy_round;
+                // Check blocks between HQC round and current round for a higher last_proxy_round
+                let hqc_round = sync_info.highest_quorum_cert().certified_block().round();
+                for r in (hqc_round + 1)..current_round {
+                    if let Some(block) = self.block_store.get_block_for_round(r) {
+                        if let Some(lpr) = block.block().block_data().last_proxy_round() {
+                            start_after = start_after.max(lpr);
+                        }
+                    }
+                }
 
                 // Collect blocks from pending_proxy_blocks with round > start_after
                 use std::ops::Bound;
