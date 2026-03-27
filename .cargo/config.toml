@@ -27,7 +27,8 @@ build-perf = ["build", "--profile", "performance", "--config", ".cargo/performan
 rustflags = ["--cfg", "tokio_unstable", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes"]
 
 [target.x86_64-unknown-linux-gnu]
-# Select linker via APTOS_LINKER: mold | lld | system (default: system).
+# Select linker via APTOS_LINKER: mold | lld | system.
+# If not set, it auto-detects in order: mold -> lld -> system linker.
 linker = "scripts/linker_wrapper.sh"
 rustflags = [
   "--cfg",

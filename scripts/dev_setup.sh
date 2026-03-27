@@ -734,6 +734,13 @@ function install_libdw {
   fi
 }
 
+function install_lld {
+  # Right now, only install lld for linux
+  if [[ "$(uname)" == "Linux" ]]; then
+    install_pkg lld "$PACKAGE_MANAGER"
+  fi
+}
+
 # this is needed for hdpi crate from aptos-ledger
 function install_libudev-dev {
   # Need to install libudev-dev for linux
@@ -1000,6 +1007,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
+  install_lld
   install_libdw
 
   install_rustup "$BATCH_MODE"
