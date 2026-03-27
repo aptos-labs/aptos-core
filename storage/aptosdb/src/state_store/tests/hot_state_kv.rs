@@ -172,8 +172,9 @@ fn test_put_hot_state_updates_integration() {
     let key2 = make_state_key(20);
     let key3 = make_state_key(30);
 
-    let mut shards: [HotStateShardUpdates; NUM_STATE_SHARDS] =
-        std::array::from_fn(|_| HotStateShardUpdates::new(HashMap::new(), HashMap::new()));
+    let mut shards: [HotStateShardUpdates; NUM_STATE_SHARDS] = std::array::from_fn(|_| {
+        HotStateShardUpdates::new(HashMap::new(), HashMap::new(), HashMap::new())
+    });
 
     // key1: occupied insertion at hot_since_version=100, value_version=50
     shards[key1.get_shard_id()].insertions.insert(
@@ -565,8 +566,9 @@ fn test_load_write_then_load_roundtrip() {
     let val1 = make_state_value(10);
     let key2 = make_state_key(20);
 
-    let mut shards: [HotStateShardUpdates; NUM_STATE_SHARDS] =
-        std::array::from_fn(|_| HotStateShardUpdates::new(HashMap::new(), HashMap::new()));
+    let mut shards: [HotStateShardUpdates; NUM_STATE_SHARDS] = std::array::from_fn(|_| {
+        HotStateShardUpdates::new(HashMap::new(), HashMap::new(), HashMap::new())
+    });
 
     // key1: occupied at hot_since_version=100, value_version=50
     shards[key1.get_shard_id()].insertions.insert(

@@ -5,6 +5,7 @@ use crate::{
     pruner::pruner_utils::get_or_initialize_subpruner_progress,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
     },
@@ -15,10 +16,11 @@ use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 
-// Per-shard pruner for state KV data
+// Per-shard pruner for state KV data (both cold and hot state KV DBs)
 pub(in crate::pruner) struct StateKvShardPruner {
     shard_id: usize,
     db_shard: Arc<DB>,
+    is_hot: bool,
 }
 
 impl StateKvShardPruner {
@@ -26,18 +28,24 @@ impl StateKvShardPruner {
         shard_id: usize,
         db_shard: Arc<DB>,
         metadata_progress: Version,
+        is_hot: bool,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
             &db_shard,
             &DbMetadataKey::StateKvShardPrunerProgress(shard_id),
             metadata_progress,
         )?;
-        let myself = Self { shard_id, db_shard };
+        let myself = Self {
+            shard_id,
+            db_shard,
+            is_hot,
+        };
 
+        let tag = if is_hot { "hot" } else { "cold" };
         info!(
             progress = progress,
             metadata_progress = metadata_progress,
-            "Catching up state kv shard {shard_id}."
+            "Catching up {tag} state kv shard {shard_id}."
         );
         myself.prune(progress, metadata_progress)?;
 
@@ -64,8 +72,17 @@ impl StateKvShardPruner {
             }
             batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
             if !index.is_first_write() {
-                batch
-                    .delete::<StateValueByKeyHashSchema>(&(index.state_key_hash, index.version))?;
+                if self.is_hot {
+                    batch.delete::<HotStateValueByKeyHashSchema>(&(
+                        index.state_key_hash,
+                        index.version,
+                    ))?;
+                } else {
+                    batch.delete::<StateValueByKeyHashSchema>(&(
+                        index.state_key_hash,
+                        index.version,
+                    ))?;
+                }
             }
         }
         batch.put::<DbMetadataSchema>(

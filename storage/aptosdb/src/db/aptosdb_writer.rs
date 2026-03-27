@@ -624,7 +624,7 @@ impl AptosDB {
                         AptosDbError::Other(format!("Failed to send update to subscriber: {}", err))
                     })?;
             }
-            // Activate the ledger pruner and state kv pruner.
+            // Activate the ledger pruner and state kv pruners.
             // Note the state merkle pruner is activated when state snapshots are persisted
             // in their async thread.
             self.ledger_pruner
@@ -633,6 +633,9 @@ impl AptosDB {
                 .state_pruner
                 .state_kv_pruner
                 .maybe_set_pruner_target_db_version(version);
+            if let Some(pruner) = &self.state_store.state_pruner.hot_state_kv_pruner {
+                pruner.maybe_set_pruner_target_db_version(version);
+            }
         }
 
         // Once everything is successfully persisted, update the latest in-memory ledger info.
