@@ -3,6 +3,7 @@
 
 use crate::{config::GRPC_MANAGER, data_manager::DataManager};
 use aptos_indexer_grpc_utils::status_page::{get_throughput_from_samples, render_status_page, Tab};
+use axum::response::Response;
 use aptos_protos::{
     indexer::v1::{FullnodeInfo, HistoricalDataServiceInfo, LiveDataServiceInfo, StreamInfo},
     util::timestamp::Timestamp,
@@ -15,9 +16,7 @@ use std::{
     collections::{HashMap, VecDeque},
     time::Duration,
 };
-use warp::{reply::Response, Rejection};
-
-pub(crate) async fn status_page() -> Result<Response, Rejection> {
+pub(crate) async fn status_page() -> Response {
     let mut tabs = vec![];
 
     if let Some(grpc_manager) = GRPC_MANAGER.get() {

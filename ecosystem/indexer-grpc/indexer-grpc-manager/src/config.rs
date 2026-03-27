@@ -7,8 +7,8 @@ use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use axum::response::Response;
 use tokio::sync::OnceCell;
-use warp::{reply::Response, Rejection};
 
 pub(crate) static GRPC_MANAGER: OnceCell<GrpcManager> = OnceCell::const_new();
 
@@ -79,7 +79,7 @@ impl RunnableConfig for IndexerGrpcManagerConfig {
         "grpc_manager".to_string()
     }
 
-    async fn status_page(&self) -> Result<Response, Rejection> {
-        crate::status_page::status_page().await
+    async fn status_page(&self) -> Result<Response> {
+        Ok(crate::status_page::status_page().await)
     }
 }

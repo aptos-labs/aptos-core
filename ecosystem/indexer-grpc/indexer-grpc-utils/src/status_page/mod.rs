@@ -3,12 +3,9 @@
 
 use crate::timestamp_to_unixtime;
 use aptos_protos::indexer::v1::StreamProgress;
+use axum::response::{Html as AxumHtml, IntoResponse, Response};
 use build_html::{Html, HtmlChild, HtmlContainer, HtmlElement, HtmlPage, HtmlTag};
 use std::time::{Duration, SystemTime};
-use warp::{
-    reply::{html, Reply, Response},
-    Rejection,
-};
 
 include!("html.rs");
 
@@ -26,7 +23,7 @@ impl Tab {
     }
 }
 
-pub fn render_status_page(tabs: Vec<Tab>) -> Result<Response, Rejection> {
+pub fn render_status_page(tabs: Vec<Tab>) -> Response {
     let tab_names = tabs.iter().map(|tab| tab.name.clone()).collect::<Vec<_>>();
     let tab_contents = tabs.into_iter().map(|tab| tab.content).collect::<Vec<_>>();
 
@@ -79,7 +76,7 @@ pub fn render_status_page(tabs: Vec<Tab>) -> Result<Response, Rejection> {
         .with_raw(content)
         .to_html_string();
 
-    Ok(html(page).into_response())
+    AxumHtml(page).into_response()
 }
 
 pub fn get_throughput_from_samples(

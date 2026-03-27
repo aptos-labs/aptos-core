@@ -12,6 +12,7 @@ use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig, constants::DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES,
 };
+use axum::response::Response;
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
@@ -23,7 +24,6 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::task::JoinHandle;
 use tonic::{codec::CompressionEncoding, transport::Server};
 use tracing::info;
-use warp::{reply::Response, Rejection};
 
 pub(crate) static LIVE_DATA_SERVICE: OnceCell<LiveDataService<'static>> = OnceCell::new();
 pub(crate) static HISTORICAL_DATA_SERVICE: OnceCell<HistoricalDataService> = OnceCell::new();
@@ -286,7 +286,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         "indexer_grpc_data_service_v2".to_string()
     }
 
-    async fn status_page(&self) -> Result<Response, Rejection> {
-        crate::status_page::status_page()
+    async fn status_page(&self) -> Result<Response> {
+        Ok(crate::status_page::status_page())
     }
 }

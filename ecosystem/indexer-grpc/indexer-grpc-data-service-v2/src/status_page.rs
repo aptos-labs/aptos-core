@@ -6,14 +6,14 @@ use crate::{
     connection_manager::ConnectionManager,
 };
 use aptos_indexer_grpc_utils::status_page::{get_throughput_from_samples, render_status_page, Tab};
+use axum::response::Response;
 use build_html::{
     Container, ContainerType, HtmlContainer, HtmlElement, HtmlTag, Table, TableCell, TableCellType,
     TableRow,
 };
 use std::time::Duration;
-use warp::{reply::Response, Rejection};
 
-pub(crate) fn status_page() -> Result<Response, Rejection> {
+pub(crate) fn status_page() -> Response {
     let mut tabs = vec![];
     // TODO(grao): Add something real.
     let overview_tab_content = HtmlElement::new(HtmlTag::Div).with_raw("Welcome!").into();
