@@ -10,7 +10,7 @@ use crate::{
 use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorError};
-use aptos_logger::prelude::{info, warn};
+use aptos_logger::prelude::warn;
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
     register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
@@ -1358,17 +1358,13 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
     let txn_status = compute_result.compute_status_for_input_txns();
     LAST_COMMITTED_VERSION.set(compute_result.last_version_or_0() as i64);
     NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
-    let mut dup_count = 0u64;
-    let mut seqnum_too_new_count = 0u64;
     for status in txn_status.iter() {
         let commit_status = match status {
             TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
             TransactionStatus::Discard(reason) => {
                 if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
-                    seqnum_too_new_count += 1;
                     TXN_COMMIT_SEQNUM_TOO_NEW_LABEL
                 } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
-                    dup_count += 1;
                     TXN_COMMIT_FAILED_DUPLICATE_LABEL
                 } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
                     TXN_COMMIT_FAILED_EXPIRED_LABEL
@@ -1386,15 +1382,6 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
             .with_label_values(&[commit_status])
             .inc();
     }
-    // [proxy-debug] Log per-block duplicate/seqnum stats when non-zero.
-    if dup_count > 0 || seqnum_too_new_count > 0 {
-        warn!(
-            "[proxy-debug] Block execution: total_txns={}, failed_duplicate={}, seqnum_too_new={}",
-            txn_status.len(),
-            dup_count,
-            seqnum_too_new_count,
-        );
-    }
 }
 
 /// Update various counters for committed blocks
@@ -1405,82 +1392,6 @@ pub fn update_counters_for_committed_blocks(
     for block in blocks_to_commit {
         update_counters_for_block(block.block(), consensus_type);
         update_counters_for_compute_result(&block.compute_result());
-    }
-    // [proxy-debug] Committed-block dedup diagnostic.
-    // Uses static state so tracking is cumulative across calls (within one epoch).
-    use aptos_consensus_types::proof_of_store::TBatchInfo;
-    use std::collections::HashSet as StdHashSet;
-    use std::sync::Mutex as StdMutex;
-    static SEEN_PROXY_ROUNDS: Lazy<StdMutex<StdHashSet<u64>>> =
-        Lazy::new(|| StdMutex::new(StdHashSet::new()));
-    static SEEN_BATCH_DIGESTS: Lazy<StdMutex<StdHashSet<aptos_crypto::HashValue>>> =
-        Lazy::new(|| StdMutex::new(StdHashSet::new()));
-
-    for block in blocks_to_commit {
-        if let Some(proxy_rounds) = block.block().block_data().proxy_rounds() {
-            let mut dup_proxy_rounds = Vec::new();
-            let mut dup_batch_digests = 0usize;
-            let mut total_batches = 0usize;
-
-            // Case 3: check for proxy round overlap across committed primary blocks
-            {
-                let mut seen = SEEN_PROXY_ROUNDS.lock().unwrap();
-                for &pr in proxy_rounds {
-                    if !seen.insert(pr) {
-                        dup_proxy_rounds.push(pr);
-                    }
-                }
-            }
-
-            // Case 2: check for batch digest overlap across committed primary blocks
-            if let Some(payload) = block.block().payload() {
-                let batch_infos = match payload {
-                    aptos_consensus_types::common::Payload::OrderedPayloads(subs) => {
-                        let refs: Vec<&aptos_consensus_types::common::Payload> = subs.iter().collect();
-                        match aptos_consensus_types::common::PayloadFilter::from(&refs) {
-                            aptos_consensus_types::common::PayloadFilter::InQuorumStore(set) => set,
-                            _ => StdHashSet::new(),
-                        }
-                    },
-                    other => {
-                        let refs = vec![other];
-                        match aptos_consensus_types::common::PayloadFilter::from(&refs) {
-                            aptos_consensus_types::common::PayloadFilter::InQuorumStore(set) => set,
-                            _ => StdHashSet::new(),
-                        }
-                    },
-                };
-                total_batches = batch_infos.len();
-                let mut seen = SEEN_BATCH_DIGESTS.lock().unwrap();
-                for bi in &batch_infos {
-                    if !seen.insert(*bi.digest()) {
-                        dup_batch_digests += 1;
-                    }
-                }
-            }
-
-            // Case 1: count SEQUENCE_NUMBER_TOO_OLD from execution result
-            let failed_duplicate = block.compute_result()
-                .compute_status_for_input_txns()
-                .iter()
-                .filter(|s| matches!(s, aptos_types::transaction::TransactionStatus::Discard(
-                    aptos_types::vm_status::DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD
-                )))
-                .count();
-
-            info!(
-                "[proxy-debug] Committed primary block: round={}, proxy_rounds={:?}, \
-                 total_batches={}, total_txns={}, \
-                 dup_proxy_rounds(case3)={:?}, dup_batches(case2)={}, failed_dup(case1)={}",
-                block.block().round(),
-                proxy_rounds,
-                total_batches,
-                block.block().payload().map_or(0, |p| p.len()),
-                dup_proxy_rounds,
-                dup_batch_digests,
-                failed_duplicate,
-            );
-        }
     }
 }
 
