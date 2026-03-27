@@ -555,33 +555,32 @@ impl RoundManager {
                 .proposal_generator
                 .can_propose_in_round(new_round_event.round)
         {
-            // When proxy consensus is active, primary blocks should be formed from
-            // proxy blocks. If proxy blocks are available, include them. If not,
-            // propose an empty block to avoid timeout (e.g. at startup before
-            // the txn emitter starts and proxy consensus orders empty blocks).
+            // When proxy consensus is active, primary blocks MUST be formed from
+            // proxy blocks. Empty primary blocks break last_proxy_round monotonicity
+            // (different proposers have different local values), causing proxy block
+            // overlap and duplicate transactions in consecutive primary blocks.
             if self.proxy_verifier.is_some() {
                 if !self.pending_proxy_blocks.is_empty() {
-                    // Proxy blocks already available (arrived before round event).
-                    // Generate proposal immediately with all accumulated batches.
+                    // Proxy blocks already available — generate proposal immediately.
                     info!(
                         self.new_log(LogEvent::NewRound),
                         "Proxy blocks available ({} batches), generating proposal for round {}",
                         self.pending_proxy_blocks.len(),
                         new_round_event.round,
                     );
+                    self.spawn_proposal_generation(new_round_event).await;
                 } else {
-                    // No proxy blocks yet — propose empty block to avoid timeout.
-                    // This happens at startup before load begins, or during proxy
-                    // consensus stalls. Empty proposals keep primary rounds advancing.
+                    // No proxy blocks yet — defer proposal until they arrive.
+                    // process_ordered_proxy_blocks_msg will trigger the deferred proposal.
                     info!(
                         self.new_log(LogEvent::NewRound),
-                        "No proxy blocks available, proposing empty block for round {} to avoid timeout. \
+                        "No proxy blocks available, deferring proposal for round {}. \
                          last_consumed_proxy_round={}",
                         new_round_event.round,
                         self.last_consumed_proxy_round,
                     );
+                    self.pending_proposal_event = Some(new_round_event);
                 }
-                self.spawn_proposal_generation(new_round_event).await;
             } else {
                 // No proxy consensus — or this IS the proxy RM.
                 self.spawn_proposal_generation(new_round_event).await;
@@ -612,28 +611,22 @@ impl RoundManager {
         let is_primary_with_proxy = self.proxy_verifier.is_some() && proxy_hooks.is_none();
         let proxy_payload = if is_primary_with_proxy {
             if !self.pending_proxy_blocks.is_empty() {
-                // Determine start: the actual parent block's last_proxy_round.
-                // With optimistic proposals, HQC certifies the grandparent (round R-1),
-                // not the parent (round R). Using HQC would give a stale start_after,
-                // causing proxy block overlap between consecutive primary blocks.
-                // Instead, walk backwards from the current round to find the actual
-                // parent block in the block store.
-                let current_round = new_round_event.round;
-                let hqc_parent_proxy_round = self
+                // Determine start_after from the parent block's last_proxy_round.
+                // For regular proposals, HQC certifies the parent → correct.
+                // For optimistic proposals, HQC certifies the grandparent (round R-1),
+                // but the proposer has the actual parent (round R) in its store.
+                // Check both and use the max to handle both cases.
+                let hqc_block_lpr = self
                     .block_store
                     .get_block(sync_info.highest_quorum_cert().certified_block().id())
                     .and_then(|b| b.block().block_data().last_proxy_round())
                     .unwrap_or(0);
-                let mut start_after = hqc_parent_proxy_round;
-                // Check blocks between HQC round and current round for a higher last_proxy_round
-                let hqc_round = sync_info.highest_quorum_cert().certified_block().round();
-                for r in (hqc_round + 1)..current_round {
-                    if let Some(block) = self.block_store.get_block_for_round(r) {
-                        if let Some(lpr) = block.block().block_data().last_proxy_round() {
-                            start_after = start_after.max(lpr);
-                        }
-                    }
-                }
+                let parent_block_lpr = self
+                    .block_store
+                    .get_block_for_round(new_round_event.round.saturating_sub(1))
+                    .and_then(|b| b.block().block_data().last_proxy_round())
+                    .unwrap_or(0);
+                let start_after = hqc_block_lpr.max(parent_block_lpr);
 
                 // Collect blocks from pending_proxy_blocks with round > start_after
                 use std::ops::Bound;
@@ -651,7 +644,8 @@ impl RoundManager {
                          start_after={}, proposing empty proxy block. last_consumed_proxy_round={}",
                         start_after, self.last_consumed_proxy_round,
                     );
-                    Some((Vec::new(), Payload::empty(true, true), self.last_consumed_proxy_round, HashValue::zero()))
+                    // Use start_after (parent's last_proxy_round) to maintain monotonicity
+                    Some((Vec::new(), Payload::empty(true, true), start_after, HashValue::zero()))
                 } else {
                     // Aggregate validator txns and payloads with a cap on total txns.
                     // After a timeout gap, pending_proxy_blocks can accumulate many blocks.
@@ -729,15 +723,20 @@ impl RoundManager {
                     Some((all_vtxns, payload, last_proxy_round, last_proxy_block_id))
                 }
             } else {
-                // No proxy blocks available — propose empty ProxyAggregatedV0 block.
-                // This avoids the standard QS pull path which would re-include batches
-                // already ordered by proxy consensus, causing duplicate execution.
+                // No proxy blocks available. Use parent's last_proxy_round to maintain
+                // monotonicity (never use local last_consumed_proxy_round which can regress).
+                let parent_id = sync_info.highest_quorum_cert().certified_block().id();
+                let parent_lpr = self
+                    .block_store
+                    .get_block(parent_id)
+                    .and_then(|b| b.block().block_data().last_proxy_round())
+                    .unwrap_or(0);
                 info!(
                     "spawn_proposal_generation: no proxy blocks available, proposing empty proxy block. \
-                     last_consumed_proxy_round={}",
-                    self.last_consumed_proxy_round,
+                     parent_last_proxy_round={}",
+                    parent_lpr,
                 );
-                Some((Vec::new(), Payload::empty(true, true), self.last_consumed_proxy_round, HashValue::zero()))
+                Some((Vec::new(), Payload::empty(true, true), parent_lpr, HashValue::zero()))
             }
         } else if !self.pending_proxy_blocks.is_empty() {
             // This shouldn't happen (pending_proxy_blocks should only be non-empty
