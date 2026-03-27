@@ -116,8 +116,7 @@
 //!   heap pointers.
 
 use crate::Function;
-use std::fmt;
-use std::ptr::NonNull;
+use std::{fmt, ptr::NonNull};
 
 // Submodules for instruction.
 mod gas;
