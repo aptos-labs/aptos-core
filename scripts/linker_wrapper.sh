@@ -5,10 +5,10 @@
 set -euo pipefail
 
 # Supported values:
-#   - lld (default): clang -fuse-ld=lld
-#   - mold:          clang -fuse-ld=mold
-#   - system:        clang default linker
-LINKER_FLAVOR="${APTOS_LINKER:-lld}"
+#   - mold (default): clang -fuse-ld=mold
+#   - lld:            clang -fuse-ld=lld
+#   - system:         clang default linker
+LINKER_FLAVOR="${APTOS_LINKER:-mold}"
 
 case "${LINKER_FLAVOR}" in
 lld)
