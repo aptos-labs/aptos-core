@@ -24,7 +24,7 @@ use aptos_bitvec::BitVec;
 use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
-    common::{Payload, PayloadFilter, Round},
+    common::{Payload, Round},
     pipelined_block::{ExecutionSummary, OrderedBlockWindow, PipelinedBlock},
     proof_of_store::BatchInfoExt,
     quorum_cert::QuorumCert,
@@ -393,12 +393,11 @@ impl BlockStore {
                     }
                 };
                 if let Some((new_commit_id, ids_to_remove)) = advance_info {
-                    // Collect batch infos from blocks about to be pruned. These blocks
-                    // will fall out of path_from_commit_root (the exclusion set used by
-                    // the proposal generator). The primary's mark_committed notification
-                    // goes through an async channel and may not have been processed by
-                    // the QS coordinator yet, so we hold these batch infos in a local
-                    // filter to prevent QS from re-pulling them.
+                    // Notify QS mark_committed BEFORE pruning, matching the primary
+                    // consensus pattern. This ensures batches are queued for mark_committed
+                    // while still in the tree (protected by path_from_commit_root). After
+                    // pruning, the FIFO channel guarantees mark_committed is processed
+                    // before any subsequent QS pull, eliminating the re-pull gap.
                     {
                         let tree = self.inner.read();
                         let payloads: Vec<Payload> = ids_to_remove
@@ -406,12 +405,12 @@ impl BlockStore {
                             .filter_map(|id| tree.get_block(id))
                             .filter_map(|b| b.payload().cloned())
                             .collect();
-                        let payload_refs: Vec<&Payload> = payloads.iter().collect();
-                        let batch_infos = match PayloadFilter::from(&payload_refs) {
-                            PayloadFilter::InQuorumStore(set) => set,
-                            _ => HashSet::new(),
-                        };
-                        *self.committed_payload_filter.lock() = batch_infos;
+                        if !payloads.is_empty() {
+                            // Use timestamp 0 — proxy blocks don't have meaningful
+                            // execution timestamps. The timestamp is only used for
+                            // QS batch expiry which is not relevant here.
+                            self.payload_manager.notify_commit(0, payloads);
+                        }
                     }
 
                     if let Err(e) = self
