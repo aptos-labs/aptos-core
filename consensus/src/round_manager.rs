@@ -1945,9 +1945,12 @@ impl RoundManager {
             return Ok(());
         };
 
-        // When proxy consensus is active, primary proposals must wait for proxy blocks.
-        // Optimistic proposals bypass the deferred proposal mechanism, so block them.
-        if self.proxy_event_tx.is_some() {
+        // When proxy consensus is active, disable opt proposals for ALL primary validators
+        // (both proxy and non-proxy). Opt proposals create OptimisticProposal blocks that
+        // lack last_proxy_round, breaking the start_after chain and causing overlapping
+        // proxy rounds across committed primary blocks. Proxy RM (proxy_hooks.is_some())
+        // is allowed — it generates proxy opt proposals, not primary ones.
+        if self.proxy_verifier.is_some() && self.proxy_hooks.is_none() {
             return Ok(());
         }
 
