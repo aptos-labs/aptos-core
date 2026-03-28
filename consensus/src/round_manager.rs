@@ -2049,8 +2049,12 @@ impl RoundManager {
                     }
                 });
             } else if self.proxy_verifier.is_some() {
-                // Primary RM with proxy: collect and consume proxy blocks, create
-                // proxy-aggregated opt proposal to preserve last_proxy_round chain.
+                // Primary RM with proxy: only generate opt proposal if proxy blocks
+                // are available. Empty opt proposals waste primary rounds.
+                if self.pending_proxy_blocks.is_empty() {
+                    return Ok(());
+                }
+
                 // Mark round before spawning to prevent regular proposal from duplicating.
                 proposal_generator.mark_round_generated(opt_proposal_round)?;
 
