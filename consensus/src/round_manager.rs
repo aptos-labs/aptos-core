@@ -776,13 +776,14 @@ impl RoundManager {
         let consensus_type = self.consensus_type();
         let is_proxy_rm = proxy_hooks.is_some();
 
-        // Proxy RM: run inline to avoid tokio::spawn scheduling delay (50-80ms
-        // under load) that pushes proposal broadcast past the 100ms timeout.
-        // Proxy proposal generation is fast (<20ms) so inline execution is safe.
-        // Primary RM: spawn as before — 1000ms timeout has plenty of slack.
-        if is_proxy_rm {
+        // Spawn proposal generation for both proxy and primary RMs.
+        // Spawning unblocks the event loop so votes, proposals, and QC processing
+        // continue in parallel with the QS payload pull. Previously the proxy ran
+        // inline to avoid tokio::spawn scheduling delay, but this blocked the event
+        // loop during QS pull (~10-20ms), limiting proxy throughput to ~30 blocks/sec.
+        tokio::spawn(async move {
             if let Err(e) = monitor!(
-                "proxy_generate_and_send_proposal",
+                "generate_and_send_proposal",
                 Self::generate_and_send_proposal(
                     epoch_state,
                     new_round_event,
@@ -798,27 +799,7 @@ impl RoundManager {
             ) {
                 warn!(consensus_type = consensus_type, "Error generating and sending proposal: {}", e);
             }
-        } else {
-            tokio::spawn(async move {
-                if let Err(e) = monitor!(
-                    "primary_generate_and_send_proposal",
-                    Self::generate_and_send_proposal(
-                        epoch_state,
-                        new_round_event,
-                        network,
-                        sync_info,
-                        proposal_generator,
-                        safety_rules,
-                        proposer_election,
-                        proxy_hooks,
-                        proxy_payload,
-                    )
-                    .await
-                ) {
-                    warn!(consensus_type = consensus_type, "Error generating and sending proposal: {}", e);
-                }
-            });
-        }
+        });
     }
 
     async fn generate_and_send_proposal(
