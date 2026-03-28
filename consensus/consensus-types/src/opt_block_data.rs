@@ -76,6 +76,36 @@ impl OptBlockData {
         }
     }
 
+    pub fn new_proxy_aggregated(
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        parent: BlockInfo,
+        grandparent_qc: QuorumCert,
+        last_proxy_round: Round,
+        last_proxy_block_id: HashValue,
+        proxy_rounds: Vec<Round>,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            parent,
+            block_body: OptBlockBody::ProxyAggregatedV0 {
+                validator_txns,
+                payload,
+                author,
+                grandparent_qc,
+                last_proxy_round,
+                last_proxy_block_id,
+                proxy_rounds,
+            },
+        }
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }

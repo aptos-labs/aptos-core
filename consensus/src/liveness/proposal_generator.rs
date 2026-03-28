@@ -479,6 +479,18 @@ impl ProposalGenerator {
         *self.last_round_generated.lock() < round
     }
 
+    /// Mark a round as proposed (prevents duplicate proposals for the same round).
+    /// Used by opt proxy-aggregated proposals that bypass the standard generate_ methods.
+    pub fn mark_round_generated(&self, round: Round) -> anyhow::Result<()> {
+        let mut last_round_generated = self.last_round_generated.lock();
+        if *last_round_generated < round {
+            *last_round_generated = round;
+            Ok(())
+        } else {
+            anyhow::bail!("Already proposed in the round {}", round);
+        }
+    }
+
     pub fn is_proposal_under_backpressure(&self) -> bool {
         *self.proposal_under_backpressure.lock()
     }

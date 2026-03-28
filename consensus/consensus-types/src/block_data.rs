@@ -233,6 +233,7 @@ impl BlockData {
         matches!(
             &self.block_type,
             BlockType::ProposalExt(ProposalExt::ProxyAggregatedV0 { .. })
+                | BlockType::OptimisticProposal(OptBlockBody::ProxyAggregatedV0 { .. })
         )
     }
 
@@ -240,6 +241,7 @@ impl BlockData {
     pub fn last_proxy_round(&self) -> Option<Round> {
         match &self.block_type {
             BlockType::ProposalExt(p) => p.last_proxy_round(),
+            BlockType::OptimisticProposal(p) => p.last_proxy_round(),
             _ => None,
         }
     }
@@ -256,6 +258,7 @@ impl BlockData {
     pub fn proxy_rounds(&self) -> Option<&Vec<Round>> {
         match &self.block_type {
             BlockType::ProposalExt(p) => p.proxy_rounds(),
+            BlockType::OptimisticProposal(p) => p.proxy_rounds(),
             _ => None,
         }
     }

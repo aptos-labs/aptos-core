@@ -27,32 +27,63 @@ pub enum OptBlockBody {
         author: Author,
         grandparent_qc: QuorumCert,
     },
+    /// Primary opt block aggregating proxy blocks — carries last_proxy_round
+    /// so the start_after chain is preserved across opt proposals.
+    ProxyAggregatedV0 {
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        grandparent_qc: QuorumCert,
+        last_proxy_round: Round,
+        last_proxy_block_id: HashValue,
+        proxy_rounds: Vec<Round>,
+    },
 }
 
 impl OptBlockBody {
     pub fn author(&self) -> &Author {
         match self {
-            OptBlockBody::V0 { author, .. } | OptBlockBody::ProxyV0 { author, .. } => author,
+            OptBlockBody::V0 { author, .. }
+            | OptBlockBody::ProxyV0 { author, .. }
+            | OptBlockBody::ProxyAggregatedV0 { author, .. } => author,
         }
     }
 
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match self {
             OptBlockBody::V0 { validator_txns, .. }
-            | OptBlockBody::ProxyV0 { validator_txns, .. } => Some(validator_txns),
+            | OptBlockBody::ProxyV0 { validator_txns, .. }
+            | OptBlockBody::ProxyAggregatedV0 { validator_txns, .. } => Some(validator_txns),
         }
     }
 
     pub fn payload(&self) -> &Payload {
         match self {
-            OptBlockBody::V0 { payload, .. } | OptBlockBody::ProxyV0 { payload, .. } => payload,
+            OptBlockBody::V0 { payload, .. }
+            | OptBlockBody::ProxyV0 { payload, .. }
+            | OptBlockBody::ProxyAggregatedV0 { payload, .. } => payload,
         }
     }
 
     pub fn grandparent_qc(&self) -> &QuorumCert {
         match self {
             OptBlockBody::V0 { grandparent_qc, .. }
-            | OptBlockBody::ProxyV0 { grandparent_qc, .. } => grandparent_qc,
+            | OptBlockBody::ProxyV0 { grandparent_qc, .. }
+            | OptBlockBody::ProxyAggregatedV0 { grandparent_qc, .. } => grandparent_qc,
+        }
+    }
+
+    pub fn last_proxy_round(&self) -> Option<Round> {
+        match self {
+            OptBlockBody::ProxyAggregatedV0 { last_proxy_round, .. } => Some(*last_proxy_round),
+            _ => None,
+        }
+    }
+
+    pub fn proxy_rounds(&self) -> Option<&Vec<Round>> {
+        match self {
+            OptBlockBody::ProxyAggregatedV0 { proxy_rounds, .. } => Some(proxy_rounds),
+            _ => None,
         }
     }
 }
