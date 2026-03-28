@@ -20,6 +20,7 @@ use aptos_config::utils::get_available_port;
 use aptos_db::AptosDB;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
+use axum::{extract::Path, response::IntoResponse, routing::get, Router};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     ledger_info::LedgerInfoWithSignatures,
@@ -34,7 +35,6 @@ use std::{
     sync::Arc,
 };
 use tokio::{runtime::Runtime, time::Duration};
-use warp::Filter;
 
 #[test]
 fn end_to_end() {
@@ -160,19 +160,30 @@ prop_compose! {
 }
 
 async fn mock_backup_service_get_epoch_ending_lis(lis: Vec<LedgerInfoWithSignatures>) -> u16 {
-    let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
-    let route = warp::path!("epoch_ending_ledger_infos" / usize / usize).map(move |start, end| {
-        let mut response = Vec::<u8>::new();
-        for li in &lis[start..end] {
-            let bytes = bcs::to_bytes(&li).unwrap();
-            let size_bytes = (bytes.len() as u32).to_be_bytes();
-            response.write_all(&size_bytes).unwrap();
-            response.write_all(&bytes).unwrap();
-        }
-        response
+    let app = Router::new().route(
+        "/epoch_ending_ledger_infos/:start/:end",
+        get(move |Path((start, end)): Path<(usize, usize)>| {
+            let lis = lis.clone();
+            async move {
+                let mut response = Vec::<u8>::new();
+                for li in &lis[start..end] {
+                    let bytes = bcs::to_bytes(&li).unwrap();
+                    let size_bytes = (bytes.len() as u32).to_be_bytes();
+                    response.write_all(&size_bytes).unwrap();
+                    response.write_all(&bytes).unwrap();
+                }
+                response.into_response()
+            }
+        }),
+    );
+
+    let listener = tokio::net::TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
     });
-    let (addr, svr) = warp::serve(route).bind_ephemeral(address);
-    tokio::spawn(svr);
     addr.port()
 }
 

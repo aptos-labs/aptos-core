@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{golden_output::GoldenOutputs, pretty};
-use aptos_api::{attach_axum_to_runtime, BasicError, Context};
+use aptos_api::{attach_poem_to_runtime, BasicError, Context};
 use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
@@ -137,7 +137,7 @@ pub fn new_test_context_inner(
     let validator_owner = validator_identity.account_address.unwrap();
     let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
-        let mut aptos_db = AptosDB::new_for_test_with_indexer(&tmp_dir);
+        let mut aptos_db = AptosDB::new_for_test(&tmp_dir);
         if node_config
             .indexer_db_config
             .is_internal_indexer_db_enabled()
@@ -157,7 +157,6 @@ pub fn new_test_context_inner(
                     .enable_storage_sharding,
                 ..Default::default()
             },
-            false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
@@ -202,10 +201,10 @@ pub fn new_test_context_inner(
 
     // Configure the testing depending on which API version we're testing.
     let runtime_handle = tokio::runtime::Handle::current();
-    let axum_address =
-        attach_axum_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
-            .expect("Failed to attach axum to runtime");
-    let api_specific_config = ApiSpecificConfig::V1(axum_address);
+    let poem_address =
+        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+            .expect("Failed to attach poem to runtime");
+    let api_specific_config = ApiSpecificConfig::V1(poem_address);
 
     TestContext::new(
         context,

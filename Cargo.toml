@@ -876,8 +876,6 @@ usdt = "0.6.0"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 variant_count = "1.1.0"
 walkdir = "2.3.3"
-warp = { version = "0.3.5", features = ["tls"] }
-warp-reverse-proxy = "1.0.0"
 wasm-bindgen = "0.2.100"
 wasm-bindgen-futures = "0.4.50"
 which = "4.2.5"
