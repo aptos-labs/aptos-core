@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+module 0x66::test_generic_pack_bytecode_swapped_type_params
+
+struct Pair<A, B>
+    first: A
+    second: B
+
+// Invalid: pack$Pair has a correct return type (Pair<T0, T1>) but the PackGeneric
+// bytecode instruction uses a swapped instantiation Pair<T1, T0>.
+#[pack] public fun pack$Pair<A, B>(l0: A, l1: B): Pair<A, B>
+    move_loc l0
+    move_loc l1
+    pack Pair<B, A>
+    ret

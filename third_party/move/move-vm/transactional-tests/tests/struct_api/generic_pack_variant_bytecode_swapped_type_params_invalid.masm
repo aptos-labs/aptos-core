@@ -1,0 +1,15 @@
+//# publish --print-bytecode
+module 0x66::test_generic_pack_variant_bytecode_swapped_type_params
+
+enum Either<A, B> has drop
+  Left
+    value: A
+  Right
+    value: B
+
+// Invalid: pack$Either$Left has a correct return type (Either<T0, T1>) but the
+// PackVariantGeneric bytecode instruction uses a swapped instantiation Either<T1, T0>.
+#[pack_variant(0)] public fun pack$Either$Left<A, B>(l0: A): Either<A, B>
+    move_loc l0
+    pack_variant Either<B, A>, Left
+    ret
