@@ -664,7 +664,11 @@ impl RoundManager {
                     // (10K+ txns) that cause high Block-STM retry rates and pipeline stalls.
                     // Cap at max_receiving_block_txns; deferred blocks stay in pending_proxy_blocks
                     // for the next round (delay, not drop — per protocol safety rules).
-                    let max_txns = self.local_config.max_sending_block_txns_after_filtering as usize;
+                    // Use a higher limit for primary blocks aggregating proxy blocks.
+                    // The standard max_sending_block_txns_after_filtering (1800) is too
+                    // conservative — proxy blocks are pre-ordered and don't need the same
+                    // filtering headroom.
+                    let max_txns = 3000usize;
                     let vtxn_limit = self.vtxn_config.per_block_limit_txn_count() as usize;
                     let mut all_vtxns = Vec::new();
                     let mut sub_payloads = Vec::new();
@@ -937,56 +941,6 @@ impl RoundManager {
                 proxy_sync_info,
             );
         network.broadcast_opt_proxy_proposal(proposal_msg).await;
-        counters::PROPOSALS_COUNT.inc();
-        Ok(())
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    async fn generate_and_send_opt_proxy_aggregated_proposal(
-        epoch_state: Arc<EpochState>,
-        round: Round,
-        parent: BlockInfo,
-        grandparent_qc: QuorumCert,
-        network: Arc<NetworkSender>,
-        sync_info: SyncInfo,
-        proposal_generator: Arc<ProposalGenerator>,
-        _proposer_election: Arc<dyn ProposerElection + Send + Sync>,
-        proxy_validator_txns: Vec<aptos_types::validator_txn::ValidatorTransaction>,
-        proxy_payload: aptos_consensus_types::common::Payload,
-        last_proxy_round: Round,
-        last_proxy_block_id: aptos_crypto::HashValue,
-        proxy_rounds: Vec<Round>,
-    ) -> anyhow::Result<()> {
-        let timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
-
-        let opt_block_data =
-            aptos_consensus_types::opt_block_data::OptBlockData::new_proxy_aggregated(
-                proxy_validator_txns,
-                proxy_payload,
-                proposal_generator.author(),
-                epoch_state.epoch,
-                round,
-                timestamp,
-                parent,
-                grandparent_qc,
-                last_proxy_round,
-                last_proxy_block_id,
-                proxy_rounds,
-            );
-
-        observe_block_with_type(
-            opt_block_data.timestamp_usecs(),
-            BlockStage::OPT_PROPOSED,
-            "primary",
-        );
-        info!(
-            Self::new_log_with_round_epoch(LogEvent::OptPropose, round, epoch_state.epoch),
-            "Primary proxy-aggregated opt proposal: last_proxy_round={}",
-            last_proxy_round,
-        );
-
-        let proposal_msg = OptProposalMsg::new(opt_block_data, sync_info);
-        network.broadcast_opt_proposal(proposal_msg).await;
         counters::PROPOSALS_COUNT.inc();
         Ok(())
     }
@@ -2049,111 +2003,10 @@ impl RoundManager {
                     }
                 });
             } else if self.proxy_verifier.is_some() {
-                // Primary RM with proxy: only generate opt proposal if proxy blocks
-                // are available. Empty opt proposals waste primary rounds.
-                if self.pending_proxy_blocks.is_empty() {
-                    return Ok(());
-                }
-
-                // Mark round before spawning to prevent regular proposal from duplicating.
-                proposal_generator.mark_round_generated(opt_proposal_round)?;
-
-                let parent_lpr = self
-                    .block_store
-                    .get_block(parent.id())
-                    .and_then(|b| b.block().block_data().last_proxy_round())
-                    .unwrap_or(0);
-
-                use std::ops::Bound;
-                let blocks_to_include: Vec<Arc<Block>> = self
-                    .pending_proxy_blocks
-                    .range((Bound::Excluded(parent_lpr), Bound::Unbounded))
-                    .map(|(_, b)| b.clone())
-                    .collect();
-
-                let max_txns = self.local_config.max_sending_block_txns_after_filtering as usize;
-                let mut sub_payloads = Vec::new();
-                let mut all_vtxns = Vec::new();
-                let mut total_txns = 0usize;
-                let mut last_included_round = 0u64;
-                let mut last_included_id = HashValue::zero();
-                let mut included_count = 0usize;
-                for block in &blocks_to_include {
-                    let block_txns = block.payload().map_or(0, |p| p.len());
-                    if included_count > 0 && total_txns + block_txns > max_txns {
-                        break;
-                    }
-                    if let Some(vtxns) = block.validator_txns() {
-                        all_vtxns.extend(vtxns.iter().cloned());
-                    }
-                    if let Some(p) = block.payload().cloned() {
-                        if !p.is_empty() {
-                            total_txns += p.len();
-                            sub_payloads.push(p);
-                        }
-                    }
-                    last_included_round = block.round();
-                    last_included_id = block.id();
-                    included_count += 1;
-                }
-
-                let proxy_rounds: Vec<u64> = blocks_to_include
-                    .iter()
-                    .take(included_count)
-                    .map(|b| b.round())
-                    .collect();
-
-                let payload = match sub_payloads.len() {
-                    0 => aptos_consensus_types::common::Payload::empty(true, true),
-                    1 => sub_payloads.into_iter().next().expect("checked len"),
-                    _ => aptos_consensus_types::common::Payload::OrderedPayloads(sub_payloads),
-                };
-
-                let last_proxy_round;
-                let last_proxy_block_id;
-                if included_count > 0 {
-                    last_proxy_round = last_included_round;
-                    last_proxy_block_id = last_included_id;
-                    self.last_consumed_proxy_round = last_included_round;
-                    let to_remove: Vec<Round> = self
-                        .pending_proxy_blocks
-                        .range(..=last_included_round)
-                        .map(|(r, _)| *r)
-                        .collect();
-                    for r in to_remove {
-                        self.pending_proxy_blocks.remove(&r);
-                    }
-                } else {
-                    last_proxy_round = parent_lpr;
-                    last_proxy_block_id = HashValue::zero();
-                }
-
-                tokio::spawn(async move {
-                    if let Err(e) = monitor!(
-                        "generate_and_send_opt_proxy_aggregated_proposal",
-                        Self::generate_and_send_opt_proxy_aggregated_proposal(
-                            epoch_state,
-                            opt_proposal_round,
-                            parent,
-                            grandparent_qc,
-                            network,
-                            sync_info,
-                            proposal_generator,
-                            proposer_election,
-                            all_vtxns,
-                            payload,
-                            last_proxy_round,
-                            last_proxy_block_id,
-                            proxy_rounds,
-                        )
-                        .await
-                    ) {
-                        warn!(
-                            "[OptProposal] Error generating proxy-aggregated opt proposal: {}",
-                            e
-                        );
-                    }
-                });
+                // Primary RM with proxy: disable opt proposals to avoid empty blocks.
+                // Primary opt proposals waste rounds when proxy blocks aren't ready yet.
+                // The regular proposal path defers until proxy blocks arrive.
+                return Ok(());
             } else {
                 // Standard path (no proxy): generate standard opt proposal
                 tokio::spawn(async move {
