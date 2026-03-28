@@ -392,8 +392,19 @@ impl BlockStore {
                 let advance_info = {
                     let tree = self.inner.read();
                     if prune_up_to > tree.commit_root().round() {
-                        tree.find_block_id_by_round(prune_up_to)
-                            .map(|id| (id, tree.find_blocks_to_prune(id)))
+                        // Walk the main chain (commit_root → ordered_root) to find
+                        // the prune target. Don't use find_block_id_by_round which
+                        // uses round_to_ids and can return fork blocks.
+                        tree.path_from_commit_root(tree.ordered_root().id())
+                            .and_then(|path| {
+                                path.into_iter()
+                                    .filter(|b| b.round() <= prune_up_to)
+                                    .last()
+                                    .map(|b| {
+                                        let id = b.id();
+                                        (id, tree.find_blocks_to_prune(id))
+                                    })
+                            })
                     } else {
                         None
                     }
