@@ -627,6 +627,17 @@ impl RoundManager {
                     .and_then(|b| b.block().block_data().last_proxy_round())
                     .unwrap_or(0);
                 let start_after = hqc_block_lpr.max(parent_block_lpr);
+                let hqc_round = sync_info.highest_quorum_cert().certified_block().round();
+                let parent_round = new_round_event.round.saturating_sub(1);
+                let parent_exists = self.block_store.get_block_for_round(parent_round).is_some();
+                info!(
+                    "[proxy-debug] start_after: round={}, hqc_round={}, hqc_lpr={}, \
+                     parent_round={}, parent_exists={}, parent_lpr={}, start_after={}, \
+                     last_consumed={}",
+                    new_round_event.round, hqc_round, hqc_block_lpr,
+                    parent_round, parent_exists, parent_block_lpr, start_after,
+                    self.last_consumed_proxy_round,
+                );
 
                 // Collect blocks from pending_proxy_blocks with round > start_after
                 use std::ops::Bound;

@@ -1136,18 +1136,22 @@ impl PipelineBuilder {
             use std::sync::Mutex as StdMutex;
             use once_cell::sync::Lazy;
 
-            static SEEN_PROXY_ROUNDS: Lazy<StdMutex<StdHashSet<u64>>> =
-                Lazy::new(|| StdMutex::new(StdHashSet::new()));
-            static SEEN_BATCH_DIGESTS: Lazy<StdMutex<StdHashSet<aptos_crypto::HashValue>>> =
-                Lazy::new(|| StdMutex::new(StdHashSet::new()));
+            static SEEN_STATE: Lazy<StdMutex<(u64, StdHashSet<u64>, StdHashSet<aptos_crypto::HashValue>)>> =
+                Lazy::new(|| StdMutex::new((0, StdHashSet::new(), StdHashSet::new())));
+
+            let epoch = block.block_data().epoch();
+            let mut state = SEEN_STATE.lock().unwrap();
+            // Clear tracking on epoch change
+            if state.0 != epoch {
+                state.0 = epoch;
+                state.1.clear();
+                state.2.clear();
+            }
 
             let mut dup_proxy_rounds = Vec::new();
-            {
-                let mut seen = SEEN_PROXY_ROUNDS.lock().unwrap();
-                for &pr in proxy_rounds {
-                    if !seen.insert(pr) {
-                        dup_proxy_rounds.push(pr);
-                    }
+            for &pr in proxy_rounds {
+                if !state.1.insert(pr) {
+                    dup_proxy_rounds.push(pr);
                 }
             }
 
@@ -1161,13 +1165,13 @@ impl PipelineBuilder {
                     _ => StdHashSet::new(),
                 };
                 total_batches = batch_infos.len();
-                let mut seen = SEEN_BATCH_DIGESTS.lock().unwrap();
                 for bi in &batch_infos {
-                    if !seen.insert(*bi.digest()) {
+                    if !state.2.insert(*bi.digest()) {
                         dup_batch_digests += 1;
                     }
                 }
             }
+            drop(state);
 
             let failed_dup = compute_result
                 .compute_status_for_input_txns()
