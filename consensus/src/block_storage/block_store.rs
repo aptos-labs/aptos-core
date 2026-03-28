@@ -376,19 +376,23 @@ impl BlockStore {
             .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit, self.consensus_type);
 
-        // Proxy mode: advance commit_root based on what primary has committed.
-        // The primary writes last_proxy_round to the shared atomic on commit; the proxy
-        // reads it here to advance commit_root. Pruned blocks' batches are safe to remove
-        // because the PayloadFilter (from path_from_commit_root) still covers all
-        // non-pruned blocks, and notify_commit ensures QS marks pruned batches as committed
-        // before any subsequent pull.
+        // Proxy mode: lazily advance commit_root based on what primary has committed.
+        // Keep a buffer of recent blocks for peer sync (lagging nodes fetch missing
+        // blocks via block retrieval — if we prune too aggressively, they get IdNotFound
+        // and can never catch up). Only prune when the gap exceeds a threshold.
         if self.consensus_type == "proxy" {
             if let Some(atomic) = &self.primary_committed_proxy_round {
                 let committed_round = atomic.load(AtomicOrdering::Acquire);
+                // Keep at least 500 rounds of blocks for peer sync.
+                // Only prune up to (committed_round - buffer), not all the way.
+                // At ~100 proxy rounds/sec, 3000 rounds ≈ 30 seconds of blocks (~30MB).
+                // Enough for lagging nodes to sync via block retrieval.
+                const PROXY_PRUNE_BUFFER_ROUNDS: u64 = 3000;
+                let prune_up_to = committed_round.saturating_sub(PROXY_PRUNE_BUFFER_ROUNDS);
                 let advance_info = {
                     let tree = self.inner.read();
-                    if committed_round > tree.commit_root().round() {
-                        tree.find_block_id_by_round(committed_round)
+                    if prune_up_to > tree.commit_root().round() {
+                        tree.find_block_id_by_round(prune_up_to)
                             .map(|id| (id, tree.find_blocks_to_prune(id)))
                     } else {
                         None
