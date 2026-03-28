@@ -1289,12 +1289,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         Arc<BlockStore>,
         oneshot::Sender<oneshot::Sender<()>>,
     ) {
-        // 1. Create ProxyLivenessStorage with the epoch's ledger info
+        // 1. Create ProxyLivenessStorage with the epoch-boundary ledger info.
+        // Must use the epoch-ending LI (not latest), because get_latest_ledger_info()
+        // may return a non-epoch-ending LI if blocks from the new epoch have already
+        // been committed (race on faster validators). Waypoint::new_epoch_boundary
+        // requires ends_epoch()=true.
         let latest_ledger_info = self
             .storage
             .aptos_db()
-            .get_latest_ledger_info()
-            .expect("Failed to get latest ledger info for proxy consensus");
+            .get_epoch_ending_ledger_infos(epoch.saturating_sub(1), epoch)
+            .ok()
+            .and_then(|proof| proof.ledger_info_with_sigs.into_iter().last())
+            .unwrap_or_else(|| {
+                // Fallback to latest ledger info (works at genesis when no epoch ending LI exists)
+                self.storage
+                    .aptos_db()
+                    .get_latest_ledger_info()
+                    .expect("Failed to get latest ledger info for proxy consensus")
+            });
         let accumulator_summary = self
             .storage
             .aptos_db()
