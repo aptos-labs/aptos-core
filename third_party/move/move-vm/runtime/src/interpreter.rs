@@ -1647,9 +1647,7 @@ where
         // remap the error.
         if err.status_type() == StatusType::Verification {
             // Make sure we propagate dependency limit errors.
-            if !self.vm_config.propagate_dependency_limit_error
-                || err.major_status() != StatusCode::DEPENDENCY_LIMIT_REACHED
-            {
+            if err.major_status() != StatusCode::DEPENDENCY_LIMIT_REACHED {
                 err.set_major_status(StatusCode::VERIFICATION_ERROR);
             }
         }

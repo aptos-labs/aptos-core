@@ -38,7 +38,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use aptos_vm_environment::prod_configs::{aptos_prod_verifier_config, LATEST_GAS_FEATURE_VERSION};
+use aptos_vm_environment::prod_configs::aptos_prod_verifier_config;
 use clap::Parser;
 use futures::{stream, TryStreamExt};
 use move_binary_format::CompiledModule;
@@ -235,8 +235,7 @@ impl StateSnapshotRestoreController {
         let features = Features::default();
 
         let timed_features = TimedFeaturesBuilder::enable_all().build();
-        let config =
-            aptos_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &features, &timed_features);
+        let config = aptos_prod_verifier_config(&features, &timed_features);
         for (key, value) in blob {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {

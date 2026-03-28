@@ -15,7 +15,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::AptosVM;
-use aptos_vm_environment::{prod_configs, prod_configs::LATEST_GAS_FEATURE_VERSION};
+use aptos_vm_environment::prod_configs;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess, deserializer::DeserializerConfig, file_format::SignatureToken,
@@ -87,11 +87,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     filter_modules(&input)?;
 
     let timed_features = TimedFeaturesBuilder::enable_all().build();
-    let verifier_config = prod_configs::aptos_prod_verifier_config(
-        LATEST_GAS_FEATURE_VERSION,
-        &Features::default(),
-        &timed_features,
-    );
+    let verifier_config =
+        prod_configs::aptos_prod_verifier_config(&Features::default(), &timed_features);
     let deserializer_config = DeserializerConfig::new(BYTECODE_VERSION, 255);
 
     for m in input.dep_modules.iter_mut() {

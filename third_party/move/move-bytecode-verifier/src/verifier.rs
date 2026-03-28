@@ -54,7 +54,7 @@ pub struct VerifierConfig {
     pub max_per_mod_meter_units: Option<u128>,
     // signature checker v2 is enabled on mainnet and cannot be disabled
     pub _use_signature_checker_v2: bool,
-    pub sig_checker_v2_fix_script_ty_param_count: bool,
+    pub _sig_checker_v2_fix_script_ty_param_count: bool,
     pub enable_enum_types: bool,
     pub enable_resource_access_control: bool,
     pub enable_function_values: bool,
@@ -62,9 +62,8 @@ pub struct VerifierConfig {
     pub max_function_return_values: Option<usize>,
     /// Maximum depth of a type node.
     pub max_type_depth: Option<usize>,
-    /// If enabled, signature checker V2 also checks parameter and return types in function
-    /// signatures.
-    pub sig_checker_v2_fix_function_signatures: bool,
+    // Always enabled.
+    pub _sig_checker_v2_fix_function_signatures: bool,
 }
 
 /// Scope of verification.
@@ -260,8 +259,8 @@ impl Default for VerifierConfig {
 
             _use_signature_checker_v2: true,
 
-            sig_checker_v2_fix_script_ty_param_count: true,
-            sig_checker_v2_fix_function_signatures: true,
+            _sig_checker_v2_fix_script_ty_param_count: true,
+            _sig_checker_v2_fix_function_signatures: true,
 
             enable_enum_types: true,
             enable_resource_access_control: true,
@@ -309,8 +308,8 @@ impl VerifierConfig {
             max_per_mod_meter_units: Some(1000 * 8000),
 
             _use_signature_checker_v2: true,
-            sig_checker_v2_fix_script_ty_param_count: true,
-            sig_checker_v2_fix_function_signatures: true,
+            _sig_checker_v2_fix_script_ty_param_count: true,
+            _sig_checker_v2_fix_function_signatures: true,
 
             enable_enum_types: true,
             enable_resource_access_control: true,

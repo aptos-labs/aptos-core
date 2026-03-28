@@ -4,7 +4,7 @@
 pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
     gas_feature_versions::{
-        RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
+        RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
     },
     AptosGasParameters,
 };
@@ -151,18 +151,11 @@ pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig
 
 /// Returns [VerifierConfig] used by the Aptos blockchain in production.
 pub fn aptos_prod_verifier_config(
-    gas_feature_version: u64,
     features: &Features,
     timed_features: &TimedFeatures,
 ) -> VerifierConfig {
-    let sig_checker_v2_fix_script_ty_param_count =
-        features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX);
-    let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
-    let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
     let enable_resource_access_control =
         features.is_enabled(FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL);
-    let enable_function_values = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
-    // Note: we reuse the `enable_function_values` flag to set various stricter limits on types.
 
     let strict_bounds = timed_features.is_enabled(TimedFeatureFlag::EnableStrictBoundsInProdConfig);
     let revised_bounds = timed_features.is_enabled(TimedFeatureFlag::RevisedBoundsInProdConfig);
@@ -174,11 +167,7 @@ pub fn aptos_prod_verifier_config(
         max_function_parameters: Some(128),
         max_basic_blocks: Some(1024),
         max_value_stack_size: 1024,
-        max_type_nodes: if enable_function_values {
-            Some(128)
-        } else {
-            Some(256)
-        },
+        max_type_nodes: Some(128),
         max_push_size: Some(10000),
         max_struct_definitions: if strict_bounds {
             if revised_bounds {
@@ -198,29 +187,21 @@ pub fn aptos_prod_verifier_config(
         } else {
             None
         },
-        max_fields_in_struct: if strict_bounds { Some(64) } else { None },
-        max_function_definitions: if strict_bounds { Some(1000) } else { None },
+        max_fields_in_struct: Some(64),
+        max_function_definitions: Some(1000),
         max_back_edges_per_function: None,
         max_back_edges_per_module: None,
-        max_basic_blocks_in_script: if strict_bounds { Some(1024) } else { None },
+        max_basic_blocks_in_script: Some(1024),
         max_per_fun_meter_units: Some(1000 * 80000),
         max_per_mod_meter_units: Some(1000 * 80000),
         _use_signature_checker_v2: true,
-        sig_checker_v2_fix_script_ty_param_count,
-        sig_checker_v2_fix_function_signatures,
-        enable_enum_types,
+        _sig_checker_v2_fix_script_ty_param_count: true,
+        _sig_checker_v2_fix_function_signatures: true,
+        enable_enum_types: true,
         enable_resource_access_control,
-        enable_function_values,
-        max_function_return_values: if enable_function_values {
-            Some(128)
-        } else {
-            None
-        },
-        max_type_depth: if enable_function_values {
-            Some(20)
-        } else {
-            None
-        },
+        enable_function_values: true,
+        max_function_return_values: Some(128),
+        max_type_depth: Some(20),
     }
 }
 
@@ -239,7 +220,7 @@ pub fn aptos_prod_vm_config(
     let enable_debugging = get_debugging_enabled();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
-    let verifier_config = aptos_prod_verifier_config(gas_feature_version, features, timed_features);
+    let verifier_config = aptos_prod_verifier_config(features, timed_features);
     let enable_enum_option = features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION);
     let enable_framework_for_option = features.is_enabled(FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION);
 
@@ -256,7 +237,6 @@ pub fn aptos_prod_vm_config(
     // shallow while the value can be deeply nested, thanks to captured arguments not visible in a
     // type. Hence, depth checks have been adjusted to operate on values.
     let enable_depth_checks = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
-    let enable_closure_depth_check = timed_features.is_enabled(TimedFeatureFlag::ClosureDepthCheck);
 
     // Some feature gating was missed, so for native dynamic dispatch the feature is always on for
     // testnet after 1.38 release.
@@ -288,11 +268,11 @@ pub fn aptos_prod_vm_config(
         paranoid_ref_checks,
         enable_enum_option,
         enable_layout_caches,
-        propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
+        propagate_dependency_limit_error: true,
         enable_framework_for_option,
         enable_function_caches_for_native_dynamic_dispatch,
         enable_debugging,
-        enable_closure_depth_check,
+        enable_closure_depth_check: true,
         enable_struct_layout_local_cache: gas_feature_version >= RELEASE_V1_41,
         check_depth_on_type_counts: gas_feature_version >= RELEASE_V1_41,
         enable_public_struct_args: features.is_enabled(FeatureFlag::PUBLIC_STRUCT_ENUM_ARGS),

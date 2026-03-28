@@ -54,16 +54,9 @@ where
 {
     /// Creates a new depth checker for the specified loader to query struct definitions if needed.
     pub(crate) fn new(struct_definition_loader: &'a T) -> Self {
-        let vm_config = struct_definition_loader.runtime_environment().vm_config();
-        // Gate by other config which will be enabled in 1.38. Will be removed after it is enabled.
-        let maybe_max_depth = if vm_config.propagate_dependency_limit_error {
-            None
-        } else {
-            vm_config.max_value_nest_depth
-        };
         Self {
             struct_definition_loader,
-            maybe_max_depth,
+            maybe_max_depth: None,
             formula_cache: RefCell::new(HashMap::new()),
         }
     }

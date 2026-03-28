@@ -173,18 +173,16 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             },
             Function(params, results, abilities) => {
                 assert_abilities(*abilities, required_abilities)?;
-                if self.sig_checker_v2_fix_function_signatures {
-                    for ty in params.iter().chain(results) {
-                        self.check_ty(
-                            ty,
-                            // Immediate params and returns can be references.
-                            true,
-                            // Note we do not need to check abilities of argument or result types,
-                            // they do not matter for the `required_abilities`.
-                            AbilitySet::EMPTY,
-                            param_constraints,
-                        )?
-                    }
+                for ty in params.iter().chain(results) {
+                    self.check_ty(
+                        ty,
+                        // Immediate params and returns can be references.
+                        true,
+                        // Note we do not need to check abilities of argument or result types,
+                        // they do not matter for the `required_abilities`.
+                        AbilitySet::EMPTY,
+                        param_constraints,
+                    )?
                 }
             },
             Struct(sh_idx) => {
@@ -301,8 +299,6 @@ fn check_phantom_params(
 
 struct SignatureChecker<'a, const N: usize> {
     resolver: BinaryIndexedView<'a>,
-    // If enabled, recurses into function signature to check type signatures.
-    sig_checker_v2_fix_function_signatures: bool,
 
     // Here the arena is used as a scoped interner, allowing us to store references in the
     // caches below.
@@ -345,12 +341,10 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     fn new(
         constraints: &'a Arena<BitsetTypeParameterConstraints<N>>,
         resolver: BinaryIndexedView<'a>,
-        sig_checker_v2_fix_function_signatures: bool,
     ) -> Self {
         Self {
             resolver,
             constraints,
-            sig_checker_v2_fix_function_signatures,
 
             ty_results: RefCell::new(BTreeMap::new()),
             sig_results: RefCell::new(BTreeMap::new()),
@@ -1146,15 +1140,11 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
 }
 
 fn verify_module_impl<const N: usize>(
-    config: &VerifierConfig,
+    _config: &VerifierConfig,
     module: &CompiledModule,
 ) -> PartialVMResult<()> {
     let arena = Arena::<BitsetTypeParameterConstraints<N>>::new();
-    let checker = SignatureChecker::new(
-        &arena,
-        BinaryIndexedView::Module(module),
-        config.sig_checker_v2_fix_function_signatures,
-    );
+    let checker = SignatureChecker::new(&arena, BinaryIndexedView::Module(module));
 
     // Check if all signatures & instantiations are well-formed without any specific contexts.
     // This is only needed if we want to keep the binary format super clean.
@@ -1173,15 +1163,11 @@ fn verify_module_impl<const N: usize>(
 }
 
 fn verify_script_impl<const N: usize>(
-    config: &VerifierConfig,
+    _config: &VerifierConfig,
     script: &CompiledScript,
 ) -> PartialVMResult<()> {
     let arena = Arena::<BitsetTypeParameterConstraints<N>>::new();
-    let checker = SignatureChecker::new(
-        &arena,
-        BinaryIndexedView::Script(script),
-        config.sig_checker_v2_fix_function_signatures,
-    );
+    let checker = SignatureChecker::new(&arena, BinaryIndexedView::Script(script));
 
     // Check if all signatures & instantiations are well-formed without any specific contexts.
     // This is only needed if we want to keep the binary format super clean.
@@ -1274,9 +1260,7 @@ pub fn verify_module(config: &VerifierConfig, module: &CompiledModule) -> VMResu
 
 pub fn verify_script(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
     let mut max_num = max_num_of_ty_params_or_args(BinaryIndexedView::Script(script));
-    if config.sig_checker_v2_fix_script_ty_param_count {
-        max_num = max_num.max(script.type_parameters.len());
-    }
+    max_num = max_num.max(script.type_parameters.len());
 
     let res = if max_num <= NUM_PARAMS_PER_WORD {
         verify_script_impl::<1>(config, script)

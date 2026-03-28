@@ -163,11 +163,6 @@ where
         configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<VMChangeSet> {
-        // Note: enabled by 1.38 gas feature version.
-        let is_1_38_release = module_storage
-            .runtime_environment()
-            .vm_config()
-            .propagate_dependency_limit_error;
         let function_extension = module_storage.as_function_value_extension();
 
         let resource_converter = |value: Value,
@@ -192,24 +187,8 @@ where
                     .map(|bytes| (bytes.into(), None))
             };
             serialization_result.ok_or_else(|| {
-                let status_code = if is_1_38_release {
-                    StatusCode::VALUE_SERIALIZATION_ERROR
-                } else {
-                    StatusCode::INTERNAL_TYPE_ERROR
-                };
-                // Note: When enable_closure_depth_check is enabled, do not format
-                // `value` here - deeply nested closures can cause stack overflow
-                // during Display formatting.
-                let enable_closure_depth_check = module_storage
-                    .runtime_environment()
-                    .vm_config()
-                    .enable_closure_depth_check;
-                let message = if enable_closure_depth_check {
-                    "Error when serializing resource.".to_string()
-                } else {
-                    format!("Error when serializing resource {}.", value)
-                };
-                PartialVMError::new(status_code).with_message(message)
+                PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                    .with_message("Error when serializing resource.".to_string())
             })
         };
 
