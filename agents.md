@@ -312,3 +312,34 @@ Example:
 ```
 
 Areas: `vm`, `framework`, `consensus`, `storage`, `api`, `network`, `types`, `cli`, `docs`, `test`
+
+## Cursor Cloud specific instructions
+
+### System dependencies
+
+The update script runs `./scripts/dev_setup.sh -b` which installs all build tools. One additional package not covered by that script is required:
+
+- `libstdc++-14-dev`: clang-21 (installed by dev_setup.sh) searches for GCC 14 C++ headers. Ubuntu 24.04 ships GCC 13 headers only. Without this package, RocksDB (native C++ dep) fails to compile with `fatal error: 'cstdint' file not found`.
+
+### Building
+
+- `cargo build -p aptos` builds the CLI (includes local testnet). Takes ~9 min on first build due to RocksDB native compilation.
+- `cargo build -p aptos-node` builds the standalone node binary.
+- See `CLAUDE.md` for per-package build/test/lint commands.
+
+### Running a local testnet
+
+```bash
+./target/debug/aptos node run-local-testnet --force-restart --assume-yes
+```
+
+- REST API: `http://127.0.0.1:8080/v1`
+- Faucet: `http://127.0.0.1:8081`
+- No external DB needed (uses embedded RocksDB).
+- Takes ~30s to be ready after starting.
+
+### Linting gotchas
+
+- `cargo +nightly fmt --check` works cleanly.
+- `cargo xclippy` (workspace-wide clippy) may fail on `move-core-types` proc-macro compatibility with edition 2024. Use `cargo clippy -p <package>` for targeted checks.
+- `cargo sort --grouped --workspace --check` verifies Cargo.toml dependency ordering.
