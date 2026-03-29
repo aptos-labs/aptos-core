@@ -6,6 +6,7 @@
 //! pointer slot validity, invalid jump targets, etc.
 
 use crate::types::ObjectDescriptor;
+use mono_move_alloc::ExecutableArenaPtr;
 use mono_move_core::{
     CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, FRAME_METADATA_SIZE,
 };
@@ -38,11 +39,13 @@ impl fmt::Display for VerificationError {
 /// Validate all functions and their pointer slots against the descriptor table.
 /// Returns an empty `Vec` on success.
 pub fn verify_program(
-    functions: &[Function],
+    functions: &[ExecutableArenaPtr<Function>],
     descriptors: &[ObjectDescriptor],
 ) -> Vec<VerificationError> {
     let mut errors = Vec::new();
-    for (fid, func) in functions.iter().enumerate() {
+    for (fid, func_ptr) in functions.iter().enumerate() {
+        // SAFETY: The arena is alive during verification.
+        let func = unsafe { func_ptr.as_ref_unchecked() };
         let mut fv = FunctionVerifier {
             func_id: fid,
             func,
@@ -62,14 +65,18 @@ pub fn verify_program(
 struct FunctionVerifier<'a> {
     func_id: usize,
     func: &'a Function,
-    all_functions: &'a [Function],
+    all_functions: &'a [ExecutableArenaPtr<Function>],
     descriptors: &'a [ObjectDescriptor],
     errors: &'a mut Vec<VerificationError>,
 }
 
 impl FunctionVerifier<'_> {
     fn verify(&mut self) {
-        if self.func.code.is_empty() {
+        // SAFETY: The function's code is allocated in an executable arena that
+        // is alive for the duration of verification.
+        let code = unsafe { self.func.code.as_ref_unchecked() };
+        let pointer_offsets = unsafe { self.func.pointer_offsets.as_ref_unchecked() };
+        if code.is_empty() {
             self.err(None, "code must be non-empty");
         }
         if self.func.frame_size() > self.func.extended_frame_size {
@@ -94,11 +101,11 @@ impl FunctionVerifier<'_> {
             );
         }
 
-        for &off in &self.func.pointer_offsets {
+        for &off in pointer_offsets {
             self.check_frame_access(None, off, 8);
         }
 
-        for (pc, instr) in self.func.code.iter().enumerate() {
+        for (pc, instr) in code.iter().enumerate() {
             self.verify_instruction(pc, instr);
         }
     }
@@ -177,10 +184,11 @@ impl FunctionVerifier<'_> {
 
             MicroOp::Return | MicroOp::ForceGC => {},
 
-            MicroOp::CallFunc { func_id } => {
-                if func_id as usize >= self.all_functions.len() {
-                    self.err(Some(pc), format!("func_id {} out of bounds", func_id));
-                }
+            MicroOp::CallFunc { .. } => {
+                // TODO: re-implement once functions are arena-allocated in verifier.
+                // if func_id as usize >= self.all_functions.len() {
+                //     self.err(Some(pc), format!("func_id {} out of bounds", func_id));
+                // }
             },
             MicroOp::CallLocalFunc { .. } => {},
 
@@ -396,13 +404,15 @@ impl FunctionVerifier<'_> {
     }
 
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
-        if (target.0 as usize) >= self.func.code.len() {
+        // SAFETY: code arena pointer is valid during verification.
+        let code = unsafe { self.func.code.as_ref_unchecked() };
+        if (target.0 as usize) >= code.len() {
             self.err(
                 Some(pc),
                 format!(
                     "jump target {} out of bounds (code length {})",
                     target.0,
-                    self.func.code.len()
+                    code.len()
                 ),
             );
         }

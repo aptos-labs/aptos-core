@@ -14,6 +14,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
+use mono_move_alloc::ExecutableArenaPtr;
 use mono_move_core::{DescriptorId, Function, MicroOp, FRAME_METADATA_SIZE};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
@@ -25,7 +26,7 @@ use std::ptr::{null, NonNull};
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a> {
     /// Externally-provided function table (will be replaced by execution context).
-    pub(crate) functions: &'a [Function],
+    pub(crate) functions: &'a [ExecutableArenaPtr<Function>],
     /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
 
@@ -43,7 +44,7 @@ pub struct InterpreterContext<'a> {
 
 impl<'a> InterpreterContext<'a> {
     pub fn new(
-        functions: &'a [Function],
+        functions: &'a [ExecutableArenaPtr<Function>],
         descriptors: &'a [ObjectDescriptor],
         func_id: usize,
     ) -> Self {
@@ -52,7 +53,7 @@ impl<'a> InterpreterContext<'a> {
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(
-        functions: &'a [Function],
+        functions: &'a [ExecutableArenaPtr<Function>],
         descriptors: &'a [ObjectDescriptor],
         func_id: usize,
         heap_size: usize,
@@ -89,7 +90,7 @@ impl<'a> InterpreterContext<'a> {
             functions,
             descriptors,
             pc: 0,
-            current_func: NonNull::from(&functions[func_id]),
+            current_func: functions[func_id].as_non_null(),
             frame_ptr,
             stack,
             heap: Heap::new(heap_size),
@@ -116,13 +117,15 @@ impl<'a> InterpreterContext<'a> {
             self.functions.len()
         );
 
-        let func = &self.functions[func_id];
         let base = self.stack.as_ptr();
 
         // Reset execution state to root frame.
         self.frame_ptr = unsafe { base.add(FRAME_METADATA_SIZE) };
         self.pc = 0;
-        self.current_func = NonNull::from(func);
+        let func_ptr = self.functions[func_id];
+        self.current_func = func_ptr.as_non_null();
+        // SAFETY: Arena is alive during execution.
+        let func = unsafe { func_ptr.as_ref_unchecked() };
 
         // Re-write sentinel metadata so Return from root triggers Done.
         unsafe {
@@ -198,17 +201,20 @@ impl InterpreterContext<'_> {
         // derived from `self.functions[]` or from a `CallLocalFunc` pointer
         // (which is itself non-null and a valid reference).
         let func = unsafe { self.current_func.as_ref() };
-        if self.pc >= func.code.len() {
+        // SAFETY: The function's code is allocated in an executable arena that
+        // is alive for the duration of execution.
+        let code = unsafe { func.code.as_ref_unchecked() };
+        if self.pc >= code.len() {
             bail!(
                 "pc out of bounds: pc={} but function {} has {} instructions",
                 self.pc,
                 unsafe { func.name.as_ref_unchecked() },
-                func.code.len()
+                code.len()
             );
         }
 
         let fp = self.frame_ptr;
-        let instr = &func.code[self.pc];
+        let instr = &code[self.pc];
 
         // SAFETY: fp points into the interpreter's linear stack; all byte
         // offsets are within the current frame (enforced by the bytecode
@@ -216,13 +222,11 @@ impl InterpreterContext<'_> {
         unsafe {
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
-                MicroOp::CallFunc { func_id } => {
-                    let func_id = func_id as usize;
-                    let callee = &self.functions[func_id];
-                    return self.call(func, fp, callee);
+                MicroOp::CallFunc { .. } => {
+                    bail!("CallFunc must be resolved to CallLocalFunc before execution");
                 },
                 MicroOp::CallLocalFunc { ptr } => {
-                    return self.call(func, fp, ptr.as_ref());
+                    return self.call(func, fp, ptr.as_ref_unchecked());
                 },
 
                 MicroOp::JumpNotZeroU64 { target, src } => {

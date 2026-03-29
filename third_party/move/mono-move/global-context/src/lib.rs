@@ -3,7 +3,7 @@
 
 mod context;
 pub use context::{
-    ArenaRef, Executable, ExecutableBuilder, ExecutionGuard, FieldLayout, Function, GlobalContext,
+    ArenaRef, Executable, ExecutableBuilder, ExecutionGuard, FieldLayout, GlobalContext,
     MaintenanceGuard, Type,
 };
 pub mod maintenance_config;

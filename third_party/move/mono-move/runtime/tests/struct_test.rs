@@ -3,7 +3,7 @@
 
 //! Tests for Move struct support (both inline and heap-allocated).
 
-use mono_move_alloc::GlobalArenaPtr;
+use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
 use mono_move_core::{DescriptorId, FrameOffset as FO, Function, MicroOp, STRUCT_DATA_OFFSET};
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
@@ -21,23 +21,26 @@ fn struct_inline() {
     let pair_a: u32 = 8;
     let pair_b: u32 = 16;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         StoreImm8 { dst: FO(pair_a), imm: 10 },
         StoreImm8 { dst: FO(pair_b), imm: 20 },
         AddU64 { dst: FO(result), lhs: FO(pair_a), rhs: FO(pair_b) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>());
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: false,
-        pointer_offsets: vec![],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -58,8 +61,10 @@ fn struct_inline_borrow() {
     let pair_b: u32 = 16;
     let r#ref: u32 = 24;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         StoreImm8 { dst: FO(pair_a), imm: 10 },
         StoreImm8 { dst: FO(pair_b), imm: 20 },
         SlotBorrow { dst: FO(r#ref), local: FO(pair_b) },
@@ -68,17 +73,18 @@ fn struct_inline_borrow() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         Move8 { dst: FO(result), src: FO(pair_b) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(r#ref)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        pointer_offsets: vec![FO(r#ref)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
@@ -98,8 +104,10 @@ fn struct_heap_basic() {
     let entry: u32 = 8;
     let tmp: u32 = 16;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 42 },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
@@ -109,17 +117,18 @@ fn struct_heap_basic() {
         MicroOp::struct_load8(FO(entry), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(entry)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets: vec![FO(entry)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
         pointer_offsets: vec![],
@@ -142,8 +151,10 @@ fn struct_heap_survives_gc() {
     let entry: u32 = 8;
     let tmp: u32 = 16;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 7 },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
@@ -154,17 +165,18 @@ fn struct_heap_survives_gc() {
         MicroOp::struct_load8(FO(entry), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(entry)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets: vec![FO(entry)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
         pointer_offsets: vec![],
@@ -195,8 +207,10 @@ fn struct_with_vector_field() {
     let vec_ref: u32 = 32; // 16-byte fat pointer referencing the vector
     let ctr_ref: u32 = 48; // 16-byte fat pointer ref to ctr (for struct_borrow)
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(ctr), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(tmp), imm: 999 },
         MicroOp::struct_store8(FO(ctr), 0, FO(tmp)),
@@ -215,17 +229,18 @@ fn struct_with_vector_field() {
         MicroOp::struct_load8(FO(ctr), 0, FO(result)),
         VecLen { dst: FO(tmp), vec_ref: FO(vec_ref) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_offsets: vec![FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![
         ObjectDescriptor::Struct {
             size: 16,
@@ -264,8 +279,10 @@ fn struct_borrow_field() {
     let r#ref: u32 = 16;
     let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 5 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
@@ -278,17 +295,18 @@ fn struct_borrow_field() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         MicroOp::struct_load8(FO(entry), 8, FO(result)),
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(entry), FO(r#ref), FO(entry_ref)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets: vec![FO(entry), FO(r#ref), FO(entry_ref)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
         pointer_offsets: vec![],
@@ -317,8 +335,10 @@ fn struct_borrow_survives_gc() {
     let ref_base: u32 = 16;
     let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 100 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
@@ -329,17 +349,18 @@ fn struct_borrow_survives_gc() {
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(entry), FO(ref_base), FO(entry_ref)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets: vec![FO(entry), FO(ref_base), FO(entry_ref)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
         pointer_offsets: vec![],

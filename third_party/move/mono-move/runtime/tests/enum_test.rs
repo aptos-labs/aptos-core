@@ -3,7 +3,7 @@
 
 //! Tests for Move enum support (heap-allocated tagged unions).
 
-use mono_move_alloc::GlobalArenaPtr;
+use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
 use mono_move_core::{
     CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp, ENUM_DATA_OFFSET,
     ENUM_TAG_OFFSET,
@@ -24,8 +24,10 @@ fn enum_basic() {
     let shape: u32 = 8;
     let tmp: u32 = 16;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(shape), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(shape), 1),
         StoreImm8 { dst: FO(tmp), imm: 3 },
@@ -38,17 +40,18 @@ fn enum_basic() {
         MicroOp::enum_load8(FO(shape), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(shape)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets: vec![FO(shape)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
@@ -79,8 +82,10 @@ fn enum_survives_gc() {
     let shape: u32 = 8;
     let tmp: u32 = 16;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(shape), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(shape), 0),
         StoreImm8 { dst: FO(tmp), imm: 42 },
@@ -90,17 +95,18 @@ fn enum_survives_gc() {
         MicroOp::enum_load8(FO(shape), 0, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(shape)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets: vec![FO(shape)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
@@ -130,8 +136,10 @@ fn enum_gc_traces_refs() {
     let tmp: u32 = 24;
     let vec_ref: u32 = 32;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -149,17 +157,18 @@ fn enum_gc_traces_refs() {
         StoreImm8 { dst: FO(tmp), imm: 0 },
         VecLoadElem { dst: FO(result), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(val), FO(vec), FO(vec_ref)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets: vec![FO(val), FO(vec), FO(vec_ref)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![
         ObjectDescriptor::Enum {
             size: 16,
@@ -199,8 +208,10 @@ fn enum_pattern_match() {
     let op: u32 = 8;
     let tmp: u32 = 16;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(op), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(op), 0),
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -215,17 +226,18 @@ fn enum_pattern_match() {
         Return,
         StoreImm8 { dst: FO(result), imm: 0 },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(op)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets: vec![FO(op)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
@@ -248,8 +260,10 @@ fn enum_variant_switch() {
     let e: u32 = 8;
     let tmp: u32 = 16;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 111 },
@@ -262,17 +276,18 @@ fn enum_variant_switch() {
         MicroOp::enum_load8(FO(e), 0, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(e)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets: vec![FO(e)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 16,
         variant_pointer_offsets: vec![vec![], vec![]],
@@ -296,8 +311,10 @@ fn enum_borrow_field() {
     let r#ref: u32 = 16;
     let e_ref: u32 = 32; // 16-byte fat pointer ref to e (for enum_borrow)
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(result), imm: 10 },
@@ -311,17 +328,18 @@ fn enum_borrow_field() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         MicroOp::enum_load8(FO(e), 8, FO(result)),
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(e), FO(r#ref), FO(e_ref)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets: vec![FO(e), FO(r#ref), FO(e_ref)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
@@ -346,8 +364,10 @@ fn enum_gc_variant_switching() {
     let tmp: u32 = 24;
     let vec_ref: u32 = 32;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
@@ -365,17 +385,18 @@ fn enum_gc_variant_switching() {
         ForceGC,
         MicroOp::enum_get_tag(FO(ctr), FO(result)),
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(ctr), FO(vec), FO(vec_ref)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets: vec![FO(ctr), FO(vec), FO(vec_ref)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![
         ObjectDescriptor::Enum {
             size: 16,
@@ -407,8 +428,10 @@ fn enum_in_struct() {
     let payload: u32 = 16;
     let tmp: u32 = 24;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         HeapNew { dst: FO(payload), descriptor_id: DescriptorId(1) },
         MicroOp::enum_set_tag(FO(payload), 1),
         StoreImm8 { dst: FO(tmp), imm: 42 },
@@ -424,17 +447,18 @@ fn enum_in_struct() {
         MicroOp::enum_load8(FO(payload), 0, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(wrapper), FO(payload)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 32,
         extended_frame_size: 56,
         zero_frame: true,
-        pointer_offsets: vec![FO(wrapper), FO(payload)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![
         ObjectDescriptor::Struct {
             size: 16,
@@ -470,8 +494,10 @@ fn enum_in_vector() {
     let tmp: u32 = 24;
     let vec_ref: u32 = 32;
 
+    let arena = ExecutableArena::new();
+
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
@@ -497,17 +523,18 @@ fn enum_in_vector() {
         MicroOp::enum_load8(FO(e), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(e), FO(vec_ref)]);
 
-    let functions = [Function {
+    let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets: vec![FO(vec), FO(e), FO(vec_ref)],
-    }];
+        pointer_offsets,
+    })];
     let descriptors = vec![
         ObjectDescriptor::Enum {
             size: 24,

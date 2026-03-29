@@ -12691,8 +12691,11 @@ dependencies = [
  "mono-move-core",
  "move-asm",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
+ "move-vm-types",
  "parking_lot 0.12.5",
+ "specializer",
 ]
 
 [[package]]

@@ -34,8 +34,8 @@ fn bench_merge_sort(c: &mut Criterion) {
             );
         });
 
-        let (mut functions, descriptors) = micro_op_merge_sort();
-        mono_move_programs::resolve_calls(&mut functions);
+        let (mut functions, descriptors, _arena) = micro_op_merge_sort();
+        mono_move_core::Function::resolve_calls(&mut functions);
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {

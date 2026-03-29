@@ -16,7 +16,7 @@ mod micro_op {
     use mono_move_runtime::InterpreterContext;
 
     fn run(n: u64) -> u64 {
-        let (functions, descriptors) = micro_op_nested_loop();
+        let (functions, descriptors, _arena) = micro_op_nested_loop();
         let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
         ctx.set_root_arg(0, &n.to_le_bytes());
         ctx.run().unwrap();
