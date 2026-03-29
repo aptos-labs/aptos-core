@@ -385,10 +385,12 @@ impl BlockStore {
                 let committed_round = atomic.load(AtomicOrdering::Acquire);
                 // Keep at least 500 rounds of blocks for peer sync.
                 // Only prune up to (committed_round - buffer), not all the way.
-                // At ~100 proxy rounds/sec, 1000 rounds ≈ 10 seconds of blocks (~10MB).
-                // Enough for co-located lagging nodes to sync via block retrieval.
-                // Smaller buffer = shorter path_from_commit_root = faster PayloadFilter.
-                const PROXY_PRUNE_BUFFER_ROUNDS: u64 = 1000;
+                // Aggressive pruning for fast proxy consensus. Smaller buffer = shorter
+                // path_from_commit_root = smaller PayloadFilter = faster QS pull.
+                // Old committed batches are already mark_committed in QS, so the
+                // PayloadFilter for them is redundant. 100 rounds ≈ 1 second at
+                // 100 rounds/sec — enough for co-located peer sync.
+                const PROXY_PRUNE_BUFFER_ROUNDS: u64 = 100;
                 let prune_up_to = committed_round.saturating_sub(PROXY_PRUNE_BUFFER_ROUNDS);
                 let advance_info = {
                     let tree = self.inner.read();
