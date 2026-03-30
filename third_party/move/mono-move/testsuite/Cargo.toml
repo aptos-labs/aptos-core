@@ -1,0 +1,22 @@
+[package]
+name = "mono-move-testsuite"
+description = "End-to-end tests: move source (or assembly) to interpreter"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+
+[dev-dependencies]
+mono-move-core = { workspace = true }
+mono-move-global-context = { workspace = true }
+mono-move-programs = { workspace = true, features = ["move-bytecode", "testing"] }
+mono-move-runtime = { workspace = true }
+move-core-types = { workspace = true }

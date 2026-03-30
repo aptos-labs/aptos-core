@@ -290,7 +290,11 @@ mod micro_op {
     pub const FN_GET: usize = 2;
     pub const FN_REMOVE: usize = 4;
 
-    pub fn program() -> (Vec<ExecutableArenaPtr<Function>>, Vec<ObjectDescriptor>, ExecutableArena) {
+    pub fn program() -> (
+        Vec<ExecutableArenaPtr<Function>>,
+        Vec<ObjectDescriptor>,
+        ExecutableArena,
+    ) {
         let arena = ExecutableArena::new();
         let descriptors = vec![
             ObjectDescriptor::Trivial, // 0: node elements, free_list elements
@@ -592,8 +596,12 @@ mod micro_op {
         ];
 
         let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets = arena
-            .alloc_slice_fill_iter(vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)]);
+        let pointer_offsets = arena.alloc_slice_fill_iter(vec![
+            FO(bst),
+            FO(bst_ref),
+            FO(nodes_ref),
+            FO(free_list_ref),
+        ]);
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("alloc_node"),
             code,
@@ -798,8 +806,12 @@ mod micro_op {
         ];
 
         let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets = arena
-            .alloc_slice_fill_iter(vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)]);
+        let pointer_offsets = arena.alloc_slice_fill_iter(vec![
+            FO(bst),
+            FO(bst_ref),
+            FO(nodes_ref),
+            FO(free_list_ref),
+        ]);
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("remove_node"),
             code,

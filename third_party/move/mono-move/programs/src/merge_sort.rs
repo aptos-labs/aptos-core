@@ -68,7 +68,11 @@ mod micro_op {
     };
     use mono_move_runtime::ObjectDescriptor;
 
-    pub fn program() -> (Vec<ExecutableArenaPtr<Function>>, Vec<ObjectDescriptor>, ExecutableArena) {
+    pub fn program() -> (
+        Vec<ExecutableArenaPtr<Function>>,
+        Vec<ObjectDescriptor>,
+        ExecutableArena,
+    ) {
         let arena = ExecutableArena::new();
         let meta = FRAME_METADATA_SIZE as u32;
 

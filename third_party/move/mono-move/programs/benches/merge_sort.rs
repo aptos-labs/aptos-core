@@ -39,7 +39,9 @@ fn bench_merge_sort(c: &mut Criterion) {
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+                    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+                        functions[0].as_ref_unchecked()
+                    });
                     let vec_ptr = ctx
                         .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
                         .unwrap();

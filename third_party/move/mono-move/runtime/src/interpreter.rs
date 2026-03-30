@@ -26,6 +26,7 @@ use std::ptr::{null, NonNull};
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a> {
     /// Externally-provided function table (will be replaced by execution context).
+    #[allow(dead_code)]
     pub(crate) functions: &'a [ExecutableArenaPtr<Function>],
     /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
@@ -46,25 +47,18 @@ impl<'a> InterpreterContext<'a> {
     pub fn new(
         functions: &'a [ExecutableArenaPtr<Function>],
         descriptors: &'a [ObjectDescriptor],
-        func_id: usize,
+        entry: &Function,
     ) -> Self {
-        Self::with_heap_size(functions, descriptors, func_id, DEFAULT_HEAP_SIZE)
+        Self::with_heap_size(functions, descriptors, entry, DEFAULT_HEAP_SIZE)
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(
         functions: &'a [ExecutableArenaPtr<Function>],
         descriptors: &'a [ObjectDescriptor],
-        func_id: usize,
+        entry: &Function,
         heap_size: usize,
     ) -> Self {
-        assert!(
-            func_id < functions.len(),
-            "entry func_id {} is out of bounds (have {} functions)",
-            func_id,
-            functions.len()
-        );
-
         let verification_errors = crate::verifier::verify_program(functions, descriptors);
         assert!(
             verification_errors.is_empty(),
@@ -90,7 +84,7 @@ impl<'a> InterpreterContext<'a> {
             functions,
             descriptors,
             pc: 0,
-            current_func: functions[func_id].as_non_null(),
+            current_func: NonNull::from(entry),
             frame_ptr,
             stack,
             heap: Heap::new(heap_size),
@@ -109,23 +103,13 @@ impl<'a> InterpreterContext<'a> {
     /// Reset the context to call a different function, preserving the heap.
     ///
     /// Use `set_root_arg` to place arguments before calling `run()`.
-    pub fn invoke(&mut self, func_id: usize) {
-        assert!(
-            func_id < self.functions.len(),
-            "func_id {} out of bounds (have {} functions)",
-            func_id,
-            self.functions.len()
-        );
-
+    pub fn invoke(&mut self, func: &Function) {
         let base = self.stack.as_ptr();
 
         // Reset execution state to root frame.
         self.frame_ptr = unsafe { base.add(FRAME_METADATA_SIZE) };
         self.pc = 0;
-        let func_ptr = self.functions[func_id];
-        self.current_func = func_ptr.as_non_null();
-        // SAFETY: Arena is alive during execution.
-        let func = unsafe { func_ptr.as_ref_unchecked() };
+        self.current_func = NonNull::from(func);
 
         // Re-write sentinel metadata so Return from root triggers Done.
         unsafe {
@@ -197,9 +181,9 @@ impl<'a> InterpreterContext<'a> {
 impl InterpreterContext<'_> {
     #[inline(always)]
     pub fn step(&mut self) -> Result<StepResult> {
-        // SAFETY: current_func is always a valid, non-null pointer either
-        // derived from `self.functions[]` or from a `CallLocalFunc` pointer
-        // (which is itself non-null and a valid reference).
+        // SAFETY: Current function is always a valid, non-null pointer because
+        // it is derived from function reference (e.g., entrypoint) or when
+        // executing a call instruction, which stores a valid pointer.
         let func = unsafe { self.current_func.as_ref() };
         // SAFETY: The function's code is allocated in an executable arena that
         // is alive for the duration of execution.
@@ -223,6 +207,7 @@ impl InterpreterContext<'_> {
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
                 MicroOp::CallFunc { .. } => {
+                    // TODO: Support cross module calls here.
                     bail!("CallFunc must be resolved to CallLocalFunc before execution");
                 },
                 MicroOp::CallLocalFunc { ptr } => {

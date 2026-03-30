@@ -65,6 +65,7 @@ pub fn verify_program(
 struct FunctionVerifier<'a> {
     func_id: usize,
     func: &'a Function,
+    #[allow(dead_code)]
     all_functions: &'a [ExecutableArenaPtr<Function>],
     descriptors: &'a [ObjectDescriptor],
     errors: &'a mut Vec<VerificationError>,

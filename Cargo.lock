@@ -12728,6 +12728,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-testsuite"
+version = "0.1.0"
+dependencies = [
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-programs",
+ "mono-move-runtime",
+ "move-core-types",
+]
+
+[[package]]
 name = "more-asserts"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

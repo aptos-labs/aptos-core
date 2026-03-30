@@ -60,7 +60,9 @@ fn ref_basic() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -122,7 +124,9 @@ fn ref_survives_gc() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -198,7 +202,8 @@ fn ref_cross_frame() {
         VecLoadElem { dst: FO(m_result), vec_ref: FO(m_vec_ref), idx: FO(m_idx), elem_size: 8 },
         Return,
     ]);
-    let main_pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)]);
+    let main_pointer_offsets =
+        arena.alloc_slice_fill_iter(vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)]);
 
     let main_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
@@ -213,7 +218,9 @@ fn ref_cross_frame() {
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut functions = [main_func, callee_func];
     Function::resolve_calls(&mut functions);
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -276,7 +283,8 @@ fn ref_multiple_borrows() {
         WriteRef { ref_ptr: FO(ref_b), src: FO(val), size: 8 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(ref_a_base), FO(ref_b_base), FO(vec_ref)]);
+    let pointer_offsets =
+        arena.alloc_slice_fill_iter(vec![FO(vec), FO(ref_a_base), FO(ref_b_base), FO(vec_ref)]);
 
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
@@ -288,7 +296,9 @@ fn ref_multiple_borrows() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -353,7 +363,9 @@ fn ref_borrow_local() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -441,7 +453,9 @@ fn ref_nested_vectors() {
         elem_size: 8,
         elem_pointer_offsets: vec![0],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -524,7 +538,9 @@ fn ref_survives_double_gc() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -586,7 +602,9 @@ fn ref_struct_field_borrow() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -643,7 +661,9 @@ fn ref_struct_field_survives_gc() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 13, "entry.value should be 13 after GC");

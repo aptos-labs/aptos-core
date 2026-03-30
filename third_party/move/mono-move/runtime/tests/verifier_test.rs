@@ -20,7 +20,8 @@ fn minimal_func(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
         args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     })
 }
 
@@ -49,7 +50,8 @@ fn valid_with_arithmetic_and_jumps() {
         JumpNotZeroU64 { target: CO(2), src: FO(0) },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>());
+    let pointer_offsets =
+        arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>());
 
     let func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
@@ -108,7 +110,8 @@ fn frame_bounds_store_u64() {
         extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
         args_size: 0,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert_eq!(errors.len(), 1);
@@ -137,7 +140,8 @@ fn frame_bounds_mov() {
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
         args_size: 0,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -164,7 +168,8 @@ fn frame_bounds_fat_ptr_write() {
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
         args_size: 0,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -185,7 +190,8 @@ fn frame_bounds_callfunc_metadata() {
         extended_frame_size: 16, // args_and_locals_size 8 + 24 = 32 > 16
         args_size: 0,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func, callee], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -246,7 +252,8 @@ fn args_size_exceeds_data_size() {
         extended_frame_size: 32,
         args_size: 16, // > args_and_locals_size 8
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -271,7 +278,8 @@ fn invalid_jump_target() {
         args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -296,7 +304,8 @@ fn invalid_conditional_jump_target() {
         args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -319,7 +328,8 @@ fn invalid_callfunc_func_id() {
         args_and_locals_size: 0,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -388,7 +398,8 @@ fn zero_size_mov() {
         args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -445,7 +456,8 @@ fn empty_code() {
         args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -462,7 +474,8 @@ fn zero_frame_size() {
         args_and_locals_size: 0,
         extended_frame_size: 0,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -491,7 +504,8 @@ fn multiple_errors_collected() {
         args_and_locals_size: 8,
         extended_frame_size: 32,
         zero_frame: false,
-        pointer_offsets: arena.alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
+        pointer_offsets: arena
+            .alloc_slice_fill_iter(std::iter::empty::<mono_move_core::FrameOffset>()),
     });
     let errors = verify_program(&[func], &trivial_descriptors());
     assert!(

@@ -186,19 +186,16 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 let extended_frame_size = ctx
                     .call_sites
                     .iter()
-                    .flat_map(|cs| {
-                        cs.arg_write_slots
-                            .iter()
-                            .chain(cs.ret_read_slots.iter())
-                    })
+                    .flat_map(|cs| cs.arg_write_slots.iter().chain(cs.ret_read_slots.iter()))
                     .map(|s| (s.offset + s.size) as usize)
                     .max()
                     .unwrap_or(args_and_locals_size + FRAME_METADATA_SIZE);
 
                 // Allocate micro-ops and pointer_offsets in the executable arena.
                 let code = self.arena.alloc_slice_fill_iter(micro_ops);
-                let pointer_offsets =
-                    self.arena.alloc_slice_fill_iter(std::iter::empty::<FrameOffset>());
+                let pointer_offsets = self
+                    .arena
+                    .alloc_slice_fill_iter(std::iter::empty::<FrameOffset>());
 
                 let func = Function {
                     name,

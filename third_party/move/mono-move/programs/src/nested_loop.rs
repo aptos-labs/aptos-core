@@ -63,7 +63,11 @@ mod micro_op {
     use mono_move_core::{CodeOffset as CO, FrameOffset as FO, Function, MicroOp::*};
     use mono_move_runtime::ObjectDescriptor;
 
-    pub fn program() -> (Vec<ExecutableArenaPtr<Function>>, Vec<ObjectDescriptor>, ExecutableArena) {
+    pub fn program() -> (
+        Vec<ExecutableArenaPtr<Function>>,
+        Vec<ObjectDescriptor>,
+        ExecutableArena,
+    ) {
         let arena = ExecutableArena::new();
         let n = 0u32;
         let sum = 8u32;

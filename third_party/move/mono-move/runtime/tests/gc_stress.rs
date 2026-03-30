@@ -121,7 +121,8 @@ fn make_gc_stress_program(
         // PC 6: return
         Return,
     ]);
-    let callee_pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)]);
+    let callee_pointer_offsets =
+        arena.alloc_slice_fill_iter(vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)]);
 
     let callee_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
@@ -224,7 +225,8 @@ fn make_gc_stress_program(
         // ---- DONE (PC 30) ----
         Return,
     ]);
-    let main_pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)]);
+    let main_pointer_offsets =
+        arena.alloc_slice_fill_iter(vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)]);
 
     let main_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
@@ -294,7 +296,12 @@ fn gc_stress() {
     let arena = ExecutableArena::new();
     let (mut functions, descriptors) = make_gc_stress_program(&arena, n, max_len);
     Function::resolve_calls(&mut functions);
-    let mut ctx = InterpreterContext::with_heap_size(&functions, &descriptors, 0, 8 * 1024);
+    let mut ctx = InterpreterContext::with_heap_size(
+        &functions,
+        &descriptors,
+        unsafe { functions[0].as_ref_unchecked() },
+        8 * 1024,
+    );
     ctx.set_rng_seed(seed);
     ctx.run().unwrap();
 

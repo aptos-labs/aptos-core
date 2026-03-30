@@ -17,7 +17,9 @@ mod micro_op {
 
     fn run(n: u64) -> u64 {
         let (functions, descriptors, _arena) = micro_op_nested_loop();
-        let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+        let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+            functions[0].as_ref_unchecked()
+        });
         ctx.set_root_arg(0, &n.to_le_bytes());
         ctx.run().unwrap();
         ctx.root_result()

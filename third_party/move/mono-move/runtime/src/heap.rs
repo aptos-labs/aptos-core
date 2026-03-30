@@ -228,8 +228,7 @@ impl InterpreterContext<'_> {
             // via frame metadata. pointer_offsets is an arena pointer valid
             // for the lifetime of the executable. `fp.sub` retrieves saved
             // metadata written by the call protocol.
-            let pointer_offsets =
-                unsafe { func_ptr.as_ref().pointer_offsets.as_ref_unchecked() };
+            let pointer_offsets = unsafe { func_ptr.as_ref().pointer_offsets.as_ref_unchecked() };
             unsafe {
                 for &offset in pointer_offsets {
                     let old_ptr = read_ptr(fp, offset);

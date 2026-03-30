@@ -11,7 +11,10 @@ use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 ///   [fp + 16] : i (loop counter / len)
 ///   [fp + 24] : tmp (scratch)
 ///   [fp + 32] : vec_ref (16-byte fat pointer referencing vec_ptr)
-fn make_vec_sum_program(arena: &ExecutableArena, n: u64) -> (Vec<ExecutableArenaPtr<Function>>, Vec<ObjectDescriptor>) {
+fn make_vec_sum_program(
+    arena: &ExecutableArena,
+    n: u64,
+) -> (Vec<ExecutableArenaPtr<Function>>, Vec<ObjectDescriptor>) {
     use MicroOp::*;
 
     let slot_result: u32 = 0;
@@ -62,7 +65,9 @@ fn vec_sum_100() {
     let n: u64 = 100;
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_vec_sum_program(&arena, n);
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
 }
@@ -72,7 +77,12 @@ fn vec_sum_with_gc_pressure() {
     let n: u64 = 200;
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_vec_sum_program(&arena, n);
-    let mut ctx = InterpreterContext::with_heap_size(&functions, &descriptors, 0, 4 * 1024);
+    let mut ctx = InterpreterContext::with_heap_size(
+        &functions,
+        &descriptors,
+        unsafe { functions[0].as_ref_unchecked() },
+        4 * 1024,
+    );
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
     assert!(ctx.gc_count() > 0, "GC should have run at least once");
