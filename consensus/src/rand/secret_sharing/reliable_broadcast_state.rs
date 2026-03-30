@@ -125,8 +125,7 @@ mod tests {
             if i < 2 {
                 assert!(result.is_none());
             } else {
-                // The aggregation is triggered asynchronously via spawn_blocking,
-                // so add_share returns decided=true but the channel delivery is async
+                // Threshold met, state transitions to Aggregating
                 assert!(result.is_some());
             }
         }
