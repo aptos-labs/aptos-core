@@ -65,9 +65,7 @@ fn vec_sum_100() {
     let n: u64 = 100;
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_vec_sum_program(&arena, n);
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
 }
@@ -78,7 +76,6 @@ fn vec_sum_with_gc_pressure() {
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_vec_sum_program(&arena, n);
     let mut ctx = InterpreterContext::with_heap_size(
-        &functions,
         &descriptors,
         unsafe { functions[0].as_ref_unchecked() },
         4 * 1024,

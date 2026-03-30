@@ -20,10 +20,10 @@ mod micro_op {
 
     fn run(n: u64) -> Vec<u64> {
         let values = shuffled_range(n, 42);
-        let (mut functions, descriptors, _arena) = micro_op_merge_sort();
-        mono_move_core::Function::resolve_calls(&mut functions);
-        let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-            functions[0].as_ref_unchecked()
+        let (functions, descriptors, _arena) = micro_op_merge_sort();
+        mono_move_core::Function::resolve_calls(&functions);
+        let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+            functions[0].unwrap().as_ref_unchecked()
         });
         let vec_ptr = ctx
             .alloc_u64_vec(mono_move_core::DescriptorId(0), &values)

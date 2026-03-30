@@ -291,7 +291,7 @@ mod micro_op {
     pub const FN_REMOVE: usize = 4;
 
     pub fn program() -> (
-        Vec<ExecutableArenaPtr<Function>>,
+        Vec<Option<ExecutableArenaPtr<Function>>>,
         Vec<ObjectDescriptor>,
         ExecutableArena,
     ) {
@@ -306,13 +306,13 @@ mod micro_op {
         ];
         (
             vec![
-                make_new(&arena),         // 0
-                make_insert(&arena, 3),   // 1, calls alloc_node at 3
-                make_get(&arena),         // 2
-                make_alloc_node(&arena),  // 3
-                make_remove(&arena, 5),   // 4, calls remove_node at 5
-                make_remove_node(&arena), // 5
-                make_run_ops(&arena),     // 6
+                Some(make_new(&arena)),         // 0
+                Some(make_insert(&arena, 3)),   // 1, calls alloc_node at 3
+                Some(make_get(&arena)),         // 2
+                Some(make_alloc_node(&arena)),  // 3
+                Some(make_remove(&arena, 5)),   // 4, calls remove_node at 5
+                Some(make_remove_node(&arena)), // 5
+                Some(make_run_ops(&arena)),     // 6
             ],
             descriptors,
             arena,

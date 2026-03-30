@@ -63,7 +63,7 @@ pub struct Function {
     ///   callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer_offset slot may only be
     ///   overwritten with another valid heap pointer (or null). The
-    ///   re-compiler must guarantee this.
+    ///   specializer must guarantee this.
     ///
     /// The callee arg region (`frame_size()..extended_frame_size`)
     /// overlaps with the callee's frame during GC traversal — both
@@ -80,17 +80,21 @@ impl Function {
     }
 
     /// Replaces every [`MicroOp::CallFunc`] (index-based dispatch) with
-    /// [`MicroOp::CallLocalFunc`] (direct pointer dispatch) in a slice of
-    /// arena-allocated functions.
+    /// [`MicroOp::CallLocalFunc`] (direct pointer dispatch).
     ///
-    /// # Safety contract
+    /// `func_ptrs` is indexed by definition index and may contain `None`
+    /// for functions that were not lowered (e.g. generic functions).
+    ///
+    /// # Safety
     ///
     /// The caller must have exclusive access to the functions and their
     /// arena-allocated code. The arena must outlive all uses of the patched
     /// code.
-    pub fn resolve_calls(functions: &mut [ExecutableArenaPtr<Function>]) {
-        let ptrs: Vec<ExecutableArenaPtr<Function>> = functions.to_vec();
-        for func_ptr in functions.iter_mut() {
+    pub fn resolve_calls(func_ptrs: &[Option<ExecutableArenaPtr<Function>>]) {
+        for i in 0..func_ptrs.len() {
+            let Some(mut func_ptr) = func_ptrs[i] else {
+                continue;
+            };
             // SAFETY: We have exclusive access during build — no concurrent
             // readers exist yet. The arena is alive because the caller owns it.
             let func = unsafe { func_ptr.as_mut_unchecked() };
@@ -98,7 +102,8 @@ impl Function {
             for op in code.iter_mut() {
                 if let MicroOp::CallFunc { func_id } = *op {
                     *op = MicroOp::CallLocalFunc {
-                        ptr: ptrs[func_id as usize],
+                        ptr: func_ptrs[func_id as usize]
+                            .expect("CallFunc target must be a lowered function"),
                     };
                 }
             }

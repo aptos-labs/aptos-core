@@ -6,7 +6,6 @@
 //! pointer slot validity, invalid jump targets, etc.
 
 use crate::types::ObjectDescriptor;
-use mono_move_alloc::ExecutableArenaPtr;
 use mono_move_core::{
     CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, FRAME_METADATA_SIZE,
 };
@@ -18,7 +17,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct VerificationError {
-    pub func_id: usize,
+    pub func_name: String,
     pub pc: Option<usize>,
     pub message: String,
 }
@@ -26,8 +25,8 @@ pub struct VerificationError {
 impl fmt::Display for VerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.pc {
-            Some(pc) => write!(f, "func {}, pc {}: {}", self.func_id, pc, self.message),
-            None => write!(f, "func {}: {}", self.func_id, self.message),
+            Some(pc) => write!(f, "'{}', pc {}: {}", self.func_name, pc, self.message),
+            None => write!(f, "'{}': {}", self.func_name, self.message),
         }
     }
 }
@@ -36,25 +35,19 @@ impl fmt::Display for VerificationError {
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Validate all functions and their pointer slots against the descriptor table.
+/// Validate a single function and its pointer slots against the descriptor table.
 /// Returns an empty `Vec` on success.
-pub fn verify_program(
-    functions: &[ExecutableArenaPtr<Function>],
+pub fn verify_function(
+    func: &Function,
     descriptors: &[ObjectDescriptor],
 ) -> Vec<VerificationError> {
     let mut errors = Vec::new();
-    for (fid, func_ptr) in functions.iter().enumerate() {
-        // SAFETY: The arena is alive during verification.
-        let func = unsafe { func_ptr.as_ref_unchecked() };
-        let mut fv = FunctionVerifier {
-            func_id: fid,
-            func,
-            all_functions: functions,
-            descriptors,
-            errors: &mut errors,
-        };
-        fv.verify();
-    }
+    let mut fv = FunctionVerifier {
+        func,
+        descriptors,
+        errors: &mut errors,
+    };
+    fv.verify();
     errors
 }
 
@@ -63,10 +56,7 @@ pub fn verify_program(
 // ---------------------------------------------------------------------------
 
 struct FunctionVerifier<'a> {
-    func_id: usize,
     func: &'a Function,
-    #[allow(dead_code)]
-    all_functions: &'a [ExecutableArenaPtr<Function>],
     descriptors: &'a [ObjectDescriptor],
     errors: &'a mut Vec<VerificationError>,
 }
@@ -349,8 +339,10 @@ impl FunctionVerifier<'_> {
     // -----------------------------------------------------------------------
 
     fn err(&mut self, pc: Option<usize>, msg: impl Into<String>) {
+        // SAFETY: The function name is allocated in an arena alive during verification.
+        let func_name = unsafe { self.func.name.as_ref_unchecked() }.to_string();
         self.errors.push(VerificationError {
-            func_id: self.func_id,
+            func_name,
             pc,
             message: msg.into(),
         });

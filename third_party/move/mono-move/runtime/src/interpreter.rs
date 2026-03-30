@@ -14,7 +14,6 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
-use mono_move_alloc::ExecutableArenaPtr;
 use mono_move_core::{DescriptorId, Function, MicroOp, FRAME_METADATA_SIZE};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
@@ -25,9 +24,6 @@ use std::ptr::{null, NonNull};
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a> {
-    /// Externally-provided function table (will be replaced by execution context).
-    #[allow(dead_code)]
-    pub(crate) functions: &'a [ExecutableArenaPtr<Function>],
     /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
 
@@ -44,22 +40,17 @@ pub struct InterpreterContext<'a> {
 }
 
 impl<'a> InterpreterContext<'a> {
-    pub fn new(
-        functions: &'a [ExecutableArenaPtr<Function>],
-        descriptors: &'a [ObjectDescriptor],
-        entry: &Function,
-    ) -> Self {
-        Self::with_heap_size(functions, descriptors, entry, DEFAULT_HEAP_SIZE)
+    pub fn new(descriptors: &'a [ObjectDescriptor], entry: &Function) -> Self {
+        Self::with_heap_size(descriptors, entry, DEFAULT_HEAP_SIZE)
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(
-        functions: &'a [ExecutableArenaPtr<Function>],
         descriptors: &'a [ObjectDescriptor],
         entry: &Function,
         heap_size: usize,
     ) -> Self {
-        let verification_errors = crate::verifier::verify_program(functions, descriptors);
+        let verification_errors = crate::verifier::verify_function(entry, descriptors);
         assert!(
             verification_errors.is_empty(),
             "verification failed:\n{}",
@@ -81,7 +72,6 @@ impl<'a> InterpreterContext<'a> {
         }
 
         Self {
-            functions,
             descriptors,
             pc: 0,
             current_func: NonNull::from(entry),

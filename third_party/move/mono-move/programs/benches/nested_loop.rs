@@ -27,7 +27,7 @@ fn bench_nested_loop(c: &mut Criterion) {
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
+                    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
                         functions[0].as_ref_unchecked()
                     });
                     ctx.set_root_arg(0, &N.to_le_bytes());

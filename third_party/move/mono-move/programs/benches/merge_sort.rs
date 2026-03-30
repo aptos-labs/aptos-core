@@ -34,13 +34,13 @@ fn bench_merge_sort(c: &mut Criterion) {
             );
         });
 
-        let (mut functions, descriptors, _arena) = micro_op_merge_sort();
-        mono_move_core::Function::resolve_calls(&mut functions);
+        let (functions, descriptors, _arena) = micro_op_merge_sort();
+        mono_move_core::Function::resolve_calls(&functions);
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-                        functions[0].as_ref_unchecked()
+                    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+                        functions[0].unwrap().as_ref_unchecked()
                     });
                     let vec_ptr = ctx
                         .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)

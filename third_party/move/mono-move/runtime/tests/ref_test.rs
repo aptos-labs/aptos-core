@@ -60,9 +60,7 @@ fn ref_basic() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -124,9 +122,7 @@ fn ref_survives_gc() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -216,10 +212,10 @@ fn ref_cross_frame() {
     });
 
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut functions = [main_func, callee_func];
-    Function::resolve_calls(&mut functions);
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
+    let functions = [Some(main_func), Some(callee_func)];
+    Function::resolve_calls(&functions);
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+        functions[0].unwrap().as_ref_unchecked()
     });
     ctx.run().unwrap();
 
@@ -296,9 +292,7 @@ fn ref_multiple_borrows() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -363,9 +357,7 @@ fn ref_borrow_local() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -453,9 +445,7 @@ fn ref_nested_vectors() {
         elem_size: 8,
         elem_pointer_offsets: vec![0],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -538,9 +528,7 @@ fn ref_survives_double_gc() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -602,9 +590,7 @@ fn ref_struct_field_borrow() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -661,9 +647,7 @@ fn ref_struct_field_survives_gc() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 13, "entry.value should be 13 after GC");

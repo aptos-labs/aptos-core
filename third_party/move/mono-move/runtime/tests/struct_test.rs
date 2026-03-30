@@ -43,9 +43,7 @@ fn struct_inline() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 30, "result should be 10 + 20 = 30");
@@ -89,9 +87,7 @@ fn struct_inline_borrow() {
         pointer_offsets,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 99, "pair.b should be 99 after WriteRef");
@@ -138,9 +134,7 @@ fn struct_heap_basic() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 142, "result should be 42 + 100 = 142");
@@ -188,9 +182,7 @@ fn struct_heap_survives_gc() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -258,9 +250,7 @@ fn struct_with_vector_field() {
         },
         ObjectDescriptor::Trivial,
     ];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 999, "ctr.tag should be 999 after GC");
@@ -323,9 +313,7 @@ fn struct_borrow_field() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -379,9 +367,7 @@ fn struct_borrow_survives_gc() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 200, "entry.value should be 200 after GC");

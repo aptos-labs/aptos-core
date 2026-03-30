@@ -69,7 +69,7 @@ mod micro_op {
     use mono_move_runtime::ObjectDescriptor;
 
     pub fn program() -> (
-        Vec<ExecutableArenaPtr<Function>>,
+        Vec<Option<ExecutableArenaPtr<Function>>>,
         Vec<ObjectDescriptor>,
         ExecutableArena,
     ) {
@@ -306,7 +306,11 @@ mod micro_op {
 
         let descriptors = vec![ObjectDescriptor::Trivial];
         (
-            vec![func_merge_sort, func_merge_sort_range, func_merge],
+            vec![
+                Some(func_merge_sort),
+                Some(func_merge_sort_range),
+                Some(func_merge),
+            ],
             descriptors,
             arena,
         )

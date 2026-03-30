@@ -27,13 +27,13 @@ fn bench_bst(c: &mut Criterion) {
             b.iter(|| native_run_ops(black_box(&ops)));
         });
 
-        let (mut functions, descriptors, _arena) = micro_op_bst();
-        mono_move_core::Function::resolve_calls(&mut functions);
+        let (functions, descriptors, _arena) = micro_op_bst();
+        mono_move_core::Function::resolve_calls(&functions);
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-                        functions[6].as_ref_unchecked()
+                    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+                        functions[6].unwrap().as_ref_unchecked()
                     });
                     let vec_ptr = ctx
                         .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)

@@ -46,7 +46,7 @@ mod micro_op {
     use mono_move_runtime::ObjectDescriptor;
 
     pub fn program() -> (
-        Vec<ExecutableArenaPtr<Function>>,
+        Vec<Option<ExecutableArenaPtr<Function>>>,
         Vec<ObjectDescriptor>,
         ExecutableArena,
     ) {
@@ -93,7 +93,7 @@ mod micro_op {
             pointer_offsets,
         });
 
-        (vec![func], vec![ObjectDescriptor::Trivial], arena)
+        (vec![Some(func)], vec![ObjectDescriptor::Trivial], arena)
     }
 }
 

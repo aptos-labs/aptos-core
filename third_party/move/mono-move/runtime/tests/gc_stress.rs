@@ -95,7 +95,10 @@ fn make_gc_stress_program(
     arena: &ExecutableArena,
     num_iterations: u64,
     max_len: u64,
-) -> (Vec<ExecutableArenaPtr<Function>>, Vec<ObjectDescriptor>) {
+) -> (
+    Vec<Option<ExecutableArenaPtr<Function>>>,
+    Vec<ObjectDescriptor>,
+) {
     use MicroOp::*;
 
     // -- Function 1: make_entry(val) -> entry_ptr --
@@ -253,7 +256,7 @@ fn make_gc_stress_program(
         },
     ];
 
-    (vec![main_func, callee_func], descriptors)
+    (vec![Some(main_func), Some(callee_func)], descriptors)
 }
 
 // ---------------------------------------------------------------------------
@@ -294,12 +297,11 @@ fn gc_stress() {
     let expected = simulate(n, max_len, seed);
 
     let arena = ExecutableArena::new();
-    let (mut functions, descriptors) = make_gc_stress_program(&arena, n, max_len);
-    Function::resolve_calls(&mut functions);
+    let (functions, descriptors) = make_gc_stress_program(&arena, n, max_len);
+    Function::resolve_calls(&functions);
     let mut ctx = InterpreterContext::with_heap_size(
-        &functions,
         &descriptors,
-        unsafe { functions[0].as_ref_unchecked() },
+        unsafe { functions[0].unwrap().as_ref_unchecked() },
         8 * 1024,
     );
     ctx.set_rng_seed(seed);

@@ -23,13 +23,13 @@ fn bench_fib(c: &mut Criterion) {
             b.iter(|| black_box(native_fib(N)));
         });
 
-        let (mut functions, descriptors, _arena) = micro_op_fib();
-        mono_move_core::Function::resolve_calls(&mut functions);
+        let (functions, descriptors, _arena) = micro_op_fib();
+        mono_move_core::Function::resolve_calls(&functions);
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&functions, &descriptors, unsafe {
-                        functions[0].as_ref_unchecked()
+                    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+                        functions[0].unwrap().as_ref_unchecked()
                     });
                     ctx.set_root_arg(0, &N.to_le_bytes());
                     ctx

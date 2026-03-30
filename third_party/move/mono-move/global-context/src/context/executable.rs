@@ -162,19 +162,19 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             .map(|i| StructNameIndex::new(i as u32))
             .collect();
         let module_ir = specializer::destack(self.module.clone(), &struct_name_table)?;
-        let func_id_map = specializer::lowering_context::build_func_id_map(&module_ir.module);
+        let func_id_map = specializer::lower::build_func_id_map(&module_ir.module);
 
-        let mut side_vec = Vec::new();
-        for func_ir in &module_ir.functions {
+        // Indexed by definition index. Generic functions that are not
+        // lowered leave their slot as None.
+        let mut func_ptrs = vec![None; module_ir.functions.len()];
+        for (def_idx, func_ir) in module_ir.functions.iter().enumerate() {
             let name = module_ir.module.identifier_at(func_ir.name_idx);
             let name = self.guard.intern_identifier_internal(name);
 
             // TODO: support generic functions.
-            if let Some(ctx) = specializer::lowering_context::try_build_context(
-                &module_ir.module,
-                func_ir,
-                &func_id_map,
-            )? {
+            if let Some(ctx) =
+                specializer::lower::try_build_context(&module_ir.module, func_ir, &func_id_map)?
+            {
                 let micro_ops = specializer::lower::lower_function(func_ir, &ctx)?;
 
                 // Compute frame layout.
@@ -209,12 +209,12 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 };
                 let ptr = self.arena.alloc(func);
                 self.data.functions.insert(name, ptr);
-                side_vec.push(ptr);
+                func_ptrs[def_idx] = Some(ptr);
             }
         }
 
-        // Patch CallFunc to CallLocalFunc using the ordered side_vec.
-        Function::resolve_calls(&mut side_vec);
+        // Patch CallFunc to CallLocalFunc using definition-indexed func_ptrs.
+        Function::resolve_calls(&func_ptrs);
 
         Ok(Box::new(Executable {
             data: self.data,
