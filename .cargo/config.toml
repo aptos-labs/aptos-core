@@ -49,7 +49,7 @@ linker = "scripts/linker_wrapper.sh"
 [target.x86_64-pc-windows-msvc]
 # Select linker via APTOS_LINKER: mold | lld | system.
 # If not set, it auto-detects in order: mold -> lld -> system linker.
-linker = "scripts/linker_wrapper.sh"
+linker = "scripts/linker_wrapper.ps1"
 rustflags = [
   "--cfg",
   "tokio_unstable",
