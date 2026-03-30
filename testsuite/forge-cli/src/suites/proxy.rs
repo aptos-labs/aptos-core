@@ -163,7 +163,7 @@ fn proxy_primary_remote_test() -> ForgeConfig {
         }))
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 10000 })
+                .mode(EmitJobMode::ConstTps { tps: 15000 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
