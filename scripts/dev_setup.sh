@@ -724,6 +724,13 @@ function install_postgres {
   fi
 }
 
+function install_lld {
+  # Right now, only install lld for linux
+  if [[ "$(uname)" == "Linux" ]]; then
+    install_pkg lld "$PACKAGE_MANAGER"
+  fi
+}
+
 function install_libdw {
   # Right now, only install libdw for linux
   if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman" ]]; then
@@ -731,12 +738,6 @@ function install_libdw {
   elif [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" == "pacman" ]]; then
     # libdw-dev is named libelf on arch linux
     install_pkg libelf "$PACKAGE_MANAGER"
-  fi
-}
-
-function install_lld {
-  if [[ "$(uname)" == "Linux" ]]; then
-    install_pkg lld "$PACKAGE_MANAGER"
   fi
 }
 
