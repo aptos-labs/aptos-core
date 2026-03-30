@@ -735,7 +735,7 @@ function install_libdw {
 }
 
 function install_lld {
-  if [[ "$(uname)" == "Linux" ]] || [[ "$(uname)" == "Darwin" ]]; then
+  if [[ "$(uname)" == "Linux" ]]; then
     install_pkg lld "$PACKAGE_MANAGER"
   fi
 }

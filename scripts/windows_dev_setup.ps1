@@ -332,6 +332,16 @@ function install_llvm {
   }
 }
 
+function install_lld {
+  if (!(Get-Command lld -ErrorAction SilentlyContinue)) {
+    Write-Host "Installing LLD..."
+    winget install LLVM.LLVM --silent --accept-source-agreements
+  }
+  else {
+    Write-Host "LLD is already installed."
+  }
+}
+
 function install_openssl {
   $result = check_package "OpenSSL"
   if ($result) {
@@ -462,6 +472,7 @@ function install_build_tools {
   Write-Host (build_tools_message)
   install_msvc_build_tools
   install_llvm
+  install_lld
   install_openssl
   install_nodejs
   install_pnpm
