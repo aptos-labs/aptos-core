@@ -278,16 +278,6 @@ impl TransactionTraceStore {
     }
 
     /// Replace the metadata of the last recorded stage for a traced txn.
-    /// Used to correct Executed(Keep) → Executed(Retry) or Executed(Discard)
-    /// after execution output is available.
-    pub fn replace_last_stage_metadata(&self, hash: &HashValue, metadata: StageMetadata) {
-        if let Some(mut trace) = self.traces.get_mut(hash) {
-            if let Some(last) = trace.stages.last_mut() {
-                last.metadata = Some(metadata);
-            }
-        }
-    }
-
     /// Check if a transaction hash has an active trace.
     pub fn is_traced(&self, hash: &HashValue) -> bool {
         self.traces.contains_key(hash)
