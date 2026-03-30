@@ -14,7 +14,7 @@ use aptos_storage_interface::{
         state_update_refs::StateUpdateRefs,
         state_view::cached_state_view::CachedStateView,
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        HotStateUpdates,
+        HotStateShardUpdates, HotStateUpdates,
     },
     DbReader, Result as DbResult,
 };
@@ -530,6 +530,94 @@ impl DbReader for StateByVersion {
     }
 }
 
+/// Verifies `HotInsertionOp` / `HotEvictionOp` fields against the naive model.
+///
+/// Checks per shard:
+///  - Insertions and evictions have disjoint key sets.
+///  - `superseded_version` bijects with the base hot state:
+///    - key hot at base with `hot_since == v`  ⟹  `superseded_version == Some(v)`
+///    - key cold at base                       ⟹  `superseded_version == None`
+///  - `value_version` matches the naive model's result-version hot state slot.
+///  - `value_version.is_some() == value.value_opt().is_some()`.
+fn assert_hot_state_ops(
+    state_by_version: &StateByVersion,
+    hot_state_updates: &HotStateUpdates,
+    for_ckpt_base: Option<Version>,
+    for_latest_base: Option<Version>,
+    for_ckpt_result: Option<Version>,
+    for_latest_result: Option<Version>,
+) {
+    if let Some(shards) = &hot_state_updates.for_last_checkpoint {
+        let base = state_by_version.get_state(for_ckpt_base);
+        let result = state_by_version.get_state(for_ckpt_result);
+        assert_hot_state_shard_ops(&base.hot_state, &result.hot_state, shards);
+    }
+    if let Some(shards) = &hot_state_updates.for_latest {
+        let base = state_by_version.get_state(for_latest_base);
+        let result = state_by_version.get_state(for_latest_result);
+        assert_hot_state_shard_ops(&base.hot_state, &result.hot_state, shards);
+    }
+}
+
+fn assert_hot_state_shard_ops(
+    naive_base_hot: &[LruCache<StateKey, StateSlot>; NUM_STATE_SHARDS],
+    naive_result_hot: &[LruCache<StateKey, StateSlot>; NUM_STATE_SHARDS],
+    shards: &[HotStateShardUpdates; NUM_STATE_SHARDS],
+) {
+    for (shard_id, shard) in shards.iter().enumerate() {
+        // Insertions and evictions must be disjoint — a key is either still hot (insertion) or
+        // removed (eviction), never both.
+        for key_hash in shard.insertions.keys() {
+            assert!(
+                !shard.evictions.contains_key(key_hash),
+                "key_hash {key_hash} in both insertions and evictions for shard {shard_id}"
+            );
+        }
+
+        // Build lookup from the naive model's base-version hot state.
+        let base_hot: HashMap<HashValue, Version> = naive_base_hot[shard_id]
+            .iter()
+            .map(|(k, s)| (*k.crypto_hash_ref(), s.expect_hot_since_version()))
+            .collect();
+
+        // Build lookup from the naive model's result-version hot state (value_version + slot).
+        let result_hot: HashMap<HashValue, &StateSlot> = naive_result_hot[shard_id]
+            .iter()
+            .map(|(k, s)| (*k.crypto_hash_ref(), s))
+            .collect();
+
+        for (key_hash, op) in &shard.insertions {
+            // superseded_version must biject with the base hot state.
+            assert_eq!(
+                op.superseded_version,
+                base_hot.get(key_hash).copied(),
+                "insertion superseded_version mismatch for key_hash {key_hash}"
+            );
+            // value_version must be present iff value is occupied.
+            assert_eq!(
+                op.value_version.is_some(),
+                op.value.value_opt().is_some(),
+                "value_version presence should match value occupancy for {key_hash}"
+            );
+            // value_version value must match the naive model's result hot state.
+            if let Some(result_slot) = result_hot.get(key_hash) {
+                assert_eq!(
+                    op.value_version,
+                    result_slot.value_version_opt(),
+                    "value_version mismatch vs naive result hot state for {key_hash}"
+                );
+            }
+        }
+        for (key_hash, op) in &shard.evictions {
+            assert_eq!(
+                op.superseded_version,
+                base_hot.get(key_hash).copied(),
+                "eviction superseded_version mismatch for key_hash {key_hash}"
+            );
+        }
+    }
+}
+
 fn update_state(
     blocks: Vec<Chunk>,
     state_by_version: Arc<StateByVersion>,
@@ -577,6 +665,26 @@ fn update_state(
             .unwrap();
 
         state_by_version.assert_ledger_state(&next_state);
+
+        // Base version: the State the LRU was rebuilt from at the start of update().
+        // Result version: the State produced by update() — its hot state has the final slots.
+        //   for_last_checkpoint: base=parent.latest(), result=next.last_checkpoint()
+        //   for_latest: base=new checkpoint (or parent.latest()), result=next.latest()
+        let for_ckpt_base = parent_state.latest().version();
+        let had_checkpoint = hot_state_updates.for_last_checkpoint.is_some();
+        let for_latest_base = if had_checkpoint {
+            next_state.last_checkpoint().version()
+        } else {
+            for_ckpt_base
+        };
+        assert_hot_state_ops(
+            &state_by_version,
+            &hot_state_updates,
+            for_ckpt_base,
+            for_latest_base,
+            next_state.last_checkpoint().version(),
+            next_state.latest().version(),
+        );
 
         parent_state = next_state.clone();
 
