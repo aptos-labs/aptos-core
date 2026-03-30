@@ -764,12 +764,12 @@ Build tools (since -t or no option was provided):
   * Rust (and the necessary components, e.g. rust-fmt, clippy)
   * CMake
   * Clang
-  * lld
   * grcov
   * lcov
   * pkg-config
   * libssl-dev
   * protoc (and related tools)
+  * lld (only for Linux)
 EOF
   fi
 
