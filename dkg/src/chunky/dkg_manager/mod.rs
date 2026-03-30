@@ -10,7 +10,7 @@ use crate::{
             AggregatedSubtranscriptWithHashes, CertifiedAggregatedSubtranscript,
             MissingTranscriptRequest, MissingTranscriptResponse,
         },
-        TEST_DIGEST_KEY,
+        DIGEST_KEY,
     },
     counters, monitor,
     network::{IncomingRpcRequest, NetworkSender, RpcResponseSender},
@@ -546,8 +546,10 @@ impl ChunkyDKGManager {
         // Derive encryption key from subtranscript + DigestKey.
         // Heavy pairing-based crypto — run off the main loop.
         let (encryption_key_bytes, transcript_bytes) = tokio::task::spawn_blocking(move || {
-            let key =
-                aggregated_subtranscript.derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)?;
+            let digest_key = DIGEST_KEY
+                .as_ref()
+                .ok_or_else(|| anyhow!("DigestKey not available; cannot derive encryption key"))?;
+            let key = aggregated_subtranscript.derive_encryption_key_bytes(digest_key.tau_g2)?;
             let bytes = bcs::to_bytes(&aggregated_subtranscript)
                 .map_err(|e| anyhow!("transcript serialization error: {e}"))?;
             counters::CHUNKY_DKG_OBJECT_SIZE_BYTES

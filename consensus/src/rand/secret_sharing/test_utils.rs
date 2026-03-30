@@ -43,7 +43,7 @@ impl TestContext {
 
         let secret_share_config = SecretShareConfig::new(
             Arc::new(validator_verifier),
-            dk,
+            Arc::new(dk),
             msk_shares[0].clone(),
             vks,
             tc,

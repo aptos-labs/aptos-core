@@ -12,7 +12,7 @@ use aptos_logger::{info, warn};
 use aptos_types::{
     dkg::chunky_dkg::{
         AggregatedSubtranscript, CertifiedAggregatedChunkySubtranscript, CertifiedChunkyDKGOutput,
-        ChunkyDKGState, TEST_DIGEST_KEY,
+        ChunkyDKGState, DIGEST_KEY,
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
@@ -145,13 +145,17 @@ impl AptosVM {
             .map_err(|_| ExecutionFailure::Expected(ExpectedFailure::MultiSigVerificationFailed))?;
 
         // Rederive encryption key from the transcript and verify it matches the claimed key.
-        let derived_key_bytes = trx
-            .derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)
-            .map_err(|_| ExecutionFailure::Expected(ExpectedFailure::EncryptionKeyMismatch))?;
-        if derived_key_bytes != encryption_key {
-            return Err(ExecutionFailure::Expected(
-                ExpectedFailure::EncryptionKeyMismatch,
-            ));
+        // When no DigestKey is available (e.g. fullnodes without the blob), skip verification
+        // and trust consensus.
+        if let Some(digest_key) = DIGEST_KEY.as_ref() {
+            let derived_key_bytes = trx
+                .derive_encryption_key_bytes(digest_key.tau_g2)
+                .map_err(|_| ExecutionFailure::Expected(ExpectedFailure::EncryptionKeyMismatch))?;
+            if derived_key_bytes != encryption_key {
+                return Err(ExecutionFailure::Expected(
+                    ExpectedFailure::EncryptionKeyMismatch,
+                ));
+            }
         }
 
         let mut gas_meter = UnmeteredGasMeter;

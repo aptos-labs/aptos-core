@@ -716,6 +716,12 @@ pub fn setup_environment_and_start_node(
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
 
+    // Initialize the DigestKey for chunky DKG
+    aptos_dkg_runtime::initialize_digest_key_with_counters(
+        node_config.consensus.decryption_setup_blob_path.as_ref(),
+        chain_id,
+    );
+
     // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(
         &node_config,

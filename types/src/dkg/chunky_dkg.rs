@@ -3,6 +3,7 @@
 
 use crate::{
     aggregate_signature::AggregateSignature,
+    chain_id::ChainId,
     dkg::{
         real_dkg::rounding::{
             DKGRoundingProfile, DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
@@ -39,7 +40,9 @@ use serde::{Deserialize, Serialize};
 use std::{
     cmp::max,
     fmt::{Debug, Formatter},
-    sync::Arc,
+    path::PathBuf,
+    sync::{Arc, OnceLock},
+    time::Instant,
 };
 
 pub type ChunkyTranscript = SignedWeightedTranscript<Pairing>;
@@ -51,13 +54,98 @@ pub type ChunkyEncryptPubKey = EncryptPubKey<Pairing>;
 pub type ChunkyDecryptPrivKey = DecryptPrivKey<Pairing>;
 pub type ChunkyDKGPublicParameters = PublicParameters<Pairing>;
 pub type ChunkyInputSecret = InputSecret<Fr>;
-/// Shared test DigestKey for encryption key derivation.
-/// TODO(ibalajiarun): Replace with proper trusted setup for production.
+/// Shared test DigestKey for encryption key derivation (unit tests only).
 pub static TEST_DIGEST_KEY: Lazy<DigestKey> = Lazy::new(|| {
     use ark_std::rand::SeedableRng;
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(100u64);
     DigestKey::new(&mut rng, 32, 200).expect("DigestKey creation should not fail")
 });
+
+/// Path to the BCS-serialized DigestKey blob file.
+static DIGEST_KEY_PATH: OnceLock<PathBuf> = OnceLock::new();
+/// Direct DigestKey override (for test chains).
+static DIGEST_KEY_OVERRIDE: OnceLock<Arc<DigestKey>> = OnceLock::new();
+
+/// Production DigestKey: checks override first, then reads from file path.
+/// Returns `None` if neither was configured or if reading/deserializing fails.
+pub static DIGEST_KEY: Lazy<Option<Arc<DigestKey>>> = Lazy::new(|| {
+    if let Some(key) = DIGEST_KEY_OVERRIDE.get() {
+        return Some(Arc::clone(key));
+    }
+    let path = DIGEST_KEY_PATH.get()?;
+    let start = Instant::now();
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::error!(
+                "[DigestKey] failed to read blob file {}: {}",
+                path.display(),
+                e
+            );
+            return None;
+        },
+    };
+    let key: DigestKey = match bcs::from_bytes(&bytes) {
+        Ok(k) => k,
+        Err(e) => {
+            tracing::error!(
+                "[DigestKey] failed to deserialize blob ({} bytes): {}",
+                bytes.len(),
+                e
+            );
+            return None;
+        },
+    };
+    let elapsed = start.elapsed();
+    tracing::info!(
+        "[DigestKey] loaded from {} ({} bytes) in {:?}",
+        path.display(),
+        bytes.len(),
+        elapsed,
+    );
+    Some(Arc::new(key))
+});
+
+/// Store the path to the DigestKey blob file. No I/O is performed.
+pub fn set_digest_key_path(path: PathBuf) {
+    DIGEST_KEY_PATH
+        .set(path)
+        .expect("DigestKey path already set");
+}
+
+/// Directly set the DigestKey (for test chains).
+pub fn set_digest_key(key: Arc<DigestKey>) {
+    DIGEST_KEY_OVERRIDE.set(key).expect("DigestKey already set");
+}
+
+/// Result of early DigestKey initialization (metadata only, no file read).
+#[derive(Debug)]
+pub enum DigestKeySource {
+    /// A blob file exists and will be lazily read on first access.
+    WillLoadFromFile { file_size: u64 },
+    /// Fell back to the built-in test key.
+    TestKeyFallback,
+    /// No DigestKey is available (no path configured, not a test chain).
+    NotAvailable,
+}
+
+/// Initialize the DigestKey source. Checks metadata only (no file read).
+/// On test chains without an explicit path, sets the test key override.
+pub fn initialize_digest_key(chain_id: ChainId) -> DigestKeySource {
+    if let Some(path) = DIGEST_KEY_PATH.get() {
+        match std::fs::metadata(path) {
+            Ok(meta) => DigestKeySource::WillLoadFromFile {
+                file_size: meta.len(),
+            },
+            Err(_) => DigestKeySource::NotAvailable,
+        }
+    } else if chain_id == ChainId::test() {
+        let _ = DIGEST_KEY_OVERRIDE.set(Arc::new(TEST_DIGEST_KEY.clone()));
+        DigestKeySource::TestKeyFallback
+    } else {
+        DigestKeySource::NotAvailable
+    }
+}
 
 /// An aggregated transcript with the list of dealers who contributed to it.
 #[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
