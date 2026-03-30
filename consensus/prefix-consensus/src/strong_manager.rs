@@ -21,6 +21,7 @@ use crate::{
         Certificate, EmptyViewMessage, EmptyViewStatement,
         IndirectCertificate, StrongPCCommit,
     },
+    counters,
     inner_pc_impl::ThreeRoundPC,
     inner_pc_trait::InnerPCAlgorithm,
     network_interface::SubprotocolNetworkSender,
@@ -44,7 +45,7 @@ use futures::{FutureExt, StreamExt};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::mpsc::UnboundedSender as TokioUnboundedSender;
 use tokio::time::Sleep;
@@ -127,6 +128,26 @@ pub struct StrongPrefixConsensusManager<NetworkSender, T: InnerPCAlgorithm> {
     // Optional channel to notify SlotManager of SPC progress (v_low and v_high).
     // None when running standalone (e.g., smoke tests or EpochManager-managed SPC).
     output_tx: Option<TokioUnboundedSender<SPCOutput>>,
+
+    // ---- Diagnostic fields for investigating View 2 delay ----
+
+    /// What triggered the inner PC start: "enter_view_immediate", "first_ranked_cert", "timer", or "unknown".
+    pc_start_trigger: &'static str,
+
+    /// Wall-clock time when View 1 started (for View 1 duration measurement).
+    view1_start_time: Option<Instant>,
+
+    /// Wall-clock time when `enter_view()` was called for the current view.
+    view_enter_time: Option<Instant>,
+
+    /// Number of select loop iterations since the last `enter_view()` call.
+    select_iterations_since_view_enter: u64,
+
+    /// Number of priority_rx messages processed since the last `enter_view()` call.
+    priority_msgs_since_view_enter: u64,
+
+    /// Number of regular message_rx messages processed since the last `enter_view()` call.
+    regular_msgs_since_view_enter: u64,
 }
 
 impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: InnerPCAlgorithm<Message = PrefixConsensusMsg>>
@@ -164,6 +185,12 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
             validator_verifier,
             input_vector,
             output_tx,
+            pc_start_trigger: "unknown",
+            view1_start_time: None,
+            view_enter_time: None,
+            select_iterations_since_view_enter: 0,
+            priority_msgs_since_view_enter: 0,
+            regular_msgs_since_view_enter: 0,
         }
     }
 
@@ -277,6 +304,8 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                 // Checked before the timer and regular messages so that
                 // ViewProposals are never starved behind inner PC votes.
                 Some((author, msg)) = priority_rx.next() => {
+                    self.select_iterations_since_view_enter += 1;
+                    self.priority_msgs_since_view_enter += 1;
                     self.process_message(author, msg).await;
 
                     if self.protocol.is_complete() {
@@ -306,6 +335,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                             "View start timer expired after {}ms, starting inner PC with available certificates",
                             VIEW_START_TIMEOUT.as_millis()
                         );
+                        self.pc_start_trigger = "timer";
                         self.start_pc_now(view).await;
 
                         if self.protocol.is_complete() {
@@ -322,6 +352,8 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
 
                 // Regular messages: InnerPC votes, Fetch requests/responses
                 Some((author, msg)) = message_rx.next() => {
+                    self.select_iterations_since_view_enter += 1;
+                    self.regular_msgs_since_view_enter += 1;
                     self.process_message(author, msg).await;
 
                     if self.protocol.is_complete() {
@@ -361,6 +393,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
     /// Start View 1 with the raw input vector
     async fn start_view1(&mut self) -> Result<()> {
         self.current_view = 1;
+        self.view1_start_time = Some(Instant::now());
 
         info!(
             party_id = %self.party_id,
@@ -402,6 +435,17 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
 
     /// Handle View 1 completion
     async fn handle_view1_complete(&mut self, output: ViewOutput) {
+        let view1_duration = self.view1_start_time.map(|t| t.elapsed());
+        if let Some(d) = view1_duration {
+            info!(
+                party_id = %self.party_id,
+                slot = self.slot,
+                view1_duration_ms = d.as_millis(),
+                "View 1 complete"
+            );
+            counters::SPC_VIEW1_DURATION.observe(d.as_secs_f64());
+        }
+
         let decision = self.protocol.process_view1_output(output);
 
         // v_low is now set in protocol — send it to SlotManager for early commit.
@@ -502,6 +546,26 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
 
         self.current_view = view;
 
+        // Reset diagnostic counters for the new view
+        self.view_enter_time = Some(Instant::now());
+        self.pc_start_trigger = "unknown";
+        self.select_iterations_since_view_enter = 0;
+        self.priority_msgs_since_view_enter = 0;
+        self.regular_msgs_since_view_enter = 0;
+
+        // Log if the timer is being replaced (indicates a view was skipped)
+        if let Some((old_view, _)) = &self.view_start_timer {
+            if *old_view != view {
+                warn!(
+                    party_id = %self.party_id,
+                    slot = self.slot,
+                    old_view = *old_view,
+                    new_view = view,
+                    "View start timer replaced — skipping view"
+                );
+            }
+        }
+
         info!(
             party_id = %self.party_id,
             view = view,
@@ -516,6 +580,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
 
         if self.has_first_ranked_cert(view) {
             // Best case: start immediately with the optimal (shortest) input vector
+            self.pc_start_trigger = "enter_view_immediate";
             self.start_pc_now(view).await;
         } else {
             // Set timer fallback: if the first-ranked cert doesn't arrive within
@@ -557,6 +622,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
             }
         }
 
+        self.pc_start_trigger = "first_ranked_cert";
         self.start_pc_now(view).await;
     }
 
@@ -584,13 +650,31 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
         let input_vector = view_state.build_truncated_input_vector();
 
         let has_certs = input_vector.iter().any(|h| *h != HashValue::zero());
+        let enter_to_pc_elapsed = self.view_enter_time.map(|t| t.elapsed());
+        let trigger = self.pc_start_trigger;
+
         info!(
             party_id = %self.party_id,
             view = view,
             input_len = input_vector.len(),
             has_certs = has_certs,
+            trigger = trigger,
+            enter_to_pc_ms = ?enter_to_pc_elapsed.map(|d| d.as_millis()),
+            select_iterations = self.select_iterations_since_view_enter,
+            priority_msgs = self.priority_msgs_since_view_enter,
+            regular_msgs = self.regular_msgs_since_view_enter,
             "Starting inner PC for View {}", view
         );
+
+        // Record prometheus metrics
+        if let Some(d) = enter_to_pc_elapsed {
+            counters::SPC_VIEW_ENTER_TO_PC_START
+                .with_label_values(&[trigger])
+                .observe(d.as_secs_f64());
+        }
+        counters::SPC_PC_START_TRIGGER
+            .with_label_values(&[trigger])
+            .inc();
 
         // Create inner PC algorithm
         let input = PrefixConsensusInput::new(

@@ -107,3 +107,18 @@ pub static WAVE_COMMITTED_BLOCKS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Time for SlotManager to forward a priority SPC message to the SPC task channel.
+///
+/// Labels:
+///   "Proposal"  — ViewProposal for a view
+///   "EmptyView" — EmptyViewMessage
+///   "Commit"    — StrongPCCommit
+pub static SLOT_MANAGER_SPC_PRIORITY_FORWARD_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "pc_slot_manager_spc_priority_forward",
+        "Count of priority SPC messages forwarded from SlotManager to SPC task",
+        &["msg_type"]
+    )
+    .unwrap()
+});

@@ -13,8 +13,9 @@ use crate::{
     payload_client::PayloadClient,
     pipeline::{buffer_manager::OrderedBlocks, pipeline_builder::PipelineBuilder},
     prefix_consensus::counters::{
-        PROPOSAL_WAIT_DURATION, SLOT_DURATION, SLOT_START_TRIGGER, UNCOMMITTED_PAYLOAD_COUNT,
-        WAVE_COMMITTED_BLOCKS, WAVE_COMMITTED_TXNS,
+        PROPOSAL_WAIT_DURATION, SLOT_DURATION, SLOT_MANAGER_SPC_PRIORITY_FORWARD_COUNT,
+        SLOT_START_TRIGGER, UNCOMMITTED_PAYLOAD_COUNT, WAVE_COMMITTED_BLOCKS,
+        WAVE_COMMITTED_TXNS,
     },
 };
 use aptos_consensus_types::{
@@ -1431,6 +1432,17 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         if slot == self.current_slot {
             if msg.is_priority() {
                 if let Some(tx) = &mut self.spc_priority_tx {
+                    let msg_name = msg.name();
+                    info!(
+                        epoch = self.epoch,
+                        slot = slot,
+                        msg_type = msg_name,
+                        author = %author,
+                        "Forwarding priority SPC message to SPC task"
+                    );
+                    SLOT_MANAGER_SPC_PRIORITY_FORWARD_COUNT
+                        .with_label_values(&[msg_name])
+                        .inc();
                     if let Err(e) = tx.send((author, msg)).await {
                         error!(
                             epoch = self.epoch,

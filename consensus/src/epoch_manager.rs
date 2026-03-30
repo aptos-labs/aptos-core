@@ -1966,6 +1966,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     } else if let Some(tx) = &mut self.slot_manager_tx {
                         // Wrap as SlotConsensusMsg and route through SlotManager
                         let slot = msg.slot();
+                        debug!(
+                            remote_peer = %peer_id,
+                            epoch = msg_epoch,
+                            slot = slot,
+                            msg_type = msg.name(),
+                            "[EpochManager] Routing StrongPrefixConsensusMsg to SlotManager"
+                        );
                         let wrapped = aptos_prefix_consensus::slot_types::SlotConsensusMsg::StrongPCMsg {
                             slot,
                             epoch: msg_epoch,
