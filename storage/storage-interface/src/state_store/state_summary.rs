@@ -140,7 +140,7 @@ impl StateSummary {
                 shard
                     .insertions
                     .iter()
-                    .map(|(k, (value, _))| (k, Some(value.hash())))
+                    .map(|(k, op)| (k, Some(op.value.hash())))
                     .chain(shard.evictions.keys().map(|k| (k, None)))
                     .sorted_by_key(|(k, _)| *k)
                     .collect_vec()
