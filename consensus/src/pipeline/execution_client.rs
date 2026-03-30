@@ -23,7 +23,7 @@ use crate::{
             storage::interface::RandStorage,
             types::{AugmentedData, RandConfig, Share},
         },
-        secret_sharing::secret_share_manager::SecretShareManager,
+        secret_sharing::{secret_share_manager::SecretShareManager, verifier::SecretShareVerifier},
     },
     state_computer::ExecutionProxy,
     state_replication::StateComputer,
@@ -51,7 +51,6 @@ use aptos_types::{
         OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainRandomnessConfig,
     },
-    secret_sharing::SecretShareConfig,
     validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
@@ -83,7 +82,7 @@ pub trait TExecutionClient: Send + Sync {
         onchain_randomness_config: &OnChainRandomnessConfig,
         onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
         rand_config: Option<RandConfig>,
-        secret_share_config: Option<SecretShareConfig>,
+        secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
@@ -271,7 +270,7 @@ impl ExecutionProxyClient {
     fn make_secret_sharing_manager(
         &self,
         epoch_state: &Arc<EpochState>,
-        config: SecretShareConfig,
+        verifier: Arc<SecretShareVerifier>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: u64,
         network_sender: &Arc<NetworkSender>,
@@ -289,7 +288,7 @@ impl ExecutionProxyClient {
         let secret_share_manager = SecretShareManager::new(
             self.author,
             epoch_state.clone(),
-            config,
+            verifier,
             secret_ready_block_tx,
             network_sender.clone(),
             self.bounded_executor.clone(),
@@ -382,7 +381,7 @@ impl ExecutionProxyClient {
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
-        secret_share_config: Option<SecretShareConfig>,
+        secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
@@ -406,8 +405,8 @@ impl ExecutionProxyClient {
             execution_ready_block_rx,
             maybe_reset_tx_to_rand_manager,
             maybe_reset_tx_to_secret_share_manager,
-        ) = match (rand_config, secret_share_config) {
-            (Some(rand_config), Some(secret_share_config)) => {
+        ) = match (rand_config, secret_share_verifier) {
+            (Some(rand_config), Some(secret_share_verifier)) => {
                 let (rand_manager_input_tx, rand_ready_block_rx, reset_tx_to_rand_manager) = self
                     .make_rand_manager(
                         &epoch_state,
@@ -424,7 +423,7 @@ impl ExecutionProxyClient {
                     reset_tx_to_secret_share_manager,
                 ) = self.make_secret_sharing_manager(
                     &epoch_state,
-                    secret_share_config,
+                    secret_share_verifier,
                     secret_sharing_msg_rx,
                     highest_committed_round,
                     &network_sender,
@@ -538,7 +537,7 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_randomness_config: &OnChainRandomnessConfig,
         onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
         rand_config: Option<RandConfig>,
-        secret_share_config: Option<SecretShareConfig>,
+        secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
@@ -554,7 +553,7 @@ impl TExecutionClient for ExecutionProxyClient {
             commit_signer_provider,
             epoch_state.clone(),
             rand_config,
-            secret_share_config.clone(),
+            secret_share_verifier.clone(),
             onchain_consensus_config,
             rand_msg_rx,
             secret_sharing_msg_rx,
@@ -589,7 +588,7 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_consensus_config.clone(),
             aux_version,
             network_sender,
-            secret_share_config,
+            secret_share_verifier.as_ref().map(|v| v.config().clone()),
             self.consensus_publisher.clone(),
             self.consensus_observer_config.enable_v2_message_sending,
         );
@@ -810,7 +809,7 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
         _rand_config: Option<RandConfig>,
-        _secret_share_config: Option<SecretShareConfig>,
+        _secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         _highest_committed_round: Round,
