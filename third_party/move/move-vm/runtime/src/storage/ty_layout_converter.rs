@@ -482,14 +482,14 @@ where
         // METERING SAFETY:
         //   Module has already been loaded because we got the struct definition.
         if !modules.contains(struct_identifier.module()) {
-            let (hash, size) = self
+            let (hash, _) = self
                 .struct_definition_loader
                 .unmetered_get_module_hash_and_size(
                     struct_identifier.module().address(),
                     struct_identifier.module().name(),
                 )
                 .map_err(|err| err.to_partial())?;
-            modules.insert(struct_identifier.module(), hash, size);
+            modules.insert(struct_identifier.module(), hash);
         }
 
         let result = match &struct_definition.layout {

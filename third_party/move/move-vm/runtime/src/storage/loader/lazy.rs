@@ -221,18 +221,15 @@ where
         let entry = self.module_storage.get_struct_layout(key)?;
         let (layout, modules) = entry.unpack();
 
-        // Validate all module hashes, collecting most recent sizes for gas charging.
-        // Even though old sizes are stored, they CANNOT be used because upgrades can
-        // change them.
         let mut module_sizes = Vec::with_capacity(modules.iter().count());
-        for (module_id, stored_hash, _) in modules.iter() {
+        for (module_id, stored_hash) in modules.iter() {
             // If failed to get the module, treat as a cache miss.
-            let (current_hash, current_size) = self
+            let (current_module_hash, current_size) = self
                 .unmetered_get_module_hash_and_size(module_id.address(), module_id.name())
                 .ok()?;
 
             // Validate that the module has not been republished since this layout was cached.
-            if current_hash != *stored_hash {
+            if &current_module_hash != stored_hash {
                 // Evict the stale entry so that subsequent readers can insert the correct one.
                 // Treat as cache miss; caller will recompute with the current module version.
                 //
