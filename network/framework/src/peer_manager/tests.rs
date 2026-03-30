@@ -1149,6 +1149,82 @@ fn test_non_priority_peer_rejected_at_limit() {
     });
 }
 
+#[test]
+fn test_zero_inbound_connection_limit_rejects_all_unknown_peers() {
+    // Create a peer manager with a limit of 0 inbound connections (reject all unknown peers)
+    let runtime = create_test_runtime();
+    let peer_ids = ordered_peer_ids(2);
+    let unknown_peer = peer_ids[0];
+
+    let (mut peer_manager, _, _, _conn_status_rx) = create_peer_manager_with_priority_peers(
+        runtime.handle().clone(),
+        PeerId::random(),
+        Vec::new(), // no priority peers
+        0,          // zero inbound connection limit
+    );
+
+    // Try to add an unknown peer via inbound connection
+    let (_, inbound) = build_test_connection();
+    let connection = Connection {
+        socket: inbound,
+        metadata: ConnectionMetadata::new(
+            unknown_peer,
+            ConnectionId::default(),
+            "/memory/0".parse().unwrap(),
+            ConnectionOrigin::Inbound,
+            MessagingProtocolVersion::V1,
+            ProtocolIdSet::mock(),
+            PeerRole::Unknown,
+        ),
+    };
+    peer_manager.handle_new_connection_event(connection);
+
+    // The peer should be rejected because the limit is 0
+    assert!(
+        peer_manager.active_peers.is_empty(),
+        "No unknown peers should be accepted when inbound_connection_limit is 0"
+    );
+}
+
+#[test]
+fn test_zero_limit_rejects_priority_peer_with_no_peers_to_evict() {
+    // With limit=0 and no existing non-priority peers to evict, even priority peers
+    // are rejected because there are no slots to free up.
+    let runtime = create_test_runtime();
+    let peer_ids = ordered_peer_ids(2);
+    let priority_peer = peer_ids[0];
+
+    let (mut peer_manager, _, _, _conn_status_rx) = create_peer_manager_with_priority_peers(
+        runtime.handle().clone(),
+        PeerId::random(),
+        vec![priority_peer],
+        0, // zero inbound connection limit
+    );
+
+    // Try to add the priority peer via inbound connection
+    let (_, inbound) = build_test_connection();
+    let connection = Connection {
+        socket: inbound,
+        metadata: ConnectionMetadata::new(
+            priority_peer,
+            ConnectionId::default(),
+            "/memory/0".parse().unwrap(),
+            ConnectionOrigin::Inbound,
+            MessagingProtocolVersion::V1,
+            ProtocolIdSet::mock(),
+            PeerRole::Unknown,
+        ),
+    };
+    peer_manager.handle_new_connection_event(connection);
+
+    // With limit=0 and no existing non-priority peers to evict,
+    // the priority peer also gets rejected (all slots occupied by priority peers path)
+    assert!(
+        peer_manager.active_peers.is_empty(),
+        "Even priority peers are rejected when limit=0 and there are no peers to evict"
+    );
+}
+
 /// Helper function to add a test connection for a given peer ID to the peer manager
 fn add_test_connection_to_manager(
     peer_id: AccountAddress,

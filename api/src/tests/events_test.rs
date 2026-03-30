@@ -36,21 +36,7 @@ async fn test_get_events_filter_by_start_sequence_number() {
             .as_str(),
         )
         .await;
-    context.check_golden_output(resp.clone());
-
-    // assert the same resp after db sharding migration with internal indexer turned on
-    let shard_context =
-        new_test_context_with_orderless_flags(current_function_name!(), false, false);
-    let new_resp = shard_context
-        .get(
-            format!(
-                "/accounts/{}/events/{}?start=1",
-                ACCOUNT_ADDRESS, CREATION_NUMBER
-            )
-            .as_str(),
-        )
-        .await;
-    assert_eq!(resp, new_resp);
+    context.check_golden_output(resp);
 }
 
 // turn it back until we have multiple events in genesis
@@ -99,13 +85,7 @@ async fn test_get_events_by_account_event_handle() {
     let resp = context
         .get("/accounts/0x1/events/0x1::reconfiguration::Configuration/events")
         .await;
-    context.check_golden_output(resp.clone());
-
-    let shard_context = new_test_context(current_function_name!());
-    let new_resp = shard_context
-        .get("/accounts/0x1/events/0x1::reconfiguration::Configuration/events")
-        .await;
-    assert_eq!(resp, new_resp);
+    context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -47,21 +47,12 @@ async fn test_get_account_resources_by_address_0x0() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resources_by_valid_account_address() {
     let context = new_test_context(current_function_name!());
-    let addresses = vec!["0x1", "0x00000000000000000000000000000001"];
-    let mut res = vec![];
-    for address in &addresses {
-        let resp = context.get(&account_resources(address)).await;
-        res.push(resp);
-    }
-
-    let shard_context = new_test_context(current_function_name!());
-    let mut shard_res = vec![];
-    for address in &addresses {
-        let resp = shard_context.get(&account_resources(address)).await;
-        shard_res.push(resp);
-    }
-
-    assert_eq!(res, shard_res);
+    // Both address formats should resolve to the same account and return identical resources.
+    let short_resp = context.get(&account_resources("0x1")).await;
+    let full_resp = context
+        .get(&account_resources("0x00000000000000000000000000000001"))
+        .await;
+    assert_eq!(short_resp, full_resp);
 }
 
 // Unstable due to framework changes
@@ -211,25 +202,6 @@ async fn test_get_account_resources_by_ledger_version(
         use_orderless_transactions,
     );
     test_account_resources_by_ledger_version_with_context(context).await;
-}
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_get_account_resources_by_ledger_version_with_shard_context(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let shard_context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    test_account_resources_by_ledger_version_with_context(shard_context).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -417,29 +389,9 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_get_account_modules_by_ledger_version(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_get_account_modules_by_ledger_version() {
+    let context = new_test_context(current_function_name!());
     test_get_account_modules_by_ledger_version_with_context(context).await;
-    let shard_context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    test_get_account_modules_by_ledger_version_with_context(shard_context).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

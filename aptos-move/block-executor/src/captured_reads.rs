@@ -1377,16 +1377,19 @@ impl ModuleStorage for SnapshotModuleView<'_> {
         }
     }
 
-    fn unmetered_get_module_hash(
+    fn unmetered_get_module_hash_and_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Option<[u8; 32]>> {
+    ) -> VMResult<Option<([u8; 32], usize)>> {
         match self.get_module_read(address, module_name)? {
-            ModuleRead::GlobalCache(code) => Ok(Some(*code.extension().hash())),
-            ModuleRead::PerBlockCache(code) => {
-                Ok(code.as_ref().map(|(c, _)| *c.extension().hash()))
-            },
+            ModuleRead::GlobalCache(code) => Ok(Some((
+                *code.extension().hash(),
+                code.extension().size_in_bytes(),
+            ))),
+            ModuleRead::PerBlockCache(code) => Ok(code
+                .as_ref()
+                .map(|(c, _)| (*c.extension().hash(), c.extension().size_in_bytes()))),
         }
     }
 
