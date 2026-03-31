@@ -2966,7 +2966,6 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
- "rayon",
  "serde",
 ]
 
@@ -9896,7 +9895,6 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "primitive-types",
- "rayon",
  "ring 0.16.20",
  "serde",
  "serde_json",

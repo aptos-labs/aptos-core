@@ -48,10 +48,10 @@ parking_lot = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
-rayon = { workspace = true }
 triomphe = { workspace = true }
 
 [dev-dependencies]
+rayon = { workspace = true }
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true, features = ["testing"] }
