@@ -439,7 +439,10 @@ proptest! {
                 None,
                 /*readonly=*/ false,
                 /*max_num_nodes_per_lru_cache_shard=*/ 0,
-                /*reset_hot_state=*/ true,
+                HotStateConfig {
+                    delete_on_restart: true,
+                    ..HotStateConfig::default()
+                },
             )
             .unwrap();
 

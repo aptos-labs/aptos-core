@@ -1260,7 +1260,8 @@ StakingConfig does not exist under the aptos_framework before creating it.
 
 
 
-<pre><code><b>let</b> config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>let</b> config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 <b>ensures</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() &&
@@ -1540,67 +1541,6 @@ Abort at any condition in StakingRewardsConfigValidationAborts.
 
 
 <pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
-</code></pre>
-
-
-rewards_rate must be within [0, 1].
-min_rewards_rate must be not greater than rewards_rate.
-rewards_rate_period_in_secs must be greater than 0.
-rewards_rate_decrease_rate must be within [0,1].
-
-
-<a id="0x1_staking_config_StakingRewardsConfigValidationAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a> {
-    rewards_rate: FixedPoint64;
-    min_rewards_rate: FixedPoint64;
-    rewards_rate_period_in_secs: u64;
-    rewards_rate_decrease_rate: FixedPoint64;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_greater">fixed_point64::spec_greater</a>(
-        rewards_rate,
-        <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_create_from_u128">fixed_point64::spec_create_from_u128</a>((1u128)));
-    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_greater">fixed_point64::spec_greater</a>(min_rewards_rate, rewards_rate);
-    <b>aborts_if</b> rewards_rate_period_in_secs == 0;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_ceil">fixed_point64::spec_ceil</a>(rewards_rate_decrease_rate) &gt; 1;
-}
-</code></pre>
-
-
-
-
-<a id="0x1_staking_config_StakingRewardsConfigRequirement"></a>
-
-
-<pre><code><b>schema</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a> {
-    <b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
-    <b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() ==&gt; <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">StakingRewardsConfigEnabledRequirement</a>;
-}
-</code></pre>
-
-
-
-
-<a id="0x1_staking_config_StakingRewardsConfigEnabledRequirement"></a>
-
-
-<pre><code><b>schema</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">StakingRewardsConfigEnabledRequirement</a> {
-    <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
-    <b>let</b> staking_rewards_config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
-    <b>let</b> rewards_rate = staking_rewards_config.rewards_rate;
-    <b>let</b> min_rewards_rate = staking_rewards_config.min_rewards_rate;
-    <b>let</b> rewards_rate_period_in_secs = staking_rewards_config.rewards_rate_period_in_secs;
-    <b>let</b> last_rewards_rate_period_start_in_secs = staking_rewards_config.last_rewards_rate_period_start_in_secs;
-    <b>let</b> rewards_rate_decrease_rate = staking_rewards_config.rewards_rate_decrease_rate;
-    <b>requires</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">fixed_point64::spec_less_or_equal</a>(
-        rewards_rate,
-        <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_create_from_u128">fixed_point64::spec_create_from_u128</a>((1u128)));
-    <b>requires</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">fixed_point64::spec_less_or_equal</a>(min_rewards_rate, rewards_rate);
-    <b>requires</b> rewards_rate_period_in_secs &gt; 0;
-    // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-    <b>requires</b> last_rewards_rate_period_start_in_secs &lt;= <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
-    <b>requires</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_ceil">fixed_point64::spec_ceil</a>(rewards_rate_decrease_rate) &lt;= 1;
-}
 </code></pre>
 
 

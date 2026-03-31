@@ -1,18 +1,21 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Transformation which injects specifications (Move function spec blocks) into the bytecode.
 
 use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
+use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast,
-    ast::{Exp, ExpData, QuantKind, TempIndex, Value},
+    ast::{Exp, ExpData, MemoryLabel, QuantKind, TempIndex, Value},
     exp_generator::ExpGenerator,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
-    spec_translator::{SpecTranslator, TranslatedSpec},
+    spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
+    symbol::Symbol,
     ty::{ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
 };
 use move_stackless_bytecode::{
@@ -44,103 +47,8 @@ const EMITS_FAILS_MESSAGE: &str = "function does not emit the expected event";
 const EMITS_NOT_COVERED: &str = "emitted event not covered by any of the `emits` clauses";
 const CHOICE_WITNESS_FAILS_MESSAGE: &str = "choice expression requires a witness to exist";
 
-fn modify_check_fails_message(
-    env: &GlobalEnv,
-    mem: QualifiedId<StructId>,
-    targs: &[Type],
-) -> String {
-    let targs_str = if targs.is_empty() {
-        "".to_string()
-    } else {
-        let tctx = TypeDisplayContext::new(env);
-        format!(
-            "<{}>",
-            targs
-                .iter()
-                .map(|ty| ty.display(&tctx).to_string())
-                .join(", ")
-        )
-    };
-    let module_env = env.get_module(mem.module_id);
-    format!(
-        "caller does not have permission to modify `{}::{}{}` at given address",
-        module_env.get_name().display(env),
-        module_env
-            .get_struct(mem.id)
-            .get_name()
-            .display(env.symbol_pool()),
-        targs_str
-    )
-}
-
-/// Checks if an expression uses memory operations or behavioral predicates.
-/// This is used to determine if a choice expression needs a well-formedness assertion.
-fn uses_memory_or_behavior(exp: &Exp) -> bool {
-    use ast::Operation;
-    let mut uses_memory = false;
-    exp.visit_pre_order(&mut |e| {
-        if let ExpData::Call(_, op, _) = e {
-            match op {
-                Operation::Global(_)
-                | Operation::Exists(_)
-                | Operation::CanModify
-                | Operation::ResourceDomain
-                | Operation::Behavior(..) => {
-                    uses_memory = true;
-                    return false; // stop traversal
-                },
-                _ => {},
-            }
-        }
-        !uses_memory // continue only if we haven't found memory ops
-    });
-    uses_memory
-}
-
-/// For choice expressions that involve memory or behavioral predicates,
-/// return the existential well-formedness check.
-/// Converts `choose y: T where pred(y)` to `exists y: T :: pred(y)`.
-///
-/// We only emit this for choices involving state/memory because:
-/// 1. The SMT solver may not be able to prove simple mathematical existentials
-///    like `exists i: u64 :: i > 0` due to quantifier handling
-/// 2. The fix is specifically needed for behavioral predicates and stateful choices
-///    where Z3 ignores the conditional choice axiom
-fn extract_choice_exists_check(env: &GlobalEnv, exp: &Exp) -> Option<Exp> {
-    if let ExpData::Quant(node_id, kind, ranges, triggers, condition, body) = exp.as_ref() {
-        if kind.is_choice() {
-            // Only emit well-formedness assertion for choices involving memory/state
-            // Pure mathematical choices don't need this and may cause false positives
-            if !uses_memory_or_behavior(body)
-                && condition
-                    .as_ref()
-                    .is_none_or(|c| !uses_memory_or_behavior(c))
-            {
-                return None;
-            }
-            // Create exists with same structure but QuantKind::Exists
-            let exists_id = env.new_node(env.get_node_loc(*node_id), BOOL_TYPE.clone());
-            if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
-                env.set_node_instantiation(exists_id, inst);
-            }
-            return Some(
-                ExpData::Quant(
-                    exists_id,
-                    QuantKind::Exists,
-                    ranges.clone(),
-                    triggers.clone(),
-                    condition.clone(),
-                    body.clone(),
-                )
-                .into_exp(),
-            );
-        }
-    }
-    None
-}
-
-//  ================================================================================================
-/// # Spec Instrumenter
+// ================================================================================================
+// # Spec Instrumenter
 
 pub struct SpecInstrumentationProcessor {}
 
@@ -179,18 +87,33 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
             // out of this data and into the clone.
             let mut verification_data =
                 data.fork(FunctionVariant::Verification(VerificationFlavor::Regular));
-            verification_data =
+            let (instrumented, split_points) =
                 Instrumenter::run(&options, targets, fun_env, verification_data, scc_opt);
-            targets.insert_target_data(
-                &fun_env.get_qualified_id(),
-                verification_data.variant.clone(),
-                verification_data,
-            );
+            verification_data = instrumented;
+
+            if split_points.is_empty() {
+                // No splits — insert the single verification variant.
+                targets.insert_target_data(
+                    &fun_env.get_qualified_id(),
+                    verification_data.variant.clone(),
+                    verification_data,
+                );
+            } else {
+                // Expand splits into multiple verification variants.
+                Self::expand_splits(
+                    fun_env.module_env.env,
+                    targets,
+                    fun_env,
+                    verification_data,
+                    &split_points,
+                );
+            }
         }
 
         // Instrument baseline variant only if it is inlined.
         if is_inlined {
-            Instrumenter::run(&options, targets, fun_env, data, scc_opt)
+            let (data, _) = Instrumenter::run(&options, targets, fun_env, data, scc_opt);
+            data
         } else {
             // Clear code but keep function data stub.
             // TODO(refactoring): the stub is currently still needed because boogie_wrapper
@@ -221,12 +144,15 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 continue;
             }
             for ref fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_not_prover_target() || !fun.is_compiled() {
                     continue;
                 }
                 for (variant, target) in targets.get_targets(fun) {
                     let spec = &*target.get_spec();
-                    if !spec.conditions.is_empty() {
+                    let has_frame = spec.frame_spec.as_ref().is_some_and(|f| {
+                        !f.modifies_targets.is_empty() || !f.reads_targets.is_empty()
+                    });
+                    if !spec.conditions.is_empty() || !spec.properties.is_empty() || has_frame {
                         writeln!(
                             f,
                             "fun {}[{}]\n{}",
@@ -243,6 +169,187 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
     }
 }
 
+/// Maximum number of split combinations before we emit an error.
+const MAX_SPLIT_COMBINATIONS: usize = 1024;
+
+impl SpecInstrumentationProcessor {
+    /// Expand split points into multiple verification variants.
+    /// Each split point on a bool expression creates 2 cases; on an enum, N cases
+    /// (one per variant). If a split has a guard (path condition from an enclosing `if`
+    /// in the proof block), an extra case is added for `!guard`, and the base cases
+    /// are conjuncted with `guard`. The total combinations is the product of all case counts.
+    fn expand_splits(
+        env: &GlobalEnv,
+        targets: &mut FunctionTargetsHolder,
+        fun_env: &FunctionEnv,
+        verification_data: FunctionData,
+        split_points: &[(AttrId, Exp, Option<Exp>)],
+    ) {
+        // Determine the number of base cases for each split point, validating types.
+        let mut has_error = false;
+        let base_case_counts: Vec<usize> = split_points
+            .iter()
+            .map(|(_, exp, _)| {
+                let ty = env.get_node_type(exp.node_id());
+                if ty == BOOL_TYPE {
+                    2
+                } else if let Some((struct_env, _)) = ty.get_struct(env) {
+                    if struct_env.has_variants() {
+                        struct_env.get_variants().count()
+                    } else {
+                        env.error(
+                            &env.get_node_loc(exp.node_id()),
+                            "`split` expression must be of type `bool` or an enum type",
+                        );
+                        has_error = true;
+                        2
+                    }
+                } else {
+                    env.error(
+                        &env.get_node_loc(exp.node_id()),
+                        "`split` expression must be of type `bool` or an enum type",
+                    );
+                    has_error = true;
+                    2
+                }
+            })
+            .collect();
+
+        if has_error {
+            // Insert the original variant to avoid cascading errors.
+            targets.insert_target_data(
+                &fun_env.get_qualified_id(),
+                verification_data.variant.clone(),
+                verification_data,
+            );
+            return;
+        }
+
+        // If there's a guard, add one extra case for `!guard`.
+        let case_counts: Vec<usize> = split_points
+            .iter()
+            .zip(base_case_counts.iter())
+            .map(|((_, _, guard), &base)| if guard.is_some() { base + 1 } else { base })
+            .collect();
+
+        let total: usize = case_counts.iter().product();
+        if total > MAX_SPLIT_COMBINATIONS {
+            env.error(
+                &fun_env.get_loc(),
+                &format!(
+                    "split produces {} verification variants, exceeding the limit of {}",
+                    total, MAX_SPLIT_COMBINATIONS
+                ),
+            );
+            // Fall back: insert the original (with Nop placeholders) as single variant.
+            targets.insert_target_data(
+                &fun_env.get_qualified_id(),
+                verification_data.variant.clone(),
+                verification_data,
+            );
+            return;
+        }
+
+        let original_flavor = match &verification_data.variant {
+            FunctionVariant::Verification(f) => f.clone(),
+            _ => VerificationFlavor::Regular,
+        };
+
+        for combo in 0..total {
+            let new_flavor = VerificationFlavor::Split(Box::new(original_flavor.clone()), combo);
+            let new_variant = FunctionVariant::Verification(new_flavor);
+            let mut forked = verification_data.fork(new_variant.clone());
+
+            // For each split point, replace the Nop at that offset with the
+            // appropriate Assume.
+            let mut remainder = combo;
+            for (i, (split_attr, exp, guard)) in split_points.iter().enumerate() {
+                let case_idx = remainder % case_counts[i];
+                remainder /= case_counts[i];
+
+                let base_cases = base_case_counts[i];
+
+                // Extra guard-false case: assume !guard.
+                if guard.is_some() && case_idx == base_cases {
+                    let guard_exp = guard.as_ref().unwrap();
+                    let not_node =
+                        env.new_node(env.get_node_loc(guard_exp.node_id()), BOOL_TYPE.clone());
+                    let assume_exp =
+                        ExpData::Call(not_node, ast::Operation::Not, vec![guard_exp.clone()])
+                            .into_exp();
+                    if let Some(offset) = forked
+                        .code
+                        .iter()
+                        .position(|bc| matches!(bc, Bytecode::Nop(aid) if *aid == *split_attr))
+                    {
+                        forked.code[offset] =
+                            Bytecode::Prop(*split_attr, PropKind::Assume, assume_exp);
+                    }
+                    continue;
+                }
+
+                let ty = env.get_node_type(exp.node_id());
+                let base_assume = if ty == BOOL_TYPE {
+                    if case_idx == 0 {
+                        // true case: assume the expression
+                        exp.clone()
+                    } else {
+                        // false case: assume !expression
+                        let not_node =
+                            env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+                        ExpData::Call(not_node, ast::Operation::Not, vec![exp.clone()]).into_exp()
+                    }
+                } else if let Some((struct_env, inst)) = ty.get_struct(env) {
+                    // Enum case: assume TestVariants for variant at case_idx
+                    let variant_sym: Symbol = struct_env
+                        .get_variants()
+                        .nth(case_idx)
+                        .expect("variant exists");
+                    let test_node =
+                        env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+                    env.set_node_instantiation(test_node, inst.to_vec());
+                    ExpData::Call(
+                        test_node,
+                        ast::Operation::TestVariants(
+                            struct_env.module_env.get_id(),
+                            struct_env.get_id(),
+                            vec![variant_sym],
+                        ),
+                        vec![exp.clone()],
+                    )
+                    .into_exp()
+                } else {
+                    // Fallback (shouldn't happen): just assume the expression
+                    exp.clone()
+                };
+
+                // If guarded, conjunct with the guard: assume guard && base_assume.
+                let assume_exp = if let Some(guard_exp) = guard {
+                    let and_node = env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+                    ExpData::Call(and_node, ast::Operation::And, vec![
+                        guard_exp.clone(),
+                        base_assume,
+                    ])
+                    .into_exp()
+                } else {
+                    base_assume
+                };
+
+                // Find and replace the Nop with matching AttrId (stable across optimization).
+                if let Some(offset) = forked
+                    .code
+                    .iter()
+                    .position(|bc| matches!(bc, Bytecode::Nop(aid) if *aid == *split_attr))
+                {
+                    forked.code[offset] = Bytecode::Prop(*split_attr, PropKind::Assume, assume_exp);
+                }
+            }
+
+            targets.insert_target_data(&fun_env.get_qualified_id(), new_variant, forked);
+        }
+    }
+}
+
 struct Instrumenter<'a> {
     options: &'a ProverOptions,
     builder: FunctionDataBuilder<'a>,
@@ -253,17 +360,23 @@ struct Instrumenter<'a> {
     abort_label: Label,
     can_abort: bool,
     mem_info: &'a BTreeSet<QualifiedInstId<StructId>>,
+    /// Map from Nop AttrId to split expression and optional guard (for `split` proof items).
+    /// AttrIds are stable across optimization passes, unlike bytecode offsets.
+    /// The optional guard is a path condition from enclosing `if` in the proof block.
+    split_points: Vec<(AttrId, Exp, Option<Exp>)>,
 }
 
+// =================================================================================================
+// # Core Instrumentation
+
 impl<'a> Instrumenter<'a> {
-    #[allow(clippy::needless_collect)]
     fn run(
         options: &'a ProverOptions,
         targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv<'a>,
         data: FunctionData,
         scc_opt: Option<&[FunctionEnv]>,
-    ) -> FunctionData {
+    ) -> (FunctionData, Vec<(AttrId, Exp, Option<Exp>)>) {
         // Pre-collect properties in the original function data
         let props: Vec<_> = data
             .code
@@ -350,8 +463,12 @@ impl<'a> Instrumenter<'a> {
             abort_label,
             can_abort: false,
             mem_info: &mem_info,
+            split_points: vec![],
         };
         instrumenter.instrument(&spec, &inlined_props);
+
+        // Extract split points before consuming the instrumenter.
+        let split_points = std::mem::take(&mut instrumenter.split_points);
 
         // Run copy propagation (reaching definitions) and then assignment
         // elimination (live vars). This cleans up some redundancy created by
@@ -360,7 +477,10 @@ impl<'a> Instrumenter<'a> {
         let reach_def = ReachingDefProcessor::new();
         let live_vars = LiveVarAnalysisProcessor::new_no_annotate();
         data = reach_def.process(targets, fun_env, data, scc_opt);
-        live_vars.process(targets, fun_env, data, scc_opt)
+        (
+            live_vars.process(targets, fun_env, data, scc_opt),
+            split_points,
+        )
     }
 
     fn is_verified(&self) -> bool {
@@ -398,7 +518,12 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             // Inject 'CanModify' assumptions for this function.
             for (loc, exp) in &spec.modifies {
-                let struct_ty = self.builder.global_env().get_node_type(exp.node_id());
+                let struct_ty = self
+                    .builder
+                    .global_env()
+                    .get_node_type(exp.node_id())
+                    .skip_reference()
+                    .clone();
                 self.generate_modifies_check(
                     PropKind::Assume,
                     spec,
@@ -443,8 +568,38 @@ impl<'a> Instrumenter<'a> {
             }
         }
 
-        // Instrument and generate new code
-        for bc in old_code {
+        // Collect intermediate state labels from spec conditions.
+        // These are labels (e.g. @inter, @inter1) that need SaveMem
+        // emitted at the appropriate bytecode offset (not at function entry).
+        let intermediate_saves = if self.is_verified() {
+            self.collect_intermediate_saves(spec, &old_code)
+        } else {
+            BTreeMap::new()
+        };
+
+        // Instrument and generate new code.
+        // Peel leading TraceLocal instructions and emit them before pre_proof
+        // so that pre-proof assertion errors can display model values in counter-examples.
+        let mut old_code = old_code.into_iter().enumerate();
+        let mut pre_proof_emitted = false;
+        for (offset, bc) in old_code.by_ref() {
+            self.emit_intermediate_saves(&intermediate_saves, offset as CodeOffset);
+            if matches!(&bc, Call(_, _, Operation::TraceLocal(_), _, _)) {
+                self.builder.emit(bc);
+            } else {
+                // First non-trace instruction: emit pre_proof, then this instruction.
+                self.emit_proof_actions(&spec.pre_proof, spec);
+                pre_proof_emitted = true;
+                self.instrument_bytecode(spec, inlined_props, bc);
+                break;
+            }
+        }
+        if !pre_proof_emitted {
+            self.emit_proof_actions(&spec.pre_proof, spec);
+        }
+        // Continue with remaining old_code.
+        for (offset, bc) in old_code {
+            self.emit_intermediate_saves(&intermediate_saves, offset as CodeOffset);
             self.instrument_bytecode(spec, inlined_props, bc);
         }
 
@@ -618,7 +773,7 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             let loc = self.builder.get_loc(id);
             for (_, exp) in &callee_spec.modifies {
-                let rty = env.get_node_type(exp.node_id());
+                let rty = env.get_node_type(exp.node_id()).skip_reference().clone();
                 let new_addr = exp.call_args()[0].clone();
                 self.generate_modifies_check(
                     PropKind::Assert,
@@ -787,7 +942,12 @@ impl<'a> Instrumenter<'a> {
             self.generate_opaque_call(dests, mid, fid, targs, srcs, aa, false);
         }
     }
+}
 
+// =================================================================================================
+// # Spec Condition Emission
+
+impl<'a> Instrumenter<'a> {
     fn emit_save_for_old(&mut self, vars: &BTreeMap<TempIndex, TempIndex>) {
         use Bytecode::*;
         for (idx, saved_idx) in vars {
@@ -806,6 +966,275 @@ impl<'a> Instrumenter<'a> {
                     .emit_with(|attr_id| Assign(attr_id, *saved_idx, *idx, AssignKind::Copy))
             }
         }
+    }
+
+    /// Emit SaveMem instructions for intermediate state labels at the given bytecode offset.
+    fn emit_intermediate_saves(
+        &mut self,
+        intermediate_saves: &BTreeMap<CodeOffset, Vec<(QualifiedInstId<StructId>, MemoryLabel)>>,
+        offset: CodeOffset,
+    ) {
+        use Bytecode::*;
+        if let Some(saves) = intermediate_saves.get(&offset) {
+            for (mem, label) in saves {
+                let mem = mem.clone();
+                let label = *label;
+                self.builder
+                    .emit_with(|attr_id| SaveMem(attr_id, label, mem));
+            }
+        }
+    }
+
+    /// Collect intermediate SaveMem instructions needed for state labels in the spec.
+    /// Uses structural matching: labels are ordered via the behavioral predicate chain,
+    /// then mapped to state-transition operations in the bytecode.
+    /// Returns a map from bytecode offset to the set of (memory, label) pairs to save at that offset.
+    fn collect_intermediate_saves(
+        &self,
+        spec: &TranslatedSpec,
+        code: &[Bytecode],
+    ) -> BTreeMap<CodeOffset, Vec<(QualifiedInstId<StructId>, MemoryLabel)>> {
+        let env = self.builder.global_env();
+
+        // Collect all expressions from spec conditions
+        let mut all_exps: Vec<&Exp> = Vec::new();
+        for (_, exp) in &spec.post {
+            all_exps.push(exp);
+        }
+        for (_, exp, code_exp) in &spec.aborts {
+            all_exps.push(exp);
+            if let Some(c) = code_exp {
+                all_exps.push(c);
+            }
+        }
+        for (_, exp) in &spec.modifies {
+            all_exps.push(exp);
+        }
+        for (_, exps) in &spec.aborts_with {
+            for exp in exps {
+                all_exps.push(exp);
+            }
+        }
+        for (_, exp, exp2, opt_exp) in &spec.emits {
+            all_exps.push(exp);
+            all_exps.push(exp2);
+            if let Some(e) = opt_exp {
+                all_exps.push(e);
+            }
+        }
+        for (_, exp, exp2) in &spec.updates {
+            all_exps.push(exp);
+            all_exps.push(exp2);
+        }
+
+        // Collect (label, memory) pairs from expressions that use intermediate state labels.
+        // These come from:
+        // - Behavior(kind, range) with non-default range: behavioral predicates with state labels
+        // - Exists(Some(label)): existence checks at intermediate states
+        // - Global(Some(label)): resource access at intermediate states
+        let mut label_memory_pairs: BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> =
+            BTreeSet::new();
+
+        for exp in &all_exps {
+            exp.visit_pre_order(&mut |e| {
+                if let ExpData::Call(node_id, op, args) = e {
+                    match op {
+                        ast::Operation::Behavior(_, range) if !range.is_default() => {
+                            // Resolve the closure target to get memory types
+                            let closure_info: Option<(
+                                Vec<Type>,
+                                move_model::model::ModuleId,
+                                FunId,
+                            )> = match args.first().map(|a| a.as_ref()) {
+                                Some(ExpData::Call(
+                                    closure_id,
+                                    ast::Operation::Closure(mid, fid, _),
+                                    _,
+                                )) => {
+                                    let inst = env.get_node_instantiation(*closure_id);
+                                    Some((inst, *mid, *fid))
+                                },
+                                Some(ExpData::Temporary(_, idx)) => {
+                                    code.iter().rev().find_map(|bc| {
+                                        if let Bytecode::Call(
+                                            _,
+                                            dests,
+                                            Operation::Closure(mid, fid, types, _),
+                                            _,
+                                            _,
+                                        ) = bc
+                                        {
+                                            if dests.first() == Some(idx) {
+                                                return Some((types.clone(), *mid, *fid));
+                                            }
+                                        }
+                                        None
+                                    })
+                                },
+                                _ => None,
+                            };
+                            if let Some((inst, mid, fid)) = closure_info {
+                                let closure_fun_env = env.get_function(mid.qualified(fid));
+                                let all_memory = closure_fun_env
+                                    .get_spec_used_memory()
+                                    .iter()
+                                    .chain(closure_fun_env.get_spec_old_memory().iter());
+                                for memory in all_memory {
+                                    let memory = memory.clone().instantiate(&inst);
+                                    for label in range.labels() {
+                                        label_memory_pairs.insert((label, memory.clone()));
+                                    }
+                                }
+                            }
+                        },
+                        ast::Operation::SpecFunction(mid, fid, range) if !range.is_default() => {
+                            // Two-state spec function with state labels
+                            let module = env.get_module(*mid);
+                            let sfun = module.get_spec_fun(*fid);
+                            let inst = env.get_node_instantiation(*node_id);
+                            let all_memory = sfun.used_memory.iter().chain(sfun.old_memory.iter());
+                            for memory in all_memory {
+                                let memory = memory.clone().instantiate(&inst);
+                                for label in range.labels() {
+                                    label_memory_pairs.insert((label, memory.clone()));
+                                }
+                            }
+                        },
+                        ast::Operation::Exists(Some(label))
+                        | ast::Operation::Global(Some(label)) => {
+                            // Extract memory type from node's type instantiation
+                            let mem_ty = &env.get_node_instantiation(*node_id)[0];
+                            let (mid, sid, inst) = mem_ty.require_struct();
+                            let memory = mid.qualified_inst(sid, inst.to_owned());
+                            label_memory_pairs.insert((*label, memory));
+                        },
+                        _ => {},
+                    }
+                }
+                true
+            });
+        }
+
+        // Build set of labels already saved at function entry (from saved_memory)
+        let already_saved: BTreeSet<MemoryLabel> = spec.saved_memory.values().copied().collect();
+
+        // Filter to labels that actually need intermediate SaveMem
+        let labels_needing_save: BTreeSet<MemoryLabel> = label_memory_pairs
+            .iter()
+            .map(|(label, _)| *label)
+            .filter(|label| !already_saved.contains(label))
+            .collect();
+
+        if labels_needing_save.is_empty() {
+            return BTreeMap::new();
+        }
+
+        // Build a total order of intermediate labels from the behavioral predicate chain.
+        // Behavioral predicates (Behavior/SpecFunction) with MemoryRange {pre, post}
+        // define edges pre→post in a DAG. Topologically sorting this DAG gives program
+        // order, which we then filter to labels that need saving.
+        let label_order = Self::build_label_order_from_spec(&all_exps, &labels_needing_save);
+
+        // Enumerate state-transition operations in bytecode order.
+        // These are the operations that change global memory state: function calls,
+        // MoveFrom, MoveTo, WriteBack to global root, and OpaqueCallBegin (which marks
+        // the start of an opaque call that may modify global state).
+        let state_transition_offsets: Vec<CodeOffset> = code
+            .iter()
+            .enumerate()
+            .filter(|(_, bc)| {
+                bc.is_global_state_transition()
+                    || matches!(
+                        bc,
+                        Bytecode::Call(_, _, Operation::OpaqueCallBegin(..), _, _)
+                    )
+            })
+            .map(|(i, _)| i as CodeOffset)
+            .collect();
+
+        // TODO: Support state labels on branching control flow by anchoring labels to
+        // specific transitions in the CFG rather than ordinal position.
+        if !label_order.is_empty() && code.iter().any(|bc| matches!(bc, Bytecode::Branch(..))) {
+            env.error(
+                &self.builder.fun_env.get_spec_loc(),
+                "intermediate state labels (`|~`) are currently only supported \
+                 for functions with linear control flow (no branches); \
+                 this restriction will be lifted in a future version",
+            );
+            return BTreeMap::new();
+        }
+
+        // Map the Nth intermediate label to the state after the Nth state-transition
+        // operation. SaveMem is emitted at (state_transition_offset + 1), i.e., right
+        // after the operation completes and before the next bytecode executes.
+        let mut result: BTreeMap<CodeOffset, Vec<(QualifiedInstId<StructId>, MemoryLabel)>> =
+            BTreeMap::new();
+        for (n, label) in label_order.iter().enumerate() {
+            if n >= state_transition_offsets.len() {
+                break;
+            }
+            let save_offset = state_transition_offsets[n] + 1;
+            for (l, memory) in &label_memory_pairs {
+                if l == label {
+                    result
+                        .entry(save_offset)
+                        .or_default()
+                        .push((memory.clone(), *label));
+                }
+            }
+        }
+        result
+    }
+
+    /// Build a total order of intermediate labels from behavioral predicate chains in spec
+    /// expressions. Returns labels from `labels_needing_save` sorted in program order.
+    fn build_label_order_from_spec(
+        all_exps: &[&Exp],
+        labels_needing_save: &BTreeSet<MemoryLabel>,
+    ) -> Vec<MemoryLabel> {
+        use petgraph::{algo::toposort, graph::DiGraph};
+
+        // Build a directed graph of label ordering edges from behavioral predicate ranges.
+        let mut graph = DiGraph::<MemoryLabel, ()>::new();
+        let mut node_map: BTreeMap<MemoryLabel, petgraph::graph::NodeIndex> = BTreeMap::new();
+        let mut get_or_insert =
+            |g: &mut DiGraph<MemoryLabel, ()>, label: MemoryLabel| -> petgraph::graph::NodeIndex {
+                *node_map.entry(label).or_insert_with(|| g.add_node(label))
+            };
+
+        for exp in all_exps {
+            exp.visit_pre_order(&mut |e| {
+                if let ExpData::Call(_, op, _) = e {
+                    match op {
+                        ast::Operation::Behavior(_, range)
+                        | ast::Operation::SpecFunction(_, _, range) => {
+                            for label in range.labels() {
+                                get_or_insert(&mut graph, label);
+                            }
+                            if let (Some(pre), Some(post)) = (range.pre, range.post) {
+                                let pre_node = get_or_insert(&mut graph, pre);
+                                let post_node = get_or_insert(&mut graph, post);
+                                graph.update_edge(pre_node, post_node, ());
+                            }
+                        },
+                        ast::Operation::Global(Some(label))
+                        | ast::Operation::Exists(Some(label)) => {
+                            get_or_insert(&mut graph, *label);
+                        },
+                        _ => {},
+                    }
+                }
+                true
+            });
+        }
+
+        // Topological sort to get program order, then filter to labels that need saving.
+        toposort(&graph, None)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|idx| graph[idx])
+            .filter(|label| labels_needing_save.contains(label))
+            .collect()
     }
 
     fn emit_updates(&mut self, spec: &TranslatedSpec, prop_rhs_opt: Option<Exp>) {
@@ -916,8 +1345,7 @@ impl<'a> Instrumenter<'a> {
             .iter()
             .filter(|(_, is_post, ..)| *is_post == post_state);
         for (loc, _, _, exp) in lets {
-            let env = self.builder.global_env();
-            if let Some(exists_check) = extract_choice_exists_check(env, exp) {
+            if let Some(exists_check) = self.extract_choice_exists_check(exp) {
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), CHOICE_WITNESS_FAILS_MESSAGE);
                 self.builder
@@ -973,6 +1401,95 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
+    /// Checks if an expression uses memory operations or behavioral predicates.
+    fn uses_memory_or_behavior(exp: &Exp) -> bool {
+        use ast::Operation;
+        let mut uses_memory = false;
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(
+                _,
+                Operation::Global(_)
+                | Operation::Exists(_)
+                | Operation::CanModify
+                | Operation::ResourceDomain
+                | Operation::Behavior(..),
+                _,
+            ) = e
+            {
+                uses_memory = true;
+                return false; // stop traversal
+            }
+            !uses_memory // continue only if we haven't found memory ops
+        });
+        uses_memory
+    }
+
+    /// Extract an exists-check from a choice expression for well-formedness assertions.
+    fn extract_choice_exists_check(&self, exp: &Exp) -> Option<Exp> {
+        let env = self.builder.global_env();
+        if let ExpData::Quant(node_id, kind, ranges, triggers, condition, body) = exp.as_ref()
+            && kind.is_choice()
+        {
+            if !Self::uses_memory_or_behavior(body)
+                && condition
+                    .as_ref()
+                    .is_none_or(|c| !Self::uses_memory_or_behavior(c))
+            {
+                return None;
+            }
+            let exists_id = env.new_node(env.get_node_loc(*node_id), BOOL_TYPE.clone());
+            if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
+                env.set_node_instantiation(exists_id, inst);
+            }
+            return Some(
+                ExpData::Quant(
+                    exists_id,
+                    QuantKind::Exists,
+                    ranges.clone(),
+                    triggers.clone(),
+                    condition.clone(),
+                    body.clone(),
+                )
+                .into_exp(),
+            );
+        }
+        None
+    }
+
+    fn modify_check_fails_message(
+        env: &GlobalEnv,
+        mem: QualifiedId<StructId>,
+        targs: &[Type],
+    ) -> String {
+        let targs_str = if targs.is_empty() {
+            "".to_string()
+        } else {
+            let tctx = TypeDisplayContext::new(env);
+            format!(
+                "<{}>",
+                targs
+                    .iter()
+                    .map(|ty| ty.display(&tctx).to_string())
+                    .join(", ")
+            )
+        };
+        let module_env = env.get_module(mem.module_id);
+        format!(
+            "caller does not have permission to modify `{}::{}{}` at given address",
+            module_env.get_name().display(env),
+            module_env
+                .get_struct(mem.id)
+                .get_name()
+                .display(env.symbol_pool()),
+            targs_str
+        )
+    }
+}
+
+// =================================================================================================
+// # Block Generation
+
+impl<'a> Instrumenter<'a> {
     fn generate_abort_block(&mut self, spec: &TranslatedSpec) {
         use Bytecode::*;
         // Set the location to the function and emit label.
@@ -1096,6 +1613,9 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(|id| Prop(id, Assert, exp))
             }
 
+            // Emit return-point proof actions (`post`-prefixed proof statements).
+            self.emit_proof_actions(&spec.post_proof, spec);
+
             // Emit all post-conditions which must hold as we do not abort.
             for (loc, cond) in &spec.post {
                 self.emit_traces(spec, cond);
@@ -1165,7 +1685,7 @@ impl<'a> Instrumenter<'a> {
                 let (mid, sid, inst) = resource_type.require_struct();
                 self.builder.set_loc_and_vc_info(
                     loc.clone(),
-                    &modify_check_fails_message(env, mid.qualified(sid), inst),
+                    &Self::modify_check_fails_message(env, mid.qualified(sid), inst),
                 );
             } else {
                 self.builder.set_loc(loc.clone());
@@ -1195,18 +1715,50 @@ impl<'a> Instrumenter<'a> {
     }
 }
 
+// =================================================================================================
+// # Proof Emission
+
+impl<'a> Instrumenter<'a> {
+    /// Emit bytecode for a flat list of proof actions.
+    fn emit_proof_actions(&mut self, actions: &[(Loc, ProofAction)], spec: &TranslatedSpec) {
+        use Bytecode::*;
+        for (loc, action) in actions {
+            match action {
+                ProofAction::Assert(exp, msg) => {
+                    self.emit_traces(spec, exp);
+                    self.builder.set_loc_and_vc_info(loc.clone(), msg);
+                    self.builder
+                        .emit_with(|id| Prop(id, PropKind::Assert, exp.clone()));
+                },
+                ProofAction::Assume(exp) => {
+                    self.builder.set_loc(loc.clone());
+                    self.builder
+                        .emit_with(|id| Prop(id, PropKind::Assume, exp.clone()));
+                },
+                ProofAction::Split(exp, guard) => {
+                    self.builder.set_loc(loc.clone());
+                    let attr_id = self.builder.new_attr();
+                    self.builder.emit(Bytecode::Nop(attr_id));
+                    self.split_points
+                        .push((attr_id, exp.clone(), guard.clone()));
+                },
+            }
+        }
+    }
+}
+
 //  ================================================================================================
 /// # Modifies Checker
-
 /// Check modifies annotations. This is depending on usage analysis and is therefore
 /// invoked here from the initialize trait function of this processor.
 fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
     for module_env in env.get_modules() {
         if module_env.is_target() {
             for fun_env in module_env.get_functions() {
-                if !fun_env.is_inline() {
+                if !fun_env.is_not_prover_target() && fun_env.is_compiled() {
                     check_caller_callee_modifies_relation(env, targets, &fun_env);
                     check_opaque_modifies_completeness(env, targets, &fun_env);
+                    check_reads_completeness(env, targets, &fun_env);
                 }
             }
         }
@@ -1227,7 +1779,10 @@ fn check_caller_callee_modifies_relation(
         .expect(COMPILED_MODULE_AVAILABLE)
     {
         let callee_fun_env = env.get_function(*callee);
-        if callee_fun_env.is_native() || callee_fun_env.is_intrinsic() {
+        if callee_fun_env.is_native()
+            || callee_fun_env.is_intrinsic()
+            || callee_fun_env.is_struct_api()
+        {
             continue;
         }
         let callee_func_target = targets.get_target(&callee_fun_env, &FunctionVariant::Baseline);
@@ -1288,6 +1843,56 @@ fn check_opaque_modifies_completeness(
             &format!("function `{}` is opaque but its specification does not have a modifies clause for `{}`",
                 fun_env.get_full_name_str(),
                 env.display(mem))
+            )
+        }
+    }
+}
+
+/// Check that a function's actual resource access is covered by its `reads` declaration.
+/// If a function declares `reads R, S;`, every resource it accesses (reads or writes)
+/// must be listed. Resources in `modifies` are implicitly included.
+fn check_reads_completeness(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    fun_env: &FunctionEnv,
+) {
+    let frame_spec = fun_env.get_frame_spec();
+    let reads_targets = match &frame_spec {
+        Some(fs) if !fs.reads_targets.is_empty() => &fs.reads_targets,
+        _ => return, // No reads declaration — nothing to check
+    };
+
+    let target = targets.get_target(fun_env, &FunctionVariant::Baseline);
+    let modify_ids = target.get_modify_ids();
+
+    // All accessed memory must be in reads_targets or modify_ids
+    for mem in usage_analysis::get_memory_usage(&target)
+        .accessed
+        .all
+        .iter()
+    {
+        if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {
+            continue;
+        }
+        if env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory() {
+            continue;
+        }
+        let in_reads = reads_targets
+            .iter()
+            .any(|r| r.to_qualified_id() == mem.to_qualified_id());
+        let in_modifies = modify_ids
+            .iter()
+            .any(|m| m.to_qualified_id() == mem.to_qualified_id());
+        if !in_reads && !in_modifies {
+            let loc = fun_env.get_spec_loc();
+            env.error(
+                &loc,
+                &format!(
+                    "function `{}` accesses resource `{}` which is not covered by \
+                     its `reads` or `modifies` declaration",
+                    fun_env.get_full_name_str(),
+                    env.display(mem)
+                ),
             )
         }
     }

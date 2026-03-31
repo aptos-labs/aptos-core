@@ -1,0 +1,67 @@
+=== Module 0x66::borrow_soundness ===
+
+fun borrow_loc_no_source_subst(r0): u64 {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: u64
+    r2: &u64
+    r3: u64
+  code:
+    0: r1 := copy r0
+    1: r2 := imm_borrow_loc r1
+    2: r3 := read_ref r2
+    3: ret [r3]
+}
+
+fun imm_borrow_value_prop(r0): u64 {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: u64
+    r2: &u64
+    r3: u64
+  code:
+    0: r1 := copy r0
+    1: r2 := imm_borrow_loc r1
+    2: r3 := read_ref r2
+    3: r3 := add r3, r0
+    4: ret [r3]
+}
+
+fun mut_borrow_kills_subst(r0): u64 {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: &mut u64
+  code:
+    0: r1 := copy r0
+    1: r2 := ld_u64 42
+    2: r3 := mut_borrow_loc r1
+    3: write_ref r3, r2
+    4: ret [r1]
+}
+
+fun mut_borrow_kills_reverse(r0): u64 {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: &mut u64
+  code:
+    0: r1 := copy r0
+    1: r2 := ld_u64 99
+    2: r3 := mut_borrow_loc r0
+    3: write_ref r3, r2
+    4: ret [r1]
+}
+
+=== micro-ops ===
+=== Module 0x66::borrow_soundness ===
+
+fun borrow_loc_no_source_subst(): skipped (lowering: instruction ImmBorrowLoc(Home(2), Home(1)) not yet lowered)
+
+fun imm_borrow_value_prop(): skipped (lowering: instruction ImmBorrowLoc(Home(2), Home(1)) not yet lowered)
+
+fun mut_borrow_kills_subst(): skipped (lowering: instruction MutBorrowLoc(Home(3), Home(1)) not yet lowered)
+
+fun mut_borrow_kills_reverse(): skipped (lowering: instruction MutBorrowLoc(Home(3), Home(0)) not yet lowered)

@@ -111,6 +111,7 @@ use std::{
     convert::{AsRef, TryFrom},
     fmt,
     str::FromStr,
+    sync::Arc,
 };
 use tiny_keccak::{Hasher, Sha3};
 
@@ -557,6 +558,17 @@ pub trait CryptoHash {
 
     /// Hashes the object and produces a `HashValue`.
     fn hash(&self) -> HashValue;
+}
+
+impl<T> CryptoHash for Arc<T>
+where
+    T: CryptoHash,
+{
+    type Hasher = T::Hasher;
+
+    fn hash(&self) -> HashValue {
+        self.as_ref().hash()
+    }
 }
 
 /// A trait for representing the state of a cryptographic hasher.

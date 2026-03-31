@@ -8,7 +8,7 @@ module 0x42::M {
     }
 
     spec apply_requires_err {
-        ensures requires_of<f>(x)@post; // Error: post-state label not allowed on requires_of
+        ensures ..post |~ requires_of<f>(x); // Error: post-state label not allowed on requires_of
     }
 
     // Error: aborts_of should not have post-state label
@@ -17,16 +17,7 @@ module 0x42::M {
     }
 
     spec apply_aborts_err {
-        aborts_if aborts_of<f>(x)@post; // Error: post-state label not allowed on aborts_of
-    }
-
-    // Error: pre-state label references undefined post-state
-    fun apply_undefined_label(f: |u64| u64, x: u64): u64 {
-        f(x)
-    }
-
-    spec apply_undefined_label {
-        ensures undefined@ensures_of<f>(x, result); // Error: 'undefined' label not defined
+        aborts_if ..post |~ aborts_of<f>(x); // Error: post-state label not allowed on aborts_of
     }
 
     // Error: post-state label defined but never referenced
@@ -35,7 +26,7 @@ module 0x42::M {
     }
 
     spec apply_orphan_post {
-        ensures ensures_of<f>(x, result)@orphan; // Error: 'orphan' is never referenced
+        ensures ..orphan |~ ensures_of<f>(x, result); // Error: 'orphan' is never referenced
     }
 
     // Error: cyclic state label reference
@@ -45,8 +36,8 @@ module 0x42::M {
 
     spec apply_cycle {
         // a references b's post-state, b references a's post-state - cycle!
-        ensures a@ensures_of<f>(x, result)@b;
-        ensures b@ensures_of<f>(x, result)@a;
+        ensures a..b |~ ensures_of<f>(x, result);
+        ensures b..a |~ ensures_of<f>(x, result);
     }
 
     // Error: self-referencing state label (length-1 cycle)
@@ -55,6 +46,6 @@ module 0x42::M {
     }
 
     spec apply_self_cycle {
-        ensures a@ensures_of<f>(x, result)@a;
+        ensures a..a |~ ensures_of<f>(x, result);
     }
 }

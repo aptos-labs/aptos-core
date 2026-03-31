@@ -257,6 +257,10 @@ fn compute_h_denom_eval<E: Pairing>(
     roots_of_unity_in_eval_dom: &Vec<E::ScalarField>,
 ) -> Vec<E::ScalarField> {
     let num_omegas = roots_of_unity_in_eval_dom.len();
+    assert!(
+        num_omegas >= 2,
+        "num_omegas must be at least 2 (max_n >= 1)"
+    );
     let mut h_denom_eval = Vec::with_capacity(num_omegas);
 
     // First element: inverse of (max_n * (max_n + 1) / 2)
@@ -719,28 +723,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
         // Step 8
-        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
-
-        let u_values: Vec<_> = (0..num_omegas)
-            .map(|i| {
-                mu * hat_f_evals[i]
-                    + mu_h * h_evals[i]
-                    + mus
-                        .iter()
-                        .zip(&f_js_evals)
-                        .map(|(&mu_j, f_j)| mu_j * f_j[i])
-                        .sum::<E::ScalarField>()
-            })
-            .collect();
+        let gamma =
+            fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &ck_S.roots_of_unity_in_eval_dom);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("get_mu_challenges + u_values", start.elapsed());
+        print_cumulative("Step 8: gamma", start.elapsed());
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
-        // Step 9
-        let gamma =
-            fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &ck_S.roots_of_unity_in_eval_dom);
-
+        // Step 9a
         let a: E::ScalarField = {
             let poly = ark_poly::univariate::DensePolynomial {
                 coeffs: hat_f_coeffs,
@@ -763,12 +753,38 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 poly.evaluate(&gamma)
             }) // Again, using Horner's here
             .collect();
+
+        // Step 9b
+        fiat_shamir::append_evaluations_at_gamma::<E>(&mut fs_t, a, a_h, &a_js);
+
+        // Step 9c:
+        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("gamma + a + a_h + a_js (evals at gamma)", start.elapsed());
+        print_cumulative(
+            "Step 9: a,a_h,a_js + append_evaluations_at_gamma + get_mu_challenges",
+            start.elapsed(),
+        );
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
         // Step 10
+        let u_values: Vec<_> = (0..num_omegas)
+            .map(|i| {
+                mu * hat_f_evals[i]
+                    + mu_h * h_evals[i]
+                    + mus
+                        .iter()
+                        .zip(&f_js_evals)
+                        .map(|(&mu_j, f_j)| mu_j * f_j[i])
+                        .sum::<E::ScalarField>()
+            })
+            .collect();
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("Step 10: u_values", start.elapsed());
+
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
+        // Step 10 (continued)
         let s = sample_field_element(rng);
 
         let rho_u = mu * (rho.0 + delta_rho)
@@ -851,11 +867,19 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             verifier_precomputed,
         } = vk;
 
+        let max_ell = verifier_precomputed.powers_of_two.len();
         ensure!(
-            ell as usize <= verifier_precomputed.powers_of_two.len(),
+            ell as usize <= max_ell,
             "ell (got {}) must be ≤ max_ell (which is {})",
             ell,
-            verifier_precomputed.powers_of_two.len()
+            max_ell
+        );
+        let max_n = verifier_precomputed.roots_of_unity.len().saturating_sub(1);
+        ensure!(
+            n <= max_n,
+            "n (got {}) must be ≤ max_n (which is {})",
+            n,
+            max_n
         );
 
         let Proof {
@@ -868,6 +892,19 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             a_js,
             pi_gamma,
         } = self;
+
+        ensure!(
+            Cs.len() == ell as usize,
+            "Cs length must equal ell (got {} vs ell {})",
+            Cs.len(),
+            ell
+        );
+        ensure!(
+            a_js.len() == ell as usize,
+            "a_js length must equal ell (got {} vs ell {})",
+            a_js.len(),
+            ell
+        );
 
         // Step 2a
         fiat_shamir::append_initial_data(&mut fs_t, Self::DST, vk, PublicStatement {
@@ -916,16 +953,20 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
 
         // Step 7
+        let gamma =
+            fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &verifier_precomputed.roots_of_unity);
+
+        // Step 8:
+        fiat_shamir::append_evaluations_at_gamma::<E>(&mut fs_t, *a, *a_h, &a_js);
+
+        // Step 9:
         let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative(
-            "append_sigma + append_f_j + get_beta + append_h + get_mu",
-            start.elapsed(),
-        );
+        print_cumulative("Step 4a–9: append_sigma + append_f_j + get_beta + append_h + gamma + append_evaluations_at_gamma + get_mu_challenges", start.elapsed());
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
-        // Step 8
+        // Step 10
         let U_bases: Vec<E::G1Affine> = {
             let mut v = Vec::with_capacity(2 + Cs.len());
             v.push(*hat_C);
@@ -949,15 +990,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             )
         })?;
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("U_bases + U_scalars + MSM", start.elapsed());
+        print_cumulative("Step 10: U_bases + U_scalars + MSM", start.elapsed());
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
-        // Step 9
-        let gamma =
-            fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &verifier_precomputed.roots_of_unity);
 
-        // Step 10
+        // Step 10 (continued)
         let a_u = *a * mu
             + *a_h * mu_h
             + a_js
@@ -967,7 +1005,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 .sum::<E::ScalarField>();
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("gamma + a_u", start.elapsed());
+        print_cumulative("Step 10: a_u", start.elapsed());
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
@@ -1040,7 +1078,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 // TODO: Move some of this to the range proof trait in the fiat_shamir file? Or not?
 mod fiat_shamir {
     use super::*;
-    use crate::fiat_shamir::RangeProof;
+    use crate::fiat_shamir::{PolynomialCommitmentScheme, RangeProof};
     use merlin::Transcript;
 
     pub(crate) fn append_initial_data<E: Pairing>(
@@ -1096,6 +1134,17 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_h_commitment<E: Pairing>(fs_transcript: &mut Transcript, D: &E::G1Affine) {
         <Transcript as RangeProof<E, Proof<E>>>::append_h_commitment(fs_transcript, D);
+    }
+
+    pub(crate) fn append_evaluations_at_gamma<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        a: E::ScalarField,
+        a_h: E::ScalarField,
+        a_js: &Vec<E::ScalarField>,
+    ) {
+        let mut points = vec![a, a_h];
+        points.extend(a_js);
+        fs_transcript.append_evaluation_points(&points);
     }
 
     pub(crate) fn get_mu_challenges<E: Pairing>(

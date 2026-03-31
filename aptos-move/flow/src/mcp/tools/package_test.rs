@@ -213,7 +213,14 @@ impl FlowSession {
         &self,
         params: MovePackageCoverageParams,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        log::info!("move_package_coverage: path=`{}`", params.package_path);
+        log::info!(
+            "move_package_coverage: path=`{}`{}",
+            params.package_path,
+            params
+                .function
+                .as_deref()
+                .map_or(String::new(), |f| format!(", function=`{}`", f))
+        );
 
         let pkg_path = PathBuf::from(&params.package_path);
         if !pkg_path.exists() {
@@ -350,7 +357,12 @@ fn run_tests(pkg_path: &Path, args: &McpArgs) -> anyhow::Result<(bool, String)> 
         },
         Err(e) => {
             log::error!("test execution error: {}", e);
-            Err(e.context("test execution error"))
+            log::error!(
+                "captured output ({} bytes): {}",
+                output_str.len(),
+                output_str
+            );
+            Err(e.context(output_str))
         },
     }
 }
@@ -378,7 +390,7 @@ fn make_test_build_config(pkg_path: &Path, args: &McpArgs) -> BuildConfig {
     let compiler_config = CompilerConfig {
         known_attributes: extended_checks::get_all_attribute_names().clone(),
         bytecode_version: args.bytecode_version,
-        language_version: args.language_version,
+        language_version: Some(args.language_version),
         experiments: args.experiments.clone(),
         ..Default::default()
     };
@@ -471,7 +483,7 @@ fn load_coverage_map(path: &Path) -> anyhow::Result<CoverageMap> {
 
 /// Ensure bytecode is available and return the model environment.
 fn ensure_env(pkg_data: &mut PackageData) -> anyhow::Result<&GlobalEnv> {
-    if !pkg_data.has_bytecode() {
+    if !pkg_data.built_with_bytecode() {
         pkg_data.rebuild_with_bytecode()?;
     }
     Ok(pkg_data.env())

@@ -20,8 +20,9 @@
 //! cleared when the arena backing the allocation is reset. Hence, it is safe
 //! to dereference any arena-based pointers stored in the map.
 
-use crate::{alloc::GlobalArenaPtr, context::ArenaRef, ExecutionGuard};
-use dashmap::{Entry, Equivalent};
+use crate::{context::ArenaRef, ExecutionGuard};
+use dashmap::Equivalent;
+use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::identifier::IdentStr;
 use std::hash::{Hash, Hasher};
 
@@ -31,7 +32,7 @@ impl<'guard> ArenaRef<'guard, str> {
         // SAFETY: The lifetime on this reference guarantees that the execution
         // guard is still alive, which guarantees that the arena allocation is
         // still valid and there were no deallocations.
-        unsafe { self.ptr.as_ref() }
+        unsafe { self.ptr.as_ref_unchecked() }
     }
 }
 
@@ -56,7 +57,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     where
         'ctx: 'guard,
     {
-        let ptr = self.intern_identifier_impl(identifier);
+        let ptr = self.intern_identifier_internal(identifier);
 
         // SAFETY: If the returned pointer is the one that was allocated, it is
         // trivially valid until the next maintenance phase, and it is safe to
@@ -73,7 +74,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 // ------------------------
 
 impl<'ctx> ExecutionGuard<'ctx> {
-    pub(super) fn intern_identifier_impl(&self, identifier: &IdentStr) -> GlobalArenaPtr<str> {
+    pub(super) fn intern_identifier_internal(&self, identifier: &IdentStr) -> GlobalArenaPtr<str> {
         // TODO:
         //   Consider checking that the identifier size is within bounds. While
         //   CompiledModule / CompiledScript deserializer enforces 256 byte
@@ -91,24 +92,24 @@ impl<'ctx> ExecutionGuard<'ctx> {
         //   or ensure no speculative data even for names ever get on-chain, we
         //   limit interned set to the on-chain data, so for DoS one actually
         //   has to publish modules (expensive).
-        let str = identifier.as_str();
 
         // SAFETY: All existing keys/values are valid pointers because the map
         // is guaranteed to be cleared on arena's reset.
-        if let Some(entry) = self.ctx.identifiers.get(&LookupKey(str)) {
+        if let Some(entry) = self.ctx.identifiers.get(identifier) {
             return *entry.value();
         }
 
+        let str = identifier.as_str();
         let ptr = self.global_arena.alloc_str(str);
 
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
         // valid pointers because the map is cleared on arena's reset.
-        let key = IdentifierInternerKey(ptr);
-        match self.ctx.identifiers.entry(key) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => *entry.insert(ptr),
-        }
+        *self
+            .ctx
+            .identifiers
+            .entry(IdentifierInternerKey(ptr))
+            .or_insert(ptr)
     }
 }
 
@@ -119,10 +120,6 @@ impl<'ctx> ExecutionGuard<'ctx> {
 /// Constructor must enforce the pointer points to the valid data and can be
 /// safely dereferenced.
 pub(super) struct IdentifierInternerKey(GlobalArenaPtr<str>);
-
-// Wrapper to avoid orphan rule.
-#[derive(Hash, PartialEq, Eq)]
-struct LookupKey<'a>(&'a str);
 
 impl Hash for IdentifierInternerKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -144,11 +141,11 @@ impl PartialEq for IdentifierInternerKey {
 // PartialEq implementation above is a full equivalence relation.
 impl Eq for IdentifierInternerKey {}
 
-impl Equivalent<IdentifierInternerKey> for LookupKey<'_> {
+impl Equivalent<IdentifierInternerKey> for IdentStr {
     fn equivalent(&self, key: &IdentifierInternerKey) -> bool {
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
         let key = unsafe { key.0.as_ref_unchecked() };
-        self.0 == key
+        self.as_str() == key
     }
 }

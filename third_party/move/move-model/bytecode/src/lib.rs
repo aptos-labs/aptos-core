@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -61,7 +62,7 @@ pub fn print_targets_with_annotations_for_test(
             continue;
         }
         for func_env in module_env.get_functions() {
-            if func_env.is_inline() {
+            if func_env.is_inline() || func_env.is_lemma() {
                 continue;
             }
             for (variant, target) in targets.get_targets(&func_env) {

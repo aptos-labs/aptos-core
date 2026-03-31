@@ -43,7 +43,6 @@ num_cpus = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 rand = { workspace = true }
-rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

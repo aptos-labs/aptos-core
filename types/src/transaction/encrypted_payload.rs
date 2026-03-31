@@ -49,6 +49,19 @@ impl PayloadAssociatedData {
 impl AssociatedData for PayloadAssociatedData {}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum DecryptionFailureReason {
+    /// Cryptographic decryption failed (e.g., invalid ciphertext, key mismatch).
+    CryptoFailure,
+    /// Transaction exceeded the per-block encrypted transaction batch limit.
+    /// Should be retried in a subsequent block.
+    BatchLimitReached,
+    /// The decryption key is not available.
+    ConfigUnavailable,
+    /// The decryption key is not available.
+    DecryptionKeyUnavailable,
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptedPayload {
     Encrypted {
         ciphertext: Ciphertext,
@@ -59,7 +72,8 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
-        eval_proof: EvalProof,
+        eval_proof: Option<EvalProof>,
+        reason: DecryptionFailureReason,
     },
     Decrypted {
         ciphertext: Ciphertext,
@@ -100,6 +114,13 @@ impl EncryptedPayload {
         })
     }
 
+    pub fn decryption_failure_reason(&self) -> Option<&DecryptionFailureReason> {
+        match self {
+            EncryptedPayload::FailedDecryption { reason, .. } => Some(reason),
+            _ => None,
+        }
+    }
+
     pub fn extra_config(&self) -> &TransactionExtraConfig {
         match self {
             EncryptedPayload::Encrypted { extra_config, .. } => extra_config,
@@ -138,7 +159,11 @@ impl EncryptedPayload {
         Ok(())
     }
 
-    pub fn into_failed_decryption(&mut self, eval_proof: EvalProof) -> anyhow::Result<()> {
+    pub fn into_failed_decryption_with_reason(
+        &mut self,
+        eval_proof: Option<EvalProof>,
+        reason: DecryptionFailureReason,
+    ) -> anyhow::Result<()> {
         let Self::Encrypted {
             ciphertext,
             extra_config,
@@ -154,6 +179,7 @@ impl EncryptedPayload {
             extra_config: extra_config.clone(),
             payload_hash: *payload_hash,
             eval_proof,
+            reason,
         };
         Ok(())
     }

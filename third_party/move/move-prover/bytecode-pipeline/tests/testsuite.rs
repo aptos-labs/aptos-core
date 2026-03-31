@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::anyhow;
 use move_prover_bytecode_pipeline::{
@@ -157,7 +158,20 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         .and_then(|p| p.file_name())
         .and_then(|p| p.to_str())
         .ok_or_else(|| anyhow!("bad file name"))?;
-    let pipeline_opt = get_tested_transformation_pipeline(dir_name)?;
+    // For nested subdirectories (e.g. spec_instrumentation/proofs/),
+    // fall back to the grandparent directory name.
+    let pipeline_opt = match get_tested_transformation_pipeline(dir_name) {
+        Ok(p) => p,
+        Err(_) => {
+            let parent_dir = path
+                .parent()
+                .and_then(|p| p.parent())
+                .and_then(|p| p.file_name())
+                .and_then(|p| p.to_str())
+                .ok_or_else(|| anyhow!("bad file name"))?;
+            get_tested_transformation_pipeline(parent_dir)?
+        },
+    };
     move_stackless_bytecode_test_utils::test_runner_with_annotations(
         path,
         pipeline_opt,

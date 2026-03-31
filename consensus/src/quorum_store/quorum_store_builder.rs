@@ -328,6 +328,7 @@ impl InnerBuilder {
                 self.batch_generator_cmd_tx.clone(),
                 self.batch_store.clone().unwrap(),
                 self.config.receiver_max_batch_txns as u64,
+                self.config.receiver_max_encrypted_batch_txns as u64,
                 self.config.receiver_max_batch_bytes as u64,
                 self.config.receiver_max_total_txns as u64,
                 self.config.receiver_max_total_bytes as u64,

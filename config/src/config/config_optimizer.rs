@@ -7,9 +7,9 @@ use super::{
 };
 use crate::{
     config::{
-        node_config_loader::NodeType, utils::get_config_name, AdminServiceConfig, Error,
-        ExecutionConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig, Peer,
-        PeerRole, PeerSet, StateSyncConfig,
+        node_config_loader::NodeType, utils::get_config_name, AdminServiceConfig, BaseConfig,
+        Error, ExecutionConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig,
+        Peer, PeerRole, PeerSet, StateSyncConfig,
     },
     network_id::NetworkId,
 };
@@ -111,6 +111,9 @@ impl ConfigOptimizer for NodeConfig {
         if AdminServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(AdminServiceConfig::get_optimizer_name());
         }
+        if BaseConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(BaseConfig::get_optimizer_name());
+        }
         if ConsensusConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(ConsensusConfig::get_optimizer_name());
         }
@@ -185,7 +188,6 @@ fn optimize_all_network_configs(
 ///
 /// For validators, a default public network is added if validator-PFN connections
 /// are enabled, and a public network is not already configured.
-// TODO: enable this for testnet and mainnet validators once we're ready.
 fn optimize_public_network_config(
     node_config: &mut NodeConfig,
     local_config_yaml: &Value,
@@ -194,7 +196,7 @@ fn optimize_public_network_config(
 ) -> Result<bool, Error> {
     // If this is a validator, optimize the public network separately
     if node_type.is_validator() {
-        return optimize_validator_public_network(node_config, local_config_yaml, chain_id);
+        return optimize_validator_public_network(node_config, local_config_yaml);
     }
 
     // For VFNs and PFNs: add seeds to existing public network configs and persist identity
@@ -241,24 +243,15 @@ fn optimize_public_network_config(
 }
 
 /// If validator-PFN connections are enabled, this adds a public network
-/// to the validator's full node networks config. This only occurs if the
-/// network is not mainnet or testnet, and if a public network is not
-/// already present in the config or local YAML.
+/// to the validator's full node networks config. This only occurs if a
+/// public network is not already present in the config or local YAML.
 fn optimize_validator_public_network(
     node_config: &mut NodeConfig,
     local_config_yaml: &Value,
-    chain_id: Option<ChainId>,
 ) -> Result<bool, Error> {
     // If validator-PFN connections are disabled, return early
     if !node_config.base.enable_validator_pfn_connections {
         return Ok(false);
-    }
-
-    // If this is mainnet or testnet, return early
-    if let Some(chain_id) = chain_id {
-        if chain_id.is_mainnet() || chain_id.is_testnet() {
-            return Ok(false);
-        }
     }
 
     // If the config already contains a public network, return early
@@ -270,10 +263,7 @@ fn optimize_validator_public_network(
         return Ok(false);
     }
 
-    // If the local YAML config explicitly includes a public network entry, return
-    // early. This check must be done independently of the in-memory config, since
-    // the in-memory full_node_networks list may be empty (e.g., a bare validator
-    // with no VFN configured) even when the user has specified a public network.
+    // If the local YAML config includes a public network, return early
     if let Some(networks) = local_config_yaml["full_node_networks"].as_sequence() {
         for network in networks {
             if let Some(network_id) = network["network_id"].as_str() {
@@ -284,7 +274,7 @@ fn optimize_validator_public_network(
         }
     }
 
-    // Create a public network for the validator
+    // Create a public network for the validator using the default port
     let mut public_network = NetworkConfig::network_with_id(NetworkId::Public);
     public_network.listen_address = format!("/ip4/0.0.0.0/tcp/{}", DEFAULT_PUBLIC_NETWORK_PORT)
         .parse()
@@ -297,10 +287,7 @@ fn optimize_validator_public_network(
     public_network.discovery_method = DiscoveryMethod::None; // Disable discovery for the public network
     public_network.max_outbound_connections = 0; // Disable outbound connections
 
-    // Use the validator network's identity for the public network. PFNs connect
-    // to validators using the noise-ik address format, which embeds the validator's
-    // public key (as registered on-chain). If the public network used a different
-    // ephemeral key, the noise handshake would fail.
+    // Use the validator network's identity for the public network
     if let Some(validator_network) = &node_config.validator_network {
         public_network.identity = validator_network.identity.clone();
     }
@@ -855,56 +842,6 @@ mod tests {
         let mut node_config = NodeConfig {
             base: crate::config::BaseConfig {
                 enable_validator_pfn_connections: false,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        // Optimize the config
-        let modified = optimize_public_network_config(
-            &mut node_config,
-            &serde_yaml::from_str("{}").unwrap(),
-            NodeType::Validator,
-            Some(ChainId::testnet()),
-        )
-        .unwrap();
-
-        // Verify no modifications were made and no public network was added
-        assert!(!modified);
-        assert!(node_config.full_node_networks.is_empty());
-    }
-
-    #[test]
-    fn test_optimize_validator_pfn_public_network_mainnet_skipped() {
-        // Create a validator config with PFN connections enabled, but on mainnet
-        let mut node_config = NodeConfig {
-            base: crate::config::BaseConfig {
-                enable_validator_pfn_connections: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        // Optimize the config
-        let modified = optimize_public_network_config(
-            &mut node_config,
-            &serde_yaml::from_str("{}").unwrap(),
-            NodeType::Validator,
-            Some(ChainId::mainnet()),
-        )
-        .unwrap();
-
-        // Verify no modifications were made and no public network was added
-        assert!(!modified);
-        assert!(node_config.full_node_networks.is_empty());
-    }
-
-    #[test]
-    fn test_optimize_validator_pfn_public_network_testnet_skipped() {
-        // Create a validator config with PFN connections enabled, but on testnet
-        let mut node_config = NodeConfig {
-            base: crate::config::BaseConfig {
-                enable_validator_pfn_connections: true,
                 ..Default::default()
             },
             ..Default::default()

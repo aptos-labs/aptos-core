@@ -9,7 +9,7 @@ use aptos_types::{
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
 use dashmap::DashMap;
-use hashbrown::HashMap;
+use hashbrown::{Equivalent, HashMap};
 use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{LayoutCacheEntry, Module, RuntimeEnvironment, StructKey};
@@ -129,7 +129,10 @@ where
 
     /// Returns the module stored in cache. If the module has not been cached, or it exists but is
     /// overridden, [None] is returned.
-    pub fn get(&self, key: &K) -> Option<Arc<ModuleCode<D, V, E>>> {
+    pub fn get<Q>(&self, key: &Q) -> Option<Arc<ModuleCode<D, V, E>>>
+    where
+        Q: Hash + Equivalent<K>,
+    {
         self.module_cache.get(key).and_then(|entry| {
             entry
                 .is_not_overridden()

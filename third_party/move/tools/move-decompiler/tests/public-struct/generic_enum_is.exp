@@ -1,0 +1,24 @@
+module 0x42::defs {
+    public enum Result<T: copy + drop, E: copy + drop> has copy, drop {
+        Ok {
+            value: T,
+        }
+        Err {
+            error: E,
+        }
+    }
+}
+module 0x42::consumer {
+    use 0x42::defs;
+    fun is_err_u64(r: &defs::Result<u64, u8>): bool {
+        r is Err
+    }
+    fun is_ok_bool(r: &defs::Result<bool, u64>): bool {
+        r is Ok
+    }
+    fun is_ok_u64(r: &defs::Result<u64, u8>): bool {
+        r is Ok
+    }
+}
+
+============ recompilation succeeded ========

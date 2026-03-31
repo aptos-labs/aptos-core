@@ -3,12 +3,15 @@
 
 #![allow(clippy::unwrap_used)]
 
-use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{
+    block::Block, common::Payload, payload::OptQuorumStorePayload, proof_of_store::TBatchInfo,
+};
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
     register_histogram_vec, register_int_counter, register_int_counter_vec, Histogram,
     HistogramVec, IntCounter, IntCounterVec,
 };
+use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
 use std::time::Duration;
 
@@ -224,6 +227,57 @@ pub fn update_batch_stats(block: &Block) {
     TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK
         .with_label_values(&["opt_batch"])
         .observe(opt_batch_txn_bytes as f64);
+
+    update_committed_batches_by_author(block);
+}
+
+fn update_committed_batches_by_author(block: &Block) {
+    let Some(payload) = block.payload() else {
+        return;
+    };
+    let Payload::OptQuorumStore(opt_qs) = payload else {
+        return;
+    };
+
+    // Helper to record per-author stats for a batch type
+    fn record_batch_author(author: aptos_types::PeerId, num_txns: u64, batch_type: &str) {
+        let author_str = author.short_str();
+        COMMITTED_BATCHES_BY_AUTHOR
+            .with_label_values(&[author_str.as_str(), batch_type])
+            .inc();
+        COMMITTED_TXNS_BY_AUTHOR
+            .with_label_values(&[author_str.as_str(), batch_type])
+            .inc_by(num_txns);
+    }
+
+    match opt_qs {
+        OptQuorumStorePayload::V1(p) => {
+            for proof in p.proof_with_data().iter() {
+                let info = proof.info();
+                record_batch_author(info.author(), info.num_txns(), "proof");
+            }
+            for batch in p.opt_batches().iter() {
+                record_batch_author(batch.author(), batch.num_txns(), "opt_batch");
+            }
+            for batch in p.inline_batches().iter() {
+                let info = batch.info();
+                record_batch_author(info.author(), TBatchInfo::num_txns(info), "inline_batch");
+            }
+        },
+        OptQuorumStorePayload::V2(p) => {
+            for proof in p.proof_with_data().iter() {
+                let info = proof.info();
+                record_batch_author(info.author(), info.num_txns(), "proof");
+            }
+            for batch in p.opt_batches().iter() {
+                record_batch_author(batch.author(), batch.num_txns(), "opt_batch");
+            }
+            for batch in p.inline_batches().iter() {
+                let info = batch.info();
+                record_batch_author(info.author(), TBatchInfo::num_txns(info), "inline_batch");
+            }
+        },
+    }
 }
 
 /// Histogram for the number of transactions per batch.
@@ -231,15 +285,15 @@ static NUM_TXN_PER_BATCH: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_num_txn_per_batch",
         "Histogram for the number of transanctions per batch.",
-        &["bucket"],
+        &["bucket", "batch_version"],
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub fn num_txn_per_batch(bucket_start: &str, num: usize) {
+pub fn num_txn_per_batch(bucket_start: &str, num: usize, batch_version: &str) {
     NUM_TXN_PER_BATCH
-        .with_label_values(&[bucket_start])
+        .with_label_values(&[bucket_start, batch_version])
         .observe(num as f64)
 }
 
@@ -628,11 +682,22 @@ pub static BATCH_PULL_EXCLUDED_TXNS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the created batches since last restart.
-pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+/// Count of the created batches since last restart, by version and kind.
+pub static CREATED_BATCHES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "quorum_store_created_batch_count",
-        "Count of the created batches since last restart."
+        "Count of the created batches since last restart.",
+        &["batch_version", "batch_kind"]
+    )
+    .unwrap()
+});
+
+/// Count of total transactions created, by version and kind.
+pub static CREATED_TXNS_BY_KIND: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_created_txns_by_kind",
+        "Count of total transactions created, split by batch version and kind.",
+        &["batch_version", "batch_kind"]
     )
     .unwrap()
 });
@@ -651,14 +716,14 @@ static LOCAL_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "quorum_store_local_PoS_count",
         "Count of the locally created PoS since last restart.",
-        &["bucket"]
+        &["bucket", "batch_version"]
     )
     .unwrap()
 });
 
-pub fn inc_local_pos_count(bucket: u64) {
+pub fn inc_local_pos_count(bucket: u64, batch_version: &str) {
     LOCAL_POS_COUNT
-        .with_label_values(&[bucket.to_string().as_str()])
+        .with_label_values(&[bucket.to_string().as_str(), batch_version])
         .inc()
 }
 
@@ -667,14 +732,14 @@ static REMOTE_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "quorum_store_remote_PoS_count",
         "Count of the received PoS since last restart.",
-        &["bucket"]
+        &["bucket", "batch_version"]
     )
     .unwrap()
 });
 
-pub fn inc_remote_pos_count(bucket: u64) {
+pub fn inc_remote_pos_count(bucket: u64, batch_version: &str) {
     REMOTE_POS_COUNT
-        .with_label_values(&[bucket.to_string().as_str()])
+        .with_label_values(&[bucket.to_string().as_str(), batch_version])
         .inc()
 }
 
@@ -1055,7 +1120,7 @@ pub static BATCH_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_batch_tracing",
         "Histogram for different stages of a QS batch",
-        &["author", "stage"],
+        &["author", "stage", "batch_version"],
         BATCH_TRACING_BUCKETS.to_vec()
     )
     .unwrap()
@@ -1065,8 +1130,30 @@ pub static BATCH_VOTE_PROGRESS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_batch_vote_progress",
         "Histogram for vote collection of a QS batch",
-        &["author", "vote_pct"],
+        &["author", "vote_pct", "batch_version"],
         BATCH_TRACING_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Counter for committed batches per author and type (proof, opt_batch, inline_batch).
+/// Unlike BATCH_PULLED_BY_AUTHOR which counts at proposal pull time, this counts
+/// batches that are actually committed in blocks.
+pub static COMMITTED_BATCHES_BY_AUTHOR: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_committed_batches_by_author",
+        "Number of committed batches by author and batch type (proof, opt_batch, inline_batch)",
+        &["author", "type"]
+    )
+    .unwrap()
+});
+
+/// Counter for committed txns per author and type (proof, opt_batch, inline_batch).
+pub static COMMITTED_TXNS_BY_AUTHOR: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_committed_txns_by_author",
+        "Number of committed transactions by author and batch type (proof, opt_batch, inline_batch)",
+        &["author", "type"]
     )
     .unwrap()
 });

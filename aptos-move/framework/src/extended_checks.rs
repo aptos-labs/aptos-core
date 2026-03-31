@@ -828,7 +828,7 @@ impl ExtendedChecker<'_> {
             }
         }
         for fun in module.get_functions() {
-            if fun.is_inline() || fun.is_native() {
+            if !fun.is_compiled() {
                 continue;
             }
             // Holder for stackless function data

@@ -21,8 +21,10 @@
 //! when the arena backing the allocation is reset. It is safe to dereference
 //! any arena-based pointers stored in the map.
 
-use crate::{alloc::GlobalArenaPtr, context::ArenaRef, ExecutionGuard};
-use dashmap::{Entry, Equivalent};
+use crate::{context::ArenaRef, ExecutionGuard};
+use dashmap::Equivalent;
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::ExecutableId;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
@@ -34,7 +36,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         // SAFETY: The lifetime on this reference guarantees that the execution
         // guard is still alive, which guarantees that the arena allocation is
         // still valid and there were no deallocations.
-        unsafe { &self.ptr.as_ref().address }
+        unsafe { self.ptr.as_ref_unchecked().address() }
     }
 
     /// Returns the name of this executable.
@@ -45,8 +47,8 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         // allocator APIs), the name allocation is  also valid for the same
         // lifetime.
         unsafe {
-            let id = self.ptr.as_ref();
-            id.name.as_ref_unchecked()
+            let id = self.ptr.as_ref_unchecked();
+            id.name().as_ref_unchecked()
         }
     }
 }
@@ -121,21 +123,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
 // Only private APIs below.
 // ------------------------
 
-/// Identifies an executable (module or script) by its address and name.
-///   - For modules, constructed from module address and name.
-///   - For scripts: TODO
-///
-/// # Safety
-///
-/// Must be created from a valid global arena pointer to executable's name.
-pub struct ExecutableId {
-    address: AccountAddress,
-    name: GlobalArenaPtr<str>,
-}
-
 #[allow(private_interfaces)]
 impl<'ctx> ExecutionGuard<'ctx> {
-    fn intern_address_name_internal(
+    pub(super) fn intern_address_name_internal(
         &self,
         address: AccountAddress,
         name: &IdentStr,
@@ -148,17 +138,20 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
         // SAFETY: Name pointer has been just interned - it is valid and can be
         // used safely for ID construction.
-        let name = self.intern_identifier_impl(name);
-        let ptr = self.global_arena.alloc(ExecutableId { address, name });
+        let name = self.intern_identifier_internal(name);
+        // SAFETY: Name pointer has been just interned - it is valid.
+        let ptr = self
+            .global_arena
+            .alloc(unsafe { ExecutableId::new(address, name) });
 
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
         // valid pointers because the map is cleared on arena's reset.
-        let key = ExecutableIdInternerKey(ptr);
-        match self.ctx.executable_ids.entry(key) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => *entry.insert(ptr),
-        }
+        *self
+            .ctx
+            .executable_ids
+            .entry(ExecutableIdInternerKey(ptr))
+            .or_insert(ptr)
     }
 }
 
@@ -177,8 +170,8 @@ impl Hash for ExecutableIdInternerKey {
         // ensures it remains valid during the lifetime of the key.
         unsafe {
             let id = self.0.as_ref_unchecked();
-            id.address.hash(state);
-            id.name.as_ref_unchecked().hash(state);
+            id.address().hash(state);
+            id.name().as_ref_unchecked().hash(state);
         }
     }
 }
@@ -190,8 +183,9 @@ impl PartialEq for ExecutableIdInternerKey {
         unsafe {
             let this_id = self.0.as_ref_unchecked();
             let other_id = other.0.as_ref_unchecked();
-            this_id.address == other_id.address
-                && this_id.name.as_ref_unchecked() == other_id.name.as_ref_unchecked()
+            // SAFETY: Names are already canonical pointers, so we can use
+            // pointer equality for them.
+            this_id.address() == other_id.address() && this_id.name() == other_id.name()
         }
     }
 }
@@ -205,7 +199,7 @@ impl Equivalent<ExecutableIdInternerKey> for (&AccountAddress, &IdentStr) {
         // ensures it remains valid during the lifetime of the key.
         unsafe {
             let key = key.0.as_ref_unchecked();
-            self.0 == &key.address && self.1.as_str() == key.name.as_ref_unchecked()
+            self.0 == key.address() && self.1.as_str() == key.name().as_ref_unchecked()
         }
     }
 }

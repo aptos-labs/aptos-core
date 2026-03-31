@@ -17,7 +17,7 @@ module 0xc0ffee::m {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
-    struct S<T> {
+    public struct S<T> {
         f: T,
     }
 }

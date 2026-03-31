@@ -29,7 +29,7 @@ use tonic::{
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
-pub const RETRY_TIME_MILLIS: u64 = 100;
+pub const RETRY_TIME_MILLIS: u64 = 1;
 
 /// Creates a runtime which creates a thread pool which sets up the grpc streaming service
 /// Returns corresponding Tokio runtime

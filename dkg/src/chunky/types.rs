@@ -13,6 +13,7 @@ use aptos_types::{
 };
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Once Chunky DKG starts, a validator should send this message to peers in order to collect Chunky DKG transcripts from peers.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -32,6 +33,9 @@ pub struct ChunkyDKGSubtranscriptSignatureRequest {
     pub dealer_epoch: u64,
     pub subtranscript_hash: HashValue,
     pub aggregated_subtrx_dealers: Vec<Player>,
+    /// Per-dealer transcript hash, same order as `aggregated_subtrx_dealers`.
+    /// Allows the responder to detect equivocated transcripts (not just missing ones).
+    pub dealer_transcript_hashes: Vec<HashValue>,
 }
 
 impl ChunkyDKGSubtranscriptSignatureRequest {
@@ -39,13 +43,24 @@ impl ChunkyDKGSubtranscriptSignatureRequest {
         dealer_epoch: u64,
         subtranscript_hash: HashValue,
         aggregated_subtrx_dealers: Vec<Player>,
+        dealer_transcript_hashes: Vec<HashValue>,
     ) -> Self {
         Self {
             dealer_epoch,
             subtranscript_hash,
             aggregated_subtrx_dealers,
+            dealer_transcript_hashes,
         }
     }
+}
+
+/// Wrapper that pairs an `AggregatedSubtranscript` with per-dealer transcript hashes,
+/// used to pass both through the channel from the aggregation producer to the certification producer.
+#[derive(Clone, Debug)]
+pub struct AggregatedSubtranscriptWithHashes {
+    pub aggregated_subtranscript: AggregatedSubtranscript,
+    /// Per-dealer transcript hash, same order as `aggregated_subtranscript.dealers`.
+    pub dealer_transcript_hashes: Vec<HashValue>,
 }
 
 /// Response containing a signature for subtranscript validation.
@@ -73,7 +88,7 @@ impl ChunkyDKGSubtranscriptSignatureResponse {
 /// A validated aggregated subtranscript with an aggregate signature that can verify it.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CertifiedAggregatedSubtranscript {
-    pub aggregated_subtranscript: AggregatedSubtranscript,
+    pub aggregated_subtranscript: Arc<AggregatedSubtranscript>,
     pub aggregate_signature: AggregateSignature,
 }
 

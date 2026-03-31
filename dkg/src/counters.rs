@@ -8,6 +8,10 @@ use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 use std::time::Duration;
 
+/// Monitor counters, used by monitor! macro
+pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
+    Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("dkg"));
+
 /// Count of the pending messages sent to itself in the channel
 pub static PENDING_SELF_MESSAGES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -55,6 +59,20 @@ pub fn observe_dkg_stage(start_time: Duration, my_addr: AccountAddress, stage: &
             .observe(elapsed.as_secs_f64());
     }
 }
+
+pub static CHUNKY_DKG_OBJECT_SIZE_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_chunky_dkg_object_size_bytes",
+        "Serialized size of chunky DKG objects in bytes",
+        &["type"],
+        // Buckets from 64B to 10MB (powers of 4)
+        vec![
+            64.0, 256.0, 1024.0, 4096.0, 16384.0, 65536.0, 262144.0, 1048576.0, 4194304.0,
+            10485760.0,
+        ]
+    )
+    .unwrap()
+});
 
 /// Record the time during each stage of ChunkyDKG, similar to observe_dkg_stage.
 /// Only observes when the elapsed time is non-negative (guards against clock skew).

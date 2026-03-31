@@ -24,6 +24,21 @@ public fun Test::remove($t0|a: address): 0x42::Test::R {
 
 ============ after pipeline `global_invariant_instrumentation` ================
 
+[variant baseline]
+public fun Test::publish($t0|s: signer) {
+     var $t1: u64
+     var $t2: 0x42::Test::R
+     var $t3: num
+  0: $t1 := 1
+  1: $t2 := pack 0x42::Test::R($t1)
+  2: move_to<0x42::Test::R>($t0, $t2) on_abort goto 5 with $t3
+  3: label L1
+  4: return ()
+  5: label L2
+  6: abort($t3)
+}
+
+
 [variant verification]
 public fun Test::publish($t0|s: signer) {
      var $t1: u64
@@ -41,6 +56,18 @@ public fun Test::publish($t0|s: signer) {
   6: return ()
   7: label L2
   8: abort($t3)
+}
+
+
+[variant baseline]
+public fun Test::remove($t0|a: address): 0x42::Test::R {
+     var $t1: 0x42::Test::R
+     var $t2: num
+  0: $t1 := move_from<0x42::Test::R>($t0) on_abort goto 3 with $t2
+  1: label L1
+  2: return $t1
+  3: label L2
+  4: abort($t2)
 }
 
 

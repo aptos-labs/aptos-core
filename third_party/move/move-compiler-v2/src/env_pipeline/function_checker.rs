@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Do a few checks of functions and function calls.
 
@@ -436,7 +436,7 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::Tuple
             | Operation::SpecFunction(_, _, _)
             | Operation::UpdateField(_, _, _)
-            | Operation::Behavior(_, _)
+            | Operation::Behavior(..)
             | Operation::Result(_)
             | Operation::Index
             | Operation::Slice

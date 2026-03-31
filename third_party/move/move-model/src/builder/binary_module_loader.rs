@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module implements functions which allow to add binary modules (`CompiledModule`) and
 //! scripts (`CompiledScript`) to the global env.
@@ -513,6 +512,20 @@ impl<'a> BinaryModuleLoader<'a> {
             }
         }
 
+        // Computed before the mutable borrow of fun_data below.
+        let is_struct_api_fn = handle_view.attributes().iter().any(|attr| {
+            matches!(
+                attr,
+                FunctionAttribute::Pack
+                    | FunctionAttribute::Unpack
+                    | FunctionAttribute::PackVariant(_)
+                    | FunctionAttribute::UnpackVariant(_)
+                    | FunctionAttribute::TestVariant(_)
+                    | FunctionAttribute::BorrowFieldImmutable(_)
+                    | FunctionAttribute::BorrowFieldMutable(_)
+            )
+        });
+
         let mut new = false;
         let fun_data = self.env.module_data[module_id.to_usize()]
             .function_data
@@ -522,6 +535,7 @@ impl<'a> BinaryModuleLoader<'a> {
                 FunctionData {
                     visibility,
                     is_native,
+                    is_struct_api: is_struct_api_fn,
                     kind,
                     attributes,
                     ..FunctionData::new(fun_id.symbol(), loc)
@@ -542,6 +556,7 @@ impl<'a> BinaryModuleLoader<'a> {
             fun_data.params = params;
             fun_data.access_specifiers = access_specifiers;
             fun_data.result_type = result_type;
+            fun_data.is_struct_api = is_struct_api_fn;
         }
 
         if has_error {
@@ -550,6 +565,27 @@ impl<'a> BinaryModuleLoader<'a> {
                 "function `{}` has incompatible signature with already loaded function",
                 fun_id.symbol().display(self.env.symbol_pool())
             ))
+        }
+
+        // If this is a struct API function in the defining module, update the corresponding
+        // struct's visibility to match the API function's visibility. The binary format does
+        // not store struct visibility explicitly; it is inferred from the API wrapper functions
+        // (pack$S, unpack$S, borrow$S$N, etc.) which carry the correct visibility.
+        if has_def && is_struct_api_fn {
+            let fun_name = handle_view.name().as_str();
+            // The struct name is always the component between the first and second '$'.
+            // This holds for every struct API operation:
+            //   pack$S → "S",  unpack$S → "S",  borrow$S$N → "S",  borrow_mut$S$N → "S",
+            //   test_variant$E$V → "E",  pack_variant$E$V → "E",  unpack_variant$E$V → "E"
+            if let Some(struct_name) = fun_name.split('$').nth(1) {
+                let struct_id = StructId::new(self.sym(struct_name));
+                if let Some(struct_data) = self.env.module_data[module_id.to_usize()]
+                    .struct_data
+                    .get_mut(&struct_id)
+                {
+                    struct_data.visibility = visibility;
+                }
+            }
         }
     }
 

@@ -15,7 +15,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_config::config::BatchTransactionFilterConfig;
-use aptos_consensus_types::proof_of_store::{BatchInfoExt, TBatchInfo};
+use aptos_consensus_types::proof_of_store::{BatchInfoExt, BatchKind, TBatchInfo};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
@@ -39,6 +39,7 @@ pub struct BatchCoordinator {
     sender_to_batch_generator: Arc<Sender<BatchGeneratorCommand>>,
     batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
+    max_encrypted_batch_txns: u64,
     max_batch_bytes: u64,
     max_total_txns: u64,
     max_total_bytes: u64,
@@ -54,6 +55,7 @@ impl BatchCoordinator {
         sender_to_batch_generator: Sender<BatchGeneratorCommand>,
         batch_store: Arc<BatchStore>,
         max_batch_txns: u64,
+        max_encrypted_batch_txns: u64,
         max_batch_bytes: u64,
         max_total_txns: u64,
         max_total_bytes: u64,
@@ -67,6 +69,7 @@ impl BatchCoordinator {
             sender_to_batch_generator: Arc::new(sender_to_batch_generator),
             batch_store,
             max_batch_txns,
+            max_encrypted_batch_txns,
             max_batch_bytes,
             max_total_txns,
             max_total_bytes,
@@ -99,11 +102,17 @@ impl BatchCoordinator {
                 })
                 .collect();
 
-            if persist_requests[0].batch_info().is_v2() {
+            let first_batch_info = persist_requests[0].batch_info().clone();
+            if first_batch_info.is_v2() {
                 let signed_batch_infos = batch_store.persist(persist_requests);
                 if !signed_batch_infos.is_empty() {
                     if approx_created_ts_usecs > 0 {
-                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+                        observe_batch(
+                            approx_created_ts_usecs,
+                            peer_id,
+                            BatchStage::SIGNED,
+                            &first_batch_info,
+                        );
                     }
                     network_sender
                         .send_signed_batch_info_msg_v2(signed_batch_infos, vec![peer_id])
@@ -117,7 +126,12 @@ impl BatchCoordinator {
                         .expect("must not be empty")
                         .is_v2());
                     if approx_created_ts_usecs > 0 {
-                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+                        observe_batch(
+                            approx_created_ts_usecs,
+                            peer_id,
+                            BatchStage::SIGNED,
+                            &first_batch_info,
+                        );
                     }
                     let signed_batch_infos = signed_batch_infos
                         .into_iter()
@@ -144,6 +158,14 @@ impl BatchCoordinator {
                 batch.num_txns(),
                 self.max_batch_txns,
             );
+            if batch.batch_info().batch_kind() == Some(BatchKind::Encrypted) {
+                ensure!(
+                    batch.num_txns() <= self.max_encrypted_batch_txns,
+                    "Exceeds encrypted batch txn limit {} > {}",
+                    batch.num_txns(),
+                    self.max_encrypted_batch_txns,
+                );
+            }
             ensure!(
                 batch.num_bytes() <= self.max_batch_bytes,
                 "Exceeds batch bytes limit {} > {}",
@@ -222,6 +244,7 @@ impl BatchCoordinator {
                 approx_created_ts_usecs,
                 batch.author(),
                 BatchStage::RECEIVED,
+                batch.batch_info(),
             );
         }
 

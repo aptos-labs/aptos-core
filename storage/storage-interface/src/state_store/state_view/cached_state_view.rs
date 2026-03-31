@@ -18,7 +18,9 @@ use anyhow::Result;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_key::StateKey,
+        state_slot::{StateSlot, StateSlotKind},
+        state_storage_usage::StateStorageUsage,
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -236,17 +238,18 @@ impl CachedStateView {
         let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
             slot
-        } else if let Some(slot) = self.hot.get_state_slot(state_key) {
+        } else if let Some(slot) = self.hot.get_state_slot(state_key.crypto_hash_ref()) {
             COUNTER.inc_with(&["sv_hit_hot"]);
             slot
         } else if let Some(base_version) = self.base_version() {
             COUNTER.inc_with(&["sv_cold"]);
             StateSlot::from_db_get(
+                state_key.clone(),
                 self.cold
                     .get_state_value_with_version_by_version(state_key, base_version)?,
             )
         } else {
-            StateSlot::ColdVacant
+            StateSlot::new(state_key.clone(), StateSlotKind::ColdVacant)
         };
 
         Ok(ret)

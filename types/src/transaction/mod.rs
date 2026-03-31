@@ -16,7 +16,7 @@ use crate::{
             AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature,
             SingleKeyAuthenticator, TransactionAuthenticator,
         },
-        encrypted_payload::EncryptedPayload,
+        encrypted_payload::{DecryptionFailureReason, EncryptedPayload},
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::{HotStateOp, WriteSet},
@@ -925,12 +925,7 @@ impl TransactionPayload {
     }
 
     pub fn replay_protection_nonce(&self) -> Option<u64> {
-        match self {
-            Self::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
-                extra_config.replay_protection_nonce()
-            },
-            _ => None,
-        }
+        self.extra_config().replay_protection_nonce()
     }
 
     pub fn executable(&self) -> Result<TransactionExecutable> {
@@ -989,6 +984,13 @@ impl TransactionPayload {
             TransactionPayload::EncryptedPayload(encrypted_payload) => {
                 encrypted_payload.extra_config().clone()
             },
+        }
+    }
+
+    pub fn decryption_failure_reason(&self) -> Option<&DecryptionFailureReason> {
+        match self {
+            TransactionPayload::EncryptedPayload(ep) => ep.decryption_failure_reason(),
+            _ => None,
         }
     }
 

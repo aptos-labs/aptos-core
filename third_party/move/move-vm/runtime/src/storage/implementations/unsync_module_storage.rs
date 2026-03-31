@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![allow(clippy::duplicated_attributes)]
 
@@ -14,6 +16,7 @@ use crate::{
 };
 use ambassador::Delegate;
 use bytes::Bytes;
+use hashbrown::Equivalent;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
@@ -25,7 +28,7 @@ use move_vm_types::{
     },
     sha3_256,
 };
-use std::{borrow::Borrow, ops::Deref, sync::Arc};
+use std::{borrow::Borrow, hash::Hash, ops::Deref, sync::Arc};
 
 /// Represents owned or borrowed types, similar to [std::borrow::Cow] but without enforcing
 /// [ToOwned] trait bound on types it stores. We use it to be able to construct different storages

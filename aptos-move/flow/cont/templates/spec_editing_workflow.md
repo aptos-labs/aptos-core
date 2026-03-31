@@ -2,7 +2,7 @@
 {% if once(name="spec_editing_workflow") %}
 
 {% include "templates/spec_lang.md" %}
-{% include "templates/status_tool.md" %}
+{% include "templates/core_tools.md" %}
 
 ## Writing and Editing Specs
 
@@ -12,8 +12,8 @@ When writing or editing specifications:
 2. Read the function body to understand its behavior and abort conditions.
 3. Write `spec fun_name { ... }` blocks after each function, following the Move Specification
    Language rules above.
-4. Spec functions are put into a `spec fun` declarations
-5. Axioms are in `spec module { axiom P; }` blocks.
+4. Write `spec lemma lemma_name ...` block after the function for which they are introduced.
+5. Spec functions are put into a `spec fun` declarations
 6. If the project already uses `.spec.move` files, put new specs into that file instead of the 
    main Move file.
 7. Spec modules (as in `spec <module_name> { items }`) share the same 

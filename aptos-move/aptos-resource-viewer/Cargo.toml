@@ -19,6 +19,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
+hashbrown = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-core-types = { workspace = true }

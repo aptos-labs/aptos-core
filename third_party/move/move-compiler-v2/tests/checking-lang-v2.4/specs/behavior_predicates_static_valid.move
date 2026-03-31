@@ -197,25 +197,6 @@ module 0x42::M {
         ensures ensures_of<mixed_params>(x, b, result);
     }
 
-    // Test modifies_of with single resource
-    fun test_modifies_single(addr: address) acquires Counter {
-        increment_counter(addr)
-    }
-
-    spec test_modifies_single {
-        // modifies_of returns bool indicating if the modifies spec of the function holds
-        ensures modifies_of<increment_counter>(global<Counter>(addr));
-    }
-
-    // Test modifies_of with multiple resources
-    fun test_modifies_multi(addr1: address, addr2: address) acquires Counter {
-        swap_counters(addr1, addr2)
-    }
-
-    spec test_modifies_multi {
-        ensures modifies_of<swap_counters>(global<Counter>(addr1), global<Counter>(addr2));
-    }
-
     // ========================================
     // Tests: Generic functions WITH explicit type arguments - all behavior kinds
     // ========================================

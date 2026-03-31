@@ -44,7 +44,7 @@ CompiledPackageInfo {
             ),
             language_version: None,
             experiments: [],
-            print_errors: false,
+            print_errors: None,
         },
     },
 }
