@@ -15,7 +15,6 @@ use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     combinatorial_tests::{
         mock_executor::{MockEvent, MockOutput, MockTask},
-        resource_tests::create_executor_thread_pool,
         types::{KeyType, MockIncarnation, MockTransaction, ValueType},
     },
     executor::BlockExecutor,
@@ -44,7 +43,6 @@ fn execute_block_with_pre_write_config<Provider>(
 where
     Provider: TxnProvider<TestTransaction, AuxiliaryInfo> + Sync + 'static,
 {
-    let executor_thread_pool = create_executor_thread_pool();
     let mut guard = AptosModuleCacheManagerGuard::none();
 
     let config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), None);
@@ -55,7 +53,7 @@ where
         NoOpTransactionCommitHook<usize>,
         Provider,
         AuxiliaryInfo,
-    >::new(config, executor_thread_pool, None);
+    >::new(config, None);
 
     if block_stm_v2 {
         block_executor.execute_transactions_parallel_v2(

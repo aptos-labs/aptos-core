@@ -46,9 +46,12 @@ use crate::{
         quorum_store_coordinator::CoordinatorCommand,
         quorum_store_db::QuorumStoreStorage,
     },
-    rand::rand_gen::{
-        storage::interface::RandStorage,
-        types::{AugmentedData, RandConfig},
+    rand::{
+        rand_gen::{
+            storage::interface::RandStorage,
+            types::{AugmentedData, RandConfig},
+        },
+        secret_sharing::verifier::SecretShareVerifier,
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
@@ -823,7 +826,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
-        secret_sharing_config: Option<SecretShareConfig>,
+        secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
@@ -884,7 +887,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_randomness_config,
                 &onchain_chunky_dkg_config,
                 rand_config,
-                secret_sharing_config.clone(),
+                secret_share_verifier.clone(),
                 rand_msg_rx,
                 secret_sharing_msg_rx,
                 recovery_data.commit_root_block().round(),
@@ -915,9 +918,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             100,
             epoch_state.verifier.get_ordered_account_addresses(),
         )));
-        let encrypted_txn_limit = secret_sharing_config
+        let encrypted_txn_limit = secret_share_verifier
             .as_ref()
-            .map(|c| c.digest_key().max_batch_size() as u64);
+            .map(|c| c.config().digest_key().max_batch_size() as u64);
         let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
             self.config.quorum_store.enable_opt_quorum_store,
             self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
@@ -1321,14 +1324,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         info!("Generating secret share config");
         let onchain_chunky_dkg_config =
             OnChainChunkyDKGConfig::from_configs(chunky_dkg_config_move_struct.ok());
-        let secret_sharing_config = match self.try_get_secret_share_config_for_epoch(
+        let secret_share_verifier = match self.try_get_secret_share_config_for_epoch(
             loaded_consensus_key.clone(),
             &epoch_state,
             &onchain_chunky_dkg_config,
             chunky_dkg_state,
             &consensus_config,
         ) {
-            Ok(config) => Some(config),
+            Ok(config) => Some(Arc::new(SecretShareVerifier::new(
+                config,
+                self.config.optimistic_secret_share_verification,
+            ))),
             Err(reason) => {
                 warn!(
                     "Failed to get secret share config for epoch [{}]: {:?}",
@@ -1399,7 +1405,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 payload_client,
                 payload_manager,
                 rand_config,
-                secret_sharing_config,
+                secret_share_verifier,
                 rand_msg_rx,
                 secret_share_manager_rx,
             )
@@ -1457,7 +1463,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
-        secret_sharing_config: Option<SecretShareConfig>,
+        secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
@@ -1480,7 +1486,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     payload_client,
                     payload_manager,
                     rand_config,
-                    secret_sharing_config,
+                    secret_share_verifier,
                     rand_msg_rx,
                     secret_share_msg_rx,
                 )

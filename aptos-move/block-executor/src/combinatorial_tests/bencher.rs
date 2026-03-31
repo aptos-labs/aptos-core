@@ -31,7 +31,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 pub struct Bencher<K, V, E> {
     transaction_size: usize,
@@ -126,13 +126,6 @@ where
     pub(crate) fn run(self) {
         let state_view = MockStateView::empty();
 
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get())
-                .build()
-                .unwrap(),
-        );
-
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
         let mut guard = AptosModuleCacheManagerGuard::none();
 
@@ -143,7 +136,7 @@ where
             NoOpTransactionCommitHook<usize>,
             DefaultTxnProvider<MockTransaction<KeyType<K>, E>, AuxiliaryInfo>,
             AuxiliaryInfo,
-        >::new(config, executor_thread_pool, None)
+        >::new(config, None)
         .execute_transactions_parallel(
             &self.txns_provider,
             &state_view,

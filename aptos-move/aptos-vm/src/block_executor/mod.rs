@@ -45,24 +45,13 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
-    sync::Arc,
 };
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
-
-static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -517,7 +506,6 @@ impl<
         L: TransactionCommitHook,
         TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
-        executor_thread_pool: Arc<rayon::ThreadPool>,
         signature_verified_block: &TP,
         state_view: &S,
         module_cache_manager: &AptosModuleCacheManager,
@@ -545,7 +533,6 @@ impl<
         let executor =
             BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
                 config,
-                executor_thread_pool,
                 transaction_commit_listener,
             );
 
@@ -585,7 +572,7 @@ impl<
         }
     }
 
-    /// Uses shared thread pool to execute blocks.
+    /// Uses shared worker pool (internal to block-executor) to execute blocks.
     pub(crate) fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook,
@@ -599,7 +586,6 @@ impl<
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
-            Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
             state_view,
             module_cache_manager,
