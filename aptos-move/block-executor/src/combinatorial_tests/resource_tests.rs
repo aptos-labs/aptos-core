@@ -49,13 +49,16 @@ pub(crate) fn get_gas_limit_variants(
     }
 }
 
-pub(crate) fn create_executor_thread_pool() -> Arc<rayon::ThreadPool> {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
+pub(crate) fn create_executor_thread_pool() -> tokio::runtime::Handle {
+    static RT: once_cell::sync::Lazy<tokio::runtime::Runtime> = once_cell::sync::Lazy::new(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .max_blocking_threads(num_cpus::get())
+            .thread_name("par_exec")
             .build()
-            .unwrap(),
-    )
+            .unwrap()
+    });
+    RT.handle().clone()
 }
 
 /// Populates a module cache manager guard with empty modules for testing.
@@ -98,7 +101,7 @@ pub(crate) fn populate_guard_with_modules(
 }
 
 pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    executor_thread_pool: tokio::runtime::Handle,
     block_gas_limit: Option<u64>,
     txn_provider: &Provider,
     data_view: &ViewType,

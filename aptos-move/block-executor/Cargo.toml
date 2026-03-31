@@ -48,7 +48,7 @@ parking_lot = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
-rayon = { workspace = true }
+tokio = { workspace = true }
 triomphe = { workspace = true }
 
 [dev-dependencies]
@@ -63,6 +63,7 @@ move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
+rayon = { workspace = true }
 test-case = { workspace = true }
 
 [features]

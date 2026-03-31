@@ -19,6 +19,7 @@ use std::sync::Arc;
 pub struct GlobalExecutor<S: StateView + Sync + Send + 'static> {
     global_cross_shard_client: Arc<GlobalCrossShardClient>,
     executor_thread_pool: Arc<rayon::ThreadPool>,
+    runtime_handle: tokio::runtime::Handle,
     concurrency_level: usize,
     phantom: std::marker::PhantomData<S>,
 }
@@ -33,9 +34,16 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
                 .build()
                 .unwrap(),
         );
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .max_blocking_threads(num_threads)
+            .thread_name("par_exec")
+            .build()
+            .unwrap();
         Self {
             global_cross_shard_client: cross_shard_client,
             executor_thread_pool,
+            runtime_handle: runtime.handle().clone(),
             phantom: std::marker::PhantomData,
             concurrency_level: num_threads,
         }
@@ -54,6 +62,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
         ShardedExecutorService::execute_transactions_with_dependencies(
             None,
             self.executor_thread_pool.clone(),
+            self.runtime_handle.clone(),
             transactions,
             self.global_cross_shard_client.clone(),
             None,
