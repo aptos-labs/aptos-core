@@ -56,7 +56,7 @@ CXXFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3 -mpclmul"
 [target.x86_64-pc-windows-msvc]
 # Select linker via APTOS_LINKER: mold | lld | system.
 # If not set, it auto-detects in order: mold -> lld -> system linker.
-linker = "scripts/linker_wrapper.ps1"
+linker = "scripts/linker_wrapper.cmd"
 rustflags = [
   "--cfg",
   "tokio_unstable",
