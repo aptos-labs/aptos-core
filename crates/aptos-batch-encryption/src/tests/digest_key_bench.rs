@@ -17,7 +17,14 @@ fn bench_digest_key_generate_serialize_deserialize() {
     println!();
     println!(
         "{:<12} {:<12} {:<20} {:<20} {:<15} {:<20} {:<20} {:<15}",
-        "batch_size", "num_rounds", "generate (s)", "serialize (s)", "file_size (MB)", "write_file (s)", "deserialize (s)", "read_file (s)"
+        "batch_size",
+        "num_rounds",
+        "generate (s)",
+        "serialize (s)",
+        "file_size (MB)",
+        "write_file (s)",
+        "deserialize (s)",
+        "read_file (s)"
     );
     println!("{}", "-".repeat(134));
 
@@ -34,10 +41,7 @@ fn bench_digest_key_generate_serialize_deserialize() {
             let bytes = bcs::to_bytes(&dk).expect("BCS serialization should succeed");
             let serialize_elapsed = start.elapsed();
 
-            let file_path = format!(
-                "/tmp/digest_key_b{}_r{}.bcs",
-                batch_size, num_rounds
-            );
+            let file_path = format!("/tmp/digest_key_b{}_r{}.bcs", batch_size, num_rounds);
             let start = Instant::now();
             std::fs::write(&file_path, &bytes).expect("File write should succeed");
             let write_elapsed = start.elapsed();
@@ -89,8 +93,7 @@ fn bench_digest_key_deserialize_from_file() {
     println!("Read time: {:.3} s", read_elapsed.as_secs_f64());
 
     let start = Instant::now();
-    let _dk: DigestKey =
-        bcs::from_bytes(&read_bytes).expect("BCS deserialization should succeed");
+    let _dk: DigestKey = bcs::from_bytes(&read_bytes).expect("BCS deserialization should succeed");
     let deserialize_elapsed = start.elapsed();
 
     println!(

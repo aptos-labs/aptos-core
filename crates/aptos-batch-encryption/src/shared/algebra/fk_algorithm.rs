@@ -24,14 +24,20 @@ use std::{fmt, marker::PhantomData, ops::Mul};
 /// subset a "domain".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CirculantDomain<F: FftField> {
-    #[serde(serialize_with = "ark_se_uncompressed", deserialize_with = "ark_de_uncompressed_no_validate")]
+    #[serde(
+        serialize_with = "ark_se_uncompressed",
+        deserialize_with = "ark_de_uncompressed_no_validate"
+    )]
     fft_domain: Radix2EvaluationDomain<F>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreparedInput<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
 {
-    #[serde(serialize_with = "ark_se_uncompressed", deserialize_with = "ark_de_uncompressed_no_validate")]
+    #[serde(
+        serialize_with = "ark_se_uncompressed",
+        deserialize_with = "ark_de_uncompressed_no_validate"
+    )]
     pub y: Vec<T>,
     _phantom: PhantomData<F>,
 }

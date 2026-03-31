@@ -49,7 +49,9 @@ where
 }
 
 /// Serialize without compression or validation
-pub fn ark_de_uncompressed_no_validate<'de, D, A: CanonicalDeserialize>(data: D) -> Result<A, D::Error>
+pub fn ark_de_uncompressed_no_validate<'de, D, A: CanonicalDeserialize>(
+    data: D,
+) -> Result<A, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
@@ -57,7 +59,6 @@ where
     let a = A::deserialize_with_mode(s.reader(), Compress::No, Validate::No);
     a.map_err(serde::de::Error::custom)
 }
-
 
 /// TODO: Not sure this is a good idea, will probably remove it in the next PR?
 pub trait BatchSerializable<E: Pairing> {
