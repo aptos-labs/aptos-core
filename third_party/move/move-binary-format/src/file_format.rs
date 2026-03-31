@@ -1241,6 +1241,18 @@ impl SignatureToken {
         }
     }
 
+    /// Returns struct handle index and type argument list if this token is a struct.
+    pub fn struct_idx_and_ty_args(&self) -> Option<(&StructHandleIndex, &[SignatureToken])> {
+        use SignatureToken::*;
+        match self {
+            Struct(idx) => Some((idx, &[])),
+            StructInstantiation(idx, ty_args) => Some((idx, ty_args.as_slice())),
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer | Vector(_) | Function(..) | Reference(_) | MutableReference(_)
+            | TypeParameter(_) => None,
+        }
+    }
+
     /// Returns true if the `SignatureToken` is any kind of reference (mutable and immutable).
     pub fn is_reference(&self) -> bool {
         use SignatureToken::*;

@@ -54,7 +54,7 @@
 //! TODO: support substitution
 
 use crate::ExecutionGuard;
-use dashmap::{Entry, Equivalent};
+use dashmap::Equivalent;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::ExecutableId;
 use move_binary_format::{
@@ -62,7 +62,7 @@ use move_binary_format::{
     file_format::{SignatureToken, StructHandleIndex},
     CompiledModule,
 };
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress, identifier::IdentStr};
 use std::hash::{Hash, Hasher};
 
 /// Total size of the type in flat memory including padding and any alignment.
@@ -147,7 +147,12 @@ pub enum Type {
         ty_args: GlobalArenaPtr<[GlobalArenaPtr<Type>]>,
         // TODO: Optional layout for enums with fixed size (frozen).
     },
-    // TODO: Support function types.
+    /// Function type with argument types, result types and abilities.
+    Function {
+        args: GlobalArenaPtr<[GlobalArenaPtr<Type>]>,
+        results: GlobalArenaPtr<[GlobalArenaPtr<Type>]>,
+        abilities: AbilitySet,
+    },
     /// Unresolved generic type parameter placeholder (index into the enclosing
     /// type-argument list). Note that pointer equality of type parameters does
     /// not guarantee anything. For example, for
@@ -190,6 +195,9 @@ impl Type {
 
             // Enums: always heap pointers because of upgradability.
             Type::Enum { .. } => (8, 8),
+
+            // Function values - TODO: for now use heap pointer values.
+            Type::Function { .. } => (8, 8),
 
             // Structs: the layout must be pre-computed for all fields inline.
             Type::Struct { layout, .. } => {
@@ -234,6 +242,7 @@ impl Type {
             | Type::MutRef { .. }
             | Type::Vector { .. }
             | Type::Enum { .. }
+            | Type::Function { .. }
             | Type::TypeParam { .. } => None,
         }
     }
@@ -312,11 +321,51 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
         // valid pointers because the map is cleared on arena's reset.
-        let key = TypeInternerKey(ptr);
-        match self.ctx.types.entry(key) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => *entry.insert(ptr),
-        }
+        *self.ctx.types.entry(TypeInternerKey(ptr)).or_insert(ptr)
+    }
+
+    /// Inserts the newly allocated type list pointer into the deduplication
+    /// map. If the entry exists, the allocated pointer is discarded and the
+    /// existing pointer is returned. If the entry does not exist, the
+    /// allocated pointer is inserted and its copy returned.
+    ///
+    /// # Safety
+    ///
+    ///   1. The caller must ensure that the inserted pointer is alive.
+    ///   2. All inner type pointers must be canonical (previously interned).
+    ///   3. For any pointer that exists in the map, it must be still alive.
+    pub(super) fn insert_allocated_type_list_internal(
+        &self,
+        ptr: GlobalArenaPtr<[GlobalArenaPtr<Type>]>,
+    ) -> GlobalArenaPtr<[GlobalArenaPtr<Type>]> {
+        // SAFETY: We have just allocated the pointer, hence it is safe to wrap
+        // it as a key and compute hash / equality. All existing keys are also
+        // valid pointers because the map is cleared on arena's reset.
+        *self
+            .ctx
+            .type_lists
+            .entry(TypeListInternerKey(ptr))
+            .or_insert(ptr)
+    }
+
+    /// Returns the interned type list pointer if it has been interned before,
+    /// or [`None`] otherwise. Looks up directly from signature tokens without
+    /// interning each element first.
+    ///
+    /// # Safety
+    ///
+    /// For any pointer that exists in the map, it must be still alive.
+    pub(super) fn get_interned_type_list_internal(
+        &self,
+        tokens: &[SignatureToken],
+        module: &CompiledModule,
+    ) -> Option<GlobalArenaPtr<[GlobalArenaPtr<Type>]>> {
+        // SAFETY: All existing keys/values are valid pointers because the map
+        // is guaranteed to be cleared on arena's reset.
+        self.ctx
+            .type_lists
+            .get(&SignatureTokenListKey(tokens, module))
+            .map(|entry| *entry.value())
     }
 }
 
@@ -392,7 +441,6 @@ mod type_discriminant {
     pub(super) const REFERENCE_MUT: u8 = 16;
     pub(super) const VECTOR: u8 = 17;
     pub(super) const STRUCT: u8 = 18;
-    #[allow(dead_code)]
     pub(super) const FUNCTION: u8 = 19;
     pub(super) const TYPE_PARAM: u8 = 20;
 }
@@ -475,12 +523,13 @@ impl Hash for TypeInternerKey {
             Struct {
                 executable_id,
                 name,
-                ..
+                ty_args,
+                layout: _,
             }
             | Enum {
                 executable_id,
                 name,
-                ..
+                ty_args,
             } => {
                 // SAFETY: It is safe to dereference pointers because the
                 // caller ensures they remain valid during the lifetime of
@@ -488,6 +537,7 @@ impl Hash for TypeInternerKey {
                 let executable_id = unsafe { executable_id.as_ref_unchecked() };
                 let executable_name = unsafe { executable_id.name().as_ref_unchecked() };
                 let name = unsafe { name.as_ref_unchecked() };
+                let ty_args = unsafe { ty_args.as_ref_unchecked() };
 
                 // Must use structural hash because it is compared against the
                 // hash of lookup key (e.g., signature token). Enums reuse the
@@ -497,11 +547,32 @@ impl Hash for TypeInternerKey {
                 executable_id.address().hash(state);
                 executable_name.hash(state);
                 name.hash(state);
+                ty_args.len().hash(state);
+                for ty_arg in ty_args {
+                    Self(*ty_arg).hash(state);
+                }
+            },
+            Function {
+                args,
+                results,
+                abilities,
+            } => {
+                type_discriminant::FUNCTION.hash(state);
+                // SAFETY: It is safe to dereference pointers because the
+                // caller ensures they remain valid during the lifetime of
+                // the key.
+                let args = unsafe { args.as_ref_unchecked() };
+                let results = unsafe { results.as_ref_unchecked() };
 
-                // TODO:
-                //   1. Hash length of type arguments.
-                //   2. Hash type arguments.
-                0usize.hash(state);
+                args.len().hash(state);
+                for arg in args {
+                    Self(*arg).hash(state);
+                }
+                results.len().hash(state);
+                for result in results {
+                    Self(*result).hash(state);
+                }
+                abilities.hash(state);
             },
             TypeParam { idx } => {
                 type_discriminant::TYPE_PARAM.hash(state);
@@ -607,6 +678,25 @@ impl PartialEq for TypeInternerKey {
                     false
                 }
             },
+            Function {
+                args,
+                results,
+                abilities,
+            } => {
+                if let Function {
+                    args: other_args,
+                    results: other_results,
+                    abilities: other_abilities,
+                } = other
+                {
+                    // SAFETY: Argument and return pointers are already
+                    // canonical pointers, so it is safe to compare by pointer
+                    // equality.
+                    args == other_args && results == other_results && abilities == other_abilities
+                } else {
+                    false
+                }
+            },
             TypeParam { idx } => {
                 if let TypeParam { idx: other_idx } = other {
                     idx == other_idx
@@ -692,8 +782,21 @@ impl Hash for SignatureTokenKey<'_> {
             Struct(idx) => {
                 hash_struct_signature_token(state, *idx, &[], self.1);
             },
-            StructInstantiation(..) => todo!("Support generic types / type lists"),
-            Function(..) => todo!("Support function types / type lists"),
+            StructInstantiation(idx, ty_args) => {
+                hash_struct_signature_token(state, *idx, ty_args, self.1);
+            },
+            Function(args, results, abilities) => {
+                type_discriminant::FUNCTION.hash(state);
+                args.len().hash(state);
+                for arg in args {
+                    Self(arg, self.1).hash(state);
+                }
+                results.len().hash(state);
+                for result in results {
+                    Self(result, self.1).hash(state);
+                }
+                abilities.hash(state);
+            },
             TypeParameter(idx) => {
                 type_discriminant::TYPE_PARAM.hash(state);
                 idx.hash(state);
@@ -717,6 +820,74 @@ fn hash_struct_signature_token<H: Hasher>(
     for ty_arg in ty_args {
         SignatureTokenKey(ty_arg, module).hash(state);
     }
+}
+
+/// Returns true if [`Type`] is equivalent to a [`SignatureToken`] struct or
+/// an enum (identified by handle index and type arguments).
+///
+/// # Safety
+///
+/// All pointers inside the interned type must be safe to dereference.
+fn equivalent_struct_types(
+    ty: &Type,
+    idx: StructHandleIndex,
+    ty_args: &[SignatureToken],
+    module: &CompiledModule,
+) -> bool {
+    let (other_executable_id, other_name, other_ty_args) = match ty {
+        Type::Struct {
+            executable_id,
+            name,
+            ty_args,
+            ..
+        }
+        | Type::Enum {
+            executable_id,
+            name,
+            ty_args,
+        } => (executable_id, name, ty_args),
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer
+        | Type::ImmutRef { .. }
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Function { .. }
+        | Type::TypeParam { .. } => {
+            return false;
+        },
+    };
+
+    // SAFETY: It is safe to dereference pointers because the caller ensures
+    // they remain valid during the lifetime of the key.
+    let other_executable_id = unsafe { other_executable_id.as_ref_unchecked() };
+    let other_executable_name = unsafe { other_executable_id.name().as_ref_unchecked() };
+    let other_name = unsafe { other_name.as_ref_unchecked() };
+    let other_ty_args = unsafe { other_ty_args.as_ref_unchecked() };
+
+    let (address, module_name, struct_name) = struct_info_at(module, idx);
+    address == other_executable_id.address()
+        && module_name.as_str() == other_executable_name
+        && struct_name.as_str() == other_name
+        && ty_args.len() == other_ty_args.len()
+        && ty_args
+            .iter()
+            .zip(other_ty_args.iter())
+            .all(|(ty_arg, other_ty_arg)| {
+                SignatureTokenKey(ty_arg, module).equivalent(&TypeInternerKey(*other_ty_arg))
+            })
 }
 
 impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
@@ -766,62 +937,38 @@ impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
                     false
                 }
             },
-            Struct(idx) => {
-                // This signature token can refer to either a struct or an enum
-                // in the binary format.
-                let (other_executable_id, other_name, _other_ty_args) = match ty {
-                    Type::Struct {
-                        executable_id,
-                        name,
-                        ty_args,
-                        ..
-                    }
-                    | Type::Enum {
-                        executable_id,
-                        name,
-                        ty_args,
-                    } => (executable_id, name, ty_args),
-                    Type::Bool
-                    | Type::U8
-                    | Type::U16
-                    | Type::U32
-                    | Type::U64
-                    | Type::U128
-                    | Type::U256
-                    | Type::I8
-                    | Type::I16
-                    | Type::I32
-                    | Type::I64
-                    | Type::I128
-                    | Type::I256
-                    | Type::Address
-                    | Type::Signer
-                    | Type::ImmutRef { .. }
-                    | Type::MutRef { .. }
-                    | Type::Vector { .. }
-                    | Type::TypeParam { .. } => {
+            Struct(idx) => equivalent_struct_types(ty, *idx, &[], self.1),
+            StructInstantiation(idx, ty_args) => equivalent_struct_types(ty, *idx, ty_args, self.1),
+            Function(args, results, abilities) => {
+                if let Type::Function {
+                    args: other_args,
+                    results: other_results,
+                    abilities: other_abilities,
+                } = ty
+                {
+                    // SAFETY: It is safe to dereference pointers because the
+                    // caller ensures they remain valid during the lifetime of
+                    // the key.
+                    let other_args = unsafe { other_args.as_ref_unchecked() };
+                    let other_results = unsafe { other_results.as_ref_unchecked() };
+
+                    if args.len() != other_args.len()
+                        || results.len() != other_results.len()
+                        || abilities != other_abilities
+                    {
                         return false;
-                    },
-                };
+                    }
 
-                // SAFETY: It is safe to dereference pointers because the
-                // caller ensures they remain valid during the lifetime of
-                // the key.
-                let other_executable_id = unsafe { other_executable_id.as_ref_unchecked() };
-                let other_executable_name =
-                    unsafe { other_executable_id.name().as_ref_unchecked() };
-                let other_name = unsafe { other_name.as_ref_unchecked() };
-
-                // TODO:
-                //   Also compare type arguments structurally.
-
-                let (address, module_name, struct_name) = struct_info_at(self.1, *idx);
-                address == other_executable_id.address()
-                    && module_name.as_str() == other_executable_name
-                    && struct_name.as_str() == other_name
+                    args.iter()
+                        .zip(other_args.iter())
+                        .chain(results.iter().zip(other_results.iter()))
+                        .all(|(tok, other_ty)| {
+                            Self(tok, self.1).equivalent(&TypeInternerKey(*other_ty))
+                        })
+                } else {
+                    false
+                }
             },
-            StructInstantiation(..) => todo!("Support generic types / type lists"),
-            Function(..) => todo!("Support function types / type lists"),
             TypeParameter(idx) => {
                 if let Type::TypeParam { idx: other_idx } = ty {
                     idx == other_idx
@@ -845,4 +992,75 @@ pub(super) fn struct_info_at(
     let module_name = module.identifier_at(module_handle.name);
     let struct_name = module.identifier_at(struct_handle.name);
     (address, module_name, struct_name)
+}
+
+/// Wraps allocated type list pointer to implement structural hash and
+/// equality.
+///
+/// # Safety
+///
+/// Constructor must enforce the pointer points to the valid data and can be
+/// safely dereferenced.
+pub(super) struct TypeListInternerKey(GlobalArenaPtr<[GlobalArenaPtr<Type>]>);
+
+impl Hash for TypeListInternerKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // SAFETY: It is safe to dereference the pointer because the caller
+        // ensures it remains valid during the lifetime of the key.
+        let tys = unsafe { self.0.as_ref_unchecked() };
+        tys.len().hash(state);
+        for ty_ptr in tys {
+            TypeInternerKey(*ty_ptr).hash(state);
+        }
+    }
+}
+
+impl PartialEq for TypeListInternerKey {
+    fn eq(&self, other: &Self) -> bool {
+        // SAFETY: It is safe to dereference the pointer because the caller
+        // ensures it remains valid during the lifetime of the key.
+        let this = unsafe { self.0.as_ref_unchecked() };
+        let other = unsafe { other.0.as_ref_unchecked() };
+
+        if this.len() != other.len() {
+            return false;
+        }
+        this.iter().zip(other.iter()).all(|(ty, other_ty)| {
+            // SAFETY: These pointers are already canonical, so using pointer
+            // equality is sufficient.
+            ty == other_ty
+        })
+    }
+}
+
+// PartialEq implementation above is a full equivalence relation.
+impl Eq for TypeListInternerKey {}
+
+/// Wrapper around a slice of [`SignatureToken`]s and the owning
+/// [`CompiledModule`] that is equivalent to [`TypeListInternerKey`] and
+/// implements the same structural hashing.
+struct SignatureTokenListKey<'a>(&'a [SignatureToken], &'a CompiledModule);
+
+impl Hash for SignatureTokenListKey<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.len().hash(state);
+        for token in self.0 {
+            SignatureTokenKey(token, self.1).hash(state);
+        }
+    }
+}
+
+impl Equivalent<TypeListInternerKey> for SignatureTokenListKey<'_> {
+    fn equivalent(&self, key: &TypeListInternerKey) -> bool {
+        // SAFETY: It is safe to dereference the pointer because the caller
+        // ensures it remains valid during the lifetime of the key.
+        let key = unsafe { key.0.as_ref_unchecked() };
+        if self.0.len() != key.len() {
+            return false;
+        }
+        self.0
+            .iter()
+            .zip(key.iter())
+            .all(|(tok, key)| SignatureTokenKey(tok, self.1).equivalent(&TypeInternerKey(*key)))
+    }
 }

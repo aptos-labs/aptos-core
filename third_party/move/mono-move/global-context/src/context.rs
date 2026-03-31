@@ -52,8 +52,8 @@ pub use executable::{Executable, ExecutableBuilder};
 mod executable_cache;
 use executable_cache::ExecutableCache;
 mod types;
-use types::TypeInternerKey;
 pub use types::{FieldLayout, Type};
+use types::{TypeInternerKey, TypeListInternerKey};
 
 /// Global execution context with a two-phase state machine.
 ///
@@ -90,6 +90,8 @@ struct Context {
     executable_ids:
         DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
     types: DashMap<TypeInternerKey, GlobalArenaPtr<Type>, ahash::RandomState>,
+    type_lists:
+        DashMap<TypeListInternerKey, GlobalArenaPtr<[GlobalArenaPtr<Type>]>, ahash::RandomState>,
     executable_cache: ExecutableCache,
 }
 
@@ -181,6 +183,7 @@ impl GlobalContext {
                 identifiers: DashMap::default(),
                 executable_ids: DashMap::default(),
                 types: DashMap::default(),
+                type_lists: DashMap::default(),
                 executable_cache: ExecutableCache::new(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
@@ -254,6 +257,11 @@ impl<'ctx> MaintenanceGuard<'ctx> {
     /// Returns the number of entries in interner's map for types.
     pub fn interned_types_count(&self) -> usize {
         self.ctx.types.len()
+    }
+
+    /// Returns the number of entries in interner's map for type lists.
+    pub fn interned_type_lists_count(&self) -> usize {
+        self.ctx.type_lists.len()
     }
 
     /// Resets all caches that store pointers to the arenas, and then resets
@@ -335,12 +343,14 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             identifiers,
             executable_ids,
             types,
+            type_lists,
             executable_cache,
         } = self.ctx;
 
         identifiers.clear();
         executable_ids.clear();
         types.clear();
+        type_lists.clear();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to executables

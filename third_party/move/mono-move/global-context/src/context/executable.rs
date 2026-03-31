@@ -373,8 +373,9 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
 
         // Special case for structs / enums because we need to resolve local
         // and non-local definitions.
-        if let SignatureToken::Struct(idx) = token {
+        if let Some((idx, _ty_args)) = token.struct_idx_and_ty_args() {
             return match self.struct_def_idx.get(idx).copied() {
+                // TODO: handle type arguments for generic structs!
                 Some(idx) => self.resolve_struct_def(&self.module.struct_defs[idx]),
                 None => {
                     // TODO:
@@ -422,8 +423,15 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 let elem = self.intern_signature_token(elem_token.as_ref())?;
                 self.guard.global_arena.alloc(Type::Vector { elem })
             },
-            SignatureToken::StructInstantiation(..) => todo!("Support generic types / type lists"),
-            SignatureToken::Function(..) => todo!("Support function types / type lists"),
+            SignatureToken::Function(arg_tokens, result_tokens, abilities) => {
+                let args = self.intern_signature_token_list(arg_tokens)?;
+                let results = self.intern_signature_token_list(result_tokens)?;
+                self.guard.global_arena.alloc(Type::Function {
+                    args,
+                    results,
+                    abilities: *abilities,
+                })
+            },
             SignatureToken::TypeParameter(idx) => {
                 self.guard.global_arena.alloc(Type::TypeParam { idx: *idx })
             },
@@ -444,12 +452,42 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             | SignatureToken::I256
             | SignatureToken::Address
             | SignatureToken::Signer
-            | SignatureToken::Struct(..) => unreachable!("Must be already handled"),
+            | SignatureToken::Struct(..)
+            | SignatureToken::StructInstantiation(..) => bail!("Must be already handled"),
         };
 
         // Insert and deduplicate the pointer, to ensure uniqueness even if
         // there are race conditions.
         Ok(self.guard.insert_allocated_type_pointer_internal(ptr))
+    }
+
+    /// Interns a list of signature tokens as a canonical type list. Empty
+    /// lists return a static pointer (no allocations). Non-empty lists are
+    /// arena-allocated and deduplicated. Because allocation is outside the
+    /// lock, it is possible that some allocations will not be used. This is
+    /// a design choice - the memory waste is bounded by available concurrency
+    /// and the number of unique type lists.
+    fn intern_signature_token_list(
+        &mut self,
+        tokens: &[SignatureToken],
+    ) -> anyhow::Result<GlobalArenaPtr<[GlobalArenaPtr<Type>]>> {
+        if tokens.is_empty() {
+            return Ok(GlobalArenaPtr::from_static(&EMPTY_LIST));
+        }
+
+        if let Some(ptr) = self
+            .guard
+            .get_interned_type_list_internal(tokens, self.module)
+        {
+            return Ok(ptr);
+        }
+
+        let mut types = Vec::with_capacity(tokens.len());
+        for token in tokens {
+            types.push(self.intern_signature_token(token)?);
+        }
+        let ptr = self.guard.global_arena.alloc_slice_copy(&types);
+        Ok(self.guard.insert_allocated_type_list_internal(ptr))
     }
 }
 
