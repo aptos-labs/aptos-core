@@ -26,7 +26,6 @@ use aptos_types::{
     transaction::AuxiliaryInfo,
 };
 use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};
-use std::sync::Arc;
 use test_case::test_case;
 
 /// Create a data view for testing with non-empty groups
@@ -46,7 +45,7 @@ pub(crate) fn create_non_empty_group_data_view(
 
 /// Run both parallel and sequential execution tests for a transaction provider
 pub(crate) fn run_tests_with_groups(
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    executor_thread_pool: tokio::runtime::Handle,
     gas_limits: Vec<Option<u64>>,
     transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
     data_view: &NonEmptyGroupDataView<KeyType<[u8; 32]>>,

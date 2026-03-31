@@ -750,6 +750,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "test-case",
+ "tokio",
  "triomphe",
 ]
 
@@ -2966,8 +2967,8 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
- "rayon",
  "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -5044,6 +5045,7 @@ dependencies = [
  "rayon",
  "serde",
  "test-case",
+ "tokio",
  "triomphe",
 ]
 
@@ -9896,10 +9898,10 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "primitive-types",
- "rayon",
  "ring 0.16.20",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

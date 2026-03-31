@@ -49,19 +49,22 @@ use once_cell::sync::{Lazy, OnceCell};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
-    sync::Arc,
 };
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
 
-static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
+static PAR_EXEC_RUNTIME: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .max_blocking_threads(num_cpus::get())
+        .thread_name_fn(|| {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNTER: AtomicUsize = AtomicUsize::new(0);
+            let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+            format!("par_exec-{}", id)
+        })
+        .build()
+        .unwrap()
 });
 
 /// Output type wrapper used by block executor. VM output is stored first, then
@@ -517,7 +520,7 @@ impl<
         L: TransactionCommitHook,
         TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
-        executor_thread_pool: Arc<rayon::ThreadPool>,
+        runtime_handle: tokio::runtime::Handle,
         signature_verified_block: &TP,
         state_view: &S,
         module_cache_manager: &AptosModuleCacheManager,
@@ -545,7 +548,7 @@ impl<
         let executor =
             BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
                 config,
-                executor_thread_pool,
+                runtime_handle,
                 transaction_commit_listener,
             );
 
@@ -599,7 +602,7 @@ impl<
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
-            Arc::clone(&RAYON_EXEC_POOL),
+            PAR_EXEC_RUNTIME.handle().clone(),
             signature_verified_block,
             state_view,
             module_cache_manager,

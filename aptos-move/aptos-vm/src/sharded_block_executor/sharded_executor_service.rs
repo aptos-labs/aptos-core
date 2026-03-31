@@ -43,6 +43,7 @@ pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     num_shards: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
+    runtime_handle: tokio::runtime::Handle,
     coordinator_client: Arc<dyn CoordinatorClient<S>>,
     cross_shard_client: Arc<dyn CrossShardClient>,
 }
@@ -64,10 +65,17 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 .build()
                 .unwrap(),
         );
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .max_blocking_threads(num_threads)
+            .thread_name("par_exec")
+            .build()
+            .unwrap();
         Self {
             shard_id,
             num_shards,
             executor_thread_pool,
+            runtime_handle: runtime.handle().clone(),
             coordinator_client,
             cross_shard_client,
         }
@@ -91,6 +99,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         Self::execute_transactions_with_dependencies(
             Some(self.shard_id),
             self.executor_thread_pool.clone(),
+            self.runtime_handle.clone(),
             sub_block.into_transactions_with_deps(),
             self.cross_shard_client.clone(),
             Some(cross_shard_commit_sender),
@@ -103,6 +112,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     pub fn execute_transactions_with_dependencies(
         shard_id: Option<ShardId>, // None means execution on global shard
         executor_thread_pool: Arc<rayon::ThreadPool>,
+        runtime_handle: tokio::runtime::Handle,
         transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
         cross_shard_commit_sender: Option<CrossShardCommitSender>,
@@ -143,7 +153,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 let txn_provider =
                     DefaultTxnProvider::new_without_info(signature_verified_transactions);
                 let ret = AptosVMBlockExecutorWrapper::execute_block_on_thread_pool(
-                    executor_thread_pool,
+                    runtime_handle,
                     &txn_provider,
                     aggr_overridden_state_view.as_ref(),
                     // Since we execute blocks in parallel, we cannot share module caches, so each

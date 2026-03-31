@@ -46,8 +46,19 @@ use std::{
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
-    sync::Arc,
 };
+
+fn test_runtime_handle() -> tokio::runtime::Handle {
+    static RT: once_cell::sync::Lazy<tokio::runtime::Runtime> = once_cell::sync::Lazy::new(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .max_blocking_threads(num_cpus::get())
+            .thread_name("par_exec")
+            .build()
+            .unwrap()
+    });
+    RT.handle().clone()
+}
 
 #[test]
 fn test_block_epilogue_happy_path() {
@@ -56,12 +67,7 @@ fn test_block_epilogue_happy_path() {
     let t_1 = MockTransaction::from_behavior(behaivor);
     let transactions = vec![t_0, t_1];
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = test_runtime_handle();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -127,12 +133,7 @@ fn test_block_epilogue_block_gas_limit_reached() {
     let t_1 = MockTransaction::from_behavior(behaivor);
     let transactions = vec![t_0, t_1];
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = test_runtime_handle();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -222,12 +223,7 @@ fn test_resource_group_deletion() {
         group_keys: HashSet::new(),
         delayed_field_testing: false,
     };
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = test_runtime_handle();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -301,12 +297,7 @@ fn resource_group_bcs_fallback() {
         group_keys: HashSet::new(),
         delayed_field_testing: false,
     };
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = test_runtime_handle();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -417,12 +408,7 @@ fn interrupt_requested() {
     let mut guard = AptosModuleCacheManagerGuard::none();
 
     let data_view = MockStateView::empty();
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = test_runtime_handle();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -464,12 +450,7 @@ fn block_output_err_precedence() {
     let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = MockStateView::empty();
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = test_runtime_handle();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -508,12 +489,7 @@ fn skip_rest_gas_limit() {
     let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = MockStateView::empty();
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = test_runtime_handle();
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -543,12 +519,7 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = test_runtime_handle();
 
     let mut guard = AptosModuleCacheManagerGuard::none();
     let txn_provider = DefaultTxnProvider::new_without_info(transactions);
