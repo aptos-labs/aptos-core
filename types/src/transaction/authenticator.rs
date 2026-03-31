@@ -39,8 +39,6 @@ pub const MAX_NUM_OF_SIGS: usize = 32;
 pub enum AuthenticationError {
     /// The number of signatures exceeds the maximum supported.
     MaxSignaturesExceeded,
-    /// Encrypted transactions are not supported with this authenticator type.
-    EncryptedTxnUnsupportedAuthenticator,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -169,24 +167,19 @@ impl TransactionAuthenticator {
         if num_sigs > MAX_NUM_OF_SIGS {
             return Err(Error::new(AuthenticationError::MaxSignaturesExceeded));
         }
-        // TODO(ibalajiarun): Support all authenticators for encrypted transactions.
-        if raw_txn.payload.is_encrypted_variant() && !matches!(self, Self::Ed25519 { .. }) {
-            return Err(Error::new(
-                AuthenticationError::EncryptedTxnUnsupportedAuthenticator,
-            ));
-        }
+        // For encrypted transactions, signatures are verified over the encrypted form
+        // (not the decrypted payload). Convert back to the encrypted variant for signing
+        // message reconstruction.
+        let raw_txn_for_signing = if raw_txn.payload.is_encrypted_variant() {
+            raw_txn.clone().into_encrypted_variant()
+        } else {
+            raw_txn.clone()
+        };
         match self {
             Self::Ed25519 {
                 public_key,
                 signature,
-            } => {
-                if raw_txn.payload.is_encrypted_variant() {
-                    let raw_txn = raw_txn.clone().into_encrypted_variant();
-                    signature.verify(&raw_txn, public_key)
-                } else {
-                    signature.verify(raw_txn, public_key)
-                }
-            },
+            } => signature.verify(&raw_txn_for_signing, public_key),
             Self::FeePayer {
                 sender,
                 secondary_signer_addresses,
@@ -209,7 +202,7 @@ impl TransactionAuthenticator {
                     .collect::<Vec<_>>();
 
                 let no_fee_payer_address_message = RawTransactionWithData::new_fee_payer(
-                    raw_txn.clone(),
+                    raw_txn_for_signing.clone(),
                     secondary_signer_addresses.clone(),
                     AccountAddress::ZERO,
                 );
@@ -222,7 +215,7 @@ impl TransactionAuthenticator {
                 remaining.push(&fee_payer_signer);
 
                 let fee_payer_address_message = RawTransactionWithData::new_fee_payer(
-                    raw_txn.clone(),
+                    raw_txn_for_signing,
                     secondary_signer_addresses.clone(),
                     *fee_payer_address,
                 );
@@ -236,14 +229,14 @@ impl TransactionAuthenticator {
             Self::MultiEd25519 {
                 public_key,
                 signature,
-            } => signature.verify(raw_txn, public_key),
+            } => signature.verify(&raw_txn_for_signing, public_key),
             Self::MultiAgent {
                 sender,
                 secondary_signer_addresses,
                 secondary_signers,
             } => {
                 let message = RawTransactionWithData::new_multi_agent(
-                    raw_txn.clone(),
+                    raw_txn_for_signing,
                     secondary_signer_addresses.clone(),
                 );
                 sender.verify(&message)?;
@@ -252,7 +245,7 @@ impl TransactionAuthenticator {
                 }
                 Ok(())
             },
-            Self::SingleSender { sender } => sender.verify(raw_txn),
+            Self::SingleSender { sender } => sender.verify(&raw_txn_for_signing),
         }
     }
 
@@ -1611,11 +1604,16 @@ impl Serialize for EphemeralPublicKey {
 mod tests {
     use super::*;
     use crate::{
+        chain_id::ChainId,
         keyless::test_utils::{
             get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk,
             maul_raw_groth16_txn,
         },
-        transaction::{webauthn::AssertionSignature, SignedTransaction},
+        secret_sharing::{Ciphertext, EvalProof},
+        transaction::{
+            encrypted_payload::EncryptedPayload, webauthn::AssertionSignature, SignedTransaction,
+            TransactionExecutable, TransactionExtraConfig, TransactionPayload,
+        },
     };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
@@ -2259,5 +2257,199 @@ mod tests {
             result.unwrap_err().to_string(),
             "The number of public keys is greater than 32."
         );
+    }
+
+    /// Helper: build an `EncryptedPayload::Encrypted` `TransactionPayload`.
+    fn make_encrypted_payload() -> (
+        TransactionPayload,
+        Ciphertext,
+        TransactionExtraConfig,
+        HashValue,
+    ) {
+        let ciphertext = Ciphertext::random();
+        let extra_config = TransactionExtraConfig::V1 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+        };
+        let payload_hash = HashValue::random();
+        let payload = TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted {
+            ciphertext: ciphertext.clone(),
+            extra_config: extra_config.clone(),
+            payload_hash,
+            claimed_entry_fun: None,
+        });
+        (payload, ciphertext, extra_config, payload_hash)
+    }
+
+    /// Simulate decryption by mutating the signed transaction's payload
+    /// from Encrypted to Decrypted.
+    fn simulate_decryption(
+        signed_txn: &mut SignedTransaction,
+        ciphertext: Ciphertext,
+        extra_config: TransactionExtraConfig,
+        payload_hash: HashValue,
+    ) {
+        *signed_txn.payload_mut() =
+            TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
+                ciphertext,
+                extra_config,
+                payload_hash,
+                claimed_entry_fun: None,
+                eval_proof: EvalProof::random(),
+                executable: TransactionExecutable::Empty,
+                decryption_nonce: 42,
+            });
+    }
+
+    #[test]
+    fn verify_ed25519_encrypted_payload_after_decryption() {
+        let sender_key = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender_key.public_key();
+        let sender_addr = AuthenticationKey::ed25519(&sender_pub).account_address();
+
+        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let raw_txn = RawTransaction::new(
+            sender_addr,
+            0,
+            payload,
+            1_000_000,
+            100,
+            100,
+            ChainId::test(),
+        );
+        let signature = sender_key.sign(&raw_txn).unwrap();
+        let mut signed_txn = SignedTransaction::new(raw_txn, sender_pub, signature);
+
+        // Verify passes with the original Encrypted payload.
+        signed_txn.verify_signature().unwrap();
+
+        // Simulate decryption (Encrypted -> Decrypted).
+        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+
+        // Signature should still verify because as_encrypted_variant() converts back.
+        signed_txn.verify_signature().unwrap();
+    }
+
+    #[test]
+    fn verify_fee_payer_encrypted_payload_after_decryption() {
+        let sender_key = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender_key.public_key();
+        let sender_addr = AuthenticationKey::ed25519(&sender_pub).account_address();
+
+        let fee_payer_key = Ed25519PrivateKey::generate(&mut rand::thread_rng());
+        let fee_payer_pub = fee_payer_key.public_key();
+        let fee_payer_addr = AuthenticationKey::ed25519(&fee_payer_pub).account_address();
+
+        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let raw_txn = RawTransaction::new(
+            sender_addr,
+            0,
+            payload,
+            1_000_000,
+            100,
+            100,
+            ChainId::test(),
+        );
+
+        // Build fee-payer signing message and sign.
+        let fee_payer_message =
+            RawTransactionWithData::new_fee_payer(raw_txn.clone(), vec![], fee_payer_addr);
+        let sender_sig = sender_key.sign(&fee_payer_message).unwrap();
+        let fee_payer_sig = fee_payer_key.sign(&fee_payer_message).unwrap();
+
+        let sender_auth = AccountAuthenticator::ed25519(sender_pub, sender_sig);
+        let fee_payer_auth = AccountAuthenticator::ed25519(fee_payer_pub, fee_payer_sig);
+
+        let mut signed_txn = SignedTransaction::new_fee_payer(
+            raw_txn,
+            sender_auth,
+            vec![],
+            vec![],
+            fee_payer_addr,
+            fee_payer_auth,
+        );
+
+        // Verify passes with Encrypted payload.
+        signed_txn.verify_signature().unwrap();
+
+        // Simulate decryption.
+        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+
+        // Signature should still verify.
+        signed_txn.verify_signature().unwrap();
+    }
+
+    #[test]
+    fn verify_multi_agent_encrypted_payload_after_decryption() {
+        let sender_key = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender_key.public_key();
+        let sender_addr = AuthenticationKey::ed25519(&sender_pub).account_address();
+
+        let secondary_key = Ed25519PrivateKey::generate(&mut rand::thread_rng());
+        let secondary_pub = secondary_key.public_key();
+        let secondary_addr = AuthenticationKey::ed25519(&secondary_pub).account_address();
+
+        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let raw_txn = RawTransaction::new(
+            sender_addr,
+            0,
+            payload,
+            1_000_000,
+            100,
+            100,
+            ChainId::test(),
+        );
+
+        let multi_agent_message =
+            RawTransactionWithData::new_multi_agent(raw_txn.clone(), vec![secondary_addr]);
+        let sender_sig = sender_key.sign(&multi_agent_message).unwrap();
+        let secondary_sig = secondary_key.sign(&multi_agent_message).unwrap();
+
+        let sender_auth = AccountAuthenticator::ed25519(sender_pub, sender_sig);
+        let secondary_auth = AccountAuthenticator::ed25519(secondary_pub, secondary_sig);
+
+        let mut signed_txn =
+            SignedTransaction::new_multi_agent(raw_txn, sender_auth, vec![secondary_addr], vec![
+                secondary_auth,
+            ]);
+
+        signed_txn.verify_signature().unwrap();
+
+        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+
+        signed_txn.verify_signature().unwrap();
+    }
+
+    #[test]
+    fn verify_single_sender_encrypted_payload_after_decryption() {
+        let sender_key = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender_key.public_key();
+        let sender_addr =
+            AuthenticationKey::any_key(AnyPublicKey::ed25519(sender_pub.clone())).account_address();
+
+        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let raw_txn = RawTransaction::new(
+            sender_addr,
+            0,
+            payload,
+            1_000_000,
+            100,
+            100,
+            ChainId::test(),
+        );
+
+        let signature = sender_key.sign(&raw_txn).unwrap();
+        let sk_auth = SingleKeyAuthenticator::new(
+            AnyPublicKey::ed25519(sender_pub),
+            AnySignature::ed25519(signature),
+        );
+        let account_auth = AccountAuthenticator::single_key(sk_auth);
+        let mut signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+
+        signed_txn.verify_signature().unwrap();
+
+        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+
+        signed_txn.verify_signature().unwrap();
     }
 }

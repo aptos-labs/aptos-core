@@ -1,10 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{smoke_test_environment::SwarmBuilder, txn_emitter::generate_traffic};
+use crate::{
+    smoke_test_environment::SwarmBuilder, txn_emitter::generate_traffic,
+    utils::create_and_fund_account,
+};
 use aptos_forge::{EmitJobMode, LocalSwarm, NodeExt, TransactionType};
 use aptos_logger::info;
 use aptos_rest_client::Client;
+use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_types::on_chain_config::{
     FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainRandomnessConfig,
 };
@@ -211,5 +215,131 @@ async fn test_encryption_key_rotation_and_encrypted_txns() {
         "Expected decrypted encrypted transactions to be committed, but found 0 in versions [{}, {})",
         version_before_traffic,
         final_version
+    );
+}
+
+/// Smoke test that verifies fee-payer encrypted transactions work end-to-end:
+/// 1. Builds an encrypted entry-function payload.
+/// 2. Signs with the FeePayer authenticator.
+/// 3. Submits and verifies the transaction is committed and decrypted.
+#[tokio::test]
+async fn test_fee_payer_encrypted_transaction() {
+    let mut swarm = create_swarm_with_encryption(4).await;
+
+    let client = swarm.validators().last().unwrap().rest_client();
+
+    // Wait for epoch 2 so an encryption key is available.
+    info!("Waiting for epoch 2 for encryption key...");
+    let key_bytes = wait_for_epoch(&client, 2, 90).await;
+    assert!(
+        key_bytes.is_some(),
+        "Encryption key should exist after epoch 2"
+    );
+    let key_bytes = key_bytes.unwrap();
+
+    let state = client.get_ledger_information().await.unwrap().into_inner();
+
+    // Build a TransactionFactory with the encryption key and non-zero gas price
+    // (GAS_UNIT_PRICE is 0 in test builds).
+    let txn_factory = TransactionFactory::new(swarm.chain_id())
+        .with_gas_unit_price(100)
+        .with_max_gas_amount(10_000);
+    txn_factory
+        .update_encryption_key_state(state.epoch, Some(&key_bytes))
+        .expect("failed to set encryption key");
+
+    // Create and fund sender and fee-payer accounts.
+    let sender = create_and_fund_account(&mut swarm, 10_000).await;
+    let fee_payer = create_and_fund_account(&mut swarm, 10_000_000).await;
+
+    const APT_COIN: &str = "0x1::aptos_coin::AptosCoin";
+
+    let sender_balance_before = client
+        .view_account_balance_bcs_impl(sender.address(), APT_COIN, None)
+        .await
+        .unwrap()
+        .into_inner();
+    let fee_payer_balance_before = client
+        .view_account_balance_bcs_impl(fee_payer.address(), APT_COIN, None)
+        .await
+        .unwrap()
+        .into_inner();
+
+    // Record version before submission.
+    let version_before = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .version;
+
+    // Build and sign an encrypted fee-payer transaction (simple coin transfer to self).
+    let payload = aptos_cached_packages::aptos_stdlib::aptos_coin_transfer(sender.address(), 1);
+    let builder = txn_factory.payload(payload);
+    let signed_txn = sender.sign_fee_payer_with_transaction_builder(vec![], &fee_payer, builder);
+
+    // Verify the built transaction has an encrypted payload.
+    assert!(
+        signed_txn.payload().is_encrypted_variant(),
+        "Transaction payload should be encrypted"
+    );
+
+    info!(
+        "Submitting fee-payer encrypted txn: sender={}, fee_payer={}",
+        sender.address(),
+        fee_payer.address()
+    );
+    let committed_txn = client
+        .submit_and_wait(&signed_txn)
+        .await
+        .expect("fee-payer encrypted transaction should commit")
+        .into_inner();
+
+    // Verify the transaction succeeded.
+    assert!(
+        committed_txn.success(),
+        "Fee-payer encrypted transaction should succeed"
+    );
+
+    // Verify the committed transaction was decrypted.
+    let final_version = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .version;
+    let (encrypted_count, decrypted_count) =
+        count_encrypted_txns(&client, version_before, final_version).await;
+    info!(
+        "Found {} encrypted transactions ({} decrypted) in versions [{}, {})",
+        encrypted_count, decrypted_count, version_before, final_version
+    );
+    assert!(
+        decrypted_count > 0,
+        "Expected the fee-payer encrypted transaction to be decrypted, found 0"
+    );
+
+    // Verify gas was charged to the fee payer, not the sender.
+    let sender_balance_after = client
+        .view_account_balance_bcs_impl(sender.address(), APT_COIN, None)
+        .await
+        .unwrap()
+        .into_inner();
+    let fee_payer_balance_after = client
+        .view_account_balance_bcs_impl(fee_payer.address(), APT_COIN, None)
+        .await
+        .unwrap()
+        .into_inner();
+
+    // Sender transferred 1 coin to self (no net change). No gas should be charged to sender.
+    assert_eq!(
+        sender_balance_before, sender_balance_after,
+        "Sender balance should not change (gas charged to fee payer)"
+    );
+    assert!(
+        fee_payer_balance_after < fee_payer_balance_before,
+        "Fee payer balance should decrease (gas charged to fee payer): before={}, after={}",
+        fee_payer_balance_before,
+        fee_payer_balance_after
     );
 }
