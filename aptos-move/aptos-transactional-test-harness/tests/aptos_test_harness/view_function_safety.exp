@@ -1,6 +1,6 @@
 processed 2 tasks
-task 1 lines 4-51:  publish --private-key alice [module alice::view_function_safety {]
-warning: view functions should not modify state, but this function (or one of its callees) calls `borrow_global_mut`. Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.
+task 1 lines 4-68:  publish --private-key alice [module alice::view_function_safety {]
+warning: view functions should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`). Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.
    ┌─ TEMPFILE:15:5
    │  
 15 │ ╭     public fun unsafe_view_modifies_state(): u64 acquires State {
@@ -9,7 +9,7 @@ warning: view functions should not modify state, but this function (or one of it
 18 │ │     }
    │ ╰─────^
 
-warning: view functions should not modify state, but this function (or one of its callees) calls `borrow_global_mut`. Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.
+warning: view functions should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`). Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.
    ┌─ TEMPFILE:21:5
    │  
 21 │ ╭     public fun unsafe_view_direct_borrow(): u64 acquires State {
@@ -17,6 +17,23 @@ warning: view functions should not modify state, but this function (or one of it
 23 │ │         state.val = state.val + 1;
 24 │ │         1
 25 │ │     }
+   │ ╰─────^
+
+warning: view functions should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`). Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.
+   ┌─ TEMPFILE:41:5
+   │  
+41 │ ╭     public fun unsafe_view_move_from(): u64 acquires State {
+42 │ │         let State { val } = move_from<State>(@alice);
+43 │ │         val
+44 │ │     }
+   │ ╰─────^
+
+warning: view functions should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`). Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.
+   ┌─ TEMPFILE:51:5
+   │  
+51 │ ╭     public fun unsafe_view_move_from_indirect(): u64 acquires State {
+52 │ │         helper_move_from()
+53 │ │     }
    │ ╰─────^
 
 

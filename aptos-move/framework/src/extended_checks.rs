@@ -5,7 +5,7 @@ use aptos_types::vm::module_metadata::{
     KnownAttribute, RandomnessAnnotation, ResourceGroupScope, RuntimeModuleMetadataV1,
 };
 use legacy_move_compiler::shared::known_attributes;
-use move_binary_format::file_format::Visibility;
+use move_binary_format::file_format::{Bytecode as FileFormatBytecode, Visibility};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
@@ -106,12 +106,9 @@ struct ExtendedChecker<'a> {
     error_category_module: ModuleId,
     /// A cache for functions which are known to call or not call randomness features
     randomness_caller_cache: BTreeMap<QualifiedId<FunId>, bool>,
-    /// A cache for functions which are known to call or not call borrow_global_mut
-    borrow_global_mut_caller_cache: BTreeMap<QualifiedId<FunId>, bool>,
-    /// Callers map used to back-propagate borrow_global_mut discovery across cycles
-    borrow_global_mut_callers: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>,
-    /// Functions currently in the borrow_global_mut DFS to break recursion
-    borrow_global_mut_in_progress: BTreeSet<QualifiedId<FunId>>,
+    /// Set of functions that (directly or transitively) call a state-mutating global
+    /// operation (borrow_global_mut, move_to, move_from). Precomputed before per-module checks.
+    mutating_global_op_funs: BTreeSet<QualifiedId<FunId>>,
 }
 
 impl<'a> ExtendedChecker<'a> {
@@ -124,13 +121,12 @@ impl<'a> ExtendedChecker<'a> {
                 Identifier::new("error").unwrap(),
             ),
             randomness_caller_cache: BTreeMap::new(),
-            borrow_global_mut_caller_cache: BTreeMap::new(),
-            borrow_global_mut_callers: BTreeMap::new(),
-            borrow_global_mut_in_progress: BTreeSet::new(),
+            mutating_global_op_funs: BTreeSet::new(),
         }
     }
 
     fn run(&mut self) {
+        self.precompute_mutating_global_op_funs();
         for ref module in self.env.get_modules() {
             if module.is_primary_target() {
                 self.check_and_record_resource_groups(module);
@@ -364,6 +360,7 @@ impl ExtendedChecker<'_> {
         true
     }
 
+    /// Warn on public(friend) or public(package) entry fns, since `entry` makes them callable by anyone.
     fn check_friend_or_package_entry_functions(&self, module: &ModuleEnv) {
         for ref fun in module.get_functions() {
             if !fun.is_entry() || fun.visibility() != Visibility::Friend {
@@ -382,11 +379,8 @@ impl ExtendedChecker<'_> {
             );
 
             if !self.has_attribute(fun, expected_attr) {
-                self.env.warning(
-                    // TODO: we need to make this an error
-                    &fun.get_loc(),
-                    msg.as_str(),
-                );
+                // TODO: upgrade from warning to error in a future version
+                self.env.warning(&fun.get_loc(), msg.as_str());
             }
         }
     }
@@ -788,72 +782,73 @@ impl ExtendedChecker<'_> {
         module_name.addr().expect_numerical() == AccountAddress::ONE
             && *self.env.symbol_pool().string(module_name.name()) == RANDOMNESS_MODULE_NAME
     }
+}
 
-    fn calls_borrow_global_mut(&mut self, fun_id: QualifiedId<FunId>) -> bool {
-        if let Some(res) = self.borrow_global_mut_caller_cache.get(&fun_id) {
-            return *res;
-        }
-        if self.borrow_global_mut_in_progress.contains(&fun_id) {
-            return false;
-        }
-        self.borrow_global_mut_in_progress.insert(fun_id);
-        let fun = self.env.get_function(fun_id);
-        if fun.is_native() {
-            self.borrow_global_mut_in_progress.remove(&fun_id);
-            self.borrow_global_mut_caller_cache.insert(fun_id, false);
-            return false;
-        }
+// ----------------------------------------------------------------------------------
+// Global State Mutation Analysis
 
-        let mut borrows = self.borrows_global_mut_directly(&fun);
-
-        for callee in fun.get_called_functions().expect("callees defined") {
-            self.borrow_global_mut_callers
-                .entry(*callee)
-                .or_default()
-                .insert(fun_id);
-            if self.calls_borrow_global_mut(*callee) {
-                borrows = true;
-            }
-        }
-        self.borrow_global_mut_in_progress.remove(&fun_id);
-
-        if borrows {
-            self.propagate_borrow_global_mut_true(fun_id);
-            true
-        } else {
-            self.borrow_global_mut_caller_cache.insert(fun_id, false);
-            false
-        }
+impl ExtendedChecker<'_> {
+    /// Returns whether the given function (directly or transitively) calls a state-mutating
+    /// global operation. This is a simple set lookup into the precomputed set.
+    fn calls_mutating_global_op(&self, fun_id: QualifiedId<FunId>) -> bool {
+        self.mutating_global_op_funs.contains(&fun_id)
     }
 
-    fn borrows_global_mut_directly(&self, fun: &FunctionEnv) -> bool {
-        let data = StacklessBytecodeGenerator::new(fun).generate_function();
-        let target = FunctionTarget::new(fun, &data);
-        for bc in target.get_bytecode() {
-            if let Bytecode::Call(_, dests, Operation::BorrowGlobal(..), _, _) = bc
-                && !dests.is_empty()
-            {
-                let ty = target.get_local_type(dests[0]);
-                if let Type::Reference(ReferenceKind::Mutable, _) = ty {
-                    return true;
+    fn mutates_global_state_directly(&self, fun: &FunctionEnv) -> bool {
+        fun.get_bytecode().is_some_and(|code| {
+            code.iter().any(|bc| {
+                matches!(
+                    bc,
+                    FileFormatBytecode::MutBorrowGlobal(_)
+                        | FileFormatBytecode::MutBorrowGlobalGeneric(_)
+                        | FileFormatBytecode::MoveTo(_)
+                        | FileFormatBytecode::MoveToGeneric(_)
+                        | FileFormatBytecode::MoveFrom(_)
+                        | FileFormatBytecode::MoveFromGeneric(_)
+                )
+            })
+        })
+    }
+
+    /// Precomputes the set of all functions that (directly or transitively) call a
+    /// state-mutating global operation (`borrow_global_mut`, `move_to`, `move_from`).
+    /// Uses a reverse-caller graph and worklist propagation so that
+    /// `calls_mutating_global_op` becomes a simple set lookup.
+    fn precompute_mutating_global_op_funs(&mut self) {
+        // Build the reverse call graph (callee -> set of callers) and seed the worklist
+        // with functions that directly mutate global state.
+        let mut reverse_callees: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>> =
+            BTreeMap::new();
+        let mut worklist: Vec<QualifiedId<FunId>> = Vec::new();
+
+        for module in self.env.get_modules() {
+            for fun in module.get_functions() {
+                let fun_id = fun.get_qualified_id();
+                if fun.is_native() {
+                    continue;
+                }
+                if self.mutates_global_state_directly(&fun) {
+                    worklist.push(fun_id);
+                }
+                if let Some(callees) = fun.get_called_functions() {
+                    for callee in callees {
+                        reverse_callees.entry(*callee).or_default().insert(fun_id);
+                    }
                 }
             }
         }
-        false
-    }
 
-    fn propagate_borrow_global_mut_true(&mut self, fun_id: QualifiedId<FunId>) {
-        let mut stack = vec![fun_id];
-        while let Some(current) = stack.pop() {
-            if matches!(
-                self.borrow_global_mut_caller_cache.get(&current),
-                Some(true)
-            ) {
-                continue;
+        // Propagate: any caller of a function in the set also belongs in the set.
+        while let Some(current) = worklist.pop() {
+            if !self.mutating_global_op_funs.insert(current) {
+                continue; // already processed
             }
-            self.borrow_global_mut_caller_cache.insert(current, true);
-            if let Some(callers) = self.borrow_global_mut_callers.get(&current) {
-                stack.extend(callers.iter().copied());
+            if let Some(callers) = reverse_callees.get(&current) {
+                for caller in callers {
+                    if !self.mutating_global_op_funs.contains(caller) {
+                        worklist.push(*caller);
+                    }
+                }
             }
         }
     }
@@ -917,23 +912,23 @@ impl ExtendedChecker<'_> {
         }
     }
 
-    fn check_view_functions_mutability(&mut self, module: &ModuleEnv) {
-        let mut view_funs = vec![];
+    /// Warn on public view fns that directly or transitively call a state-mutating global op.
+    fn check_view_functions_mutability(&self, module: &ModuleEnv) {
         for ref fun in module.get_functions() {
-            if self.has_attribute(fun, VIEW_FUN_ATTRIBUTE) && fun.visibility().is_public() {
-                view_funs.push(fun.get_qualified_id());
+            if !self.has_attribute(fun, VIEW_FUN_ATTRIBUTE) || !fun.visibility().is_public() {
+                continue;
             }
-        }
-
-        for fun_id in view_funs {
-            if self.calls_borrow_global_mut(fun_id) {
-                let fun = self.env.get_function(fun_id);
-                if !self.has_attribute(&fun, ALLOW_UNSAFE_MUTABLE_VIEW_FUNCTIONS_ATTRIBUTE) {
-                    self.env.warning( // TODO: we need to figured out a way to make this an error
-                        &fun.get_loc(),
-                        "view functions should not modify state, but this function (or one of its callees) calls `borrow_global_mut`. Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.",
-                    );
-                }
+            if self.calls_mutating_global_op(fun.get_qualified_id())
+                && !self.has_attribute(fun, ALLOW_UNSAFE_MUTABLE_VIEW_FUNCTIONS_ATTRIBUTE)
+            {
+                // TODO: upgrade from warning to error in a future version
+                self.env.warning(
+                    &fun.get_loc(),
+                    "view functions should not modify state, but this function \
+                     (or one of its callees) calls a state-mutating operation \
+                     (`borrow_global_mut`, `move_to`, or `move_from`). \
+                     Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.",
+                );
             }
         }
     }

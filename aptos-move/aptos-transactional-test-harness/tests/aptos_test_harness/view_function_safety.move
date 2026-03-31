@@ -3,9 +3,8 @@
 
 //# publish --private-key alice
 module alice::view_function_safety {
-
     struct State has key {
-        val: u64,
+        val: u64
     }
 
     fun modify_state() acquires State {
@@ -41,6 +40,24 @@ module alice::view_function_safety {
     fun private_view_modifies_state(): u64 acquires State {
         modify_state();
         1
+    }
+
+    // Error: public view function using move_from directly
+    #[view]
+    public fun unsafe_view_move_from(): u64 acquires State {
+        let State { val } = move_from<State>(@alice);
+        val
+    }
+
+    // Error: public view function using move_from via helper
+    fun helper_move_from(): u64 acquires State {
+        let State { val } = move_from<State>(@alice);
+        val
+    }
+
+    #[view]
+    public fun unsafe_view_move_from_indirect(): u64 acquires State {
+        helper_move_from()
     }
 
     // Ok: public view function reading state
