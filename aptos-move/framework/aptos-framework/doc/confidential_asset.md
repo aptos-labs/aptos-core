@@ -3549,6 +3549,8 @@ Verifies range proofs + $\Sigma$-protocol for transfer. Returns (new_balance, re
         zkrp_new_balance, zkrp_amount, sigma
     } = proof;
 
+    // Note: `update_auditor` already guarantees that `compressed_ek_eff_aud` is not the identity, but the voluntary
+    // auditor EKs need <b>to</b> be manually checked.
     compressed_ek_volun_auds.for_each_ref(|ek| {
         <b>assert</b>!(!ek.is_identity(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EK_IS_IDENTITY">E_EK_IS_IDENTITY</a>));
     });

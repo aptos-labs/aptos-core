@@ -89,6 +89,31 @@ pub static DIGEST_KEY_FILE_SIZE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PUBLIC_PARAMS_SOURCE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_dkg_public_params_source",
+        "Which PublicParameters source was used at startup (file, test_fallback, none)",
+        &["source"]
+    )
+    .unwrap()
+});
+
+pub static PUBLIC_PARAMS_LOAD_DURATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_dkg_public_params_load_duration_seconds",
+        "Time to read and deserialize the PublicParameters blob file"
+    )
+    .unwrap()
+});
+
+pub static PUBLIC_PARAMS_FILE_SIZE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_dkg_public_params_file_size_bytes",
+        "Size of the PublicParameters blob file in bytes (only set when file exists)"
+    )
+    .unwrap()
+});
+
 pub static CHUNKY_DKG_OBJECT_SIZE_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_chunky_dkg_object_size_bytes",
