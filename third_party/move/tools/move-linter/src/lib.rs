@@ -9,7 +9,10 @@ use move_compiler_v2::external_checks::{
     ConstantChecker, ExpChecker, ExternalChecks, FunctionChecker, StacklessBytecodeChecker,
     StructChecker,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 /// Holds collection of lint checks for Move.
 pub struct MoveLintChecks {
@@ -35,6 +38,29 @@ impl ExternalChecks for MoveLintChecks {
 
     fn get_function_checkers(&self) -> Vec<Box<dyn FunctionChecker>> {
         model_ast_lints::get_default_function_linter_pipeline(&self.config)
+    }
+
+    fn get_all_checker_names(&self) -> BTreeSet<String> {
+        // Use the "experimental" tier config, which is the superset of all tiers,
+        // so that all checker names are recognized in `#[lint::skip(...)]` attributes.
+        let all_config = BTreeMap::from([("checks".to_string(), "experimental".to_string())]);
+        let mut names = BTreeSet::new();
+        for c in model_ast_lints::get_default_exp_linter_pipeline(&all_config) {
+            names.insert(c.get_name());
+        }
+        for c in stackless_bytecode_lints::get_default_linter_pipeline(&all_config) {
+            names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_constant_linter_pipeline(&all_config) {
+            names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_struct_linter_pipeline(&all_config) {
+            names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_function_linter_pipeline(&all_config) {
+            names.insert(c.get_name());
+        }
+        names
     }
 }
 
