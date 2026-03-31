@@ -18,6 +18,7 @@ use aptos_block_executor::{
     txn_commit_hook::TransactionCommitHook,
     txn_provider::TxnProvider,
     types::InputOutputKey,
+    worker_pool::WorkerPool,
 };
 use aptos_types::{
     block_executor::{
@@ -54,15 +55,7 @@ use std::{
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
 
-static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
+static WORKER_POOL: Lazy<Arc<WorkerPool>> = Lazy::new(|| Arc::new(WorkerPool::new("par_exec")));
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -517,7 +510,7 @@ impl<
         L: TransactionCommitHook,
         TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
-        executor_thread_pool: Arc<rayon::ThreadPool>,
+        worker_pool: Arc<WorkerPool>,
         signature_verified_block: &TP,
         state_view: &S,
         module_cache_manager: &AptosModuleCacheManager,
@@ -545,7 +538,7 @@ impl<
         let executor =
             BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
                 config,
-                executor_thread_pool,
+                worker_pool,
                 transaction_commit_listener,
             );
 
@@ -585,7 +578,7 @@ impl<
         }
     }
 
-    /// Uses shared thread pool to execute blocks.
+    /// Uses shared worker pool (internal to block-executor) to execute blocks.
     pub(crate) fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook,
@@ -599,7 +592,7 @@ impl<
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
-            Arc::clone(&RAYON_EXEC_POOL),
+            Arc::clone(&WORKER_POOL),
             signature_verified_block,
             state_view,
             module_cache_manager,

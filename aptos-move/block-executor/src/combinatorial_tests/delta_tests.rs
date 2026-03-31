@@ -16,7 +16,7 @@ use crate::{
 };
 use aptos_types::transaction::AuxiliaryInfo;
 use proptest::test_runner::TestRunner;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 use test_case::test_matrix;
 
 fn run_transactions_deltas(
@@ -27,8 +27,6 @@ fn run_transactions_deltas(
     num_executions: usize,
     num_random_generations: usize,
 ) {
-    let executor_thread_pool = create_executor_thread_pool();
-
     // The delta threshold controls how many keys / paths are guaranteed r/w resources even
     // in the presence of deltas.
     let delta_threshold = std::cmp::min(15, universe_size / 2);
@@ -55,6 +53,7 @@ fn run_transactions_deltas(
         };
 
         let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
+        let executor_thread_pool = create_executor_thread_pool();
 
         for maybe_block_gas_limit in gas_limits {
             for _ in 0..num_executions {
@@ -66,7 +65,7 @@ fn run_transactions_deltas(
                         AuxiliaryInfo,
                     >,
                 >(
-                    executor_thread_pool.clone(),
+                    Arc::clone(&executor_thread_pool),
                     maybe_block_gas_limit,
                     &txn_provider,
                     &data_view,
