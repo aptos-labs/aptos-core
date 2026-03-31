@@ -8,16 +8,11 @@ where mold >nul 2>&1
 if %ERRORLEVEL%==0 (
   set "LINKER_FLAVOR=mold"
 ) else (
-  where lld >nul 2>&1
+  where lld-link >nul 2>&1
   if %ERRORLEVEL%==0 (
     set "LINKER_FLAVOR=lld"
   ) else (
-    where ld.lld >nul 2>&1
-    if %ERRORLEVEL%==0 (
-      set "LINKER_FLAVOR=lld"
-    ) else (
-      set "LINKER_FLAVOR=system"
-    )
+    set "LINKER_FLAVOR=system"
   )
 )
 
@@ -29,13 +24,13 @@ echo Unsupported APTOS_LINKER='%LINKER_FLAVOR%'. Use one of: mold, lld, system. 
 exit /b 2
 
 :mold
-clang -fuse-ld=mold %*
+mold %*
 exit /b %ERRORLEVEL%
 
 :lld
-clang -fuse-ld=lld %*
+lld-link %*
 exit /b %ERRORLEVEL%
 
 :system
-clang %*
+link %*
 exit /b %ERRORLEVEL%
