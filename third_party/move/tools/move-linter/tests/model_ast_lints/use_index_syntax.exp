@@ -1,0 +1,91 @@
+
+Diagnostics:
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:15:9
+   │
+15 │         vector::borrow(v, i)
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:20:9
+   │
+20 │         vector::borrow_mut(v, i)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:25:9
+   │
+25 │         *vector::borrow(v, i)
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:30:9
+   │
+30 │         *vector::borrow_mut(v, i) = x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:35:9
+   │
+35 │         vector::borrow(v, i).value
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:40:9
+   │
+40 │         vector::borrow_mut(v, i).value
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:45:9
+   │
+45 │         vector::borrow_mut(v, i).value = x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:50:24
+   │
+50 │         vector::borrow(vector::borrow(v, i), j)
+   │                        ^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:50:9
+   │
+50 │         vector::borrow(vector::borrow(v, i), j)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:55:9
+   │
+55 │         *vector::borrow(v, i) > 0
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.

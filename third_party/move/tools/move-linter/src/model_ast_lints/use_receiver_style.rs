@@ -1,0 +1,52 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+//! Detects function calls that can be written using receiver-style (method) syntax.
+
+use move_compiler_v2::external_checks::ExpChecker;
+use move_model::{
+    ast::{ExpData, Operation},
+    model::{FunctionEnv, SurfaceSyntax},
+};
+
+#[derive(Default)]
+pub struct UseReceiverStyle;
+
+impl ExpChecker for UseReceiverStyle {
+    fn get_name(&self) -> String {
+        "use_receiver_style".to_string()
+    }
+
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
+        let ExpData::Call(id, Operation::MoveFunction(mid, fid), _) = expr else {
+            return;
+        };
+        let env = function.env();
+
+        if env.has_surface_syntax(*id, SurfaceSyntax::ReceiverCall)
+            || env.has_surface_syntax(*id, SurfaceSyntax::IndexNotation)
+        {
+            return;
+        }
+
+        let called_fun = env.get_function(mid.qualified(*fid));
+        if !called_fun.is_receiver_function() {
+            return;
+        }
+
+        let func_name = called_fun.get_name_str();
+        let replacement = if called_fun.get_parameter_count() > 1 {
+            format!("<first_arg>.{}(<rest_args>)", func_name)
+        } else {
+            format!("<arg>.{}()", func_name)
+        };
+        self.report(
+            env,
+            &env.get_node_loc(*id),
+            &format!(
+                "this function call can be written as `{}` using receiver-style syntax.",
+                replacement,
+            ),
+        );
+    }
+}
