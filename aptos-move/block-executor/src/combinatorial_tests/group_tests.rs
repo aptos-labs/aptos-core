@@ -18,6 +18,7 @@ use crate::{
     task::ExecutorTask,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
+    worker_pool::WorkerPool,
 };
 use aptos_types::{
     block_executor::{
@@ -46,7 +47,7 @@ pub(crate) fn create_non_empty_group_data_view(
 
 /// Run both parallel and sequential execution tests for a transaction provider
 pub(crate) fn run_tests_with_groups(
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    worker_pool: Arc<WorkerPool>,
     gas_limits: Vec<Option<u64>>,
     transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
     data_view: &NonEmptyGroupDataView<KeyType<[u8; 32]>>,
@@ -71,7 +72,7 @@ pub(crate) fn run_tests_with_groups(
                         AuxiliaryInfo,
                     >,
                 >(
-                    executor_thread_pool.clone(),
+                    Arc::clone(&worker_pool),
                     *maybe_block_gas_limit,
                     &txn_provider,
                     data_view,
@@ -98,7 +99,7 @@ pub(crate) fn run_tests_with_groups(
             AuxiliaryInfo,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-            executor_thread_pool.clone(),
+            Arc::clone(&worker_pool),
             None,
         )
         .execute_transactions_sequential(
@@ -169,11 +170,11 @@ fn non_empty_group_transaction_tests(
         .collect();
 
     let data_view = create_non_empty_group_data_view(&key_universe, universe_size, false);
-    let executor_thread_pool = create_executor_thread_pool();
+    let worker_pool = create_executor_thread_pool();
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
 
     run_tests_with_groups(
-        executor_thread_pool,
+        worker_pool,
         gas_limits,
         transactions,
         &data_view,
