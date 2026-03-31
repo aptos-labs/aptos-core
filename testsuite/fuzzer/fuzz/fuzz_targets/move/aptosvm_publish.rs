@@ -4,6 +4,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod utils;
+use aptos_block_executor::worker_pool::WorkerPool;
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{chain_id::ChainId, write_set::WriteSet};
@@ -24,14 +25,7 @@ static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clo
 
 const TEST_UPGRADE: bool = true;
 const FUZZER_CONCURRENCY_LEVEL: usize = 1;
-static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(FUZZER_CONCURRENCY_LEVEL)
-            .build()
-            .unwrap(),
-    )
-});
+static TP: Lazy<Arc<WorkerPool>> = Lazy::new(|| Arc::new(WorkerPool::new("par_exec")));
 
 fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     tdbg!(&input);

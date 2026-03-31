@@ -3,6 +3,7 @@
 #![no_main]
 #![allow(unused_imports)]
 
+use aptos_block_executor::worker_pool::WorkerPool;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -52,14 +53,7 @@ use utils::{
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
 
 const FUZZER_CONCURRENCY_LEVEL: usize = 1;
-static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(FUZZER_CONCURRENCY_LEVEL)
-            .build()
-            .unwrap(),
-    )
-});
+static TP: Lazy<Arc<WorkerPool>> = Lazy::new(|| Arc::new(WorkerPool::new("par_exec")));
 
 fn run_case(input: TransactionState) -> Result<(), Corpus> {
     tdbg!(&input);

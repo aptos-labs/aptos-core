@@ -18,6 +18,7 @@ use crate::{
     task::ExecutorTask,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
+    worker_pool::WorkerPool,
 };
 use aptos_types::{
     block_executor::{
@@ -46,7 +47,7 @@ pub(crate) fn create_non_empty_group_data_view(
 
 /// Run both parallel and sequential execution tests for a transaction provider
 pub(crate) fn run_tests_with_groups(
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    executor_thread_pool: Arc<WorkerPool>,
     gas_limits: Vec<Option<u64>>,
     transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
     data_view: &NonEmptyGroupDataView<KeyType<[u8; 32]>>,

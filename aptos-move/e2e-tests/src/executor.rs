@@ -13,7 +13,7 @@ use aptos_bitvec::BitVec;
 use aptos_block_executor::code_cache_global_manager::ModuleHotCacheSnapshot;
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::default::DefaultTxnProvider,
+    txn_provider::default::DefaultTxnProvider, worker_pool::WorkerPool,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
@@ -162,7 +162,8 @@ struct SharedCacheState {
 pub struct FakeExecutorImpl<O: OutputLogger> {
     state_store: FakeExecutorStateStore,
     event_store: Vec<ContractEvent>,
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    worker_pool: Arc<WorkerPool>,
+    concurrency_level: usize,
     block_time: u64,
     executed_output: Option<O>,
     trace_dir: Option<PathBuf>,
@@ -232,20 +233,14 @@ pub enum ExecFuncTimerDynamicArgs {
 impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// Creates an executor from a genesis [`WriteSet`].
     pub fn from_genesis(write_set: &WriteSet, chain_id: ChainId) -> Self {
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get())
-                .build()
-                .unwrap(),
-        );
-
         let state_store = empty_in_memory_state_store();
         state_store.set_chain_id(chain_id).unwrap();
 
         let mut executor = Self {
             state_store,
             event_store: Vec::new(),
-            executor_thread_pool,
+            worker_pool: Arc::new(WorkerPool::new("par_exec")),
+            concurrency_level: num_cpus::get(),
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -262,7 +257,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     pub fn from_genesis_with_existing_thread_pool(
         write_set: &WriteSet,
         chain_id: ChainId,
-        executor_thread_pool: Arc<rayon::ThreadPool>,
+        worker_pool: Arc<WorkerPool>,
         module_cache_manager: Option<AptosModuleCacheManager>,
     ) -> Self {
         let state_store = empty_in_memory_state_store();
@@ -271,7 +266,8 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         let mut executor = Self {
             state_store,
             event_store: Vec::new(),
-            executor_thread_pool,
+            worker_pool,
+            concurrency_level: num_cpus::get(),
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -313,17 +309,11 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             .get_on_chain_config::<CurrentTimeMicroseconds>()
             .expect("failed to get block time from remote");
 
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get())
-                .build()
-                .unwrap(),
-        );
-
         Self {
             state_store,
             event_store: Vec::new(),
-            executor_thread_pool,
+            worker_pool: Arc::new(WorkerPool::new("par_exec")),
+            concurrency_level: num_cpus::get(),
             block_time: timestamp.microseconds,
             executed_output: None,
             trace_dir: None,
@@ -507,16 +497,11 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
     /// Creates an executor in which no genesis state has been applied yet.
     pub fn no_genesis() -> Self {
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get())
-                .build()
-                .unwrap(),
-        );
         Self {
             state_store: empty_in_memory_state_store(),
             event_store: Vec::new(),
-            executor_thread_pool,
+            worker_pool: Arc::new(WorkerPool::new("par_exec")),
+            concurrency_level: num_cpus::get(),
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -895,7 +880,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 NoOpTransactionCommitHook<VMStatus>,
                 _,
             >(
-                self.executor_thread_pool.clone(),
+                Arc::clone(&self.worker_pool),
                 &txn_provider,
                 &state_view,
                 self.module_cache_manager_opt()
@@ -1077,7 +1062,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
             // use the number of threads specified in the executor thread pool as specified at construction time
-            config.local.concurrency_level = self.executor_thread_pool.current_num_threads();
+            config.local.concurrency_level = self.concurrency_level;
             Some(self.execute_transaction_block_impl_with_state_view(
                 sig_verified_block,
                 state_view,

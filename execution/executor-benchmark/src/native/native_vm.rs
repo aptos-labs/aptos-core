@@ -4,7 +4,7 @@
 use crate::{
     db_access::DbAccessUtil,
     native::{
-        native_config::{NativeConfig, NATIVE_EXECUTOR_POOL},
+        native_config::NativeConfig,
         native_transaction::{compute_deltas_for_batch, NativeTransaction},
     },
 };
@@ -18,6 +18,7 @@ use aptos_block_executor::{
     task::{ExecutionStatus, ExecutorTask},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
+    worker_pool::WorkerPool,
 };
 use aptos_logger::error;
 use aptos_mvhashmap::types::TxnIndex;
@@ -63,8 +64,12 @@ use move_core_types::{
     vm_status::VMStatus,
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use once_cell::sync::Lazy;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
+
+static NATIVE_WORKER_POOL: Lazy<Arc<WorkerPool>> =
+    Lazy::new(|| Arc::new(WorkerPool::new("native_exe")));
 
 pub struct NativeVMBlockExecutor;
 
@@ -91,7 +96,7 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
             NoOpTransactionCommitHook<VMStatus>,
             _,
         >(
-            Arc::clone(&NATIVE_EXECUTOR_POOL),
+            Arc::clone(&NATIVE_WORKER_POOL),
             txn_provider,
             state_view,
             &AptosModuleCacheManager::new(),
