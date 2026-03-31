@@ -42,7 +42,7 @@ fn default_dlog_extra_bits() -> u8 {
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
     utils::powers(
         E::ScalarField::from(1u64 << ell),
-        num_chunks_per_scalar::<E::ScalarField>(ell) as usize,
+        num_chunks_per_scalar::<E::ScalarField>(ell),
     )
 }
 
@@ -91,7 +91,7 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             max_aggregation: self.max_aggregation,
             dlog_extra_bits: self.dlog_extra_bits,
             dlog_table: self.dlog_table.clone(),
-            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares as usize), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
+            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
         }
     }
@@ -175,7 +175,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             dlog_extra_bits: serialized.dlog_extra_bits,
             G2_table: BatchMulPreprocessing::new(
                 serialized.G_2.into(),
-                serialized.max_num_shares as usize,
+                serialized.max_num_shares,
             ),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
             dlog_table: serialized.dlog_table
@@ -313,7 +313,7 @@ impl<E: Pairing> PublicParameters<E> {
             max_aggregation,
             dlog_extra_bits: DLOG_EXTRA_BITS,
             dlog_table: Self::build_dlog_table(G_1.into(), ell, max_aggregation, DLOG_EXTRA_BITS),
-            G2_table: BatchMulPreprocessing::new(commitment_base.into(), max_num_shares as usize),
+            G2_table: BatchMulPreprocessing::new(commitment_base.into(), max_num_shares),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };
 

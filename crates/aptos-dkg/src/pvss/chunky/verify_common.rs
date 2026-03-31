@@ -99,7 +99,7 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
         );
     }
 
-    let expected_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
+    let expected_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell);
 
     for i in 0..sc.get_total_num_players() {
         let player = sc.get_player(i);
