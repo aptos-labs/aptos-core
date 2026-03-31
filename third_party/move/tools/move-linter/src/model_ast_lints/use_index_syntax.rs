@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Detects cases where concise vector index notation syntax can be used.
 
