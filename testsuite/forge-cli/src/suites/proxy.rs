@@ -46,6 +46,7 @@ fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) 
     // Larger batches reduce proof count: at 15K TPS, 250 txns/batch = 60 proofs/sec
     // vs 50 txns/batch = 300 proofs/sec. Keeps proof backlog well under the 140 limit.
     config.consensus.quorum_store.sender_max_batch_txns = 250;
+    config.consensus.quorum_store.receiver_max_batch_txns = 250;
     // Raise the QS backpressure floor so dynamic rate never drops below
     // per-validator needs (~750 TPS with 4 proxy validators at 3k TPS).
     config
