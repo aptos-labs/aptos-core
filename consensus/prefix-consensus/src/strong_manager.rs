@@ -300,27 +300,13 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                     break;
                 }
 
-                // Priority messages: Proposals, EmptyView, Commit.
-                // Checked before the timer and regular messages so that
-                // ViewProposals are never starved behind inner PC votes.
-                Some((author, msg)) = priority_rx.next() => {
-                    self.select_iterations_since_view_enter += 1;
-                    self.priority_msgs_since_view_enter += 1;
-                    self.process_message(author, msg).await;
-
-                    if self.protocol.is_complete() {
-                        info!(
-                            party_id = %self.party_id,
-                            slot = self.slot,
-                            current_view = self.current_view,
-                            "Strong Prefix Consensus complete — exiting event loop"
-                        );
-                        break;
-                    }
-                }
-
                 // View start timer: fallback when first-ranked cert hasn't arrived.
                 // Fires after VIEW_START_TIMEOUT (1s) to start inner PC with available certs.
+                //
+                // Placed ABOVE priority_rx so the Sleep is always polled and can
+                // register its waker with the tokio timer driver. Previously this
+                // arm was below priority_rx, and the biased select never polled the
+                // Sleep when priority_rx had messages — causing ~46s timer delays.
                 _ = async {
                     if let Some((_view, timer)) = &mut self.view_start_timer {
                         timer.as_mut().await;
@@ -347,6 +333,23 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                             );
                             break;
                         }
+                    }
+                }
+
+                // Priority messages: Proposals, EmptyView, Commit.
+                Some((author, msg)) = priority_rx.next() => {
+                    self.select_iterations_since_view_enter += 1;
+                    self.priority_msgs_since_view_enter += 1;
+                    self.process_message(author, msg).await;
+
+                    if self.protocol.is_complete() {
+                        info!(
+                            party_id = %self.party_id,
+                            slot = self.slot,
+                            current_view = self.current_view,
+                            "Strong Prefix Consensus complete — exiting event loop"
+                        );
+                        break;
                     }
                 }
 
