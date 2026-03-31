@@ -43,6 +43,7 @@ static_assertions = { workspace = true }
 
 [dev-dependencies]
 num_cpus = { workspace = true }
+chrono = { workspace = true }
 
 [features]
 assert-private-keys-not-cloneable = []

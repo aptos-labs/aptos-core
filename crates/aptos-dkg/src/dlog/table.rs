@@ -4,21 +4,26 @@
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::Zero;
 use ark_serialize::{CanonicalSerialize, SerializationError};
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 
 /// Baby-step table plus precomputed giant-step term: holds points j*G for j in [0, m),
 /// and stores G, table_size, and the precomputed -table_size*G for the giant-step loop.
 /// Points are stored as compressed-serialized bytes (CanonicalSerialize with Compress::Yes).
 #[allow(non_snake_case)]
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(bound(serialize = "", deserialize = ""))]
 pub struct BabyStepTable<A: AffineRepr> {
     /// Base point for baby steps (point = j*G).
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub G: A,
     /// Baby steps: compressed(point) -> exponent j (so that point = affinisation of j*G).
     table: HashMap<Vec<u8>, u32>,
     /// Number of baby steps (table length).
     pub table_size: u32,
     /// Precomputed -table_size*G for giant steps.
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub G_neg_table_size: A,
 }
 

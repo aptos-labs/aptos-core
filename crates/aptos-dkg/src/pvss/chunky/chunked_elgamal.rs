@@ -356,7 +356,7 @@ impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for Homomorphism<'a, C> 
 pub fn correlated_randomness<F, R>(
     rng: &mut R,
     radix: u64,
-    num_chunks: u32,
+    num_chunks: usize,
     target_sum: &F,
 ) -> Vec<F>
 where
@@ -368,7 +368,7 @@ where
     let radix_f = F::from(radix);
     let mut cur_base = radix_f;
 
-    for i in 1..(num_chunks as usize) {
+    for i in 1..num_chunks {
         r_vals[i] = sample_field_element(rng);
         remaining -= r_vals[i] * cur_base;
         cur_base *= radix_f;
@@ -378,8 +378,8 @@ where
     r_vals
 }
 
-pub fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> u32 {
-    F::MODULUS_BIT_SIZE.div_ceil(ell as u32) // Maybe add `as usize` here?
+pub fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> usize {
+    F::MODULUS_BIT_SIZE.div_ceil(ell as u32) as usize
 }
 
 /// Decrypt a vector of chunked ciphertexts using the corresponding committed randomness and decryption keys
@@ -445,9 +445,9 @@ mod tests {
         let mut rng = thread_rng();
         let target_sum = F::one();
         let radix: u64 = 4;
-        let num_chunks: u8 = 8;
+        let num_chunks: usize = 8;
 
-        let coefs = correlated_randomness(&mut rng, radix, num_chunks as u32, &target_sum);
+        let coefs = correlated_randomness(&mut rng, radix, num_chunks, &target_sum);
 
         // Compute actual sum: Σ coef[i] * radix^i
         let actual_sum: F = (0..num_chunks)
@@ -466,7 +466,7 @@ mod tests {
     fn prepare_chunked_witness<F: PrimeField>(
         sc: WeightedConfig<ShamirThresholdConfig<F>>,
         ell: u8,
-    ) -> (Vec<F>, Witness<F>, u8, u32) {
+    ) -> (Vec<F>, Witness<F>, u8, usize) {
         let mut rng = thread_rng();
 
         // 1. Generate random values
