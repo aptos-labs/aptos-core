@@ -8,7 +8,8 @@ use aptos_forge::{
     EmitJobMode, EmitJobRequest, ForgeConfig,
 };
 use aptos_sdk::types::on_chain_config::{
-    ConsensusAlgorithmConfig, OnChainConsensusConfig, OnChainExecutionConfig, ValidatorTxnConfig,
+    BlockGasLimitType, ConsensusAlgorithmConfig, ExecutionConfigV7, OnChainConsensusConfig,
+    OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType, ValidatorTxnConfig,
     DEFAULT_WINDOW_SIZE,
 };
 use aptos_testcases::{
@@ -166,9 +167,28 @@ fn proxy_primary_remote_test() -> ForgeConfig {
                     proxy_validator_indices: proxy_indices.clone(),
                 })
                 .expect("must serialize");
+            // Raise block gas limit from 20K to 35K. At ~10 primary blocks/sec,
+            // 20K gas limit caps throughput. Higher limit allows more txns per block.
             helm_values["chain"]["on_chain_execution_config"] =
-                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(OnChainExecutionConfig::V7(ExecutionConfigV7 {
+                    transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
+                    block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
+                        effective_block_gas_limit: 35000,
+                        execution_gas_effective_multiplier: 1,
+                        io_gas_effective_multiplier: 1,
+                        conflict_penalty_window: 9,
+                        use_granular_resource_group_conflicts: false,
+                        use_module_publishing_block_conflict: true,
+                        block_output_limit: Some(6 * 1024 * 1024),
+                        include_user_txn_size_in_block_output: true,
+                        add_block_limit_outcome_onchain: true,
+                    },
+                    enable_per_block_gas_limit: false,
+                    transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
+                    gas_price_to_burn: 90,
+                    persisted_auxiliary_info_version: 1,
+                }))
+                .expect("must serialize");
         }))
         .with_emit_job(
             EmitJobRequest::default()
