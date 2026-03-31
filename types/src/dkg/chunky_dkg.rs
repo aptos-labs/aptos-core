@@ -55,10 +55,10 @@ pub type ChunkyDecryptPrivKey = DecryptPrivKey<Pairing>;
 pub type ChunkyDKGPublicParameters = PublicParameters<Pairing>;
 pub type ChunkyInputSecret = InputSecret<Fr>;
 /// Shared test DigestKey for encryption key derivation (unit tests only).
-pub static TEST_DIGEST_KEY: Lazy<DigestKey> = Lazy::new(|| {
+pub static TEST_DIGEST_KEY: Lazy<Arc<DigestKey>> = Lazy::new(|| {
     use ark_std::rand::SeedableRng;
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(100u64);
-    DigestKey::new(&mut rng, 32, 200).expect("DigestKey creation should not fail")
+    Arc::new(DigestKey::new(&mut rng, 32, 200).expect("DigestKey creation should not fail"))
 });
 
 /// Path to the BCS-serialized DigestKey blob file.
@@ -140,7 +140,7 @@ pub fn initialize_digest_key(chain_id: ChainId) -> DigestKeySource {
             Err(_) => DigestKeySource::NotAvailable,
         }
     } else if chain_id == ChainId::test() {
-        let _ = DIGEST_KEY_OVERRIDE.set(Arc::new(TEST_DIGEST_KEY.clone()));
+        let _ = DIGEST_KEY_OVERRIDE.set(Arc::clone(&TEST_DIGEST_KEY));
         DigestKeySource::TestKeyFallback
     } else {
         DigestKeySource::NotAvailable
