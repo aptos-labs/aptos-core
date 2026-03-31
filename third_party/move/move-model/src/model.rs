@@ -5415,11 +5415,9 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns true if this is a receiver function, i.e., its first parameter is named `self`.
     pub fn is_receiver_function(&self) -> bool {
-        self.get_parameters_ref()
-            .first()
-            .is_some_and(|p| {
-                self.symbol_pool().string(p.0).as_ref() == well_known::RECEIVER_PARAM_NAME
-            })
+        self.get_parameters_ref().first().is_some_and(|p| {
+            self.symbol_pool().string(p.0).as_ref() == well_known::RECEIVER_PARAM_NAME
+        })
     }
 
     /// Returns the parameter types associated with this function
