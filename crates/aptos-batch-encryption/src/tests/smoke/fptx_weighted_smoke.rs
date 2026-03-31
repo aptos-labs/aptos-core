@@ -2,11 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    group::{Fr}, schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEMasterSecretKeyShare, WeightedBIBEVerificationKey}, shared::{digest::DigestKey, encryption_key::EncryptionKey}, tests::smoke::run_smoke, traits::BatchThresholdEncryption
+    group::{Fr}, schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEMasterSecretKeyShare, WeightedBIBEVerificationKey}, shared::{digest::DigestKey, encryption_key::EncryptionKey},  traits::BatchThresholdEncryption
 };
+
 use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
 use aptos_dkg::pvss::traits::transcript::Aggregatable;
 use ark_ec::AffineRepr as _;
+
+#[cfg(test)]
+use crate::tests::smoke::run_smoke;
+#[cfg(test)]
 use ark_std::rand::{Rng as _, thread_rng};
 
 pub fn run_pvss(dk: &DigestKey) -> (

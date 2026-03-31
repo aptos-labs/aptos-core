@@ -6,7 +6,9 @@ use aptos_crypto::TSecretSharingConfig;
 use crate::traits::{BatchThresholdEncryption, DecryptionKeyShare};
 use anyhow::Result;
 
+#[cfg(test)]
 pub mod fptx_smoke;
+#[cfg(test)]
 pub mod fptx_succinct_smoke;
 pub mod fptx_weighted_smoke;
 
