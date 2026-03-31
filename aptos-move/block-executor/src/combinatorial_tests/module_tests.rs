@@ -20,6 +20,7 @@ use fail::FailScenario;
 use move_core_types::language_storage::ModuleId;
 use move_vm_types::module_id_interner::InternedModuleIdPool;
 use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};
+use std::sync::Arc;
 use test_case::test_matrix;
 
 enum ModuleTestType {
@@ -48,7 +49,6 @@ fn execute_module_tests(
     assert!(fail::has_failpoints());
     fail::cfg("module_test", "return").unwrap();
 
-    let executor_thread_pool = create_executor_thread_pool();
     let mut runner = TestRunner::default();
 
     let module_id_pool = InternedModuleIdPool::new();
@@ -109,6 +109,7 @@ fn execute_module_tests(
         let all_module_ids = generate_all_potential_module_ids(&universe);
 
         // Run tests with fail point enabled to test the version metadata
+        let executor_thread_pool = create_executor_thread_pool();
         for exe_idx in 0..num_executions {
             for maybe_block_gas_limit in &gas_limits {
                 if *maybe_block_gas_limit == Some(0) && (gen_idx > 0 || exe_idx > 0) {
@@ -124,7 +125,7 @@ fn execute_module_tests(
                         AuxiliaryInfo,
                     >,
                 >(
-                    executor_thread_pool.clone(),
+                    Arc::clone(&executor_thread_pool),
                     *maybe_block_gas_limit,
                     &txn_provider,
                     &state_view,

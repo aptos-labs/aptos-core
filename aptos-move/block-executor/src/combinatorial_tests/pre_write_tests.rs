@@ -44,10 +44,10 @@ fn execute_block_with_pre_write_config<Provider>(
 where
     Provider: TxnProvider<TestTransaction, AuxiliaryInfo> + Sync + 'static,
 {
-    let executor_thread_pool = create_executor_thread_pool();
     let mut guard = AptosModuleCacheManagerGuard::none();
 
     let config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), None);
+    let executor_thread_pool = create_executor_thread_pool();
     let block_executor = BlockExecutor::<
         TestTransaction,
         MockTask<TestKey, MockEvent>,

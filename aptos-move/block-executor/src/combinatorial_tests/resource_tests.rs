@@ -12,6 +12,7 @@ use crate::{
     task::ExecutorTask,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
+    worker_pool::WorkerPool,
 };
 use aptos_types::{
     block_executor::{
@@ -49,13 +50,8 @@ pub(crate) fn get_gas_limit_variants(
     }
 }
 
-pub(crate) fn create_executor_thread_pool() -> Arc<rayon::ThreadPool> {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    )
+pub(crate) fn create_executor_thread_pool() -> Arc<WorkerPool> {
+    Arc::new(WorkerPool::new("par_exec"))
 }
 
 /// Populates a module cache manager guard with empty modules for testing.
@@ -98,7 +94,7 @@ pub(crate) fn populate_guard_with_modules(
 }
 
 pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    worker_pool: Arc<WorkerPool>,
     block_gas_limit: Option<u64>,
     txn_provider: &Provider,
     data_view: &ViewType,
@@ -126,7 +122,7 @@ where
         NoOpTransactionCommitHook<usize>,
         Provider,
         AuxiliaryInfo,
-    >::new(config, executor_thread_pool, None);
+    >::new(config, worker_pool, None);
 
     if block_stm_v2 {
         block_executor.execute_transactions_parallel_v2(
@@ -246,7 +242,7 @@ pub(crate) fn run_transactions_resources(
                             AuxiliaryInfo,
                         >,
                     >(
-                        executor_thread_pool.clone(),
+                        Arc::clone(&executor_thread_pool),
                         *maybe_block_gas_limit,
                         &txn_provider,
                         &state_view,

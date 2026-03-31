@@ -20,6 +20,7 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
+    worker_pool::WorkerPool,
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
@@ -56,12 +57,7 @@ fn test_block_epilogue_happy_path() {
     let t_1 = MockTransaction::from_behavior(behaivor);
     let transactions = vec![t_0, t_1];
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -127,12 +123,7 @@ fn test_block_epilogue_block_gas_limit_reached() {
     let t_1 = MockTransaction::from_behavior(behaivor);
     let transactions = vec![t_0, t_1];
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -222,12 +213,7 @@ fn test_resource_group_deletion() {
         group_keys: HashSet::new(),
         delayed_field_testing: false,
     };
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -301,12 +287,7 @@ fn resource_group_bcs_fallback() {
         group_keys: HashSet::new(),
         delayed_field_testing: false,
     };
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -417,12 +398,7 @@ fn interrupt_requested() {
     let mut guard = AptosModuleCacheManagerGuard::none();
 
     let data_view = MockStateView::empty();
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -464,12 +440,7 @@ fn block_output_err_precedence() {
     let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = MockStateView::empty();
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -508,12 +479,7 @@ fn skip_rest_gas_limit() {
     let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = MockStateView::empty();
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -543,15 +509,9 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
-
     let mut guard = AptosModuleCacheManagerGuard::none();
     let txn_provider = DefaultTxnProvider::new_without_info(transactions);
+    let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
 
     let output = if use_delta_data_view {
         let data_view = DeltaDataView::<K> {
@@ -567,7 +527,7 @@ where
             AuxiliaryInfo,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-            executor_thread_pool,
+            Arc::clone(&executor_thread_pool),
             None,
         )
         .execute_transactions_parallel(
@@ -587,7 +547,7 @@ where
             AuxiliaryInfo,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-            executor_thread_pool,
+            Arc::clone(&executor_thread_pool),
             None,
         )
         .execute_transactions_parallel(
