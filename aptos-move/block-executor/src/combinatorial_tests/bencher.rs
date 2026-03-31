@@ -13,6 +13,7 @@ use crate::{
     executor::BlockExecutor,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
+    worker_pool::WorkerPool,
 };
 use aptos_types::{
     block_executor::{
@@ -126,12 +127,7 @@ where
     pub(crate) fn run(self) {
         let state_view = MockStateView::empty();
 
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get())
-                .build()
-                .unwrap(),
-        );
+        let executor_thread_pool = Arc::new(WorkerPool::new("par_exec"));
 
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
         let mut guard = AptosModuleCacheManagerGuard::none();

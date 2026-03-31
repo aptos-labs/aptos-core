@@ -4,6 +4,7 @@
 use crate::sharded_block_executor::{
     local_executor_shard::GlobalCrossShardClient, sharded_executor_service::ShardedExecutorService,
 };
+use aptos_block_executor::worker_pool::WorkerPool;
 use aptos_logger::trace;
 use aptos_types::{
     block_executor::{
@@ -19,6 +20,7 @@ use std::sync::Arc;
 pub struct GlobalExecutor<S: StateView + Sync + Send + 'static> {
     global_cross_shard_client: Arc<GlobalCrossShardClient>,
     executor_thread_pool: Arc<rayon::ThreadPool>,
+    worker_pool: Arc<WorkerPool>,
     concurrency_level: usize,
     phantom: std::marker::PhantomData<S>,
 }
@@ -33,9 +35,11 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
                 .build()
                 .unwrap(),
         );
+        let worker_pool = Arc::new(WorkerPool::new("par_exec"));
         Self {
             global_cross_shard_client: cross_shard_client,
             executor_thread_pool,
+            worker_pool,
             phantom: std::marker::PhantomData,
             concurrency_level: num_threads,
         }
@@ -54,6 +58,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
         ShardedExecutorService::execute_transactions_with_dependencies(
             None,
             self.executor_thread_pool.clone(),
+            Arc::clone(&self.worker_pool),
             transactions,
             self.global_cross_shard_client.clone(),
             None,
