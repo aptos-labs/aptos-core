@@ -451,7 +451,7 @@ mod tests {
 
         // Compute actual sum: Σ coef[i] * radix^i
         let actual_sum: F = (0..num_chunks)
-            .map(|i| coefs[i as usize] * F::from(radix.pow(i as u32)))
+            .map(|i| coefs[i] * F::from(radix.pow(i as u32)))
             .sum();
 
         assert_eq!(target_sum, actual_sum);

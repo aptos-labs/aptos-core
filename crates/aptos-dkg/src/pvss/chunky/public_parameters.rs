@@ -162,7 +162,10 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::from_bases(
             serialized.pp_elgamal.G,
             serialized.pp_elgamal.H,
-            serialized.max_num_shares.try_into().expect("Should always fit in u32"),
+            serialized
+                .max_num_shares
+                .try_into()
+                .expect("Should always fit in u32"),
         );
 
         Ok(Self {
@@ -173,12 +176,9 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             ell: serialized.ell,
             max_aggregation: serialized.max_aggregation,
             dlog_extra_bits: serialized.dlog_extra_bits,
-            G2_table: BatchMulPreprocessing::new(
-                serialized.G_2.into(),
-                serialized.max_num_shares,
-            ),
+            G2_table: BatchMulPreprocessing::new(serialized.G_2.into(), serialized.max_num_shares),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
-            dlog_table: serialized.dlog_table
+            dlog_table: serialized.dlog_table,
         })
     }
 }
@@ -259,7 +259,14 @@ impl<E: Pairing> PublicParameters<E> {
         commitment_base: E::G2Affine,
         rng: &mut R,
     ) -> Self {
-        Self::new_internal(max_num_shares, ell, max_aggregation, commitment_base, None, rng)
+        Self::new_internal(
+            max_num_shares,
+            ell,
+            max_aggregation,
+            commitment_base,
+            None,
+            rng,
+        )
     }
 
     /// Creates public parameters for chunky, with the provided DeKart prover key.
@@ -271,7 +278,14 @@ impl<E: Pairing> PublicParameters<E> {
         dekart_prover_key: dekart_univariate_v2::ProverKey<E>,
         rng: &mut R,
     ) -> Self {
-        Self::new_internal(max_num_shares, ell, max_aggregation, commitment_base, Some(dekart_prover_key), rng)
+        Self::new_internal(
+            max_num_shares,
+            ell,
+            max_aggregation,
+            commitment_base,
+            Some(dekart_prover_key),
+            rng,
+        )
     }
 
     fn new_internal<R: RngCore + CryptoRng>(
@@ -292,9 +306,13 @@ impl<E: Pairing> PublicParameters<E> {
             .expect("Overflow computing max_num_chunks_padded");
 
         let group_generators = GroupGenerators::default();
-        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares.try_into().expect("should always fit into u32"));
+        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(
+            max_num_shares
+                .try_into()
+                .expect("should always fit into u32"),
+        );
         let G_1 = *pp_elgamal.message_base();
-        let pk_range_proof = maybe_dekart_prover_key.unwrap_or_else(||
+        let pk_range_proof = maybe_dekart_prover_key.unwrap_or_else(|| {
             dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded.try_into().unwrap(),
                 ell,
@@ -302,7 +320,7 @@ impl<E: Pairing> PublicParameters<E> {
                 rng,
             )
             .0
-        );
+        });
 
         let pp = Self {
             max_num_shares,
@@ -319,8 +337,6 @@ impl<E: Pairing> PublicParameters<E> {
 
         pp
     }
-
-
 }
 
 impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
@@ -362,26 +378,36 @@ impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     fn with_max_num_shares_and_bit_size(n: usize, ell: u8) -> Self {
         use ark_ec::AffineRepr;
         let mut rng = thread_rng();
-        Self::new_for_testing(n, ell, DEFAULT_MAX_AGGREGATION, E::G2Affine::generator(), &mut rng)
+        Self::new_for_testing(
+            n,
+            ell,
+            DEFAULT_MAX_AGGREGATION,
+            E::G2Affine::generator(),
+            &mut rng,
+        )
     }
 
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
     fn with_max_num_shares_for_generate(_n: usize) -> Self {
         use ark_ec::AffineRepr;
         let mut rng = thread_rng();
-        Self::new_for_testing(1, DEFAULT_ELL_FOR_TESTING, 1, E::G2Affine::generator(), &mut rng)
+        Self::new_for_testing(
+            1,
+            DEFAULT_ELL_FOR_TESTING,
+            1,
+            E::G2Affine::generator(),
+            &mut rng,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
-    use ark_ec::AffineRepr;
-    use rand::thread_rng;
-
     use crate::pvss::chunky::PublicParameters;
     use ark_bls12_381::G2Affine;
+    use ark_ec::AffineRepr;
+    use rand::thread_rng;
+    use std::time::Instant;
 
     #[test]
     #[ignore]
@@ -390,36 +416,48 @@ mod tests {
 
         let start = Instant::now();
         println!("{}: Generating pp", chrono::Local::now());
-        let pp : PublicParameters<ark_bls12_381::Bls12_381> = PublicParameters::new_for_testing(
-            256,
-            32,
-            256,
-            G2Affine::generator(),
-            &mut rng
+        let pp: PublicParameters<ark_bls12_381::Bls12_381> =
+            PublicParameters::new_for_testing(256, 32, 256, G2Affine::generator(), &mut rng);
+        println!(
+            "{}: time taken: {:?}",
+            chrono::Local::now(),
+            start.elapsed()
         );
-        println!("{}: time taken: {:?}", chrono::Local::now(), start.elapsed());
-
 
         let start = Instant::now();
         println!("{}: Serializing pp", chrono::Local::now());
         let bytes = bcs::to_bytes(&pp).unwrap();
-        println!("{}: time taken: {:?}", chrono::Local::now(), start.elapsed());
-        println!("{}: pp serialized size: {} MB", chrono::Local::now(), bytes.len() / 1000 / 1000);
+        println!(
+            "{}: time taken: {:?}",
+            chrono::Local::now(),
+            start.elapsed()
+        );
+        println!(
+            "{}: pp serialized size: {} MB",
+            chrono::Local::now(),
+            bytes.len() / 1000 / 1000
+        );
 
         let start = Instant::now();
         println!("{}: Deserializing pp", chrono::Local::now());
-        let pp_deserialized : PublicParameters<ark_bls12_381::Bls12_381> = bcs::from_bytes(&bytes).unwrap();
-        println!("{}: time taken: {:?}", chrono::Local::now(), start.elapsed());
+        let pp_deserialized: PublicParameters<ark_bls12_381::Bls12_381> =
+            bcs::from_bytes(&bytes).unwrap();
+        println!(
+            "{}: time taken: {:?}",
+            chrono::Local::now(),
+            start.elapsed()
+        );
 
         assert_eq!(pp, pp_deserialized);
     }
 
     #[test]
     fn test_serialize_deserialize() {
-        let pp : PublicParameters<ark_bls12_381::Bls12_381> = PublicParameters::default();
+        let pp: PublicParameters<ark_bls12_381::Bls12_381> = PublicParameters::default();
 
         let bytes = bcs::to_bytes(&pp).unwrap();
-        let pp_deserialized : PublicParameters<ark_bls12_381::Bls12_381> = bcs::from_bytes(&bytes).unwrap();
+        let pp_deserialized: PublicParameters<ark_bls12_381::Bls12_381> =
+            bcs::from_bytes(&bytes).unwrap();
 
         assert_eq!(pp, pp_deserialized);
     }
