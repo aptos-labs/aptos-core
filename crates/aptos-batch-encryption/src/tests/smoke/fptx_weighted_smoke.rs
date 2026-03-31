@@ -2,40 +2,20 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    schemes::fptx_weighted::FPTXWeighted, shared::digest::DigestKey, tests::smoke::run_smoke, traits::BatchThresholdEncryption
+    group::{Fr}, schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEMasterSecretKeyShare, WeightedBIBEVerificationKey}, shared::{digest::DigestKey, encryption_key::EncryptionKey}, tests::smoke::run_smoke, traits::BatchThresholdEncryption
 };
 use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
 use aptos_dkg::pvss::traits::transcript::Aggregatable;
 use ark_ec::AffineRepr as _;
-use ark_std::rand::{thread_rng, Rng as _};
+use ark_std::rand::{Rng as _, thread_rng};
 
-
-#[test]
-fn weighted_smoke_with_setup_for_testing() {
-    let mut rng = thread_rng();
-    let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
-
-    let (ek, dk, vks, msk_shares) =
-        FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
-
-    run_smoke::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
-}
-
-type T = aptos_dkg::pvss::chunky::SignedWeightedTranscript<crate::group::Pairing>;
-use crate::group::G2Affine;
-use aptos_crypto::{SigningKey, Uniform};
-use aptos_dkg::pvss::{
-    test_utils::NoAux,
-    traits::{
-        transcript::{HasAggregatableSubtranscript, TranscriptCore},
-        Convert, HasEncryptionPublicParams, Transcript,
-    },
-};
-
-#[test]
-fn weighted_smoke_with_pvss() {
-    let mut rng = thread_rng();
-    let mut rng_aptos = rand::thread_rng();
+pub fn run_pvss(dk: &DigestKey) -> (
+    WeightedConfigArkworks<Fr>,
+    EncryptionKey,
+    Vec<WeightedBIBEVerificationKey>,
+    Vec<WeightedBIBEMasterSecretKeyShare>,
+){
+   let mut rng_aptos = rand::thread_rng();
 
     let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
     let pp = <T as TranscriptCore>::PublicParameters::new_with_commitment_base(
@@ -89,7 +69,6 @@ fn weighted_smoke_with_pvss() {
     let subtranscript =
         <T as HasAggregatableSubtranscript>::Subtranscript::aggregate(&tc, subtrx_paths).unwrap();
 
-    let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 
     let (ek, vks, _) =
         FPTXWeighted::setup(&dk, &pp, &subtranscript, &tc, tc.get_player(0), &dks[0]).unwrap();
@@ -99,10 +78,41 @@ fn weighted_smoke_with_pvss() {
         .into_iter()
         .map(|p| {
             let (_, _, msk_share) =
-                FPTXWeighted::setup(&dk, &pp, &subtranscript, &tc, p, &dks[p.get_id()]).unwrap();
+            FPTXWeighted::setup(&dk, &pp, &subtranscript, &tc, p, &dks[p.get_id()]).unwrap();
             msk_share
         })
         .collect();
+
+    (tc, ek, vks, msk_shares)
+}
+
+
+#[test]
+fn weighted_smoke_with_setup_for_testing() {
+    let mut rng = thread_rng();
+    let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
+
+    let (ek, dk, vks, msk_shares) =
+        FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
+
+    run_smoke::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
+}
+
+type T = aptos_dkg::pvss::chunky::SignedWeightedTranscript<crate::group::Pairing>;
+use crate::group::G2Affine;
+use aptos_crypto::{SigningKey, Uniform};
+use aptos_dkg::pvss::{
+    test_utils::NoAux,
+    traits::{
+        transcript::{HasAggregatableSubtranscript, TranscriptCore},
+        Convert, HasEncryptionPublicParams, Transcript,
+    },
+};
+
+#[test]
+fn weighted_smoke_with_pvss() {
+    let dk = DigestKey::new(&mut thread_rng(), 8, 1).unwrap();
+    let (tc, ek, vks, msk_shares) = run_pvss(&dk);
 
     run_smoke::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
 }

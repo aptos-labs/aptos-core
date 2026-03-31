@@ -1,12 +1,11 @@
 #[cfg(test)]
-use crate::shared::digest::DigestKey;
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     errors::BatchEncryptionError,
     group::G2Affine,
     shared::{
-        digest::{Digest, DigestKey},
+        digest::Digest,
         key_derivation::{self, BIBEDecryptionKey},
     },
 };
@@ -35,10 +34,6 @@ impl EncryptionKey {
             sig_mpk_g2: G2Affine::generator(),
             tau_g2: G2Affine::generator(),
         }
-    }
-
-    pub fn use_digest_key(&mut self, digest_key: &DigestKey) {
-        self.tau_g2 = digest_key.tau_g2;
     }
 
     pub fn verify_decryption_key(
