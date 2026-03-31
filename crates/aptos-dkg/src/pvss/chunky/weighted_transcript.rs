@@ -41,14 +41,17 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_crypto::{
-    CryptoMaterialError, TSecretSharingConfig as _, ValidCryptoMaterial, arkworks::{
+    arkworks::{
         self,
         msm::{self, MsmInput},
         random::{sample_field_element, sample_field_element_with_powers, unsafe_random_point},
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
         srs::SrsBasis,
-    }, bls12381::{self}, weighted_config::WeightedConfigArkworks as SecretSharingConfig
+    },
+    bls12381::{self},
+    weighted_config::WeightedConfigArkworks as SecretSharingConfig,
+    CryptoMaterialError, TSecretSharingConfig as _, ValidCryptoMaterial,
 };
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -316,13 +319,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         // Step 2: Verify the range proof
         // Note(Rex): g1_terms and g2_terms are the hiding KZG verification pairing terms
-        let (dekart_verification_g1_terms, dekart_verification_g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
-            &pp.pk_range_proof.vk,
-            sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell),
-            pp.ell,
-            &self.sharing_proof.range_proof_commitment,
-            rng,
-        )?;
+        let (dekart_verification_g1_terms, dekart_verification_g2_terms) =
+            self.sharing_proof.range_proof.pairing_for_verify(
+                &pp.pk_range_proof.vk,
+                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                pp.ell,
+                &self.sharing_proof.range_proof_commitment,
+                rng,
+            )?;
 
         // Step 3: Check that ciphertexts encrypt the committed shares
         let n = sc.get_total_weight();
@@ -405,15 +409,18 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 )
             })?;
 
-        let random_scalar_for_dekart : E::ScalarField = sample_field_element(rng);
-        let random_scalar_for_ciphertext_check : E::ScalarField = sample_field_element(rng);
+        let random_scalar_for_dekart: E::ScalarField = sample_field_element(rng);
+        let random_scalar_for_ciphertext_check: E::ScalarField = sample_field_element(rng);
 
         let res = E::multi_pairing(
-            dekart_verification_g1_terms.into_iter()
+            dekart_verification_g1_terms
+                .into_iter()
                 .map(|g| (g * random_scalar_for_dekart).into_affine())
                 .chain([
                     (combined_G1 * random_scalar_for_ciphertext_check).into_affine(),
-                    (*pp.get_encryption_public_params().message_base() * random_scalar_for_ciphertext_check).into_affine(),
+                    (*pp.get_encryption_public_params().message_base()
+                        * random_scalar_for_ciphertext_check)
+                        .into_affine(),
                 ]),
             dekart_verification_g2_terms
                 .into_iter()
@@ -426,7 +433,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         Ok(())
     }
 }
-
 
 delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
 
