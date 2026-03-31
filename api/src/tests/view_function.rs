@@ -30,19 +30,8 @@ fn build_coin_decimals_request() -> Value {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_simple_view(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_simple_view() {
+    let mut context = new_test_context(current_function_name!());
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -58,22 +47,8 @@ async fn test_simple_view(use_txn_payload_v2_format: bool, use_orderless_transac
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_gas_used_header(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_view_gas_used_header() {
+    let mut context = new_test_context(current_function_name!());
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -104,14 +79,7 @@ async fn test_view_gas_used_header(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_allowlist(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+async fn test_view_allowlist() {
     let mut node_config = NodeConfig::default();
 
     // Allowlist only the balance function.
@@ -121,12 +89,8 @@ async fn test_view_allowlist(use_txn_payload_v2_format: bool, use_orderless_tran
         function_name: "balance".to_string(),
     }]);
 
-    let mut context = new_test_context_with_config(
-        current_function_name!(),
-        node_config,
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+    let mut context =
+        new_test_context_with_config(current_function_name!(), node_config, false, false);
 
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
@@ -151,14 +115,7 @@ async fn test_view_allowlist(use_txn_payload_v2_format: bool, use_orderless_tran
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_blocklist(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+async fn test_view_blocklist() {
     let mut node_config = NodeConfig::default();
 
     // Blocklist the balance function.
@@ -168,12 +125,8 @@ async fn test_view_blocklist(use_txn_payload_v2_format: bool, use_orderless_tran
         function_name: "balance".to_string(),
     }]);
 
-    let mut context = new_test_context_with_config(
-        current_function_name!(),
-        node_config,
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+    let mut context =
+        new_test_context_with_config(current_function_name!(), node_config, false, false);
 
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
@@ -198,22 +151,8 @@ async fn test_view_blocklist(use_txn_payload_v2_format: bool, use_orderless_tran
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_error_move_abort(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_view_error_move_abort() {
+    let mut context = new_test_context(current_function_name!());
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -236,22 +175,8 @@ async fn test_view_error_move_abort(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_error_type_resolution_error(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_view_error_type_resolution_error() {
+    let mut context = new_test_context(current_function_name!());
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -299,22 +224,8 @@ async fn test_view_does_not_exist() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_simple_view_invalid(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_simple_view_invalid() {
+    let mut context = new_test_context(current_function_name!());
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -338,22 +249,8 @@ async fn test_simple_view_invalid(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_versioned_simple_view(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_versioned_simple_view() {
+    let mut context = new_test_context(current_function_name!());
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let initial_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
@@ -378,19 +275,8 @@ async fn test_versioned_simple_view(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_tuple(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_view_tuple() {
+    let mut context = new_test_context(current_function_name!());
     let payload = aptos_stdlib::publish_module_source(
         "test_module",
         r#"
@@ -432,19 +318,8 @@ async fn test_view_tuple(use_txn_payload_v2_format: bool, use_orderless_transact
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_aggregator(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_view_aggregator() {
+    let mut context = new_test_context(current_function_name!());
     let account = context.root_account().await;
 
     let named_addresses = vec![("addr".to_string(), account.address())];
@@ -478,19 +353,8 @@ async fn test_view_aggregator(use_txn_payload_v2_format: bool, use_orderless_tra
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_option(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_view_option() {
+    let mut context = new_test_context(current_function_name!());
     let mut account = context.create_account().await;
     let account_addr = account.address();
 
@@ -568,19 +432,8 @@ async fn test_view_option_some(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_option_vec(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_view_option_vec() {
+    let mut context = new_test_context(current_function_name!());
     let mut account = context.create_account().await;
     let account_addr = account.address();
 
@@ -609,22 +462,8 @@ async fn test_view_option_vec(use_txn_payload_v2_format: bool, use_orderless_tra
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_view_option_struct(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_view_option_struct() {
+    let mut context = new_test_context(current_function_name!());
     let mut account = context.create_account().await;
     let account_addr = account.address();
 

@@ -9,10 +9,8 @@ use move_model::metadata::LanguageVersion;
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 use specializer::{
     destack,
-    ir::ModuleIR,
-    lower::lower_function,
-    lowering_context::{build_func_id_map, try_build_context},
-    micro_ops_display::MicroOpsFunctionDisplay,
+    lower::{build_func_id_map, lower_function, try_build_context, MicroOpsFunctionDisplay},
+    stackless_exec_ir::ModuleIR,
 };
 use std::path::Path;
 

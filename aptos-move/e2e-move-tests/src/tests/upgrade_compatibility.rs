@@ -70,24 +70,18 @@ fn friend_add_entry() {
 }
 
 #[test]
-fn friend_remove_entry_failure() {
+fn friend_upgrade_failures() {
     let result = check_upgrade("public(friend) entry fun f(){}", "public(friend) fun f(){}");
-    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
-}
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-#[test]
-fn friend_remove_failure() {
     let result = check_upgrade("public(friend) entry fun f(){}", "");
-    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
-}
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-#[test]
-fn friend_entry_change_sig_failure() {
     let result = check_upgrade(
         "public(friend) entry fun f(){}",
         "public(friend) entry fun f(_s: &signer){}",
     );
-    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 }
 
 #[test]
@@ -103,22 +97,16 @@ fn persistent_fun_change_success2() {
 }
 
 #[test]
-fn persistent_fun_change_failure1() {
+fn persistent_fun_change_failure() {
     let result = check_upgrade_latest_move("#[persistent] fun f(){}", "fun f(){}");
-    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
-}
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-#[test]
-fn persistent_fun_change_failure2() {
     let result =
         check_upgrade_latest_move("#[persistent] fun f(){}", "#[persistent] fun f(_x: u64){}");
-    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
-}
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-#[test]
-fn persistent_fun_change_failure3() {
     let result = check_upgrade_latest_move("#[persistent] fun f(){}", "#[persistent] fun g(){}");
-    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 }
 
 fn check_upgrade(old_decls: &str, new_decls: &str) -> TransactionStatus {

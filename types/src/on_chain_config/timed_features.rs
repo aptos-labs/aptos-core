@@ -22,9 +22,8 @@ pub enum TimedFeatureFlag {
 
     // Fixes the bug of table natives not tracking the memory usage of the global values they create.
     FixMemoryUsageTracking,
-    // Disable checking for captured option types.
-    // Only when this feature is turned on, feature flag ENABLE_CAPTURE_OPTION can control whether the option type can be captured.
-    DisabledCaptureOption,
+    // Was used to disable checking for captured option types. Feature is now permanently enabled.
+    _DisabledCaptureOption,
 
     /// Fixes the bug that table natives double count the memory usage of the global values.
     FixTableNativesMemoryDoubleCounting,
@@ -90,7 +89,7 @@ impl TimedFeatureOverride {
                 | EntryCompatibility
                 | ChargeBytesForPrints
                 | FixMemoryUsageTracking
-                | DisabledCaptureOption
+                | _DisabledCaptureOption
                 | FixTableNativesMemoryDoubleCounting
                 | ClosureDepthCheck
                 | FixCryptoAlgebraNativesResultHandling
@@ -154,14 +153,14 @@ impl TimedFeatureFlag {
                 .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
-            (DisabledCaptureOption, TESTNET) => Los_Angeles
+            (_DisabledCaptureOption, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 9, 15, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             // For testing, time set to 1 hour after the beginning of time to test the old and new behaviors in tests.
-            (DisabledCaptureOption, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (_DisabledCaptureOption, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
             // For mainnet, always enable this feature.
-            (DisabledCaptureOption, MAINNET) => BEGINNING_OF_TIME,
+            (_DisabledCaptureOption, MAINNET) => BEGINNING_OF_TIME,
 
             (FixTableNativesMemoryDoubleCounting, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 10, 16, 17, 0, 0)

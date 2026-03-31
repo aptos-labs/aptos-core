@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use move_binary_format::{access::ModuleAccess, file_format::CompiledModule};
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
-use specializer::{destack, ir::Instr};
+use specializer::{destack, stackless_exec_ir::Instr};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn print_stats(module_ir: &specializer::ir::ModuleIR) {
+fn print_stats(module_ir: &specializer::stackless_exec_ir::ModuleIR) {
     let module = &module_ir.module;
 
     let self_handle = module.module_handle_at(module.self_module_handle_idx);

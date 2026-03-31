@@ -2631,22 +2631,8 @@ async fn test_simulation_failure_with_detail_error(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_runtime_error_message_in_interpreter(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_runtime_error_message_in_interpreter() {
+    let mut context = new_test_context(current_function_name!());
     let account = context.root_account().await;
 
     let named_addresses = vec![("addr".to_string(), account.address())];

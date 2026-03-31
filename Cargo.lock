@@ -3436,6 +3436,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
+ "criterion",
  "futures",
  "futures-util",
  "hex",
@@ -3970,6 +3971,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-logging",
+ "hashbrown 0.14.3",
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
@@ -10477,6 +10479,7 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
  "ahash 0.8.12",
  "allocator-api2",
+ "equivalent",
 ]
 
 [[package]]
@@ -13001,50 +13004,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-ir-compiler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs 0.1.4",
- "clap 4.5.60",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-ir-to-bytecode",
- "serde_json",
-]
-
-[[package]]
-name = "move-ir-to-bytecode"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "codespan-reporting",
- "log",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-core-types",
- "move-ir-to-bytecode-syntax",
- "move-ir-types",
- "move-symbol-pool",
- "ouroboros",
-]
-
-[[package]]
-name = "move-ir-to-bytecode-syntax"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "hex",
- "move-command-line-common",
- "move-core-types",
- "move-ir-types",
- "move-symbol-pool",
-]
-
-[[package]]
 name = "move-ir-types"
 version = "0.1.0"
 dependencies = [
@@ -13512,6 +13471,7 @@ dependencies = [
 name = "move-vm-runtime"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "ambassador",
  "arc-swap",
  "bcs 0.1.4",
@@ -18289,26 +18249,6 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
-
-[[package]]
-name = "stackless-exec-ir-v1"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "codespan-reporting",
- "datatest-stable",
- "legacy-move-compiler",
- "mono-move-core",
- "move-asm",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-compiler-v2",
- "move-core-types",
- "move-model",
- "move-prover-test-utils",
- "move-vm-types",
- "triomphe",
-]
 
 [[package]]
 name = "static_assertions"
