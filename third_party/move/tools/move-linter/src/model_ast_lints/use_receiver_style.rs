@@ -36,9 +36,7 @@ impl ExpChecker for UseReceiverStyle {
         }
 
         // vector::borrow/borrow_mut are handled by use_index_syntax.
-        if called_fun.is_well_known(VECTOR_BORROW_MUT)
-            || called_fun.is_well_known(VECTOR_BORROW)
-        {
+        if called_fun.is_well_known(VECTOR_BORROW_MUT) || called_fun.is_well_known(VECTOR_BORROW) {
             return;
         }
 
