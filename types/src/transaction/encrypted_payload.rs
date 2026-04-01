@@ -95,6 +95,7 @@ pub enum EncryptedPayload {
         eval_proof: EvalProof,
 
         // decrypted things
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
         executable: TransactionExecutable,
         decryption_nonce: u64,
     },
@@ -169,6 +170,7 @@ impl EncryptedPayload {
             eval_proof,
             executable,
             decryption_nonce: nonce,
+            claimed_entry_fun: claimed_entry_fun.clone(),
         };
         Ok(())
     }
