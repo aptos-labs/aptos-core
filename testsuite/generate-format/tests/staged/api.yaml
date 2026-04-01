@@ -290,7 +290,7 @@ ClaimedEntryFunction:
   STRUCT:
     - module:
         TYPENAME: ModuleId
-    - name:
+    - function:
         OPTION:
           TYPENAME: Identifier
 CoinStoreResource:
