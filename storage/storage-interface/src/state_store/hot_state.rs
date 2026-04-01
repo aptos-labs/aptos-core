@@ -4,8 +4,9 @@
 use crate::state_store::state_view::hot_state_view::HotStateView;
 use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::LayeredMap;
-use aptos_types::state_store::{
-    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
+use aptos_types::{
+    state_store::{hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot},
+    transaction::Version,
 };
 use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 
@@ -47,7 +48,9 @@ impl<'a> HotStateLRU<'a> {
         }
     }
 
-    pub fn insert(&mut self, key: &StateKey, mut slot: StateSlot) {
+    /// Inserts a hot slot as the most recent entry. Returns the old `hot_since_version` if
+    /// replacing an existing hot entry.
+    pub fn insert(&mut self, key: &StateKey, mut slot: StateSlot) -> Option<Version> {
         assert!(
             slot.is_hot(),
             "Should not insert cold slots into hot state."
@@ -62,10 +65,12 @@ impl<'a> HotStateLRU<'a> {
             slot.set_state_key(key.clone());
         }
         let key_hash = *key.crypto_hash_ref();
-        if self.delete(&key_hash).is_none() {
+        let old_hot_since = self.delete(&key_hash).map(|s| s.expect_hot_since_version());
+        if old_hot_since.is_none() {
             self.num_items += 1;
         }
         self.insert_as_head(key_hash, slot);
+        old_hot_since
     }
 
     fn insert_as_head(&mut self, key_hash: HashValue, mut slot: StateSlot) {

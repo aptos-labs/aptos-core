@@ -14,7 +14,7 @@ use crate::{
             hot_state_view::HotStateView,
         },
         versioned_state_value::StateUpdateRef,
-        HotStateShardUpdates, HotStateUpdates,
+        HotEvictionOp, HotInsertionOp, HotStateShardUpdates, HotStateUpdates,
     },
     DbReader,
 };
@@ -220,8 +220,13 @@ impl State {
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
                         {
                             let key_hash = *key.crypto_hash_ref();
-                            evictions.remove(&key_hash);
-                            if let Some(insertion) = Self::apply_one_update(
+                            // If this key was evicted earlier in the same batch, recover its
+                            // `superseded_version` so the insert→evict→reinsert chain keeps
+                            // pointing at the original DB entry the pruner should clean up.
+                            let evicted_superseded = evictions
+                                .remove(&key_hash)
+                                .and_then(|e: HotEvictionOp| e.superseded_version);
+                            if let Some(op) = Self::apply_one_update(
                                 &mut lru,
                                 overlay,
                                 cache,
@@ -229,20 +234,41 @@ impl State {
                                 update,
                                 self.hot_state_config.refresh_interval_versions,
                             ) {
-                                insertions.insert(key_hash, insertion);
+                                Self::insert_preserving_superseded(
+                                    &mut insertions,
+                                    key_hash,
+                                    op,
+                                    evicted_superseded,
+                                );
                             }
                         }
                         // Only evict at the checkpoints.
                         for (key_hash, slot) in lru.maybe_evict() {
-                            insertions.remove(&key_hash);
                             assert!(slot.is_hot());
-                            evictions.insert(key_hash, *ckpt_version);
+                            assert!(
+                                !evictions.contains_key(&key_hash),
+                                "Key {key_hash} cannot be evicted twice."
+                            );
+                            // Determine the DB version superseded by this hot entry. If the key was
+                            // inserted earlier in this batch, carry forward its superseded_version;
+                            // otherwise the key has been hot since before this batch, so use its
+                            // hot_since_version.
+                            let superseded_version = insertions
+                                .remove(&key_hash)
+                                .map(|prev| prev.superseded_version)
+                                .unwrap_or(Some(slot.expect_hot_since_version()));
+                            evictions.insert(key_hash, HotEvictionOp {
+                                eviction_version: *ckpt_version,
+                                superseded_version,
+                            });
                         }
                     }
                     for (key, update) in all_updates {
                         let key_hash = *key.crypto_hash_ref();
-                        evictions.remove(&key_hash);
-                        if let Some(insertion) = Self::apply_one_update(
+                        let evicted_superseded = evictions
+                            .remove(&key_hash)
+                            .and_then(|e| e.superseded_version);
+                        if let Some(op) = Self::apply_one_update(
                             &mut lru,
                             overlay,
                             cache,
@@ -250,7 +276,12 @@ impl State {
                             update,
                             self.hot_state_config.refresh_interval_versions,
                         ) {
-                            insertions.insert(key_hash, insertion);
+                            Self::insert_preserving_superseded(
+                                &mut insertions,
+                                key_hash,
+                                op,
+                                evicted_superseded,
+                            );
                         }
                     }
 
@@ -292,9 +323,8 @@ impl State {
         ))
     }
 
-    /// Applies the update and returns `(HotStateValue, Option<value_version>)` that will later
-    /// go into the hot state Merkle tree and DB. `None` if the op is `MakeHot` and it's
-    /// determined that refresh is not necessary.
+    /// Applies one update to the LRU. Returns `None` if the op is `MakeHot` and refresh is not
+    /// necessary.
     fn apply_one_update(
         lru: &mut HotStateLRU,
         overlay: &LayeredMap<HashValue, StateSlot>,
@@ -302,15 +332,16 @@ impl State {
         key: &StateKey,
         update: &StateUpdateRef,
         refresh_interval: Version,
-    ) -> Option<(HotStateValue, Option<Version>)> {
+    ) -> Option<HotInsertionOp> {
         let key_hash = *key.crypto_hash_ref();
         if let Some(state_value_opt) = update.state_op.as_state_value_opt() {
-            lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
-            let value_version = state_value_opt.map(|_| update.version);
-            return Some((
-                HotStateValue::new(state_value_opt.cloned(), update.version),
-                value_version,
-            ));
+            let superseded_version =
+                lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
+            return Some(HotInsertionOp {
+                value: HotStateValue::new(state_value_opt.cloned(), update.version),
+                value_version: state_value_opt.map(|_| update.version),
+                superseded_version,
+            });
         }
 
         if let Some(mut slot) = lru.get_slot(&key_hash) {
@@ -327,9 +358,13 @@ impl State {
             };
             if refreshed {
                 let value_version = slot_to_insert.value_version_opt();
-                let ret = HotStateValue::clone_from_slot(&slot_to_insert);
-                lru.insert(key, slot_to_insert);
-                Some((ret, value_version))
+                let value = HotStateValue::clone_from_slot(&slot_to_insert);
+                let superseded_version = lru.insert(key, slot_to_insert);
+                Some(HotInsertionOp {
+                    value,
+                    value_version,
+                    superseded_version,
+                })
             } else {
                 None
             }
@@ -338,10 +373,34 @@ impl State {
             assert!(slot.is_cold());
             let value_version = slot.value_version_opt();
             let slot = slot.to_hot(update.version);
-            let ret = HotStateValue::clone_from_slot(&slot);
-            lru.insert(key, slot);
-            Some((ret, value_version))
+            let value = HotStateValue::clone_from_slot(&slot);
+            let superseded_version = lru.insert(key, slot);
+            Some(HotInsertionOp {
+                value,
+                value_version,
+                superseded_version,
+            })
         }
+    }
+
+    /// Inserts `op` into `insertions`, preserving the original DB-level `superseded_version`
+    /// across insert/evict/reinsert chains within the same batch.
+    fn insert_preserving_superseded(
+        insertions: &mut HashMap<HashValue, HotInsertionOp>,
+        key_hash: HashValue,
+        mut op: HotInsertionOp,
+        evicted_superseded: Option<Version>,
+    ) {
+        if let Some(prev) = insertions.get(&key_hash) {
+            // Key was already inserted earlier in this batch — keep the original
+            // superseded_version so the pruner still targets the right DB entry.
+            op.superseded_version = prev.superseded_version;
+        } else if evicted_superseded.is_some() {
+            // Key was evicted earlier in this batch — carry forward the superseded_version
+            // that was saved at eviction time.
+            op.superseded_version = evicted_superseded;
+        }
+        insertions.insert(key_hash, op);
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
