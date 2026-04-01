@@ -43,6 +43,7 @@ use move_prover_bytecode_pipeline::{
     mono_analysis::MonoInfo,
     number_operation::{GlobalNumberOperationState, NumOperation::Bitwise},
 };
+use num::ToPrimitive;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -58,6 +59,8 @@ pub struct LabelInfo {
     /// Resource types modified at this label.
     pub modified_types: BTreeSet<QualifiedInstId<StructId>>,
 }
+
+const MAX_UNROLLED_EXISTS_RANGE_SIZE: usize = 8;
 
 #[derive(Clone)]
 pub struct SpecTranslator<'env> {
@@ -244,6 +247,38 @@ impl<'env> SpecTranslator<'env> {
     /// Sets the location of the code writer from node id.
     fn set_writer_location(&self, node_id: NodeId) {
         self.writer.set_location(&self.env.get_node_loc(node_id));
+    }
+
+    fn try_eval_small_vector_len(&self, exp: &Exp) -> Option<usize> {
+        match exp.as_ref() {
+            ExpData::Value(_, Value::Vector(values)) => Some(values.len()),
+            _ => None,
+        }
+    }
+
+    fn try_eval_small_nat(&self, exp: &Exp) -> Option<usize> {
+        match exp.as_ref() {
+            ExpData::Value(_, Value::Number(value)) => value.to_usize(),
+            ExpData::Call(_, Operation::Len, args) if args.len() == 1 => {
+                self.try_eval_small_vector_len(&args[0])
+            },
+            _ => None,
+        }
+    }
+
+    fn try_get_small_unrolled_exists_values(&self, range: &Exp) -> Option<Vec<String>> {
+        match range.as_ref() {
+            ExpData::Call(_, Operation::Range, args) if args.len() == 2 => {
+                let start = self.try_eval_small_nat(&args[0])?;
+                let end = self.try_eval_small_nat(&args[1])?;
+                let len = end.checked_sub(start).unwrap_or(0);
+                if len > MAX_UNROLLED_EXISTS_RANGE_SIZE {
+                    return None;
+                }
+                Some((start..end).map(|value| value.to_string()).collect())
+            },
+            _ => None,
+        }
     }
 
     /// Generates a fresh variable name.
@@ -2915,6 +2950,57 @@ impl SpecTranslator<'_> {
         result
     }
 
+    fn try_translate_unrolled_exists(
+        &self,
+        ranges: &[(Pattern, Exp)],
+        condition: &Option<Exp>,
+        body: &Exp,
+    ) -> bool {
+        if ranges.len() != 1 {
+            return false;
+        }
+
+        let (pat, range) = &ranges[0];
+        if !matches!(
+            self.get_node_type(range.node_id()).skip_reference(),
+            Type::Primitive(PrimitiveType::Range)
+        ) {
+            return false;
+        }
+
+        let values = match self.try_get_small_unrolled_exists_values(range) {
+            Some(values) => values,
+            None => return false,
+        };
+
+        if values.is_empty() {
+            emit!(self.writer, "false");
+            return true;
+        }
+
+        let (_, var_name) = self.require_range_var(pat);
+        let var_name_str = self.env.symbol_pool().string(var_name);
+
+        emit!(self.writer, "(");
+        for (idx, value) in values.iter().enumerate() {
+            if idx > 0 {
+                emit!(self.writer, " || ");
+            }
+            emit!(self.writer, "(var {} := {}; ", var_name_str, value);
+            if let Some(cond) = condition {
+                emit!(self.writer, "(");
+                self.translate_exp(cond);
+                emit!(self.writer, ") && ");
+            }
+            emit!(self.writer, "(");
+            self.translate_exp(body);
+            emit!(self.writer, ")");
+            emit!(self.writer, ")");
+        }
+        emit!(self.writer, ")");
+        true
+    }
+
     fn translate_quant(
         &self,
         _node_id: NodeId,
@@ -2929,6 +3015,10 @@ impl SpecTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         assert!(!kind.is_choice());
+        if kind == QuantKind::Exists && self.try_translate_unrolled_exists(ranges, condition, body)
+        {
+            return;
+        }
         // Translate range expressions. While doing, check for currently unsupported
         // type quantification
         let mut range_tmps = HashMap::new();
