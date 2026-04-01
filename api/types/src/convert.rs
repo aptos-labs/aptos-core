@@ -377,8 +377,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             aptos_types::transaction::encrypted_payload::ClaimedEntryFunction,
         >|
          -> Option<ClaimedEntryFunction> {
-            let aptos_types::transaction::encrypted_payload::ClaimedEntryFunction { module, function: name } =
-                claim?;
+            let aptos_types::transaction::encrypted_payload::ClaimedEntryFunction {
+                module,
+                function: name,
+            } = claim?;
 
             Some(ClaimedEntryFunction {
                 module: module.into(),

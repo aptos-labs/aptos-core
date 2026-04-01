@@ -177,8 +177,7 @@ impl EncryptedPayload {
 
     pub fn entry_fun_matches(&self, decrypted: &DecryptedPayload) -> anyhow::Result<bool> {
         let Self::Encrypted {
-            claimed_entry_fun,
-            ..
+            claimed_entry_fun, ..
         } = self.clone()
         else {
             bail!("Payload is not in Encrypted state");
