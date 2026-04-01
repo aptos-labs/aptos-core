@@ -178,7 +178,7 @@ impl EncryptedPayload {
     pub fn entry_fun_matches(&self, decrypted: &DecryptedPayload) -> anyhow::Result<bool> {
         let Self::Encrypted {
             claimed_entry_fun, ..
-        } = self.clone()
+        } = self
         else {
             bail!("Payload is not in Encrypted state");
         };
@@ -190,7 +190,7 @@ impl EncryptedPayload {
                 if *entry_fun.module() != claim.module {
                     // module must match
                     return Ok(false);
-                } else if let Some(claimed_function_id) = claim.function
+                } else if let Some(claimed_function_id) = &claim.function
                     && entry_fun.function() != claimed_function_id.as_ident_str()
                 {
                     // if there is a claimed function name, this must also match
