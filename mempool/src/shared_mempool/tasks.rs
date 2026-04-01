@@ -725,21 +725,17 @@ pub(crate) fn process_committed_transactions(
         history.compute_tracking_set()
     };
 
+    // Collect traced txn hashes while holding the lock, finalize after releasing.
+    let mut traced_commit_hashes = Vec::new();
+    let tracing_enabled = aptos_transaction_tracing::store::TransactionTraceStore::global()
+        .is_enabled();
+
     for transaction in transactions {
-        // Record MempoolCommit tracing stage and finalize trace before removal
-        {
-            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-            if store.is_enabled() {
-                if let Some(txn) =
-                    pool.transactions.get(&transaction.sender, transaction.replay_protector)
-                {
-                    let hash = txn.committed_hash();
-                    store.record_stage(
-                        &hash,
-                        aptos_transaction_tracing::types::TransactionStage::MempoolCommit,
-                    );
-                    store.finalize_trace(&hash);
-                }
+        if tracing_enabled {
+            if let Some(txn) =
+                pool.transactions.get(&transaction.sender, transaction.replay_protector)
+            {
+                traced_commit_hashes.push(txn.committed_hash());
             }
         }
         pool.log_commit_transaction(
@@ -756,6 +752,19 @@ pub(crate) fn process_committed_transactions(
     if block_timestamp_usecs > 0 {
         pool.gc_by_expiration_time(block_timestamp);
     }
+
+    // Release mempool lock, then finalize traces (which may trigger GC).
+    drop(pool);
+    if !traced_commit_hashes.is_empty() {
+        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+        for hash in traced_commit_hashes {
+            store.record_stage(
+                &hash,
+                aptos_transaction_tracing::types::TransactionStage::MempoolCommit,
+            );
+            store.finalize_trace(&hash);
+        }
+    }
 }
 
 pub(crate) fn process_rejected_transactions(
@@ -764,6 +773,10 @@ pub(crate) fn process_rejected_transactions(
 ) {
     let mut pool = mempool.lock();
 
+    let tracing_enabled = aptos_transaction_tracing::store::TransactionTraceStore::global()
+        .is_enabled();
+    let mut traced_reject_hashes = Vec::new();
+
     for transaction in transactions {
         pool.reject_transaction(
             &transaction.sender,
@@ -771,15 +784,21 @@ pub(crate) fn process_rejected_transactions(
             &transaction.hash,
             &transaction.reason,
         );
-        {
-            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-            if store.is_enabled() {
-                store.record_stage(
-                    &transaction.hash,
-                    aptos_transaction_tracing::types::TransactionStage::MempoolReject,
-                );
-                store.finalize_trace(&transaction.hash);
-            }
+        if tracing_enabled {
+            traced_reject_hashes.push(transaction.hash);
+        }
+    }
+
+    // Release mempool lock, then finalize traces (which may trigger GC).
+    drop(pool);
+    if !traced_reject_hashes.is_empty() {
+        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+        for hash in traced_reject_hashes {
+            store.record_stage(
+                &hash,
+                aptos_transaction_tracing::types::TransactionStage::MempoolReject,
+            );
+            store.finalize_trace(&hash);
         }
     }
 }
