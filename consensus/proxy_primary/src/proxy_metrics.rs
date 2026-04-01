@@ -4,7 +4,9 @@
 //! Metrics for proxy primary consensus.
 
 use once_cell::sync::Lazy;
-use prometheus::{register_int_counter, register_int_gauge, IntCounter, IntGauge};
+use prometheus::{
+    register_histogram, register_int_counter, register_int_gauge, Histogram, IntCounter, IntGauge,
+};
 
 /// Number of proxy proposals sent
 pub static PROXY_CONSENSUS_PROPOSALS_SENT: Lazy<IntCounter> = Lazy::new(|| {
@@ -155,6 +157,28 @@ pub static PROXY_EFFECTIVE_MAX_TXNS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_proxy_effective_max_txns",
         "Effective max_txns per proxy block after adaptive backpressure reductions"
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of proxy blocks included per primary block
+pub static PROXY_BLOCKS_PER_PRIMARY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proxy_blocks_per_primary",
+        "Number of proxy blocks aggregated into each primary block",
+        vec![0.0, 1.0, 2.0, 3.0, 5.0, 8.0, 10.0, 15.0, 20.0, 30.0, 50.0]
+    )
+    .unwrap()
+});
+
+/// Histogram for txns per primary block (proxy-aggregated)
+pub static PRIMARY_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proxy_primary_block_txns",
+        "Transaction count per primary block from proxy aggregation",
+        vec![
+            0.0, 50.0, 100.0, 250.0, 500.0, 750.0, 1000.0, 1500.0, 2000.0, 3000.0, 5000.0,
+        ]
     )
     .unwrap()
 });
