@@ -188,10 +188,12 @@ impl EncryptedPayload {
             // function
             if let TransactionExecutable::EntryFunction(entry_fun) = &decrypted.executable {
                 if *entry_fun.module() != claim.module {
+                    // module must match
                     return Ok(false);
                 } else if let Some(claimed_function_id) = claim.function
                     && entry_fun.function() != claimed_function_id.as_ident_str()
                 {
+                    // if there is a claimed function name, this must also match
                     return Ok(false);
                 }
             } else {
