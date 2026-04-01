@@ -118,10 +118,10 @@ impl ProxyPrimaryNetworkEmulation {
         let inter_region_config = InterRegionNetEmConfig::default();
         let inter_region_netem = inter_region_config.build(&peer_groups);
 
-        // Build intra-region chaos with 5ms latency for proxy co-location
+        // Build intra-region chaos with 0ms latency for proxy co-location
         let intra_region_config = IntraRegionNetEmConfig {
             bandwidth_rate_mbps: 10_000, // 10 Gbps
-            delay_latency_ms: 5,
+            delay_latency_ms: 0,
             delay_jitter_ms: 0,
             delay_correlation_percentage: 20,
             loss_percentage: 0,
