@@ -15,29 +15,29 @@ module 0xc0ffee::m {
 
     #[lint::skip(unused_function)]
     fun test1_warn(addr: address) acquires S {
-        let r = borrow_global_mut<S>(addr);
+        let r = &mut S[addr];
         *&mut r.x = 5;
     }
 
     #[lint::skip(unused_function)]
     fun test1_no_warn(addr: address) acquires S {
-        let r = borrow_global_mut<S>(addr);
+        let r = &mut S[addr];
         r.x = 5;
     }
 
     #[lint::skip(unused_function)]
     fun test2_warn(addr: address): U acquires S {
-        *&borrow_global<S>(addr).y
+        *&S[addr].y
     }
 
     #[lint::skip(unused_function)]
     fun test2_no_warn(addr: address): U acquires S {
-        borrow_global<S>(addr).y
+        S[addr].y
     }
 
     #[lint::skip(unused_function)]
     fun test3_warn(addr: address): U acquires S {
-        *&mut borrow_global_mut<S>(addr).y
+        *&mut (&mut S[addr]).y
     }
 
     #[lint::skip(unused_function)]

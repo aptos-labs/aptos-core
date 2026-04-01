@@ -151,7 +151,7 @@ module 0xc0ffee::m {
 
     // borrow_global<DeprecatedStruct> -> warn
     public fun test_borrow_global_deprecated_struct(addr: address): u64 acquires DeprecatedStruct {
-        borrow_global<DeprecatedStruct>(addr).value
+        DeprecatedStruct[addr].value
     }
 
     // move_to with a deprecated struct -> warn

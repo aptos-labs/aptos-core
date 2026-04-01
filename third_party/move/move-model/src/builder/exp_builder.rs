@@ -4189,7 +4189,7 @@ impl ExpTranslator<'_, '_, '_> {
             } else {
                 self.symbol_pool().make("borrow_global")
             };
-            self.translate_call(
+            let result = self.translate_call(
                 loc,
                 &self.to_loc(&resource_ty_exp.loc),
                 CallKind::Regular,
@@ -4199,7 +4199,10 @@ impl ExpTranslator<'_, '_, '_> {
                 &[addr_exp],
                 expected_type,
                 context,
-            )
+            );
+            self.env()
+                .set_surface_syntax(result.node_id(), SurfaceSyntax::IndexNotation);
+            result
         } else {
             self.new_error_exp()
         }
