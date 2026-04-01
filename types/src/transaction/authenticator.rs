@@ -170,11 +170,7 @@ impl TransactionAuthenticator {
         // For encrypted transactions, signatures are verified over the encrypted form
         // (not the decrypted payload). Convert back to the encrypted variant for signing
         // message reconstruction.
-        let raw_txn_for_signing = if raw_txn.payload.is_encrypted_variant() {
-            raw_txn.clone().into_encrypted_variant()
-        } else {
-            raw_txn.clone()
-        };
+        let raw_txn_for_signing = raw_txn.as_encrypted_variant();
         match self {
             Self::Ed25519 {
                 public_key,
@@ -202,7 +198,7 @@ impl TransactionAuthenticator {
                     .collect::<Vec<_>>();
 
                 let no_fee_payer_address_message = RawTransactionWithData::new_fee_payer(
-                    raw_txn_for_signing.clone(),
+                    raw_txn_for_signing.clone().into_owned(),
                     secondary_signer_addresses.clone(),
                     AccountAddress::ZERO,
                 );
@@ -215,7 +211,7 @@ impl TransactionAuthenticator {
                 remaining.push(&fee_payer_signer);
 
                 let fee_payer_address_message = RawTransactionWithData::new_fee_payer(
-                    raw_txn_for_signing,
+                    raw_txn_for_signing.into_owned(),
                     secondary_signer_addresses.clone(),
                     *fee_payer_address,
                 );
@@ -236,7 +232,7 @@ impl TransactionAuthenticator {
                 secondary_signers,
             } => {
                 let message = RawTransactionWithData::new_multi_agent(
-                    raw_txn_for_signing,
+                    raw_txn_for_signing.into_owned(),
                     secondary_signer_addresses.clone(),
                 );
                 sender.verify(&message)?;
