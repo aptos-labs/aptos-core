@@ -7,6 +7,7 @@ use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation},
     model::{FunctionEnv, GlobalEnv, Loc, NodeId, SurfaceSyntax},
+    well_known::{VECTOR_BORROW, VECTOR_BORROW_MUT},
 };
 use std::collections::BTreeSet;
 
@@ -16,7 +17,7 @@ const VECTOR_INDEX_NOTATION_URL: &str =
 
 #[derive(Default)]
 pub struct UseIndexSyntax {
-    /// NodeIds already reported as part of a parent pattern (Deref, Select, or Mutate).
+    /// NodeIds already reported, to avoid duplicate warnings.
     reported_in_context: BTreeSet<NodeId>,
 }
 
@@ -29,15 +30,11 @@ fn is_verbose_vector_borrow(env: &GlobalEnv, expr: &ExpData) -> Option<NodeId> {
     if env.has_surface_syntax(*id, SurfaceSyntax::IndexNotation) {
         return None;
     }
-    let called_module = env.get_module(*mid);
-    if !called_module.is_std_vector() {
-        return None;
-    }
-    let func_env = called_module.into_function(*fid);
-    let func_name = env.symbol_pool().string(func_env.get_name());
-    match func_name.as_str() {
-        "borrow" | "borrow_mut" => Some(*id),
-        _ => None,
+    let func_env = env.get_module(*mid).into_function(*fid);
+    if func_env.is_well_known(VECTOR_BORROW) || func_env.is_well_known(VECTOR_BORROW_MUT) {
+        Some(*id)
+    } else {
+        None
     }
 }
 

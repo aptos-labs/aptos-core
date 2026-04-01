@@ -7,6 +7,7 @@ use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation},
     model::{FunctionEnv, SurfaceSyntax},
+    well_known::{VECTOR_BORROW, VECTOR_BORROW_MUT},
 };
 
 #[derive(Default)]
@@ -31,6 +32,13 @@ impl ExpChecker for UseReceiverStyle {
 
         let called_fun = env.get_function(mid.qualified(*fid));
         if !called_fun.is_receiver_function() {
+            return;
+        }
+
+        // vector::borrow/borrow_mut are handled by use_index_syntax.
+        if called_fun.is_well_known(VECTOR_BORROW_MUT)
+            || called_fun.is_well_known(VECTOR_BORROW)
+        {
             return;
         }
 
