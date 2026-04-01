@@ -104,6 +104,7 @@ pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 pub(crate) struct StatePruner {
     pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StaleNodeIndexSchema>>,
     pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>>,
+    pub hot_state_kv_pruner: Option<StateKvPrunerManager>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
     pub state_kv_pruner: StateKvPrunerManager,
@@ -113,6 +114,7 @@ impl StatePruner {
     pub fn new(
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
+        hot_state_kv_db: Option<Arc<StateKvDb>>,
         state_kv_db: Arc<StateKvDb>,
         config: PrunerConfig,
     ) -> Self {
@@ -122,6 +124,8 @@ impl StatePruner {
         let hot_epoch_snapshot_pruner = hot_state_merkle_db.map(|db| {
             StateMerklePrunerManager::new(db, config.epoch_snapshot_pruner_config.into())
         });
+        let hot_state_kv_pruner =
+            hot_state_kv_db.map(|db| StateKvPrunerManager::new(db, config.ledger_pruner_config));
         let state_merkle_pruner = StateMerklePrunerManager::new(
             Arc::clone(&state_merkle_db),
             config.state_merkle_pruner_config,
@@ -140,6 +144,7 @@ impl StatePruner {
         Self {
             hot_state_merkle_pruner,
             hot_epoch_snapshot_pruner,
+            hot_state_kv_pruner,
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
@@ -540,6 +545,7 @@ impl StateStore {
         let state_pruner = StatePruner::new(
             hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
+            hot_state_kv_db.clone(),
             Arc::clone(&state_kv_db),
             aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG,
         );
@@ -853,30 +859,60 @@ impl StateStore {
                 .par_iter_mut()
                 .zip_eq(shard_updates.par_iter())
                 .try_for_each(|(batch, shard)| {
-                    for (key_hash, (hot_val, value_version_opt)) in &shard.insertions {
-                        let schema_value = match hot_val.value_opt() {
+                    for (key_hash, op) in &shard.insertions {
+                        let schema_value = match op.value.value_opt() {
                             Some(value) => HotStateEntry::Occupied {
                                 value: value.clone(),
-                                value_version: value_version_opt
+                                value_version: op
+                                    .value_version
                                     .expect("occupied must have value_version"),
                             },
                             None => {
                                 assert!(
-                                    value_version_opt.is_none(),
+                                    op.value_version.is_none(),
                                     "vacant must not have value_version"
                                 );
                                 HotStateEntry::Vacant
                             },
                         };
                         batch.put::<HotStateValueByKeyHashSchema>(
-                            &(*key_hash, hot_val.hot_since_version()),
+                            &(*key_hash, op.value.hot_since_version()),
                             &Some(schema_value),
                         )?;
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.value.hot_since_version(),
+                                version: op
+                                    .superseded_version
+                                    .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
                     }
-                    for (key_hash, eviction_version) in &shard.evictions {
+                    for (key_hash, op) in &shard.evictions {
                         batch.put::<HotStateValueByKeyHashSchema>(
-                            &(*key_hash, *eviction_version),
+                            &(*key_hash, op.eviction_version),
                             &None,
+                        )?;
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.eviction_version,
+                                version: op
+                                    .superseded_version
+                                    .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
+                        // Self-referential stale entry for the eviction tombstone itself.
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.eviction_version,
+                                version: op.eviction_version,
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
                         )?;
                     }
                     Ok(())

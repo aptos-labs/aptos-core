@@ -18,19 +18,34 @@ use aptos_types::{
 use std::collections::HashMap;
 
 #[derive(Debug)]
+pub struct HotInsertionOp {
+    pub value: HotStateValue,
+    /// `Some(version)` for occupied entries and `None` for vacant.
+    pub value_version: Option<Version>,
+    /// The `hot_since_version` of the DB entry being superseded.
+    /// `None` means this is a first write (creation or promotion).
+    pub superseded_version: Option<Version>,
+}
+
+#[derive(Debug)]
+pub struct HotEvictionOp {
+    pub eviction_version: Version,
+    /// The `hot_since_version` of the DB entry being superseded. `None` if the key was never
+    /// persisted to hot DB (e.g. promoted and evicted in the same batch, unlikely though).
+    pub superseded_version: Option<Version>,
+}
+
+#[derive(Debug)]
 pub struct HotStateShardUpdates {
-    /// Each insertion carries the `HotStateValue` and an optional `value_version`.
-    /// `value_version` is `Some(version)` for occupied entries and `None` for vacant.
-    pub insertions: HashMap<HashValue, (HotStateValue, Option<Version>)>,
-    /// Each eviction carries the checkpoint version at which eviction happened.
+    pub insertions: HashMap<HashValue, HotInsertionOp>,
     // TODO(HotState): per-block eviction tracking will be needed for cold-write elimination.
-    pub evictions: HashMap<HashValue, Version>,
+    pub evictions: HashMap<HashValue, HotEvictionOp>,
 }
 
 impl HotStateShardUpdates {
     pub fn new(
-        insertions: HashMap<HashValue, (HotStateValue, Option<Version>)>,
-        evictions: HashMap<HashValue, Version>,
+        insertions: HashMap<HashValue, HotInsertionOp>,
+        evictions: HashMap<HashValue, HotEvictionOp>,
     ) -> Self {
         Self {
             insertions,
