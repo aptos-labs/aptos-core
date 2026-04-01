@@ -4200,8 +4200,16 @@ impl ExpTranslator<'_, '_, '_> {
                 expected_type,
                 context,
             );
+            // translate_call may wrap the result in a Freeze node when the
+            // expected type is an immutable reference. Set the surface syntax
+            // on the inner node so it is attached to the actual operation.
+            let target_id = if let ExpData::Call(_, Operation::Freeze(_), args) = &result {
+                args[0].node_id()
+            } else {
+                result.node_id()
+            };
             self.env()
-                .set_surface_syntax(result.node_id(), SurfaceSyntax::IndexNotation);
+                .set_surface_syntax(target_id, SurfaceSyntax::IndexNotation);
             result
         } else {
             self.new_error_exp()

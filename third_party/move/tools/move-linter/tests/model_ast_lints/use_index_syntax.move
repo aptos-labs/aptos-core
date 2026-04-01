@@ -157,6 +157,21 @@ module 0xc0ffee::m {
         MyResource[addr].value
     }
 
+    // No warn: mutable index syntax used where immutable ref expected (implicit freeze)
+    fun helper_takes_immref(r: &MyResource): u64 { r.value }
+
+    #[lint::skip(needless_mutable_reference)]
+    public fun test_global_index_mut_freeze_no_warn(addr: address): u64 acquires MyResource {
+        helper_takes_immref(&mut MyResource[addr])
+    }
+
+    // No warn: mutable index syntax assigned to immutable ref binding
+    #[lint::skip(needless_mutable_reference)]
+    public fun test_global_index_mut_to_immref_no_warn(addr: address): u64 acquires MyResource {
+        let _r: &MyResource = &mut MyResource[addr];
+        _r.value
+    }
+
     // === Should NOT warn: not borrow_global ===
 
     // No warn: exists is not borrow_global
