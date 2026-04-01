@@ -1988,6 +1988,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_new_epoch_with_jolteon(
         &mut self,
         consensus_key: Arc<PrivateKey>,

@@ -230,7 +230,7 @@ impl ProxyConsensusHooks for ProxyHooksImpl {
         let total_txns: usize = blocks.iter().map(|b| b.payload().map_or(0, |p| p.len())).sum();
         let empty_blocks = blocks
             .iter()
-            .filter(|b| b.payload().map_or(true, |p| p.is_empty()))
+            .filter(|b| b.payload().is_none_or(|p| p.is_empty()))
             .count();
         let last_block_author = blocks.last().and_then(|b| b.author());
 

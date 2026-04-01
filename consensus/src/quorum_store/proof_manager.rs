@@ -208,8 +208,8 @@ impl ProofManager {
                     warn!(
                         "[proxy-debug] Author {:?} split across proof/opt: proof_batch_ids={:?}, opt_batch_ids={:?}",
                         author,
-                        proof_authors.get(author).unwrap(),
-                        opt_authors.get(author).unwrap(),
+                        proof_authors.get(author).expect("author in overlapping set"),
+                        opt_authors.get(author).expect("author in overlapping set"),
                     );
                 }
             }

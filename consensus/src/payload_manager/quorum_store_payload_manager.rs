@@ -240,7 +240,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => p.get_all_batch_infos(),
                 Payload::OrderedPayloads(payloads) => payloads
                     .into_iter()
-                    .flat_map(|sub| Self::extract_batch_infos(sub))
+                    .flat_map(Self::extract_batch_infos)
                     .collect(),
             })
             .collect();

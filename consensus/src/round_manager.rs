@@ -704,7 +704,7 @@ impl RoundManager {
 
                     let payload = match sub_payloads.len() {
                         0 => Payload::empty(true, true),
-                        1 => sub_payloads.into_iter().next().unwrap(),
+                        1 => sub_payloads.into_iter().next().expect("single-element vec"),
                         _ => Payload::OrderedPayloads(sub_payloads),
                     };
 
@@ -780,7 +780,6 @@ impl RoundManager {
         let safety_rules = self.safety_rules.clone();
         let proposer_election = self.proposer_election.clone();
         let consensus_type = self.consensus_type();
-        let is_proxy_rm = proxy_hooks.is_some();
 
         // Spawn proposal generation for both proxy and primary RMs.
         // Spawning unblocks the event loop so votes, proposals, and QC processing
@@ -2755,10 +2754,7 @@ impl RoundManager {
             // primary_round must be processed to preserve safety.
             let proxy_event_future = async {
                 if let Some(ref mut rx) = proxy_event_rx {
-                    match rx.recv().await {
-                        Some(ProxyToPrimaryEvent::OrderedProxyBlocks(msg)) => Some(msg),
-                        None => None,
-                    }
+                    rx.recv().await.map(|ProxyToPrimaryEvent::OrderedProxyBlocks(msg)| msg)
                 } else {
                     // Never completes if proxy is not enabled
                     std::future::pending().await

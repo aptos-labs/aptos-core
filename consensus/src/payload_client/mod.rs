@@ -113,7 +113,7 @@ impl ProxyBudgetPayloadClient {
 
             total += 1;
             // Count blocks with non-empty user transaction payload
-            if block.payload().map_or(false, |p| !p.is_empty()) {
+            if block.payload().is_some_and(|p| !p.is_empty()) {
                 with_txns += 1;
             }
 

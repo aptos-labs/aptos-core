@@ -1140,7 +1140,7 @@ impl PipelineBuilder {
                 Lazy::new(|| StdMutex::new((0, StdHashSet::new(), StdHashSet::new())));
 
             let epoch = block.block_data().epoch();
-            let mut state = SEEN_STATE.lock().unwrap();
+            let mut state = SEEN_STATE.lock().expect("SEEN_STATE lock poisoned");
             // Clear tracking on epoch change
             if state.0 != epoch {
                 state.0 = epoch;
