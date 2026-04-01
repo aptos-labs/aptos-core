@@ -626,6 +626,7 @@ impl ProposalGenerator {
                 self.opt_qs_payload_param_provider.get_params();
 
             // Skip backpressure and proposal_delay only.
+            let pull_start = std::time::Instant::now();
             let (validator_txns, payload) = self
                 .payload_client
                 .pull_payload(
@@ -646,6 +647,8 @@ impl ProposalGenerator {
                 )
                 .await
                 .context("Fail to retrieve payload")?;
+            aptos_proxy_primary::proxy_metrics::PROXY_BLOCK_CREATION_TIME
+                .observe(pull_start.elapsed().as_secs_f64());
 
             (validator_txns, payload, timestamp.as_micros() as u64)
         };

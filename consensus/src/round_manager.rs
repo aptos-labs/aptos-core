@@ -741,6 +741,8 @@ impl RoundManager {
                         .observe(included_count as f64);
                     aptos_proxy_primary::proxy_metrics::PRIMARY_BLOCK_TXNS
                         .observe(total_txns as f64);
+                    aptos_proxy_primary::proxy_metrics::PRIMARY_DEFERRED_PROXY_BLOCKS
+                        .observe(deferred as f64);
 
                     // Send updated pipeline state to proxy
                     self.send_pipeline_state_to_proxy();

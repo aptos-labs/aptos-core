@@ -182,3 +182,23 @@ pub static PRIMARY_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Histogram for proxy block creation time (QS pull + proposal assembly)
+pub static PROXY_BLOCK_CREATION_TIME: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proxy_block_creation_time_seconds",
+        "Time to create a proxy block (QS pull + proposal assembly)",
+        vec![0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
+    )
+    .unwrap()
+});
+
+/// Histogram for proxy blocks deferred per primary block due to size cap
+pub static PRIMARY_DEFERRED_PROXY_BLOCKS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proxy_primary_deferred_blocks",
+        "Proxy blocks deferred (not included) per primary block due to size cap",
+        vec![0.0, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0]
+    )
+    .unwrap()
+});
