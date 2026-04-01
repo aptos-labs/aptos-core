@@ -17,6 +17,7 @@ use std::{
 /// Holds collection of lint checks for Move.
 pub struct MoveLintChecks {
     config: BTreeMap<String, String>,
+    all_checker_names: BTreeSet<String>,
 }
 
 impl ExternalChecks for MoveLintChecks {
@@ -41,26 +42,7 @@ impl ExternalChecks for MoveLintChecks {
     }
 
     fn get_all_checker_names(&self) -> BTreeSet<String> {
-        // Use the "experimental" tier config, which is the superset of all tiers,
-        // so that all checker names are recognized in `#[lint::skip(...)]` attributes.
-        let all_config = BTreeMap::from([("checks".to_string(), "experimental".to_string())]);
-        let mut names = BTreeSet::new();
-        for c in model_ast_lints::get_default_exp_linter_pipeline(&all_config) {
-            names.insert(c.get_name());
-        }
-        for c in stackless_bytecode_lints::get_default_linter_pipeline(&all_config) {
-            names.insert(c.get_name());
-        }
-        for c in model_ast_lints::get_default_constant_linter_pipeline(&all_config) {
-            names.insert(c.get_name());
-        }
-        for c in model_ast_lints::get_default_struct_linter_pipeline(&all_config) {
-            names.insert(c.get_name());
-        }
-        for c in model_ast_lints::get_default_function_linter_pipeline(&all_config) {
-            names.insert(c.get_name());
-        }
-        names
+        self.all_checker_names.clone()
     }
 }
 
@@ -80,6 +62,30 @@ impl MoveLintChecks {
         if !matches!(checks_value.as_str(), "default" | "strict" | "experimental") {
             panic!("Invalid value for `checks` key in the config, expected one of: `default`, `strict`, or `experimental`");
         }
-        Arc::new(MoveLintChecks { config })
+        // Precompute all checker names using the "experimental" tier config,
+        // which is the superset of all tiers, so that all checker names are
+        // recognized in `#[lint::skip(...)]` attributes.
+        let all_config = BTreeMap::from([("checks".to_string(), "experimental".to_string())]);
+        let mut all_checker_names = BTreeSet::new();
+        for c in model_ast_lints::get_default_exp_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        for c in stackless_bytecode_lints::get_default_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_constant_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_struct_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_function_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        // TODO: instead of storing a key-value config map, store a typed representation.
+        Arc::new(MoveLintChecks {
+            config,
+            all_checker_names,
+        })
     }
 }

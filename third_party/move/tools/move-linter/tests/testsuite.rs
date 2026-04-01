@@ -65,8 +65,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
 
 /// Derives the `MoveLintChecks::make` config from the test path.
 fn make_config_from_dir(path: &Path) -> BTreeMap<String, String> {
-    let path_str = path.display().to_string();
-    let checks_tier = if path_str.contains("/default-only/") {
+    let checks_tier = if path.components().any(|c| c.as_os_str() == "default-only") {
         "default"
     } else {
         "experimental"
