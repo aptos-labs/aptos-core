@@ -153,6 +153,15 @@ warning: [lint] concise global storage index notation syntax can be used here in
     = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
 
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:138:29
+    │
+138 │         helper_takes_immref(borrow_global<MyResource>(addr))
+    │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
     ┌─ tests/model_ast_lints/use_index_syntax.move:128:9
     │

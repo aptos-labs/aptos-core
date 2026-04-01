@@ -133,6 +133,11 @@ module 0xc0ffee::m {
         borrow_global_mut<MyResource>(addr).value = x;
     }
 
+    // Warn: borrow_global passed directly as function argument
+    public fun test_borrow_global_as_arg_warn(addr: address): u64 acquires MyResource {
+        helper_takes_immref(borrow_global<MyResource>(addr))
+    }
+
     // === Should NOT warn: already using global storage index syntax ===
 
     // No warn: immutable index syntax
