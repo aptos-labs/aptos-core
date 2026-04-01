@@ -1,5 +1,5 @@
 # Config to import transactions onchain.
-# Set the APTOS_API_KEY environment variable to authenticate with the API.
+# Set the X_API_KEY environment variable to authenticate with the API.
 # Alternatively, set api_key per-network below to override the env var.
 mainnet:
   # Transaction Stream endpoint address.

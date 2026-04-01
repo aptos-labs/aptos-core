@@ -41,7 +41,7 @@ Your testing folder should contain:
     ```
 - One file called `imported_transactions.yaml`, which is used for importing transactions.
     
-    Set the `APTOS_API_KEY` environment variable to authenticate with the API, or
+    Set the `X_API_KEY` environment variable to authenticate with the API, or
     set `api_key` per-network in the config to override the env var.
 
     ```yaml

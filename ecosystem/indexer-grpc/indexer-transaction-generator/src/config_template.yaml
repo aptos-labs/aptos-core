@@ -1,5 +1,5 @@
 import_config:
-  # Set the APTOS_API_KEY environment variable to authenticate with the API.
+  # Set the X_API_KEY environment variable to authenticate with the API.
   # Alternatively, set api_key per-network below to override the env var.
   testnet:
     # Transaction Stream endpoint address.

@@ -55,7 +55,7 @@ impl ClientBuilder {
             headers,
         };
 
-        if let Ok(key) = env::var("X_API_KEY").or_else(|_| env::var("APTOS_API_KEY")) {
+        if let Ok(key) = env::var("X_API_KEY") {
             client_builder = client_builder.api_key(&key).unwrap();
         }
         client_builder
