@@ -618,8 +618,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
         self.proposal_wait_start = Some(Instant::now());
 
-        // Start 2Δ timer
-        self.slot_timer = Some((slot, Box::pin(tokio::time::sleep(self.proposal_timeout))));
+        // TODO: Re-enable the 2Δ timer once the View > 1 logic is fixed.
+        // Without the timer, SPC only starts after all proposals are received,
+        // guaranteeing a full input vector and FullVLowCommit (no View 2).
+        // self.slot_timer = Some((slot, Box::pin(tokio::time::sleep(self.proposal_timeout))));
 
         // Check if all proposals already received (pre-buffered + own = all in single-validator case)
         let all_received = self
