@@ -68,6 +68,10 @@ pub struct StateKvDb {
 }
 
 impl StateKvDb {
+    pub fn is_hot(&self) -> bool {
+        self.is_hot
+    }
+
     fn db_tag(&self) -> &'static str {
         if self.is_hot {
             "hot"
