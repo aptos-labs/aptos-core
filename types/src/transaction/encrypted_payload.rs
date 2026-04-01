@@ -92,10 +92,10 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
         eval_proof: EvalProof,
 
         // decrypted things
-        claimed_entry_fun: Option<ClaimedEntryFunction>,
         executable: TransactionExecutable,
         decryption_nonce: u64,
     },
