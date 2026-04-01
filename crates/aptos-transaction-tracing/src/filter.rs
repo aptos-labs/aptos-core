@@ -64,8 +64,9 @@ impl TransactionFilter {
     }
 
     /// Returns true if this QS pull round should do tracing work.
-    /// Simple modulo: every Nth round where N = 1/batch_sample_rate.
-    /// E.g., rate=0.1 → every 10th round.
+    /// Selects N rounds out of every 100 (where N = rate * 100), evenly spaced.
+    /// E.g., rate=0.1 → rounds 0,10,20,...,90; rate=0.6 → 60 evenly spread rounds.
+    /// Accurate to 0.01 granularity.
     pub fn should_sample_batch(&self, pull_round: u64) -> bool {
         if !self.enabled || self.sender_allowlist.is_empty() {
             return false;
@@ -76,8 +77,18 @@ impl TransactionFilter {
         if self.batch_sample_rate <= 0.0 {
             return false;
         }
-        let interval = (1.0 / self.batch_sample_rate) as u64;
-        pull_round % interval == 0
+        let n = (self.batch_sample_rate * 100.0).round() as u64;
+        if n >= 100 {
+            return true;
+        }
+        // Bresenham-style even distribution: sample slot i if it crosses
+        // a new integer boundary in floor(i*n/100) vs floor((i-1)*n/100).
+        // Slot 0 is always sampled when n > 0.
+        let slot = pull_round % 100;
+        if slot == 0 {
+            return true;
+        }
+        (slot * n / 100) != ((slot - 1) * n / 100)
     }
 }
 
