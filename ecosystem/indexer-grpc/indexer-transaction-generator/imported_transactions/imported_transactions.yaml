@@ -1,8 +1,6 @@
 testnet:
-  # Transaction Stream endpoint addresss.
+  # Transaction Stream endpoint address.
   transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
-  # (Optional) The key to use with developers.aptoslabs.com
-  api_key: TESTNET_API_KEY
   # A map from versions to dump and their output names.
   versions_to_import:
     # naming: <version_descriptive_name>
@@ -34,7 +32,6 @@ testnet:
 
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-  api_key: MAINNET_API_KEY
   versions_to_import:
     # fungible asset processor
     308783012: 308783012_fa_transfer

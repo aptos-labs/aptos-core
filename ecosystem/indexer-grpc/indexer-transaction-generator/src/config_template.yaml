@@ -1,24 +1,20 @@
 import_config:
+  # Set the APTOS_API_KEY environment variable to authenticate with the API.
+  # Alternatively, set api_key per-network below to override the env var.
   testnet:
     # Transaction Stream endpoint address.
     transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
-    # (Optional) The key to use with developers.aptoslabs.com
-    api_key: YOUR_KEY_HERE
     # A map from versions to dump and their output names.
     versions_to_import:
       123: testnet_v1.json
   # mainnet:
   #   # Transaction Stream endpoint address.
   #   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-  #   # (Optional) The key to use with developers.aptoslabs.com
-  #   api_key: YOUR_KEY_HERE
   #   versions_to_import:
   #     123: mainnetnet_v1.json
   # devnet:
   #   # Transaction Stream endpoint address.
   #   transaction_stream_endpoint: https://grpc.devnet.aptoslabs.com:443
-  #   # (Optional) The key to use with developers.aptoslabs.com
-  #   api_key: YOUR_KEY_HERE
   #   versions_to_import:
   #     123: devnet_v1.json
   # custom:

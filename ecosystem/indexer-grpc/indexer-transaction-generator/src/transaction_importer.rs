@@ -5,7 +5,7 @@ use crate::config::TransactionImporterPerNetworkConfig;
 use anyhow::Context;
 use aptos_indexer_grpc_utils::create_data_service_grpc_client;
 use aptos_protos::indexer::v1::GetTransactionsRequest;
-use std::{path::Path, time::Duration};
+use std::{env, path::Path, time::Duration};
 
 /// GRPC request metadata key for the token ID.
 const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
@@ -31,10 +31,14 @@ impl TransactionImporterPerNetworkConfig {
                 GRPC_REQUEST_NAME_HEADER,
                 GRPC_REQUEST_NAME_VALUE.parse().unwrap(),
             );
-            if let Some(api_key) = &self.api_key {
+            let api_key = self
+                .api_key
+                .clone()
+                .or_else(|| env::var("APTOS_API_KEY").ok());
+            if let Some(api_key) = api_key {
                 request.metadata_mut().insert(
                     GRPC_API_GATEWAY_API_KEY_HEADER,
-                    format!("Bearer {}", api_key.clone()).parse().unwrap(),
+                    format!("Bearer {}", api_key).parse().unwrap(),
                 );
             }
             let mut stream = client.get_transactions(request).await?.into_inner();

@@ -41,12 +41,13 @@ Your testing folder should contain:
     ```
 - One file called `imported_transactions.yaml`, which is used for importing transactions.
     
+    Set the `APTOS_API_KEY` environment variable to authenticate with the API, or
+    set `api_key` per-network in the config to override the env var.
+
     ```yaml
     testnet:
       # Transaction Stream endpoint address.
       transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
-      # (Optional) The key to use with developers.aptoslabs.com
-      api_key: YOUR_KEY_HERE
       # A map from versions to dump and their output names.
       versions_to_import:
         123: testnet_v1.json
