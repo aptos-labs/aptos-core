@@ -11,6 +11,7 @@ use crate::{
     language_storage::FunctionParamOrReturnTag::{MutableReference, Reference, Value},
     parser::{parse_module_id, parse_struct_tag, parse_type_tag},
     safe_serialize,
+    value::MoveTypeLayout,
 };
 use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -210,6 +211,35 @@ impl TypeTag {
             Struct(struct_tag) => Some(struct_tag.as_ref()),
             Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
             | Address | Signer | Vector(_) | Function(_) => None,
+        }
+    }
+
+    /// Returns a lightweight `MoveTypeLayout` conversion for basic event decoding paths.
+    ///
+    /// This intentionally supports only a subset of `TypeTag` variants and returns `None`
+    /// for unsupported tags.
+    pub fn to_simple_layout(&self) -> Option<MoveTypeLayout> {
+        use TypeTag::*;
+
+        match self {
+            Bool => Some(MoveTypeLayout::Bool),
+            U8 => Some(MoveTypeLayout::U8),
+            U16 => Some(MoveTypeLayout::U16),
+            U32 => Some(MoveTypeLayout::U32),
+            U64 => Some(MoveTypeLayout::U64),
+            U128 => Some(MoveTypeLayout::U128),
+            U256 => Some(MoveTypeLayout::U256),
+            I8 => Some(MoveTypeLayout::I8),
+            I16 => Some(MoveTypeLayout::I16),
+            I32 => Some(MoveTypeLayout::I32),
+            I64 => Some(MoveTypeLayout::I64),
+            I128 => Some(MoveTypeLayout::I128),
+            I256 => Some(MoveTypeLayout::I256),
+            Address => Some(MoveTypeLayout::Address),
+            Vector(inner) => inner
+                .to_simple_layout()
+                .map(|layout| MoveTypeLayout::Vector(Box::new(layout))),
+            Struct(_) | Signer | Function(_) => None,
         }
     }
 
@@ -567,6 +597,7 @@ mod tests {
         identifier::Identifier,
         language_storage::{ModuleId, StructTag},
         safe_serialize::MAX_TYPE_TAG_NESTING,
+        value::MoveTypeLayout,
     };
     use hashbrown::Equivalent;
     use proptest::{collection::vec, prelude::*};
@@ -711,6 +742,27 @@ mod tests {
         for (actual_tag, expected_tag) in actual_tags.into_iter().zip(expected_tags) {
             assert_eq!(actual_tag, &expected_tag);
         }
+    }
+
+    #[test]
+    fn test_to_simple_layout_supported() {
+        assert_eq!(TypeTag::U64.to_simple_layout(), Some(MoveTypeLayout::U64));
+        assert_eq!(
+            TypeTag::Vector(Box::new(TypeTag::U8)).to_simple_layout(),
+            Some(MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8))),
+        );
+        assert_eq!(TypeTag::I128.to_simple_layout(), Some(MoveTypeLayout::I128));
+    }
+
+    #[test]
+    fn test_to_simple_layout_unsupported() {
+        let struct_tag = make_struct_tag(AccountAddress::ONE, "a", "A", vec![]);
+        assert_eq!(struct_tag.to_simple_layout(), None);
+        assert_eq!(TypeTag::Signer.to_simple_layout(), None);
+        assert_eq!(
+            make_function_tag(vec![], vec![], AbilitySet::EMPTY).to_simple_layout(),
+            None
+        );
     }
 
     #[test]

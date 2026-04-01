@@ -28,7 +28,6 @@ use aptos_types::{
 use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutput};
 use clap::Parser;
 use move_core_types::{
-    language_storage::TypeTag,
     value::{MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
 };
@@ -37,31 +36,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 fn serialize_as_json<T: Serialize>(value: &T) -> CliTypedResult<serde_json::Value> {
     serde_json::to_value(value).map_err(|err| CliError::UnexpectedError(err.to_string()))
-}
-
-fn type_tag_to_simple_layout(type_tag: &TypeTag) -> Option<MoveTypeLayout> {
-    use TypeTag::*;
-
-    match type_tag {
-        Bool => Some(MoveTypeLayout::Bool),
-        U8 => Some(MoveTypeLayout::U8),
-        U16 => Some(MoveTypeLayout::U16),
-        U32 => Some(MoveTypeLayout::U32),
-        U64 => Some(MoveTypeLayout::U64),
-        U128 => Some(MoveTypeLayout::U128),
-        U256 => Some(MoveTypeLayout::U256),
-        I8 => Some(MoveTypeLayout::I8),
-        I16 => Some(MoveTypeLayout::I16),
-        I32 => Some(MoveTypeLayout::I32),
-        I64 => Some(MoveTypeLayout::I64),
-        I128 => Some(MoveTypeLayout::I128),
-        I256 => Some(MoveTypeLayout::I256),
-        Address => Some(MoveTypeLayout::Address),
-        Vector(inner) => {
-            type_tag_to_simple_layout(inner).map(|layout| MoveTypeLayout::Vector(Box::new(layout)))
-        },
-        Struct(_) | Signer | Function(_) => None,
-    }
 }
 
 fn event_data_to_json(
@@ -79,7 +53,7 @@ fn event_data_to_json(
 }
 
 fn contract_event_to_json(event: &ContractEvent) -> serde_json::Value {
-    let decode_layout = type_tag_to_simple_layout(event.type_tag());
+    let decode_layout = event.type_tag().to_simple_layout();
     let raw_data_hex = hex::encode(event.event_data());
     serde_json::json!({
         "event_key": event.event_key().map(|key| key.to_string()),
@@ -492,7 +466,7 @@ mod tests {
     use aptos_types::{
         account_address::AccountAddress, event::EventKey, state_store::state_key::StateKey,
     };
-    use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout};
+    use move_core_types::language_storage::TypeTag;
 
     #[test]
     fn simulation_summary_omits_optional_fields_by_default() {
@@ -559,7 +533,7 @@ mod tests {
         )
         .unwrap();
 
-        let json = local_events_to_json(&[(event, Some(MoveTypeLayout::Bool))]);
+        let json = local_events_to_json(&[(event, None)]);
         let first = json.as_array().unwrap().first().unwrap();
         assert_eq!(first.get("sequence_number").unwrap().as_u64(), Some(7));
         assert_eq!(first.get("type").unwrap().as_str(), Some("u64"));
