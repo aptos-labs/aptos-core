@@ -65,10 +65,11 @@ pub enum DecryptionFailureReason {
     ClaimedEntryFunctionMismatch,
 }
 
+// Mirrors EntryFunction in types/src/transaction/script.rs
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ClaimedEntryFunction {
     pub module: ModuleId,
-    pub name: Option<Identifier>,
+    pub function: Option<Identifier>,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -91,7 +92,6 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
-        claimed_entry_fun: Option<ClaimedEntryFunction>,
         eval_proof: EvalProof,
 
         // decrypted things
@@ -166,7 +166,6 @@ impl EncryptedPayload {
             ciphertext: ciphertext.clone(),
             extra_config: extra_config.clone(),
             payload_hash: *payload_hash,
-            claimed_entry_fun: claimed_entry_fun.clone(),
             eval_proof,
             executable,
             decryption_nonce: nonce,
@@ -174,41 +173,31 @@ impl EncryptedPayload {
         Ok(())
     }
 
-    pub fn fail_if_claimed_entry_fun_mismatch(&mut self) -> anyhow::Result<()> {
-        let Self::Decrypted {
+    pub fn entry_fun_matches(&self, decrypted: &DecryptedPayload) -> anyhow::Result<bool> {
+        let Self::Encrypted {
             claimed_entry_fun,
-            executable,
             ..
         } = self.clone()
         else {
-            bail!("Payload is not in Decrypted state");
+            bail!("Payload is not in Encrypted state");
         };
 
         if let Some(claim) = claimed_entry_fun {
             // If there is a claim about this payload, the payload executable must be an entry
             // function
-            if let TransactionExecutable::EntryFunction(entry_fun) = executable {
+            if let TransactionExecutable::EntryFunction(entry_fun) = &decrypted.executable {
                 if *entry_fun.module() != claim.module {
-                    self.into_failed_decryption_with_reason(
-                        None,
-                        DecryptionFailureReason::ClaimedEntryFunctionMismatch,
-                    )?;
-                } else if let Some(claimed_function_id) = claim.name
+                    return Ok(false);
+                } else if let Some(claimed_function_id) = claim.function
                     && entry_fun.function() != claimed_function_id.as_ident_str()
                 {
-                    self.into_failed_decryption_with_reason(
-                        None,
-                        DecryptionFailureReason::ClaimedEntryFunctionMismatch,
-                    )?;
+                    return Ok(false);
                 }
             } else {
-                self.into_failed_decryption_with_reason(
-                    None,
-                    DecryptionFailureReason::ClaimedEntryFunctionMismatch,
-                )?;
+                return Ok(false);
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     pub fn into_failed_decryption_with_reason(
@@ -232,30 +221,8 @@ impl EncryptedPayload {
                 reason,
             };
             Ok(())
-        } else if let Self::Decrypted {
-            ciphertext,
-            extra_config,
-            payload_hash,
-            claimed_entry_fun,
-            eval_proof: eval_proof_in_self,
-            ..
-        } = self
-        {
-            if eval_proof.is_some() {
-                bail!("Eval proof given but we already have it");
-            }
-
-            *self = Self::FailedDecryption {
-                ciphertext: ciphertext.clone(),
-                extra_config: extra_config.clone(),
-                payload_hash: *payload_hash,
-                claimed_entry_fun: claimed_entry_fun.clone(),
-                eval_proof: Some(eval_proof_in_self.clone()),
-                reason,
-            };
-            Ok(())
         } else {
-            bail!("Payload is already in FailedDecryption state");
+            bail!("Payload is already in FailedDecryption or Decrypted state");
         }
         // TODO(ibalajiarun): Avoid the clone
     }
