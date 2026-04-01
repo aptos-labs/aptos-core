@@ -48,7 +48,7 @@ pub struct Function {
     /// Offsets span `[0..extended_frame_size)` — they may reference the
     /// data segment AND the callee argument/return region beyond the
     /// metadata. The GC scans these slots in every live frame — no
-    /// per-PC stack maps are needed (see docs/gc_design.md).
+    /// per-PC stack maps are needed (see docs/heap_and_gc.md).
     ///
     /// Each entry is the offset of an 8-byte slot that holds a heap
     /// pointer (or null). For a 16-byte fat pointer `(base, offset)` at

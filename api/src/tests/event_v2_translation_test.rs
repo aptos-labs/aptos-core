@@ -85,7 +85,6 @@ fn rotate_authentication_key_payload(
     use_txn_payload_v2_format,
     use_orderless_transactions,
     case(false, false),
-    case(true, false),
     case(true, true)
 )]
 async fn test_event_v2_translation_account_key_rotation_event(
@@ -287,7 +286,6 @@ fn check_for_event_v2_translation_token_objects(
     use_txn_payload_v2_format,
     use_orderless_transactions,
     case(false, false),
-    case(true, false),
     case(true, true)
 )]
 async fn test_event_v2_translation_token_objects(

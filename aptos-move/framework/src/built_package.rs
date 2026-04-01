@@ -67,7 +67,7 @@ pub const APTOS_PACKAGES: [&str; 6] = [
 ];
 
 /// Represents a set of options for building artifacts from Move.
-#[derive(Debug, Clone, Parser, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Parser, Serialize, Deserialize)]
 pub struct BuildOptions {
     /// Enables dev mode, which uses all dev-addresses and dev-dependencies
     ///

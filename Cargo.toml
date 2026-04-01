@@ -214,7 +214,6 @@ members = [
     "third_party/move/mono-move/programs",
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
-    "third_party/move/mono-move/stackless-exec-ir-v1",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -645,7 +644,7 @@ google-cloud-storage = "0.13.0"
 group = "0.13"
 guppy = "0.17.5"
 handlebars = "4.2.2"
-hashbrown = "0.14.3"
+hashbrown = { version = "0.14.3", features = ["equivalent"] }
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hex-literal = "0.3.4"
@@ -810,7 +809,6 @@ shadow-rs = "0.16.2"
 smallbitvec = "2.5.1"
 smallvec = "1.8.0"
 specializer = { path = "third_party/move/mono-move/specializer" }
-stackless-exec-ir-v1 = { path = "third_party/move/mono-move/stackless-exec-ir-v1" }
 static_assertions = "1.1.0"
 status-line = "0.2.0"
 strum = "0.27.1"

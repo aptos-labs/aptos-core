@@ -10,8 +10,9 @@ use crate::{
         block_queue::{BlockQueue, QueueItem},
         network_messages::{SecretShareMessage, SecretShareRpc},
         reliable_broadcast_state::SecretShareAggregateState,
-        secret_share_store::SecretShareStore,
+        secret_share_store::{SecretShareAggregationResult, SecretShareStore},
         types::RequestSecretShare,
+        verifier::SecretShareVerifier,
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -26,10 +27,7 @@ use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
-use aptos_types::{
-    epoch_state::EpochState,
-    secret_sharing::{SecretShareConfig, SecretShareMetadata, SecretSharedKey},
-};
+use aptos_types::{epoch_state::EpochState, secret_sharing::SecretShareMetadata};
 use bytes::Bytes;
 use futures::{
     future::{AbortHandle, Abortable},
@@ -53,13 +51,13 @@ pub struct SecretShareManager {
     author: Author,
     epoch_state: Arc<EpochState>,
     stop: bool,
-    config: SecretShareConfig,
+    verifier: Arc<SecretShareVerifier>,
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
     secret_share_request_delay_ms: u64,
 
     // local channel received from dec_store
-    decision_rx: Receiver<SecretSharedKey>,
+    decision_rx: Receiver<SecretShareAggregationResult>,
     // downstream channels
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
@@ -72,7 +70,7 @@ impl SecretShareManager {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
-        config: SecretShareConfig,
+        verifier: Arc<SecretShareVerifier>,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
         bounded_executor: BoundedExecutor,
@@ -97,7 +95,7 @@ impl SecretShareManager {
         let dec_store = Arc::new(Mutex::new(SecretShareStore::new(
             epoch_state.epoch,
             author,
-            config.clone(),
+            verifier.clone(),
             decision_tx,
         )));
 
@@ -105,7 +103,7 @@ impl SecretShareManager {
             author,
             epoch_state,
             stop: false,
-            config,
+            verifier,
             reliable_broadcast,
             network_sender,
             secret_share_request_delay_ms,
@@ -233,9 +231,49 @@ impl SecretShareManager {
         let _ = tx.send(ResetAck::default());
     }
 
-    fn process_aggregated_key(&mut self, secret_share_key: SecretSharedKey) {
-        if let Some(item) = self.block_queue.item_mut(secret_share_key.metadata.round) {
-            item.set_secret_shared_key(secret_share_key.metadata.round, secret_share_key);
+    fn process_aggregation_result(&mut self, result: SecretShareAggregationResult) {
+        match result {
+            SecretShareAggregationResult::Success(secret_share_key) => {
+                let round = secret_share_key.metadata.round;
+                self.secret_share_store
+                    .lock()
+                    .handle_aggregation_success(round);
+                if let Some(item) = self.block_queue.item_mut(round) {
+                    item.set_secret_shared_key(round, secret_share_key);
+                }
+            },
+            SecretShareAggregationResult::Failure {
+                round,
+                epoch,
+                metadata,
+                surviving_shares,
+            } => {
+                warn!(
+                    epoch = epoch,
+                    round = round,
+                    "Background aggregation failed, retrying with {} surviving shares",
+                    surviving_shares.len()
+                );
+                let existing_authors = self
+                    .secret_share_store
+                    .lock()
+                    .handle_aggregation_failure(round, surviving_shares);
+
+                if let Some(existing) = existing_authors {
+                    let targets: Vec<Author> = self
+                        .epoch_state
+                        .verifier
+                        .get_ordered_account_addresses_iter()
+                        .filter(|author| !existing.contains(author))
+                        .collect();
+                    if !targets.is_empty() {
+                        let guard = self.spawn_share_requester_for_targets(metadata, targets, 0);
+                        if let Some(item) = self.block_queue.item_mut(round) {
+                            item.push_share_requester_handle(guard);
+                        }
+                    }
+                }
+            },
         }
     }
 
@@ -256,18 +294,21 @@ impl SecretShareManager {
         epoch_state: Arc<EpochState>,
         mut incoming_rpc_request: aptos_channel::Receiver<Author, IncomingSecretShareRequest>,
         verified_msg_tx: UnboundedSender<SecretShareRpc>,
-        config: SecretShareConfig,
+        verifier: Arc<SecretShareVerifier>,
         bounded_executor: BoundedExecutor,
     ) {
         while let Some(dec_msg) = incoming_rpc_request.next().await {
             let tx = verified_msg_tx.clone();
             let epoch_state_clone = epoch_state.clone();
-            let config_clone = config.clone();
+            let verifier_clone = verifier.clone();
             bounded_executor
                 .spawn_blocking(move || {
                     match bcs::from_bytes::<SecretShareMessage>(dec_msg.req.data()) {
                         Ok(msg) => {
-                            if msg.verify(&epoch_state_clone, &config_clone).is_ok() {
+                            if msg
+                                .verify(&epoch_state_clone, &verifier_clone, &dec_msg.sender)
+                                .is_ok()
+                            {
                                 let _ = tx.unbounded_send(SecretShareRpc {
                                     msg,
                                     protocol: dec_msg.protocol,
@@ -285,47 +326,68 @@ impl SecretShareManager {
     }
 
     fn spawn_share_requester_task(&self, metadata: SecretShareMetadata) -> DropGuard {
+        let secret_share_store = self.secret_share_store.clone();
+        let existing_shares = secret_share_store.lock().get_all_shares_authors(&metadata);
+        let targets: Vec<Author> = match existing_shares {
+            Some(existing) => self
+                .epoch_state
+                .verifier
+                .get_ordered_account_addresses_iter()
+                .filter(|author| !existing.contains(author))
+                .collect(),
+            None => return DropGuard::new(AbortHandle::new_pair().0),
+        };
+        self.spawn_share_requester_for_targets(
+            metadata,
+            targets,
+            self.secret_share_request_delay_ms,
+        )
+    }
+
+    fn spawn_share_requester_for_targets(
+        &self,
+        metadata: SecretShareMetadata,
+        targets: Vec<Author>,
+        delay_ms: u64,
+    ) -> DropGuard {
         let rb = self.reliable_broadcast.clone();
         let aggregate_state = Arc::new(SecretShareAggregateState::new(
             self.secret_share_store.clone(),
             metadata.clone(),
-            self.config.clone(),
+            self.verifier.clone(),
         ));
-        let epoch_state = self.epoch_state.clone();
-        let secret_share_store = self.secret_share_store.clone();
-        let request_delay_ms = self.secret_share_request_delay_ms;
+        let epoch = self.epoch_state.epoch;
         let task = async move {
-            tokio::time::sleep(Duration::from_millis(request_delay_ms)).await;
-            let maybe_existing_shares = secret_share_store.lock().get_all_shares_authors(&metadata);
-            if let Some(existing_shares) = maybe_existing_shares {
-                let epoch = epoch_state.epoch;
-                let request = RequestSecretShare::new(metadata.clone());
-                let targets = epoch_state
-                    .verifier
-                    .get_ordered_account_addresses_iter()
-                    .filter(|author| !existing_shares.contains(author))
-                    .collect::<Vec<_>>();
-                info!(
-                    epoch = epoch,
-                    round = metadata.round,
-                    "[SecretShareManager] Start broadcasting share request for {}",
-                    targets.len(),
-                );
-                if let Err(e) = rb.multicast(request, aggregate_state, targets).await {
-                    warn!(
-                        epoch = epoch,
-                        round = metadata.round,
-                        "[SecretShareManager] Share request broadcast failed: {}",
-                        e,
-                    );
-                    return;
-                }
-                info!(
-                    epoch = epoch,
-                    round = metadata.round,
-                    "[SecretShareManager] Finish broadcasting share request",
-                );
+            if delay_ms > 0 {
+                tokio::time::sleep(Duration::from_millis(delay_ms)).await;
             }
+            info!(
+                epoch = epoch,
+                round = metadata.round,
+                "[SecretShareManager] Start broadcasting share request for {}",
+                targets.len(),
+            );
+            if let Err(e) = rb
+                .multicast(
+                    RequestSecretShare::new(metadata.clone()),
+                    aggregate_state,
+                    targets,
+                )
+                .await
+            {
+                warn!(
+                    epoch = epoch,
+                    round = metadata.round,
+                    "[SecretShareManager] Share request broadcast failed: {}",
+                    e,
+                );
+                return;
+            }
+            info!(
+                epoch = epoch,
+                round = metadata.round,
+                "[SecretShareManager] Finish broadcasting share request",
+            );
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
@@ -388,7 +450,7 @@ impl SecretShareManager {
         info!("SecretShareManager started");
         let (verified_msg_tx, mut verified_msg_rx) = unbounded();
         let epoch_state = self.epoch_state.clone();
-        let dec_config = self.config.clone();
+        let verifier = self.verifier.clone();
         {
             self.secret_share_store
                 .lock()
@@ -400,7 +462,7 @@ impl SecretShareManager {
                 epoch_state,
                 incoming_rpc_request,
                 verified_msg_tx,
-                dec_config,
+                verifier,
                 bounded_executor,
             )
         );
@@ -426,8 +488,8 @@ impl SecretShareManager {
                     }
                     self.process_reset(reset);
                 }
-                Some(secret_shared_key) = self.decision_rx.next() => {
-                    self.process_aggregated_key(secret_shared_key);
+                Some(result) = self.decision_rx.next() => {
+                    self.process_aggregation_result(result);
                 }
                 Some(request) = verified_msg_rx.next() => {
                     self.handle_incoming_msg(request);

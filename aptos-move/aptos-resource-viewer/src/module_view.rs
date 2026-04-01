@@ -12,6 +12,7 @@ use aptos_vm_environment::{
     environment::AptosEnvironment, prod_configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use hashbrown::Equivalent;
 use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, VMResult},
@@ -29,7 +30,7 @@ use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache},
     module_storage_error,
 };
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, hash::Hash, sync::Arc};
 
 pub struct ModuleView<'a, S> {
     module_cache: RefCell<HashMap<ModuleId, Arc<CompiledModule>>>,
@@ -196,9 +197,9 @@ impl<S: StateView> ModuleCache for CachedModuleView<S> {
             .insert_verified_module(key, verified_code, extension, version)
     }
 
-    fn get_module_or_build_with(
+    fn get_module_or_build_with<Q>(
         &self,
-        key: &Self::Key,
+        key: &Q,
         builder: &dyn ModuleCodeBuilder<
             Key = Self::Key,
             Deserialized = Self::Deserialized,
@@ -210,8 +211,11 @@ impl<S: StateView> ModuleCache for CachedModuleView<S> {
             Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>,
             Self::Version,
         )>,
-    > {
-        // Get the module that exists in cache.
+    >
+    where
+        Q: Hash + Equivalent<Self::Key>,
+        Self::Key: for<'a> From<&'a Q>,
+    {
         let (module, version) = match self.module_cache.get_module_or_build_with(key, builder)? {
             None => {
                 return Ok(None);
@@ -220,9 +224,10 @@ impl<S: StateView> ModuleCache for CachedModuleView<S> {
         };
 
         // Get the state value that exists in the actual state and compute the hash.
+        let key: Self::Key = Self::Key::from(key);
         let state_slot = self
             .state_view
-            .get_state_slot(&StateKey::module_id(key))
+            .get_state_slot(&StateKey::module_id(&key))
             .map_err(|err| module_storage_error!(key.address(), key.name(), err))?;
         let (value_version, state_value) = match state_slot.into_state_value_and_version_opt() {
             Some((value_version, state_value)) => (value_version as usize, state_value),

@@ -9,7 +9,9 @@ use crate::{
     shared::{algebra::fk_algorithm::FKDomain, ids::UncomputedCoeffs},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
+use aptos_crypto::arkworks::serialization::{
+    ark_de, ark_de_uncompressed_no_validate, ark_se, ark_se_uncompressed,
+};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ark_std::{
     rand::{CryptoRng, RngCore},
@@ -25,9 +27,15 @@ use std::{
 /// The digest public parameters.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DigestKey {
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(
+        serialize_with = "ark_se_uncompressed",
+        deserialize_with = "ark_de_uncompressed_no_validate"
+    )]
     pub tau_g2: G2Affine,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(
+        serialize_with = "ark_se_uncompressed",
+        deserialize_with = "ark_de_uncompressed_no_validate"
+    )]
     pub tau_powers_g1: Vec<Vec<G1Affine>>,
     pub fk_domain: FKDomain<Fr, G1Projective>,
 }
