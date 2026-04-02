@@ -2,7 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_infallible::duration_since_epoch;
-use aptos_metrics_core::{register_histogram_vec, register_int_gauge, HistogramVec, IntGauge};
+use aptos_metrics_core::{
+    register_histogram, register_histogram_vec, register_int_gauge, register_int_gauge_vec,
+    Histogram, HistogramVec, IntGauge, IntGaugeVec,
+};
 use aptos_short_hex_str::AsShortHexStr;
 use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
@@ -59,6 +62,31 @@ pub fn observe_dkg_stage(start_time: Duration, my_addr: AccountAddress, stage: &
             .observe(elapsed.as_secs_f64());
     }
 }
+
+pub static DIGEST_KEY_SOURCE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_dkg_digest_key_source",
+        "Which DigestKey source was used at startup (file, test_fallback, none)",
+        &["source"]
+    )
+    .unwrap()
+});
+
+pub static DIGEST_KEY_LOAD_DURATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_dkg_digest_key_load_duration_seconds",
+        "Time to read and deserialize the DigestKey blob file"
+    )
+    .unwrap()
+});
+
+pub static DIGEST_KEY_FILE_SIZE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_dkg_digest_key_file_size_bytes",
+        "Size of the DigestKey blob file in bytes (only set when file exists)"
+    )
+    .unwrap()
+});
 
 pub static CHUNKY_DKG_OBJECT_SIZE_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(

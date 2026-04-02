@@ -33,10 +33,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             "resource_group".to_string(),
             "resource_group_member".to_string(),
         ]),
-        external_checks: vec![MoveLintChecks::make(BTreeMap::from([(
-            "checks".to_string(),
-            "experimental".to_string(),
-        )]))],
+        external_checks: vec![MoveLintChecks::make(make_config_from_dir(path))],
         ..Default::default()
     };
     let mut output = String::new();
@@ -64,6 +61,16 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let baseline_path = path.with_extension(EXP_EXT);
     baseline_test::verify_or_update_baseline(baseline_path.as_path(), &output)?;
     Ok(())
+}
+
+/// Derives the `MoveLintChecks::make` config from the test path.
+fn make_config_from_dir(path: &Path) -> BTreeMap<String, String> {
+    let checks_tier = if path.components().any(|c| c.as_os_str() == "default-only") {
+        "default"
+    } else {
+        "experimental"
+    };
+    BTreeMap::from([("checks".to_string(), checks_tier.to_string())])
 }
 
 /// Returns a path relative to the crate root.

@@ -9,7 +9,9 @@ use anyhow::{bail, Result};
 use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -59,6 +61,15 @@ pub enum DecryptionFailureReason {
     ConfigUnavailable,
     /// The decryption key is not available.
     DecryptionKeyUnavailable,
+    /// The claimed entry function does not match the one in the decrypted payload
+    ClaimedEntryFunctionMismatch,
+}
+
+// Mirrors EntryFunction in types/src/transaction/script.rs
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ClaimedEntryFunction {
+    pub module: ModuleId,
+    pub function: Option<Identifier>,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -67,11 +78,13 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
     },
     FailedDecryption {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
         eval_proof: Option<EvalProof>,
         reason: DecryptionFailureReason,
     },
@@ -79,6 +92,7 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
         eval_proof: EvalProof,
 
         // decrypted things
@@ -143,6 +157,7 @@ impl EncryptedPayload {
             ciphertext,
             extra_config,
             payload_hash,
+            claimed_entry_fun,
         } = self
         else {
             bail!("Payload is not in Encrypted state");
@@ -155,8 +170,37 @@ impl EncryptedPayload {
             eval_proof,
             executable,
             decryption_nonce: nonce,
+            claimed_entry_fun: claimed_entry_fun.clone(),
         };
         Ok(())
+    }
+
+    pub fn entry_fun_matches(&self, decrypted: &DecryptedPayload) -> anyhow::Result<bool> {
+        let Self::Encrypted {
+            claimed_entry_fun, ..
+        } = self
+        else {
+            bail!("Payload is not in Encrypted state");
+        };
+
+        if let Some(claim) = claimed_entry_fun {
+            // If there is a claim about this payload, the payload executable must be an entry
+            // function
+            if let TransactionExecutable::EntryFunction(entry_fun) = &decrypted.executable {
+                if *entry_fun.module() != claim.module {
+                    // module must match
+                    return Ok(false);
+                } else if let Some(claimed_function_id) = &claim.function
+                    && entry_fun.function() != claimed_function_id.as_ident_str()
+                {
+                    // if there is a claimed function name, this must also match
+                    return Ok(false);
+                }
+            } else {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     pub fn into_failed_decryption_with_reason(
@@ -164,24 +208,26 @@ impl EncryptedPayload {
         eval_proof: Option<EvalProof>,
         reason: DecryptionFailureReason,
     ) -> anyhow::Result<()> {
-        let Self::Encrypted {
+        if let Self::Encrypted {
             ciphertext,
             extra_config,
             payload_hash,
+            claimed_entry_fun,
         } = self
-        else {
-            bail!("Payload is not in Encrypted state");
-        };
-
+        {
+            *self = Self::FailedDecryption {
+                ciphertext: ciphertext.clone(),
+                extra_config: extra_config.clone(),
+                payload_hash: *payload_hash,
+                claimed_entry_fun: claimed_entry_fun.clone(),
+                eval_proof,
+                reason,
+            };
+            Ok(())
+        } else {
+            bail!("Payload is already in FailedDecryption or Decrypted state");
+        }
         // TODO(ibalajiarun): Avoid the clone
-        *self = Self::FailedDecryption {
-            ciphertext: ciphertext.clone(),
-            extra_config: extra_config.clone(),
-            payload_hash: *payload_hash,
-            eval_proof,
-            reason,
-        };
-        Ok(())
     }
 
     pub fn verify(&self, sender: AccountAddress) -> anyhow::Result<()> {

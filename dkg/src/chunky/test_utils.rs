@@ -9,9 +9,10 @@ use aptos_crypto::{
 use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_types::{
+    chain_id::ChainId,
     dkg::chunky_dkg::{
-        AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionMetadata, ChunkyDKGTranscript,
-        ChunkyInputSecret, ChunkyTranscript, DealerPublicKey,
+        initialize_digest_key, AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionMetadata,
+        ChunkyDKGTranscript, ChunkyInputSecret, ChunkyTranscript, DealerPublicKey,
     },
     epoch_state::EpochState,
     on_chain_config::OnChainChunkyDKGConfig,
@@ -35,6 +36,8 @@ pub struct ChunkyTestSetup {
 impl ChunkyTestSetup {
     pub fn new(n: usize, voting_powers: Vec<u64>) -> Self {
         assert_eq!(n, voting_powers.len());
+        // Ensure the test DigestKey is available for encryption key derivation.
+        let _ = initialize_digest_key(ChainId::test());
 
         let mut rng = thread_rng();
         let private_keys: Vec<Arc<PrivateKey>> = (0..n)

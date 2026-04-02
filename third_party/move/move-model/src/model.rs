@@ -535,6 +535,21 @@ impl VerificationScope {
 }
 
 // =================================================================================================
+/// # Surface Syntax Tracking
+
+/// Tracks the syntactic sugar origin of an AST node. When the compiler desugars
+/// concise syntax (e.g., receiver-style calls) into a canonical AST form, the
+/// original syntactic form is recorded here so that linters can distinguish
+/// user-written verbose code from compiler-desugared concise code.
+#[derive(Debug, PartialEq, Eq)]
+pub enum SurfaceSyntax {
+    /// Node was desugared from receiver-style call syntax (e.g., `x.f()`).
+    ReceiverCall,
+    /// Node was desugared from index syntax (e.g., `v[i]`).
+    IndexNotation,
+}
+
+// =================================================================================================
 /// # Global Environment
 
 /// Global environment for a set of modules.
@@ -579,6 +594,11 @@ pub struct GlobalEnv {
     pub(crate) next_free_node_id: RefCell<usize>,
     /// A map from node id to associated information of the expression.
     pub(crate) exp_info: RefCell<BTreeMap<NodeId, ExpInfo>>,
+    /// Sparse map tracking which AST nodes originated from syntactic sugar.
+    /// Only populated for nodes that were desugared from concise syntax.
+    /// Note: this mapping is not yet guaranteed to survive all AST rewrites,
+    /// consumers are currently expected to use it before AST transformations.
+    pub(crate) surface_syntax: RefCell<BTreeMap<NodeId, SurfaceSyntax>>,
     /// List of loaded modules, in order they have been provided using `add`.
     pub module_data: Vec<ModuleData>,
     /// A counter for issuing global ids.
@@ -662,6 +682,7 @@ impl GlobalEnv {
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
             exp_info: Default::default(),
+            surface_syntax: Default::default(),
             module_data: vec![],
             global_id_counter: RefCell::new(0),
             global_invariants: Default::default(),
@@ -2699,6 +2720,16 @@ impl GlobalEnv {
     /// Gets the type parameter instantiation associated with the given node, if it is available.
     pub fn get_nodes(&self) -> Vec<NodeId> {
         (*self.exp_info.borrow()).clone().into_keys().collect_vec()
+    }
+
+    /// Records that a node was produced by the given syntactic sugar.
+    pub fn set_surface_syntax(&self, node_id: NodeId, syntax: SurfaceSyntax) {
+        self.surface_syntax.borrow_mut().insert(node_id, syntax);
+    }
+
+    /// Checks whether a node was produced by a specific kind of syntactic sugar.
+    pub fn has_surface_syntax(&self, node_id: NodeId, syntax: SurfaceSyntax) -> bool {
+        self.surface_syntax.borrow().get(&node_id) == Some(&syntax)
     }
 
     /// Return the total number of declared functions in the modules of `self`
@@ -5380,6 +5411,13 @@ impl<'env> FunctionEnv<'env> {
         self.get_parameters()
             .iter()
             .any(|p| self.symbol_pool().string(p.0).as_ref() == name)
+    }
+
+    /// Returns true if this is a receiver function, i.e., its first parameter is named `self`.
+    pub fn is_receiver_function(&self) -> bool {
+        self.get_parameters_ref().first().is_some_and(|p| {
+            self.symbol_pool().string(p.0).as_ref() == well_known::RECEIVER_PARAM_NAME
+        })
     }
 
     /// Returns the parameter types associated with this function

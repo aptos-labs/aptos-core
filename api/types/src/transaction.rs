@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes,
+    Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes, IdentifierWrapper,
     MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType,
     MoveValue, VerifyInput, VerifyInputWithRecursion, U64,
 };
@@ -1187,12 +1187,21 @@ pub enum EncryptedTransactionPayload {
     Decrypted(DecryptedPayload),
 }
 
+/// An encrypted payload's claim about the entry function. Specifies at least the module address,
+/// and optionally the specific entry funtion.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ClaimedEntryFunction {
+    pub module: MoveModuleId,
+    pub name: Option<IdentifierWrapper>,
+}
+
 /// Payload is still encrypted and cannot be read.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct EncryptedPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
 }
 
 /// Decryption was attempted but failed.
@@ -1201,6 +1210,7 @@ pub struct FailedDecryptionPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
 }
 
 /// Payload has been successfully decrypted.
@@ -1209,6 +1219,7 @@ pub struct DecryptedPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
     pub decrypted_payload: EncryptedTransactionInnerPayload,
     pub decryption_nonce: U64,
 }

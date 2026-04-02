@@ -23,7 +23,7 @@ use crate::{
     },
     model::{
         FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
-        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter,
+        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
         TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
@@ -2390,6 +2390,9 @@ impl ExpTranslator<'_, '_, '_> {
         } else {
             // Error reported
         }
+        // Record that this call originated from receiver-style syntax.
+        self.env()
+            .set_surface_syntax(id, SurfaceSyntax::ReceiverCall);
         // Construct result
         RewriteResult::RewrittenAndDescend(
             ExpData::Call(
@@ -4219,6 +4222,8 @@ impl ExpTranslator<'_, '_, '_> {
         );
         self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
         if let (Some(mid), Some(fid)) = self.get_vector_borrow(mutable) {
+            self.env()
+                .set_surface_syntax(node_id, SurfaceSyntax::IndexNotation);
             let call = ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
                 vec_exp_e.into_exp(),
                 idx_exp_e.clone().into_exp(),
@@ -4237,6 +4242,8 @@ impl ExpTranslator<'_, '_, '_> {
                 if let Some(borrow_fun_entry) = self.parent.parent.fun_table.get(borrow_symbol) {
                     let mid = borrow_fun_entry.module_id;
                     let fid = borrow_fun_entry.fun_id;
+                    self.env()
+                        .set_surface_syntax(node_id, SurfaceSyntax::IndexNotation);
                     return ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
                         vec_exp_e.into_exp(),
                         idx_exp_e.clone().into_exp(),

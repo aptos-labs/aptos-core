@@ -26,7 +26,7 @@ const MOD_SET_ANALYSIS_NEW_FLAG_SINCE_3_5_1: &str = "-inferModifies";
 /// but not always. Setting the max version allows Prover to warn users for the higher version of
 /// boogie and z3 because those may be incompatible.
 pub const MIN_BOOGIE_VERSION: Option<&str> = Some("3.0.1.0");
-pub const MAX_BOOGIE_VERSION: Option<&str> = Some("3.5.1.0");
+pub const MAX_BOOGIE_VERSION: Option<&str> = Some("3.5.6.0");
 pub const MIN_BOOGIE_VERSION_NEW_MOD_SET_ANALYSIS: Option<&str> = Some("3.5.1.0");
 
 pub const MIN_Z3_VERSION: Option<&str> = Some("4.11.2");
