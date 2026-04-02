@@ -112,7 +112,7 @@ fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) 
     config.consensus.proxy_consensus_config.vtxn_pull_interval = 50;
 
     // Proxy timeout tuning: with opt proposals enabled + pending_ordering=true,
-    // healthy rounds complete in ~5-10ms (1ms intra-region RTT). Use 100ms
+    // healthy rounds complete in ~10-20ms (5ms intra-region RTT). Use 100ms
     // timeout (the default) so timeouts waste only 100ms instead of 300ms.
     // At 300ms, each timeout wastes ~30x a healthy round. At 100ms, only ~10x.
     // Max exponent 4 caps escalation at 100 × 1.2^4 = 207ms.
