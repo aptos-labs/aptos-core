@@ -34,11 +34,6 @@ pub const DEFAULT_ELL_FOR_DEPLOYMENT: usize = 32;
 const DEFAULT_MAX_AGGREGATION: usize = 166;
 const DLOG_EXTRA_BITS: usize = 4;
 
-/// Default extra bits for the dlog table when deserializing legacy PublicParameters that did not store this field.
-fn default_dlog_extra_bits() -> usize {
-    DLOG_EXTRA_BITS
-}
-
 fn compute_powers_of_radix<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
     assert!(ell < 64);
     utils::powers(
@@ -155,8 +150,6 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             serialized.pp_elgamal.H,
             serialized
                 .max_num_shares
-                .try_into()
-                .expect("Should always fit in u32"),
         );
 
         Ok(Self {
