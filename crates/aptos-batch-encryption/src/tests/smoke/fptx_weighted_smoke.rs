@@ -1,26 +1,31 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+#[cfg(test)]
+use crate::tests::smoke::run_smoke;
 use crate::{
-    group::{Fr}, schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEMasterSecretKeyShare, WeightedBIBEVerificationKey}, shared::{digest::DigestKey, encryption_key::EncryptionKey},  traits::BatchThresholdEncryption
+    group::Fr,
+    schemes::fptx_weighted::{
+        FPTXWeighted, WeightedBIBEMasterSecretKeyShare, WeightedBIBEVerificationKey,
+    },
+    shared::{digest::DigestKey, encryption_key::EncryptionKey},
+    traits::BatchThresholdEncryption,
 };
-
 use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
 use aptos_dkg::pvss::traits::transcript::Aggregatable;
 use ark_ec::AffineRepr as _;
-
 #[cfg(test)]
-use crate::tests::smoke::run_smoke;
-#[cfg(test)]
-use ark_std::rand::{Rng as _, thread_rng};
+use ark_std::rand::{thread_rng, Rng as _};
 
-pub fn run_pvss(dk: &DigestKey) -> (
+pub fn run_pvss(
+    dk: &DigestKey,
+) -> (
     WeightedConfigArkworks<Fr>,
     EncryptionKey,
     Vec<WeightedBIBEVerificationKey>,
     Vec<WeightedBIBEMasterSecretKeyShare>,
-){
-   let mut rng_aptos = rand::thread_rng();
+) {
+    let mut rng_aptos = rand::thread_rng();
 
     let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
     let pp = <T as TranscriptCore>::PublicParameters::new_with_commitment_base(
@@ -74,23 +79,21 @@ pub fn run_pvss(dk: &DigestKey) -> (
     let subtranscript =
         <T as HasAggregatableSubtranscript>::Subtranscript::aggregate(&tc, subtrx_paths).unwrap();
 
-
     let (ek, vks, _) =
-        FPTXWeighted::setup(&dk, &pp, &subtranscript, &tc, tc.get_player(0), &dks[0]).unwrap();
+        FPTXWeighted::setup(dk, &pp, &subtranscript, &tc, tc.get_player(0), &dks[0]).unwrap();
 
     let msk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::MasterSecretKeyShare> = tc
         .get_players()
         .into_iter()
         .map(|p| {
             let (_, _, msk_share) =
-            FPTXWeighted::setup(&dk, &pp, &subtranscript, &tc, p, &dks[p.get_id()]).unwrap();
+                FPTXWeighted::setup(dk, &pp, &subtranscript, &tc, p, &dks[p.get_id()]).unwrap();
             msk_share
         })
         .collect();
 
     (tc, ek, vks, msk_shares)
 }
-
 
 #[test]
 fn weighted_smoke_with_setup_for_testing() {

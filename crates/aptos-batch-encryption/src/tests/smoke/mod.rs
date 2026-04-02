@@ -1,18 +1,15 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_crypto::TSecretSharingConfig;
-
 use crate::traits::{BatchThresholdEncryption, DecryptionKeyShare};
 use anyhow::Result;
+use aptos_crypto::TSecretSharingConfig;
 
 #[cfg(test)]
 pub mod fptx_smoke;
 #[cfg(test)]
 pub mod fptx_succinct_smoke;
 pub mod fptx_weighted_smoke;
-
-
 
 pub fn run_smoke<Scheme: BatchThresholdEncryption>(
     tc: <Scheme as BatchThresholdEncryption>::ThresholdConfig,
@@ -35,7 +32,10 @@ pub fn run_smoke<Scheme: BatchThresholdEncryption>(
 
     let dk_shares: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
         .into_iter()
-        .map(|msk_share| <Scheme as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &d).unwrap())
+        .map(|msk_share| {
+            <Scheme as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &d)
+                .unwrap()
+        })
         .collect();
 
     dk_shares
@@ -45,20 +45,27 @@ pub fn run_smoke<Scheme: BatchThresholdEncryption>(
         .collect::<Result<Vec<()>>>()
         .unwrap();
 
-    let eligible_share_subset : Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> = tc.get_random_eligible_subset_of_players(&mut rng_aptos)
-        .into_iter().map(|player|
-            dk_shares.iter().find(|share| share.player() == player).unwrap().clone()
-        ).collect();
+    let eligible_share_subset: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> = tc
+        .get_random_eligible_subset_of_players(&mut rng_aptos)
+        .into_iter()
+        .map(|player| {
+            dk_shares
+                .iter()
+                .find(|share| share.player() == player)
+                .unwrap()
+                .clone()
+        })
+        .collect();
 
-    let dk = Scheme::reconstruct_decryption_key(
-        &eligible_share_subset,
-        &tc,
-    )
-    .unwrap();
+    let dk = Scheme::reconstruct_decryption_key(&eligible_share_subset, &tc).unwrap();
 
     <Scheme as BatchThresholdEncryption>::verify_decryption_key(&ek, &d, &dk).unwrap();
 
-    let decrypted_plaintext: String = Scheme::decrypt(&dk, &<Scheme as BatchThresholdEncryption>::prepare_ct(&ct, &d, &pfs).unwrap()).unwrap();
+    let decrypted_plaintext: String = Scheme::decrypt(
+        &dk,
+        &<Scheme as BatchThresholdEncryption>::prepare_ct(&ct, &d, &pfs).unwrap(),
+    )
+    .unwrap();
 
     assert_eq!(decrypted_plaintext, plaintext);
 

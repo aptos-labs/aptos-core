@@ -7,9 +7,9 @@ use crate::{
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-pub mod smoke;
 #[cfg(test)]
 mod digest_key_bench;
+pub mod smoke;
 #[cfg(test)]
 pub mod typescript;
 
