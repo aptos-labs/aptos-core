@@ -73,7 +73,7 @@ fn local_contract_events_to_json(
         })
         .collect::<anyhow::Result<Vec<_>>>()
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
-    Ok(serialize_as_json(&parsed_events)?)
+    serialize_as_json(&parsed_events)
 }
 
 fn local_write_set_to_json(
@@ -123,10 +123,7 @@ fn local_write_set_to_json(
                     Path::Resource(typ) => {
                         let data = annotator
                             .view_resource(&typ, bytes)
-                            .and_then(|resource| {
-                                aptos_api_types::MoveResource::try_from(resource)
-                                    .map_err(anyhow::Error::from)
-                            })
+                            .and_then(aptos_api_types::MoveResource::try_from)
                             .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
                         changes.push(aptos_api_types::WriteSetChange::WriteResource(
                             aptos_api_types::WriteResource {
