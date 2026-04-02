@@ -908,8 +908,8 @@ mod tests {
             ),
             (
                 Type::Function {
-                    args: vec![Type::U8],
-                    results: vec![Type::U256],
+                    args: TriompheArc::new(vec![Type::U8]),
+                    results: TriompheArc::new(vec![Type::U256]),
                     abilities: AbilitySet::EMPTY,
                 },
                 MoveTypeLayout::Function,

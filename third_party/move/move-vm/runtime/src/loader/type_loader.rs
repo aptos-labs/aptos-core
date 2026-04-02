@@ -83,8 +83,8 @@ fn convert_tok_to_type_impl(
             let (results, results_fully_instantiated) =
                 convert_toks_to_types_impl(module, results, struct_name_table)?;
             let ty = Type::Function {
-                args,
-                results,
+                args: TriompheArc::new(args),
+                results: TriompheArc::new(results),
                 abilities: *abilities,
             };
             (ty, args_fully_instantiated && results_fully_instantiated)

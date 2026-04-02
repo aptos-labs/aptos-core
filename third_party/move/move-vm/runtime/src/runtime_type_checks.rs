@@ -15,6 +15,7 @@ use move_vm_types::{
     instr::Instruction,
     loaded_data::runtime_types::{Type, TypeBuilder},
 };
+use triomphe::Arc as TriompheArc;
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.
@@ -169,8 +170,8 @@ pub(crate) fn create_function_type(
         .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
         .collect::<PartialVMResult<Vec<_>>>()?;
     Ok(Type::Function {
-        args,
-        results,
+        args: TriompheArc::new(args),
+        results: TriompheArc::new(results),
         abilities,
     })
 }

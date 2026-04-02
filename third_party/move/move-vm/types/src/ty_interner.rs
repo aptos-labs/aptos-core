@@ -451,8 +451,8 @@ mod test {
         let ctx = InternedTypePool::new();
 
         let func_ty = Type::Function {
-            args: vec![Type::U64, Type::Bool],
-            results: vec![Type::U8],
+            args: TriompheArc::new(vec![Type::U64, Type::Bool]),
+            results: TriompheArc::new(vec![Type::U8]),
             abilities: AbilitySet::EMPTY,
         };
 
@@ -462,8 +462,8 @@ mod test {
         assert_eq!(id1, id2);
 
         let func_ty = Type::Function {
-            args: vec![Type::U64],
-            results: vec![Type::U8],
+            args: TriompheArc::new(vec![Type::U64]),
+            results: TriompheArc::new(vec![Type::U8]),
             abilities: AbilitySet::EMPTY,
         };
 
@@ -471,8 +471,8 @@ mod test {
         assert_ne!(id1, id3);
 
         let func_ty = Type::Function {
-            args: vec![Type::U64],
-            results: vec![Type::U8],
+            args: TriompheArc::new(vec![Type::U64]),
+            results: TriompheArc::new(vec![Type::U8]),
             abilities: AbilitySet::ALL,
         };
         let id4 = ctx.instantiate_and_intern(&func_ty, &[]);

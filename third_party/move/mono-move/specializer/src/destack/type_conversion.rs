@@ -110,8 +110,8 @@ fn convert_impl(
                 .map(|t| convert_impl(view, t, struct_name_table))
                 .collect();
             Type::Function {
-                args,
-                results,
+                args: TriompheArc::new(args),
+                results: TriompheArc::new(results),
                 abilities: *abilities,
             }
         },

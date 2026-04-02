@@ -313,8 +313,8 @@ pub enum Type {
         ability: AbilityInfo,
     },
     Function {
-        args: Vec<Type>,
-        results: Vec<Type>,
+        args: TriompheArc<Vec<Type>>,
+        results: TriompheArc<Vec<Type>>,
         abilities: AbilitySet,
     },
     Reference(Box<Type>),
@@ -1502,8 +1502,8 @@ impl TypeBuilder {
                     .map(|ty| subs_elem(count, ty))
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 Function {
-                    args,
-                    results,
+                    args: TriompheArc::new(args),
+                    results: TriompheArc::new(results),
                     abilities: *abilities,
                 }
             },
@@ -1596,8 +1596,8 @@ impl TypeBuilder {
                         .collect::<PartialVMResult<Vec<_>>>()
                 };
                 Function {
-                    args: to_list(args)?,
-                    results: to_list(results)?,
+                    args: TriompheArc::new(to_list(args)?),
+                    results: TriompheArc::new(to_list(results)?),
                     abilities: *abilities,
                 }
             },
@@ -1675,10 +1675,12 @@ impl<'a> TypeParamMap<'a> {
                 && args.len() == exp_args.len()
                 && results.len() == exp_results.len() =>
             {
-                args.iter().zip(exp_args).all(|(t, e)| self.match_ty(t, e))
+                args.iter()
+                    .zip(exp_args.iter())
+                    .all(|(t, e)| self.match_ty(t, e))
                     && results
                         .iter()
-                        .zip(exp_results)
+                        .zip(exp_results.iter())
                         .all(|(t, e)| self.match_ty(t, e))
             },
             // Abilities should not contribute to the equality check as they just serve for caching
