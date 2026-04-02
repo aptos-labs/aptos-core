@@ -1,0 +1,13 @@
+//# publish --print-bytecode
+module 0x66::test_generic_unpack_bytecode_swapped_type_params
+
+struct Pair<A, B>
+    first: A
+    second: B
+
+// Invalid: unpack$Pair has a correct signature (Pair<T0, T1>) but the UnpackGeneric
+// bytecode instruction uses a swapped instantiation Pair<T1, T0>.
+#[unpack] public fun unpack$Pair<A, B>(l0: Pair<A, B>): (A, B)
+    move_loc l0
+    unpack Pair<B, A>
+    ret

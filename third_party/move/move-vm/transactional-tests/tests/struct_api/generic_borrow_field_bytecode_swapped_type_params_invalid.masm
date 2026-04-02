@@ -1,0 +1,13 @@
+//# publish --print-bytecode
+module 0x66::test_generic_borrow_field_bytecode_swapped_type_params
+
+struct Pair<A, B>
+    first: A
+    second: B
+
+// Invalid: borrow$Pair$0 has a correct signature (&Pair<T0, T1>) but the
+// ImmBorrowFieldGeneric bytecode instruction uses a swapped instantiation Pair<T1, T0>.
+#[borrow(0)] public fun borrow$Pair$0<A, B>(l0: &Pair<A, B>): &A
+    move_loc l0
+    borrow_field Pair<B, A>, first
+    ret
