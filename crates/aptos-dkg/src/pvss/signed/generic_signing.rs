@@ -5,6 +5,7 @@ use crate::pvss::{
     test_utils::NoAux,
     traits::{transcript::HasAggregatableSubtranscript, Transcript, TranscriptCore},
 };
+use anyhow::{anyhow, Result};
 use aptos_crypto::{
     bls12381, player::Player, CryptoMaterialError, Signature, SigningKey, Uniform,
     ValidCryptoMaterial,
@@ -172,13 +173,25 @@ impl<
         eks: &[Self::EncryptPubKey],
         sid: &A,
         rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
+        let dealers = self.get_dealers();
+        let dealer = dealers
+            .first()
+            .ok_or_else(|| anyhow!("signed transcript has no dealers"))?;
+        let idx = dealer.id;
+        let spk = spks.get(idx).ok_or_else(|| {
+            anyhow!(
+                "dealer index {} out of range for spks (len {})",
+                idx,
+                spks.len()
+            )
+        })?;
         self.sig.verify(
             &SessionContribution {
                 contrib: self.trs.get_dealt_public_key(),
                 sid,
             },
-            &spks[self.get_dealers()[0].id],
+            spk,
         )?;
 
         T::verify(&self.trs, sc, pp, spks, eks, sid, rng)

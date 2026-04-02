@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
@@ -371,7 +372,6 @@ impl LazyLoadedFunction {
                         gas_meter,
                         traversal_context,
                         ty,
-                        true,
                     )?
                 } else {
                     let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
@@ -379,7 +379,6 @@ impl LazyLoadedFunction {
                         gas_meter,
                         traversal_context,
                         &ty,
-                        true,
                     )?
                 };
 
@@ -455,6 +454,29 @@ impl LazyLoadedFunction {
                     fun_id,
                     ty_args,
                 )?;
+
+                // A closure can only be stored if its function is persistent (public
+                // or has #[persistent] attribute). Persistent functions have their
+                // signatures frozen by the upgrade compatibility check, so captured
+                // argument types are guaranteed to match across different upgraded
+                // module versions.
+                // Here, we check that loaded function is indeed persistent. It might not
+                // be the case for `init_module` that stores a closure:
+                //   1. Function `foo` is private in original module A.
+                //   2. Module B is published which calls now public `foo`.
+                // As a result, there is a speculative resource write which resolves
+                // to older (still private) function because Block-STM makes module
+                // upgrades visible only at commit. Such behavior should be caught
+                // immediately because private function can change signature, so there
+                // is some room for type confusion via captured arguments.
+                if !fun.function.is_persistent() {
+                    return Err(PartialVMError::new_invariant_violation(format!(
+                        "Stored closure references non-persistent function `{}::{}`",
+                        module_id.short_str_lossless(),
+                        fun_id
+                    )));
+                }
+
                 *state = LazyLoadedFunctionState::Resolved {
                     fun: fun.clone(),
                     ty_args: mem::take(ty_args),

@@ -23,7 +23,7 @@ use std::io::Write;
 /// Types that go into the transcript (e.g. verification keys) implement this. Use a minimal
 /// representation when the full canonical form is large but only a small
 /// subset is needed for challenges (e.g. the first entries of the SRS); otherwise use full [`CanonicalSerialize`].
-pub trait SerializeForTranscript {
+pub trait SerializeForFiatShamirTranscript {
     /// Writes the transcript-relevant bytes in compressed form. (Probably don't need compression here, but I presume
     /// it makes hashing faster?)
     fn serialize_compressed_for_transcript<W: Write>(
@@ -108,9 +108,7 @@ pub trait PolynomialCommitmentScheme {
 pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
     fn append_sep(&mut self, dst: &[u8]);
 
-    fn append_vk(&mut self, vk: &B::VerificationKey)
-    where
-        B::VerificationKey: SerializeForTranscript;
+    fn append_vk(&mut self, vk: &B::VerificationKey);
 
     fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 

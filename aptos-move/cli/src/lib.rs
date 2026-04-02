@@ -22,6 +22,7 @@ mod script_compile;
 mod show;
 mod sim;
 pub mod stored_package;
+pub(crate) mod struct_arg_parser;
 mod tool_paths;
 mod transactions;
 

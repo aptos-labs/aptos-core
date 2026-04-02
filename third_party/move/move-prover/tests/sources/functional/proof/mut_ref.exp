@@ -1,0 +1,21 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+    ┌─ tests/sources/functional/proof/mut_ref.move:126:13
+    │
+126 │             assume [trusted] true;
+    │             ^^^^^^^^^^^^^^^^^^^^^^
+
+error: proof assertion not satisfied
+    ┌─ tests/sources/functional/proof/mut_ref.move:152:14
+    │
+152 │         post assert c.value == old(c.value);  // error: c.value == 0, not old(c.value)
+    │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/mut_ref.move:146: set_to_zero
+    =         c = <redacted>
+    =     at tests/sources/functional/proof/mut_ref.move:147: set_to_zero
+    =         c = <redacted>
+    =     at tests/sources/functional/proof/mut_ref.move:146: set_to_zero
+    =         c = <redacted>
+    =     at tests/sources/functional/proof/mut_ref.move:148: set_to_zero
+    =     at tests/sources/functional/proof/mut_ref.move:152: set_to_zero (spec)

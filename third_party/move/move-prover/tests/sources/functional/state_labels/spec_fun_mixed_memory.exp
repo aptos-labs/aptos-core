@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/spec_fun_mixed_memory.move:63:9
+   │
+63 │         ensures increased_within_limit(addr); // error: limit lowered below balance
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:57: increment_and_lower_limit
+   =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:62: increment_and_lower_limit (spec)
+   =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:57: increment_and_lower_limit
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:58: increment_and_lower_limit
+   =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:59: increment_and_lower_limit
+   =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:60: increment_and_lower_limit
+   =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:63: increment_and_lower_limit (spec)

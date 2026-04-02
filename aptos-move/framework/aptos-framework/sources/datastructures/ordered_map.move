@@ -152,7 +152,7 @@ module aptos_framework::ordered_map {
 
     /// Modifies element by calling modify_f if it exists, or calling add_f to add if it doesn't.
     /// Returns true if element already existed.
-    public inline fun modify_or_add<K: drop + copy + store, V: store>(self: &mut OrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop, add_f: ||V has drop): bool {
+    public inline fun modify_or_add<K: copy, V>(self: &mut OrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop, add_f: ||V has drop): bool {
         let exists = self.modify_if_present(key, |v| modify_f(v));
         if (!exists) {
             self.add(*key, add_f());
@@ -162,7 +162,7 @@ module aptos_framework::ordered_map {
 
     /// Modifies element by calling modify_f if it exists.
     /// Returns true if element already existed.
-    public inline fun modify_if_present<K: drop + copy + store, V: store>(self: &mut OrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop): bool {
+    public inline fun modify_if_present<K, V>(self: &mut OrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop): bool {
         let iter = self.internal_find(key);
         if (iter.iter_is_end(self)) {
             false
@@ -194,7 +194,7 @@ module aptos_framework::ordered_map {
         }
     }
 
-    public inline fun get_and_map<K: drop + copy + store, V: copy + store, R>(self: &OrderedMap<K, V>, key: &K, f: |&V|R has drop): Option<R> {
+    public inline fun get_and_map<K: drop + copy + store, V: store, R>(self: &OrderedMap<K, V>, key: &K, f: |&V|R has drop): Option<R> {
         let iter = self.internal_find(key);
         if (iter.iter_is_end(self)) {
             option::none()
@@ -639,7 +639,7 @@ module aptos_framework::ordered_map {
     }
 
     /// Apply the function to a reference of each key-value pair in the map.
-    public inline fun for_each_ref<K: copy + drop, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
+    public inline fun for_each_ref<K, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
         let iter = self.internal_new_begin_iter();
         while (!iter.iter_is_end(self)) {
             f(iter.iter_borrow_key(self), iter.iter_borrow(self));
@@ -730,7 +730,7 @@ module aptos_framework::ordered_map {
     }
 
     #[test_only]
-    fun validate_iteration<K: drop + copy + store, V: store>(self: &OrderedMap<K, V>) {
+    fun validate_iteration<K, V>(self: &OrderedMap<K, V>) {
         let expected_num_elements = self.length();
         let num_elements = 0;
         let it = self.internal_new_begin_iter();
@@ -750,7 +750,7 @@ module aptos_framework::ordered_map {
     }
 
     #[test_only]
-    public(friend) fun validate_map<K: drop + copy + store, V: store>(self: &OrderedMap<K, V>) {
+    public(friend) fun validate_map<K, V>(self: &OrderedMap<K, V>) {
         self.validate_ordered();
         self.validate_iteration();
     }

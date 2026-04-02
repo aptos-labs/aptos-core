@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     access_control::AccessControlState,
@@ -46,6 +47,7 @@ use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
     instr::Instruction,
+    limits::check_abort_message_limit,
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     ty_interner::InternedTypePool,
@@ -1604,7 +1606,8 @@ where
                         ty,
                         runtime_environment,
                     },
-                    gv.view().unwrap(),
+                    gv.view()
+                        .expect("After successful move_to, global value is set"),
                     true,
                 )?;
                 self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
@@ -1865,8 +1868,6 @@ where
 const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
 pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
-
-const ABORT_MESSAGE_SIZE_LIMIT: usize = 1024;
 
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {
@@ -2931,16 +2932,7 @@ impl Frame {
                         // Gas is charged per byte to account for the cost of UTF-8 validation.
                         gas_meter.charge_abort_message(&bytes)?;
 
-                        if bytes.len() > ABORT_MESSAGE_SIZE_LIMIT {
-                            return Err(PartialVMError::new(
-                                StatusCode::ABORT_MESSAGE_LIMIT_EXCEEDED,
-                            )
-                            .with_message(format!(
-                                "Expected at most {} bytes, got {} bytes",
-                                ABORT_MESSAGE_SIZE_LIMIT,
-                                bytes.len()
-                            )));
-                        }
+                        check_abort_message_limit(bytes.len())?;
 
                         let error_message = String::from_utf8(bytes).map_err(|err| {
                             PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)

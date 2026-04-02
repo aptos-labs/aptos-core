@@ -73,7 +73,7 @@ fn identifier_from_string(v: Value) -> SafeNativeResult<Option<Identifier>> {
         .and_then(|s| s.borrow_field(0))
         .and_then(|v| v.value_as::<VectorRef>())
         .map_err(SafeNativeError::InvariantViolation)?
-        .as_bytes_ref()
+        .as_bytes_ref()?
         .to_vec();
     Ok(Identifier::from_utf8(bytes).ok())
 }

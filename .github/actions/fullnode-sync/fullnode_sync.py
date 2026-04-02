@@ -38,27 +38,9 @@ SYNCING_DELTA_VERSIONS = 20000 # The number of versions to sync beyond the highe
 
 # Testnet seed peer constants
 TESTNET_SEED_PEERS = {
-  "2DA03E9D24E501741234047953A63ABC6D84193BE495C507C72F68269FB8B76A": {
+  "9D5AF3FFDFF04F7CD51AA9F902253067A40594C7831BF1265503220D585B4D20": {
     "addresses": [
-      "/dns4/pfn1.usce1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/2DA03E9D24E501741234047953A63ABC6D84193BE495C507C72F68269FB8B76A/handshake/0"
-    ],
-    "role": "Upstream",
-  },
-  "8B68819D267E19D44716B821CE499B79D258C86BB65E7A60884EC31FF987ED14": {
-    "addresses": [
-      "/dns4/pfn2.usce2.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/8B68819D267E19D44716B821CE499B79D258C86BB65E7A60884EC31FF987ED14/handshake/0"
-    ],
-    "role": "Upstream",
-  },
-  "76902CCCDBDC116894EBA1EDE36D1D2C3BE9155F21D731F6B4EBE17FC611DD00": {
-    "addresses": [
-      "/dns4/pfn1.euwe4.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/76902CCCDBDC116894EBA1EDE36D1D2C3BE9155F21D731F6B4EBE17FC611DD00/handshake/0"
-    ],
-    "role": "Upstream",
-  },
-  "2A8153A065E60FFE63E8B4285044972376FD06092FB8E877EBF72BE91198BB65": {
-    "addresses": [
-      "/dns4/pfn1.apne1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/2A8153A065E60FFE63E8B4285044972376FD06092FB8E877EBF72BE91198BB65/handshake/0"
+      "/dns4/pfn0.euwe4-seed.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/9D5AF3FFDFF04F7CD51AA9F902253067A40594C7831BF1265503220D585B4D20/handshake/0"
     ],
     "role": "Upstream",
   },

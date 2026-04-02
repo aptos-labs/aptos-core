@@ -67,22 +67,27 @@ module 0xc0ffee::m {
     const I8_MAX: i8 = 127;
 
     // 16-bit
+    #[lint::skip(unused_constant)]
     const I16_MIN: i16 = -32768;
     const I16_MAX: i16 = 32767;
 
     // 32-bit
+    #[lint::skip(unused_constant)]
     const I32_MIN: i32 = -2147483648;
     const I32_MAX: i32 = 2147483647;
 
     // 64-bit
+    #[lint::skip(unused_constant)]
     const I64_MIN: i64 = -9223372036854775808;
     const I64_MAX: i64 = 9223372036854775807;
 
     // 128-bit
+    #[lint::skip(unused_constant)]
     const I128_MIN: i128 = -170141183460469231731687303715884105728;
     const I128_MAX: i128 = 170141183460469231731687303715884105727;
 
     // 256-bit (custom / nonstandard)
+    #[lint::skip(unused_constant)]
     const I256_MIN: i256 = -57896044618658097711785492504343953926634992332820282019728792003956564819968;
     const I256_MAX: i256 = 57896044618658097711785492504343953926634992332820282019728792003956564819967;
 

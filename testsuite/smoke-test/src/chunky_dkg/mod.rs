@@ -6,7 +6,9 @@ use aptos_forge::LocalSwarm;
 use aptos_rest_client::Client;
 use aptos_types::{
     decryption::PerEpochEncryptionKeyResource,
-    dkg::chunky_dkg::{AggregatedSubtranscript, ChunkyDKG, ChunkyDKGSessionState, ChunkyDKGState},
+    dkg::chunky_dkg::{
+        AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionState, ChunkyDKGState,
+    },
     on_chain_config::{FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainRandomnessConfig},
 };
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
@@ -61,7 +63,7 @@ fn verify_chunky_dkg_transcript(session: &ChunkyDKGSessionState) -> AggregatedSu
     );
 
     // Validate metadata consistency by generating a config from the session metadata.
-    let _config = ChunkyDKG::generate_config(&session.metadata);
+    let _config = ChunkyDKGSession::new(&session.metadata);
 
     subtranscript
 }

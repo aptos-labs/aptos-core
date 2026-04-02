@@ -99,6 +99,9 @@ Areas: consensus, mempool, network, storage, execution, vm, framework, api, cli,
 - Use checked arithmetic (`checked_add`, `saturating_sub`, etc.)
 - Infallible locks via `aptos-infallible` crate
 
+### Pattern Matching
+- Always use exhaustive `match` — never use a wildcard `_` arm to silence new enum variants
+
 ### Conditional Test Code
 ```rust
 #[cfg(any(test, feature = "fuzzing"))]

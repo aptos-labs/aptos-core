@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Analysis which computes information needed in backends for monomorphization. This
 //! computes the distinct type instantiations in the model for structs and inlined functions.
@@ -222,7 +223,7 @@ impl Analyzer<'_> {
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.
         for module in self.env.get_modules() {
             for fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_not_prover_target() {
                     continue;
                 }
                 for (variant, target) in self.targets.get_targets(&fun) {
@@ -235,7 +236,7 @@ impl Analyzer<'_> {
                     // included in the bytecode.
                     for (_, exps) in target.get_modify_ids_and_exps() {
                         for exp in exps {
-                            self.analyze_exp(exp);
+                            self.analyze_exp(&exp);
                         }
                     }
                 }
@@ -340,9 +341,15 @@ impl Analyzer<'_> {
                 self.analyze_bytecode(&target, bc);
             }
         }
-        // Analyze spec conditions for closures and types.
-        for cond in target.get_spec().conditions.iter() {
-            for exp in cond.all_exps() {
+        // Analyze spec conditions and proof hints for closures and types.
+        {
+            let spec = target.get_spec();
+            for cond in spec.conditions.iter() {
+                for exp in cond.all_exps() {
+                    self.analyze_exp(exp);
+                }
+            }
+            for exp in spec.proof_exps() {
                 self.analyze_exp(exp);
             }
         }
@@ -481,8 +488,11 @@ impl Analyzer<'_> {
                         .entry(callee_env.module_env.get_id())
                         .or_default()
                         .insert(actuals);
-                } else if !callee_env.is_opaque() {
+                } else if !callee_env.is_opaque() && !callee_env.is_struct_api() {
                     // This call needs to be inlined, with targs instantiated by self.inst_opt.
+                    // Struct API wrappers are excluded: their call sites are translated to native
+                    // ops (Pack, BorrowField, etc.) in stackless_bytecode_generator, so there is
+                    // no independent bytecode target to schedule for monomorphization.
                     // Schedule for later processing if this instance has not been processed yet.
                     let entry = (mid.qualified(*fid), FunctionVariant::Baseline, actuals);
                     if !self.done_funs.contains(&entry) {

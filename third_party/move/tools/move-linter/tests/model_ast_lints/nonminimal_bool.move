@@ -42,7 +42,7 @@ module 0xc0ffee::m {
         if (!true && false || true) ();
     }
 
-    #[lint::skip(nonminimal_bool)]
+    #[lint::skip(nonminimal_bool, unused_function)]
     fun test_no_warn(): bool {
         !true
     }

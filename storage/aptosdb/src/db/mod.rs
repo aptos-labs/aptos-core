@@ -25,6 +25,7 @@ pub mod test_helper;
 /// access to the core Aptos data structures.
 pub struct AptosDB {
     pub(crate) ledger_db: Arc<LedgerDb>,
+    pub(crate) hot_state_kv_db: Option<Arc<StateKvDb>>,
     pub(crate) state_kv_db: Arc<StateKvDb>,
     pub(crate) event_store: Arc<EventStore>,
     pub(crate) state_store: Arc<StateStore>,
@@ -104,7 +105,7 @@ impl AptosDB {
         block_cache: Option<&Cache>,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
-        reset_hot_state: bool,
+        hot_state_config: HotStateConfig,
     ) -> Result<(
         LedgerDb,
         Option<StateMerkleDb>,
@@ -118,6 +119,7 @@ impl AptosDB {
             env,
             block_cache,
             readonly,
+            hot_state_config.persist_hotness_in_write_set,
         )?;
         let hot_state_kv_db = if !readonly {
             Some(StateKvDb::new(
@@ -127,7 +129,7 @@ impl AptosDB {
                 block_cache,
                 readonly,
                 /* is_hot = */ true,
-                reset_hot_state,
+                hot_state_config.delete_on_restart,
             )?)
         } else {
             None
@@ -150,7 +152,7 @@ impl AptosDB {
                 readonly,
                 max_num_nodes_per_lru_cache_shard,
                 /* is_hot = */ true,
-                reset_hot_state,
+                hot_state_config.delete_on_restart,
             )?)
         } else {
             None

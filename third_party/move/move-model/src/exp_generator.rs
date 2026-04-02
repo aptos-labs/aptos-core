@@ -1,10 +1,11 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     ast::{
-        Address, BehaviorKind, BehaviorState, Exp, ExpData, MemoryLabel, Operation, Pattern,
+        Address, BehaviorKind, Exp, ExpData, MemoryLabel, MemoryRange, Operation, Pattern,
         QuantKind, TempIndex, Value,
     },
     model::{
@@ -295,7 +296,11 @@ pub trait ExpGenerator<'env> {
         let val = self.mk_call_with_inst(
             val_ty,
             vec![key_ty.clone(), val_ty.clone()],
-            Operation::SpecFunction(spec_fun_get.module_id, spec_fun_get.id, None),
+            Operation::SpecFunction(
+                spec_fun_get.module_id,
+                spec_fun_get.id,
+                MemoryRange::default(),
+            ),
             vec![map.clone(), key.clone()],
         );
         if let Some(body) = self.mk_join_opt_bool(Operation::And, f(key), f(val)) {
@@ -790,8 +795,7 @@ pub trait ExpGenerator<'env> {
         self.mk_result_of_with_label(fun_exp, args, result_type, None)
     }
 
-    /// Create `result_of<f, @label>(args)` expression with optional memory label.
-    /// The label specifies which memory state the function's behavior is evaluated at.
+    /// Create `result_of<f, @label>(args)` expression with optional post memory label.
     fn mk_result_of_with_label(
         &self,
         fun_exp: Exp,
@@ -801,16 +805,18 @@ pub trait ExpGenerator<'env> {
     ) -> Exp {
         let mut all_args = vec![fun_exp];
         all_args.extend(args);
-        let state = BehaviorState::new(None, label);
+        let range = MemoryRange {
+            pre: None,
+            post: label,
+        };
         self.mk_call(
             result_type,
-            Operation::Behavior(BehaviorKind::ResultOf, state),
+            Operation::Behavior(BehaviorKind::ResultOf, range),
             all_args,
         )
     }
 
     /// Create a result expression for a function call, extracting the nth component.
-    /// Calls `mk_result_of` and indexes into the tuple if there are multiple returns.
     fn mk_result_of_at(
         &self,
         fun_exp: Exp,
@@ -854,8 +860,7 @@ pub trait ExpGenerator<'env> {
         self.mk_aborts_of_with_label(fun_exp, args, None)
     }
 
-    /// Build aborts_of<f, @label>(args) predicate with optional memory label.
-    /// The label specifies which memory state the abort condition is evaluated at.
+    /// Build aborts_of<f, @label>(args) predicate with optional post memory label.
     fn mk_aborts_of_with_label(
         &self,
         fun_exp: Exp,
@@ -864,30 +869,33 @@ pub trait ExpGenerator<'env> {
     ) -> Exp {
         let mut all_args = vec![fun_exp];
         all_args.extend(args);
-        let state = BehaviorState::new(None, label);
-        self.mk_bool_call(Operation::Behavior(BehaviorKind::AbortsOf, state), all_args)
+        let range = MemoryRange {
+            pre: None,
+            post: label,
+        };
+        self.mk_bool_call(Operation::Behavior(BehaviorKind::AbortsOf, range), all_args)
     }
 
-    /// Create `result_of<f>(args)` expression with full state (pre and post labels).
+    /// Create `result_of<f>(args)` expression with pre and post state labels.
     fn mk_result_of_with_state(
         &self,
         fun_exp: Exp,
         args: Vec<Exp>,
         result_type: &Type,
-        state: BehaviorState,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
     ) -> Exp {
         let mut all_args = vec![fun_exp];
         all_args.extend(args);
+        let range = MemoryRange { pre, post };
         self.mk_call(
             result_type,
-            Operation::Behavior(BehaviorKind::ResultOf, state),
+            Operation::Behavior(BehaviorKind::ResultOf, range),
             all_args,
         )
     }
 
-    /// Create a result expression with full state, extracting the nth component.
-    /// For multiple results, generates `{ let (_t0, _t1, ...) = result_of<f>(args); _ti }`
-    /// using let-binding deconstruction since tuple index select is not available in specs.
+    /// Create a result expression with pre/post state, extracting the nth component.
     fn mk_result_of_at_with_state(
         &self,
         fun_exp: Exp,
@@ -895,9 +903,10 @@ pub trait ExpGenerator<'env> {
         result_type: &Type,
         result_index: usize,
         num_results: usize,
-        state: BehaviorState,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
     ) -> Exp {
-        let result_exp = self.mk_result_of_with_state(fun_exp, args, result_type, state);
+        let result_exp = self.mk_result_of_with_state(fun_exp, args, result_type, pre, post);
 
         // For multiple returns, extract the nth component via let-binding deconstruction
         if num_results > 1 {
@@ -906,7 +915,6 @@ pub trait ExpGenerator<'env> {
             } else {
                 vec![result_type.clone(); num_results]
             };
-            // Build pattern elements and find the symbol for the desired index
             let mut pat_elems = Vec::with_capacity(num_results);
             let mut selected_sym = None;
             let mut selected_ty = Type::Error;
@@ -920,7 +928,6 @@ pub trait ExpGenerator<'env> {
                 }
             }
             let Some(sym) = selected_sym else {
-                // Keep translation recoverable if result metadata is inconsistent.
                 let index_exp = self.mk_num_const(BigInt::from(result_index));
                 let select_node = self.new_node(Type::Error, None);
                 return ExpData::Call(select_node, Operation::Index, vec![result_exp, index_exp])
@@ -936,21 +943,33 @@ pub trait ExpGenerator<'env> {
         }
     }
 
-    /// Build aborts_of<f>(args) predicate with full state (pre and post labels).
-    fn mk_aborts_of_with_state(&self, fun_exp: Exp, args: Vec<Exp>, state: BehaviorState) -> Exp {
+    /// Build aborts_of<f>(args) predicate with pre/post state labels.
+    fn mk_aborts_of_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
         let mut all_args = vec![fun_exp];
         all_args.extend(args);
-        self.mk_bool_call(Operation::Behavior(BehaviorKind::AbortsOf, state), all_args)
+        let range = MemoryRange { pre, post };
+        self.mk_bool_call(Operation::Behavior(BehaviorKind::AbortsOf, range), all_args)
     }
 
-    /// Build ensures_of<f>(args) predicate with full state (pre and post labels).
-    /// Used for void-returning calls to capture the callee's post-conditions
-    /// and define the post-label for state chaining.
-    fn mk_ensures_of_with_state(&self, fun_exp: Exp, args: Vec<Exp>, state: BehaviorState) -> Exp {
+    /// Build ensures_of<f>(args) predicate with pre/post state labels.
+    fn mk_ensures_of_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
         let mut all_args = vec![fun_exp];
         all_args.extend(args);
+        let range = MemoryRange { pre, post };
         self.mk_bool_call(
-            Operation::Behavior(BehaviorKind::EnsuresOf, state),
+            Operation::Behavior(BehaviorKind::EnsuresOf, range),
             all_args,
         )
     }

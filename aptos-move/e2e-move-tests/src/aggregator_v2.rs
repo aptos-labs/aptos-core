@@ -101,7 +101,7 @@ fn initialize_harness(
         ]);
     }
     let account = harness.new_account_at(AccountAddress::ONE);
-    assert_success!(harness.publish_package_cache_building(&account, &path));
+    assert_success!(harness.publish_package(&account, &path));
     (harness, account)
 }
 
@@ -286,7 +286,7 @@ impl AggV2TestHarness {
 
     pub fn republish(&mut self) -> SignedTransaction {
         self.harness
-            .create_publish_package_cache_building(&self.account, &self.path, |_| {})
+            .create_publish_package(&self.account, &self.path, None, |_| {})
     }
 
     fn create_entry_agg_func_with_args(

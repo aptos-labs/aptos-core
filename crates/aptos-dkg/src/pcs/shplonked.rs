@@ -16,7 +16,7 @@
 // WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
 use crate::{
-    fiat_shamir::{PolynomialCommitmentScheme as _, SerializeForTranscript},
+    fiat_shamir::{PolynomialCommitmentScheme as _, SerializeForFiatShamirTranscript},
     pcs::{
         shplonked_sigma::{self, ShplonkedSigmaWitness},
         traits::PolynomialCommitmentScheme,
@@ -31,6 +31,7 @@ use crate::{
     },
     Scalar,
 };
+use anyhow::Result;
 use aptos_crypto::{
     arkworks::{
         msm,
@@ -169,8 +170,8 @@ impl<F: Field> HomTrait for SumEvalHom<F> {
     type CodomainNormalized = F;
     type Domain = Vec<Vec<F>>;
 
-    fn apply(&self, hidden_evals: &Self::Domain) -> Self::Codomain {
-        hidden_evals.iter().flatten().fold(F::zero(), |a, &b| a + b)
+    fn apply(&self, hidden_evals: &Self::Domain) -> Result<Self::Codomain> {
+        Ok(hidden_evals.iter().flatten().fold(F::zero(), |a, &b| a + b))
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -214,7 +215,7 @@ pub struct Srs<E: Pairing> {
 }
 
 /// Minimal bytes for Fiat–Shamir: only first two tau powers plus G2 elements (no full `taus_1`).
-impl<E: Pairing> SerializeForTranscript for Srs<E> {
+impl<E: Pairing> SerializeForFiatShamirTranscript for Srs<E> {
     fn serialize_compressed_for_transcript<W: std::io::Write>(
         &self,
         w: &mut W,
@@ -250,6 +251,40 @@ pub struct ShplonkedBatchProof<E: Pairing> {
     pub sigma_proof_statement: ShplonkedSigmaStatement<E>,
 }
 
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
+pub struct ShplonkedBatchProofProjective<E: Pairing> {
+    /// π_1: commitment to quotient polynomial q (W in legacy naming).
+    pub pi_1: E::G1Affine,
+    /// π_2: quotient commitment from PCS.Open (opening at x).
+    pub pi_2: (E::G1, E::G1),
+    /// π_PoK: sigma protocol proof (knowledge of y^hid). Statement is (com_y_hid, C_eval, φ(y)).
+    pub sigma_proof: Proof<E::ScalarField, shplonked_sigma::ShplonkedSigmaHom<'static, E>>,
+    /// Sigma protocol statement (com_y_hid, C_eval, φ(y)).
+    pub sigma_proof_statement: ShplonkedSigmaStatement<E>,
+}
+
+impl<E: Pairing> From<ShplonkedBatchProofProjective<E>> for ShplonkedBatchProof<E> {
+    fn from(p: ShplonkedBatchProofProjective<E>) -> Self {
+        let normalized = E::G1::normalize_batch(&[p.pi_2.0, p.pi_2.1]);
+        Self {
+            pi_1: p.pi_1,
+            pi_2: (normalized[0], normalized[1]),
+            sigma_proof: p.sigma_proof,
+            sigma_proof_statement: p.sigma_proof_statement,
+        }
+    }
+}
+
+impl<E: Pairing> From<ShplonkedBatchOpeningProjective<E>> for ShplonkedBatchOpening<E> {
+    fn from(p: ShplonkedBatchOpeningProjective<E>) -> Self {
+        Self {
+            evals: p.evals,
+            proof: p.proof.into(),
+        }
+    }
+}
+
 /// Batch opening: revealed evaluations plus the batch proof.
 /// Output is { y_i^rev }_i (one vector of revealed evals per polynomial).
 #[allow(non_snake_case)]
@@ -259,6 +294,15 @@ pub struct ShplonkedBatchOpening<E: Pairing> {
     pub evals: Vec<Vec<E::ScalarField>>,
     /// Batch opening proof π.
     pub proof: ShplonkedBatchProof<E>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug)]
+pub struct ShplonkedBatchOpeningProjective<E: Pairing> {
+    /// Revealed evaluations { y_i^rev }_i: for each polynomial i, the evaluations at S_i^rev.
+    pub evals: Vec<Vec<E::ScalarField>>,
+    /// Batch opening proof π.
+    pub proof: ShplonkedBatchProofProjective<E>,
 }
 
 impl<E: Pairing> ShplonkedBatchOpening<E> {
@@ -383,7 +427,7 @@ pub fn batch_open_generalized<
     hom: &H,
     trs: &mut merlin::Transcript,
     rng: &mut R,
-) -> ShplonkedBatchOpening<E> {
+) -> ShplonkedBatchOpeningProjective<E> {
     let n = polys.len();
     assert_eq!(sets.len(), n);
     assert_eq!(rhos.len(), n);
@@ -401,7 +445,7 @@ pub fn batch_open_generalized<
         y_hid_per_poly.push(evals_i.iter().skip(n_rev).cloned().collect());
     }
     let y_hid_flat: Vec<E::ScalarField> = y_hid_per_poly.iter().flatten().cloned().collect();
-    let phi_y = hom.apply(&y_hid_per_poly);
+    let phi_y = hom.apply(&y_hid_per_poly).expect("hom.apply");
 
     let c_y_hid_randomness = sample_field_element(rng);
     let com_y_hom = shplonked_sigma::com_y_hom::<E>(&srs.taus_1[..y_hid_flat.len()], srs.xi_1);
@@ -411,6 +455,7 @@ pub fn batch_open_generalized<
             hidden_evals: y_hid_per_poly.clone(),
             C_evals_randomness: E::ScalarField::zero(),
         })
+        .expect("com_y_hom.apply")
         .0
         .into_affine();
 
@@ -488,6 +533,7 @@ pub fn batch_open_generalized<
             hiding_randomness: Scalar(rho_q),
             values: Scalar::vec_from_inner(q_poly.coeffs().to_vec()),
         })
+        .expect("hom_commit_q.apply")
         .0
         .into_affine();
 
@@ -550,7 +596,10 @@ pub fn batch_open_generalized<
         hidden_evals: y_hid_per_poly.clone(),
         C_evals_randomness: rho_eval,
     };
-    let C_eval_hid_proj: E::G1 = eval_point_commit_hom.apply(&witness_for_C_eval_hid).0;
+    let C_eval_hid_proj: E::G1 = eval_point_commit_hom
+        .apply(&witness_for_C_eval_hid)
+        .expect("eval_point_commit_hom.apply")
+        .0;
 
     // Step 5a: f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g.
     let mut f_poly = DensePolynomial::zero();
@@ -605,22 +654,21 @@ pub fn batch_open_generalized<
         ),
         phi_y,
     );
-    let (sigma_protocol_proof, sigma_statement) =
-        full_hom.prove(&witness, statement_proj, SHPLONKED_SIGMA_DST, rng);
+    let (sigma_protocol_proof, sigma_statement) = full_hom
+        .prove(&witness, statement_proj, SHPLONKED_SIGMA_DST, rng)
+        .expect("full_hom.prove");
     let sigma_proof =
         sigma_protocol_proof.change_lifetime::<shplonked_sigma::ShplonkedSigmaHom<'static, E>>();
 
     // π_2 from PCS.Open: pi_2 = quotient commitment, pi_2_extra = hiding compensation.
-    let pi_2 = opening.pi_1.0.into_affine();
-    let pi_2_extra = opening.pi_2.into_affine();
 
-    let proof = ShplonkedBatchProof {
+    let proof = ShplonkedBatchProofProjective {
         pi_1,
-        pi_2: (pi_2, pi_2_extra),
+        pi_2: (opening.pi_1.0, opening.pi_2),
         sigma_proof,
         sigma_proof_statement: sigma_statement,
     };
-    ShplonkedBatchOpening {
+    ShplonkedBatchOpeningProjective {
         evals: y_rev_per_poly,
         proof,
     }
@@ -773,13 +821,13 @@ pub fn batch_pairing_for_verify_generalized<
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    let merged = merge_msm_inputs_with_scales(&commitment_msms, &weights);
+    let merged = merge_msm_inputs_with_scales(&commitment_msms, &weights)?;
 
     let msm_pi1 = MsmInput::new(vec![*pi_1], vec![-z_S_val]).expect("MSM pi_1");
     let merged_minus_pi1 = merge_msm_inputs_with_scales(&[merged, msm_pi1], &[
         E::ScalarField::ONE,
         E::ScalarField::ONE,
-    ]);
+    ])?;
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("merge MSMs (merged, merged_minus_pi1)", start.elapsed());
 
@@ -855,8 +903,8 @@ pub fn batch_pairing_for_verify_generalized<
         &prover_commitment.0,
         &sigma_proof.z,
         c_sigma,
-    );
-    let hom1_merged = msm::merge_msm_inputs(&hom1_msm_terms, rng);
+    )?;
+    let hom1_merged = msm::merge_msm_inputs(&hom1_msm_terms, rng)?;
     // C_eval = C_eval_hid + g_rev·τ_0 for the batch pairing check.
     let c_eval = (c_eval_hid.into_group() + srs.taus_1[0].into_group() * g_rev_at_x).into_affine();
     #[cfg(feature = "range_proof_timing_multivariate")]
@@ -874,7 +922,7 @@ pub fn batch_pairing_for_verify_generalized<
             E::ScalarField::ONE,
             E::ScalarField::ONE,
             c_n,
-        ]);
+        ])?;
     let C_f = E::G1::msm(c_f_msm.bases(), c_f_msm.scalars()).expect("batch verify: C_f MSM");
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("C_f (single merged MSM)", start.elapsed());
@@ -919,8 +967,9 @@ where
     type Commitment = ShplonkedCommitment<E>;
     type CommitmentKey = Srs<E>;
     type CommitmentNormalised = ShplonkedVerifierCommitment<E>;
+    type OpeningProof = ShplonkedBatchProof<E>;
+    type OpeningProofProjective = ShplonkedBatchProofProjective<E>;
     type Polynomial = DensePolynomial<E::ScalarField>;
-    type Proof = ShplonkedBatchProof<E>;
     type VerificationKey = Srs<E>;
     // This is not ideal, but we need some of the SRS in order to verify the sigma protocol proof.
     type WitnessField = E::ScalarField;
@@ -973,6 +1022,7 @@ where
                 hiding_randomness: Scalar(r),
                 values: Scalar::vec_from_inner(poly.coeffs.clone()),
             })
+            .expect("Shplonked commit")
             .0;
         ShplonkedCommitment(comm)
     }
@@ -984,7 +1034,7 @@ where
         r: Option<Self::WitnessField>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> Self::Proof {
+    ) -> Self::OpeningProofProjective {
         let r = r.expect("Shplonked::open requires commitment randomness");
         let point = challenge
             .first()
@@ -1015,7 +1065,7 @@ where
         rs: Option<Vec<Self::WitnessField>>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> Self::Proof {
+    ) -> Self::OpeningProofProjective {
         let rs = rs.expect("Shplonked::batch_open requires randomness per polynomial");
         let point = challenge
             .first()
@@ -1046,7 +1096,7 @@ where
         com: impl Into<Self::CommitmentNormalised>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
-        proof: Self::Proof,
+        proof: Self::OpeningProof,
         trs: &mut merlin::Transcript,
         _batch: bool,
     ) -> anyhow::Result<()> {
@@ -1154,6 +1204,7 @@ mod tests {
             &mut trs,
             &mut rng,
         );
+        let opening: ShplonkedBatchOpening<Bn254> = opening.into();
         assert!(opening.get_evals().iter().all(|v| v.is_empty()));
         let expected_phi =
             polys[0].evaluate(&p0) + polys[1].evaluate(&p10) + polys[1].evaluate(&p11);
@@ -1258,6 +1309,7 @@ mod tests {
             &mut trs,
             &mut rng,
         );
+        let opening: ShplonkedBatchOpening<Bn254> = opening.into();
 
         assert!(opening.get_evals().iter().all(|v| v.is_empty()));
 
@@ -1370,6 +1422,7 @@ mod tests {
             &mut trs,
             &mut rng,
         );
+        let opening: ShplonkedBatchOpening<Bn254> = opening.into();
 
         let expected_y_rev: Vec<Vec<Fr>> = sets
             .iter()

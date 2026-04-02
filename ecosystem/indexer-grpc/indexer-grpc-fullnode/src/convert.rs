@@ -3,13 +3,14 @@
 
 use aptos_api_types::{
     transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
-    DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
-    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
-    MoveStruct, MoveStructField, MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature,
-    MultiKeySignature, MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload,
-    Signature, SingleKeySignature, Transaction, TransactionInfo, TransactionPayload,
-    TransactionSignature, WriteSet, WriteSetChange,
+    DeleteModule, DeleteResource, Ed25519Signature, EncryptedTransactionInnerPayload,
+    EncryptedTransactionPayload, EntryFunctionId, EntryFunctionPayload, Event, GenesisPayload,
+    MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
+    MoveModuleBytecode, MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField,
+    MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature, MultiKeySignature,
+    MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature,
+    SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
+    WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -221,6 +222,59 @@ pub fn convert_transaction_payload(
                     },
                 ),
             ),
+        },
+
+        TransactionPayload::EncryptedTransactionPayload(ep) => {
+            let state = match ep {
+                EncryptedTransactionPayload::Encrypted(_) => {
+                    unreachable!("Encrypted state should not reach indexer gRPC")
+                },
+                EncryptedTransactionPayload::FailedDecryption(_) => {
+                    transaction::encrypted_transaction_payload::State::FailedDecryption(
+                        transaction::FailedDecryptionPayloadState {},
+                    )
+                },
+                EncryptedTransactionPayload::Decrypted(p) => {
+                    let decrypted_payload = match &p.decrypted_payload {
+                        EncryptedTransactionInnerPayload::EntryFunctionPayload(efp) => {
+                            transaction::decrypted_payload_state::DecryptedPayload::EntryFunctionPayload(
+                                convert_entry_function_payload(efp),
+                            )
+                        },
+                        EncryptedTransactionInnerPayload::ScriptPayload(sp) => {
+                            transaction::decrypted_payload_state::DecryptedPayload::ScriptPayload(
+                                convert_script_payload(sp),
+                            )
+                        },
+                        EncryptedTransactionInnerPayload::MultisigPayload(mp) => {
+                            transaction::decrypted_payload_state::DecryptedPayload::MultisigPayload(
+                                convert_multisig_payload(mp),
+                            )
+                        },
+                    };
+                    transaction::encrypted_transaction_payload::State::Decrypted(
+                        transaction::DecryptedPayloadState {
+                            decrypted_payload: Some(decrypted_payload),
+                        },
+                    )
+                },
+            };
+            transaction::TransactionPayload {
+                r#type: transaction::transaction_payload::Type::EncryptedTransactionPayload as i32,
+                payload: Some(
+                    transaction::transaction_payload::Payload::EncryptedTransactionPayload(
+                        transaction::EncryptedTransactionPayload { state: Some(state) },
+                    ),
+                ),
+                extra_config: Some(
+                    transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                        transaction::ExtraConfigV1 {
+                            multisig_address: None,
+                            replay_protection_nonce: nonce,
+                        },
+                    ),
+                ),
+            }
         },
 
         // Deprecated.

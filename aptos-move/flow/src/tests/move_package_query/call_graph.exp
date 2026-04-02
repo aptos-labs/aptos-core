@@ -1,0 +1,9 @@
+{
+  "0xcafe::app::run": [
+    "0xcafe::math::double"
+  ],
+  "0xcafe::math::add": [],
+  "0xcafe::math::double": [
+    "0xcafe::math::add"
+  ]
+}

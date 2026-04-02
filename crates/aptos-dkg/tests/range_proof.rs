@@ -15,7 +15,7 @@ use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
-use std::{any::type_name, fmt::Debug};
+use std::any::type_name;
 
 #[cfg(test)]
 fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
@@ -34,8 +34,11 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
         ell
     );
 
-    let proof = B::prove(pk, &values, ell, &comm.clone().into(), &r, &mut rng);
-    proof.verify(vk, n, ell, &comm, &mut rng).unwrap();
+    let proof_projective = B::prove(pk, &values, ell, &comm.clone().into(), &r, &mut rng);
+    let proof: B = proof_projective.into();
+    proof
+        .verify(vk, n, ell, &comm.clone().into(), &mut rng)
+        .unwrap();
 
     // === Serialize to memory ===
     let encoded = {
@@ -58,7 +61,9 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     let decoded = B::deserialize_compressed(&*encoded).expect("Deserialization failed");
 
     // Verify still succeeds
-    decoded.verify(vk, n, ell, &comm, &mut rng).unwrap();
+    decoded
+        .verify(vk, n, ell, &comm.clone().into(), &mut rng)
+        .unwrap();
 
     println!(
         "[{}] Serialization round-trip test passed for n={}, ell={}",
@@ -70,16 +75,15 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     // Make invalid
     let mut invalid_proof = decoded.clone();
     invalid_proof.maul();
-    assert!(invalid_proof.verify(vk, n, ell, &comm, &mut rng).is_err());
+    assert!(invalid_proof
+        .verify(vk, n, ell, &comm.clone().into(), &mut rng)
+        .is_err());
 }
 
 #[cfg(test)]
 fn assert_keys_serialization<E: Pairing, B: BatchedRangeProof<E>>(
     setup: &RangeProofUniversalSetup<E, B>,
-) where
-    B::ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug, // TODO: make these part of the traits?
-    B::VerificationKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
-{
+) {
     let RangeProofUniversalSetup { pk, vk } = setup;
 
     // === Prover key serialization/deserialization ===
@@ -151,8 +155,6 @@ fn assert_correctness_and_serialization_for_range_proof_and_curve<E, B>()
 where
     E: Pairing,
     B: BatchedRangeProof<E>,
-    B::ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
-    B::VerificationKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
 {
     let setups = make_single_curve_setup::<E, B>(31, 16);
     for &(n, ell) in TEST_CASES {

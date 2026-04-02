@@ -1,0 +1,27 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/proof/split.move:59:9
+   │
+59 │         ensures result >= 10;  // too strong: result can be 5
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/split.move:55: clamp_above
+   =         x = <redacted>
+   =     at tests/sources/functional/proof/split.move:61: clamp_above (spec)
+   =     at tests/sources/functional/proof/split.move:56: clamp_above
+   =         result = <redacted>
+   =     at tests/sources/functional/proof/split.move:59: clamp_above (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/proof/split.move:59:9
+   │
+59 │         ensures result >= 10;  // too strong: result can be 5
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/split.move:55: clamp_above
+   =         x = <redacted>
+   =     at tests/sources/functional/proof/split.move:61: clamp_above (spec)
+   =     at tests/sources/functional/proof/split.move:56: clamp_above
+   =         result = <redacted>
+   =     at tests/sources/functional/proof/split.move:57: clamp_above
+   =     at tests/sources/functional/proof/split.move:59: clamp_above (spec)

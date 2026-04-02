@@ -7,6 +7,7 @@ module 0x42::loop_invalid {
         f(position, y)
     }
 
+    #[lint::skip(unused_function)]
     fun test(
         f: |&mut u64, u64|
     ) {

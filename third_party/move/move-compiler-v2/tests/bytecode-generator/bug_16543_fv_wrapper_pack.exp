@@ -27,13 +27,13 @@ module 0xc0ffee::n {
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
     friend 0xc0ffee::n;
-    struct Lazy has drop {
+    friend struct Lazy has drop {
         0: || has drop,
     }
 }
 module 0xc0ffee::m_friend {
     friend 0xc0ffee::n;
-    struct Lazy has drop {
+    friend struct Lazy has drop {
         0: || has drop,
     }
 }

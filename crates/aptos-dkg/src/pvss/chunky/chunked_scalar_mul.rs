@@ -10,6 +10,7 @@ use crate::{
     },
     Scalar,
 };
+use anyhow::{anyhow, Result};
 use aptos_crypto::arkworks::{self, msm::MsmInput};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{scalar_mul::BatchMulPreprocessing, CurveGroup};
@@ -95,12 +96,14 @@ where
     where
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
+    fn try_map<U, E, F>(self, f: F) -> Result<Self::Output<U>, E>
     where
-        F: FnMut(T) -> U,
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
-        CodomainShape(self.0.into_iter().map(f).collect())
+        Ok(CodomainShape(
+            self.0.into_iter().map(f).collect::<Result<Vec<_>, _>>()?,
+        ))
     }
 }
 
@@ -129,7 +132,7 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
     type CodomainNormalized = CodomainShape<C::Affine>;
     type Domain = Witness<C::ScalarField>;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
         // Convert each chunked value to a scalar entrywise
         let scalars: Vec<C::ScalarField> = input
             .chunked_values
@@ -140,7 +143,7 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
         // Batch multiply using the base element
         let outputs = arkworks::batch_mul(&self.table, &scalars);
 
-        CodomainShape(outputs)
+        Ok(CodomainShape(outputs))
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -160,7 +163,7 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
         let mut terms = Vec::new();
 
         for chunks in &input.chunked_values {
@@ -173,11 +176,12 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
             });
         }
 
-        CodomainShape(terms)
+        Ok(CodomainShape(terms))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr") // TODO: custom MSM here, because only length 1 MSM except during verification
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        C::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
@@ -243,7 +247,7 @@ mod tests {
         };
 
         // Apply the homomorphism
-        let CodomainShape(outputs) = hom.apply(&witness);
+        let CodomainShape(outputs) = hom.apply(&witness).expect("apply");
 
         // Check correctness:
         // base * unchunk(chunks) == output

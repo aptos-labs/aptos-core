@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Test framework for the Move decompiler, allowing different compilation, decompilation, and testing configurations.
 
@@ -188,6 +188,19 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             name: "compiler-v2-test",
             runner: |p| run_test(p, get_config_by_name("compiler-v2-test")),
             sources: "./tests/compiler-v2-test",
+            sources_deps: vec![],
+            dependencies: vec!["./tests/legacy-move-stdlib"],
+            exclude: vec![],
+            test_level: TestLevel::Recompile,
+            ..config()
+                .lang(LanguageVersion::latest())
+                .no_cfg_opt(false)
+                .no_assign_opt(false)
+        },
+        TestConfig {
+            name: "public-struct",
+            runner: |p| run_test(p, get_config_by_name("public-struct")),
+            sources: "./tests/public-struct",
             sources_deps: vec![],
             dependencies: vec!["./tests/legacy-move-stdlib"],
             exclude: vec![],

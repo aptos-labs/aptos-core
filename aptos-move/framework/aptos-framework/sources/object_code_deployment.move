@@ -31,7 +31,6 @@
 module aptos_framework::object_code_deployment {
     use std::bcs;
     use std::error;
-    use std::features;
     use std::signer;
     use aptos_framework::account;
     use aptos_framework::code;
@@ -86,11 +85,6 @@ module aptos_framework::object_code_deployment {
         code: vector<vector<u8>>,
     ) {
         code::check_code_publishing_permission(publisher);
-        assert!(
-            features::is_object_code_deployment_enabled(),
-            error::unavailable(EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED),
-        );
-
         let publisher_address = signer::address_of(publisher);
         let object_seed = object_seed(publisher_address);
         let constructor_ref = &object::create_named_object(publisher, object_seed);
@@ -116,16 +110,19 @@ module aptos_framework::object_code_deployment {
     /// along with the metadata `metadata_serialized`.
     /// Note: If the modules were deployed as immutable when calling `publish`, the upgrade will fail.
     /// Requires the publisher to be the owner of the `code_object`.
+    ///
+    /// Note: In order to publish a new package to an existing code object,
+    /// this `upgrade` function should be called, rather than `publish`.
     public entry fun upgrade(
         publisher: &signer,
         metadata_serialized: vector<u8>,
         code: vector<vector<u8>>,
         code_object: Object<PackageRegistry>,
-    ) acquires ManagingRefs {
+    ) {
         code::check_code_publishing_permission(publisher);
         let publisher_address = signer::address_of(publisher);
         assert!(
-            code_object.is_owner(publisher_address),
+            object::is_owner(code_object, publisher_address),
             error::permission_denied(ENOT_CODE_OBJECT_OWNER),
         );
 
@@ -146,5 +143,25 @@ module aptos_framework::object_code_deployment {
         code::freeze_code_object(publisher, code_object);
 
         event::emit(Freeze { object_address: code_object.object_address(), });
+    }
+
+    /// Returns the signer for the given `code_object`.
+    /// For example, this can be used if you need to additional initialization
+    /// after upgrading a module.
+    ///
+    /// Requires the publisher to be the owner of the `code_object`.
+    public fun get_code_object_signer(publisher: &signer, code_object: Object<PackageRegistry>): signer {
+        code::check_code_publishing_permission(publisher);
+        let publisher_address = signer::address_of(publisher);
+        assert!(
+            object::is_owner(code_object, publisher_address),
+            error::permission_denied(ENOT_CODE_OBJECT_OWNER),
+        );
+
+        let code_object_address = code_object.object_address();
+        assert!(exists<ManagingRefs>(code_object_address), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
+
+        let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
+        extend_ref.generate_signer_for_extending()
     }
 }

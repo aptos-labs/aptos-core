@@ -1,8 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{file_watcher::FileWatcher, package_data::PackageData, McpArgs};
-use crate::{utilities::format_error_chain, GlobalOpts};
+use super::{
+    common::format_error_chain, file_watcher::FileWatcher, package_data::PackageData, McpArgs,
+};
+use crate::GlobalOpts;
 use rmcp::{
     handler::server::router::tool::ToolRouter,
     model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo},
@@ -10,7 +12,7 @@ use rmcp::{
 };
 use serde::Serialize;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -24,6 +26,9 @@ pub(crate) struct FlowSession {
     /// Cache of compiled packages. `Mutex<PackageData>` is needed because `GlobalEnv`
     /// is `!Sync` (it uses `RefCell` internally).
     package_cache: Arc<Mutex<BTreeMap<String, Arc<Mutex<PackageData>>>>>,
+    /// Packages that have been verified or inferred and thus need bytecode on rebuild.
+    /// Entries survive cache invalidation so that file-watcher rebuilds include bytecode.
+    needs_bytecode: Arc<Mutex<BTreeSet<String>>>,
     file_watcher: FileWatcher,
     tool_router: ToolRouter<Self>,
     /// Session-scoped temp directory, automatically deleted on drop.
@@ -31,27 +36,46 @@ pub(crate) struct FlowSession {
 }
 
 impl FlowSession {
+    /// Combined router for all registered MCP tools.
+    ///
+    /// Add new tool routers here — this is the single source of truth used by
+    /// both `new()` and `tool_names()`.
+    fn all_tool_routers() -> ToolRouter<Self> {
+        Self::package_manifest_router()
+            + Self::package_query_router()
+            + Self::package_spec_infer_router()
+            + Self::package_status_router()
+            + Self::package_test_router()
+            + Self::package_verify_router()
+    }
+
     /// Returns the names of all registered MCP tools.
     /// Used by the plugin renderer to validate tool references in templates.
     pub(crate) fn tool_names() -> Vec<String> {
-        let router = Self::package_manifest_router()
-            + Self::package_status_router()
-            + Self::package_verify_router()
-            + Self::package_spec_infer_router()
-            + Self::package_test_router();
-        router
+        Self::all_tool_routers()
             .list_all()
             .into_iter()
             .map(|t| t.name.to_string())
             .collect()
     }
 
-    pub(crate) fn args(&self) -> &McpArgs {
-        &self.args
+    /// Returns (name, description) pairs for all registered MCP tools.
+    /// Used by the plugin renderer to generate the README.
+    pub(crate) fn tool_descriptions() -> Vec<(String, String)> {
+        Self::all_tool_routers()
+            .list_all()
+            .into_iter()
+            .map(|t| {
+                (
+                    t.name.to_string(),
+                    t.description.as_deref().unwrap_or("").to_string(),
+                )
+            })
+            .collect()
     }
 
-    pub(crate) fn file_watcher(&self) -> &FileWatcher {
-        &self.file_watcher
+    pub(crate) fn args(&self) -> &McpArgs {
+        &self.args
     }
 
     pub(crate) fn temp_dir(&self) -> &Path {
@@ -78,14 +102,20 @@ impl FlowSession {
             global,
             args,
             package_cache,
+            needs_bytecode: Arc::new(Mutex::new(BTreeSet::new())),
             file_watcher,
-            tool_router: Self::package_manifest_router()
-                + Self::package_status_router()
-                + Self::package_verify_router()
-                + Self::package_spec_infer_router()
-                + Self::package_test_router(),
+            tool_router: Self::all_tool_routers(),
             temp_dir,
         }
+    }
+
+    /// Record that `package_path` needs bytecode on subsequent builds.
+    pub(crate) fn mark_needs_bytecode(&self, package_path: &str) {
+        let key = self.resolve_package_path(package_path);
+        self.needs_bytecode
+            .lock()
+            .expect("needs_bytecode lock poisoned")
+            .insert(key);
     }
 
     /// Resolve and canonicalize the given package path, returning a string key.
@@ -97,17 +127,19 @@ impl FlowSession {
             .into_owned()
     }
 
-    /// Resolve a package, returning cached `PackageData` or building it on cache miss.
+    /// Resolve a package, returning `(package_data, rebuilt)`.
     ///
-    /// Building is offloaded to `spawn_blocking` since compilation is a heavy
-    /// synchronous operation that must not block the async executor.
+    /// Returns cached `PackageData` (`rebuilt = false`) or builds it on cache
+    /// miss (`rebuilt = true`). Building is offloaded to `spawn_blocking` since
+    /// compilation is a heavy synchronous operation that must not block the
+    /// async executor.
     ///
     /// Cache entries are removed directly by the file-watcher callback,
     /// so a cache miss here means either first access or an invalidation.
     pub(crate) async fn resolve_package(
         &self,
         package_path: &str,
-    ) -> Result<Arc<Mutex<PackageData>>, rmcp::ErrorData> {
+    ) -> Result<(Arc<Mutex<PackageData>>, bool), rmcp::ErrorData> {
         let key = self.resolve_package_path(package_path);
         {
             let cache = self
@@ -116,7 +148,7 @@ impl FlowSession {
                 .expect("package_cache lock poisoned");
             if let Some(data) = cache.get(&key) {
                 log::info!("cache hit for `{}`", key);
-                return Ok(Arc::clone(data));
+                return Ok((Arc::clone(data), false));
             }
         }
 
@@ -125,23 +157,31 @@ impl FlowSession {
         // `cache.remove(key)` which is a no-op while there is no cache entry.
         let build_start = std::time::SystemTime::now();
 
-        log::info!("building package `{}`", key);
+        let with_bytecode = self
+            .needs_bytecode
+            .lock()
+            .expect("needs_bytecode lock poisoned")
+            .contains(&key);
+        log::info!(
+            "building package `{}` (with_bytecode={})",
+            key,
+            with_bytecode
+        );
         let args = self.args.clone();
         let key_clone = key.clone();
-        let data =
-            tokio::task::spawn_blocking(move || PackageData::init(key_clone.as_ref(), &args))
-                .await
-                .map_err(|e| {
-                    rmcp::ErrorData::internal_error(format!("build task failed: {}", e), None)
-                })?
-                .map_err(|e| {
-                    let msg = format_error_chain(&e);
-                    log::info!("build failed for `{}`: {}", key, msg);
-                    rmcp::ErrorData::internal_error(
-                        format!("failed to build package `{}`: {}", key, msg),
-                        None,
-                    )
-                })?;
+        let data = tokio::task::spawn_blocking(move || {
+            PackageData::init(key_clone.as_ref(), &args, with_bytecode)
+        })
+        .await
+        .map_err(|e| rmcp::ErrorData::internal_error(format!("build task failed: {}", e), None))?
+        .map_err(|e| {
+            let msg = format_error_chain(&e);
+            log::info!("build failed for `{}`: {}", key, msg);
+            rmcp::ErrorData::internal_error(
+                format!("failed to build package `{}`: {}", key, msg),
+                None,
+            )
+        })?;
 
         // Swap old watches for the new source file set.
         self.file_watcher.unwatch_package(&key);
@@ -162,7 +202,7 @@ impl FlowSession {
         let data = Arc::new(Mutex::new(data));
         if stale {
             log::info!("source changed during build of `{}`, skipping cache", key);
-            return Ok(data);
+            return Ok((data, true));
         }
 
         let mut cache = self
@@ -170,7 +210,7 @@ impl FlowSession {
             .lock()
             .expect("package_cache lock poisoned");
         cache.insert(key, Arc::clone(&data));
-        Ok(data)
+        Ok((data, true))
     }
 }
 

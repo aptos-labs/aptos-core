@@ -8,7 +8,6 @@
 //! knows which package the user is working in. Outputs nothing if no
 //! package is found. Always exits 0.
 
-use crate::utilities::find_package_root;
 use anyhow::Result;
 use std::path::Path;
 
@@ -51,6 +50,21 @@ fn read_package_name(path: &Path) -> Option<String> {
         }
     }
     None
+}
+
+/// Find the Move package root by walking up from the given directory.
+fn find_package_root(start: &Path) -> Option<std::path::PathBuf> {
+    let mut dir = start;
+    loop {
+        let manifest = dir.join("Move.toml");
+        if manifest.is_file() {
+            return Some(dir.to_path_buf());
+        }
+        match dir.parent() {
+            Some(parent) => dir = parent,
+            None => return None,
+        }
+    }
 }
 
 #[cfg(test)]

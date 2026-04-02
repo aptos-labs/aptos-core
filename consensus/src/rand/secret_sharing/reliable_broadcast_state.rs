@@ -5,7 +5,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     rand::secret_sharing::{
         network_messages::SecretShareMessage, secret_share_store::SecretShareStore,
-        types::RequestSecretShare,
+        types::RequestSecretShare, verifier::SecretShareVerifier,
     },
 };
 use anyhow::ensure;
@@ -13,25 +13,25 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::BroadcastStatus;
-use aptos_types::secret_sharing::{SecretShare, SecretShareConfig, SecretShareMetadata};
+use aptos_types::secret_sharing::{SecretShare, SecretShareMetadata};
 use std::sync::Arc;
 
 pub struct SecretShareAggregateState {
     secret_share_metadata: SecretShareMetadata,
     secret_share_store: Arc<Mutex<SecretShareStore>>,
-    secret_share_config: SecretShareConfig,
+    verifier: Arc<SecretShareVerifier>,
 }
 
 impl SecretShareAggregateState {
     pub fn new(
         secret_share_store: Arc<Mutex<SecretShareStore>>,
         secret_share_metadata: SecretShareMetadata,
-        secret_share_config: SecretShareConfig,
+        verifier: Arc<SecretShareVerifier>,
     ) -> Self {
         Self {
             secret_share_store,
             secret_share_metadata,
-            secret_share_config,
+            verifier,
         }
     }
 }
@@ -49,7 +49,7 @@ impl BroadcastStatus<SecretShareMessage, SecretShareMessage> for Arc<SecretShare
             self.secret_share_metadata,
             share.metadata()
         );
-        share.verify(&self.secret_share_config)?;
+        self.verifier.optimistic_verify(&share, &peer)?;
         info!(LogSchema::new(LogEvent::ReceiveReactiveSecretShare)
             .epoch(share.epoch())
             .round(share.metadata().round)
@@ -64,10 +64,10 @@ impl BroadcastStatus<SecretShareMessage, SecretShareMessage> for Arc<SecretShare
 mod tests {
     use super::*;
     use crate::rand::secret_sharing::{
-        secret_share_store::SecretShareStore,
+        secret_share_store::{SecretShareAggregationResult, SecretShareStore},
         test_utils::{create_metadata, create_secret_share, TestContext},
+        verifier::SecretShareVerifier,
     };
-    use aptos_types::secret_sharing::SecretSharedKey;
     use futures_channel::mpsc::{unbounded, UnboundedReceiver};
 
     fn make_state(
@@ -75,15 +75,14 @@ mod tests {
         metadata: &SecretShareMetadata,
     ) -> (
         Arc<SecretShareAggregateState>,
-        UnboundedReceiver<SecretSharedKey>,
+        UnboundedReceiver<SecretShareAggregationResult>,
     ) {
         let (tx, rx) = unbounded();
-        let mut store = SecretShareStore::new(
-            ctx.epoch,
-            ctx.authors[0],
+        let verifier = Arc::new(SecretShareVerifier::new(
             ctx.secret_share_config.clone(),
-            tx,
-        );
+            true,
+        ));
+        let mut store = SecretShareStore::new(ctx.epoch, ctx.authors[0], verifier.clone(), tx);
         store.update_highest_known_round(metadata.round);
 
         // Add self share so the store is in PendingDecision state
@@ -93,7 +92,7 @@ mod tests {
         let state = Arc::new(SecretShareAggregateState::new(
             Arc::new(Mutex::new(store)),
             metadata.clone(),
-            ctx.secret_share_config.clone(),
+            verifier,
         ));
         (state, rx)
     }
@@ -126,19 +125,20 @@ mod tests {
             if i < 2 {
                 assert!(result.is_none());
             } else {
-                // The aggregation is triggered asynchronously via spawn_blocking,
-                // so add_share returns decided=true but the channel delivery is async
+                // Threshold met, state transitions to Aggregating
                 assert!(result.is_some());
             }
         }
 
         // Verify decision arrives on channel
         use futures::StreamExt;
-        let key: SecretSharedKey =
-            tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
-                .await
-                .expect("Timed out waiting for decision")
-                .expect("Channel closed unexpectedly");
-        assert_eq!(key.metadata, metadata);
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for decision")
+            .expect("Channel closed unexpectedly");
+        match result {
+            SecretShareAggregationResult::Success(key) => assert_eq!(key.metadata, metadata),
+            SecretShareAggregationResult::Failure { .. } => panic!("Expected success"),
+        }
     }
 }

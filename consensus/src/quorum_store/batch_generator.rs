@@ -246,8 +246,26 @@ impl BatchGenerator {
 
         self.insert_batch(self.my_peer_id, batch_id, txns.clone(), expiry_time);
 
-        counters::CREATED_BATCHES_COUNT.inc();
-        counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
+        let batch_version = if self.config.enable_batch_v2_tx {
+            "v2"
+        } else {
+            "v1"
+        };
+        let kind_str = if self.config.enable_batch_v2_tx {
+            match batch_kind {
+                BatchKind::Normal => "normal",
+                BatchKind::Encrypted => "encrypted",
+            }
+        } else {
+            "na"
+        };
+        counters::CREATED_BATCHES_COUNT
+            .with_label_values(&[batch_version, kind_str])
+            .inc();
+        counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len(), batch_version);
+        counters::CREATED_TXNS_BY_KIND
+            .with_label_values(&[batch_version, kind_str])
+            .inc_by(txns.len() as u64);
 
         if self.config.enable_batch_v2_tx {
             Batch::new_v2(
@@ -288,7 +306,11 @@ impl BatchGenerator {
             if *total_batches_remaining == 0 {
                 return;
             }
-            let num_take_txns = std::cmp::min(self.config.sender_max_batch_txns, txns_remaining);
+            let max_batch_txns = match batch_kind {
+                BatchKind::Encrypted => self.config.sender_max_encrypted_batch_txns,
+                BatchKind::Normal => self.config.sender_max_batch_txns,
+            };
+            let num_take_txns = std::cmp::min(max_batch_txns, txns_remaining);
             let mut batch_bytes_remaining = self.config.sender_max_batch_bytes as u64;
             let num_batch_txns = txns
                 .iter()

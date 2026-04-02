@@ -23,7 +23,7 @@ on:
         default: forge
         options:
           - forge
-          - etna
+          - etna-rust
         description: The docker image name to use for the forge runner
       FORGE_RUNNER_DURATION_SECS:
         required: false

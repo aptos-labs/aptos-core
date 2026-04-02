@@ -345,7 +345,7 @@ module swap::liquidity_pool {
     ): FungibleAsset acquires FeesAccounting, LiquidityPool, LiquidityPoolConfigs {
         assert!(!safe_liquidity_pool_configs().is_paused, ESWAPS_ARE_PAUSED);
         // Calculate the amount of tokens to return to the user and the amount of fees to extract.
-        let from_token = fungible_asset::metadata_from_asset(&from);
+        let from_token = fungible_asset::asset_metadata(&from);
         let amount_in = fungible_asset::amount(&from);
         let (amount_out, fees_amount) = get_amount_out(pool, from_token, amount_in);
         let fees = fungible_asset::extract(&mut from, fees_amount);
@@ -390,8 +390,8 @@ module swap::liquidity_pool {
         fungible_asset_2: FungibleAsset,
         is_stable: bool,
     ) acquires FeesAccounting, LiquidityPool {
-        let token_1 = fungible_asset::metadata_from_asset(&fungible_asset_1);
-        let token_2 = fungible_asset::metadata_from_asset(&fungible_asset_2);
+        let token_1 = fungible_asset::asset_metadata(&fungible_asset_1);
+        let token_2 = fungible_asset::asset_metadata(&fungible_asset_2);
         if (!is_sorted(token_1, token_2)) {
             return mint(lp, fungible_asset_2, fungible_asset_1, is_stable)
         };

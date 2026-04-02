@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     annotations::Annotations,
@@ -13,7 +14,7 @@ use crate::{
 use itertools::Itertools;
 use move_binary_format::file_format::{CodeOffset, Visibility};
 use move_model::{
-    ast::{Exp, ExpData, Spec, TempIndex},
+    ast::{Exp, Spec, TempIndex},
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId, QualifiedInstId, StructId,
         TypeParameter,
@@ -88,8 +89,7 @@ pub struct FunctionData {
     pub annotations: Annotations,
     /// A mapping from symbolic names to temporaries.
     pub name_to_index: BTreeMap<Symbol, usize>,
-    /// A cache of targets modified by this function.
-    pub modify_targets: BTreeMap<QualifiedId<StructId>, Vec<Exp>>,
+    // modify_targets removed — use FunctionTarget.get_modify_targets() which delegates to FunctionEnv
     /// The number of ghost type parameters introduced in order to instantiate related invariants
     pub ghost_type_param_count: usize,
     /// A map for temporaries to associated name, if available.
@@ -352,20 +352,19 @@ impl<'env> FunctionTarget<'env> {
         res
     }
 
-    /// Gets modify targets for a type
-    pub fn get_modify_targets_for_type(&self, ty: &QualifiedId<StructId>) -> Option<&Vec<Exp>> {
-        self.get_modify_targets().get(ty)
+    /// Gets modify targets for a type (live delegation to FunctionEnv).
+    pub fn get_modify_targets_for_type(&self, ty: &QualifiedId<StructId>) -> Option<Vec<Exp>> {
+        self.func_env.get_modify_targets().get(ty).cloned()
     }
 
-    /// Gets all modify targets
-    pub fn get_modify_targets(&self) -> &BTreeMap<QualifiedId<StructId>, Vec<Exp>> {
-        &self.data.modify_targets
+    /// Gets all modify targets (live delegation to FunctionEnv).
+    pub fn get_modify_targets(&self) -> BTreeMap<QualifiedId<StructId>, Vec<Exp>> {
+        self.func_env.get_modify_targets()
     }
 
     /// Get all modifies targets, as instantiated struct ids.
     pub fn get_modify_ids(&self) -> BTreeSet<QualifiedInstId<StructId>> {
-        self.data
-            .modify_targets
+        self.get_modify_targets()
             .iter()
             .flat_map(|(qid, exps)| {
                 exps.iter().map(move |e| {
@@ -378,11 +377,9 @@ impl<'env> FunctionTarget<'env> {
             .collect()
     }
 
-    pub fn get_modify_ids_and_exps(&self) -> BTreeMap<QualifiedInstId<StructId>, Vec<&Exp>> {
-        // TODO: for now we compute this from the legacy representation, but if this
-        //   viewpoint becomes the major use case, we should store it instead directly.
+    pub fn get_modify_ids_and_exps(&self) -> BTreeMap<QualifiedInstId<StructId>, Vec<Exp>> {
         let mut res = BTreeMap::new();
-        for (qid, exps) in &self.data.modify_targets {
+        for (qid, exps) in &self.get_modify_targets() {
             for target in exps {
                 let env = self.global_env();
                 let rty = &env.get_node_instantiation(target.node_id())[0];
@@ -390,7 +387,7 @@ impl<'env> FunctionTarget<'env> {
                 let qinstid = qid.instantiate(inst.to_owned());
                 res.entry(qinstid)
                     .or_insert_with(Vec::new)
-                    .push(&target.call_args()[0]);
+                    .push(target.call_args()[0].clone());
             }
         }
         res
@@ -517,7 +514,7 @@ impl<'env> FunctionTarget<'env> {
 impl FunctionData {
     /// Creates new function target data.
     pub fn new(
-        func_env: &FunctionEnv<'_>,
+        _func_env: &FunctionEnv<'_>,
         code: Vec<Bytecode>,
         local_types: Vec<Type>,
         result_type: Type,
@@ -528,7 +525,6 @@ impl FunctionData {
         loop_invariants: BTreeSet<AttrId>,
         local_names: BTreeMap<TempIndex, Symbol>,
     ) -> Self {
-        let modify_targets = func_env.get_modify_targets();
         FunctionData {
             variant: FunctionVariant::Baseline,
             type_args: vec![],
@@ -544,10 +540,40 @@ impl FunctionData {
             vc_infos: Default::default(),
             annotations: Default::default(),
             name_to_index,
-            modify_targets,
             ghost_type_param_count: 0,
             local_names,
         }
+    }
+
+    /// Creates a FunctionData with minimal stub code (`[Label, Ret]`), suitable for
+    /// functions that have no compilable body (e.g. lemma functions in the prover path).
+    /// The stub bytecode provides a valid CFG entry point for pipeline processors.
+    pub fn new_empty(func_env: &FunctionEnv<'_>) -> Self {
+        let attr = AttrId::new(0);
+        let code = vec![
+            Bytecode::Label(attr, Label::new(0)),
+            Bytecode::Ret(attr, vec![]),
+        ];
+        let local_types = func_env
+            .get_parameters()
+            .iter()
+            .map(|p| p.1.clone())
+            .collect();
+        let result_type = func_env.get_result_type();
+        let mut locations = BTreeMap::new();
+        locations.insert(attr, func_env.get_loc());
+        FunctionData::new(
+            func_env,
+            code,
+            local_types,
+            result_type,
+            locations,
+            Default::default(),
+            vec![],
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
     }
 
     /// Computes the next available index for AttrId.
@@ -617,22 +643,6 @@ impl FunctionData {
             .iter()
             .map(|bc| bc.instantiate(env, inst))
             .collect();
-        let modify_targets = self
-            .modify_targets
-            .iter()
-            .map(|(key, val)| {
-                let new_val = val
-                    .iter()
-                    .map(|exp| {
-                        ExpData::rewrite_node_id(exp.clone(), &mut |id| {
-                            ExpData::instantiate_node(env, id, inst)
-                        })
-                    })
-                    .collect();
-                (*key, new_val)
-            })
-            .collect();
-
         // construct the new data
         Self {
             variant: new_variant,
@@ -640,7 +650,6 @@ impl FunctionData {
             code,
             local_types,
             result_type,
-            modify_targets,
             ..self.clone()
         }
     }

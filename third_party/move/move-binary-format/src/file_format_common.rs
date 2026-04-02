@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Constants for the binary format.
 //!
@@ -352,7 +353,7 @@ pub const BINARY_SIZE_LIMIT: usize = usize::MAX;
 
 /// A wrapper for the binary vector
 #[derive(Default, Debug)]
-pub(crate) struct BinaryData {
+pub struct BinaryData {
     _binary: Vec<u8>,
 }
 
@@ -421,7 +422,7 @@ impl From<Vec<u8>> for BinaryData {
     }
 }
 
-pub(crate) fn write_u64_as_uleb128(binary: &mut BinaryData, mut val: u64) -> Result<()> {
+pub fn write_u64_as_uleb128(binary: &mut BinaryData, mut val: u64) -> Result<()> {
     loop {
         let cur = val & 0x7F;
         if cur != val {

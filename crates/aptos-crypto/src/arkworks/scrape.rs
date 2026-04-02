@@ -10,7 +10,7 @@ use crate::{
     arkworks::{msm::MsmInput, random},
 };
 use anyhow::{bail, ensure, Context};
-use ark_ec::CurveGroup;
+use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{FftField, PrimeField};
 use ark_poly::domain::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::vec::Vec;
@@ -136,10 +136,10 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
 
     /// Constructs the MSM input used by the LDT: the affine group elements and
     /// the corresponding dual-codeword scalars.
-    pub fn ldt_msm_input<C: CurveGroup<ScalarField = F>>(
+    pub fn ldt_msm_input<A: AffineRepr<ScalarField = F>>(
         &self,
-        bases: &[C::Affine],
-    ) -> anyhow::Result<MsmInput<C::Affine, F>> {
+        bases: &[A],
+    ) -> anyhow::Result<MsmInput<A, F>> {
         if bases.len() != self.n {
             bail!("Expected {} evaluations; got {}", self.n, bases.len())
         }
@@ -157,7 +157,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
 
         let scalars = v_times_f;
 
-        Ok(MsmInput::new(bases.to_vec(), scalars).expect("Could not construct MsmInput"))
+        MsmInput::new(bases.to_vec(), scalars)
     }
 
     /// Performs the LDT given group elements $G^{p(\omega^i)} \in
@@ -166,7 +166,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
         evals: &[C::Affine],
     ) -> anyhow::Result<()> {
         // Step 1: build MSM input
-        let msm_input = self.ldt_msm_input::<C>(evals)?;
+        let msm_input = self.ldt_msm_input(evals)?;
 
         // Early return in the trivial case
         if msm_input.bases.is_empty() {

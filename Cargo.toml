@@ -155,6 +155,7 @@ members = [
     "execution/executor-types",
     "experimental/bulk-txn-submit",
     "experimental/execution/ptx-executor",
+
     "experimental/runtimes",
     "experimental/storage/hexy",
     "experimental/storage/layered-map",
@@ -206,8 +207,13 @@ members = [
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",
+    "third_party/move/mono-move/alloc",
+    "third_party/move/mono-move/core",
+    "third_party/move/mono-move/gas",
     "third_party/move/mono-move/global-context",
-    "third_party/move/mono-move/micro-ops",
+    "third_party/move/mono-move/programs",
+    "third_party/move/mono-move/runtime",
+    "third_party/move/mono-move/specializer",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -222,10 +228,7 @@ members = [
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-core/types",
     "third_party/move/move-examples",
-    "third_party/move/move-ir-compiler",
     "third_party/move/move-ir-compiler/move-bytecode-source-map",
-    "third_party/move/move-ir-compiler/move-ir-to-bytecode",
-    "third_party/move/move-ir-compiler/move-ir-to-bytecode/syntax",
     "third_party/move/move-ir/types",
     "third_party/move/move-model",
     "third_party/move/move-model/bytecode",
@@ -542,6 +545,7 @@ blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
 build_html = "2.5.0"
 bulletproofs = { version = "4.0.0" }
+bumpalo = { version = "3.14" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
 bytesize = { version = "1.3.0" }
@@ -574,6 +578,7 @@ criterion = "0.3.5"
 criterion-cpu-time = "0.1.0"
 crossbeam = "0.8.1"
 crossbeam-channel = "0.5.4"
+crossbeam-utils = "0.8"
 crossterm = "0.26.1"
 csv = "1.2.1"
 curve25519-dalek = "3"
@@ -639,7 +644,7 @@ google-cloud-storage = "0.13.0"
 group = "0.13"
 guppy = "0.17.5"
 handlebars = "4.2.2"
-hashbrown = "0.14.3"
+hashbrown = { version = "0.14.3", features = ["equivalent"] }
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hex-literal = "0.3.4"
@@ -700,6 +705,9 @@ num-integer = "0.1.42"
 num-traits = "0.2.19"
 once_cell = "1.10.0"
 open = "5.3.1"
+opentelemetry = { version = "0.27.0", features = ["trace"] }
+opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"
@@ -800,6 +808,7 @@ set_env = "1.3.4"
 shadow-rs = "0.16.2"
 smallbitvec = "2.5.1"
 smallvec = "1.8.0"
+specializer = { path = "third_party/move/mono-move/specializer" }
 static_assertions = "1.1.0"
 status-line = "0.2.0"
 strum = "0.27.1"
@@ -814,13 +823,15 @@ termcolor = "1.1.2"
 test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
+thousands = "0.2.0"
 threadpool = "1.8.1"
 thread_local = "1.1.7"
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.37"
 tracing-log = "0.2.0"
-tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
+tracing-opentelemetry = "0.28.0"
+tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter", "registry"] }
 triomphe = "0.1.14"
 trybuild = "1.0.80"
 try_match = "0.4.2"
@@ -866,6 +877,11 @@ x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cd
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
+mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
+mono-move-core = { path = "third_party/move/mono-move/core" }
+mono-move-gas = { path = "third_party/move/mono-move/gas" }
+mono-move-programs = { path = "third_party/move/mono-move/programs" }
+mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 move-abigen = { path = "third_party/move/tools/move-abigen" }
 move-asm = { path = "third_party/move/tools/move-asm" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
@@ -883,8 +899,6 @@ move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
-move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
-move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-bytecode" }
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
@@ -918,12 +932,6 @@ move-vm-types = { path = "third_party/move/move-vm/types" }
 debug = true
 overflow-checks = true
 
-# For [build-dependencies], cargo sets `opt-level=0` independent of the actual profile used.
-# In `aptos-cached-packages` crate, we have `aptos-framework` as a build dependency. Which in a `--release` mode,
-# results in additional crates being compiled (335 for `opt-level=3`, 335 more for `opt-level=0`).
-# In addition to that, the same `aptos-cached-packages` build has a very compute intensive step to compile
-# the whole Aptos Framework with the Move Compiler - which with the `opt-level=0` slows down compilation a lot.
-# For the explanation, see https://github.com/rust-lang/cargo/pull/8500
 [profile.release.build-override]
 opt-level = 3
 
@@ -938,6 +946,14 @@ lto = "thin"
 codegen-units = 1
 
 [profile.cli]
+inherits = "release"
+debug = false
+opt-level = "z"
+lto = "thin"
+strip = true
+codegen-units = 1
+
+[profile.tool]
 inherits = "release"
 debug = false
 opt-level = "z"

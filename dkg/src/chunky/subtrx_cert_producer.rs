@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel::Sender;
 use aptos_consensus_types::common::Author;
-use aptos_crypto::{bls12381::Signature, hash::CryptoHash, Signature as _};
+use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue, Signature as _};
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
@@ -25,13 +25,13 @@ use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
-#[allow(dead_code)]
 pub fn start_chunky_subtranscript_certification(
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     start_time: Duration,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
-    aggregated_subtranscript: AggregatedSubtranscript,
+    aggregated_subtranscript: Arc<AggregatedSubtranscript>,
+    dealer_transcript_hashes: Vec<HashValue>,
     certified_agg_subtx_tx: Option<Sender<(), CertifiedAggregatedSubtranscript>>,
 ) -> AbortHandle {
     let epoch = epoch_state.epoch;
@@ -40,12 +40,13 @@ pub fn start_chunky_subtranscript_certification(
         epoch,
         aggregated_subtranscript.hash(),
         aggregated_subtranscript.dealers.clone(),
+        dealer_transcript_hashes,
     );
     let validation_state = Arc::new(ChunkySubtranscriptCertificationState::new(
         start_time,
         my_addr,
         epoch_state.clone(),
-        aggregated_subtranscript,
+        aggregated_subtranscript.clone(),
     ));
     let task = async move {
         let validated_trx = rb
@@ -85,7 +86,7 @@ pub struct ChunkySubtranscriptCertificationState {
     my_addr: AccountAddress,
     sig_aggregator: Mutex<ChunkySubtranscriptSignatureAggregator>,
     epoch_state: Arc<EpochState>,
-    aggregated_subtranscript: AggregatedSubtranscript,
+    aggregated_subtranscript: Arc<AggregatedSubtranscript>,
 }
 
 impl ChunkySubtranscriptCertificationState {
@@ -93,7 +94,7 @@ impl ChunkySubtranscriptCertificationState {
         start_time: Duration,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
-        aggregated_subtranscript: AggregatedSubtranscript,
+        aggregated_subtranscript: Arc<AggregatedSubtranscript>,
     ) -> Self {
         Self {
             start_time,
@@ -123,10 +124,24 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkySubtranscriptCertificationState> 
         validation_response: ChunkyDKGSubtranscriptSignatureResponse,
     ) -> anyhow::Result<Option<Self::Aggregated>> {
         let ChunkyDKGSubtranscriptSignatureResponse {
-            dealer_epoch: _,
-            subtranscript_hash: _,
+            dealer_epoch,
+            subtranscript_hash,
             signature,
         } = validation_response;
+
+        // Defense-in-depth: validate response metadata matches what we requested.
+        // While BLS signature verification would catch mismatched content, checking
+        // these fields provides better error messages and catches honest bugs early.
+        ensure!(
+            dealer_epoch == self.epoch_state.epoch,
+            "[ChunkyDKG] signature response epoch {} does not match expected {}",
+            dealer_epoch,
+            self.epoch_state.epoch,
+        );
+        ensure!(
+            subtranscript_hash == self.aggregated_subtranscript.hash(),
+            "[ChunkyDKG] signature response hash does not match local aggregated subtranscript hash",
+        );
 
         let peer_power = self.epoch_state.verifier.get_voting_power(&sender);
         ensure!(
@@ -220,6 +235,7 @@ mod tests {
     use crate::chunky::test_utils::ChunkyTestSetup;
     use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
     use aptos_infallible::duration_since_epoch;
+    use std::sync::Arc;
 
     fn make_cert_state(
         setup: &ChunkyTestSetup,
@@ -229,7 +245,7 @@ mod tests {
             duration_since_epoch(),
             setup.addrs[0],
             setup.epoch_state.clone(),
-            agg_subtrx,
+            Arc::new(agg_subtrx),
         ))
     }
 

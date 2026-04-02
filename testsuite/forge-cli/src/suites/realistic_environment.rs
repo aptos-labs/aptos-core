@@ -42,7 +42,9 @@ pub(crate) fn get_realistic_env_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
+        "realistic_env_max_load_large" => {
+            realistic_env_max_load_test(duration, test_cmd, 20, 10, 0)
+        },
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_orderbook_workload_sweep" => realistic_env_orderbook_workload_sweep_bench(),
@@ -50,9 +52,7 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
-        "realistic_env_max_load_encrypted" => {
-            realistic_env_max_load_encrypted_test(duration, test_cmd)
-        },
+        "realistic_env_max_load_encrypted" => realistic_env_max_load_encrypted_test(duration),
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -364,7 +364,8 @@ pub(crate) fn realistic_env_max_load_test(
     duration: Duration,
     test_cmd: &TestCommand,
     num_validators: usize,
-    num_fullnodes: usize,
+    num_vfns: usize,
+    num_pfns: usize,
 ) -> ForgeConfig {
     // Check if HAProxy is enabled
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
@@ -434,7 +435,7 @@ pub(crate) fn realistic_env_max_load_test(
     let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(num_fullnodes)
+        .with_initial_fullnode_count(num_vfns)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
@@ -462,8 +463,25 @@ pub(crate) fn realistic_env_max_load_test(
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Allow validator-PFN connections
+            config.base.enable_validator_pfn_connections = true;
+        }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             // Increase the consensus observer fallback thresholds
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            // Allow validator-PFN connections
+            config.base.enable_validator_pfn_connections = true;
+
+            // Enable consensus observer and increase fallback thresholds
+            config.consensus_observer.observer_enabled = true;
             config
                 .consensus_observer
                 .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
@@ -481,24 +499,13 @@ pub(crate) fn realistic_env_max_load_test(
         .with_success_criteria(success_criteria)
         .with_validator_resource_override(resource_override)
         .with_fullnode_resource_override(resource_override)
-        .with_num_pfns(1)
+        .with_num_pfns(num_pfns)
 }
 
-pub(crate) fn realistic_env_max_load_encrypted_test(
-    duration: Duration,
-    test_cmd: &TestCommand,
-) -> ForgeConfig {
-    // Check if HAProxy is enabled
-    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
-        k8s.enable_haproxy
-    } else {
-        false
-    };
-
+pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
     let num_validators = 5;
     let num_fullnodes = 1;
-
-    let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
+    let mempool_backlog = 100;
 
     let success_criteria = SuccessCriteria::new(15)
         .add_no_restarts()
@@ -541,12 +548,16 @@ pub(crate) fn realistic_env_max_load_encrypted_test(
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
+        .with_decryption_setup_blob_url("https://github.com/aptos-labs/aptos-networks/raw/87459ef53acfbb38e0f5b4209d52ad22ac0e8fa4/devnet/decryption_setup.blob")
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;
             config.consensus.quorum_store.enable_batch_v2_rx = true;
             config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
+            config.consensus_observer.enable_v2_message_sending = true;
+            config.consensus.decryption_setup_blob_path =
+                Some("/opt/aptos/genesis/decryption_setup.blob".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
@@ -555,8 +566,7 @@ pub(crate) fn realistic_env_max_load_encrypted_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 100 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
-                .latency_polling_interval(Duration::from_millis(100))
-                .encrypt_transactions(true),
+                .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)
 }

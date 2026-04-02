@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -83,8 +84,6 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         experiment_cache: Default::default(),
         sources: options.move_sources,
         sources_deps: vec![],
-        warn_deprecated: false,
-        warn_of_deprecation_use_in_aptos_libs: false,
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
@@ -103,7 +102,7 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
             global_state.create_initial_struct_oper_state(&struct_env);
         }
         for fun_env in module_env.get_functions() {
-            if !fun_env.is_inline() {
+            if !fun_env.is_not_prover_target() {
                 global_state.create_initial_func_oper_state(&fun_env);
             }
         }
@@ -277,6 +276,11 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             }
         }
         for func_env in module_env.get_functions() {
+            if func_env.is_struct_api() {
+                // Struct API wrappers have no user-written specs; skip them to avoid
+                // spurious invariant failures from DataInvariantInstrumentationProcessor.
+                continue;
+            }
             targets.add_target(&func_env)
         }
     }

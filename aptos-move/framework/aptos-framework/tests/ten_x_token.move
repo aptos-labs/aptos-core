@@ -1,5 +1,5 @@
 #[test_only]
-module 0xcafe::ten_x_token {
+module aptos_framework::ten_x_token {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, RawBalanceRef, RawSupplyRef, TransferRef};
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::object::{ConstructorRef, Object};
@@ -16,7 +16,7 @@ module 0xcafe::ten_x_token {
     }
 
     public fun initialize(account: &signer, constructor_ref: &ConstructorRef) {
-        assert!(signer::address_of(account) == @0xcafe, 1);
+        assert!(signer::address_of(account) == @aptos_framework, 1);
         let balance_ref = fungible_asset::generate_raw_balance_ref(constructor_ref);
         let supply_ref = fungible_asset::generate_raw_supply_ref(constructor_ref);
         move_to<BalanceStore>(account, BalanceStore { balance_ref, supply_ref });
@@ -58,12 +58,12 @@ module 0xcafe::ten_x_token {
 
     public fun derived_balance<T: key>(store: Object<T>): u64 acquires BalanceStore {
         // Derived value is always 10x!
-        borrow_global<BalanceStore>(@0xcafe).balance_ref.balance_with_ref(store) * 10
+        borrow_global<BalanceStore>(@aptos_framework).balance_ref.balance_with_ref(store) * 10
     }
 
     public fun derived_supply<T: key>(metadata: Object<T>): Option<u128> acquires BalanceStore {
         // Derived supply is 10x.
-        option::some(borrow_global<BalanceStore>(@0xcafe).supply_ref.supply_with_ref(metadata).extract() * 10)
+        option::some(borrow_global<BalanceStore>(@aptos_framework).supply_ref.supply_with_ref(metadata).extract() * 10)
     }
 
     public fun withdraw<T: key>(

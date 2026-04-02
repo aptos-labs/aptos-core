@@ -20,6 +20,8 @@ double-spending at compile time.
     - `acquires` annotations are no longer needed — do not add them.
 - **Error codes**: Use named constants for abort codes (`const E_NOT_FOUND: u64 = 1;`) and
   document them.
+- **Comments**: Use `//` for regular comments. `///` is a **doc comment** and is only valid
+  directly before a `module`, `struct`, `enum`, `fun`, or `const` declaration.
 - **Edit hook**: The edit hook auto-runs on `.move` files after edits. If it reports
   compilation errors, fix them before proceeding with further changes.
 

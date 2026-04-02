@@ -18,7 +18,9 @@ module 0x42::mutations {
         *r = val;
     }
     spec write_to_ref(r: &mut u64, val: u64) {
+        pragma opaque = true;
         ensures [inferred] r == val;
+        aborts_if [inferred] false;
     }
 
 
@@ -27,6 +29,7 @@ module 0x42::mutations {
         *r = *r + 1;
     }
     spec inc_ref(r: &mut u64) {
+        pragma opaque = true;
         ensures [inferred] r == old(r) + 1;
         aborts_if [inferred] r > MAX_U64 - 1;
     }
@@ -37,7 +40,9 @@ module 0x42::mutations {
         p.x = val;
     }
     spec write_to_point_x(p: &mut Point, val: u64) {
+        pragma opaque = true;
         ensures [inferred] p == update_field(old(p), x, val);
+        aborts_if [inferred] false;
     }
 
 
@@ -46,8 +51,9 @@ module 0x42::mutations {
         p.x = p.x + 1;
     }
     spec inc_point_x(p: &mut Point) {
+        pragma opaque = true;
         ensures [inferred] p == update_field(old(p), x, old(p).x + 1);
-        aborts_if [inferred] p.x > MAX_U64 - 1;
+        aborts_if [inferred] p.x == MAX_U64;
     }
 
 
@@ -57,7 +63,9 @@ module 0x42::mutations {
         p.y = y;
     }
     spec write_to_point_both(p: &mut Point, x: u64, y: u64) {
+        pragma opaque = true;
         ensures [inferred] p == update_field(update_field(old(p), x, x), y, y);
+        aborts_if [inferred] false;
     }
 
 
@@ -66,7 +74,9 @@ module 0x42::mutations {
         pair.first.x = val;
     }
     spec write_to_nested(pair: &mut Pair, val: u64) {
+        pragma opaque = true;
         ensures [inferred] pair == update_field(old(pair), first, update_field(old(pair).first, x, val));
+        aborts_if [inferred] false;
     }
 
 
@@ -80,7 +90,9 @@ module 0x42::mutations {
         x
     }
     spec create_ref_and_write(): u64 {
+        pragma opaque = true;
         ensures [inferred] result == 42;
+        aborts_if [inferred] false;
     }
 
 
@@ -93,7 +105,9 @@ module 0x42::mutations {
         x
     }
     spec local_double_increment(): u64 {
+        pragma opaque = true;
         ensures [inferred] result == 2;
+        aborts_if [inferred] false;
     }
 
 
@@ -105,7 +119,9 @@ module 0x42::mutations {
         result
     }
     spec create_field_ref_and_write(p: Point): Point {
+        pragma opaque = true;
         ensures [inferred] result == update_field(p, x, 10);
+        aborts_if [inferred] false;
     }
 
 
@@ -119,7 +135,9 @@ module 0x42::mutations {
         result
     }
     spec chain_field_refs(pair: Pair): Pair {
+        pragma opaque = true;
         ensures [inferred] result == update_field(pair, first, update_field(pair.first, x, 99));
+        aborts_if [inferred] false;
     }
 
 
@@ -132,7 +150,9 @@ module 0x42::mutations {
         *r = 3;
     }
     spec multiple_writes(r: &mut u64) {
+        pragma opaque = true;
         ensures [inferred] r == 3;
+        aborts_if [inferred] false;
     }
 
 
@@ -141,6 +161,7 @@ module 0x42::mutations {
         *r = *r + 1;
     }
     spec increment_ref(r: &mut u64) {
+        pragma opaque = true;
         ensures [inferred] r == old(r) + 1;
         aborts_if [inferred] r > MAX_U64 - 1;
     }
@@ -152,6 +173,7 @@ module 0x42::mutations {
         *r = *r + 1;
     }
     spec double_increment(r: &mut u64) {
+        pragma opaque = true;
         ensures [inferred] r == old(r) + 2;
         aborts_if [inferred] r > MAX_U64 - 2;
     }
@@ -163,6 +185,7 @@ module 0x42::mutations {
         p.x = p.x + 1;
     }
     spec double_increment_field(p: &mut Point) {
+        pragma opaque = true;
         ensures [inferred] p == update_field(old(p), x, old(p).x + 2);
         aborts_if [inferred] p.x > MAX_U64 - 2;
     }
@@ -176,7 +199,9 @@ module 0x42::mutations {
         *ry = 2;
     }
     spec update_fields_seq(p: &mut Point) {
+        pragma opaque = true;
         ensures [inferred] p == update_field(update_field(old(p), x, 1), y, 2);
+        aborts_if [inferred] false;
     }
 
 
@@ -191,10 +216,12 @@ module 0x42::mutations {
         (a, b)
     }
     spec cond_ref_to_locals(cond: bool, val: u64): (u64, u64) {
+        pragma opaque = true;
         ensures [inferred] !cond ==> result_2 == val;
         ensures [inferred] cond ==> result_2 == 0;
         ensures [inferred] cond ==> result_1 == val;
         ensures [inferred] !cond ==> result_1 == 0;
+        aborts_if [inferred] false;
     }
 
 
@@ -206,8 +233,10 @@ module 0x42::mutations {
         result
     }
     spec cond_ref_to_fields(cond: bool, p: Point, val: u64): Point {
+        pragma opaque = true;
         ensures [inferred] cond ==> result == update_field(p, x, val);
         ensures [inferred] !cond ==> result == update_field(p, y, val);
+        aborts_if [inferred] false;
     }
 
 
@@ -219,8 +248,10 @@ module 0x42::mutations {
         result
     }
     spec cond_ref_nested(cond: bool, pair: Pair, val: u64): Pair {
+        pragma opaque = true;
         ensures [inferred] cond ==> result == update_field(pair, first, update_field(pair.first, x, val));
         ensures [inferred] !cond ==> result == update_field(pair, second, update_field(pair.second, x, val));
+        aborts_if [inferred] false;
     }
 
 
@@ -234,10 +265,12 @@ module 0x42::mutations {
         local
     }
     spec cond_param_or_local(cond: bool, p_ref: &mut Point, val: u64): Point {
+        pragma opaque = true;
         ensures [inferred] cond ==> result == Point{x: 0, y: 0};
         ensures [inferred] !cond ==> p_ref == old(p_ref);
         ensures [inferred] cond ==> p_ref == update_field(old(p_ref), x, val);
         ensures [inferred] !cond ==> result == Point{x: val, y: 0};
+        aborts_if [inferred] false;
     }
 
 
@@ -248,7 +281,9 @@ module 0x42::mutations {
         // Does nothing - r should have ensures r == old(r)
     }
     spec noop_ref(_r: &mut u64) {
+        pragma opaque = true;
         ensures [inferred] _r == old(_r);
+        aborts_if [inferred] false;
     }
 
 
@@ -261,8 +296,10 @@ module 0x42::mutations {
         // When c is false: r == old(r)
     }
     spec cond_write_ref(c: bool, r: &mut u64) {
+        pragma opaque = true;
         ensures [inferred] c ==> r == 1;
         ensures [inferred] !c ==> r == old(r);
+        aborts_if [inferred] false;
     }
 
 
@@ -275,8 +312,10 @@ module 0x42::mutations {
         // When c is false: p == old(p)
     }
     spec cond_write_field(c: bool, p: &mut Point) {
+        pragma opaque = true;
         ensures [inferred] c ==> p == update_field(old(p), x, 42);
         ensures [inferred] !c ==> p == old(p);
+        aborts_if [inferred] false;
     }
 
 
@@ -290,7 +329,9 @@ module 0x42::mutations {
         *ry = val_y;
     }
     spec multi_ref_same_struct(p: &mut Point, val_x: u64, val_y: u64) {
+        pragma opaque = true;
         ensures [inferred] p == update_field(update_field(old(p), x, val_x), y, val_y);
+        aborts_if [inferred] false;
     }
 
 
@@ -300,6 +341,7 @@ module 0x42::mutations {
         write_to_ref(rx, val);
     }
     spec pass_ref_to_fn(p: &mut Point, val: u64) {
+        pragma opaque = true;
         ensures [inferred] p == update_field(old(p), x, result_of<write_to_ref>(old(p).x, val));
         aborts_if [inferred] aborts_of<write_to_ref>(p.x, val);
     }
@@ -313,6 +355,7 @@ module 0x42::mutations {
         result
     }
     spec create_pass_continue(p: Point, val: u64): Point {
+        pragma opaque = true;
         ensures [inferred] result == update_field(p, x, result_of<write_to_ref>(p.x, val));
         aborts_if [inferred] aborts_of<write_to_ref>(p.x, val);
     }
@@ -327,8 +370,10 @@ module 0x42::mutations {
         old_val
     }
     spec replace_ref(r: &mut u64, new_val: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == old(r);
         ensures [inferred] r == new_val;
+        aborts_if [inferred] false;
     }
 
 
@@ -337,12 +382,13 @@ module 0x42::mutations {
         replace_ref(r, 99)
     }
     spec call_replace(r: &mut u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == {
-            let (_t0,_t1) = result_of<replace_ref>(r, 99);
+            let (_t0,_t1) = result_of<replace_ref>(old(r), 99);
             _t0
         };
         ensures [inferred] r == {
-            let (_t0,_t1) = result_of<replace_ref>(r, 99);
+            let (_t0,_t1) = result_of<replace_ref>(old(r), 99);
             _t1
         };
         aborts_if [inferred] aborts_of<replace_ref>(r, 99);
@@ -358,8 +404,10 @@ module 0x42::mutations {
         *b = tmp;
     }
     spec swap_refs(a: &mut u64, b: &mut u64) {
+        pragma opaque = true;
         ensures [inferred] b == old(a);
         ensures [inferred] a == old(b);
+        aborts_if [inferred] false;
     }
 
 
@@ -375,6 +423,7 @@ module 0x42::mutations {
         s.radius = new_r;
     }
     spec set_circle_radius(s: &mut Shape, new_r: u64) {
+        pragma opaque = true;
         ensures [inferred] s == update_field(old(s), radius, new_r);
         aborts_if [inferred] !(s is Circle);
     }
@@ -387,10 +436,11 @@ module 0x42::mutations {
         old_r
     }
     spec inc_circle_radius(s: &mut Shape): u64 {
+        pragma opaque = true;
         ensures [inferred] result == old(s).radius;
         ensures [inferred] s == update_field(old(s), radius, old(s).radius + 1);
         aborts_if [inferred] !(s is Circle);
-        aborts_if [inferred] s.radius > MAX_U64 - 1;
+        aborts_if [inferred] s.radius == MAX_U64;
     }
 
 
@@ -407,6 +457,7 @@ module 0x42::mutations {
         t.value = v;
     }
     spec set_token_value(t: &mut Token, v: u64) {
+        pragma opaque = true;
         ensures [inferred] t == update_field(old(t), value, v);
         aborts_if [inferred] !(t is Fungible | SemiFungible);
     }
@@ -424,10 +475,11 @@ module 0x42::mutations {
         c.value = c.value + 1;
     }
     spec increment_global(addr: address) {
-        ensures [inferred] global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, old(global<Counter>(addr)).value + 1);
-        aborts_if [inferred] global<Counter>(addr).value > MAX_U64 - 1;
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
+        aborts_if [inferred] Counter[addr].value == MAX_U64;
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -436,9 +488,10 @@ module 0x42::mutations {
         Counter[addr].value = v;
     }
     spec set_global_value(addr: address, v: u64) {
-        ensures [inferred] global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, v);
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, v);
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -452,10 +505,11 @@ module 0x42::mutations {
         addr
     }
     spec addr_reassigned_after_borrow(addr: address, new_addr: address, v: u64): address {
+        pragma opaque = true;
+        modifies Counter[addr];
         ensures [inferred] result == new_addr;
-        ensures [inferred] global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, v);
+        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, v);
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -467,9 +521,10 @@ module 0x42::mutations {
         c2.value = v2;
     }
     spec double_global_write(addr: address, v1: u64, v2: u64) {
-        ensures [inferred] global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, v2);
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, v2);
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -481,10 +536,11 @@ module 0x42::mutations {
         c2.value = c2.value + 1;
     }
     spec double_increment_global(addr: address) {
-        ensures [inferred] global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, old(global<Counter>(addr)).value + 2);
-        aborts_if [inferred] global<Counter>(addr).value > MAX_U64 - 2;
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 2);
+        aborts_if [inferred] Counter[addr].value > MAX_U64 - 2;
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -494,13 +550,14 @@ module 0x42::mutations {
         Counter[a2].value = v2;
     }
     spec different_addr_global(a1: address, a2: address, v1: u64, v2: u64) {
-        ensures [inferred] global<Counter>(a2) == update_field(at_14@global<Counter>(a2), value, v2);
-        ensures [inferred = sathard] forall x: address: x != a1 ==> at_14@global<Counter>(x) == old(global<Counter>(x));
-        ensures [inferred] at_14@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
-        aborts_if [inferred] !exists<Counter>(a2);
-        aborts_if [inferred] !at_14@exists<Counter>(a1);
-        modifies [inferred] global<Counter>(a2);
-        modifies [inferred] global<Counter>(a1);
+        pragma opaque = true;
+        modifies Counter[a2];
+        modifies Counter[a1];
+        ensures [inferred] Counter[a2] == update_field(S |~ global<Counter>(a2), value, v2);
+        ensures [inferred] (S |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, v1);
+        ensures [inferred = sathard] forall x: address: x != a1 ==> (S |~ global<Counter>(x)) == old(Counter[x]);
+        aborts_if [inferred] S |~ !exists<Counter>(a2);
+        aborts_if [inferred] !exists<Counter>(a1);
     }
 
 
@@ -514,12 +571,13 @@ module 0x42::mutations {
         c.value = v;
     }
     spec cond_addr_global_write(cond: bool, a1: address, a2: address, v: u64) {
-        ensures [inferred] cond ==> global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v);
-        ensures [inferred] !cond ==> global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, v);
+        pragma opaque = true;
+        modifies Counter[a1];
+        modifies Counter[a2];
+        ensures [inferred] cond ==> Counter[a1] == update_field(old(Counter[a1]), value, v);
+        ensures [inferred] !cond ==> Counter[a2] == update_field(old(Counter[a2]), value, v);
         aborts_if [inferred] cond && !exists<Counter>(a1);
         aborts_if [inferred] !cond && !exists<Counter>(a2);
-        modifies [inferred] global<Counter>(a1);
-        modifies [inferred] global<Counter>(a2);
     }
 
 
@@ -530,14 +588,15 @@ module 0x42::mutations {
         c.value = c.value + 1;
     }
     spec cond_addr_global_inc(cond: bool, a1: address, a2: address) {
-        ensures [inferred] cond ==> global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, old(global<Counter>(a1)).value + 1);
-        ensures [inferred] !cond ==> global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, old(global<Counter>(a2)).value + 1);
-        aborts_if [inferred] cond && global<Counter>(a1).value > MAX_U64 - 1;
+        pragma opaque = true;
+        modifies Counter[a1];
+        modifies Counter[a2];
+        ensures [inferred] cond ==> Counter[a1] == update_field(old(Counter[a1]), value, old(Counter[a1]).value + 1);
+        ensures [inferred] !cond ==> Counter[a2] == update_field(old(Counter[a2]), value, old(Counter[a2]).value + 1);
+        aborts_if [inferred] cond && Counter[a1].value == MAX_U64;
         aborts_if [inferred] cond && !exists<Counter>(a1);
-        aborts_if [inferred] !cond && global<Counter>(a2).value > MAX_U64 - 1;
+        aborts_if [inferred] !cond && Counter[a2].value == MAX_U64;
         aborts_if [inferred] !cond && !exists<Counter>(a2);
-        modifies [inferred] global<Counter>(a1);
-        modifies [inferred] global<Counter>(a2);
     }
 
 
@@ -551,18 +610,19 @@ module 0x42::mutations {
         c2.value = v2;
     }
     spec cond_addr_sequential(cond: bool, a1: address, a2: address, v1: u64, v2: u64) {
-        ensures [inferred] cond ==> global<Counter>(a2) == update_field(at_21@global<Counter>(a2), value, v2);
-        ensures [inferred] !cond ==> global<Counter>(a1) == update_field(at_21@global<Counter>(a1), value, v2);
-        ensures [inferred] cond ==> (forall x: address: x != a1 ==> at_21@global<Counter>(x) == old(global<Counter>(x)));
-        ensures [inferred] cond ==> at_21@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
-        ensures [inferred] !cond ==> (forall x: address: x != a2 ==> at_21@global<Counter>(x) == old(global<Counter>(x)));
-        ensures [inferred] !cond ==> at_21@global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, v1);
-        aborts_if [inferred] cond && !exists<Counter>(a2);
-        aborts_if [inferred] !cond && !exists<Counter>(a1);
-        aborts_if [inferred] cond && !at_21@exists<Counter>(a1);
-        aborts_if [inferred] !cond && !at_21@exists<Counter>(a2);
-        modifies [inferred] global<Counter>(a2);
-        modifies [inferred] global<Counter>(a1);
+        pragma opaque = true;
+        modifies Counter[a2];
+        modifies Counter[a1];
+        ensures [inferred] cond ==> Counter[a2] == update_field(S |~ global<Counter>(a2), value, v2);
+        ensures [inferred] !cond ==> Counter[a1] == update_field(S |~ global<Counter>(a1), value, v2);
+        ensures [inferred] cond ==> (forall x: address: x != a1 ==> (S |~ global<Counter>(x)) == old(Counter[x]));
+        ensures [inferred] cond ==> (S |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, v1);
+        ensures [inferred] !cond ==> (forall x: address: x != a2 ==> (S |~ global<Counter>(x)) == old(Counter[x]));
+        ensures [inferred] !cond ==> (S |~ global<Counter>(a2)) == update_field(old(Counter[a2]), value, v1);
+        aborts_if [inferred] S |~ cond && !exists<Counter>(a2);
+        aborts_if [inferred] S |~ !cond && !exists<Counter>(a1);
+        aborts_if [inferred] cond && !exists<Counter>(a1);
+        aborts_if [inferred] !cond && !exists<Counter>(a2);
     }
 
 
@@ -576,22 +636,23 @@ module 0x42::mutations {
         c2.value = c2.value + v2;
     }
     spec cond_addr_increment(cond: bool, a1: address, a2: address, v1: u64, v2: u64) {
-        ensures [inferred] cond ==> global<Counter>(a2) == update_field(at_23@global<Counter>(a2), value, at_23@global<Counter>(a2).value + v2);
-        ensures [inferred] !cond ==> global<Counter>(a1) == update_field(at_23@global<Counter>(a1), value, at_23@global<Counter>(a1).value + v2);
-        ensures [inferred] cond ==> (forall x: address: x != a1 ==> at_23@global<Counter>(x) == old(global<Counter>(x)));
-        ensures [inferred] cond ==> at_23@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, old(global<Counter>(a1)).value + v1);
-        ensures [inferred] !cond ==> (forall x: address: x != a2 ==> at_23@global<Counter>(x) == old(global<Counter>(x)));
-        ensures [inferred] !cond ==> at_23@global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, old(global<Counter>(a2)).value + v1);
-        aborts_if [inferred] cond && at_23@global<Counter>(a2).value + v2 > MAX_U64;
-        aborts_if [inferred] cond && !exists<Counter>(a2);
-        aborts_if [inferred] !cond && at_23@global<Counter>(a1).value + v2 > MAX_U64;
-        aborts_if [inferred] !cond && !exists<Counter>(a1);
-        aborts_if [inferred] cond && global<Counter>(a1).value + v1 > MAX_U64;
-        aborts_if [inferred] cond && !at_23@exists<Counter>(a1);
-        aborts_if [inferred] !cond && global<Counter>(a2).value + v1 > MAX_U64;
-        aborts_if [inferred] !cond && !at_23@exists<Counter>(a2);
-        modifies [inferred] global<Counter>(a2);
-        modifies [inferred] global<Counter>(a1);
+        pragma opaque = true;
+        modifies Counter[a2];
+        modifies Counter[a1];
+        ensures [inferred] cond ==> Counter[a2] == update_field(S |~ global<Counter>(a2), value, (S |~ global<Counter>(a2)).value + v2);
+        ensures [inferred] !cond ==> Counter[a1] == update_field(S |~ global<Counter>(a1), value, (S |~ global<Counter>(a1)).value + v2);
+        ensures [inferred] cond ==> (forall x: address: x != a1 ==> (S |~ global<Counter>(x)) == old(Counter[x]));
+        ensures [inferred] cond ==> (S |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, old(Counter[a1]).value + v1);
+        ensures [inferred] !cond ==> (forall x: address: x != a2 ==> (S |~ global<Counter>(x)) == old(Counter[x]));
+        ensures [inferred] !cond ==> (S |~ global<Counter>(a2)) == update_field(old(Counter[a2]), value, old(Counter[a2]).value + v1);
+        aborts_if [inferred] cond && (S |~ global<Counter>(a2)).value + v2 > MAX_U64;
+        aborts_if [inferred] S |~ cond && !exists<Counter>(a2);
+        aborts_if [inferred] !cond && (S |~ global<Counter>(a1)).value + v2 > MAX_U64;
+        aborts_if [inferred] S |~ !cond && !exists<Counter>(a1);
+        aborts_if [inferred] cond && Counter[a1].value + v1 > MAX_U64;
+        aborts_if [inferred] cond && !exists<Counter>(a1);
+        aborts_if [inferred] !cond && Counter[a2].value + v1 > MAX_U64;
+        aborts_if [inferred] !cond && !exists<Counter>(a2);
     }
 
 
@@ -605,17 +666,18 @@ module 0x42::mutations {
         Counter[a3].value = v3;
     }
     spec triple_addr_global(a1: address, a2: address, a3: address, v1: u64, v2: u64, v3: u64) {
-        ensures [inferred] global<Counter>(a3) == update_field(at_24@global<Counter>(a3), value, v3);
-        ensures [inferred = sathard] forall x: address: x != a2 ==> at_24@global<Counter>(x) == at_18@global<Counter>(x);
-        ensures [inferred] at_24@global<Counter>(a2) == update_field(at_18@global<Counter>(a2), value, v2);
-        ensures [inferred = sathard] forall x: address: x != a1 ==> at_18@global<Counter>(x) == old(global<Counter>(x));
-        ensures [inferred] at_18@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
-        aborts_if [inferred] !exists<Counter>(a3);
-        aborts_if [inferred] !at_24@exists<Counter>(a2);
-        aborts_if [inferred] !at_18@exists<Counter>(a1);
-        modifies [inferred] global<Counter>(a3);
-        modifies [inferred] global<Counter>(a2);
-        modifies [inferred] global<Counter>(a1);
+        pragma opaque = true;
+        modifies Counter[a3];
+        modifies Counter[a2];
+        modifies Counter[a1];
+        ensures [inferred] Counter[a3] == update_field(S2 |~ global<Counter>(a3), value, v3);
+        ensures [inferred] (S2 |~ global<Counter>(a2)) == update_field(S1 |~ global<Counter>(a2), value, v2);
+        ensures [inferred] (S1 |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, v1);
+        ensures [inferred = sathard] forall x: address: x != a2 ==> (S2 |~ global<Counter>(x)) == (S1 |~ global<Counter>(x));
+        ensures [inferred = sathard] forall x: address: x != a1 ==> (S1 |~ global<Counter>(x)) == old(Counter[x]);
+        aborts_if [inferred] S1 |~ !exists<Counter>(a3);
+        aborts_if [inferred] !exists<Counter>(a2);
+        aborts_if [inferred] !exists<Counter>(a1);
     }
 
 
@@ -627,11 +689,13 @@ module 0x42::mutations {
         increment_global(a2);
     }
     spec mutation_then_call(a1: address, a2: address, v: u64) {
-        ensures [inferred] ensures_of<increment_global>(a2);
-        ensures [inferred] at_13@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v);
-        aborts_if [inferred] aborts_of<increment_global>(a2);
-        aborts_if [inferred] !at_13@exists<Counter>(a1);
-        modifies [inferred] global<Counter>(a1);
+        pragma opaque = true;
+        modifies Counter[a1];
+        modifies Counter[a2];
+        ensures [inferred] S.. |~ ensures_of<increment_global>(a2);
+        ensures [inferred] (S |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, v);
+        aborts_if [inferred] S |~ aborts_of<increment_global>(a2);
+        aborts_if [inferred] !exists<Counter>(a1);
     }
 
 
@@ -641,11 +705,13 @@ module 0x42::mutations {
         Counter[a1].value = v;
     }
     spec call_then_mutation(a1: address, a2: address, v: u64) {
-        ensures [inferred] global<Counter>(a1) == update_field(post_call_7@global<Counter>(a1), value, v);
-        ensures [inferred] ensures_of<increment_global>(a2)@post_call_7;
-        aborts_if [inferred] !exists<Counter>(a1);
+        pragma opaque = true;
+        modifies Counter[a1];
+        modifies Counter[a2];
+        ensures [inferred] Counter[a1] == update_field(S |~ global<Counter>(a1), value, v);
+        ensures [inferred] ..S |~ ensures_of<increment_global>(a2);
+        aborts_if [inferred] S |~ !exists<Counter>(a1);
         aborts_if [inferred] aborts_of<increment_global>(a2);
-        modifies [inferred] global<Counter>(a1);
     }
 
 
@@ -656,225 +722,40 @@ module 0x42::mutations {
         value
     }
     spec remove_and_modify(a1: address, a2: address, v: u64): u64 {
-        ensures [inferred] result == global<Counter>(a1).value;
-        ensures [inferred] global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, v);
-        ensures [inferred] !exists<Counter>(a1);
-        aborts_if [inferred] !exists<Counter>(a2);
+        pragma opaque = true;
+        modifies Counter[a2];
+        modifies Counter[a1];
+        ensures [inferred] result == old(Counter[a1]).value;
+        ensures [inferred] Counter[a2] == update_field(S |~ global<Counter>(a2), value, v);
+        ensures [inferred] S |~ !exists<Counter>(a1);
+        aborts_if [inferred] S |~ !exists<Counter>(a2);
         aborts_if [inferred] !exists<Counter>(a1);
-        modifies [inferred] global<Counter>(a2);
-        modifies [inferred] global<Counter>(a1);
     }
 
 }
 /*
-Verification: exiting with compilation errors
-error: state label `at_14` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:497:64
+Verification: exiting with bytecode transformation errors
+error: intermediate state labels (`|~`) are currently only supported for functions with linear control flow (no branches); this restriction will be lifted in a future version
+    ┌─ mutations.enriched.move:612:5
     │
-497 │         ensures [inferred] global<Counter>(a2) == update_field(at_14@global<Counter>(a2), value, v2);
-    │                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^
+612 │ ╭     spec cond_addr_sequential(cond: bool, a1: address, a2: address, v1: u64, v2: u64) {
+613 │ │         pragma opaque = true;
+614 │ │         modifies Counter[a2];
+615 │ │         modifies Counter[a1];
+    · │
+625 │ │         aborts_if [inferred] !cond && !exists<Counter>(a2);
+626 │ │     }
+    │ ╰─────^
 
-error: state label `at_14` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:498:69
+error: intermediate state labels (`|~`) are currently only supported for functions with linear control flow (no branches); this restriction will be lifted in a future version
+    ┌─ mutations.enriched.move:638:5
     │
-498 │         ensures [inferred = sathard] forall x: address: x != a1 ==> at_14@global<Counter>(x) == old(global<Counter>(x));
-    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_14` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:499:28
-    │
-499 │         ensures [inferred] at_14@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
-    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_14` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:501:31
-    │
-501 │         aborts_if [inferred] !at_14@exists<Counter>(a1);
-    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:554:73
-    │
-554 │         ensures [inferred] cond ==> global<Counter>(a2) == update_field(at_21@global<Counter>(a2), value, v2);
-    │                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:555:74
-    │
-555 │         ensures [inferred] !cond ==> global<Counter>(a1) == update_field(at_21@global<Counter>(a1), value, v2);
-    │                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:556:69
-    │
-556 │         ensures [inferred] cond ==> (forall x: address: x != a1 ==> at_21@global<Counter>(x) == old(global<Counter>(x)));
-    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:557:37
-    │
-557 │         ensures [inferred] cond ==> at_21@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
-    │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:558:70
-    │
-558 │         ensures [inferred] !cond ==> (forall x: address: x != a2 ==> at_21@global<Counter>(x) == old(global<Counter>(x)));
-    │                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:559:38
-    │
-559 │         ensures [inferred] !cond ==> at_21@global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, v1);
-    │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:562:39
-    │
-562 │         aborts_if [inferred] cond && !at_21@exists<Counter>(a1);
-    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:563:40
-    │
-563 │         aborts_if [inferred] !cond && !at_21@exists<Counter>(a2);
-    │                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:579:73
-    │
-579 │         ensures [inferred] cond ==> global<Counter>(a2) == update_field(at_23@global<Counter>(a2), value, at_23@global<Counter>(a2).value + v2);
-    │                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:579:107
-    │
-579 │         ensures [inferred] cond ==> global<Counter>(a2) == update_field(at_23@global<Counter>(a2), value, at_23@global<Counter>(a2).value + v2);
-    │                                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:580:74
-    │
-580 │         ensures [inferred] !cond ==> global<Counter>(a1) == update_field(at_23@global<Counter>(a1), value, at_23@global<Counter>(a1).value + v2);
-    │                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:580:108
-    │
-580 │         ensures [inferred] !cond ==> global<Counter>(a1) == update_field(at_23@global<Counter>(a1), value, at_23@global<Counter>(a1).value + v2);
-    │                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:581:69
-    │
-581 │         ensures [inferred] cond ==> (forall x: address: x != a1 ==> at_23@global<Counter>(x) == old(global<Counter>(x)));
-    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:582:37
-    │
-582 │         ensures [inferred] cond ==> at_23@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, old(global<Counter>(a1)).value + v1);
-    │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:583:70
-    │
-583 │         ensures [inferred] !cond ==> (forall x: address: x != a2 ==> at_23@global<Counter>(x) == old(global<Counter>(x)));
-    │                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:584:38
-    │
-584 │         ensures [inferred] !cond ==> at_23@global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, old(global<Counter>(a2)).value + v1);
-    │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:585:38
-    │
-585 │         aborts_if [inferred] cond && at_23@global<Counter>(a2).value + v2 > MAX_U64;
-    │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:587:39
-    │
-587 │         aborts_if [inferred] !cond && at_23@global<Counter>(a1).value + v2 > MAX_U64;
-    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:590:39
-    │
-590 │         aborts_if [inferred] cond && !at_23@exists<Counter>(a1);
-    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:592:40
-    │
-592 │         aborts_if [inferred] !cond && !at_23@exists<Counter>(a2);
-    │                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_24` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:608:64
-    │
-608 │         ensures [inferred] global<Counter>(a3) == update_field(at_24@global<Counter>(a3), value, v3);
-    │                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_24` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:609:69
-    │
-609 │         ensures [inferred = sathard] forall x: address: x != a2 ==> at_24@global<Counter>(x) == at_18@global<Counter>(x);
-    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:609:97
-    │
-609 │         ensures [inferred = sathard] forall x: address: x != a2 ==> at_24@global<Counter>(x) == at_18@global<Counter>(x);
-    │                                                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_24` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:610:28
-    │
-610 │         ensures [inferred] at_24@global<Counter>(a2) == update_field(at_18@global<Counter>(a2), value, v2);
-    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:610:70
-    │
-610 │         ensures [inferred] at_24@global<Counter>(a2) == update_field(at_18@global<Counter>(a2), value, v2);
-    │                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:611:69
-    │
-611 │         ensures [inferred = sathard] forall x: address: x != a1 ==> at_18@global<Counter>(x) == old(global<Counter>(x));
-    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:612:28
-    │
-612 │         ensures [inferred] at_18@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
-    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_24` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:614:31
-    │
-614 │         aborts_if [inferred] !at_24@exists<Counter>(a2);
-    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:615:31
-    │
-615 │         aborts_if [inferred] !at_18@exists<Counter>(a1);
-    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_13` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:631:28
-    │
-631 │         ensures [inferred] at_13@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v);
-    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: state label `at_13` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
-    ┌─ tests/inference/mutations.enriched.move:633:31
-    │
-633 │         aborts_if [inferred] !at_13@exists<Counter>(a1);
-    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+638 │ ╭     spec cond_addr_increment(cond: bool, a1: address, a2: address, v1: u64, v2: u64) {
+639 │ │         pragma opaque = true;
+640 │ │         modifies Counter[a2];
+641 │ │         modifies Counter[a1];
+    · │
+655 │ │         aborts_if [inferred] !cond && !exists<Counter>(a2);
+656 │ │     }
+    │ ╰─────^
 */

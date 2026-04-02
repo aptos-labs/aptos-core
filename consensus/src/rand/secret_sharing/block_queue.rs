@@ -76,6 +76,12 @@ impl QueueItem {
         }
     }
 
+    /// Resolve a round that has no encrypted transactions (no key needed).
+    /// Removes the round from the pending set so the queue can make progress.
+    pub fn resolve_round_without_key(&mut self, round: Round) {
+        self.pending_secret_key_rounds.remove(&round);
+    }
+
     fn blocks(&self) -> &[Arc<PipelinedBlock>] {
         &self.ordered_blocks.ordered_blocks
     }

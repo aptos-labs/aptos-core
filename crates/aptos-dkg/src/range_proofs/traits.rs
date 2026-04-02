@@ -1,23 +1,30 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::fiat_shamir::SerializeForTranscript;
+use crate::fiat_shamir::SerializeForFiatShamirTranscript;
 use aptos_crypto::arkworks::{random::UniformRand, GroupGenerators};
 use ark_ec::pairing::{Pairing, PairingOutput};
 use ark_ff::AdditiveGroup;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
+use std::fmt::Debug;
 
 // TODO: split this into `BatchedRangeProof` and `PairingBatchedRangeProof: BatchedRangeProof`? Or only do PairingBatchedRangeProof for now?
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
     type PublicStatement: CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
-    type ProverKey;
-    type VerificationKey: Clone + SerializeForTranscript; // This is often appended to a Fiat-Shamir transcript
+    type ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug;
+    type VerificationKey: CanonicalSerialize
+        + CanonicalDeserialize
+        + Eq
+        + Debug
+        + Clone
+        + SerializeForFiatShamirTranscript; // This is often appended to a Fiat-Shamir transcript
     type Input: From<u64>; // Slightly hacky. It's used in `range_proof_random_instance()` to generate (chunks of) inputs that have a certain bit size
     type Commitment: Clone + Into<Self::CommitmentNormalised>;
     type CommitmentNormalised: Clone;
     type CommitmentRandomness: UniformRand;
     type CommitmentKey;
+    type ProofProjective: Into<Self>; // TODO: Might want to expand this by making it return its projective elements, and building Self from affinisations of those. But not needed atm
 
     const DST: &[u8];
 
@@ -54,14 +61,14 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         comm: &Self::CommitmentNormalised,
         r: &Self::CommitmentRandomness,
         rng: &mut R,
-    ) -> Self;
+    ) -> Self::ProofProjective;
 
     fn verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
-        comm: &Self::Commitment, // TODO: should make this CommitmentNormalised
+        comm: &Self::CommitmentNormalised,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let (g1_terms, g2_terms) = self.pairing_for_verify(vk, n, ell, comm, rng)?;
@@ -76,7 +83,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
-        comm: &Self::Commitment,
+        comm: &Self::CommitmentNormalised,
         rng: &mut R,
     ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)>;
 

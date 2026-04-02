@@ -309,8 +309,8 @@ impl<F: FftField> ShamirThresholdConfig<F> {
     /// evaluations. Useful for both classic and weighted Shamir (e.g. weighted PVSS where
     /// the threshold config has `n = W`).
     ///
-    /// Note that this repository follows the convention that `t` is the reconstruction
-    /// threshold, rather than the standard adversary threshold in MPC literature.
+    /// Note that this repository uses `t` to denote the reconstruction threshold (whereas MPC
+    /// literature perhaps more commonly uses `t` for the adversary threshold).
     ///
     /// Returns a tuple containing the coefficients of the polynomial, and the shares
     #[allow(non_snake_case)]

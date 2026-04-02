@@ -143,7 +143,7 @@ impl SecretSharedKey {
 #[derive(Clone)]
 pub struct SecretShareConfig {
     validator: Arc<ValidatorVerifier>,
-    digest_key: DigestKey,
+    digest_key: Arc<DigestKey>,
     msk_share: MasterSecretKeyShare,
     verification_keys: Vec<VerificationKey>,
     config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
@@ -154,7 +154,7 @@ pub struct SecretShareConfig {
 impl SecretShareConfig {
     pub fn new(
         validator: Arc<ValidatorVerifier>,
-        digest_key: DigestKey,
+        digest_key: Arc<DigestKey>,
         msk_share: MasterSecretKeyShare,
         verification_keys: Vec<VerificationKey>,
         config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
@@ -189,6 +189,10 @@ impl SecretShareConfig {
 
     pub fn digest_key(&self) -> &DigestKey {
         &self.digest_key
+    }
+
+    pub fn digest_key_arc(&self) -> Arc<DigestKey> {
+        Arc::clone(&self.digest_key)
     }
 
     pub fn msk_share(&self) -> &MasterSecretKeyShare {

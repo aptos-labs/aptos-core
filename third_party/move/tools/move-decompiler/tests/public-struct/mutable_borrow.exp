@@ -1,0 +1,67 @@
+module 0x42::borrow_defs {
+    public struct Inner has copy, drop {
+        h: u64,
+    }
+    public struct Outer has copy, drop {
+        f: u64,
+        g: Inner,
+    }
+    public struct VecHolder has copy, drop {
+        data: vector<u8>,
+    }
+}
+module 0x42::borrow_consumer {
+    use 0x42::borrow_defs;
+    fun increment_f(s: &mut borrow_defs::Outer) {
+        let _v0 = &mut s.f;
+        *_v0 = *_v0 + 1;
+    }
+    fun increment_h(s: &mut borrow_defs::Outer) {
+        let _v0 = &mut (&mut s.g).h;
+        *_v0 = *_v0 + 1;
+    }
+    fun make_holder(byte: u8): borrow_defs::VecHolder {
+        let _v0 = 0x1::vector::empty<u8>();
+        0x1::vector::push_back<u8>(&mut _v0, byte);
+        borrow_defs::VecHolder{data: _v0}
+    }
+    fun read_f_through_mut_ref(): u64 {
+        let _v0 = borrow_defs::Inner{h: 5};
+        let _v1 = borrow_defs::Outer{f: 6, g: _v0};
+        *&freeze(&mut _v1).f
+    }
+    fun read_fields(s: &borrow_defs::Outer): (u64, u64) {
+        let _v0 = *&s.f;
+        let _v1 = *&(&s.g).h;
+        (_v0, _v1)
+    }
+    fun read_first_byte(v: &borrow_defs::VecHolder): u8 {
+        *0x1::vector::borrow<u8>(&v.data, 0)
+    }
+    fun reborrow_f(s: &mut borrow_defs::Outer) {
+        let _v0 = &mut s.f;
+        *_v0 = 88;
+        _v0 = &mut s.f;
+        *_v0 = *_v0 + 1;
+    }
+    fun round_trip(): u64 {
+        let _v0 = borrow_defs::Inner{h: 20};
+        let _v1 = borrow_defs::Outer{f: 10, g: _v0};
+        increment_f(&mut _v1);
+        increment_h(&mut _v1);
+        let (_v2,_v3) = read_fields(&_v1);
+        _v2 + _v3
+    }
+    fun set_first_byte(v: &mut borrow_defs::VecHolder, byte: u8) {
+        let _v0 = 0x1::vector::borrow_mut<u8>(&mut v.data, 0);
+        *_v0 = byte;
+    }
+    fun update_both(s: &mut borrow_defs::Outer, new_f: u64, new_h: u64) {
+        let _v0 = &mut s.f;
+        *_v0 = new_f;
+        _v0 = &mut (&mut s.g).h;
+        *_v0 = new_h;
+    }
+}
+
+============ recompilation succeeded ========
