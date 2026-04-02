@@ -85,6 +85,9 @@ container-build container="aptos-node" tag="latest" profile="release":
             just build aptos {{profile}}
             just build l1-migration {{profile}}
             ;;
+        "aptos-debugger")
+            just build aptos-debugger {{profile}}
+            ;;
         "aptos-faucet-service")
             just build aptos-faucet-service {{profile}}
             ;;
@@ -111,6 +114,27 @@ container-build container="aptos-node" tag="latest" profile="release":
     
     # Clean up the copied binary
     rm -f aptos-test
+
+# Push a container image to GHCR
+container-push container="aptos-node" tag="latest":
+    docker push ghcr.io/movementlabsxyz/{{container}}:{{tag}}
+
+# Build and push a container image
+container-release container="aptos-node" tag="latest" profile="release":
+    just container-build {{container}} {{tag}} {{profile}}
+    just container-push {{container}} {{tag}}
+
+# List available container targets
+list-containers:
+    @echo "Available container build targets:"
+    @echo "  aptos-node          - L1 blockchain node (aptos-node + movement + l1-migration)"
+    @echo "  aptos-debugger      - Database backup and restore tool"
+    @echo "  aptos-faucet-service - Token faucet for test networks"
+    @echo ""
+    @echo "Usage:"
+    @echo "  just container-build <container> [tag] [profile]"
+    @echo "  just container-push <container> [tag]"
+    @echo "  just container-release <container> [tag] [profile]  # build + push"
 
 # Build any binary by package name
 build-bin package:
@@ -143,3 +167,9 @@ help:
     @echo "  Use 'just build <binary-name>' for common binary builds"
     @echo "  Use 'just build' to build all packages"
     @echo "  Use 'just build-bin <package-name>' for custom package builds"
+    @echo ""
+    @echo "Container Build Options:"
+    @echo "  Use 'just list-containers' to see available container targets"
+    @echo "  Use 'just container-build <container>' to build a container image"
+    @echo "  Use 'just container-push <container>' to push to GHCR"
+    @echo "  Use 'just container-release <container>' to build + push"

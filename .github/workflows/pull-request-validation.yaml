@@ -80,7 +80,7 @@ jobs:
             package: "aptos-node"
             profile: "dev"
           - name: "aptos-cli"
-            package: "aptos"
+            package: "movement"
             profile: "dev"
           - name: "l1-migration"
             package: "l1-migration"
@@ -145,70 +145,6 @@ jobs:
           name: ${{ matrix.binary.package }}-${{ github.sha }}
           path: ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}
           retention-days: 7
-
-  build-docker:
-    needs: build-binaries
-    runs-on: ubuntu-latest
-    name: "Build Docker Images"
-    permissions:
-      contents: read
-      packages: write
-    env:
-      TARGET_FOLDER: target/debug
-    steps:
-      - uses: actions/checkout@v4
-      
-      # Download artifacts
-      - name: Download aptos-node binary
-        uses: actions/download-artifact@v4
-        with:
-          name: aptos-node-${{ github.sha }}
-          path: ${{ env.TARGET_FOLDER }}
-      - name: Download aptos binary
-        uses: actions/download-artifact@v4
-        with:
-          name: aptos-${{ github.sha }}
-          path: ${{ env.TARGET_FOLDER }}
-      - name: Download l1-migration binary
-        uses: actions/download-artifact@v4
-        with:
-          name: l1-migration-${{ github.sha }}
-          path: ${{ env.TARGET_FOLDER }}
-      - name: List binaries
-        run: ls -la ${{ env.TARGET_FOLDER }}
-      # Setup Docker Buildx (replaces manual Docker checks)
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          version: latest
-
-      # Log in to GHCR (can also use docker/login-action)
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ vars.INFRA_GH_USER }}
-          password: ${{ secrets.INFRA_GH_PAT }}
-      
-      # Set build environment variables
-      - name: Set build environment
-        run: |
-          echo "GIT_SHA_SHORT=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
-      
-      # Build and push Docker image
-      - name: Build and push aptos-node Docker image
-        run: |
-          docker build --build-arg BINARY_PATH=target/debug -f docker/aptos-node/Dockerfile -t ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }} .
-          docker push ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}
-      
-      # Output image information
-      - name: Output image information
-        run: |
-          echo "✅ Docker image built and pushed successfully!"
-          echo "📦 Image: ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}"
-          echo "🏷️  Tag: ${{ env.GIT_SHA_SHORT }}"
-          echo "🌐 Registry: ghcr.io/movementlabsxyz/aptos-node"
 
   # Test CLI release build to verify the release workflow will work
   test-cli-release-build:

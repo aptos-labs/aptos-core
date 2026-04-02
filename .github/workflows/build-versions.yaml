@@ -14,7 +14,7 @@ on:
 
 jobs:
   setup:
-    runs-on: buildjet-16vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     outputs:
       short_sha: ${{ steps.chop_sha.outputs.short_sha }}
       build_date: ${{ steps.build_date.outputs.build_date }}
@@ -74,7 +74,7 @@ jobs:
   binaries-aptos-node:
     needs: 
       - setup
-    runs-on: buildjet-16vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     name: "Build ${{ matrix.binary.package }} with Nix"
     strategy:
       matrix:
@@ -82,6 +82,7 @@ jobs:
           - package: "aptos-node"
           - package: "movement"
           - package: "l1-migration"
+          - package: "aptos-debugger"
     env:
       TARGET_FOLDER: target/${{ needs.setup.outputs.build_profile }}
     steps:
@@ -89,7 +90,7 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha}}
       - name: Build binary ${{ matrix.binary.package }}
-        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@ci/version-builds
+        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@m1
         with:
           binary_package: ${{ matrix.binary.package }}
           profile: ${{ needs.setup.outputs.build_profile }}
@@ -99,7 +100,7 @@ jobs:
     needs: 
       - setup
       - binaries-aptos-node
-    runs-on: buildjet-16vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     name: "build container: aptos-node"
     permissions:
       contents: read
@@ -131,7 +132,7 @@ jobs:
         run: ls -la ${{ env.TARGET_FOLDER }}
         
       - name: Build Container
-        uses: movementlabsxyz/aptos-core/.github/actions/build-container@ci/version-builds
+        uses: movementlabsxyz/aptos-core/.github/actions/build-container@m1
         with:
           image_name: ghcr.io/movementlabsxyz/aptos-node
           dockerfile_subdir: aptos-node
@@ -145,10 +146,48 @@ jobs:
           ghcr_password: ${{ secrets.INFRA_GH_PAT }}
           git_sha: ${{ needs.setup.outputs.git_sha }}
 
+  container-aptos-debugger:
+    needs:
+      - setup
+      - binaries-aptos-node
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    name: "build container: aptos-debugger"
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TARGET_FOLDER: target/${{ needs.setup.outputs.build_profile }}
+      SHORT_SHA: ${{ needs.setup.outputs.short_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha}}
+      - name: Download aptos-debugger binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-debugger-${{ env.SHORT_SHA }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: List binaries
+        run: ls -la ${{ env.TARGET_FOLDER }}
+      - name: Build Container
+        uses: movementlabsxyz/aptos-core/.github/actions/build-container@m1
+        with:
+          image_name: ghcr.io/movementlabsxyz/aptos-debugger
+          dockerfile_subdir: aptos-debugger
+          build_args: |
+            BINARY_PATH=${{ env.TARGET_FOLDER }}
+            GIT_SHA=${{ env.SHORT_SHA }}
+            GIT_TAG=${{ needs.setup.outputs.git_tag }}
+            GIT_BRANCH=${{ needs.setup.outputs.git_branch }}
+            BUILD_DATE=${{ needs.setup.outputs.build_date }}
+          ghcr_username: ${{ vars.INFRA_GH_USER }}
+          ghcr_password: ${{ secrets.INFRA_GH_PAT }}
+          git_sha: ${{ needs.setup.outputs.git_sha }}
+
   binaries-aptos-faucet-service:
     needs: 
       - setup
-    runs-on: buildjet-16vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     name: "Build ${{ matrix.binary.package }} with Nix"
     strategy:
       matrix:
@@ -161,7 +200,7 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha}}
       - name: Build binary ${{ matrix.binary.package }}
-        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@ci/version-builds
+        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@m1
         with:
           binary_package: ${{ matrix.binary.package }}
           profile: ${{ needs.setup.outputs.build_profile }}
@@ -171,7 +210,7 @@ jobs:
     needs: 
       - setup
       - binaries-aptos-faucet-service
-    runs-on: buildjet-16vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     name: "build container: aptos-faucet-service"
     permissions:
       contents: read
@@ -193,7 +232,7 @@ jobs:
         run: ls -la ${{ env.TARGET_FOLDER }}
         
       - name: Build Container
-        uses: movementlabsxyz/aptos-core/.github/actions/build-container@ci/version-builds
+        uses: movementlabsxyz/aptos-core/.github/actions/build-container@m1
         with:
           image_name: ghcr.io/movementlabsxyz/aptos-faucet-service
           dockerfile_subdir: aptos-faucet-service
@@ -210,7 +249,7 @@ jobs:
   binaries-aptos-tools:
     needs: 
       - setup
-    runs-on: buildjet-16vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     name: "Build ${{ matrix.binary.package }} with Nix"
     strategy:
       matrix:
@@ -223,7 +262,7 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha}}
       - name: Build binary ${{ matrix.binary.package }}
-        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@ci/version-builds
+        uses: movementlabsxyz/aptos-core/.github/actions/build-binary@m1
         with:
           binary_package: ${{ matrix.binary.package }}
           profile: ${{ needs.setup.outputs.build_profile }}
