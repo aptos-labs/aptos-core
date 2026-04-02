@@ -36,7 +36,7 @@ mod state_sync_config;
 mod storage_config;
 mod telemetry_service_config;
 mod transaction_filters_config;
-pub mod transaction_tracing_config;
+mod transaction_tracing_config;
 mod utils;
 
 // All public usage statements should be declared below

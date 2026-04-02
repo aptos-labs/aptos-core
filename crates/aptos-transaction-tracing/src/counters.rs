@@ -6,8 +6,9 @@ use once_cell::sync::Lazy;
 use std::time::Duration;
 
 /// Histogram buckets for tracing latencies (in seconds).
+/// Focused on sub-second resolution where most pipeline stages complete.
 const TRACING_BUCKETS: &[f64] = &[
-    0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0,
+    0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
 ];
 
 /// Per-transaction latency from mempool insertion to each lifecycle stage,
