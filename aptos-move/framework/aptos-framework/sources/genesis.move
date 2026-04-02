@@ -532,10 +532,6 @@ module aptos_framework::genesis {
         use aptos_framework::object;
         use aptos_framework::primary_fungible_store;
         use aptos_framework::fungible_asset::Metadata;
-        use std::features;
-
-        let feature = features::get_new_accounts_default_to_fa_apt_store_feature();
-        features::change_feature_flags_for_testing(aptos_framework, vector[feature], vector[]);
 
         aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
 

@@ -5,8 +5,9 @@
 //! that would otherwise cause undefined behavior at runtime: frame bounds,
 //! pointer slot validity, invalid jump targets, etc.
 
-use crate::{
-    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, ObjectDescriptor, FRAME_METADATA_SIZE,
+use crate::types::ObjectDescriptor;
+use mono_move_core::{
+    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -181,6 +182,7 @@ impl FunctionVerifier<'_> {
                     self.err(Some(pc), format!("func_id {} out of bounds", func_id));
                 }
             },
+            MicroOp::CallLocalFunc { .. } => {},
 
             // ----- VecNew -----
             MicroOp::VecNew { dst } => {
@@ -327,6 +329,9 @@ impl FunctionVerifier<'_> {
                 self.check_nonzero_size(pc, size);
                 self.check_frame_access(Some(pc), src, size);
             },
+
+            // Inserted by the instrumentation pass; no frame accesses to verify.
+            MicroOp::Charge { .. } => {},
         }
     }
 

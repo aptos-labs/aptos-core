@@ -46,7 +46,7 @@ use aptos_types::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
-    on_chain_config::{BlockGasLimitType, Features},
+    on_chain_config::Features,
     state_store::{state_value::StateValue, TStateView},
     transaction::{
         block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockExecutableTransaction,
@@ -438,7 +438,7 @@ where
         runtime_environment: &RuntimeEnvironment,
         parallel_state: ParallelState<T>,
         scheduler: &SchedulerV2,
-        block_gas_limit_type: &BlockGasLimitType,
+        config: &BlockExecutorConfig,
     ) -> Result<(), PanicError> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
 
@@ -475,8 +475,11 @@ where
 
         // Verify that all pre-written keys were actually written by the transaction.
         // If not, fallback to sequential execution to avoid speculative reads seeing
-        // incorrect pre-write values.
-        Self::verify_pre_writes(txn, maybe_output)?;
+        // incorrect pre-write values. Only needed when pre-writes are enabled, as
+        // the check guards against stale pre-write data in the MVHashMap.
+        if config.local.enable_pre_write {
+            Self::verify_pre_writes(txn, maybe_output)?;
+        }
 
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         Self::process_delayed_field_output(
@@ -538,7 +541,7 @@ where
             idx_to_execute,
             read_set,
             execution_result,
-            block_gas_limit_type,
+            &config.onchain.block_gas_limit_type,
             txn.user_txn_bytes_len() as u64,
         )?;
 
@@ -587,7 +590,7 @@ where
         >,
         runtime_environment: &RuntimeEnvironment,
         parallel_state: ParallelState<T>,
-        block_gas_limit_type: &BlockGasLimitType,
+        config: &BlockExecutorConfig,
     ) -> Result<SchedulerTask, PanicError> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
 
@@ -614,8 +617,11 @@ where
 
         // Verify that all pre-written keys were actually written by the transaction.
         // If not, fallback to sequential execution to avoid speculative reads seeing
-        // incorrect pre-write values.
-        Self::verify_pre_writes(txn, processed_output)?;
+        // incorrect pre-write values. Only needed when pre-writes are enabled, as
+        // the check guards against stale pre-write data in the MVHashMap.
+        if config.local.enable_pre_write {
+            Self::verify_pre_writes(txn, processed_output)?;
+        }
 
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
@@ -745,7 +751,7 @@ where
             idx_to_execute,
             read_set,
             execution_result,
-            block_gas_limit_type,
+            &config.onchain.block_gas_limit_type,
             txn.user_txn_bytes_len() as u64,
         )?;
         if let Some(scheduler) = maybe_scheduler {
@@ -955,7 +961,7 @@ where
             AptosModuleExtension,
         >,
         runtime_environment: &RuntimeEnvironment,
-        block_gas_limit_type: &BlockGasLimitType,
+        config: &BlockExecutorConfig,
     ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::new(
             versioned_cache,
@@ -982,7 +988,7 @@ where
                     global_module_cache,
                     runtime_environment,
                     parallel_state,
-                    block_gas_limit_type,
+                    config,
                 )?;
             },
             Some((scheduler, worker_id)) => {
@@ -1000,7 +1006,7 @@ where
                     runtime_environment,
                     parallel_state,
                     scheduler,
-                    block_gas_limit_type,
+                    config,
                 )?;
             },
         }
@@ -1079,7 +1085,7 @@ where
                 shared_sync_params.base_view,
                 global_module_cache,
                 runtime_environment,
-                &self.config.onchain.block_gas_limit_type,
+                &self.config,
             )?;
         }
 
@@ -1462,7 +1468,7 @@ where
                         shared_sync_params.delayed_field_id_counter,
                         incarnation,
                     ),
-                    &self.config.onchain.block_gas_limit_type,
+                    &self.config,
                 )?,
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     {
@@ -1573,7 +1579,7 @@ where
                             incarnation,
                         ),
                         scheduler,
-                        &self.config.onchain.block_gas_limit_type,
+                        &self.config,
                     )?;
                 },
                 TaskKind::PostCommitProcessing(txn_idx) => {
@@ -1741,7 +1747,7 @@ where
                     base_view,
                     module_cache,
                     runtime_environment,
-                    &self.config.onchain.block_gas_limit_type,
+                    &self.config,
                 )?;
                 self.materialize_txn_commit(
                     epilogue_txn_idx,

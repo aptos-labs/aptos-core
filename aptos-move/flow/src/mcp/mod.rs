@@ -5,6 +5,7 @@ pub(crate) mod common;
 pub(crate) mod file_watcher;
 mod package_data;
 pub(crate) mod session;
+pub(crate) mod supervisor;
 pub(crate) mod tools;
 
 use crate::GlobalOpts;
@@ -60,17 +61,16 @@ pub struct McpArgs {
     pub bytecode_version: Option<u32>,
 
     /// Move language version.
-    #[arg(long, value_parser = clap::value_parser!(LanguageVersion))]
-    pub language_version: Option<LanguageVersion>,
+    #[arg(long, value_parser = clap::value_parser!(LanguageVersion), default_value_t = LanguageVersion::latest())]
+    pub language_version: LanguageVersion,
 
     /// Compiler experiments to enable.
     #[arg(long)]
     pub experiments: Vec<String>,
 }
 
-/// Start the MCP stdio server.
-pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
-    move_compiler_v2::logging::setup_logging(None);
+fn setup() {
+    move_compiler_v2::logging::setup_logging_with_timestamps(None);
 
     // Register Aptos package hooks to recognize custom fields like upgrade_policy.
     register_package_hooks(Box::new(MoveFlowPackageHooks));
@@ -85,12 +85,34 @@ pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
     // log file with location info rather than silently crashing the process.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        log::error!("panic: {}", info);
+        let bt = std::backtrace::Backtrace::force_capture();
+        log::error!("panic: {}\nBacktrace:\n{}", info, bt);
         default_hook(info);
     }));
+}
+
+/// Start the MCP stdio server.
+///
+/// When `restart` is true, skips the MCP `initialize` handshake because the
+/// client already completed it with the previous child process. After a crash
+/// the client is waiting for a response, not sending `initialize`, so a new
+/// handshake would deadlock.
+pub async fn run(args: &McpArgs, global: &GlobalOpts, restart: bool) -> Result<()> {
+    setup();
+
+    log::info!(
+        "move-flow MCP server v{} starting (tools: {})",
+        env!("CARGO_PKG_VERSION"),
+        FlowSession::tool_names().join(", ")
+    );
 
     let session = FlowSession::new(args.clone(), global.clone());
-    let service = session.serve(stdio()).await?;
-    service.waiting().await?;
+    if restart {
+        let service = rmcp::service::serve_directly(session, stdio(), None);
+        service.waiting().await?;
+    } else {
+        let service = session.serve(stdio()).await?;
+        service.waiting().await?;
+    }
     Ok(())
 }

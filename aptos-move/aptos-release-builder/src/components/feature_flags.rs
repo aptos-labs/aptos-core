@@ -411,7 +411,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::MonotonicallyIncreasingCounter => {
                 AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
             },
-            FeatureFlag::EnableCaptureOption => AptosFeatureFlag::ENABLE_CAPTURE_OPTION,
+            FeatureFlag::EnableCaptureOption => AptosFeatureFlag::_ENABLE_CAPTURE_OPTION,
             FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::EnableEnumOption => AptosFeatureFlag::ENABLE_ENUM_OPTION,
             FeatureFlag::VMBinaryFormatV9 => AptosFeatureFlag::VM_BINARY_FORMAT_V9,
@@ -598,7 +598,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER => {
                 FeatureFlag::MonotonicallyIncreasingCounter
             },
-            AptosFeatureFlag::ENABLE_CAPTURE_OPTION => FeatureFlag::EnableCaptureOption,
+            AptosFeatureFlag::_ENABLE_CAPTURE_OPTION => FeatureFlag::EnableCaptureOption,
             AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
             AptosFeatureFlag::ENABLE_ENUM_OPTION => FeatureFlag::EnableEnumOption,
             AptosFeatureFlag::VM_BINARY_FORMAT_V9 => FeatureFlag::VMBinaryFormatV9,

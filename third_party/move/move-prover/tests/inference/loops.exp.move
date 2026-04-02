@@ -19,6 +19,7 @@ module 0x42::loops {
         sum
     }
     spec sum_to_n(n: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == n * (n + 1) / 2;
         aborts_if [inferred] n > 0 && (n - 1) * n / 2 + n > MAX_U64;
     }
@@ -33,7 +34,9 @@ module 0x42::loops {
         count
     }
     spec count_down(n: u64): u64 {
-        ensures [inferred = vacuous] forall x: u64: x <= 0 ==> result == x;
+        pragma opaque = true;
+        ensures [inferred] result == 0;
+        aborts_if [inferred] false;
     }
 
 
@@ -49,7 +52,7 @@ module 0x42::loops {
     }
     spec inc_n_times {
         pragma unroll = 5;
-        ensures [inferred] 5 < n ==> r == old(r) + 6;
+        pragma opaque = true;
         ensures [inferred] n == 5 ==> r == old(r) + 5;
         ensures [inferred] n == 4 ==> r == old(r) + 4;
         ensures [inferred] n == 3 ==> r == old(r) + 3;
@@ -88,6 +91,7 @@ module 0x42::loops {
     }
     spec double_n_times {
         pragma verify = false; // timeout
+        pragma opaque = true;
         ensures [inferred] r == old(r) * pow2(n);
         aborts_if [inferred] n > 0 && r * pow2(n - 1) * 2 > MAX_U64;
     }
@@ -106,6 +110,7 @@ module 0x42::loops {
     spec double_n_times_ensures {
         pragma inference = only_ensures;
         pragma verify = false; // timeout
+        pragma opaque = true;
         ensures [inferred] r == old(r) * pow2(n);
     }
 
@@ -123,6 +128,7 @@ module 0x42::loops {
     spec double_n_times_aborts {
         pragma inference = only_aborts;
         pragma verify = false; // timeout
+        pragma opaque = true;
         aborts_if [inferred] n > 0 && r * pow2(n - 1) * 2 > MAX_U64;
     }
 
@@ -136,13 +142,17 @@ module 0x42::loops {
                 *r = *r + 1;
             };
             i = i + 1;
+        } spec {
+            invariant i <= n;
+            invariant do_inc ==> r == old(r) + i;
+            invariant !do_inc ==> r == old(r);
         };
     }
     spec cond_inc_loop(r: &mut u64, n: u64, do_inc: bool) {
-        ensures [inferred = vacuous] forall x: u64, y: u64: x < n && do_inc ==> r == y + 1;
-        ensures [inferred = vacuous] forall x: u64, y: u64: x < n && !do_inc ==> r == y;
-        ensures [inferred = vacuous] forall x: u64: r == x;
-        aborts_if [inferred] do_inc && n > 0;
+        pragma opaque = true;
+        ensures [inferred] do_inc ==> r == old(r) + n;
+        ensures [inferred] !do_inc ==> r == old(r);
+        aborts_if [inferred] do_inc && r + n > MAX_U64;
     }
 
 
@@ -165,20 +175,20 @@ module 0x42::loops {
         // Test with unrolling. Notice that the inferred spec is incomplete and will
         // fail verification.
         pragma unroll = 3;
-        ensures [inferred] 3 < n ==> global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, old(global<Counter>(addr)).value + 4);
-        ensures [inferred] n == 3 ==> global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, old(global<Counter>(addr)).value + 3);
-        ensures [inferred] n == 2 ==> global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, old(global<Counter>(addr)).value + 2);
-        ensures [inferred] n == 1 ==> global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, old(global<Counter>(addr)).value + 1);
-        ensures [inferred] n == 0 ==> global<Counter>(addr) == old(global<Counter>(addr));
-        aborts_if [inferred] 3 < n && global<Counter>(addr).value > MAX_U64 - 4;
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] n == 3 ==> Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 3);
+        ensures [inferred] n == 2 ==> Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 2);
+        ensures [inferred] n == 1 ==> Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
+        ensures [inferred] n == 0 ==> Counter[addr] == old(Counter[addr]);
+        aborts_if [inferred] 3 < n && Counter[addr].value > MAX_U64 - 4;
         aborts_if [inferred] 3 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 2 < n && global<Counter>(addr).value > MAX_U64 - 3;
+        aborts_if [inferred] 2 < n && Counter[addr].value > MAX_U64 - 3;
         aborts_if [inferred] 2 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 1 < n && global<Counter>(addr).value > MAX_U64 - 2;
+        aborts_if [inferred] 1 < n && Counter[addr].value > MAX_U64 - 2;
         aborts_if [inferred] 1 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 0 < n && global<Counter>(addr).value > MAX_U64 - 1;
+        aborts_if [inferred] 0 < n && Counter[addr].value == MAX_U64;
         aborts_if [inferred] 0 < n && !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
     // Increment global counter n times with a user-provided loop invariant
@@ -195,10 +205,11 @@ module 0x42::loops {
         };
     }
     spec inc_global_with_invariant(addr: address, n: u64) {
-        ensures [inferred] global<Counter>(addr) == Counter{value: old(global<Counter>(addr)).value + n};
-        aborts_if [inferred] n > 0 && global<Counter>(addr).value + (n - 1) > MAX_U64 - 1;
+        pragma opaque = true;
+        modifies Counter[addr];
+        ensures [inferred] Counter[addr] == Counter{value: old(Counter[addr]).value + n};
+        aborts_if [inferred] Counter[addr].value + n > MAX_U64;
         aborts_if [inferred] !exists<Counter>(addr);
-        modifies [inferred] global<Counter>(addr);
     }
 
 
@@ -220,6 +231,7 @@ module 0x42::loops {
         sum
     }
     spec agent_invariant_loop(n: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == n * (n + 1) / 2;
         aborts_if [inferred] n > 0 && (n - 1) * n / 2 + n > MAX_U64;
     }
@@ -241,6 +253,7 @@ module 0x42::loops {
         sum
     }
     spec empty_spec_block {
+        pragma opaque = true;
         ensures [inferred] result == n * (n + 1) / 2;
         aborts_if [inferred] n > 0 && (n - 1) * n / 2 + n > MAX_U64;
     }
@@ -268,78 +281,12 @@ module 0x42::loops {
         count
     }
     spec nested_count(m: u64, n: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == m * n;
         aborts_if [inferred] n > 0 && (m > 0 && m * n > MAX_U64);
     }
 
 }
 /*
-Verification: exiting with verification errors
-error: post-condition does not hold
-    ┌─ tests/inference/loops.enriched.move:143:9
-    │
-143 │         ensures [inferred = vacuous] forall x: u64, y: u64: x < n && !do_inc ==> r == y;
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
-    =         r = <redacted>
-    =         n = <redacted>
-    =         do_inc = <redacted>
-    =     at tests/inference/loops.enriched.move:133: cond_inc_loop
-    =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     enter loop, variable(s) r, i havocked and reassigned
-    =         r = <redacted>
-    =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
-    =         r = <redacted>
-    =     at tests/inference/loops.enriched.move:145: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:142: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:143: cond_inc_loop (spec)
-
-error: post-condition does not hold
-    ┌─ tests/inference/loops.enriched.move:144:9
-    │
-144 │         ensures [inferred = vacuous] forall x: u64: r == x;
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
-    =         r = <redacted>
-    =         n = <redacted>
-    =         do_inc = <redacted>
-    =     at tests/inference/loops.enriched.move:133: cond_inc_loop
-    =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     enter loop, variable(s) r, i havocked and reassigned
-    =         r = <redacted>
-    =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
-    =         r = <redacted>
-    =     at tests/inference/loops.enriched.move:145: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:142: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:143: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:144: cond_inc_loop (spec)
-
-error: function does not abort under this condition
-    ┌─ tests/inference/loops.enriched.move:145:9
-    │
-145 │         aborts_if [inferred] do_inc && n > 0;
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
-    =         r = <redacted>
-    =         n = <redacted>
-    =         do_inc = <redacted>
-    =     at tests/inference/loops.enriched.move:133: cond_inc_loop
-    =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     enter loop, variable(s) r, i havocked and reassigned
-    =         r = <redacted>
-    =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
-    =         r = <redacted>
-    =     at tests/inference/loops.enriched.move:145: cond_inc_loop (spec)
+Verification: Succeeded.
 */

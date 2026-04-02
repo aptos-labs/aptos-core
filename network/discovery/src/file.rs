@@ -171,4 +171,67 @@ mod tests {
             panic!("No message sent by discovery")
         }
     }
+
+    /// Tests that clearing a discovery file (writing an empty PeerSet) is
+    /// propagated as an update with no peers — the unit-test equivalent of
+    /// the smoke test `test_file_discovery` which verified that clearing the
+    /// file removes previously discovered peers.
+    #[tokio::test]
+    async fn test_file_cleared_after_peers_added() {
+        let path = TempPath::new();
+        path.create_as_file().unwrap();
+        let path = Arc::new(path);
+
+        // Write initial peers
+        let mut peers = PeerSet::new();
+        let addr = NetworkAddress::from_str("/ip4/1.2.3.4/tcp/6180/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0").unwrap();
+        let key = addr.find_noise_proto().unwrap();
+        let mut keys = HashSet::new();
+        keys.insert(key);
+        peers.insert(
+            PeerId::random(),
+            Peer::new(vec![addr], keys, PeerRole::Downstream),
+        );
+        write_peer_set(&peers, path.as_ref().as_ref());
+
+        let mut conn_mgr_reqs_rx = create_listener(path.clone());
+
+        // First update should contain the peer
+        if let Some(ConnectivityRequest::UpdateDiscoveredPeers(
+            DiscoverySource::File,
+            actual_peers,
+        )) = conn_mgr_reqs_rx.next().await
+        {
+            assert_eq!(peers.len(), actual_peers.len());
+        } else {
+            panic!("Expected initial peer set update")
+        }
+
+        // Clear the file (write empty peer set)
+        write_peer_set(&PeerSet::new(), path.as_ref().as_ref());
+
+        // The next update should propagate the empty peer set
+        // (may need to skip stale reads of the old state)
+        let mut found_empty = false;
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        for _ in 0..20 {
+            match tokio::time::timeout_at(deadline, conn_mgr_reqs_rx.next()).await {
+                Ok(Some(ConnectivityRequest::UpdateDiscoveredPeers(
+                    DiscoverySource::File,
+                    actual_peers,
+                ))) => {
+                    if actual_peers.is_empty() {
+                        found_empty = true;
+                        break;
+                    }
+                },
+                Ok(_) => {},
+                Err(_) => break, // timed out
+            }
+        }
+        assert!(
+            found_empty,
+            "Clearing the discovery file should produce an empty peer set update"
+        );
+    }
 }

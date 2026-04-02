@@ -53,7 +53,7 @@ module <package_address>::<module>_tests {
 }
 ```
 
-**Full module mode:** Generate tests in batches.
+**Full module mode:** Generate tests in batches, one module at a time.
 
 **Suspected bugs:** Assert the *correct* expected behavior — the test should fail against the buggy code.
 

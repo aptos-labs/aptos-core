@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // In the informal grammar comments in this file, Comma<T> is shorthand for:
 //      (<T> ",")* <T>?
@@ -1183,9 +1184,8 @@ fn exp_ends_with_rbrace(exp: &Exp) -> bool {
         | Exp_::Vector(_, _, _)
         | Exp_::Lambda(_, _, _, _)
         | Exp_::Quant(_, _, _, _, _)
-        | Exp_::Behavior(_, _, _, _, _, _)
-        | Exp_::LabeledCall(_, _, _, _)
-        | Exp_::LabeledIndex(_, _, _)
+        | Exp_::Behavior(_, _, _, _)
+        | Exp_::StateLabeled(_, _, _)
         | Exp_::ExpList(_)
         | Exp_::Unit
         | Exp_::Assign(_, _, _)
@@ -1956,9 +1956,9 @@ fn parse_match_arms(
 //          | <NameAccessChain> "!" <CallArgs>
 //          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
-    // Check for behavioral predicates first, before parsing as a regular name
-    if is_behavior_predicate(context) {
-        return parse_behavior(context);
+    // Check for bare behavioral predicates (state labels handled at parse_exp level)
+    if is_bare_behavior(context) {
+        return parse_bare_behavior(context);
     }
 
     let n = parse_name_access_chain(context, false, || {
@@ -2155,17 +2155,27 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
             let lhs = sp(loc, quant_exp);
             return parse_binop_exp(context, lhs, /* min_prec */ 1);
         },
-        Tok::Identifier if is_behavior_predicate(context) => {
-            let behavior_exp = parse_behavior(context)?;
+        Tok::Identifier if is_state_label(context) => {
+            // State-labeled expression: `ident |~ expr`, `ident.. |~ expr`,
+            // or `ident..ident |~ expr`. The `|~` operator binds weaker than
+            // all other operators, so the RHS is a full expression.
+            let labeled_exp = parse_state_label(context)?;
             let loc = make_loc(
                 context.tokens.file_hash(),
                 start_loc,
                 context.tokens.previous_end_loc(),
             );
-            let lhs = sp(loc, behavior_exp);
-            // Apply dot/index chain for postfix access (e.g., label@global<R>(addr).field)
-            let lhs = apply_dot_or_index_chain(context, start_loc, lhs)?;
-            return parse_binop_exp(context, lhs, /* min_prec */ 1);
+            return Ok(sp(loc, labeled_exp));
+        },
+        Tok::PeriodPeriod if is_post_only_state_label(context) => {
+            // Post-only state label: `..post |~ expr`
+            let labeled_exp = parse_post_only_state_label(context)?;
+            let loc = make_loc(
+                context.tokens.file_hash(),
+                start_loc,
+                context.tokens.previous_end_loc(),
+            );
+            return Ok(sp(loc, labeled_exp));
         },
         _ => {
             // This could be either an assignment, operator assignment (e.g., +=), or a binary operator
@@ -2559,157 +2569,169 @@ fn behavior_kind_from_str(s: &str) -> Option<BehaviorKind> {
         "requires_of" => Some(BehaviorKind::RequiresOf),
         "aborts_of" => Some(BehaviorKind::AbortsOf),
         "ensures_of" => Some(BehaviorKind::EnsuresOf),
-        "modifies_of" => Some(BehaviorKind::ModifiesOf),
         "result_of" => Some(BehaviorKind::ResultOf),
         _ => None,
     }
 }
 
-// Check if we're looking at a behavior predicate expression.
-// This can be either:
-//   - `identifier @ behavior_keyword < ...`  (with pre-state label)
-//   - `behavior_keyword < ...`               (without pre-state label)
-fn is_behavior_predicate(context: &mut Context) -> bool {
-    // Behavior predicates are only available in V2_4 and later
+/// Checks if the current Identifier token is a bare behavior predicate: `behavior_keyword<...`.
+fn is_bare_behavior(context: &mut Context) -> bool {
     if context.env.flags().language_version() < LanguageVersion::V2_4 {
         return false;
     }
     if context.tokens.peek() != Tok::Identifier {
         return false;
     }
-
     let content = context.tokens.content();
-
-    // Check for direct behavior keyword followed by `<`
-    if behavior_kind_from_str(content).is_some() {
-        return matches!(context.tokens.lookahead(), Ok(Tok::Less));
-    }
-
-    // Check for `label @ behavior_keyword < ...` pattern
-    match context.tokens.lookahead2() {
-        Ok((Tok::AtSign, Tok::Identifier)) => {
-            // Need to check the third token - it should be a behavior keyword
-            // We can't easily lookahead 3, so we accept this pattern and validate during parse
-            true
-        },
-        _ => false,
-    }
+    behavior_kind_from_str(content).is_some() && matches!(context.tokens.lookahead(), Ok(Tok::Less))
 }
 
-// Parses a behavior predicate expression or a labeled resource access:
-//   [pre_label@]behavior_kind<fn_exp>(args)[@post_label]
-//   label@global<R>(addr)
-//   label@exists<R>(addr)
-//   label@R[addr]
-fn parse_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
-    // Parse optional pre-state label
-    let pre_label = if context.tokens.peek() == Tok::Identifier
-        && matches!(context.tokens.lookahead(), Ok(Tok::AtSign))
-    {
-        let label_name = parse_identifier(context)?;
-        let label = Label(label_name);
-        consume_token(context.tokens, Tok::AtSign)?;
-        Some(label)
-    } else {
-        None
-    };
+/// Checks if the current Identifier token starts a state-labeled expression.
+/// Returns true for (V2.4+):
+///   - `identifier |~ ...` (single state label)
+///   - `identifier .. |~ ...` (pre-only range)
+///   - `identifier .. identifier |~ ...` (full range)
+fn is_state_label(context: &mut Context) -> bool {
+    if context.env.flags().language_version() < LanguageVersion::V2_4 {
+        return false;
+    }
+    // Current token must be Identifier (verified by caller)
+    let content = context.tokens.content();
+    // Exclude behavior keywords — they are handled as bare behavior predicates
+    if behavior_kind_from_str(content).is_some() {
+        return false;
+    }
 
-    // Check if this is a labeled resource access (label@global<R>(addr), label@exists<R>(addr),
-    // or label@R[addr]) rather than a behavior predicate
-    let kind_content = context.tokens.content();
-    if let Some(label) = pre_label {
-        if behavior_kind_from_str(kind_content).is_none() {
-            return parse_labeled_resource(context, label);
+    // Check for `identifier |~ ...` (PipeTilde is a single token)
+    if matches!(context.tokens.lookahead(), Ok(Tok::PipeTilde)) {
+        return true;
+    }
+
+    // Check for range forms starting with `identifier ..`
+    if matches!(context.tokens.lookahead(), Ok(Tok::PeriodPeriod)) {
+        // `ident .. |~ expr` (pre-only range)
+        if matches!(context.tokens.lookahead_nth(1), Ok(Tok::PipeTilde)) {
+            return true;
+        }
+        // `ident .. ident |~ expr` (full range)
+        if matches!(
+            (
+                context.tokens.lookahead_nth(1),
+                context.tokens.lookahead_nth(2)
+            ),
+            (Ok(Tok::Identifier), Ok(Tok::PipeTilde))
+        ) {
+            return true;
         }
     }
 
-    // Parse behavior kind
+    false
+}
+
+/// Checks if the current PeriodPeriod token starts a post-only state label: `.. ident |~ ...`.
+fn is_post_only_state_label(context: &mut Context) -> bool {
+    if context.env.flags().language_version() < LanguageVersion::V2_4 {
+        return false;
+    }
+    // Current token is PeriodPeriod; check `.. identifier |~`
+    matches!(
+        context.tokens.lookahead2(),
+        Ok((Tok::Identifier, Tok::PipeTilde))
+    )
+}
+
+/// Parses a state label expression starting with an identifier.
+///
+/// Forms:
+///   - `ident |~ expr` — single state label
+///   - `ident .. |~ expr` — pre-only range
+///   - `ident .. ident |~ expr` — full range
+///
+/// The `|~` operator binds weaker than all other operators, so the RHS
+/// is parsed with `parse_exp()`.
+fn parse_state_label(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
+    // Parse the first identifier (pre-label or single state label)
+    let first_name = parse_identifier(context)?;
+
+    if context.tokens.peek() == Tok::PeriodPeriod {
+        // Range form: `ident .. [ident] |~ expr`
+        consume_token(context.tokens, Tok::PeriodPeriod)?;
+        let pre_label = Label(first_name);
+
+        // Check if there's a post label before `|~`
+        let post_label = if context.tokens.peek() == Tok::Identifier
+            && matches!(context.tokens.lookahead(), Ok(Tok::PipeTilde))
+        {
+            let post_name = parse_identifier(context)?;
+            Some(Label(post_name))
+        } else {
+            None
+        };
+
+        // Consume `|~`
+        consume_token(context.tokens, Tok::PipeTilde)?;
+
+        let inner = parse_exp(context)?;
+        Ok(Exp_::StateLabeled(
+            Some(pre_label),
+            Box::new(inner),
+            post_label,
+        ))
+    } else {
+        // Single state form: `ident |~ expr`
+        consume_token(context.tokens, Tok::PipeTilde)?;
+
+        let inner = parse_exp(context)?;
+        Ok(Exp_::StateLabeled(
+            Some(Label(first_name)),
+            Box::new(inner),
+            None,
+        ))
+    }
+}
+
+/// Parses a post-only state label: `.. ident |~ expr`.
+fn parse_post_only_state_label(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
+    consume_token(context.tokens, Tok::PeriodPeriod)?;
+    let post_name = parse_identifier(context)?;
+    consume_token(context.tokens, Tok::PipeTilde)?;
+    let inner = parse_exp(context)?;
+    Ok(Exp_::StateLabeled(
+        None,
+        Box::new(inner),
+        Some(Label(post_name)),
+    ))
+}
+
+/// Parse a bare behavior predicate (no state labels):
+///   `behavior_kind<fn_name[<T1,...,Tn>]>(args)`
+fn parse_bare_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
+    let kind_content = context.tokens.content();
     let kind = behavior_kind_from_str(kind_content).ok_or_else(|| {
-        Box::new(
-            diag!(
-                Syntax::UnexpectedToken,
-                (
-                    current_token_loc(context.tokens),
-                    format!(
-                        "expected a behavior predicate keyword (requires_of, aborts_of, ensures_of, modifies_of, result_of), found '{}'",
-                        kind_content
-                    )
+        Box::new(diag!(
+            Syntax::UnexpectedToken,
+            (
+                current_token_loc(context.tokens),
+                format!(
+                    "expected a behavior predicate keyword \
+                     (requires_of, aborts_of, ensures_of, result_of), found '{}'",
+                    kind_content
                 )
             )
-        )
+        ))
     })?;
     context.tokens.advance()?;
 
     // Parse `<` fn_name [type_args] `>`
-    // We parse a name access chain (not a full expression) to avoid ambiguity with `>`
     consume_token(context.tokens, Tok::Less)?;
     let fn_name = parse_name_access_chain(context, false, || "a function name")?;
-    // Parse optional type arguments for the function
     let type_args = parse_optional_type_args(context)?;
     consume_token(context.tokens, Tok::Greater)?;
 
     // Parse `(` args `)`
     let args = parse_call_args(context)?;
 
-    // Parse optional post-state label
-    let post_label = if context.tokens.peek() == Tok::AtSign {
-        context.tokens.advance()?;
-        let label_name = parse_identifier(context)?;
-        Some(Label(label_name))
-    } else {
-        None
-    };
-
-    Ok(Exp_::Behavior(
-        kind, pre_label, fn_name, type_args, args, post_label,
-    ))
-}
-
-// Parses a labeled resource access expression, called after the label and '@' have been consumed.
-// The next token is an identifier that is NOT a behavior keyword.
-//   label@global<R>(addr) → LabeledCall
-//   label@exists<R>(addr) → LabeledCall
-//   label@R[addr]         → LabeledIndex
-fn parse_labeled_resource(context: &mut Context, label: Label) -> Result<Exp_, Box<Diagnostic>> {
-    let name_content = context.tokens.content();
-    if (name_content == "global" || name_content == "exists")
-        && matches!(context.tokens.lookahead(), Ok(Tok::Less))
-    {
-        // label@global<R>(addr) or label@exists<R>(addr)
-        let name = parse_name_access_chain(context, false, || "a builtin name")?;
-        let type_args = parse_optional_type_args(context)?;
-        let args = parse_call_args(context)?;
-        Ok(Exp_::LabeledCall(label, name, type_args, args))
-    } else {
-        // label@R[addr]
-        // Parse the resource name as a name expression (it could be qualified like M::R)
-        let start_loc = context.tokens.start_loc();
-        let n = parse_name_access_chain(context, false, || "a resource type name")?;
-        // Parse optional type arguments (e.g., label@R<T>[addr])
-        let tys = if context.tokens.peek() == Tok::Less
-            && n.loc.end() as usize == context.tokens.start_loc()
-        {
-            let loc = make_loc(
-                context.tokens.file_hash(),
-                context.tokens.start_loc(),
-                context.tokens.start_loc(),
-            );
-            parse_optional_type_args(context)
-                .map_err(|diag| add_type_args_ambiguity_label(loc, diag))?
-        } else {
-            None
-        };
-        let target_loc = make_loc(
-            context.tokens.file_hash(),
-            start_loc,
-            context.tokens.previous_end_loc(),
-        );
-        let target = Box::new(sp(target_loc, Exp_::Name(n, tys)));
-        consume_token(context.tokens, Tok::LBracket)?;
-        let index = Box::new(parse_exp(context)?);
-        consume_token(context.tokens, Tok::RBracket)?;
-        Ok(Exp_::LabeledIndex(label, target, index))
-    }
+    Ok(Exp_::Behavior(kind, fn_name, type_args, args))
 }
 
 // Parses a quantifier expressions, assuming is_quant(context) is true.
@@ -3936,8 +3958,13 @@ fn parse_module(
                     )?)
                 },
                 Tok::Spec => {
-                    match context.tokens.lookahead() {
-                        Ok(Tok::Fun) | Ok(Tok::Native) => {
+                    let lookahead = context.tokens.lookahead_content();
+                    // `spec lemma <name>` is a lemma declaration.
+                    // `spec lemma { ... }` is a spec block for a function named "lemma".
+                    let is_lemma = matches!(&lookahead, Ok((Tok::Identifier, s)) if s == "lemma")
+                        && matches!(context.tokens.lookahead2(), Ok((_, Tok::Identifier)));
+                    match lookahead {
+                        Ok((Tok::Fun, _)) | Ok((Tok::Native, _)) => {
                             context.tokens.match_doc_comments();
                             let start_loc = context.tokens.start_loc();
                             context.tokens.advance()?;
@@ -3954,6 +3981,17 @@ fn parse_module(
                                 start_loc,
                                 attributes,
                                 parse_spec_function,
+                            )?)
+                        },
+                        _ if is_lemma => {
+                            context.tokens.match_doc_comments();
+                            let start_loc = context.tokens.start_loc();
+                            context.tokens.advance()?; // consume `spec`
+                            ModuleMember::Spec(singleton_module_spec_block(
+                                context,
+                                start_loc,
+                                attributes,
+                                parse_lemma,
                             )?)
                         },
                         _ => {
@@ -4155,7 +4193,7 @@ fn parse_spec_block(
         _ => {
             return Err(unexpected_token_error(
                 context.tokens,
-                "one of `module`, `struct`, `fun`, `schema`, or `{`",
+                "one of `module`, `struct`, `fun`, `schema`, a name, or `{`",
             ));
         },
     };
@@ -4179,6 +4217,16 @@ fn parse_spec_block(
         members.push(parse_spec_block_member(context)?);
     }
     consume_token(context.tokens, Tok::RBrace)?;
+    // Parse optional trailing proof block: `} proof { ... }`
+    if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "proof" {
+        require_language_version(
+            context,
+            current_token_loc(context.tokens),
+            LanguageVersion::V2_4,
+            "proof blocks are",
+        );
+        members.push(parse_proof_block(context)?);
+    }
     Ok(spanned(
         context.tokens.file_hash(),
         start_loc,
@@ -4238,13 +4286,22 @@ fn parse_spec_block_member(context: &mut Context) -> Result<SpecBlockMember, Box
         Tok::Fun | Tok::Native => parse_spec_function(context),
         Tok::Identifier => match context.tokens.content() {
             "assert" | "assume" | "decreases" | "aborts_if" | "aborts_with" | "succeeds_if"
-            | "modifies" | "emits" | "ensures" | "requires" => parse_condition(context),
+            | "emits" | "ensures" | "requires" => parse_condition(context),
+            "modifies" => parse_modifies_member(context),
+            "reads" => parse_reads_member(context),
             "axiom" => parse_axiom(context),
             "include" => parse_spec_include(context),
             "apply" => parse_spec_apply(context),
             "pragma" => parse_spec_pragma(context),
+            "lemma" => parse_lemma(context),
             "global" | "local" => parse_spec_variable(context),
             "update" => parse_spec_update(context),
+            "modifies_of" if context.env.flags().language_version() >= LanguageVersion::V2_4 => {
+                parse_modifies_of(context)
+            },
+            "reads_of" if context.env.flags().language_version() >= LanguageVersion::V2_4 => {
+                parse_reads_of(context)
+            },
             _ => {
                 // local is optional but supported to be able to declare variables which are
                 // named like the weak keywords above
@@ -4276,7 +4333,6 @@ fn parse_condition(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnos
         "aborts_if" => SpecConditionKind_::AbortsIf,
         "aborts_with" => SpecConditionKind_::AbortsWith,
         "succeeds_if" => SpecConditionKind_::SucceedsIf,
-        "modifies" => SpecConditionKind_::Modifies,
         "emits" => SpecConditionKind_::Emits,
         "ensures" => SpecConditionKind_::Ensures,
         "requires" => SpecConditionKind_::Requires,
@@ -4290,7 +4346,7 @@ fn parse_condition(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnos
         kind_.clone(),
     );
     let properties = parse_condition_properties(context)?;
-    let exp = if kind_ == SpecConditionKind_::AbortsWith || kind_ == SpecConditionKind_::Modifies {
+    let exp = if kind_ == SpecConditionKind_::AbortsWith {
         // Use a dummy expression as a placeholder for this field.
         let loc = make_loc(context.tokens.file_hash(), start_loc, start_loc + 1);
         sp(loc, Exp_::Value(sp(loc, Value_::Bool(false))))
@@ -4305,14 +4361,14 @@ fn parse_condition(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnos
         let codes = vec![parse_exp(context)?];
         consume_token(context.tokens, Tok::Semicolon)?;
         codes
-    } else if kind_ == SpecConditionKind_::AbortsWith || kind_ == SpecConditionKind_::Modifies {
+    } else if kind_ == SpecConditionKind_::AbortsWith {
         parse_comma_list_after_start(
             context,
             context.tokens.start_loc(),
             context.tokens.peek(),
             Tok::Semicolon,
             parse_exp,
-            "an aborts code or modifies target",
+            "an aborts code",
         )?
     } else if kind_ == SpecConditionKind_::Emits {
         consume_identifier(context.tokens, "to")?;
@@ -4446,6 +4502,9 @@ fn parse_spec_function(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
     consume_token(context.tokens, Tok::Colon)?;
     let return_type = parse_type(context)?;
 
+    // Parse optional modifies/reads before body
+    let (modifies, reads) = parse_spec_fun_modifies_reads(context)?;
+
     let body_start_loc = context.tokens.start_loc();
     let no_body = context.tokens.peek() != Tok::LBrace;
     let (uninterpreted, body_) = if native_opt.is_some() || no_body {
@@ -4477,8 +4536,151 @@ fn parse_spec_function(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
             signature,
             uninterpreted,
             name,
+            modifies,
+            reads,
             body,
         },
+    ))
+}
+
+// Parse modifies/reads on spec functions (same syntax as spec block conditions).
+//     [ "modifies" Exp { "," Exp }* ] [ "reads" Type { "," Type }* ]
+fn parse_spec_fun_modifies_reads(
+    context: &mut Context,
+) -> Result<(Vec<Exp>, Vec<Type>), Box<Diagnostic>> {
+    let mut modifies = vec![];
+    let mut reads = vec![];
+    loop {
+        match context.tokens.peek() {
+            Tok::Identifier if context.tokens.content() == "modifies" => {
+                context.tokens.advance()?;
+                loop {
+                    modifies.push(parse_exp(context)?);
+                    if context.tokens.peek() != Tok::Comma {
+                        break;
+                    }
+                    context.tokens.advance()?;
+                }
+            },
+            Tok::Identifier if context.tokens.content() == "reads" => {
+                context.tokens.advance()?;
+                loop {
+                    reads.push(parse_type(context)?);
+                    if context.tokens.peek() != Tok::Comma {
+                        break;
+                    }
+                    context.tokens.advance()?;
+                }
+            },
+            _ => break,
+        }
+    }
+    Ok((modifies, reads))
+}
+
+// Parse a modifies spec block member: "modifies" Exp { "," Exp }* ";"
+fn parse_modifies_member(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::Identifier)?; // consume "modifies"
+    let targets = parse_comma_list_after_start(
+        context,
+        context.tokens.start_loc(),
+        context.tokens.peek(),
+        Tok::Semicolon,
+        parse_exp,
+        "a modify target expression",
+    )?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::Modifies { targets },
+    ))
+}
+
+// Parse a reads spec block member: "reads" Type { "," Type }* ";"
+fn parse_reads_member(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::Identifier)?; // consume "reads"
+    let types = parse_comma_list_after_start(
+        context,
+        context.tokens.start_loc(),
+        context.tokens.peek(),
+        Tok::Semicolon,
+        parse_type,
+        "a resource type",
+    )?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::Reads { types },
+    ))
+}
+
+// Parse a modifies_of specification member:
+//     "modifies_of" "<" Identifier ">" "(" Comma<Parameter> ")" Exp { "," Exp }* ";"
+fn parse_modifies_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    // consume "modifies_of"
+    consume_token(context.tokens, Tok::Identifier)?;
+    // "<" Identifier ">"
+    consume_token(context.tokens, Tok::Less)?;
+    let fun_param = parse_identifier(context)?;
+    consume_token(context.tokens, Tok::Greater)?;
+    // "(" Comma<Parameter> ")"
+    let params = parse_comma_list(
+        context,
+        Tok::LParen,
+        Tok::RParen,
+        parse_parameter,
+        "a function parameter",
+    )?;
+    // comma-separated modify target expressions
+    let targets = parse_comma_list_after_start(
+        context,
+        context.tokens.start_loc(),
+        context.tokens.peek(),
+        Tok::Semicolon,
+        parse_exp,
+        "a modify target expression",
+    )?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::ModifiesOf {
+            fun_param,
+            params,
+            targets,
+        },
+    ))
+}
+
+// Parse a reads_of specification member:
+//     "reads_of" "<" Identifier ">" Type { "," Type }* ";"
+fn parse_reads_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    // consume "reads_of"
+    consume_token(context.tokens, Tok::Identifier)?;
+    // "<" Identifier ">"
+    consume_token(context.tokens, Tok::Less)?;
+    let fun_param = parse_identifier(context)?;
+    consume_token(context.tokens, Tok::Greater)?;
+    // comma-separated type names
+    let types = parse_comma_list_after_start(
+        context,
+        context.tokens.start_loc(),
+        context.tokens.peek(),
+        Tok::Semicolon,
+        parse_type,
+        "a resource type",
+    )?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::ReadsOf { fun_param, types },
     ))
 }
 
@@ -4762,6 +4964,349 @@ fn parse_spec_property(context: &mut Context) -> Result<PragmaProperty, Box<Diag
         context.tokens.previous_end_loc(),
         PragmaProperty_ { name, value },
     ))
+}
+
+// Parse a proof block:
+//    ProofBlock = "proof" "{" ProofStmt* "}"
+//    ProofStmt  = "let" <Name> "=" <Exp> ";"
+//               | "if" "(" <Exp> ")" <ProofBody> ["else" <ProofBody>]
+//               | "{" ProofStmt* "}"
+//               | "assert" <Exp> ";"
+//               | "assume" <ConditionProperties> <Exp> ";"
+//               | "apply" <NameAccessChain> "(" Comma<Exp> ")" ";"
+//               | "forall" <QuantBindings> [<TriggerSets>] "apply" <NameAccessChain> "(" Comma<Exp> ")" ";"
+//               | "calc" "(" <Exp> { <RelOp> <Exp> } ")" ";"
+fn parse_proof_block(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    consume_identifier(context.tokens, "proof")?;
+    let body = parse_proof_block_body(context)?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::Proof { body },
+    ))
+}
+
+/// Parses `"{" ProofStmt* "}"` and returns a `Proof_::Block`.
+fn parse_proof_block_body(context: &mut Context) -> Result<Proof, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::LBrace)?;
+    let mut stmts = vec![];
+    while context.tokens.peek() != Tok::RBrace {
+        stmts.push(parse_proof_stmt(context)?);
+    }
+    consume_token(context.tokens, Tok::RBrace)?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        Proof_::Block(stmts),
+    ))
+}
+
+/// Parses a single proof statement.
+fn parse_proof_stmt(context: &mut Context) -> Result<Proof, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    let proof_ = match context.tokens.peek() {
+        Tok::LBrace => {
+            // Nested block
+            return parse_proof_block_body(context);
+        },
+        Tok::Let => {
+            // let name = exp;
+            context.tokens.advance()?;
+            let name = parse_identifier(context)?;
+            consume_token(context.tokens, Tok::Equal)?;
+            let exp = parse_exp(context)?;
+            consume_token(context.tokens, Tok::Semicolon)?;
+            Proof_::Let(name, exp)
+        },
+        Tok::If => {
+            // if (cond) proof_body [else proof_body]
+            context.tokens.advance()?;
+            consume_token(context.tokens, Tok::LParen)?;
+            let cond = parse_exp(context)?;
+            consume_token(context.tokens, Tok::RParen)?;
+            let then_branch = parse_proof_body(context)?;
+            let else_branch = if context.tokens.peek() == Tok::Else {
+                context.tokens.advance()?;
+                Some(Box::new(parse_proof_body(context)?))
+            } else {
+                None
+            };
+            Proof_::IfElse(cond, Box::new(then_branch), else_branch)
+        },
+        Tok::Identifier => match context.tokens.content() {
+            "assert" => {
+                context.tokens.advance()?;
+                let exp = parse_exp(context)?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Assert(exp)
+            },
+            "assume" => {
+                context.tokens.advance()?;
+                let properties = parse_condition_properties(context)?;
+                let exp = parse_exp(context)?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Assume(properties, exp)
+            },
+            "forall" => {
+                // forall bindings [triggers] use lemma(args);
+                context.tokens.advance()?;
+                let bindings_start = context.tokens.start_loc();
+                let binds = parse_list(
+                    context,
+                    |context| {
+                        if context.tokens.peek() == Tok::Comma {
+                            context.tokens.advance()?;
+                            Ok(true)
+                        } else {
+                            Ok(false)
+                        }
+                    },
+                    parse_quant_binding,
+                )?;
+                let bindings = spanned(
+                    context.tokens.file_hash(),
+                    bindings_start,
+                    context.tokens.previous_end_loc(),
+                    binds,
+                );
+                // Optional trigger groups: {e1, e2} {e3}
+                let patterns = if context.tokens.peek() == Tok::LBrace {
+                    parse_list(
+                        context,
+                        |context| Ok(context.tokens.peek() == Tok::LBrace),
+                        |context| {
+                            parse_comma_list(
+                                context,
+                                Tok::LBrace,
+                                Tok::RBrace,
+                                parse_exp,
+                                "a trigger expression",
+                            )
+                        },
+                    )?
+                } else {
+                    vec![]
+                };
+                // "apply" lemma(args);
+                consume_identifier(context.tokens, "apply")?;
+                let lemma = parse_name_access_chain(context, false, || "a lemma name")?;
+                let args = parse_comma_list(
+                    context,
+                    Tok::LParen,
+                    Tok::RParen,
+                    parse_exp,
+                    "a call argument expression",
+                )?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::ForallApply {
+                    bindings,
+                    patterns,
+                    lemma,
+                    args,
+                }
+            },
+            "calc" => {
+                // calc(e1 relop e2 relop ... en);
+                // Expressions are parsed up to (but not including) relational
+                // operators, so `x + 3` works without parentheses.
+                context.tokens.advance()?;
+                consume_token(context.tokens, Tok::LParen)?;
+                let mut steps = vec![];
+                // Parse first expression (stop before relops, precedence > 5)
+                let first_exp = {
+                    let lhs = parse_unary_exp(context)?;
+                    parse_binop_exp(context, lhs, 6)?
+                };
+                steps.push((first_exp, None));
+                // Parse remaining relop expr pairs
+                while is_relop(context.tokens.peek()) {
+                    let op_start = context.tokens.start_loc();
+                    let op_ = parse_relop(context.tokens.peek());
+                    context.tokens.advance()?;
+                    let op = spanned(
+                        context.tokens.file_hash(),
+                        op_start,
+                        context.tokens.previous_end_loc(),
+                        op_,
+                    );
+                    let exp = {
+                        let lhs = parse_unary_exp(context)?;
+                        parse_binop_exp(context, lhs, 6)?
+                    };
+                    // Set relop on previous step
+                    if let Some(last) = steps.last_mut() {
+                        last.1 = Some(op);
+                    }
+                    steps.push((exp, None));
+                }
+                consume_token(context.tokens, Tok::RParen)?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Calc(steps)
+            },
+            "apply" => {
+                context.tokens.advance()?;
+                let name = parse_name_access_chain(context, false, || "a lemma name")?;
+                let args = parse_comma_list(
+                    context,
+                    Tok::LParen,
+                    Tok::RParen,
+                    parse_exp,
+                    "a call argument expression",
+                )?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Apply(name, args)
+            },
+            "post" => {
+                context.tokens.advance()?;
+                let inner = parse_proof_stmt(context)?;
+                Proof_::Post(Box::new(inner))
+            },
+            "split" => {
+                context.tokens.advance()?;
+                let exp = parse_exp(context)?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Split(exp)
+            },
+            _ => {
+                return Err(unexpected_token_error(
+                    context.tokens,
+                    "one of `let`, `if`, `assert`, `assume`, `apply`, `forall`, `calc`, `post`, `split`, or `{`",
+                ));
+            },
+        },
+        _ => {
+            return Err(unexpected_token_error(
+                context.tokens,
+                "one of `let`, `if`, `assert`, `assume`, `apply`, `forall`, `calc`, `post`, `split`, or `{`",
+            ));
+        },
+    };
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        proof_,
+    ))
+}
+
+/// Parses a proof body: either a block `{ ... }` or a single statement.
+fn parse_proof_body(context: &mut Context) -> Result<Proof, Box<Diagnostic>> {
+    if context.tokens.peek() == Tok::LBrace {
+        parse_proof_block_body(context)
+    } else {
+        parse_proof_stmt(context)
+    }
+}
+
+/// Returns true if the token is a relational operator for calc blocks.
+fn is_relop(tok: Tok) -> bool {
+    matches!(
+        tok,
+        Tok::EqualEqual
+            | Tok::ExclaimEqual
+            | Tok::Less
+            | Tok::Greater
+            | Tok::LessEqual
+            | Tok::GreaterEqual
+    )
+}
+
+/// Maps a token to a BinOp_ for relational operators.
+fn parse_relop(tok: Tok) -> BinOp_ {
+    match tok {
+        Tok::EqualEqual => BinOp_::Eq,
+        Tok::ExclaimEqual => BinOp_::Neq,
+        Tok::Less => BinOp_::Lt,
+        Tok::Greater => BinOp_::Gt,
+        Tok::LessEqual => BinOp_::Le,
+        Tok::GreaterEqual => BinOp_::Ge,
+        _ => unreachable!(),
+    }
+}
+
+// Parse a lemma declaration:
+//    Lemma = "lemma" <Name> <OptionalTypeParameters> "(" Comma<Parameter> ")"
+//            "{" <SpecConditions> "}" ["proof" "{" ProofStmt* "}"]
+fn parse_lemma(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    require_language_version(
+        context,
+        current_token_loc(context.tokens),
+        LanguageVersion::V2_4,
+        "lemma declarations are",
+    );
+    consume_identifier(context.tokens, "lemma")?;
+    let name = FunctionName(parse_identifier(context)?);
+    let type_parameters = parse_optional_type_parameters(context)?;
+    let parameters = parse_comma_list(
+        context,
+        Tok::LParen,
+        Tok::RParen,
+        parse_parameter,
+        "a function parameter",
+    )?;
+    // Lemma has no return type (unit)
+    let return_type = sp(
+        make_loc(
+            context.tokens.file_hash(),
+            context.tokens.start_loc(),
+            context.tokens.start_loc(),
+        ),
+        Type_::Unit,
+    );
+    let signature = FunctionSignature {
+        type_parameters,
+        parameters,
+        return_type,
+    };
+    // Parse spec body: { requires/ensures/pragma }
+    consume_token(context.tokens, Tok::LBrace)?;
+    let mut spec_members = vec![];
+    while context.tokens.peek() != Tok::RBrace {
+        spec_members.push(parse_lemma_spec_member(context)?);
+    }
+    consume_token(context.tokens, Tok::RBrace)?;
+    // Optional proof block
+    let proof = if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "proof" {
+        consume_identifier(context.tokens, "proof")?;
+        Some(parse_proof_block_body(context)?)
+    } else {
+        None
+    };
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::Lemma {
+            name,
+            signature,
+            spec_members,
+            proof,
+        },
+    ))
+}
+
+/// Parses a spec member inside a lemma spec block (only requires, ensures, pragma).
+fn parse_lemma_spec_member(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    context.tokens.match_doc_comments();
+    match context.tokens.peek() {
+        Tok::Identifier => match context.tokens.content() {
+            "requires" | "ensures" => parse_condition(context),
+            "pragma" => parse_spec_pragma(context),
+            _ => Err(unexpected_token_error(
+                context.tokens,
+                "one of `requires`, `ensures`, or `pragma`",
+            )),
+        },
+        _ => Err(unexpected_token_error(
+            context.tokens,
+            "one of `requires`, `ensures`, or `pragma`",
+        )),
+    }
 }
 
 /// Creates a module spec block for a single member.

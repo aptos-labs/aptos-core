@@ -14,5 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-mono-move-micro-ops = { workspace = true }
+mono-move-alloc = { workspace = true }
+mono-move-core = { workspace = true }
 rand = { workspace = true }

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use super::multi_point_eval::multi_point_eval;
 use crate::shared::algebra::multi_point_eval::multi_point_eval_naive;
-use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
+use aptos_crypto::arkworks::serialization::{ark_de_uncompressed_no_validate, ark_se_uncompressed};
 use ark_ec::VariableBaseMSM;
 use ark_ff::FftField;
 use ark_poly::{domain::DomainCoeff, EvaluationDomain, Radix2EvaluationDomain};
@@ -24,14 +24,20 @@ use std::{fmt, marker::PhantomData, ops::Mul};
 /// subset a "domain".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CirculantDomain<F: FftField> {
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(
+        serialize_with = "ark_se_uncompressed",
+        deserialize_with = "ark_de_uncompressed_no_validate"
+    )]
     fft_domain: Radix2EvaluationDomain<F>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreparedInput<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
 {
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(
+        serialize_with = "ark_se_uncompressed",
+        deserialize_with = "ark_de_uncompressed_no_validate"
+    )]
     pub y: Vec<T>,
     _phantom: PhantomData<F>,
 }

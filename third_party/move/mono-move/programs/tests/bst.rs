@@ -160,7 +160,8 @@ mod micro_op {
     /// Run the same ops on micro-op BST and return results in the same format
     /// as `native_run_ops_with_results`.
     fn micro_op_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
-        let (functions, descriptors) = micro_op_bst();
+        let (mut functions, descriptors) = micro_op_bst();
+        mono_move_programs::resolve_calls(&mut functions);
         let mut ctx = InterpreterContext::new(&functions, &descriptors, FN_NEW);
         let bst = bst_new(&mut ctx);
         let mut results = Vec::new();

@@ -3,10 +3,13 @@
 
 //! Tests for Move enum support (heap-allocated tagged unions).
 
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{
+    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp, ENUM_DATA_OFFSET,
+    ENUM_TAG_OFFSET,
+};
 use mono_move_runtime::{
-    read_ptr, read_u64, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function,
-    InterpreterContext, MicroOp, ObjectDescriptor, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -38,6 +41,7 @@ fn enum_basic() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
@@ -89,6 +93,7 @@ fn enum_survives_gc() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
@@ -147,6 +152,7 @@ fn enum_gc_traces_refs() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
@@ -212,6 +218,7 @@ fn enum_pattern_match() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
@@ -258,6 +265,7 @@ fn enum_variant_switch() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 24,
@@ -306,6 +314,7 @@ fn enum_borrow_field() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
@@ -359,6 +368,7 @@ fn enum_gc_variant_switching() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
@@ -417,6 +427,7 @@ fn enum_in_struct() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 32,
@@ -489,6 +500,7 @@ fn enum_in_vector() {
     ];
 
     let functions = [Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,

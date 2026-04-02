@@ -17725,6 +17725,21 @@
           }
         }
       },
+      "ClaimedEntryFunction": {
+        "type": "object",
+        "description": "An encrypted payload's claim about the entry function. Specifies at least the module address,\nand optionally the specific entry funtion.",
+        "required": [
+          "module"
+        ],
+        "properties": {
+          "module": {
+            "$ref": "#/components/schemas/MoveModuleId"
+          },
+          "name": {
+            "$ref": "#/components/schemas/IdentifierWrapper"
+          }
+        }
+      },
       "DKGResultTransaction": {
         "type": "object",
         "required": [
@@ -17840,6 +17855,9 @@
                 "description": "BCS-serialized ciphertext bytes, hex-encoded."
               }
             ]
+          },
+          "claimed_entry_fun": {
+            "$ref": "#/components/schemas/ClaimedEntryFunction"
           },
           "decrypted_payload": {
             "$ref": "#/components/schemas/EncryptedTransactionInnerPayload"
@@ -18044,6 +18062,9 @@
                 "description": "BCS-serialized ciphertext bytes, hex-encoded."
               }
             ]
+          },
+          "claimed_entry_fun": {
+            "$ref": "#/components/schemas/ClaimedEntryFunction"
           }
         }
       },
@@ -18417,6 +18438,9 @@
                 "description": "BCS-serialized ciphertext bytes, hex-encoded."
               }
             ]
+          },
+          "claimed_entry_fun": {
+            "$ref": "#/components/schemas/ClaimedEntryFunction"
           }
         }
       },

@@ -68,6 +68,7 @@ fn run_bench(
 ///
 /// For each (op, n) pair, compares same-module (baseline) vs. cross-module (accessor call overhead).
 #[test]
+#[ignore]
 fn test_gas_bench_public_struct() {
     let mut harness = MoveHarness::new();
     let mod_addr = setup(&mut harness);

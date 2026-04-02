@@ -32,26 +32,28 @@
 //!   - Duplicate allocations leak but are bounded (interning converges).
 //!   - Trade-off: minor memory waste for lower lock contention.
 
-use crate::{
-    alloc::{GlobalArenaPtr, GlobalArenaShard},
-    maintenance_config::MaintenanceConfig,
-    GlobalArenaPool,
-};
+use crate::maintenance_config::MaintenanceConfig;
 use dashmap::DashMap;
+use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
+use mono_move_core::ExecutableId;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
-    ptr,
-    ptr::NonNull,
 };
 
 // Submodules: to split implementation into smaller pieces.
 mod identifiers;
 use identifiers::IdentifierInternerKey;
 mod executable_ids;
-pub use executable_ids::ExecutableId;
 use executable_ids::ExecutableIdInternerKey;
+mod executable;
+pub use executable::{Executable, ExecutableBuilder, Function};
+mod executable_cache;
+use executable_cache::ExecutableCache;
+mod types;
+use types::TypeInternerKey;
+pub use types::{FieldLayout, Type};
 
 /// Global execution context with a two-phase state machine.
 ///
@@ -87,6 +89,8 @@ struct Context {
     identifiers: DashMap<IdentifierInternerKey, GlobalArenaPtr<str>, ahash::RandomState>,
     executable_ids:
         DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
+    types: DashMap<TypeInternerKey, GlobalArenaPtr<Type>, ahash::RandomState>,
+    executable_cache: ExecutableCache,
 }
 
 /// RAII guard for the maintenance phase providing exclusive write access.
@@ -135,9 +139,8 @@ pub struct ExecutionGuard<'ctx> {
 ///
 /// The pointer stored behind the reference is guaranteed to be valid and
 /// safe to dereference.
-#[repr(transparent)]
 pub struct ArenaRef<'guard, T: ?Sized> {
-    ptr: NonNull<T>,
+    ptr: GlobalArenaPtr<T>,
     _guard: PhantomData<&'guard ()>,
 }
 
@@ -177,6 +180,8 @@ impl GlobalContext {
             ctx: Context {
                 identifiers: DashMap::default(),
                 executable_ids: DashMap::default(),
+                types: DashMap::default(),
+                executable_cache: ExecutableCache::new(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
@@ -246,6 +251,11 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         self.ctx.executable_ids.len()
     }
 
+    /// Returns the number of entries in interner's map for types.
+    pub fn interned_types_count(&self) -> usize {
+        self.ctx.types.len()
+    }
+
     /// Resets all caches that store pointers to the arenas, and then resets
     /// the arenas as well.
     pub fn reset_arena_pool(&mut self) {
@@ -264,7 +274,43 @@ impl<'ctx> MaintenanceGuard<'ctx> {
     }
 }
 
-impl<'ctx> ExecutionGuard<'ctx> {}
+impl<'ctx> ExecutionGuard<'ctx> {
+    /// Inserts a loaded executable into the cache, keyed by its interned ID.
+    pub fn insert_executable<'guard>(
+        &'guard self,
+        key: ArenaRef<'guard, ExecutableId>,
+        executable: Box<Executable>,
+    ) -> &'guard Executable {
+        // TODO: use ID stored inside executable instead.
+        let ptr = self
+            .ctx
+            .executable_cache
+            .insert(key.into_global_arena_ptr(), executable);
+
+        // SAFETY: The pointer is valid since it was created by leaking a box,
+        // and can only be freed during the maintenance phase, while we are in
+        // the execution phase (guard is alive). If the executable was already
+        // in the cache, it is also alive (maintenance has not reset caches).
+        unsafe { ptr.as_ref_unchecked() }
+    }
+
+    /// Looks up a cached executable by its interned ID and returns a reference
+    /// tied to the guard's lifetime, if found.
+    pub fn get_executable<'guard>(
+        &'guard self,
+        key: ArenaRef<'guard, ExecutableId>,
+    ) -> Option<&'guard Executable>
+    where
+        'ctx: 'guard,
+    {
+        let ptr = self.ctx.executable_cache.get(key.into_global_arena_ptr())?;
+
+        // SAFETY: The pointer is valid since it was created by leaking a box,
+        // and can only be freed during the maintenance phase, while we are in
+        // the execution phase (guard is alive).
+        Some(unsafe { ptr.as_ref_unchecked() })
+    }
+}
 
 //
 // Only private APIs below.
@@ -288,10 +334,20 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         let Context {
             identifiers,
             executable_ids,
+            types,
+            executable_cache,
         } = self.ctx;
 
         identifiers.clear();
         executable_ids.clear();
+        types.clear();
+
+        // SAFETY: We are in maintenance phase, and therefore there are no
+        // execution guards alive. Hence, there are no pointers to executables
+        // alive, and it is safe to free the allocation behind the box.
+        unsafe {
+            executable_cache.clear();
+        }
     }
 }
 
@@ -310,17 +366,22 @@ impl<'ctx> ExecutionGuard<'ctx> {
         'ctx: 'guard,
     {
         ArenaRef {
-            ptr: ptr.into_inner(),
-            _guard: Default::default(),
+            ptr,
+            _guard: PhantomData,
         }
     }
 }
 
 impl<'guard, T: ?Sized> ArenaRef<'guard, T> {
+    /// Returns the underlying [`GlobalArenaPtr`] for this arena reference.
+    pub(crate) fn into_global_arena_ptr(self) -> GlobalArenaPtr<T> {
+        self.ptr
+    }
+
     /// Returns the raw address of the allocation of the pointer. For testing
     /// purposes only.
     pub fn raw_address_for_testing(&self) -> usize {
-        self.ptr.as_ptr().addr()
+        self.ptr.as_raw_ptr().addr()
     }
 }
 
@@ -328,7 +389,7 @@ impl<'guard, T: ?Sized> ArenaRef<'guard, T> {
 // equality implies structural hash equality (ignoring hash collisions).
 impl<'guard, T: ?Sized> Hash for ArenaRef<'guard, T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.ptr.hash(state)
+        self.ptr.hash(state);
     }
 }
 
@@ -336,7 +397,7 @@ impl<'guard, T: ?Sized> Hash for ArenaRef<'guard, T> {
 // equality implies structural equality.
 impl<'guard, T: ?Sized> PartialEq for ArenaRef<'guard, T> {
     fn eq(&self, other: &Self) -> bool {
-        ptr::eq(self.ptr.as_ptr(), other.ptr.as_ptr())
+        self.ptr == other.ptr
     }
 }
 

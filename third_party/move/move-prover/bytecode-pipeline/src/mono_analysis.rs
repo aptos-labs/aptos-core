@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Analysis which computes information needed in backends for monomorphization. This
 //! computes the distinct type instantiations in the model for structs and inlined functions.
@@ -235,7 +236,7 @@ impl Analyzer<'_> {
                     // included in the bytecode.
                     for (_, exps) in target.get_modify_ids_and_exps() {
                         for exp in exps {
-                            self.analyze_exp(exp);
+                            self.analyze_exp(&exp);
                         }
                     }
                 }
@@ -340,9 +341,15 @@ impl Analyzer<'_> {
                 self.analyze_bytecode(&target, bc);
             }
         }
-        // Analyze spec conditions for closures and types.
-        for cond in target.get_spec().conditions.iter() {
-            for exp in cond.all_exps() {
+        // Analyze spec conditions and proof hints for closures and types.
+        {
+            let spec = target.get_spec();
+            for cond in spec.conditions.iter() {
+                for exp in cond.all_exps() {
+                    self.analyze_exp(exp);
+                }
+            }
+            for exp in spec.proof_exps() {
                 self.analyze_exp(exp);
             }
         }

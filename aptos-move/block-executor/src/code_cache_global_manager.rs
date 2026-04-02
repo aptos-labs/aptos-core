@@ -115,7 +115,7 @@ where
         if environment_requires_update {
             if storage_environment.gas_feature_version() >= RELEASE_V1_34 {
                 let flush_verifier_cache = self.environment.as_ref().is_none_or(|e| {
-                    e.verifier_config_bytes() != storage_environment.verifier_config_bytes()
+                    e.verifier_config_hash() != storage_environment.verifier_config_hash()
                 });
                 if flush_verifier_cache {
                     // Additionally, if the verifier config changes, we flush static verifier cache

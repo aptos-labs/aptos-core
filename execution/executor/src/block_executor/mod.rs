@@ -108,7 +108,9 @@ where
         self.inner
             .read()
             .as_ref()
-            .expect("BlockExecutor is not reset")
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "BlockExecutor is not reset".into(),
+            })?
             .execute_and_update_state(block, parent_block_id, onchain_config)
     }
 
@@ -134,7 +136,9 @@ where
         self.inner
             .read()
             .as_ref()
-            .expect("BlockExecutor is not reset")
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "BlockExecutor is not reset".into(),
+            })?
             .pre_commit_block(block_id)
     }
 
@@ -144,7 +148,9 @@ where
         self.inner
             .read()
             .as_ref()
-            .expect("BlockExecutor is not reset")
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "BlockExecutor is not reset".into(),
+            })?
             .commit_ledger(ledger_info_with_sigs)
     }
 

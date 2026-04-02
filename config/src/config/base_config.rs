@@ -2,13 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
-    SecureBackend,
+    config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
+    node_config_loader::NodeType, Error, NodeConfig, SecureBackend,
 };
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{chain_id::ChainId, waypoint::Waypoint};
 use poem_openapi::Enum as PoemEnum;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use std::{fmt, fs, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
@@ -52,6 +53,34 @@ impl ConfigSanitizer for BaseConfig {
         }
 
         Ok(())
+    }
+}
+
+impl ConfigOptimizer for BaseConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        _node_type: NodeType,
+        chain_id: Option<ChainId>,
+    ) -> Result<bool, Error> {
+        let base_config = &mut node_config.base;
+        let local_base_config_yaml = &local_config_yaml["base"];
+
+        let mut modified_config = false;
+
+        // Enable validator-PFN connections for all networks except mainnet,
+        // and test environments (e.g., local swarms, and smoke tests).
+        if local_base_config_yaml["enable_validator_pfn_connections"].is_null() {
+            let should_enable = chain_id
+                .map(|id| !id.is_mainnet() && id != ChainId::test())
+                .unwrap_or(true);
+            if should_enable {
+                base_config.enable_validator_pfn_connections = true;
+                modified_config = true;
+            }
+        }
+
+        Ok(modified_config)
     }
 }
 
@@ -229,5 +258,108 @@ mod test {
             RoleType::from_str(invalid_role_type),
             Err(ParseRoleError(_))
         ));
+    }
+
+    #[test]
+    fn test_optimize_validator_pfn_connections() {
+        // Create a node config with PFN validator connections disabled
+        let mut node_config = create_config_with_validator_pfn_connections(false);
+
+        // Optimize for a testing chain (smoke tests) and verify the flag is still disabled
+        let modified = BaseConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            NodeType::Validator,
+            Some(ChainId::test()),
+        )
+        .unwrap();
+        assert!(!modified);
+        assert!(!node_config.base.enable_validator_pfn_connections);
+    }
+
+    #[test]
+    fn test_optimize_validator_pfn_connections_for_testnet() {
+        // Create a node config with PFN validator connections disabled
+        let mut node_config = create_config_with_validator_pfn_connections(false);
+
+        // Optimize for testnet and verify the flag is now enabled
+        let modified = BaseConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(),
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap();
+        assert!(modified);
+        assert!(node_config.base.enable_validator_pfn_connections);
+    }
+
+    #[test]
+    fn test_optimize_validator_pfn_connections_for_mainnet() {
+        // Create a node config with PFN validator connections disabled
+        let mut node_config = create_config_with_validator_pfn_connections(false);
+
+        // Optimize for mainnet and verify the flag is still disabled
+        let modified = BaseConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(),
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(!modified);
+        assert!(!node_config.base.enable_validator_pfn_connections);
+    }
+
+    #[test]
+    fn test_optimize_validator_pfn_connections_local_yaml() {
+        // Create a node config with PFN validator connections disabled
+        let mut node_config = create_config_with_validator_pfn_connections(false);
+
+        // Provide a local YAML that explicitly sets the flag to false
+        let local_config_yaml = serde_yaml::from_str(
+            r#"
+            base:
+                enable_validator_pfn_connections: false
+            "#,
+        )
+        .unwrap();
+
+        // Optimize for a non-production chain and verify the flag is still disabled
+        let modified = BaseConfig::optimize(
+            &mut node_config,
+            &local_config_yaml,
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap();
+        assert!(!modified);
+        assert!(!node_config.base.enable_validator_pfn_connections);
+    }
+
+    #[test]
+    fn test_optimize_validator_pfn_connections_missing_chain() {
+        // Create a node config with PFN validator connections disabled
+        let mut node_config = create_config_with_validator_pfn_connections(false);
+
+        // Optimize for a missing chain and verify the flag is now enabled
+        let modified = BaseConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(),
+            NodeType::Validator,
+            None,
+        )
+        .unwrap();
+        assert!(modified);
+        assert!(node_config.base.enable_validator_pfn_connections);
+    }
+
+    /// Creates a node config with validator PFN connections as specified
+    fn create_config_with_validator_pfn_connections(
+        enable_validator_pfn_connections: bool,
+    ) -> NodeConfig {
+        let mut node_config = NodeConfig::default();
+        node_config.base.enable_validator_pfn_connections = enable_validator_pfn_connections;
+        node_config
     }
 }

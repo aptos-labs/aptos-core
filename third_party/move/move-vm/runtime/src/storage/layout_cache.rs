@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Data structures for caching layouts of VM values in a long-living, concurrent cache. The design
 //! goal is to make sure that cache hit is semantically equivalent to layout construction. That is,
@@ -32,7 +34,7 @@ use triomphe::Arc as TriompheArc;
 /// detected and evicted.
 #[derive(Debug, Default)]
 pub struct DefiningModules {
-    modules: HashSet<ModuleId>,
+    modules: HashSet<ModuleId, ahash::RandomState>,
     seen_modules: Vec<(ModuleId, [u8; 32])>,
 }
 
@@ -40,9 +42,14 @@ impl DefiningModules {
     /// Returns a new empty set of modules.
     pub fn new() -> Self {
         Self {
-            modules: HashSet::new(),
+            modules: HashSet::with_hasher(ahash::RandomState::new()),
             seen_modules: vec![],
         }
+    }
+
+    /// Returns true if the module is already in the set.
+    pub fn contains(&self, module_id: &ModuleId) -> bool {
+        self.modules.contains(module_id)
     }
 
     /// If module is not in the set, adds it with its hash.

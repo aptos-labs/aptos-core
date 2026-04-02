@@ -545,9 +545,9 @@ spec aptos_framework::object {
         ensures result == global<ObjectCore>(self.inner).allow_ungated_transfer;
     }
 
-    spec is_owner<T: key>(self: Object<T>, owner: address): bool {
-        aborts_if !exists<ObjectCore>(self.inner);
-        ensures result == (global<ObjectCore>(self.inner).owner == owner);
+    spec is_owner<T: key>(object: Object<T>, owner: address): bool {
+        aborts_if !exists<ObjectCore>(object.inner);
+        ensures result == (global<ObjectCore>(object.inner).owner == owner);
     }
 
     spec owner<T: key>(self: Object<T>): address {
@@ -555,12 +555,12 @@ spec aptos_framework::object {
         ensures result == global<ObjectCore>(self.inner).owner;
     }
 
-    spec owns<T: key>(self: Object<T>, owner: address): bool {
+    spec owns<T: key>(object: Object<T>, owner: address): bool {
         pragma aborts_if_is_partial;
-        let current_address_0 = self.inner;
+        let current_address_0 = object.inner;
         let object_0 = global<ObjectCore>(current_address_0);
         let current_address = object_0.owner;
-        aborts_if self.inner != owner && !exists<ObjectCore>(self.inner);
+        aborts_if object.inner != owner && !exists<ObjectCore>(object.inner);
         ensures current_address_0 == owner ==> result == true;
     }
 

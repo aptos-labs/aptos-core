@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Provides a model for a set of Move modules (and scripts, which
 //! are handled like modules). The model allows to access many different aspects of the Move
@@ -17,10 +18,10 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
-        Exp, ExpData, FriendDecl, GlobalInvariant, MemoryLabel, ModuleName, PropertyBag,
-        PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl,
-        SpecVarDecl, UseDecl, Value,
+        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, Exp, ExpData,
+        FrameSpec, FriendDecl, FunParamAccessOf, GlobalInvariant, LemmaDecl, LemmaId, MemoryLabel,
+        ModuleName, PropertyBag, PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo,
+        SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -534,6 +535,21 @@ impl VerificationScope {
 }
 
 // =================================================================================================
+/// # Surface Syntax Tracking
+
+/// Tracks the syntactic sugar origin of an AST node. When the compiler desugars
+/// concise syntax (e.g., receiver-style calls) into a canonical AST form, the
+/// original syntactic form is recorded here so that linters can distinguish
+/// user-written verbose code from compiler-desugared concise code.
+#[derive(Debug, PartialEq, Eq)]
+pub enum SurfaceSyntax {
+    /// Node was desugared from receiver-style call syntax (e.g., `x.f()`).
+    ReceiverCall,
+    /// Node was desugared from index syntax (e.g., `v[i]`).
+    IndexNotation,
+}
+
+// =================================================================================================
 /// # Global Environment
 
 /// Global environment for a set of modules.
@@ -578,6 +594,11 @@ pub struct GlobalEnv {
     pub(crate) next_free_node_id: RefCell<usize>,
     /// A map from node id to associated information of the expression.
     pub(crate) exp_info: RefCell<BTreeMap<NodeId, ExpInfo>>,
+    /// Sparse map tracking which AST nodes originated from syntactic sugar.
+    /// Only populated for nodes that were desugared from concise syntax.
+    /// Note: this mapping is not yet guaranteed to survive all AST rewrites,
+    /// consumers are currently expected to use it before AST transformations.
+    pub(crate) surface_syntax: RefCell<BTreeMap<NodeId, SurfaceSyntax>>,
     /// List of loaded modules, in order they have been provided using `add`.
     pub module_data: Vec<ModuleData>,
     /// A counter for issuing global ids.
@@ -661,6 +682,7 @@ impl GlobalEnv {
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
             exp_info: Default::default(),
+            surface_syntax: Default::default(),
             module_data: vec![],
             global_id_counter: RefCell::new(0),
             global_invariants: Default::default(),
@@ -1618,6 +1640,7 @@ impl GlobalEnv {
         function_data: BTreeMap<FunId, FunctionData>,
         spec_vars: Vec<SpecVarDecl>,
         spec_funs: Vec<SpecFunDecl>,
+        lemma_decls: Vec<LemmaDecl>,
         module_spec: Spec,
         spec_block_infos: Vec<SpecBlockInfo>,
     ) -> ModuleId {
@@ -1643,6 +1666,17 @@ impl GlobalEnv {
             .map(|(i, v)| (SpecFunId::new(i), v))
             .collect();
 
+        let lemma_table: BTreeMap<Symbol, LemmaId> = lemma_decls
+            .iter()
+            .enumerate()
+            .map(|(i, ld)| (ld.name, LemmaId::new(i)))
+            .collect();
+        let lemmas: BTreeMap<LemmaId, LemmaDecl> = lemma_decls
+            .into_iter()
+            .enumerate()
+            .map(|(i, ld)| (LemmaId::new(i), ld))
+            .collect();
+
         let id = ModuleId(self.module_data.len() as RawIndex);
         let used_modules = use_decls.iter().filter_map(|ud| ud.module_id).collect();
         self.module_data.push(ModuleData {
@@ -1657,6 +1691,8 @@ impl GlobalEnv {
             function_idx_to_id: Default::default(),
             spec_vars,
             spec_funs,
+            lemmas,
+            lemma_table,
             module_spec: RefCell::new(module_spec),
             loc,
             attributes,
@@ -1797,6 +1833,28 @@ impl GlobalEnv {
                 fun_data.called_funs = Some(called_funs);
             }
         }
+
+        // Assign synthetic def_idx to lemma functions for Boogie debug tracking.
+        // Lemma functions are not compiled, so they lack a FunctionDefinitionIndex.
+        // We give them synthetic indices starting after the last compiled function,
+        // so `boogie_debug_track` can emit $track_local calls and the model extractor
+        // can resolve them back via `try_get_function_id`.
+        let next_idx = module.function_defs.len() as u16;
+        let mod_data = &mut self.module_data[module_id.0 as usize];
+        let lemma_funs: Vec<_> = mod_data
+            .function_data
+            .iter()
+            .filter(|(_, data)| data.kind == FunctionKind::Lemma)
+            .map(|(fun_id, _)| *fun_id)
+            .collect();
+        for (i, fun_id) in lemma_funs.iter().enumerate() {
+            let def_idx = FunctionDefinitionIndex(next_idx + i as u16);
+            if let Some(fun_data) = mod_data.function_data.get_mut(fun_id) {
+                fun_data.def_idx = Some(def_idx);
+            }
+            mod_data.function_idx_to_id.insert(def_idx, *fun_id);
+        }
+
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
 
@@ -2221,6 +2279,10 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            fun_param_access_of: vec![],
+            spec_used_memory: BTreeSet::new(),
+            spec_old_memory: BTreeSet::new(),
+            spec_uses_old: false,
             acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
@@ -2289,6 +2351,10 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            fun_param_access_of: vec![],
+            spec_used_memory: BTreeSet::new(),
+            spec_old_memory: BTreeSet::new(),
+            spec_uses_old: false,
             acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
@@ -2443,6 +2509,41 @@ impl GlobalEnv {
     /// Gets a function by qualified id.
     pub fn get_function_qid(&self, qid: QualifiedId<FunId>) -> FunctionEnv<'_> {
         self.get_module(qid.module_id).into_function(qid.id)
+    }
+
+    /// Sets spec memory information for a function, computed during spec_rewriter.
+    pub fn set_function_spec_memory(
+        &mut self,
+        qid: QualifiedId<FunId>,
+        spec_used_memory: BTreeSet<QualifiedInstId<StructId>>,
+        spec_old_memory: BTreeSet<QualifiedInstId<StructId>>,
+        spec_uses_old: bool,
+    ) {
+        let data = self
+            .get_module_data_mut(qid.module_id)
+            .function_data
+            .get_mut(&qid.id)
+            .expect("function data exists");
+        data.spec_used_memory = spec_used_memory;
+        data.spec_old_memory = spec_old_memory;
+        data.spec_uses_old = spec_uses_old;
+    }
+
+    /// Sets derived memory on a function parameter's access_of entry.
+    pub fn set_fun_param_access_of_memory(
+        &mut self,
+        qid: QualifiedId<FunId>,
+        param_idx: usize,
+        used_memory: BTreeSet<QualifiedInstId<StructId>>,
+        old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    ) {
+        let data = self
+            .get_module_data_mut(qid.module_id)
+            .function_data
+            .get_mut(&qid.id)
+            .expect("function data exists");
+        data.fun_param_access_of[param_idx].used_memory = used_memory;
+        data.fun_param_access_of[param_idx].old_memory = old_memory;
     }
 
     /// Returns an iterator for all modules in the environment.
@@ -2619,6 +2720,16 @@ impl GlobalEnv {
     /// Gets the type parameter instantiation associated with the given node, if it is available.
     pub fn get_nodes(&self) -> Vec<NodeId> {
         (*self.exp_info.borrow()).clone().into_keys().collect_vec()
+    }
+
+    /// Records that a node was produced by the given syntactic sugar.
+    pub fn set_surface_syntax(&self, node_id: NodeId, syntax: SurfaceSyntax) {
+        self.surface_syntax.borrow_mut().insert(node_id, syntax);
+    }
+
+    /// Checks whether a node was produced by a specific kind of syntactic sugar.
+    pub fn has_surface_syntax(&self, node_id: NodeId, syntax: SurfaceSyntax) -> bool {
+        self.surface_syntax.borrow().get(&node_id) == Some(&syntax)
     }
 
     /// Return the total number of declared functions in the modules of `self`
@@ -3138,6 +3249,12 @@ pub struct ModuleData {
 
     /// Holds the set of modules declared as friend.
     pub(crate) friend_modules: BTreeSet<ModuleId>,
+
+    /// Lemma declarations.
+    pub(crate) lemmas: BTreeMap<LemmaId, LemmaDecl>,
+
+    /// Lemma name to id lookup.
+    pub(crate) lemma_table: BTreeMap<Symbol, LemmaId>,
 }
 
 impl ModuleData {
@@ -3163,6 +3280,8 @@ impl ModuleData {
             used_modules: Default::default(),
             used_modules_including_specs: RefCell::new(None),
             friend_modules: Default::default(),
+            lemmas: Default::default(),
+            lemma_table: Default::default(),
         }
     }
 }
@@ -3745,6 +3864,24 @@ impl<'env> ModuleEnv<'env> {
     /// Gets spec fun by id.
     pub fn get_spec_fun(&self, id: SpecFunId) -> &SpecFunDecl {
         self.data.spec_funs.get(&id).expect("spec fun id defined")
+    }
+
+    /// Returns lemma declarations of this module.
+    pub fn get_lemmas(&'env self) -> impl Iterator<Item = (&'env LemmaId, &'env LemmaDecl)> {
+        self.data.lemmas.iter()
+    }
+
+    /// Gets a lemma by id.
+    pub fn get_lemma(&self, id: LemmaId) -> &LemmaDecl {
+        self.data.lemmas.get(&id).expect("lemma id defined")
+    }
+
+    /// Finds a lemma by name.
+    pub fn find_lemma_by_name(&self, name: Symbol) -> Option<(LemmaId, &LemmaDecl)> {
+        self.data
+            .lemma_table
+            .get(&name)
+            .map(|id| (*id, self.data.lemmas.get(id).expect("lemma id defined")))
     }
 
     /// Gets module specification.
@@ -4706,6 +4843,17 @@ pub struct FunctionData {
     /// Access specifiers.
     pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
 
+    /// Access specifiers for function-typed parameters (from `modifies_of`/`reads_of` in spec blocks).
+    pub(crate) fun_param_access_of: Vec<FunParamAccessOf>,
+
+    /// Memory used by this function's spec conditions (requires, ensures, aborts_if).
+    /// Computed during the spec_rewriter pass.
+    pub(crate) spec_used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Resources accessed in old() contexts within spec conditions.
+    pub(crate) spec_old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Whether any spec condition uses old() or the function has &mut params.
+    pub(crate) spec_uses_old: bool,
+
     /// Acquires information, if available. This is either inferred or annotated by the
     /// user via a legacy acquires declaration.
     pub(crate) acquired_structs: Option<BTreeSet<StructId>>,
@@ -4758,6 +4906,10 @@ impl FunctionData {
             params: vec![],
             result_type: Type::unit(),
             access_specifiers: None,
+            fun_param_access_of: vec![],
+            spec_used_memory: BTreeSet::new(),
+            spec_old_memory: BTreeSet::new(),
+            spec_uses_old: false,
             acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: None,
@@ -4779,6 +4931,7 @@ pub enum FunctionKind {
     Regular,
     Inline,
     Entry,
+    Lemma,
 }
 
 #[derive(Debug, Clone)]
@@ -4901,6 +5054,14 @@ impl<'env> FunctionEnv<'env> {
     /// Checks whether this function or its module is test-only or verify-only.
     pub fn is_test_or_verify_only(&self) -> bool {
         self.is_test_only() || self.is_verify_only()
+    }
+
+    /// Returns true if this function is compiled from source to bytecode.
+    /// Returns false for native, inline, and lemma functions:
+    /// native has no source, inline is expanded at call sites,
+    /// and lemma has synthetic stub code but is not compiled.
+    pub fn is_compiled(&self) -> bool {
+        !self.is_native() && !self.is_inline() && !self.is_lemma()
     }
 
     /// Returns `true` if this is a compiler-generated struct API wrapper (`pack$S`, `unpack$S`,
@@ -5115,6 +5276,19 @@ impl<'env> FunctionEnv<'env> {
         self.data.kind == FunctionKind::Inline
     }
 
+    /// Return true if this is a lemma function (synthesized from a lemma declaration).
+    pub fn is_lemma(&self) -> bool {
+        self.data.kind == FunctionKind::Lemma
+    }
+
+    /// Returns true if this function has no verified bytecode, meaning it should
+    /// be skipped by prover pipeline processors that analyze or instrument code.
+    /// This includes non-compiled functions (native, inline, lemma) and intrinsic
+    /// functions (which have opaque semantics defined by the prover).
+    pub fn no_verified_bytecode(&self) -> bool {
+        !self.is_compiled() || self.is_intrinsic()
+    }
+
     /// Returns kind of this function.
     pub fn get_kind(&self) -> FunctionKind {
         self.data.kind
@@ -5239,6 +5413,13 @@ impl<'env> FunctionEnv<'env> {
             .any(|p| self.symbol_pool().string(p.0).as_ref() == name)
     }
 
+    /// Returns true if this is a receiver function, i.e., its first parameter is named `self`.
+    pub fn is_receiver_function(&self) -> bool {
+        self.get_parameters_ref().first().is_some_and(|p| {
+            self.symbol_pool().string(p.0).as_ref() == well_known::RECEIVER_PARAM_NAME
+        })
+    }
+
     /// Returns the parameter types associated with this function
     pub fn get_parameter_types(&self) -> Vec<Type> {
         self.get_parameters()
@@ -5284,6 +5465,26 @@ impl<'env> FunctionEnv<'env> {
     /// specifiers disallows it (intersection of exclusion specifiers).
     pub fn get_access_specifiers(&self) -> Option<&[AccessSpecifier]> {
         self.data.access_specifiers.as_deref()
+    }
+
+    /// Returns access specifiers for function-typed parameters (from `modifies_of`/`reads_of` in spec blocks).
+    pub fn get_fun_param_access_of(&self) -> &[FunParamAccessOf] {
+        &self.data.fun_param_access_of
+    }
+
+    /// Returns memory used by this function's spec conditions.
+    pub fn get_spec_used_memory(&self) -> &BTreeSet<QualifiedInstId<StructId>> {
+        &self.data.spec_used_memory
+    }
+
+    /// Returns memory accessed in old() contexts within spec conditions.
+    pub fn get_spec_old_memory(&self) -> &BTreeSet<QualifiedInstId<StructId>> {
+        &self.data.spec_old_memory
+    }
+
+    /// Returns whether any spec condition uses old() or function has &mut params.
+    pub fn spec_uses_old(&self) -> bool {
+        self.data.spec_uses_old
     }
 
     /// Returns the inferred acquired structs of this function. This is checked
@@ -5388,26 +5589,44 @@ impl<'env> FunctionEnv<'env> {
         )
     }
 
-    /// Computes the modified targets of the spec clause, as a map from resource type names to
-    /// resource indices (list of types and address).
+    /// Returns the modified targets, as a map from resource type names to
+    /// target expressions (Operation::Global with address).
     pub fn get_modify_targets(&self) -> BTreeMap<QualifiedId<StructId>, Vec<Exp>> {
-        // Compute the modify targets from `modifies` conditions.
-        let spec = &self.get_spec();
-        let modify_conditions = spec.filter_kind(ConditionKind::Modifies);
         let mut modify_targets: BTreeMap<QualifiedId<StructId>, Vec<Exp>> = BTreeMap::new();
-        for cond in modify_conditions {
-            cond.all_exps().for_each(|target| {
+        let spec = self.data.spec.borrow();
+        if let Some(frame) = &spec.frame_spec {
+            for target in &frame.modifies_targets {
                 let node_id = target.node_id();
-                let rty = &self.module_env.env.get_node_instantiation(node_id)[0];
-                let (mid, sid, _) = rty.require_struct();
-                let type_name = mid.qualified(sid);
-                modify_targets
-                    .entry(type_name)
-                    .or_default()
-                    .push(target.clone());
-            });
+                let ty = self.module_env.env.get_node_type(node_id);
+                let ty = ty.skip_reference();
+                if let Type::Struct(mid, sid, _) = ty {
+                    modify_targets
+                        .entry(mid.qualified(*sid))
+                        .or_default()
+                        .push(target.clone());
+                }
+            }
         }
         modify_targets
+    }
+
+    /// Returns the frame spec (modifies/reads) if any.
+    pub fn get_frame_spec(&self) -> Option<std::cell::Ref<'_, FrameSpec>> {
+        let spec = self.data.spec.borrow();
+        if spec.frame_spec.is_some() {
+            Some(std::cell::Ref::map(spec, |s| {
+                s.frame_spec.as_ref().unwrap()
+            }))
+        } else {
+            None
+        }
+    }
+
+    /// Adds inferred modifies targets to the function's frame spec.
+    pub fn add_modifies_targets(&self, targets: Vec<Exp>) {
+        let mut spec = self.data.spec.borrow_mut();
+        let frame = spec.frame_spec.get_or_insert_with(FrameSpec::default);
+        frame.modifies_targets.extend(targets);
     }
 
     /// Determine whether the function is target of verification.
@@ -5616,6 +5835,7 @@ impl<'env> FunctionEnv<'env> {
             FunctionKind::Regular => "",
             FunctionKind::Inline => " inline",
             FunctionKind::Entry => " entry",
+            FunctionKind::Lemma => " lemma",
         });
         if self.is_native() {
             s.push_str(" native")
@@ -5650,7 +5870,7 @@ impl<'env> FunctionEnv<'env> {
     }
 
     fn definition_view(&'env self) -> Option<FunctionDefinitionView<'env, CompiledModule>> {
-        if self.is_inline() {
+        if self.is_inline() || self.is_lemma() {
             return None;
         }
         let module = self.module_env.data.compiled_module.as_ref()?;

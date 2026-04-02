@@ -13201,6 +13201,18 @@ components:
           $ref: '#/components/schemas/ExportedCertifiedAggregatedChunkySubtranscript'
         encryption_key:
           $ref: '#/components/schemas/HexEncodedBytes'
+    ClaimedEntryFunction:
+      type: object
+      description: |-
+        An encrypted payload's claim about the entry function. Specifies at least the module address,
+        and optionally the specific entry funtion.
+      required:
+      - module
+      properties:
+        module:
+          $ref: '#/components/schemas/MoveModuleId'
+        name:
+          $ref: '#/components/schemas/IdentifierWrapper'
     DKGResultTransaction:
       type: object
       required:
@@ -13284,6 +13296,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/HexEncodedBytes'
           - description: BCS-serialized ciphertext bytes, hex-encoded.
+        claimed_entry_fun:
+          $ref: '#/components/schemas/ClaimedEntryFunction'
         decrypted_payload:
           $ref: '#/components/schemas/EncryptedTransactionInnerPayload'
         decryption_nonce:
@@ -13423,6 +13437,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/HexEncodedBytes'
           - description: BCS-serialized ciphertext bytes, hex-encoded.
+        claimed_entry_fun:
+          $ref: '#/components/schemas/ClaimedEntryFunction'
     EncryptedTransactionInnerPayload:
       type: object
       description: The inner payload of an encrypted transaction, present only when decrypted.
@@ -13668,6 +13684,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/HexEncodedBytes'
           - description: BCS-serialized ciphertext bytes, hex-encoded.
+        claimed_entry_fun:
+          $ref: '#/components/schemas/ClaimedEntryFunction'
     FederatedKeyless:
       type: object
       required:

@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "9.0.0"
+version = "9.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -361,6 +361,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "set_env",
+ "sha2 0.9.9",
  "shadow-rs",
  "tempfile",
  "thiserror 1.0.69",
@@ -726,7 +727,6 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
- "arc-swap",
  "bcs 0.1.4",
  "bytes",
  "cfg-if",
@@ -745,7 +745,7 @@ dependencies = [
  "move-vm-types",
  "num_cpus",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -2213,7 +2213,7 @@ name = "aptos-in-memory-cache"
 version = "0.1.0"
 dependencies = [
  "get-size",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "tokio",
 ]
 
@@ -2420,6 +2420,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
  "aptos-protos 1.3.1",
  "async-trait",
  "axum 0.7.5",
@@ -2490,12 +2491,16 @@ dependencies = [
  "backtrace",
  "clap 4.5.60",
  "figment",
+ "opentelemetry 0.27.1",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk 0.27.1",
  "prometheus",
  "serde",
  "tempfile",
  "tokio",
  "toml 0.7.8",
  "tracing",
+ "tracing-opentelemetry",
  "tracing-subscriber 0.3.18",
  "warp",
 ]
@@ -2553,6 +2558,7 @@ dependencies = [
  "itertools 0.13.0",
  "lz4",
  "once_cell",
+ "opentelemetry 0.27.1",
  "prometheus",
  "prost 0.13.4",
  "redis",
@@ -2564,6 +2570,7 @@ dependencies = [
  "tokio-util 0.7.10",
  "tonic 0.12.3",
  "tracing",
+ "tracing-opentelemetry",
  "url",
  "uuid 1.11.0",
  "warp",
@@ -3082,7 +3089,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "rand 0.7.3",
- "rayon",
  "serde",
  "thiserror 1.0.69",
  "tokio",
@@ -3280,7 +3286,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-move-flow"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-framework",
@@ -3431,6 +3437,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
+ "criterion",
  "futures",
  "futures-util",
  "hex",
@@ -3948,7 +3955,7 @@ dependencies = [
  "clap 4.5.60",
  "colored",
  "move-core-types",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "rand 0.7.3",
  "serde",
  "tokio",
@@ -3965,6 +3972,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-logging",
+ "hashbrown 0.14.3",
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
@@ -4245,7 +4253,7 @@ dependencies = [
  "aptos-infallible",
  "claims",
  "crossbeam",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "proptest",
  "proptest-derive",
  "rayon",
@@ -4320,7 +4328,7 @@ dependencies = [
  "itertools 0.13.0",
  "lru",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -4766,7 +4774,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "proptest",
  "serde",
 ]
@@ -5989,9 +5997,9 @@ dependencies = [
 
 [[package]]
 name = "autocfg"
-version = "1.1.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
+checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "autometrics"
@@ -6006,7 +6014,7 @@ dependencies = [
  "metrics-exporter-prometheus",
  "once_cell",
  "opentelemetry-prometheus",
- "opentelemetry_sdk",
+ "opentelemetry_sdk 0.21.2",
  "prometheus",
  "prometheus-client",
  "spez",
@@ -6224,7 +6232,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "457d7ed3f888dfd2c7af56d4975cade43c622f74bdcddfed6d4352f57acc6310"
 dependencies = [
  "futures-util",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "portable-atomic",
  "tokio",
 ]
@@ -6885,9 +6893,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-if"
-version = "1.0.0"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "cfg_aliases"
@@ -8050,7 +8058,7 @@ dependencies = [
  "hashbrown 0.14.3",
  "lock_api",
  "once_cell",
- "parking_lot_core 0.9.10",
+ "parking_lot_core 0.9.12",
 ]
 
 [[package]]
@@ -8064,7 +8072,7 @@ dependencies = [
  "equivalent",
  "hashbrown 0.15.3",
  "lock_api",
- "parking_lot_core 0.9.10",
+ "parking_lot_core 0.9.12",
 ]
 
 [[package]]
@@ -8353,7 +8361,7 @@ dependencies = [
  "pq-sys",
  "r2d2",
  "serde_json",
- "uuid 0.8.2",
+ "uuid 1.11.0",
 ]
 
 [[package]]
@@ -8694,6 +8702,7 @@ dependencies = [
  "serde",
  "sha3 0.9.1",
  "test-case",
+ "thousands",
  "tokio",
 ]
 
@@ -9537,7 +9546,7 @@ checksum = "e29e5681dc8556fb9df1409e95eae050e12e8776394313da3546dcb8cf390c73"
 dependencies = [
  "az",
  "bytemuck",
- "half 1.8.2",
+ "half 2.2.1",
  "typenum",
 ]
 
@@ -10471,6 +10480,7 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
  "ahash 0.8.12",
  "allocator-api2",
+ "equivalent",
 ]
 
 [[package]]
@@ -11439,7 +11449,7 @@ dependencies = [
  "dashmap 5.5.3",
  "hashbrown 0.12.3",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
 ]
 
 [[package]]
@@ -12023,9 +12033,9 @@ checksum = "db13adb97ab515a3691f56e4dbab09283d0b86cb45abd991d8634a9d6f501760"
 
 [[package]]
 name = "libc"
-version = "0.2.182"
+version = "0.2.183"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
+checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
 
 [[package]]
 name = "libfuzzer-sys"
@@ -12250,11 +12260,10 @@ checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 
 [[package]]
 name = "lock_api"
-version = "0.4.12"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07af8b9cdd281b7915f413fa73f29ebd5d55d0d3f0155584dade1ff18cea1b17"
+checksum = "224399e74b87b5f3557511d98dff8b14089b3dadafcab6bb93eab67d3aace965"
 dependencies = [
- "autocfg",
  "scopeguard",
 ]
 
@@ -12624,20 +12633,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-alloc"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+ "crossbeam-utils",
+ "parking_lot 0.12.5",
+]
+
+[[package]]
+name = "mono-move-core"
+version = "0.1.0"
+dependencies = [
+ "mono-move-alloc",
+ "mono-move-gas",
+ "move-core-types",
+]
+
+[[package]]
+name = "mono-move-gas"
+version = "0.1.0"
+
+[[package]]
 name = "mono-move-global-context"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
- "bumpalo",
- "crossbeam-utils",
+ "anyhow",
  "dashmap 7.0.0-rc2",
+ "fxhash",
+ "mono-move-alloc",
+ "mono-move-core",
+ "move-asm",
+ "move-binary-format",
  "move-core-types",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
 ]
-
-[[package]]
-name = "mono-move-micro-ops"
-version = "0.1.0"
 
 [[package]]
 name = "mono-move-programs"
@@ -12645,6 +12676,8 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "legacy-move-compiler",
+ "mono-move-alloc",
+ "mono-move-core",
  "mono-move-runtime",
  "move-binary-format",
  "move-compiler-v2",
@@ -12661,7 +12694,8 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "mono-move-micro-ops",
+ "mono-move-alloc",
+ "mono-move-core",
  "rand 0.7.3",
 ]
 
@@ -12971,50 +13005,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-ir-compiler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs 0.1.4",
- "clap 4.5.60",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-ir-to-bytecode",
- "serde_json",
-]
-
-[[package]]
-name = "move-ir-to-bytecode"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "codespan-reporting",
- "log",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-core-types",
- "move-ir-to-bytecode-syntax",
- "move-ir-types",
- "move-symbol-pool",
- "ouroboros",
-]
-
-[[package]]
-name = "move-ir-to-bytecode-syntax"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "hex",
- "move-command-line-common",
- "move-core-types",
- "move-ir-types",
- "move-symbol-pool",
-]
-
-[[package]]
 name = "move-ir-types"
 version = "0.1.0"
 dependencies = [
@@ -13229,6 +13219,7 @@ dependencies = [
  "move-stackless-bytecode",
  "move-stackless-bytecode-test-utils",
  "num 0.4.1",
+ "petgraph 0.6.5",
  "serde",
  "shell-words",
  "tempfile",
@@ -13481,6 +13472,7 @@ dependencies = [
 name = "move-vm-runtime"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "ambassador",
  "arc-swap",
  "bcs 0.1.4",
@@ -13502,7 +13494,7 @@ dependencies = [
  "move-vm-profiler",
  "move-vm-types",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "serde",
  "smallbitvec",
  "test-case",
@@ -13559,7 +13551,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "proptest",
  "rand 0.7.3",
  "serde",
@@ -13640,7 +13632,7 @@ checksum = "40a3eb6b7c682b65d1f631ec3176829d72ab450b3aacdd3f719bf220822e59ac"
 dependencies = [
  "libc",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "thiserror 1.0.69",
  "widestring",
  "winapi 0.3.9",
@@ -14214,16 +14206,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab70038c28ed37b97d8ed414b6429d343a8bbf44c9f79ec854f3a643029ba6d7"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "js-sys",
+ "pin-project-lite",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "opentelemetry-otlp"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91cf61a1868dacc576bf2b2a1c3e9ab150af7272909e80085c3173384fe11f76"
+dependencies = [
+ "async-trait",
+ "futures-core",
+ "http 1.1.0",
+ "opentelemetry 0.27.1",
+ "opentelemetry-proto",
+ "opentelemetry_sdk 0.27.1",
+ "prost 0.13.4",
+ "thiserror 1.0.69",
+ "tokio",
+ "tonic 0.12.3",
+ "tracing",
+]
+
+[[package]]
 name = "opentelemetry-prometheus"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f8f082da115b0dcb250829e3ed0b8792b8f963a1ad42466e48422fbe6a079bd"
 dependencies = [
  "once_cell",
- "opentelemetry",
- "opentelemetry_sdk",
+ "opentelemetry 0.21.0",
+ "opentelemetry_sdk 0.21.2",
  "prometheus",
  "protobuf",
+]
+
+[[package]]
+name = "opentelemetry-proto"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6e05acbfada5ec79023c85368af14abd0b307c015e9064d249b2a950ef459a6"
+dependencies = [
+ "opentelemetry 0.27.1",
+ "opentelemetry_sdk 0.27.1",
+ "prost 0.13.4",
+ "tonic 0.12.3",
 ]
 
 [[package]]
@@ -14238,9 +14275,30 @@ dependencies = [
  "futures-util",
  "glob",
  "once_cell",
- "opentelemetry",
+ "opentelemetry 0.21.0",
  "ordered-float 4.6.0",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "opentelemetry_sdk"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "231e9d6ceef9b0b2546ddf52335785ce41252bc7474ee8ba05bfad277be13ab8"
+dependencies = [
+ "async-trait",
+ "futures-channel",
+ "futures-executor",
+ "futures-util",
+ "glob",
+ "opentelemetry 0.27.1",
+ "percent-encoding",
+ "rand 0.8.5",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -14401,12 +14459,12 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
-version = "0.12.1"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
+checksum = "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a"
 dependencies = [
  "lock_api",
- "parking_lot_core 0.9.10",
+ "parking_lot_core 0.9.12",
 ]
 
 [[package]]
@@ -14425,15 +14483,15 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.9.10"
+version = "0.9.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e401f977ab385c9e4e3ab30627d6f26d00e2c73eef317493c4ec6d468726cf8"
+checksum = "2621685985a2ebf1c516881c026032ac7deafcda1a2c9b7850dc81e3dfcb64c1"
 dependencies = [
  "cfg-if",
  "libc",
- "redox_syscall 0.5.11",
+ "redox_syscall 0.5.18",
  "smallvec",
- "windows-targets 0.52.6",
+ "windows-link",
 ]
 
 [[package]]
@@ -15062,7 +15120,7 @@ dependencies = [
  "mime",
  "multer 3.1.0",
  "nix 0.29.0",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "percent-encoding",
  "pin-project-lite",
  "poem-derive",
@@ -15281,7 +15339,7 @@ dependencies = [
  "log",
  "nix 0.26.4",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "protobuf",
  "protobuf-codegen-pure",
  "smallvec",
@@ -15603,7 +15661,7 @@ dependencies = [
  "fnv",
  "lazy_static",
  "memchr",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "protobuf",
  "thiserror 1.0.69",
 ]
@@ -15616,7 +15674,7 @@ checksum = "504ee9ff529add891127c4827eb481bd69dc0ebc72e9a682e187db4caa60c3ca"
 dependencies = [
  "dtoa",
  "itoa",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "prometheus-client-derive-encode",
 ]
 
@@ -15921,7 +15979,7 @@ dependencies = [
  "ahash 0.8.12",
  "equivalent",
  "hashbrown 0.14.3",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
 ]
 
 [[package]]
@@ -16019,7 +16077,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51de85fb3fb6524929c8a2eb85e6b6d363de4e8c48f9e2c2eac4944abc181c93"
 dependencies = [
  "log",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "scheduled-thread-pool",
 ]
 
@@ -16275,9 +16333,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.11"
+version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2f103c6d277498fbceb16e84d317e2a400f160f46904d5f5410848c829511a3"
+checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
  "bitflags 2.11.0",
 ]
@@ -17104,7 +17162,7 @@ version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cbc66816425a074528352f5789333ecff06ca41b36b0b0efdfbb29edc391a19"
 dependencies = [
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
 ]
 
 [[package]]
@@ -17951,9 +18009,9 @@ checksum = "75ce4f9dc4a41b4c3476cc925f1efb11b66df373a8fde5d4b8915fa91b5d995e"
 
 [[package]]
 name = "smallvec"
-version = "1.13.1"
+version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
+checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "smawk"
@@ -18111,6 +18169,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "specializer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.5.60",
+ "codespan-reporting",
+ "datatest-stable",
+ "legacy-move-compiler",
+ "mono-move-core",
+ "move-asm",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-model",
+ "move-prover-test-utils",
+ "move-vm-types",
+ "triomphe",
+]
+
+[[package]]
 name = "spez"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18202,7 +18281,7 @@ checksum = "f91138e76242f575eb1d3b38b4f1362f10d3a43f47d182a5b359af488a02293b"
 dependencies = [
  "new_debug_unreachable",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "phf_shared 0.10.0",
  "precomputed-hash",
 ]
@@ -18761,6 +18840,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "thousands"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf63baf9f5039dadc247375c29eb13706706cfde997d0330d05aa63a77d8820"
+
+[[package]]
 name = "thread-id"
 version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18947,7 +19032,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2 0.6.2",
@@ -19000,7 +19085,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "log",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.5",
  "percent-encoding",
  "phf 0.13.1",
  "pin-project-lite",
@@ -19486,6 +19571,24 @@ dependencies = [
  "log",
  "once_cell",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-opentelemetry"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97a971f6058498b5c0f1affa23e7ea202057a7301dbff68e968b2d578bcbd053"
+dependencies = [
+ "js-sys",
+ "once_cell",
+ "opentelemetry 0.27.1",
+ "opentelemetry_sdk 0.27.1",
+ "smallvec",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
+ "tracing-subscriber 0.3.18",
+ "web-time",
 ]
 
 [[package]]
@@ -19979,7 +20082,7 @@ dependencies = [
  "errno",
  "js-sys",
  "libc",
- "rustix 0.37.27",
+ "rustix 0.38.28",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
  "winapi 0.3.9",

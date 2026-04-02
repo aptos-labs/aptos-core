@@ -1,11 +1,11 @@
 #[test_only]
-module 0xcafe::permissioned_token_tests {
+module aptos_framework::permissioned_token_tests {
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
-    use 0xcafe::permissioned_token;
+    use aptos_framework::permissioned_token;
     use std::option;
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @aptos_framework, aaron = @0xface)]
     fun test_permissioned_e2e_basic_flow(
         creator: &signer,
         aaron: &signer,
@@ -39,8 +39,8 @@ module 0xcafe::permissioned_token_tests {
         dispatchable_fungible_asset::deposit(aaron_store, fa);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(abort_code = 1, location = 0xcafe::permissioned_token)]
+    #[test(creator = @aptos_framework, aaron = @0xface)]
+    #[expected_failure(abort_code = 1, location = aptos_framework::permissioned_token)]
     fun test_permissioned_disallowed_sender(
         creator: &signer,
         aaron: &signer,
@@ -74,7 +74,7 @@ module 0xcafe::permissioned_token_tests {
         dispatchable_fungible_asset::deposit(creator_store, fa);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @aptos_framework, aaron = @0xface)]
     fun test_permissioned_update_disallowed_sender(
         creator: &signer,
         aaron: &signer,

@@ -81,6 +81,7 @@ pub enum NodeTool {
     RunLocalnet(RunLocalnet),
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
+    VerifyDigestKey(VerifyDigestKey),
 }
 
 impl NodeTool {
@@ -108,6 +109,7 @@ impl NodeTool {
                 .map(|_| "".to_string()),
             UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
+            VerifyDigestKey(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -1487,6 +1489,64 @@ impl Time {
 
     pub fn new_seconds(seconds: u64) -> Self {
         Self::new(Duration::from_secs(seconds))
+    }
+}
+
+/// Verify a BCS-serialized DigestKey blob file
+///
+/// Reads the file, attempts BCS deserialization, and prints the file size
+/// and SHA-256 checksum.
+#[derive(Parser)]
+pub struct VerifyDigestKey {
+    /// Path to the BCS-serialized DigestKey blob file
+    #[clap(value_parser)]
+    pub file: PathBuf,
+}
+
+#[derive(Serialize)]
+pub struct VerifyDigestKeyResult {
+    pub file_size_bytes: u64,
+    pub sha256: String,
+}
+
+#[async_trait]
+impl CliCommand<VerifyDigestKeyResult> for VerifyDigestKey {
+    fn command_name(&self) -> &'static str {
+        "VerifyDigestKey"
+    }
+
+    async fn execute(self) -> CliTypedResult<VerifyDigestKeyResult> {
+        use aptos_types::secret_sharing::DigestKey;
+        use sha2::{Digest, Sha256};
+        use std::time::Instant;
+
+        println!("Reading file {}...", self.file.display());
+        let t = Instant::now();
+        let bytes = std::fs::read(&self.file).map_err(|e| {
+            CliError::IO(format!("Failed to read {}: {}", self.file.display(), e), e)
+        })?;
+        let file_size_bytes = bytes.len() as u64;
+        println!("Read {} bytes in {:.2?}", file_size_bytes, t.elapsed());
+
+        println!("Computing SHA-256...");
+        let t = Instant::now();
+        let sha256 = hex::encode(Sha256::digest(&bytes));
+        println!("SHA-256: {} in {:.2?}", sha256, t.elapsed());
+
+        println!("Deserializing DigestKey...");
+        let t = Instant::now();
+        let _key: DigestKey = bcs::from_bytes(&bytes).map_err(|e| {
+            CliError::UnexpectedError(format!(
+                "Failed to deserialize DigestKey ({} bytes): {}",
+                file_size_bytes, e
+            ))
+        })?;
+        println!("DigestKey is valid. Deserialized in {:.2?}", t.elapsed());
+
+        Ok(VerifyDigestKeyResult {
+            file_size_bytes,
+            sha256,
+        })
     }
 }
 

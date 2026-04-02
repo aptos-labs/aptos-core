@@ -6,7 +6,10 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
-use aptos_types::{account_address::AccountAddress, transaction::{ExecutionStatus, TransactionStatus}};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{ExecutionStatus, TransactionStatus},
+};
 
 #[test]
 fn test_macros() {
@@ -97,7 +100,7 @@ fn test_macros() {
             vec![],
         ),
         14566554180833181696,
-        "assertion `left == right` failed: custom error message\n  left: 1\n right: 2",
+        "assertion `left == right` failed: \"custom error message\"\n  left: 1\n right: 2",
     );
 
     assert_abort_code_and_message(
@@ -108,7 +111,7 @@ fn test_macros() {
             vec![],
         ),
         14566554180833181696,
-        "assertion `left == right` failed: custom error message with arg: 42\n  left: 1\n right: 2",
+        "assertion `left == right` failed: \"custom error message with arg: 42\"\n  left: 1\n right: 2",
     );
 
     assert_success!(h.run_entry_function(
@@ -137,7 +140,7 @@ fn test_macros() {
             vec![],
         ),
         14566554180833181696,
-        "assertion `left != right` failed: custom error message\n  left: 1\n right: 1",
+        "assertion `left != right` failed: \"custom error message\"\n  left: 1\n right: 1",
     );
 
     assert_abort_code_and_message(
@@ -148,7 +151,7 @@ fn test_macros() {
             vec![],
         ),
         14566554180833181696,
-        "assertion `left != right` failed: custom error message with arg: 42\n  left: 1\n right: 1",
+        "assertion `left != right` failed: \"custom error message with arg: 42\"\n  left: 1\n right: 1",
     );
 }
 
@@ -166,6 +169,6 @@ fn assert_abort_code_and_message(
         },
         _ => {
             panic!("Expected transaction to abort, but got: {:?}", status);
-        }
+        },
     }
 }

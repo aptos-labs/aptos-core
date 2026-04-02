@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: cannot bind `bool` to left-hand side of type `u64`
+  ┌─ tests/match-checks/match_literal_ref_type_error.move:9:13
+  │
+9 │             true => 1,
+  │             ^^^^
+
+error: cannot bind `vector<u8>` to left-hand side of type `bool`
+   ┌─ tests/match-checks/match_literal_ref_type_error.move:16:13
+   │
+16 │             b"hi" => 1,
+   │             ^^^^^
+
+error: cannot bind `bool` to left-hand side of type `u64`
+   ┌─ tests/match-checks/match_literal_ref_type_error.move:23:19
+   │
+23 │             E::V1(true) => 1,
+   │                   ^^^^

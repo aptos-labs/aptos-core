@@ -8,7 +8,7 @@ module struct_enum_tests::struct_enum_tests {
     use std::string::Self;
     use aptos_std::fixed_point32::{Self, FixedPoint32};
     use aptos_std::fixed_point64::{Self, FixedPoint64};
-    use std::object::{Self, Object};
+    use std::object;
 
     // Test structs for struct transaction arguments
 

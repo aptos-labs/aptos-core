@@ -283,8 +283,6 @@ impl RunConfig {
                     chain_id.unwrap_or_else(ChainId::test),
                 ),
                 transaction_submission_config: TransactionSubmissionConfig::new(
-                    None,    // maximum_amount
-                    None,    // maximum_amount_with_bypass
                     30,      // gas_unit_price_ttl_secs
                     None,    // gas_unit_price_override
                     500_000, // max_gas_amount
@@ -999,6 +997,70 @@ mod test {
             .await?;
 
         assert_eq!(response.into_inner(), 100);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_asset_disabled() -> Result<()> {
+        make_auth_tokens_file(&["test_token"])?;
+
+        let aptos_node_api_client = aptos_sdk::rest_client::Client::new(
+            reqwest::Url::from_str("http://127.0.0.1:8080").unwrap(),
+        );
+        aptos_node_api_client
+            .get_index_bcs()
+            .await
+            .context("Localnet API couldn't be reached at port 8080, have you started one?")?;
+
+        init();
+        let (port, _handle) = {
+            let _guard = MUTEX.get().unwrap().lock().await;
+            let config_content =
+                include_str!("../../../configs/testing_mint_funder_local_asset_disabled.yaml");
+            start_server(config_content).await?
+        };
+
+        // A normal request (no bypass) should be rejected with AssetDisabled
+        // because maximum_amount is 0.
+        let fund_request = get_fund_request(Some(10));
+        let response = reqwest::Client::new()
+            .post(get_fund_endpoint(port))
+            .body(fund_request.to_json_string())
+            .header(CONTENT_TYPE, "application/json")
+            .send()
+            .await?;
+        assert_eq!(response.status(), reqwest::StatusCode::GONE);
+        let aptos_error = AptosTapError::parse_from_json_string(&response.text().await?)
+            .expect("Failed to read response as AptosError");
+        assert_eq!(aptos_error.error_code, AptosTapErrorCode::AssetDisabled);
+        assert!(
+            aptos_error.message.contains("disabled"),
+            "Expected 'disabled' in error message, got: {}",
+            aptos_error.message
+        );
+
+        // A bypassed request should succeed because maximum_amount_with_bypass
+        // is non-zero (10000).
+        let fund_request = get_fund_request(Some(10));
+        unwrap_reqwest_result(
+            reqwest::Client::new()
+                .post(get_fund_endpoint(port))
+                .body(fund_request.to_json_string())
+                .header(CONTENT_TYPE, "application/json")
+                .header(AUTHORIZATION, "Bearer test_token")
+                .send()
+                .await,
+        )
+        .await?;
+
+        // Confirm the bypassed account actually received funds.
+        let response = aptos_node_api_client
+            .view_apt_account_balance(
+                AccountAddress::from_str(&fund_request.address.unwrap()).unwrap(),
+            )
+            .await?;
+        assert_eq!(response.into_inner(), 10);
 
         Ok(())
     }

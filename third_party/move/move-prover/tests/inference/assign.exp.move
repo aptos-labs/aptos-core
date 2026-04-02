@@ -6,7 +6,9 @@ module 0x42::assign {
         x
     }
     spec identity(x: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x;
+        aborts_if [inferred] false;
     }
 
 
@@ -16,8 +18,9 @@ module 0x42::assign {
     }
     spec with_spec {
         ensures result == x + 1;
+        pragma opaque = true;
         ensures [inferred] result == x + 1;
-        aborts_if [inferred] x > MAX_U64 - 1;
+        aborts_if [inferred] x == MAX_U64;
     }
 
     // Multiple parameters, returns first - should infer: ensures result == x
@@ -25,7 +28,9 @@ module 0x42::assign {
         x
     }
     spec first(x: u64, _y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x;
+        aborts_if [inferred] false;
     }
 
 
@@ -34,7 +39,9 @@ module 0x42::assign {
         y
     }
     spec second(_x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == y;
+        aborts_if [inferred] false;
     }
 
 
@@ -44,7 +51,9 @@ module 0x42::assign {
         y
     }
     spec single_assign(x: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x;
+        aborts_if [inferred] false;
     }
 
 
@@ -55,7 +64,9 @@ module 0x42::assign {
         z
     }
     spec chain_assign(x: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x;
+        aborts_if [inferred] false;
     }
 
 
@@ -68,7 +79,9 @@ module 0x42::assign {
         d
     }
     spec long_chain(x: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x;
+        aborts_if [inferred] false;
     }
 
 }

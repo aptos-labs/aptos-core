@@ -168,28 +168,33 @@ where
         } = connection;
         let remote_peer_id = connection_metadata.remote_peer_id;
         let max_fragments = max_message_size / max_frame_size;
+        // Build sub-components first, then move time_service into Self.
+        // This keeps clone count the same (2 clones for InboundRpcs/OutboundRpcs)
+        // but lets Self receive the original rather than a third clone.
+        let inbound_rpcs = InboundRpcs::new(
+            network_context,
+            time_service.clone(),
+            remote_peer_id,
+            inbound_rpc_timeout,
+            max_concurrent_inbound_rpcs,
+        );
+        let outbound_rpcs = OutboundRpcs::new(
+            network_context,
+            time_service.clone(),
+            remote_peer_id,
+            max_concurrent_outbound_rpcs,
+        );
         Self {
             network_context,
             executor,
-            time_service: time_service.clone(),
+            time_service,
             connection_metadata,
             connection: Some(socket),
             connection_notifs_tx,
             peer_reqs_rx,
             upstream_handlers,
-            inbound_rpcs: InboundRpcs::new(
-                network_context,
-                time_service.clone(),
-                remote_peer_id,
-                inbound_rpc_timeout,
-                max_concurrent_inbound_rpcs,
-            ),
-            outbound_rpcs: OutboundRpcs::new(
-                network_context,
-                time_service,
-                remote_peer_id,
-                max_concurrent_outbound_rpcs,
-            ),
+            inbound_rpcs,
+            outbound_rpcs,
             state: State::Connected,
             max_frame_size,
             max_message_size,

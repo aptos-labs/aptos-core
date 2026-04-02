@@ -21,10 +21,12 @@
 //! At the end, walks the VM's outer vector via heap pointers and compares
 //! element-by-element against a pure-Rust simulation using the same seed.
 
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{
+    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp, STRUCT_DATA_OFFSET,
+};
 use mono_move_runtime::{
-    read_ptr, read_u64, CodeOffset as CO, DescriptorId, FrameOffset as FO, Function,
-    InterpreterContext, MicroOp, ObjectDescriptor, STRUCT_DATA_OFFSET, VEC_DATA_OFFSET,
-    VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -120,6 +122,7 @@ fn make_gc_stress_program(
     ];
 
     let callee_func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code: make_entry_code,
         args_size: 8,
         args_and_locals_size: 40,
@@ -221,6 +224,7 @@ fn make_gc_stress_program(
     ];
 
     let main_func = Function {
+        name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 64,

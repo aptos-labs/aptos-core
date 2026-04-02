@@ -10,7 +10,9 @@ use move_docgen::OutputFormat;
 use move_model::model::GlobalEnv;
 use std::{path::PathBuf, sync::Mutex};
 
-#[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize, Default)]
+#[derive(
+    Debug, Clone, Hash, Eq, PartialEq, clap::Parser, serde::Serialize, serde::Deserialize, Default,
+)]
 pub struct DocgenOptions {
     /// Whether to include private declarations and implementations into the generated
     /// documentation. Defaults to false.

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::bail;
 use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
@@ -35,6 +35,10 @@ pub mod lang_feature_versions {
     pub const LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING: LanguageVersion = LanguageVersion::V2_2;
     pub const LANGUAGE_VERSION_FOR_SINT: LanguageVersion = LanguageVersion::V2_3;
     pub const LANGUAGE_VERSION_FOR_PUBLIC_STRUCT: LanguageVersion = LanguageVersion::V2_4;
+    /// This version guards checks for unused private functions, private structs, and constants.
+    pub const LANGUAGE_VERSION_FOR_UNUSED_CHECK: LanguageVersion = LanguageVersion::V2_4;
+    /// This version guards proof blocks, lemma declarations, and behavioral predicates.
+    pub const LANGUAGE_VERSION_FOR_PROOFS: LanguageVersion = LanguageVersion::V2_4;
     /// This version guards match support for primitive types.
     pub const LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH: LanguageVersion = LanguageVersion::V2_4;
     pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion =
@@ -96,7 +100,7 @@ impl CompilationMetadata {
 /// The versioning scheme is `major.minor`, where for `major = 1` we do not
 /// distinguish a minor version. A major version change represents
 /// a different/largely refactored compiler. This we have versions `1, 2.0, 2.1, 2.2, .., `.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum CompilerVersion {
     /// The legacy v1 Move compiler, no longer supported.
     V1,
@@ -200,7 +204,7 @@ impl CompilerVersion {
 /// Typically, a major version change is given with an addition of larger new language
 /// features. There are no breaking changes expected with major version changes,
 /// however, there maybe some isolated exceptions.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum LanguageVersion {
     /// The version of Move at around the genesis of the Aptos network end
     /// of '22. This is the original Diem Move plus the extension of inline

@@ -286,6 +286,13 @@ Ciphertext:
         TUPLEARRAY:
           CONTENT: U8
           SIZE: 64
+ClaimedEntryFunction:
+  STRUCT:
+    - module:
+        TYPENAME: ModuleId
+    - function:
+        OPTION:
+          TYPENAME: Identifier
 CoinStoreResource:
   STRUCT:
     - coin: U64
@@ -341,6 +348,8 @@ DecryptionFailureReason:
       ConfigUnavailable: UNIT
     3:
       DecryptionKeyUnavailable: UNIT
+    4:
+      ClaimedEntryFunctionMismatch: UNIT
 DepositEvent:
   STRUCT:
     - amount: U64
@@ -362,6 +371,9 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - claimed_entry_fun:
+              OPTION:
+                TYPENAME: ClaimedEntryFunction
     1:
       FailedDecryption:
         STRUCT:
@@ -371,6 +383,9 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - claimed_entry_fun:
+              OPTION:
+                TYPENAME: ClaimedEntryFunction
           - eval_proof:
               OPTION:
                 TYPENAME: EvalProof
@@ -385,6 +400,9 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - claimed_entry_fun:
+              OPTION:
+                TYPENAME: ClaimedEntryFunction
           - eval_proof:
               TYPENAME: EvalProof
           - executable:

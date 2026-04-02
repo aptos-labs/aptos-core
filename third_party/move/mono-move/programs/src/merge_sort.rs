@@ -61,10 +61,12 @@ pub fn native_merge_sort(v: &mut [u64]) {
 /// and pseudocode.
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_runtime::{
-        CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp::*, ObjectDescriptor,
+    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_core::{
+        CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp::*,
         FRAME_METADATA_SIZE,
     };
+    use mono_move_runtime::ObjectDescriptor;
 
     pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
         let meta = FRAME_METADATA_SIZE as u32;
@@ -102,6 +104,7 @@ mod micro_op {
             ];
 
             Function {
+                name: GlobalArenaPtr::from_static("merge_sort"),
                 code,
                 args_size: 8,
                 args_and_locals_size: args_and_locals_size as usize,
@@ -167,6 +170,7 @@ mod micro_op {
             ];
 
             Function {
+                name: GlobalArenaPtr::from_static("merge_sort_range"),
                 code,
                 args_size: 24,
                 args_and_locals_size: args_and_locals_size as usize,
@@ -275,6 +279,7 @@ mod micro_op {
             ];
 
             Function {
+                name: GlobalArenaPtr::from_static("merge"),
                 code,
                 args_size: 32,
                 args_and_locals_size: 120,
