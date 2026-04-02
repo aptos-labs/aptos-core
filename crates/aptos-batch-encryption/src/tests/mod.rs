@@ -9,12 +9,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 #[cfg(test)]
 mod digest_key_bench;
-#[cfg(test)]
-pub mod fptx_smoke;
-#[cfg(test)]
-pub mod fptx_succinct_smoke;
-#[cfg(test)]
-pub mod fptx_weighted_smoke;
+pub mod smoke;
 #[cfg(test)]
 pub mod typescript;
 
