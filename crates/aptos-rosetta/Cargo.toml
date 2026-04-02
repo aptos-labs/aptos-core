@@ -37,5 +37,5 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-tower-http = { workspace = true }
+tower-http = { workspace = true, features = ["cors"] }
 url = { workspace = true }
