@@ -62,14 +62,8 @@ impl<C: CurveGroup> PublicParameters<C> {
 
     /// Builds public parameters from given bases and table size (e.g. for deserialization).
     pub fn from_bases(G: C::Affine, H: C::Affine, approximate_num_shares: usize) -> Self {
-        let G_table = Arc::new(BatchMulPreprocessing::new(
-            G.into(),
-            approximate_num_shares,
-        ));
-        let H_table = Arc::new(BatchMulPreprocessing::new(
-            H.into(),
-            approximate_num_shares,
-        ));
+        let G_table = Arc::new(BatchMulPreprocessing::new(G.into(), approximate_num_shares));
+        let H_table = Arc::new(BatchMulPreprocessing::new(H.into(), approximate_num_shares));
         Self {
             G,
             H,

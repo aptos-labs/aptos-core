@@ -148,8 +148,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::from_bases(
             serialized.pp_elgamal.G,
             serialized.pp_elgamal.H,
-            serialized
-                .max_num_shares
+            serialized.max_num_shares,
         );
 
         Ok(Self {
@@ -290,18 +289,10 @@ impl<E: Pairing> PublicParameters<E> {
         let max_num_chunks_padded = (max_num_shares * num_chunks + 1).next_power_of_two() - 1;
 
         let group_generators = GroupGenerators::default();
-        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(
-            max_num_shares,
-        );
+        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G_1 = *pp_elgamal.message_base();
         let pk_range_proof = maybe_dekart_prover_key.unwrap_or_else(|| {
-            dekart_univariate_v2::Proof::setup(
-                max_num_chunks_padded,
-                ell,
-                group_generators,
-                rng,
-            )
-            .0
+            dekart_univariate_v2::Proof::setup(max_num_chunks_padded, ell, group_generators, rng).0
         });
 
         let pp = Self {

@@ -34,7 +34,7 @@ impl<A: AffineRepr> BabyStepTable<A> {
     /// then inserts each affine point into the table using compressed serialization.
     #[allow(non_snake_case)]
     pub fn new(G: A, table_size: usize) -> Self {
-        assert!( table_size < 1 << 32);
+        assert!(table_size < 1 << 32);
         let mut points: Vec<A::Group> = Vec::with_capacity(table_size);
         let mut current = A::Group::zero();
         for _ in 0..table_size {
@@ -95,7 +95,12 @@ mod tests {
         for j in 0..table_size {
             let point = (G * Fr::from(j as u64)).into_affine();
             let stored = tbl.get(&point);
-            assert_eq!(stored, Some(j as u32), "table should map j*G -> j for j = {}", j);
+            assert_eq!(
+                stored,
+                Some(j as u32),
+                "table should map j*G -> j for j = {}",
+                j
+            );
         }
     }
 }

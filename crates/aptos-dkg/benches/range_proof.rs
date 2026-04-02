@@ -60,7 +60,9 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
 ) {
     let mut group = c.benchmark_group(format!("{}/{}", scheme_name, curve_name));
 
-    let l = std::env::var("L").ok().and_then(|s| s.parse::<usize>().ok());
+    let l = std::env::var("L")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok());
     let n = std::env::var("N")
         .ok()
         .and_then(|s| s.parse::<usize>().ok());
