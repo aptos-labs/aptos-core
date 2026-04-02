@@ -88,6 +88,7 @@ const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
 const CHUNKY_DKG_MODULE_NAME: &str = "chunky_dkg";
 const CHUNKY_DKG_CONFIG_MODULE_NAME: &str = "chunky_dkg_config";
+const CHUNKY_DKG_CONFIG_SEQNUM_MODULE_NAME: &str = "chunky_dkg_config_seqnum";
 const DECRYPTION_MODULE_NAME: &str = "decryption";
 const ACCOUNT_ABSTRACTION_MODULE_NAME: &str = "account_abstraction";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
@@ -341,6 +342,7 @@ pub fn encode_genesis_change_set(
         .chunky_dkg_config_override
         .clone()
         .unwrap_or_else(OnChainChunkyDKGConfig::default_for_genesis);
+    initialize_chunky_dkg_config_seqnum(&mut session, &module_storage, &mut traversal_context);
     initialize_chunky_dkg_config(
         &mut session,
         &module_storage,
@@ -702,6 +704,22 @@ fn initialize_randomness_resources(
         module_storage,
         traversal_context,
         RANDOMNESS_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_chunky_dkg_config_seqnum(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        CHUNKY_DKG_CONFIG_SEQNUM_MODULE_NAME,
         "initialize",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),

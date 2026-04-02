@@ -18,9 +18,9 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        ChunkyDKGConfigMoveStruct, OnChainChunkyDKGConfig, OnChainConsensusConfig,
-        OnChainExecutionConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        RandomnessConfigSeqNum, ValidatorSet,
+        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, OnChainChunkyDKGConfig,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
+        RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
 };
 use futures::StreamExt;
@@ -213,6 +213,20 @@ async fn extract_on_chain_configs(
         onchain_randomness_config.ok(),
     );
 
+    // Extract the chunky DKG config sequence number (or use the default if it's missing)
+    let onchain_chunky_dkg_config_seq_num: anyhow::Result<ChunkyDKGConfigSeqNum> =
+        on_chain_configs.get();
+    if let Err(error) = &onchain_chunky_dkg_config_seq_num {
+        warn!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Failed to read on-chain chunky DKG config seq num! Error: {:?}",
+                error
+            ))
+        );
+    }
+    let onchain_chunky_dkg_config_seq_num = onchain_chunky_dkg_config_seq_num
+        .unwrap_or_else(|_| ChunkyDKGConfigSeqNum::default_if_missing());
+
     // Extract the chunky DKG config
     let onchain_chunky_dkg_config: anyhow::Result<ChunkyDKGConfigMoveStruct> =
         on_chain_configs.get();
@@ -224,7 +238,11 @@ async fn extract_on_chain_configs(
             ))
         );
     }
-    let chunky_dkg_config = OnChainChunkyDKGConfig::from_configs(onchain_chunky_dkg_config.ok());
+    let chunky_dkg_config = OnChainChunkyDKGConfig::from_configs(
+        node_config.chunky_dkg_override_seq_num,
+        onchain_chunky_dkg_config_seq_num.seq_num,
+        onchain_chunky_dkg_config.ok(),
+    );
 
     // Return the extracted epoch state and on-chain configs
     (

@@ -17,6 +17,7 @@ use tokio::time::Instant;
 
 mod correctness;
 mod enable_feature;
+mod stall_recovery;
 mod with_validator_down;
 
 /// Poll on-chain `ChunkyDKGState` until we see a completed session.

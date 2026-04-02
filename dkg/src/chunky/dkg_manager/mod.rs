@@ -41,6 +41,7 @@ use aptos_types::{
     validator_txn::{Topic, ValidatorTransaction},
 };
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
+use fail::fail_point;
 use futures_channel::oneshot;
 use futures_util::{
     future::{AbortHandle, Abortable},
@@ -606,6 +607,7 @@ impl ChunkyDKGManager {
             my_addr = self.my_addr,
             "[ChunkyDKG] Processing DKGStart event."
         );
+        fail_point!("chunky_dkg::process_dkg_start_event", |_| Ok(()));
         let ChunkyDKGStartEvent {
             session_metadata,
             start_time_us,
