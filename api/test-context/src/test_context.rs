@@ -1448,14 +1448,17 @@ impl TestContext {
         let status = resp.status().as_u16();
         let headers = resp.headers().clone();
 
-        // Verify content-type is JSON
-        if let Some(ct) = headers.get("content-type") {
-            assert!(
-                ct.to_str().unwrap().starts_with(mime_types::JSON),
-                "Expected JSON content type, got: {:?}",
-                ct
-            );
-        }
+        let content_type = headers
+            .get("content-type")
+            .unwrap_or_else(|| panic!("Missing content-type header for {} {}", method, url));
+        assert!(
+            content_type
+                .to_str()
+                .expect("content-type must be valid utf-8")
+                .starts_with(mime_types::JSON),
+            "Expected JSON content type, got: {:?}",
+            content_type
+        );
 
         let body_bytes = resp.bytes().await.expect("Failed to read response body");
         if body_bytes.is_empty() {

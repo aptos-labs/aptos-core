@@ -10,13 +10,13 @@ use crate::{
     constants::MAX_DECOMPRESSED_LENGTH,
     context::Context,
     debug, error,
-    errors::{LogIngestError, ServiceError},
+    errors::{bytes_rejection_to_service_error, LogIngestError, ServiceError},
     metrics::LOG_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
 };
 use axum::{
     body::Bytes,
-    extract::Extension,
+    extract::{rejection::BytesRejection, Extension},
     http::{header::CONTENT_ENCODING, HeaderMap, StatusCode},
 };
 use flate2::bufread::GzDecoder;
@@ -26,8 +26,9 @@ use tokio::time::Instant;
 pub async fn post_log_ingest(
     Extension(context): Extension<Context>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<StatusCode, ServiceError> {
+    let body = body.map_err(bytes_rejection_to_service_error)?;
     let claims = authorize_request(&context, &headers, &[
         NodeType::Validator,
         NodeType::ValidatorFullNode,

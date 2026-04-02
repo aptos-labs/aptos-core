@@ -9,7 +9,8 @@ use axum::{
     response::Response,
     Router,
 };
-use std::time::Instant;
+use aptos_logger::prelude::{sample, SampleRate};
+use std::time::{Duration, Instant};
 
 pub fn logger<S>(router: Router<S>) -> Router<S>
 where
@@ -47,15 +48,18 @@ async fn log_middleware(request: Request<Body>, next: Next) -> Response {
     let elapsed = start.elapsed();
 
     if status >= 500 {
-        aptos_logger::error!(
-            method = method,
-            path = path,
-            status = status,
-            elapsed = ?elapsed,
-            forwarded = forwarded,
-            user_agent = user_agent,
-            referer = referer,
-            "http request failed"
+        sample!(
+            SampleRate::Duration(Duration::from_secs(1)),
+            aptos_logger::error!(
+                method = method,
+                path = path,
+                status = status,
+                elapsed = ?elapsed,
+                forwarded = forwarded,
+                user_agent = user_agent,
+                referer = referer,
+                "http request failed"
+            )
         );
     } else {
         aptos_logger::debug!(

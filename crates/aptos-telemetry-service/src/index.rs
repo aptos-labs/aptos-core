@@ -14,7 +14,7 @@ use crate::{
 };
 use axum::{
     extract::{DefaultBodyLimit, Extension, Request},
-    http::StatusCode,
+    http::{header, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -64,6 +64,7 @@ pub fn routes(context: Context) -> Router {
             post(custom_contract_ingest::post_custom_contract_custom_event),
         )
         .fallback(fallback_not_found)
+        .layer(middleware::from_fn(normalize_axum_error_responses))
         .layer(DefaultBodyLimit::max(
             crate::constants::MAX_CONTENT_LENGTH as usize,
         ))
@@ -108,6 +109,42 @@ async fn fallback_not_found() -> (StatusCode, AxumJson<ErrorResponse>) {
         code,
         AxumJson(ErrorResponse::new(code, "Not Found".to_owned())),
     )
+}
+
+async fn normalize_axum_error_responses(request: Request, next: Next) -> Response {
+    let response = next.run(request).await;
+    let status = response.status();
+    let is_json = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("application/json"));
+
+    if is_json {
+        return response;
+    }
+
+    // Route-level axum rejections (e.g. wrong method/body limit) can bypass
+    // `ServiceError` conversion and otherwise emit non-JSON default bodies.
+    match status {
+        StatusCode::METHOD_NOT_ALLOWED => (
+            StatusCode::METHOD_NOT_ALLOWED,
+            AxumJson(ErrorResponse::new(
+                StatusCode::METHOD_NOT_ALLOWED,
+                "Method Not Allowed".to_string(),
+            )),
+        )
+            .into_response(),
+        StatusCode::PAYLOAD_TOO_LARGE => (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            AxumJson(ErrorResponse::new(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "Payload Too Large".to_string(),
+            )),
+        )
+            .into_response(),
+        _ => response,
+    }
 }
 
 impl IntoResponse for ServiceError {

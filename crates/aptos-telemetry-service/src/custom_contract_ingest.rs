@@ -13,8 +13,8 @@ use crate::{
     custom_contract_auth::authorize_custom_contract_request,
     debug, error,
     errors::{
-        json_rejection_to_service_error, CustomEventIngestError, LogIngestError, ServiceError,
-        ServiceErrorCode,
+        bytes_rejection_to_service_error, json_rejection_to_service_error, CustomEventIngestError,
+        LogIngestError, ServiceError, ServiceErrorCode,
     },
     metrics::{record_custom_contract_error, CustomContractEndpoint, CustomContractErrorType},
     types::{
@@ -25,7 +25,10 @@ use crate::{
 use aptos_types::{chain_id::ChainId, PeerId};
 use axum::{
     body::Bytes,
-    extract::{rejection::JsonRejection, Extension, Json, Path},
+    extract::{
+        rejection::{BytesRejection, JsonRejection},
+        Extension, Json, Path,
+    },
     http::{header::CONTENT_ENCODING, HeaderMap, StatusCode},
 };
 use flate2::read::GzDecoder;
@@ -40,8 +43,9 @@ pub async fn post_custom_contract_metrics(
     Path(contract_name): Path<String>,
     Extension(context): Extension<Context>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<StatusCode, ServiceError> {
+    let body = body.map_err(bytes_rejection_to_service_error)?;
     let content_encoding = headers
         .get(CONTENT_ENCODING)
         .and_then(|v| v.to_str().ok())
@@ -239,8 +243,9 @@ pub async fn post_custom_contract_logs(
     Path(contract_name): Path<String>,
     Extension(context): Extension<Context>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<StatusCode, ServiceError> {
+    let body = body.map_err(bytes_rejection_to_service_error)?;
     let content_encoding = headers
         .get(CONTENT_ENCODING)
         .and_then(|v| v.to_str().ok())

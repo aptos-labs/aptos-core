@@ -16,6 +16,7 @@ use crate::{
 };
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_types::{chain_id::ChainId, PeerId};
+use anyhow::Context as _;
 use clap::Parser;
 use context::GroupedMetricsClients;
 use gcp_bigquery_client::Client as BigQueryClient;
@@ -328,25 +329,28 @@ impl AptosTelemetryServiceArgs {
             .run();
         }
 
-        Self::serve(&config, routes(context)).await;
+        if let Err(err) = Self::serve(&config, routes(context)).await {
+            panic!("Failed to start telemetry service: {}", err);
+        }
     }
 
-    async fn serve(config: &TelemetryServiceConfig, app: axum::Router) {
+    async fn serve(config: &TelemetryServiceConfig, app: axum::Router) -> anyhow::Result<()> {
         match &config.tls_cert_path {
             None => {
                 let listener = TcpListener::bind(config.address)
                     .await
-                    .unwrap_or_else(|e| panic!("Failed to bind telemetry service listener: {}", e));
+                    .with_context(|| {
+                        format!("Failed to bind telemetry service listener on {}", config.address)
+                    })?;
                 axum::serve(listener, app)
                     .await
-                    .unwrap_or_else(|e| panic!("Telemetry service server error: {}", e));
+                    .context("Telemetry service server error")?;
+                Ok(())
             },
-            Some(_cert_path) => {
-                panic!(
-                    "TLS for aptos-telemetry-service is not yet supported with axum \
-                     (set tls_cert_path only after TLS support is added; same contract as aptos-warp-webserver)"
-                );
-            },
+            Some(_) => Err(anyhow::anyhow!(
+                "TLS for aptos-telemetry-service is not yet supported with axum \
+                 (clear tls_cert_path/tls_key_path or migrate to axum rustls listener)"
+            )),
         }
     }
 }

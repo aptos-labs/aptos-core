@@ -5,14 +5,14 @@ use crate::{
     auth::authorize_request,
     context::Context,
     debug, error,
-    errors::{MetricsIngestError, ServiceError},
+    errors::{bytes_rejection_to_service_error, MetricsIngestError, ServiceError},
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
 use aptos_types::PeerId;
 use axum::{
     body::Bytes,
-    extract::Extension,
+    extract::{rejection::BytesRejection, Extension},
     http::{header::CONTENT_ENCODING, HeaderMap, StatusCode},
 };
 use rand::Rng;
@@ -24,8 +24,9 @@ const MAX_METRICS_POST_WAIT_DURATION_SECS: u64 = 5;
 pub async fn post_metrics_ingest(
     Extension(context): Extension<Context>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<StatusCode, ServiceError> {
+    let body = body.map_err(bytes_rejection_to_service_error)?;
     let claims = authorize_request(&context, &headers, &[
         NodeType::Validator,
         NodeType::ValidatorFullNode,

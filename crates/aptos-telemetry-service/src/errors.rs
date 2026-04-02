@@ -4,7 +4,10 @@
 use aptos_crypto::noise::NoiseError;
 use aptos_rest_client::error::RestError;
 use aptos_types::{chain_id::ChainId, PeerId};
-use axum::{extract::rejection::JsonRejection, http::StatusCode};
+use axum::{
+    extract::rejection::{BytesRejection, JsonRejection},
+    http::StatusCode,
+};
 use debug_ignore::DebugIgnore;
 use gcp_bigquery_client::{
     error::BQError,
@@ -24,6 +27,11 @@ pub fn json_rejection_to_service_error(err: JsonRejection) -> ServiceError {
         _ => StatusCode::BAD_REQUEST,
     };
     ServiceError::new(status, ServiceErrorCode::RequestParseError(msg))
+}
+
+/// Maps axum [`BytesRejection`] to a [`ServiceError`] with the same JSON error envelope as other API errors.
+pub fn bytes_rejection_to_service_error(err: BytesRejection) -> ServiceError {
+    ServiceError::new(err.status(), ServiceErrorCode::RequestParseError(err.body_text()))
 }
 
 #[derive(Debug, ThisError)]

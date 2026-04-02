@@ -13,7 +13,7 @@ use crate::{
 };
 use axum::{
     extract::Query,
-    http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+    http::{header::CONTENT_TYPE, Method},
     response::IntoResponse,
     response::Response,
     routing::{get, post},
@@ -23,9 +23,10 @@ use axum::{
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
 use aptos_types::chain_id::ChainId;
-use aptos_warp_webserver::WebServer;
+use aptos_warp_webserver::{logger, WebServer};
 use std::{collections::HashSet, sync::Arc};
 use tokio::task::JoinHandle;
+use tower_http::cors::{Any, CorsLayer};
 
 pub use aptos_types::account_address::AccountAddress;
 
@@ -162,14 +163,17 @@ pub async fn bootstrap_async(
             supported_currencies,
         )
         .await;
-        api.serve(routes(context)).await;
+        if let Err(err) = api.serve(routes(context)).await {
+            panic!("Failed to start rosetta service: {}", err);
+        }
     });
     Ok(handle)
 }
 
 /// Collection of all routes for the server
 pub fn routes(context: RosettaContext) -> Router {
-    Router::new()
+    logger(
+        Router::new()
         .route("/account/balance", post(account::account_balance_route))
         .route("/block", post(block::block_route))
         .route("/construction/combine", post(construction::combine_route))
@@ -193,16 +197,14 @@ pub fn routes(context: RosettaContext) -> Router {
         .route("/network/options", post(network::network_options_route))
         .route("/network/status", post(network::network_status_route))
         .route("/-/healthy", get(health_check_route))
-        .layer(axum::middleware::from_fn(
-            |req: axum::extract::Request, next: axum::middleware::Next| async move {
-                let mut response = next.run(req).await;
-                response
-                    .headers_mut()
-                    .insert(ACCESS_CONTROL_ALLOW_ORIGIN, "*".parse().unwrap());
-                response
-            },
-        ))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods([Method::GET, Method::POST])
+                .allow_headers([CONTENT_TYPE]),
+        )
         .with_state(context)
+    )
 }
 
 /// These parameters are directly passed onto the underlying rest server for a healthcheck

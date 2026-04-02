@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_config::config::ApiConfig;
+use anyhow::Context;
 use axum::Router;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -32,16 +33,16 @@ impl WebServer {
         }
     }
 
-    pub async fn serve(&self, routes: Router) {
-        assert!(
-            self.tls_cert_path.is_none() && self.tls_key_path.is_none(),
-            "TLS for aptos-warp-webserver is not yet supported with axum",
-        );
+    pub async fn serve(&self, routes: Router) -> anyhow::Result<()> {
+        if self.tls_cert_path.is_some() || self.tls_key_path.is_some() {
+            anyhow::bail!("TLS for aptos-warp-webserver is not yet supported with axum");
+        }
         let listener = TcpListener::bind(self.address)
             .await
-            .expect("Failed to bind aptos webserver listener");
+            .with_context(|| format!("failed to bind aptos webserver listener at {}", self.address))?;
         axum::serve(listener, routes)
             .await
-            .expect("aptos webserver terminated unexpectedly");
+            .context("aptos webserver terminated unexpectedly")?;
+        Ok(())
     }
 }
