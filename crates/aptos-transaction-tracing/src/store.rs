@@ -25,6 +25,11 @@ const GC_INTERVAL_USECS: u64 = 30_000_000;
 /// Traces older than this TTL are considered orphaned and evicted (60 seconds).
 const GC_TTL_USECS: u64 = 60_000_000;
 
+/// Upper bound on concurrent traces. Prevents unbounded memory growth under
+/// high sampling rates or misconfigured allowlists. At ~1KB per trace, 10K
+/// traces ≈ 10MB — well within safe limits.
+const MAX_TRACES: usize = 10_000;
+
 /// Global store for transaction lifecycle traces.
 ///
 /// Thread-safe via DashMap. Only traces transactions whose sender is in the
@@ -87,6 +92,10 @@ impl TransactionTraceStore {
     ) -> bool {
         let filter = self.filter.load();
         if !filter.should_trace(&sender, &hash) {
+            return false;
+        }
+        // Cap concurrent traces to prevent unbounded memory growth.
+        if self.traces.len() >= MAX_TRACES {
             return false;
         }
         let mut trace = TransactionTrace::new(hash, sender, now_usecs);
@@ -277,7 +286,75 @@ impl TransactionTraceStore {
         self.block_txns.get(block_id).map(|r| r.value().clone())
     }
 
-    /// Replace the metadata of the last recorded stage for a traced txn.
+    /// Process a proposed block: record BlockProposed per batch and register
+    /// block → traced txn hashes for efficient post-proposal stage recording.
+    /// Called from round_manager::process_proposal.
+    pub fn process_proposed_block(
+        &self,
+        block_id: HashValue,
+        block_timestamp_usecs: u64,
+        batch_digests: &[(HashValue, crate::types::BatchInclusionType)],
+    ) {
+        let mut block_traced_txns: Vec<HashValue> = Vec::new();
+        for (digest, inclusion) in batch_digests {
+            self.record_batch_stage_with_metadata_at(
+                digest,
+                TransactionStage::BlockProposed,
+                StageMetadata::BatchInclusion(*inclusion),
+                block_timestamp_usecs,
+            );
+            if let Some(txn_hashes) = self.get_batch_traced_txns(digest) {
+                block_traced_txns.extend(txn_hashes.iter());
+            }
+        }
+        self.register_block(block_id, block_traced_txns);
+    }
+
+    /// Record execution results (Keep/Retry/Discard) for traced txns in a block.
+    /// Called from block_executor::execute_and_update_state after execution.
+    pub fn record_execution_result(
+        &self,
+        block_id: &HashValue,
+        retry_hashes: &[HashValue],
+        discard_hashes: &[HashValue],
+    ) {
+        if let Some(traced_hashes) = self.get_block_traced_txns(block_id) {
+            use crate::types::{ExecutionStatus, StageMetadata};
+            let now = now_usecs();
+
+            let retry_set: std::collections::HashSet<HashValue> =
+                retry_hashes.iter().copied().collect();
+            let discard_set: std::collections::HashSet<HashValue> =
+                discard_hashes.iter().copied().collect();
+
+            for hash in &traced_hashes {
+                if retry_set.contains(hash) {
+                    self.record_stage_with_metadata_at(
+                        hash,
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Retry),
+                        now,
+                    );
+                    self.mark_retry(hash);
+                } else if discard_set.contains(hash) {
+                    self.record_stage_with_metadata_at(
+                        hash,
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Discard),
+                        now,
+                    );
+                } else {
+                    self.record_stage_with_metadata_at(
+                        hash,
+                        TransactionStage::Executed,
+                        StageMetadata::Execution(ExecutionStatus::Keep),
+                        now,
+                    );
+                }
+            }
+        }
+    }
+
     /// Check if a transaction hash has an active trace.
     pub fn is_traced(&self, hash: &HashValue) -> bool {
         self.traces.contains_key(hash)

@@ -1273,13 +1273,8 @@ impl RoundManager {
                 payload::OptQuorumStorePayload,
                 proof_of_store::TBatchInfo,
             };
-            use aptos_transaction_tracing::{
-                store::TransactionTraceStore,
-                types::{BatchInclusionType, StageMetadata, TransactionStage},
-            };
+            use aptos_transaction_tracing::types::BatchInclusionType;
 
-            let store = TransactionTraceStore::global();
-            let block_ts = proposal.timestamp_usecs();
             if let Some(payload) = proposal.payload() {
                 macro_rules! collect_batches {
                     ($p:expr, $out:expr) => {{
@@ -1294,8 +1289,7 @@ impl RoundManager {
                         }
                     }};
                 }
-                let mut batch_digests: Vec<(aptos_crypto::HashValue, BatchInclusionType)> =
-                    Vec::new();
+                let mut batch_digests = Vec::new();
                 match payload {
                     Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
                         collect_batches!(p, batch_digests);
@@ -1305,20 +1299,12 @@ impl RoundManager {
                     },
                     _ => {},
                 }
-                // Record BlockProposed per batch and collect traced txn hashes.
-                let mut block_traced_txns: Vec<aptos_crypto::HashValue> = Vec::new();
-                for (digest, inclusion) in &batch_digests {
-                    store.record_batch_stage_with_metadata_at(
-                        digest,
-                        TransactionStage::BlockProposed,
-                        StageMetadata::BatchInclusion(*inclusion),
-                        block_ts,
+                aptos_transaction_tracing::store::TransactionTraceStore::global()
+                    .process_proposed_block(
+                        proposal.id(),
+                        proposal.timestamp_usecs(),
+                        &batch_digests,
                     );
-                    if let Some(txn_hashes) = store.get_batch_traced_txns(digest) {
-                        block_traced_txns.extend(txn_hashes.iter());
-                    }
-                }
-                store.register_block(proposal.id(), block_traced_txns);
             }
         }
 
