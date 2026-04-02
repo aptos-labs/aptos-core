@@ -1,0 +1,21 @@
+//# publish --print-bytecode
+module 0x66::test_test_variant_wrong_enum_ownership
+
+enum Either has drop
+  Left
+    value: u64
+  Right
+    value: u64
+
+enum EitherClone has drop
+  Left
+    value: u64
+  Right
+    value: u64
+
+// Invalid: test_variant$Either$Left tests EitherClone's Left variant instead of Either's.
+// The variant name matches, but the variant handle belongs to the wrong enum.
+#[test_variant(0)] public fun test_variant$Either$Left(l0: &Either): bool
+    move_loc l0
+    test_variant EitherClone, Left
+    ret
