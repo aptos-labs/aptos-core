@@ -287,7 +287,7 @@ impl ChunkyDKGSession {
         // TODO(ibalajiarun): Replace seed for public parameters with a trusted setup
         let seed = dkg_session_metadata.dealer_epoch;
         let mut rng_aptos = StdRng::seed_from_u64(seed);
-        let public_parameters = PublicParameters::new_with_commitment_base(
+        let public_parameters = PublicParameters::new_for_testing(
             total_weight as usize,
             aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
             threshold_config.get_total_num_players(),

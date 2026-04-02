@@ -17,7 +17,6 @@ use crate::{
 };
 use aptos_crypto::{
     arkworks::{
-        hashing,
         serialization::{ark_de, ark_se},
         GroupGenerators,
     },
@@ -30,7 +29,6 @@ use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Mul;
 
-const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 pub const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 pub const DEFAULT_ELL_FOR_DEPLOYMENT: u8 = 32; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 const DEFAULT_MAX_AGGREGATION: usize = 166;
@@ -44,11 +42,10 @@ fn default_dlog_extra_bits() -> u8 {
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
     utils::powers(
         E::ScalarField::from(1u64 << ell),
-        num_chunks_per_scalar::<E::ScalarField>(ell) as usize,
+        num_chunks_per_scalar::<E::ScalarField>(ell),
     )
 }
 
-// TODO: If we need it later, let's derive CanonicalSerialize/CanonicalDeserialize from Serialize/Deserialize? E.g. the opposite of ark_se/de...
 #[derive(Serialize)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
@@ -63,16 +60,17 @@ pub struct PublicParameters<E: Pairing> {
 
     pub ell: u8, // Should be below 64 to prevent overflows etc
 
-    pub max_num_shares: u32,
+    pub max_num_shares: usize,
 
-    // Meaning here it seems, the max number of times `n` that transcripts can be aggregated (which means the number of contained transcripts can be `n + 1`)
+    // Max number of transcripts that can be aggregated. Used to determine the BSGS dlog table
+    // size, since aggregation doubles the max possible exponent size that needs to be decrypted.
     pub max_aggregation: usize,
 
     /// Extra bits for the dlog baby-step table size. Must be serialized so clone/deserialize rebuild the same table.
+    /// TODO(Rex): Check if we actually still need this.
     #[serde(default = "default_dlog_extra_bits")]
     pub dlog_extra_bits: u8,
 
-    #[serde(skip)]
     pub dlog_table: BabyStepTable<E::G1Affine>,
 
     #[serde(skip)]
@@ -93,7 +91,7 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             max_aggregation: self.max_aggregation,
             dlog_extra_bits: self.dlog_extra_bits,
             dlog_table: self.dlog_table.clone(),
-            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares as usize), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
+            G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
         }
     }
@@ -108,6 +106,7 @@ impl<E: Pairing> PartialEq for PublicParameters<E> {
             && self.max_num_shares == other.max_num_shares
             && self.max_aggregation == other.max_aggregation
             && self.dlog_extra_bits == other.dlog_extra_bits
+            && self.dlog_table == other.dlog_table
         // table, G2_table, and powers_of_radix are ignored
     }
 }
@@ -152,18 +151,21 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             #[serde(deserialize_with = "ark_de")]
             G_2: E::G2Affine,
             ell: u8,
-            max_num_shares: u32,
+            max_num_shares: usize,
             max_aggregation: usize,
             #[serde(default = "default_dlog_extra_bits")]
             dlog_extra_bits: u8,
+            dlog_table: BabyStepTable<E::G1Affine>,
         }
 
         let serialized = SerializedFields::<E>::deserialize(deserializer)?;
-        let G: E::G1 = serialized.pp_elgamal.G.into();
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::from_bases(
             serialized.pp_elgamal.G,
             serialized.pp_elgamal.H,
-            serialized.max_num_shares,
+            serialized
+                .max_num_shares
+                .try_into()
+                .expect("Should always fit in u32"),
         );
 
         Ok(Self {
@@ -174,17 +176,9 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             ell: serialized.ell,
             max_aggregation: serialized.max_aggregation,
             dlog_extra_bits: serialized.dlog_extra_bits,
-            dlog_table: Self::build_dlog_table(
-                G,
-                serialized.ell,
-                serialized.max_aggregation,
-                serialized.dlog_extra_bits,
-            ),
-            G2_table: BatchMulPreprocessing::new(
-                serialized.G_2.into(),
-                serialized.max_num_shares as usize,
-            ),
+            G2_table: BatchMulPreprocessing::new(serialized.G_2.into(), serialized.max_num_shares),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
+            dlog_table: serialized.dlog_table,
         })
     }
 }
@@ -256,13 +250,50 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 
 #[allow(non_snake_case)]
 impl<E: Pairing> PublicParameters<E> {
-    /// Verifiably creates Aptos-specific public parameters.
-    /// If `g2` is `Some(base)`, that value is used as the commitment base (G₂); otherwise it is derived via hashing.
-    pub fn new<R: RngCore + CryptoRng>(
-        max_num_shares: u32,
+    /// Creates public parameters for chunky, with the underlying DeKart prover key generated
+    /// insecurely. Should be used only for testing.
+    pub fn new_for_testing<R: RngCore + CryptoRng>(
+        max_num_shares: usize,
         ell: u8,
         max_aggregation: usize,
-        g2: Option<E::G2Affine>,
+        commitment_base: E::G2Affine,
+        rng: &mut R,
+    ) -> Self {
+        Self::new_internal(
+            max_num_shares,
+            ell,
+            max_aggregation,
+            commitment_base,
+            None,
+            rng,
+        )
+    }
+
+    /// Creates public parameters for chunky, with the provided DeKart prover key.
+    pub fn new<R: RngCore + CryptoRng>(
+        max_num_shares: usize,
+        ell: u8,
+        max_aggregation: usize,
+        commitment_base: E::G2Affine,
+        dekart_prover_key: dekart_univariate_v2::ProverKey<E>,
+        rng: &mut R,
+    ) -> Self {
+        Self::new_internal(
+            max_num_shares,
+            ell,
+            max_aggregation,
+            commitment_base,
+            Some(dekart_prover_key),
+            rng,
+        )
+    }
+
+    fn new_internal<R: RngCore + CryptoRng>(
+        max_num_shares: usize,
+        ell: u8,
+        max_aggregation: usize,
+        commitment_base: E::G2Affine,
+        maybe_dekart_prover_key: Option<dekart_univariate_v2::ProverKey<E>>,
         rng: &mut R,
     ) -> Self {
         assert!(ell > 0, "ell must be greater than zero");
@@ -274,47 +305,37 @@ impl<E: Pairing> PublicParameters<E> {
             .map(|v| (v as u64).next_power_of_two().saturating_sub(1) as u32)
             .expect("Overflow computing max_num_chunks_padded");
 
-        let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
-        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
+        let group_generators = GroupGenerators::default();
+        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(
+            max_num_shares
+                .try_into()
+                .expect("should always fit into u32"),
+        );
         let G_1 = *pp_elgamal.message_base();
-        let G_2 = g2.unwrap_or_else(|| hashing::unsafe_hash_to_affine(b"G_2", DST));
-        let pp = Self {
-            max_num_shares,
-            pp_elgamal,
-            pk_range_proof: dekart_univariate_v2::Proof::setup(
+        let pk_range_proof = maybe_dekart_prover_key.unwrap_or_else(|| {
+            dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded.try_into().unwrap(),
                 ell,
                 group_generators,
                 rng,
             )
-            .0,
-            G_2,
+            .0
+        });
+
+        let pp = Self {
+            max_num_shares,
+            pp_elgamal,
+            pk_range_proof,
+            G_2: commitment_base,
             ell,
             max_aggregation,
             dlog_extra_bits: DLOG_EXTRA_BITS,
             dlog_table: Self::build_dlog_table(G_1.into(), ell, max_aggregation, DLOG_EXTRA_BITS),
-            G2_table: BatchMulPreprocessing::new(G_2.into(), max_num_shares as usize),
+            G2_table: BatchMulPreprocessing::new(commitment_base.into(), max_num_shares),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };
 
         pp
-    }
-
-    /// Creates public parameters with a specified commitment base.
-    pub fn new_with_commitment_base<R: RngCore + CryptoRng>(
-        n: usize,
-        ell: u8,
-        max_aggregation: usize,
-        commitment_base: E::G2Affine,
-        rng: &mut R,
-    ) -> Self {
-        Self::new(
-            n.try_into().unwrap(),
-            ell,
-            max_aggregation,
-            Some(commitment_base),
-            rng,
-        )
     }
 }
 
@@ -329,37 +350,115 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
 impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking
     fn default() -> Self {
+        use ark_ec::AffineRepr;
         let mut rng = thread_rng();
-        Self::new(
+        Self::new_for_testing(
             1,
             DEFAULT_ELL_FOR_TESTING,
             DEFAULT_MAX_AGGREGATION,
-            None,
+            E::G2Affine::generator(),
             &mut rng,
         )
     }
 }
 
 impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
-    fn with_max_num_shares(n: u32) -> Self {
+    fn with_max_num_shares(n: usize) -> Self {
+        use ark_ec::AffineRepr;
         let mut rng = thread_rng();
-        Self::new(
+        Self::new_for_testing(
             n,
             DEFAULT_ELL_FOR_TESTING,
             DEFAULT_MAX_AGGREGATION,
-            None,
+            E::G2Affine::generator(),
             &mut rng,
         )
     }
 
-    fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self {
+    fn with_max_num_shares_and_bit_size(n: usize, ell: u8) -> Self {
+        use ark_ec::AffineRepr;
         let mut rng = thread_rng();
-        Self::new(n, ell, DEFAULT_MAX_AGGREGATION, None, &mut rng)
+        Self::new_for_testing(
+            n,
+            ell,
+            DEFAULT_MAX_AGGREGATION,
+            E::G2Affine::generator(),
+            &mut rng,
+        )
     }
 
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
-    fn with_max_num_shares_for_generate(_n: u32) -> Self {
+    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+        use ark_ec::AffineRepr;
         let mut rng = thread_rng();
-        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, None, &mut rng)
+        Self::new_for_testing(
+            1,
+            DEFAULT_ELL_FOR_TESTING,
+            1,
+            E::G2Affine::generator(),
+            &mut rng,
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::pvss::chunky::PublicParameters;
+    use ark_bls12_381::G2Affine;
+    use ark_ec::AffineRepr;
+    use rand::thread_rng;
+    use std::time::Instant;
+
+    #[test]
+    #[ignore]
+    fn test_realistic_serialize_deserialize() {
+        let mut rng = thread_rng();
+
+        let start = Instant::now();
+        println!("{}: Generating pp", chrono::Local::now());
+        let pp: PublicParameters<ark_bls12_381::Bls12_381> =
+            PublicParameters::new_for_testing(256, 32, 256, G2Affine::generator(), &mut rng);
+        println!(
+            "{}: time taken: {:?}",
+            chrono::Local::now(),
+            start.elapsed()
+        );
+
+        let start = Instant::now();
+        println!("{}: Serializing pp", chrono::Local::now());
+        let bytes = bcs::to_bytes(&pp).unwrap();
+        println!(
+            "{}: time taken: {:?}",
+            chrono::Local::now(),
+            start.elapsed()
+        );
+        println!(
+            "{}: pp serialized size: {} MB",
+            chrono::Local::now(),
+            bytes.len() / 1000 / 1000
+        );
+
+        let start = Instant::now();
+        println!("{}: Deserializing pp", chrono::Local::now());
+        let pp_deserialized: PublicParameters<ark_bls12_381::Bls12_381> =
+            bcs::from_bytes(&bytes).unwrap();
+        println!(
+            "{}: time taken: {:?}",
+            chrono::Local::now(),
+            start.elapsed()
+        );
+
+        assert_eq!(pp, pp_deserialized);
+    }
+
+    #[test]
+    fn test_serialize_deserialize() {
+        let pp: PublicParameters<ark_bls12_381::Bls12_381> = PublicParameters::default();
+
+        let bytes = bcs::to_bytes(&pp).unwrap();
+        let pp_deserialized: PublicParameters<ark_bls12_381::Bls12_381> =
+            bcs::from_bytes(&bytes).unwrap();
+
+        assert_eq!(pp, pp_deserialized);
     }
 }

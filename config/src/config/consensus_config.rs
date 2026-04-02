@@ -193,7 +193,7 @@ impl Default for ExecutionBackpressureGasLimitConfig {
                 target_block_time_ms: 90,
             },
             block_execution_overhead_ms: 10,
-            min_calibrated_block_gas_limit: 2000,
+            min_calibrated_block_gas_limit: 20000,
         }
     }
 }
