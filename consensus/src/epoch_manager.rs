@@ -1437,7 +1437,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             None, // Proxy doesn't execute blocks — disable back pressure
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
-            Some(0), // Proxy doesn't execute — skip block window prefetching in insert_block
+            Some(1), // Proxy doesn't execute — minimal window to avoid prefetch overhead
             Arc::new(Mutex::new(PendingBlocks::new())),
             None, // pipeline_builder: None - proxy doesn't execute blocks
             "proxy",
