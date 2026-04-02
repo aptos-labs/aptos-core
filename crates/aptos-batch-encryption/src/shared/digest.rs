@@ -157,7 +157,7 @@ impl DigestKey {
         let fk_domain = FKDomain::new(
             batch_size,
             batch_size,
-            randomized_tau_powers_g1_projective.clone(),
+            randomized_tau_powers_g1_projective,
         )
         .ok_or(BatchEncryptionError::DigestInitError(
             DigestKeyInitError::FKDomainInitFailure,
