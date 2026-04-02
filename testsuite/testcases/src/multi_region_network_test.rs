@@ -63,12 +63,31 @@ pub(crate) fn chunk_peers(mut peers: Vec<Vec<PeerId>>, num_chunks: usize) -> Vec
     chunks
 }
 
+/// Splits peers into chunks with the given exact counts. The last chunk absorbs any remaining
+/// peers not accounted for by the counts.
+fn chunk_peers_with_counts(mut peers: Vec<Vec<PeerId>>, counts: &[usize]) -> Vec<Vec<PeerId>> {
+    let mut chunks = vec![];
+    for (i, &count) in counts.iter().enumerate() {
+        let take = if i == counts.len() - 1 {
+            peers.len()
+        } else {
+            count.min(peers.len())
+        };
+        let remaining = peers.split_off(take);
+        chunks.push(peers.iter().flatten().cloned().collect());
+        peers = remaining;
+    }
+    chunks
+}
+
 /// Creates a table of peers grouped by region. The peers are divided into N groups, where N is the
-/// number of regions provided in the link stats table. Any remaining peers are added to the first
-/// group.
+/// number of regions provided in the link stats table.
+/// If `region_counts` is provided, each group gets exactly that many peers (last group absorbs any
+/// remainder). Otherwise peers are distributed evenly across regions.
 fn create_link_stats_table_with_peer_groups(
     peers: Vec<Vec<PeerId>>,
     link_stats_table: &LinkStatsTable,
+    region_counts: Option<&[usize]>,
 ) -> LinkStatsTableWithPeerGroups {
     // Verify that we have enough grouped peers to simulate the link stats table
     assert!(peers.len() >= link_stats_table.len());
@@ -85,7 +104,17 @@ fn create_link_stats_table_with_peer_groups(
     );
 
     // Create the link stats table with peer groups
-    let peer_chunks = chunk_peers(peers, number_of_regions);
+    let peer_chunks = match region_counts {
+        Some(counts) => {
+            assert_eq!(
+                counts.len(),
+                number_of_regions,
+                "region_counts length must match number of regions"
+            );
+            chunk_peers_with_counts(peers, counts)
+        },
+        None => chunk_peers(peers, number_of_regions),
+    };
     peer_chunks
         .into_iter()
         .zip(link_stats_table.iter())
@@ -217,6 +246,8 @@ pub struct MultiRegionNetworkEmulationConfig {
     pub link_stats_table: LinkStatsTable,
     pub inter_region_config: InterRegionNetEmConfig,
     pub intra_region_config: Option<IntraRegionNetEmConfig>,
+    /// Optional per-region peer counts. If None, peers are distributed evenly across regions.
+    pub region_counts: Option<Vec<usize>>,
 }
 
 impl Default for MultiRegionNetworkEmulationConfig {
@@ -225,6 +256,7 @@ impl Default for MultiRegionNetworkEmulationConfig {
             link_stats_table: get_link_stats_table(FOUR_REGION_LINK_STATS),
             inter_region_config: InterRegionNetEmConfig::default(),
             intra_region_config: Some(IntraRegionNetEmConfig::default()),
+            region_counts: None,
         }
     }
 }
@@ -247,6 +279,35 @@ impl MultiRegionNetworkEmulationConfig {
     pub fn six_regions() -> Self {
         Self {
             link_stats_table: get_link_stats_table(SIX_REGION_LINK_STATS),
+            ..Default::default()
+        }
+    }
+
+    /// A four-region config that reflects the mainnet validator distribution:
+    /// ~70% EU, ~25% North America, ~5% Asia. The regions in the CSV are sorted
+    /// lexicographically, so the weights correspond to:
+    ///   "1-gcp--eu-west2"      (Netherlands / Ireland / UK)  — 30%
+    ///   "2-gcp--eu-west6"      (Germany / France / CH)       — 40%
+    ///   "3-gcp--us-east4"      (US East / Canada)            — 20%
+    ///   "4-gcp--as-southeast1" (Tokyo / Singapore)           — 10%
+    /// Asia is intentionally over-represented relative to mainnet (2%) so that
+    /// inter-continental tail latency is exercised even with a small validator set.
+    pub fn four_regions_mainnet_like(num_validators: usize) -> Self {
+        // Weights in the same lexicographic order as the BTreeMap keys in the CSV.
+        let weights = [30usize, 40, 20, 10];
+        let total_weight: usize = weights.iter().sum();
+        let mut counts: Vec<usize> = weights
+            .iter()
+            .map(|&w| num_validators * w / total_weight)
+            .collect();
+        // Distribute any integer-division remainder to front regions.
+        let allocated: usize = counts.iter().sum();
+        for i in 0..(num_validators - allocated) {
+            counts[i % weights.len()] += 1;
+        }
+        Self {
+            link_stats_table: get_link_stats_table(FOUR_REGION_LINK_STATS),
+            region_counts: Some(counts),
             ..Default::default()
         }
     }
@@ -327,6 +388,7 @@ pub fn create_multi_region_swarm_network_chaos(
     let peer_groups = create_link_stats_table_with_peer_groups(
         all_peers,
         &network_emulation_config.link_stats_table,
+        network_emulation_config.region_counts.as_deref(),
     );
 
     // Create the inter and intra network emulation configs
@@ -385,42 +447,34 @@ mod tests {
     fn test_create_multi_region_swarm_network_chaos() {
         aptos_logger::Logger::new().init();
 
-        // Create a config with 8 peers and multiple regions
+        // Default config: four regions, with intra-region netem.
+        // 4 intra-region + C(4,2)*2 inter-region = 4 + 12 = 16 group netems.
+
+        // Create a config with 8 peers across 4 regions (2 per region)
         let all_peers: Vec<_> = (0..8).map(|_| vec![PeerId::random()]).collect();
         let netem = create_multi_region_swarm_network_chaos(all_peers, None);
+        assert_eq!(netem.group_netems.len(), 16);
 
-        // Verify the number of group netems
-        assert_eq!(netem.group_netems.len(), 10);
-
-        // Create a config with 10 peers and multiple regions
-        let all_peers: Vec<_> = (0..10).map(|_| vec![PeerId::random()]).collect();
+        // Create a config with 12 peers across 4 regions (3 per region)
+        let all_peers: Vec<_> = (0..12).map(|_| vec![PeerId::random()]).collect();
         let netem = create_multi_region_swarm_network_chaos(all_peers.clone(), None);
+        assert_eq!(netem.group_netems.len(), 16);
 
-        // Verify the resulting group netems
-        assert_eq!(netem.group_netems.len(), 10);
-        assert_eq!(netem.group_netems[0].source_nodes.len(), 4);
-        assert_eq!(netem.group_netems[0].target_nodes.len(), 4);
+        // Intra-region netems come first (sorted by BTreeMap key order).
+        // First region lexicographically is "1-gcp--eu-west2".
+        assert_eq!(netem.group_netems[0].source_nodes.len(), 3);
+        assert_eq!(netem.group_netems[0].target_nodes.len(), 3);
         assert_eq!(netem.group_netems[0], GroupNetEm {
-            name: "aws--ap-northeast-1-self-netem".to_owned(),
+            name: "1-gcp--eu-west2-self-netem".to_owned(),
             rate_in_mbps: 10000,
-            source_nodes: vec![
-                all_peers[0][0],
-                all_peers[1][0],
-                all_peers[8][0],
-                all_peers[9][0],
-            ],
-            target_nodes: vec![
-                all_peers[0][0],
-                all_peers[1][0],
-                all_peers[8][0],
-                all_peers[9][0],
-            ],
-            delay_latency_ms: 50,
-            delay_jitter_ms: 5,
-            delay_correlation_percentage: 50,
+            source_nodes: vec![all_peers[0][0], all_peers[1][0], all_peers[2][0]],
+            target_nodes: vec![all_peers[0][0], all_peers[1][0], all_peers[2][0]],
+            delay_latency_ms: 20,
+            delay_jitter_ms: 0,
+            delay_correlation_percentage: 20,
             loss_percentage: 1,
-            loss_correlation_percentage: 50
-        })
+            loss_correlation_percentage: 20,
+        });
     }
 
     #[test]
