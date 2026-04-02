@@ -1437,7 +1437,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             None, // Proxy doesn't execute blocks — disable back pressure
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
-            onchain_consensus_config.window_size(),
+            Some(0), // Proxy doesn't execute — skip block window prefetching in insert_block
             Arc::new(Mutex::new(PendingBlocks::new())),
             None, // pipeline_builder: None - proxy doesn't execute blocks
             "proxy",
@@ -1482,7 +1482,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_block_store.clone(),
             proxy_payload_client,
             self.time_service.clone(),
-            Duration::from_millis(5), // Match devnet quorum_store_poll_time_ms
+            Duration::from_millis(1), // Proxy rounds are fast; batches arrive continuously
             aptos_consensus_types::utils::PayloadTxnsSize::new(
                 proxy_config.max_proxy_block_txns,
                 proxy_config.max_proxy_block_bytes,
