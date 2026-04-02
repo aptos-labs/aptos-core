@@ -577,25 +577,45 @@ impl LatencyWeightedHeuristic {
         }
     }
 
-    /// Compute per-proposer round times from the history.
+    /// Compute per-proposer round times from the history, restricted to the current epoch.
     ///
     /// History is ordered newest-first: `history[0]` is the latest block.
-    /// The round time for block `i` is `history[i].proposed_time() - history[i+1].proposed_time()`.
-    fn compute_round_times(history: &[NewBlockEvent]) -> HashMap<Author, Vec<u64>> {
-        let mut round_times: HashMap<Author, Vec<u64>> = HashMap::new();
+    /// With optimistic proposals the interval `history[i].proposed_time() - history[i+1].proposed_time()`
+    /// is approximately the one-way network latency from `history[i+1].proposer()` (sender) to
+    /// `history[i].proposer()` (receiver).  We track both the per-receiver solo times *and* the
+    /// per-(sender, receiver) pair times so that `get_weights` can condition on who just proposed.
+    ///
+    /// Returns `(receiver_times, pair_times)` where:
+    ///   - `receiver_times[R]`    = all intervals where R was the receiver (solo view)
+    ///   - `pair_times[S][R]`     = intervals where S was the sender and R was the receiver
+    fn compute_round_times(
+        epoch: u64,
+        history: &[NewBlockEvent],
+    ) -> (
+        HashMap<Author, Vec<u64>>,
+        HashMap<Author, HashMap<Author, Vec<u64>>>,
+    ) {
+        let mut receiver_times: HashMap<Author, Vec<u64>> = HashMap::new();
+        let mut pair_times: HashMap<Author, HashMap<Author, Vec<u64>>> = HashMap::new();
         for i in 0..history.len().saturating_sub(1) {
             let newer = &history[i];
             let older = &history[i + 1];
-            // Only compute within the same epoch to avoid epoch-boundary outliers.
-            if newer.epoch() != older.epoch() {
-                continue;
+            // History is newest-first; once older leaves the current epoch we're done.
+            if older.epoch() != epoch {
+                break;
             }
             let interval = newer.proposed_time().saturating_sub(older.proposed_time());
             if interval > 0 {
-                round_times.entry(newer.proposer()).or_default().push(interval);
+                receiver_times.entry(newer.proposer()).or_default().push(interval);
+                pair_times
+                    .entry(older.proposer())
+                    .or_default()
+                    .entry(newer.proposer())
+                    .or_default()
+                    .push(interval);
             }
         }
-        round_times
+        (receiver_times, pair_times)
     }
 
     fn median(values: &mut Vec<u64>) -> u64 {
@@ -621,47 +641,67 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
     ) -> Vec<u64> {
         let base_weights = self.inner.get_weights(epoch, epoch_to_candidates, history);
 
-        let mut round_times = Self::compute_round_times(history);
+        let (mut receiver_times, pair_times) = Self::compute_round_times(epoch, history);
 
-        // Compute per-validator median round time.
-        let mut medians: HashMap<Author, u64> = HashMap::new();
-        for (author, times) in round_times.iter_mut() {
+        // Compute per-validator solo (receiver) medians.
+        let mut solo_medians: HashMap<Author, u64> = HashMap::new();
+        for (author, times) in receiver_times.iter_mut() {
             let m = Self::median(times);
             if m > 0 {
-                medians.insert(*author, m);
+                solo_medians.insert(*author, m);
             }
         }
 
-        // We need at least a handful of data points to trust the medians.
-        // Require each candidate to have at least 2 observations; otherwise fall back to base.
+        // Require every candidate to have at least 2 solo observations before applying any
+        // weighting, to avoid misfiring at epoch start.
         let min_observations = 2usize;
         let candidates = &epoch_to_candidates[&epoch];
-        let enough_data = candidates.iter().all(|author| {
-            round_times
+        let enough_solo = candidates.iter().all(|author| {
+            receiver_times
                 .get(author)
                 .map_or(false, |v| v.len() >= min_observations)
         });
 
-        if !enough_data || medians.is_empty() {
+        if !enough_solo || solo_medians.is_empty() {
             return base_weights;
         }
 
-        // The slowest (highest) median round time is the reference — we scale all others
-        // relative to it so that the fastest proposer keeps `active_weight` and slower
-        // ones get a proportionally smaller share.
-        let max_median = *medians.values().max().expect("medians is non-empty");
+        // Option 5: condition on the most recently committed proposer.  When we have enough
+        // (sender → receiver) pair observations, use the pair-specific median instead of the
+        // solo average.  This captures within-region topology differences (e.g. cross-EU
+        // 8.5 ms vs intra-region 20 ms) that the solo median averages away.
+        let current_proposer = history.first().map(|b| b.proposer());
+        let cp_pairs = current_proposer.and_then(|cp| pair_times.get(&cp));
+
+        let effective_medians: HashMap<Author, u64> = candidates
+            .iter()
+            .filter_map(|author| {
+                // Prefer a pair-specific median when we have enough data for it.
+                let pair_median = cp_pairs
+                    .and_then(|m| m.get(author))
+                    .filter(|times| times.len() >= min_observations)
+                    .and_then(|times| {
+                        let mut t = times.clone();
+                        let m = Self::median(&mut t);
+                        if m > 0 { Some(m) } else { None }
+                    });
+                let median = pair_median.or_else(|| solo_medians.get(author).copied())?;
+                Some((*author, median))
+            })
+            .collect();
+
+        // The slowest effective median is the reference.
+        let max_median = *effective_medians.values().max().expect("medians is non-empty");
 
         epoch_to_candidates[&epoch]
             .iter()
             .zip(base_weights.iter())
             .map(|(author, &base)| {
-                // Only adjust the weight for validators that received the active weight.
                 if base != self.active_weight {
                     return base;
                 }
-                match medians.get(author) {
+                match effective_medians.get(author) {
                     Some(&median_rt) if median_rt > 0 => {
-                        // Scale proportionally: fastest gets active_weight, others get less.
                         (self.active_weight * max_median) / median_rt
                     },
                     _ => base,
