@@ -8,11 +8,10 @@ use crate::{local_simulation, MoveDebugger, MoveEnv};
 pub use aptos_cli_common::ReplayProtectionType;
 use aptos_cli_common::{
     format_txn_status, get_account_with_state, CliError, CliTypedResult, EncodingOptions,
-    ExtractEd25519PublicKey,
     GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions,
     TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_rest_client::Client;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
@@ -21,6 +20,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     transaction::{
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
         PersistedAuxiliaryInfo, ReplayProtector, SignedTransaction, TransactionPayload,
         TransactionStatus,
     },
@@ -224,9 +224,6 @@ impl TxnOptions {
     ) -> CliTypedResult<TransactionSummary> {
         let client = self.rest_client()?;
         let sender_address = self.get_address()?;
-        let sender_public_key = self
-            .private_key_options
-            .extract_public_key(self.encoding_options.encoding, &self.profile_options)?;
 
         let gas_unit_price = if let Some(gas_unit_price) = self.gas_options.gas_unit_price {
             gas_unit_price
@@ -267,10 +264,11 @@ impl TxnOptions {
         }
         let unsigned_transaction = txn_builder.build();
 
-        let signed_transaction = SignedTransaction::new(
+        let signed_transaction = SignedTransaction::new_signed_transaction(
             unsigned_transaction,
-            sender_public_key,
-            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+            TransactionAuthenticator::SingleSender {
+                sender: AccountAuthenticator::NoAccountAuthenticator,
+            },
         );
 
         let simulated_txn = client
