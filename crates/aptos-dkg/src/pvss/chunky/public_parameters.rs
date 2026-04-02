@@ -40,6 +40,7 @@ fn default_dlog_extra_bits() -> usize {
 }
 
 fn compute_powers_of_radix<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
+    assert!(ell < 64);
     utils::powers(
         E::ScalarField::from(1u64 << ell),
         num_chunks_per_scalar::<E::ScalarField>(ell),
@@ -184,7 +185,9 @@ impl<E: Pairing> PublicParameters<E> {
         max_aggregation: usize,
         extra_bits: usize,
     ) -> BabyStepTable<E::G1Affine> {
-        let table_size_exp: usize = extra_bits + ((ell + log2(max_aggregation) as usize) / 2); // TODO: I think we need the floor of log_2 here, not the ceiling?
+        let table_size_exp: usize = extra_bits + ((ell + log2(max_aggregation) as usize) / 2);
+        assert!(table_size_exp < 32); // BabyStepTable stores exps as u32, so supports table size at most 2^32-1
+
         eprintln!(
             "[build_dlog_table] table_size = {} (ell={}, max_aggregation={}, extra_bits={})",
             table_size_exp, ell, max_aggregation, extra_bits
@@ -285,7 +288,10 @@ impl<E: Pairing> PublicParameters<E> {
         maybe_dekart_prover_key: Option<dekart_univariate_v2::ProverKey<E>>,
         rng: &mut R,
     ) -> Self {
-        assert!(ell > 0, "ell must be greater than zero");
+        // ell >= means a BabyStepTable of size >= 2^32, which causes an overflow:
+        // - in build_dlog_table(..), table_size_exp = 4 + ((48 + 8) / 2) = 32
+        // - BabyStepTable stores exponents as u32
+        assert!((8..=47).contains(&pp.ell));
 
         let num_chunks = num_chunks_per_scalar::<E::ScalarField>(ell);
         let max_num_chunks_padded = (max_num_shares * num_chunks + 1).next_power_of_two() - 1;

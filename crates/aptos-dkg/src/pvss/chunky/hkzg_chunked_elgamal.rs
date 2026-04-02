@@ -73,11 +73,6 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     rng: &mut R,
 ) -> WitnessData<E> {
-    debug_assert!(
-        (8..=63).contains(&pp.ell),
-        "pp.ell must be between 8 and 63 (inclusive), got {}", // 2^64 will lead to overflows
-        pp.ell
-    );
     // Step 3: convert the Shamir shares into chunked values
     let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
         .iter()

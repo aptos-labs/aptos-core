@@ -34,15 +34,15 @@ impl<A: AffineRepr> BabyStepTable<A> {
     /// then inserts each affine point into the table using compressed serialization.
     #[allow(non_snake_case)]
     pub fn new(G: A, table_size: usize) -> Self {
-        let table_size_as_usize = table_size as usize;
-        let mut points: Vec<A::Group> = Vec::with_capacity(table_size_as_usize);
+        assert!( table_size < 1 << 32);
+        let mut points: Vec<A::Group> = Vec::with_capacity(table_size);
         let mut current = A::Group::zero();
         for _ in 0..table_size {
             points.push(current);
             current += G;
         }
         let normalized = A::Group::normalize_batch(&points);
-        let mut table = HashMap::with_capacity(table_size_as_usize);
+        let mut table = HashMap::with_capacity(table_size);
         for (j, aff) in normalized.into_iter().enumerate() {
             let key = compressed_bytes(&aff).expect("baby-step table: serialization failed");
             table.insert(key, j as u32);
