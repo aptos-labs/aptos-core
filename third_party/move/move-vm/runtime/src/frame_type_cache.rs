@@ -191,8 +191,8 @@ pub(crate) struct FrameTypeCache {
 
     /// Cached instantiated local types for generic functions.
     pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
-    /// Cached number of type nodes per instantiated local type for gas charging re-use.
-    pub(crate) instantiated_local_ty_counts: Option<Rc<[NumTypeNodes]>>,
+    /// Cached number of type nodes per local type for gas charging re-use.
+    pub(crate) local_ty_counts: Option<Rc<[NumTypeNodes]>>,
 
     /// Governs how type sizes are returned from cache APIs for gas metering.
     /// If true, charging is suboptimal (charge on cache hit, multiple charges
@@ -215,7 +215,7 @@ impl FrameTypeCache {
             function_cache: BTreeMap::new(),
             generic_function_cache: BTreeMap::new(),
             instantiated_local_tys: None,
-            instantiated_local_ty_counts: None,
+            local_ty_counts: None,
             charge_create_ty_on_cache_hit,
         }
     }

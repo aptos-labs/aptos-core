@@ -170,12 +170,27 @@ impl Frame {
         stack: &Stack,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
-
         let ty_builder = vm_config.ty_builder.clone();
+        let mut cache_borrow = frame_cache.borrow_mut();
+
         let local_tys = if ty_args.is_empty() {
-            // Function is not generic - avoid cloning types.
-            for ty in function.local_tys() {
-                gas_meter.charge_create_ty(NumTypeNodes::new(ty.num_nodes() as u64))?;
+            // Try cached instantiated locals in frame cache. This way we instantiate only once per
+            // usage of the function.
+            if let Some(local_ty_counts) = cache_borrow.local_ty_counts.as_ref() {
+                // Already cached - charge only for compatibility.
+                if cache_borrow.charge_create_ty_on_cache_hit {
+                    for cnt in local_ty_counts.iter() {
+                        gas_meter.charge_create_ty(*cnt)?;
+                    }
+                }
+            } else {
+                let mut local_ty_counts = Vec::with_capacity(function.local_tys().len());
+                for ty in function.local_tys() {
+                    let cnt = NumTypeNodes::new(ty.num_nodes() as u64);
+                    gas_meter.charge_create_ty(cnt)?;
+                    local_ty_counts.push(cnt);
+                }
+                cache_borrow.local_ty_counts = Some(Rc::from(local_ty_counts));
             }
 
             if RTTCheck::should_perform_checks(&function.function) {
@@ -186,8 +201,7 @@ impl Frame {
         } else {
             // Try cached instantiated locals in frame cache. This way we instantiate only once per
             // usage of the function.
-            let mut cache_borrow = frame_cache.borrow_mut();
-            if let Some(local_ty_counts) = cache_borrow.instantiated_local_ty_counts.as_ref() {
+            if let Some(local_ty_counts) = cache_borrow.local_ty_counts.as_ref() {
                 // Already cached - charge only for compatibility.
                 if cache_borrow.charge_create_ty_on_cache_hit {
                     for cnt in local_ty_counts.iter() {
@@ -211,7 +225,7 @@ impl Frame {
 
                     local_ty_counts.push(cnt);
                 }
-                cache_borrow.instantiated_local_ty_counts = Some(Rc::from(local_ty_counts));
+                cache_borrow.local_ty_counts = Some(Rc::from(local_ty_counts));
             }
 
             if RTTCheck::should_perform_checks(&function.function) {
