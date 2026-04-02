@@ -552,7 +552,7 @@ fn build_wait_summary(
             intervals_ms.sort_unstable();
             let pct = |p: f64| {
                 let idx = ((intervals_ms.len() as f64 - 1.0) * p / 100.0).round() as usize;
-                intervals_ms[idx]
+                intervals_ms[idx.min(intervals_ms.len() - 1)]
             };
             parts.push(format!(
                 "interval=p50:{}ms/p70:{}ms/p90:{}ms",
