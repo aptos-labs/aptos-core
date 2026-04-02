@@ -97,6 +97,9 @@ pub struct ConsensusConfig {
     pub secret_share_rb_config: ReliableBroadcastConfig,
     /// Delay in ms before broadcasting secret share requests.
     pub secret_share_request_delay_ms: u64,
+    /// Path to the decryption setup blob file (BCS-serialized DigestKey).
+    /// Required for validators on non-test chains. For test chains, falls back to TEST_DIGEST_KEY.
+    pub decryption_setup_blob_path: Option<PathBuf>,
     pub num_bounded_executor_tasks: u64,
     pub enable_pre_commit: bool,
     pub max_pending_rounds_in_commit_vote_cache: u64,
@@ -391,6 +394,7 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             secret_share_request_delay_ms: 300,
+            decryption_setup_blob_path: None,
             num_bounded_executor_tasks: 16,
             enable_pre_commit: true,
             max_pending_rounds_in_commit_vote_cache: 100,

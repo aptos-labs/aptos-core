@@ -361,6 +361,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "set_env",
+ "sha2 0.9.9",
  "shadow-rs",
  "tempfile",
  "thiserror 1.0.69",

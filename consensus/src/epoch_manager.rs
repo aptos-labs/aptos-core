@@ -92,7 +92,7 @@ use aptos_types::{
     dkg::{
         chunky_dkg::{
             AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGState, ChunkyDecryptPrivKey,
-            TEST_DIGEST_KEY,
+            DIGEST_KEY,
         },
         real_dkg::maybe_dk_from_bls_sk,
         DKGState, DKGTrait, DefaultDKG,
@@ -1190,8 +1190,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             bcs::from_bytes::<AggregatedSubtranscript>(dkg_session_state.transcript.as_slice())
                 .map_err(NoSecretSharingReason::TranscriptDeserializationError)?;
 
-        // TODO(ibalajiarun): Replace with proper Trusted setup for production
-        let digest_key = TEST_DIGEST_KEY.clone();
+        let digest_key = DIGEST_KEY
+            .as_ref()
+            .ok_or(NoSecretSharingReason::NoTrustedSetupAvailable)?
+            .clone();
 
         let current_player = Player { id: my_index };
 
@@ -2106,6 +2108,7 @@ pub enum NoSecretSharingReason {
     ErrConvertingConsensusKeyToDecryptionKey(anyhow::Error),
     TranscriptDeserializationError(bcs::Error),
     SetupDigestKeyError(anyhow::Error),
+    NoTrustedSetupAvailable,
     SecretShareSetupFailed(anyhow::Error),
 }
 

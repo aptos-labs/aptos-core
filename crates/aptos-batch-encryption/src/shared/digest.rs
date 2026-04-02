@@ -25,7 +25,7 @@ use std::{
 };
 
 /// The digest public parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DigestKey {
     #[serde(
         serialize_with = "ark_se_uncompressed",
