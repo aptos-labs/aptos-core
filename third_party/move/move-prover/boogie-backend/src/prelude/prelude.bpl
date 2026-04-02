@@ -375,6 +375,9 @@ procedure {:inline 1} $bv2int{{impl.base}}(src: bv{{impl.base}}) returns (dst: i
 
 function {:builtin "(_ int2bv {{impl.base}})"} $int2bv.{{impl.base}}(i: int) returns (bv{{impl.base}});
 function {:builtin "bv2nat"} $bv2int.{{impl.base}}(i: bv{{impl.base}}) returns (int);
+axiom (forall n: int :: {$int2bv.{{impl.base}}(n)}
+    n >= 0 && n <= {{impl.max}} ==>
+    $bv2int.{{impl.base}}($int2bv.{{impl.base}}(n)) == n);
 
 {%- endfor %}
 

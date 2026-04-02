@@ -24,7 +24,7 @@ struct MovePackageVerifyParams {
     /// Each entry follows the same format as `filter`: `module_name` or
     /// `module_name::function_name`. Exclusions take precedence over the filter scope.
     exclude: Option<Vec<String>>,
-    /// Solver timeout per verification condition, in seconds. Default: 10. Maximum: 10.
+    /// Solver timeout per verification condition, in seconds. Default: 10. Maximum: 60.
     timeout: Option<usize>,
 }
 

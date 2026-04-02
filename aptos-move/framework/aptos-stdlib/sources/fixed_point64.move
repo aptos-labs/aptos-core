@@ -141,7 +141,6 @@ module aptos_std::fixed_point64 {
     }
     spec create_from_rational {
         pragma opaque;
-        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved).
         include CreateFromRationalAbortsIf;
         ensures result == spec_create_from_rational(numerator, denominator);
     }

@@ -212,11 +212,7 @@ impl ProverOptions {
                 .to_string();
             None
         };
-        options.backend.custom_natives =
-            Some(move_prover_boogie_backend::options::CustomNativeOptions {
-                template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
-                module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
-            });
+        configure_aptos_custom_natives(&mut options);
         if benchmark {
             // Special mode of benchmarking
             run_prover_benchmark(package_path, &mut model, options)?;
@@ -414,4 +410,19 @@ fn run_prover_benchmark(
         }
     }
     move_prover_lab::plot::plot_svg(&args)
+}
+
+/// Sets `options.backend.custom_natives` to the Aptos-specific native Boogie implementations
+/// from `aptos-natives.bpl`.
+///
+/// This must be called before running the Move Prover on any Aptos package (or package that
+/// transitively depends on `move-stdlib`, which includes the `cmp` module with `pragma intrinsic`
+/// types). Without it, the Boogie backend lacks the `$1_cmp_Ordering` type declaration and the
+/// `cmp_vector_instances` axioms, causing Boogie compilation errors.
+pub fn configure_aptos_custom_natives(options: &mut Options) {
+    options.backend.custom_natives =
+        Some(move_prover_boogie_backend::options::CustomNativeOptions {
+            template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
+            module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
+        });
 }

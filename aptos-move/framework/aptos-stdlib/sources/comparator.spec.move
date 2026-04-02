@@ -22,6 +22,7 @@ spec aptos_std::comparator {
     }
 
     spec compare<T>(left: &T, right: &T): Result {
+        aborts_if false;
         let left_bytes = bcs::to_bytes(left);
         let right_bytes = bcs::to_bytes(right);
         ensures result == spec_compare_u8_vector(left_bytes, right_bytes);

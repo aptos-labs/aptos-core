@@ -45,8 +45,19 @@ spec aptos_std::math128 {
     spec sqrt(x: u128): u128 {
         pragma opaque;
         aborts_if [abstract] false;
+        ensures [abstract] x == 0 ==> result == 0;
         ensures [abstract] x > 0 ==> result * result <= x;
         ensures [abstract] x > 0 ==> x < (result+1) * (result+1);
+    }
+
+    spec log2(x: u128): FixedPoint32 {
+        pragma opaque;
+        aborts_if [abstract] x == 0;
+    }
+
+    spec log2_64(x: u128): FixedPoint64 {
+        pragma opaque;
+        aborts_if [abstract] x == 0;
     }
 
     spec fun spec_pow(n: u128, e: u128): u128 {

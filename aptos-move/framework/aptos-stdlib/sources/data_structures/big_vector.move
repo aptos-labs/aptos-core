@@ -80,12 +80,29 @@ module aptos_std::big_vector {
     public fun append<T: store>(self: &mut BigVector<T>, other: BigVector<T>) {
         let other_len = other.length();
         let half_other_len = other_len / 2;
+        spec {
+            update initial_self_len = length(self);
+        };
         let i = 0;
-        while (i < half_other_len) {
+        while ({
+            spec {
+                invariant i <= half_other_len;
+                invariant other.length() == other_len - i;
+                invariant self.length() == initial_self_len + i;
+            };
+            i < half_other_len
+        }) {
             self.push_back(other.swap_remove(i));
             i += 1;
         };
-        while (i < other_len) {
+        while ({
+            spec {
+                invariant half_other_len <= i && i <= other_len;
+                invariant other.length() == other_len - i;
+                invariant self.length() == initial_self_len + i;
+            };
+            i < other_len
+        }) {
             self.push_back(other.pop_back());
             i += 1;
         };
@@ -134,10 +151,18 @@ module aptos_std::big_vector {
         let res = cur_bucket.remove(i % self.bucket_size);
         self.end_index -= 1;
         move cur_bucket;
+        spec {
+            update initial_end_index = self.end_index;
+            update initial_bucket_size = self.bucket_size;
+        };
         while ({
             spec {
-                invariant cur_bucket_index <= num_buckets;
+                invariant 1 <= cur_bucket_index && cur_bucket_index <= num_buckets;
+                invariant self.end_index == initial_end_index;
+                invariant self.bucket_size == initial_bucket_size;
                 invariant table_with_length::spec_len(self.buckets) == num_buckets;
+                invariant forall j in 0..table_with_length::spec_len(self.buckets):
+                    table_with_length::spec_contains(self.buckets, j);
             };
             (cur_bucket_index < num_buckets)
         }) {

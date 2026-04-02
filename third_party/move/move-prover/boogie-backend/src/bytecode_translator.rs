@@ -4943,6 +4943,7 @@ impl FunctionTranslator<'_> {
                             } else {
                                 let dest_bv_flag = !dests.is_empty() && compute_flag(dests[0]);
                                 let bv_flag = !srcs.is_empty() && compute_flag(srcs[0]);
+                                let mut already_emitted = false;
                                 if module_env.is_cmp() {
                                     fun_name = boogie_function_name(&callee_env, inst, &[
                                         bv_flag || dest_bv_flag
@@ -4975,6 +4976,7 @@ impl FunctionTranslator<'_> {
                                             fun_name,
                                             args_str
                                         );
+                                        already_emitted = true;
                                     } else if callee_name.contains("borrow")
                                         || callee_name.contains("remove")
                                         || callee_name.contains("swap")
@@ -5019,9 +5021,18 @@ impl FunctionTranslator<'_> {
                                             fun_name,
                                             args_str
                                         );
+                                        already_emitted = true;
                                     }
                                 }
-                                emitln!(writer, "call {} := {}({});", dest_str, fun_name, args_str);
+                                if !already_emitted {
+                                    emitln!(
+                                        writer,
+                                        "call {} := {}({});",
+                                        dest_str,
+                                        fun_name,
+                                        args_str
+                                    );
+                                }
                             }
                         }
 

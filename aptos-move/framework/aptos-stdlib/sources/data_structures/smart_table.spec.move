@@ -42,7 +42,9 @@ spec aptos_std::smart_table {
     }
 
     spec borrow_with_default<K: copy + drop, V>(self: &SmartTable<K, V>, key: K, default: &V): &V {
-        pragma verify = false;
+        aborts_if false;
+        ensures spec_contains(self, key) ==> result == spec_get(self, key);
+        ensures !spec_contains(self, key) ==> result == default;
     }
 
     spec load_factor<K, V>(self: &SmartTable<K, V>): u64 {
@@ -85,11 +87,15 @@ spec aptos_std::smart_table {
     }
 
     spec borrow_kv<K, V>(self: &Entry<K, V>): (&K, &V) {
-        pragma verify = false;
+        aborts_if false;
+        ensures result_1 == self.key;
+        ensures result_2 == self.value;
     }
 
     spec borrow_kv_mut<K, V>(self: &mut Entry<K, V>): (&mut K, &mut V) {
-        pragma verify = false;
+        aborts_if false;
+        ensures result_1 == old(self.key);
+        ensures result_2 == old(self.value);
     }
 
     spec num_buckets<K, V>(self: &SmartTable<K, V>): u64 {

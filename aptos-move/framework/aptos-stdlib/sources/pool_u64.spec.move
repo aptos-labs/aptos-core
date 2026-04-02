@@ -3,8 +3,6 @@
 spec aptos_std::pool_u64 {
 
     spec module {
-        // TODO: Disabled due to the issue with the data invariant verification
-        pragma verify = false;
     }
     // -----------------
     // Struct invariants
@@ -12,9 +10,17 @@ spec aptos_std::pool_u64 {
 
     // The invariants of the struct Pool.
     spec Pool {
-        // `shares` contains the key `addr` if and only if `shareholders` contains `addr.
-        invariant forall addr: address:
-            (simple_map::spec_contains_key(shares, addr) == vector::spec_contains(shareholders, addr));
+        // Every element of `shareholders` is a key in `shares`.
+        // This is ∀∀ (no existential), Z3-friendly.
+        invariant forall i in 0..len(shareholders):
+            simple_map::spec_contains_key(shares, shareholders[i]);
+
+        // `shares` and `shareholders` have the same cardinality.
+        // Combined with the above + no-dup, this implies the full bijection.
+        invariant simple_map::spec_len(shares) == len(shareholders);
+
+        // `shareholders` is bounded by the limit.
+        invariant len(shareholders) <= shareholders_limit;
 
         // `shareholders` does not contain duplicates.
         invariant forall i in 0..len(shareholders), j in 0..len(shareholders):
@@ -98,8 +104,16 @@ spec aptos_std::pool_u64 {
             self.shares == simple_map::spec_set(old(self.shares), shareholder, current_shares + new_shares);
         ensures (!key_exists && new_shares > 0) ==>
             self.shares == simple_map::spec_set(old(self.shares), shareholder, new_shares);
+        // Element-level ensures for the vector push (replaces eq_push_back).
+        // eq_push_back uses array slices which Z3 cannot unfold into element-level facts,
+        // preventing it from re-establishing the ∀i invariant on shareholders.
         ensures (!key_exists && new_shares > 0) ==>
-            vector::eq_push_back(self.shareholders, old(self.shareholders), shareholder);
+            len(self.shareholders) == len(old(self.shareholders)) + 1;
+        ensures (!key_exists && new_shares > 0) ==>
+            self.shareholders[len(old(self.shareholders))] == shareholder;
+        ensures (!key_exists && new_shares > 0) ==>
+            (forall i in 0..len(old(self.shareholders)):
+                self.shareholders[i] == old(self.shareholders)[i]);
     }
 
     spec fun spec_amount_to_shares_with_total_coins(pool: Pool, coins_amount: u64, total_coins: u64): u64 {
@@ -184,5 +198,10 @@ spec aptos_std::pool_u64 {
         ensures remaining_shares > 0 ==> simple_map::spec_get(self.shares, shareholder) == remaining_shares;
         ensures remaining_shares == 0 ==> !simple_map::spec_contains_key(self.shares, shareholder);
         ensures remaining_shares == 0 ==> !vector::spec_contains(self.shareholders, shareholder);
+        // Explicit length postcondition: anchors the spec_len == len invariant after removal.
+        ensures remaining_shares == 0 ==>
+            len(self.shareholders) == len(old(self.shareholders)) - 1;
+        ensures remaining_shares == 0 ==>
+            simple_map::spec_len(self.shares) == simple_map::spec_len(old(self.shares)) - 1;
     }
 }

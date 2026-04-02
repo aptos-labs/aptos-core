@@ -183,7 +183,7 @@
           "nullable": true
         },
         "timeout": {
-          "description": "Solver timeout per verification condition, in seconds. Default: 10. Maximum: 10.",
+          "description": "Solver timeout per verification condition, in seconds. Default: 10. Maximum: 60.",
           "type": "integer",
           "format": "uint",
           "minimum": 0,

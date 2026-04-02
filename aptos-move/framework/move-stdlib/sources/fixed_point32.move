@@ -243,7 +243,6 @@ module std::fixed_point32 {
         (val >> 32 as u64)
     }
     spec ceil {
-        pragma verify_duration_estimate = 120;
         pragma opaque;
         aborts_if false;
         ensures result == spec_ceil(self);
@@ -269,7 +268,6 @@ module std::fixed_point32 {
         }
     }
     spec round {
-        pragma verify_duration_estimate = 120;
         pragma opaque;
         aborts_if false;
         ensures result == spec_round(self);
