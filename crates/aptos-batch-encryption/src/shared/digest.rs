@@ -122,17 +122,27 @@ impl DigestKey {
     pub fn with_randomized_powers_of_tau(
         randomized_tau_powers_g1: Vec<Vec<G1Affine>>,
         tau_g2: G2Affine
-    ) -> Self {
-        assert!(randomized_tau_powers_g1.len() > 0);
+    ) -> Result<Self> {
+        if randomized_tau_powers_g1.is_empty() {
+            Err(BatchEncryptionError::DigestInitError(DigestKeyInitError::NumRoundsMustBeNonzero))?;
+        }
 
         let batch_size = randomized_tau_powers_g1[0].len() - 1;
 
         let mut i = batch_size;
         while i > 1 {
-            if !i.is_multiple_of(2) {
-                panic!("Batch size must be power of two");
-            }
+            i.is_multiple_of(2)
+                .then_some(())
+                .ok_or(BatchEncryptionError::DigestInitError(
+                    DigestKeyInitError::BatchSizeMustBePowerOfTwo,
+                ))?;
             i >>= 1;
+        }
+
+        for powers in &randomized_tau_powers_g1 {
+            if powers.len() != batch_size + 1 {
+                Err(BatchEncryptionError::DigestInitError(DigestKeyInitError::RandomizedTauPowersMalformedShape))?;
+            }
         }
 
         let randomized_tau_powers_g1_projective: Vec<Vec<G1Projective>> = randomized_tau_powers_g1
@@ -142,13 +152,13 @@ impl DigestKey {
 
         let fk_domain = FKDomain::new(batch_size, batch_size, randomized_tau_powers_g1_projective.clone()).ok_or(
             BatchEncryptionError::DigestInitError(DigestKeyInitError::FKDomainInitFailure),
-        ).expect("FKDomain should never fail to initialize");
+        )?;
 
-        Self {
+        Ok(Self {
             tau_g2,
             tau_powers_g1: randomized_tau_powers_g1,
             fk_domain
-        }
+        })
     }
 
     pub fn max_batch_size(&self) -> usize {
