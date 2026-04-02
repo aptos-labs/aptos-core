@@ -85,6 +85,7 @@ fn failed_encrypted_transaction_increments_sequence_number() {
         ciphertext: ciphertext.clone(),
         extra_config: extra_config.clone(),
         payload_hash,
+        claimed_entry_fun: None,
     };
     let payload = TransactionPayload::EncryptedPayload(encrypted_payload);
     let mut txn = h.create_transaction_payload(&sender, payload);
@@ -97,6 +98,7 @@ fn failed_encrypted_transaction_increments_sequence_number() {
         payload_hash,
         eval_proof: Some(EvalProof::random()),
         reason: DecryptionFailureReason::CryptoFailure,
+        claimed_entry_fun: None,
     };
     *txn.payload_mut() = TransactionPayload::EncryptedPayload(failed_payload);
 

@@ -363,15 +363,27 @@ async fn decrypt_validator_path(
 
                 match do_final_decryption(&decryption_key.key, prepared_ciphertext_or_error) {
                     Ok(payload) => {
-                        let (executable, nonce) = payload.unwrap();
-                        txn.payload_mut()
+                        let encrypted_payload = txn.payload_mut()
                             .as_encrypted_payload_mut()
-                            .map(|p| {
-                                p.into_decrypted(eval_proof, executable, nonce)
-                                    .expect("must happen")
-                            })
-                            .expect("must exist");
-                        txn
+                            .expect("must happen");
+                        if !encrypted_payload.entry_fun_matches(&payload)
+                            .expect("must be encrypted") {
+                            warn!(
+                                "transaction with ciphertext id {:?} has mismatching entry function",
+                                id
+                            );
+                            num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
+                            mark_txn_failed_decryption(
+                                txn,
+                                Some(eval_proof),
+                                DecryptionFailureReason::ClaimedEntryFunctionMismatch,
+                            )
+                        } else {
+                            let (executable, nonce) = payload.unwrap();
+                            encrypted_payload.into_decrypted(eval_proof, executable, nonce)
+                                .expect("must happen");
+                            txn
+                        }
                     },
                     Err(e) => {
                         error!(

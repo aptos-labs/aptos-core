@@ -3,7 +3,7 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData,
+        BlockEpilogueTransaction, BlockMetadataTransaction, ClaimedEntryFunction, DecodedTableData,
         DecryptedPayload as ApiDecryptedPayload, DeleteModule, DeleteResource, DeleteTableItem,
         DeletedTableData, EncryptedPayload as ApiEncryptedPayload,
         EncryptedTransactionInnerPayload, EncryptedTransactionPayload,
@@ -373,6 +373,21 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             })
         };
 
+        let into_api_claimed_entry_function = |claim: Option<
+            aptos_types::transaction::encrypted_payload::ClaimedEntryFunction,
+        >|
+         -> Option<ClaimedEntryFunction> {
+            let aptos_types::transaction::encrypted_payload::ClaimedEntryFunction {
+                module,
+                function: name,
+            } = claim?;
+
+            Some(ClaimedEntryFunction {
+                module: module.into(),
+                name: name.map(|n| n.into()),
+            })
+        };
+
         let ret = match payload {
             Script(s) => TransactionPayload::ScriptPayload(try_into_script_payload(s)?),
             EntryFunction(fun) => {
@@ -461,28 +476,33 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let ciphertext = HexEncodedBytes::from(bcs::to_bytes(encrypted.ciphertext())?);
 
                 match encrypted {
-                    EP::Encrypted { payload_hash, .. } => {
-                        TransactionPayload::EncryptedTransactionPayload(
-                            EncryptedTransactionPayload::Encrypted(ApiEncryptedPayload {
-                                payload_hash: crate::HashValue::from(payload_hash),
-                                ciphertext: ciphertext.clone(),
-                            }),
-                        )
-                    },
-                    EP::FailedDecryption { payload_hash, .. } => {
-                        TransactionPayload::EncryptedTransactionPayload(
-                            EncryptedTransactionPayload::FailedDecryption(
-                                ApiFailedDecryptionPayload {
-                                    payload_hash: crate::HashValue::from(payload_hash),
-                                    ciphertext: ciphertext.clone(),
-                                },
-                            ),
-                        )
-                    },
+                    EP::Encrypted {
+                        payload_hash,
+                        claimed_entry_fun,
+                        ..
+                    } => TransactionPayload::EncryptedTransactionPayload(
+                        EncryptedTransactionPayload::Encrypted(ApiEncryptedPayload {
+                            payload_hash: crate::HashValue::from(payload_hash),
+                            ciphertext: ciphertext.clone(),
+                            claimed_entry_fun: into_api_claimed_entry_function(claimed_entry_fun),
+                        }),
+                    ),
+                    EP::FailedDecryption {
+                        payload_hash,
+                        claimed_entry_fun,
+                        ..
+                    } => TransactionPayload::EncryptedTransactionPayload(
+                        EncryptedTransactionPayload::FailedDecryption(ApiFailedDecryptionPayload {
+                            payload_hash: crate::HashValue::from(payload_hash),
+                            ciphertext: ciphertext.clone(),
+                            claimed_entry_fun: into_api_claimed_entry_function(claimed_entry_fun),
+                        }),
+                    ),
                     EP::Decrypted {
                         payload_hash,
                         executable,
                         decryption_nonce,
+                        claimed_entry_fun,
                         ..
                     } => {
                         let inner = match executable {
@@ -520,6 +540,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 ciphertext,
                                 decrypted_payload: inner,
                                 decryption_nonce: U64::from(decryption_nonce),
+                                claimed_entry_fun: into_api_claimed_entry_function(
+                                    claimed_entry_fun,
+                                ),
                             }),
                         )
                     },
@@ -854,6 +877,19 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 ))
             };
 
+        let into_claimed_entry_fun = |claim: Option<ClaimedEntryFunction>| -> Option<
+            aptos_types::transaction::encrypted_payload::ClaimedEntryFunction,
+        > {
+            let ClaimedEntryFunction { module, name } = claim?;
+
+            Some(
+                aptos_types::transaction::encrypted_payload::ClaimedEntryFunction {
+                    module: module.into(),
+                    function: name.map(|n| n.into()),
+                },
+            )
+        };
+
         let try_into_script_payload = |script: ScriptPayload| -> Result<Script> {
             let ScriptPayload {
                 code,
@@ -958,8 +994,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             TransactionPayload::EncryptedTransactionPayload(encrypted) => {
                 // Only the Encrypted variant can be submitted; VerifyInput enforces this.
-                let (payload_hash, ciphertext_bytes) = match encrypted {
-                    EncryptedTransactionPayload::Encrypted(p) => (p.payload_hash, p.ciphertext),
+                let (payload_hash, ciphertext_bytes, claimed_entry_fun) = match encrypted {
+                    EncryptedTransactionPayload::Encrypted(p) => {
+                        (p.payload_hash, p.ciphertext, p.claimed_entry_fun)
+                    },
                     _ => bail!("Only encrypted state payloads can be submitted"),
                 };
                 let ciphertext: Ciphertext = bcs::from_bytes(&ciphertext_bytes.0)
@@ -972,6 +1010,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     ciphertext,
                     extra_config,
                     payload_hash: payload_hash.into(),
+                    claimed_entry_fun: into_claimed_entry_fun(claimed_entry_fun),
                 })
             },
             // Deprecated.

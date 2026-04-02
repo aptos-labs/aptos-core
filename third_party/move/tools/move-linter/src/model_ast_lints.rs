@@ -30,6 +30,8 @@ pub(crate) mod unused_common;
 mod unused_constant;
 mod unused_function;
 mod unused_struct;
+mod use_index_syntax;
+mod use_receiver_style;
 mod while_true;
 
 use move_compiler_v2::external_checks::{
@@ -73,6 +75,8 @@ pub fn get_default_exp_linter_pipeline(
     let checks_category = config.get("checks").map_or("default", |s| s.as_str());
     if checks_category == "strict" || checks_category == "experimental" {
         checks.push(Box::<deprecated_usage::DeprecatedUsage>::default());
+        checks.push(Box::<use_index_syntax::UseIndexSyntax>::default());
+        checks.push(Box::<use_receiver_style::UseReceiverStyle>::default());
     }
     if checks_category == "experimental" {
         checks.push(Box::<cyclomatic_complexity::CyclomaticComplexity>::default());

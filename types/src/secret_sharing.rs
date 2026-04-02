@@ -154,7 +154,7 @@ pub struct SecretShareConfig {
 impl SecretShareConfig {
     pub fn new(
         validator: Arc<ValidatorVerifier>,
-        digest_key: DigestKey,
+        digest_key: Arc<DigestKey>,
         msk_share: MasterSecretKeyShare,
         verification_keys: Vec<VerificationKey>,
         config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
@@ -170,7 +170,7 @@ impl SecretShareConfig {
             .collect();
         Self {
             validator,
-            digest_key: Arc::new(digest_key),
+            digest_key,
             msk_share,
             verification_keys,
             config,

@@ -20,8 +20,13 @@ use aptos_event_notifications::{
 };
 use aptos_metrics_core::IntGauge;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_types::{
+    chain_id::ChainId,
+    dkg::chunky_dkg::{initialize_digest_key, set_digest_key_path, DigestKeySource, DIGEST_KEY},
+};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
+use std::{path::PathBuf, time::Instant};
 use tokio::runtime::Runtime;
 pub use types::DKGMessage;
 
@@ -55,6 +60,39 @@ pub fn start_dkg_runtime(
     runtime.spawn(network_task.start());
     runtime.spawn(dkg_epoch_manager.start(network_receiver));
     runtime
+}
+
+/// Initialize the DigestKey and emit Prometheus counters for the source.
+/// Spawns a background thread to eagerly load the key from file and record load duration.
+pub fn initialize_digest_key_with_counters(blob_path: Option<&PathBuf>, chain_id: ChainId) {
+    if let Some(path) = blob_path {
+        set_digest_key_path(path.clone());
+    }
+    let source = initialize_digest_key(chain_id);
+    match &source {
+        DigestKeySource::WillLoadFromFile { file_size } => {
+            counters::DIGEST_KEY_FILE_SIZE_BYTES.set(*file_size as i64);
+            counters::DIGEST_KEY_SOURCE
+                .with_label_values(&["file"])
+                .set(1);
+            // Eagerly load the key in a background thread so the metric is available on all nodes.
+            std::thread::spawn(|| {
+                let start = Instant::now();
+                let _ = &*DIGEST_KEY;
+                counters::DIGEST_KEY_LOAD_DURATION_SECONDS.observe(start.elapsed().as_secs_f64());
+            });
+        },
+        DigestKeySource::TestKeyFallback => {
+            counters::DIGEST_KEY_SOURCE
+                .with_label_values(&["test_fallback"])
+                .set(1);
+        },
+        DigestKeySource::NotAvailable => {
+            counters::DIGEST_KEY_SOURCE
+                .with_label_values(&["none"])
+                .set(1);
+        },
+    }
 }
 
 pub struct IntGaugeGuard {

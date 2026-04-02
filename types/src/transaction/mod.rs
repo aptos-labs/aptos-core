@@ -697,12 +697,14 @@ impl RawTransaction {
                 ciphertext,
                 extra_config,
                 payload_hash,
+                claimed_entry_fun,
                 ..
             })
             | TransactionPayload::EncryptedPayload(EncryptedPayload::FailedDecryption {
                 ciphertext,
                 extra_config,
                 payload_hash,
+                claimed_entry_fun,
                 ..
             }) => RawTransaction {
                 sender: self.sender,
@@ -711,6 +713,7 @@ impl RawTransaction {
                     ciphertext,
                     extra_config,
                     payload_hash,
+                    claimed_entry_fun,
                 }),
                 max_gas_amount: self.max_gas_amount,
                 gas_unit_price: self.gas_unit_price,
