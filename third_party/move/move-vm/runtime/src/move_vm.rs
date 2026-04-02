@@ -124,7 +124,7 @@ impl MoveVM {
                 deserialized_args,
                 data_cache,
                 // TODO(caches): async drop
-                &mut InterpreterFunctionCaches::new(),
+                &mut InterpreterFunctionCaches::new(vm_config.charge_create_ty_on_cache_hit),
                 loader,
                 &ty_depth_checker,
                 &layout_converter,

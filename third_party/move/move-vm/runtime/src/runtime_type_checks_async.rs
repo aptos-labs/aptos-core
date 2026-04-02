@@ -108,7 +108,9 @@ where
         Self {
             type_stack: Stack::new(),
             call_stack: CallStack::new(),
-            function_caches: InterpreterFunctionCaches::new(),
+            function_caches: InterpreterFunctionCaches::new(
+                vm_config.charge_create_ty_on_cache_hit,
+            ),
             module_storage,
             ty_pool,
             vm_config,
@@ -202,7 +204,10 @@ where
                         .consume_closure_call()
                         .map_err(|err| err.finish(Location::Undefined))
                         .map(|(f, mask)| (Rc::new(f.clone()), mask))?;
-                    let callee_frame_cache = FrameTypeCache::make_rc_for_function(&callee);
+                    let callee_frame_cache = FrameTypeCache::make_rc_for_function(
+                        &callee,
+                        self.vm_config.charge_create_ty_on_cache_hit,
+                    );
                     self.execute_closure_call::<RTTCheck>(
                         cursor,
                         &mut current_frame,

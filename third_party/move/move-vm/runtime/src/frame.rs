@@ -188,8 +188,11 @@ impl Frame {
             // usage of the function.
             let mut cache_borrow = frame_cache.borrow_mut();
             if let Some(local_ty_counts) = cache_borrow.instantiated_local_ty_counts.as_ref() {
-                for cnt in local_ty_counts.iter() {
-                    gas_meter.charge_create_ty(*cnt)?;
+                // Already cached - charge only for compatibility.
+                if cache_borrow.charge_create_ty_on_cache_hit {
+                    for cnt in local_ty_counts.iter() {
+                        gas_meter.charge_create_ty(*cnt)?;
+                    }
                 }
             } else {
                 let local_tys = function.local_tys();

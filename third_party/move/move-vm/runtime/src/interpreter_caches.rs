@@ -17,13 +17,15 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 pub struct InterpreterFunctionCaches {
     function_instruction_caches: HashMap<FunctionPtr, Rc<RefCell<FrameTypeCache>>>,
     generic_function_instruction_caches: HashMap<GenericFunctionPtr, Rc<RefCell<FrameTypeCache>>>,
+    charge_create_ty_on_cache_hit: bool,
 }
 
 impl InterpreterFunctionCaches {
-    pub fn new() -> Self {
+    pub fn new(charge_create_ty_on_cache_hit: bool) -> Self {
         Self {
             function_instruction_caches: HashMap::new(),
             generic_function_instruction_caches: HashMap::new(),
+            charge_create_ty_on_cache_hit,
         }
     }
 
@@ -48,7 +50,9 @@ impl InterpreterFunctionCaches {
         let ptr = FunctionPtr::from_loaded_function(function);
         self.function_instruction_caches
             .entry(ptr)
-            .or_insert_with(|| FrameTypeCache::make_rc_for_function(function))
+            .or_insert_with(|| {
+                FrameTypeCache::make_rc_for_function(function, self.charge_create_ty_on_cache_hit)
+            })
             .clone()
     }
 
@@ -62,7 +66,9 @@ impl InterpreterFunctionCaches {
         let ptr = GenericFunctionPtr::from_loaded_function(function);
         self.generic_function_instruction_caches
             .entry(ptr)
-            .or_insert_with(|| FrameTypeCache::make_rc_for_function(function))
+            .or_insert_with(|| {
+                FrameTypeCache::make_rc_for_function(function, self.charge_create_ty_on_cache_hit)
+            })
             .clone()
     }
 }

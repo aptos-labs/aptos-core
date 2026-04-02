@@ -638,7 +638,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
                 ref_state.borrow_global::<true>(struct_ty)?;
             },
             MutBorrowGlobalGeneric(index) => {
-                let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
+                let struct_ty = ty_cache.get_struct_type(*index, frame)?;
                 ref_state.borrow_global::<true>(struct_ty.clone())?;
             },
             ImmBorrowGlobal(index) => {
@@ -646,7 +646,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
                 ref_state.borrow_global::<false>(struct_ty)?;
             },
             ImmBorrowGlobalGeneric(index) => {
-                let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
+                let struct_ty = ty_cache.get_struct_type(*index, frame)?;
                 ref_state.borrow_global::<false>(struct_ty.clone())?;
             },
             Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Or | And | Lt | Gt | Le | Ge
@@ -676,7 +676,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
                 ref_state.move_from(struct_ty)?;
             },
             MoveFromGeneric(index) => {
-                let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
+                let struct_ty = ty_cache.get_struct_type(*index, frame)?;
                 ref_state.move_from(struct_ty.clone())?;
             },
             MoveTo(_) => {

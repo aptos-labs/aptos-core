@@ -76,6 +76,11 @@ pub struct VMConfig {
     /// When enabled, non-private structs and enums with the copy ability can be used as
     /// transaction arguments if they have public pack functions with the Pack attribute.
     pub enable_public_struct_args: bool,
+    /// When true, type creation is charged even if the type was cached for the
+    /// function frame. When false, type creation is only charged on cache miss
+    ///making it much cheaper for use cases like repeated calls to generic
+    /// functions in a loop.
+    pub charge_create_ty_on_cache_hit: bool,
 }
 
 impl Default for VMConfig {
@@ -108,6 +113,7 @@ impl Default for VMConfig {
             enable_struct_layout_local_cache: true,
             check_depth_on_type_counts: true,
             enable_public_struct_args: true,
+            charge_create_ty_on_cache_hit: false,
         }
     }
 }
