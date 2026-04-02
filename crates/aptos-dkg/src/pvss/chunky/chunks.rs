@@ -13,15 +13,15 @@ pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec<F>
 
     let bytes = scalar.into_bigint().to_bytes_le();
     let total_bits = bytes.len() * 8;
-    let num_chunks = total_bits.div_ceil(num_bits as usize);
+    let num_chunks = total_bits.div_ceil(num_bits);
 
     let mut chunks = Vec::with_capacity(num_chunks);
 
     for chunk_idx in 0..num_chunks {
-        let start = chunk_idx * (num_bits as usize);
+        let start = chunk_idx * num_bits;
         let mut value: u64 = 0;
         for i in 0..num_bits {
-            let bit_idx = start + (i as usize);
+            let bit_idx = start + i;
             if bit_idx < total_bits {
                 let byte_idx = bit_idx / 8;
                 let bit_in_byte = bit_idx % 8;
@@ -47,11 +47,11 @@ pub fn scalar_to_le_chunks_byte_aligned<F: PrimeField>(num_bits: usize, scalar: 
 
     let bytes = scalar.into_bigint().to_bytes_le();
     let num_bytes = num_bits / 8;
-    let num_chunks = bytes.len().div_ceil(num_bytes as usize);
+    let num_chunks = bytes.len().div_ceil(num_bytes);
 
     let mut chunks = Vec::with_capacity(num_chunks);
 
-    for bytes_chunk in bytes.chunks(num_bytes as usize) {
+    for bytes_chunk in bytes.chunks(num_bytes) {
         let mut padded = [0u8; 8]; // The last chunk might be shorter, so this guarantees a fixed 8-byte buffer
         padded[..bytes_chunk.len()].copy_from_slice(bytes_chunk);
 

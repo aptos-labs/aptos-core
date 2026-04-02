@@ -25,7 +25,7 @@ pub fn scalars_to_bits_le<F: PrimeField>(scalars: &[F], number_of_bits: usize) -
         .map(|scalar| {
             scalar_to_bits_le(scalar)
                 .into_iter()
-                .take(number_of_bits as usize)
+                .take(number_of_bits)
                 .collect::<Vec<_>>()
         })
         .collect()
