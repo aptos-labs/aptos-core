@@ -54,7 +54,7 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
         n,
         ell,
         encoded.len(),
-        2 * 8 + 48 + (48 + 96) * ell as usize // Can get rid of the 2 * 8 here by turning the Vecs in `proof` into tuples
+        2 * 8 + 48 + (48 + 96) * ell // Can get rid of the 2 * 8 here by turning the Vecs in `proof` into tuples
     );
 
     // === Round-trip deserialization ===
