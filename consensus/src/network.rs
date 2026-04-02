@@ -1009,6 +1009,14 @@ impl NetworkTask {
                                 response_sender: callback,
                             })
                         },
+                        ConsensusMsg::SecretShareMsg(req) => {
+                            IncomingRpcRequest::SecretShareRequest(IncomingSecretShareRequest {
+                                req,
+                                sender: peer_id,
+                                protocol,
+                                response_sender: callback,
+                            })
+                        },
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
                             continue;
