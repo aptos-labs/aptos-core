@@ -283,7 +283,7 @@ impl<E: Pairing> PublicParameters<E> {
         // ell >= means a BabyStepTable of size >= 2^32, which causes an overflow:
         // - in build_dlog_table(..), table_size_exp = 4 + ((48 + 8) / 2) = 32
         // - BabyStepTable stores exponents as u32
-        assert!(ell <= 47);
+        assert!(ell > 1 && ell <= 47);
 
         let num_chunks = num_chunks_per_scalar::<E::ScalarField>(ell);
         let max_num_chunks_padded = (max_num_shares * num_chunks + 1).next_power_of_two() - 1;

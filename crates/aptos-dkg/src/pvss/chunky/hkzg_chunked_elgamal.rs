@@ -89,7 +89,7 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
         repeat_with(|| {
             chunked_elgamal::correlated_randomness(
                 rng,
-                1 << pp.ell as u64, // debug_assert is to prevent overflow here
+                1 << pp.ell as u64,
                 chunked_elgamal::num_chunks_per_scalar::<E::ScalarField>(pp.ell),
                 &E::ScalarField::zero(),
             )
