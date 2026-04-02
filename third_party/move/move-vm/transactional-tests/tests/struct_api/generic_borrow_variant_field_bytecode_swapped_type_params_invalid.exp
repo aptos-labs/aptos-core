@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-15:  publish --print-bytecode [module 0x66::test_generic_borrow_variant_field_bytecode_swapped_type_params]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_generic_borrow_variant_field_bytecode_swapped_type_params'. Got VMError: {
+    major_status: INVALID_STRUCT_API_CODE,
+    sub_status: None,
+    location: 0x66::test_generic_borrow_variant_field_bytecode_swapped_type_params,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [],
+}
