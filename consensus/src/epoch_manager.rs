@@ -1108,12 +1108,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 !proxy_infos.is_empty(),
                 "proxy_addresses must map to at least one validator in the epoch"
             );
-            let verifier = ValidatorVerifier::new(proxy_infos);
+            // Use 3f+1 = n (unanimity) as the proxy quorum threshold. This ensures all
+            // proxy validators must vote for a block to be certified — no QC can form
+            // if any proxy validator is absent or stuck. This prevents the "3 validators
+            // form QC and leave the 4th behind with pruned blocks" failure mode where a
+            // late-starting proxy can never catch up.
+            let total_vp: u128 = proxy_infos
+                .iter()
+                .fold(0u128, |sum, x| sum.checked_add(x.voting_power as u128)
+                    .expect("proxy total voting power overflow"));
+            let verifier = ValidatorVerifier::new_with_quorum_voting_power(proxy_infos, total_vp)
+                .expect("proxy quorum <= total voting power");
             info!(
                 epoch = epoch,
                 proxy_validators = verifier.len(),
                 proxy_quorum = %verifier.quorum_voting_power(),
-                "Built proxy-only ValidatorVerifier"
+                "Built proxy-only ValidatorVerifier (3f+1 unanimity threshold)"
             );
             Some(Arc::new(verifier))
         } else {
