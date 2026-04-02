@@ -125,7 +125,7 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             |b, &table_size| {
                 b.iter(|| {
                     let t = table::BabyStepTable::new(G.into_affine(), table_size);
-                    assert_eq!(t.table_size as usize, table_size as usize);
+                    assert_eq!(t.table_size, table_size);
                 });
             },
         );

@@ -214,8 +214,8 @@ fn chunky_sizes() -> ChunkySizes {
     let num_chunks = num_chunks_per_scalar::<ArkFr>(ell);
 
     let g2 = 2 * n + 1 + 1 + n * num_chunks + num_chunks * max_weight;
-    let g1 = 2 * (n * num_chunks + num_chunks * max_weight) + ell as usize + 2 + 2 + 2;
-    let scalars = ell as usize + 2 + 2;
+    let g1 = 2 * (n * num_chunks + num_chunks * max_weight) + ell + 2 + 2 + 2;
+    let scalars = ell + 2 + 2;
 
     ChunkySizes { g1, g2, scalars }
 }
