@@ -1482,7 +1482,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_block_store.clone(),
             proxy_payload_client,
             self.time_service.clone(),
-            Duration::from_millis(1), // Proxy rounds are fast; batches arrive continuously
+            Duration::from_millis(5), // Max wait when no batches available; instant return otherwise
             aptos_consensus_types::utils::PayloadTxnsSize::new(
                 proxy_config.max_proxy_block_txns,
                 proxy_config.max_proxy_block_bytes,
