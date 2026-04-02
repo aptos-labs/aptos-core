@@ -1,0 +1,42 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+use crate::{schemes::fptx::FPTX, tests::smoke::run_smoke, traits::BatchThresholdEncryption};
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+use ark_std::rand::{thread_rng, Rng as _};
+
+#[test]
+fn smoke_with_setup_for_testing() {
+    let mut rng = thread_rng();
+    let tc = ShamirThresholdConfig::new(3, 8);
+
+    let (ek, dk, vks, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
+
+    run_smoke::<FPTX>(tc, ek, dk, vks, msk_shares);
+}
+
+#[test]
+fn fptx_serialize_deserialize_setup() {
+    let mut rng = thread_rng();
+    let tc = ShamirThresholdConfig::new(3, 8);
+
+    let setup = FPTX::setup_for_testing(rng.r#gen(), 8, 2, &tc).unwrap();
+
+    let bytes = bcs::to_bytes(&setup).unwrap();
+    let setup2: (
+        <FPTX as BatchThresholdEncryption>::EncryptionKey,
+        <FPTX as BatchThresholdEncryption>::DigestKey,
+        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+    ) = bcs::from_bytes(&bytes).unwrap();
+
+    assert_eq!(setup, setup2);
+
+    let json = serde_json::to_string(&setup).unwrap();
+    let setup2: (
+        <FPTX as BatchThresholdEncryption>::EncryptionKey,
+        <FPTX as BatchThresholdEncryption>::DigestKey,
+        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+    ) = serde_json::from_str(&json).unwrap();
+    assert_eq!(setup, setup2);
+}

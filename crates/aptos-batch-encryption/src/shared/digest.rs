@@ -119,6 +119,53 @@ impl DigestKey {
         })
     }
 
+    pub fn with_randomized_powers_of_tau(
+        randomized_tau_powers_g1: Vec<Vec<G1Affine>>,
+        tau_g2: G2Affine,
+    ) -> Result<Self> {
+        if randomized_tau_powers_g1.is_empty() {
+            Err(BatchEncryptionError::DigestInitError(
+                DigestKeyInitError::NumRoundsMustBeNonzero,
+            ))?;
+        }
+
+        let batch_size = randomized_tau_powers_g1[0].len() - 1;
+
+        let mut i = batch_size;
+        while i > 1 {
+            i.is_multiple_of(2)
+                .then_some(())
+                .ok_or(BatchEncryptionError::DigestInitError(
+                    DigestKeyInitError::BatchSizeMustBePowerOfTwo,
+                ))?;
+            i >>= 1;
+        }
+
+        for powers in &randomized_tau_powers_g1 {
+            if powers.len() != batch_size + 1 {
+                Err(BatchEncryptionError::DigestInitError(
+                    DigestKeyInitError::RandomizedTauPowersMalformedShape,
+                ))?;
+            }
+        }
+
+        let randomized_tau_powers_g1_projective: Vec<Vec<G1Projective>> = randomized_tau_powers_g1
+            .iter()
+            .map(|gs| gs.iter().map(|g| G1Projective::from(*g)).collect())
+            .collect();
+
+        let fk_domain = FKDomain::new(batch_size, batch_size, randomized_tau_powers_g1_projective)
+            .ok_or(BatchEncryptionError::DigestInitError(
+                DigestKeyInitError::FKDomainInitFailure,
+            ))?;
+
+        Ok(Self {
+            tau_g2,
+            tau_powers_g1: randomized_tau_powers_g1,
+            fk_domain,
+        })
+    }
+
     pub fn max_batch_size(&self) -> usize {
         self.tau_powers_g1[0].len() - 1
     }
@@ -304,5 +351,14 @@ pub(crate) mod tests {
         let mut rng = thread_rng();
         let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
         assert_eq!(dk.max_batch_size(), 8);
+    }
+
+    #[test]
+    fn test_with_randomized_powers_of_tau() {
+        let mut rng = thread_rng();
+        let dk = DigestKey::new(&mut rng, 8, 2).unwrap();
+        let dk2 =
+            DigestKey::with_randomized_powers_of_tau(dk.tau_powers_g1.clone(), dk.tau_g2).unwrap();
+        assert_eq!(dk, dk2);
     }
 }
