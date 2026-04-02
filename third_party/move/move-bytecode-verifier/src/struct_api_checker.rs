@@ -19,7 +19,7 @@
 //! - A function with an attribute but a non-API name would never be discovered by callers,
 //!   making the attribute meaningless and potentially confusing future tooling.
 //!
-//! 1. Function name matches struct API pattern ↔ has corresponding struct API attribute (bidirectional)
+//! 1. Function name matches struct API pattern iff it has the corresponding struct API attribute
 //! 2. Attribute type must match name pattern (e.g., pack$S requires Pack attribute)
 //! 3. Only one struct API attribute allowed per function
 //!
@@ -49,16 +49,18 @@
 //! - Unpack: MoveLoc + Unpack + Ret
 //! - UnpackVariant: MoveLoc + UnpackVariant + Ret (bytecode variant index must equal attribute)
 //! - TestVariant: MoveLoc + TestVariant + Ret (bytecode variant index must equal attribute)
-//! - BorrowField: MoveLoc + ImmBorrowField/MutBorrowField + Ret
+//! - BorrowField: MoveLoc + ImmBorrowField/MutBorrowField/ImmBorrowVariantField/MutBorrowVariantField (or Generic variants) + Ret
 
 use move_binary_format::{
     access::ModuleAccess,
-    binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeUnit, CompiledModule, FunctionAttribute, FunctionDefinition, FunctionHandle,
-        MemberCount, SignatureToken, StructDefinitionIndex, StructFieldInformation,
-        StructHandleIndex, VariantDefinition, VariantIndex,
+        Bytecode, CodeUnit, CompiledModule, FieldDefinition, FieldHandleIndex,
+        FieldInstantiationIndex, FunctionAttribute, FunctionDefinition, FunctionHandle,
+        MemberCount, Signature, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
+        StructDefinitionIndex, StructFieldInformation, StructHandleIndex, StructVariantHandleIndex,
+        StructVariantInstantiationIndex, VariantDefinition, VariantFieldHandleIndex,
+        VariantFieldInstantiationIndex, VariantIndex,
     },
 };
 use move_core_types::{
@@ -69,6 +71,12 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use std::collections::BTreeMap;
+
+fn struct_api_err(msg: impl Into<String>) -> PartialVMError {
+    PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(msg.into())
+}
+
+// ── Pre-computed module context ───────────────────────────────────────────────
 
 /// Pre-computed metadata for efficient struct API validation.
 /// This context is computed once per module and reused for all function validations.
@@ -121,6 +129,16 @@ impl StructApiContext {
             }
         }
 
+        // Enforce uniqueness of struct API attributes on all function handles,
+        // including imported ones that are never visited by check_function.
+        // Note: for locally-defined functions this check also fires here before
+        // check_function can annotate the error with a FunctionDefinition index,
+        // so duplicate-attribute errors on local functions will lack that annotation.
+        // This is an acceptable diagnostic trade-off for uniform coverage.
+        for handle in module.function_handles() {
+            try_get_struct_api_attr(&handle.attributes)?;
+        }
+
         Ok(Self {
             struct_name_to_handle,
             struct_name_to_def,
@@ -129,26 +147,19 @@ impl StructApiContext {
         })
     }
 
-    /// Get struct handle by name
-    pub fn get_struct_handle(&self, name: &str) -> Option<StructHandleIndex> {
+    fn get_struct_handle(&self, name: &str) -> Option<StructHandleIndex> {
         self.struct_name_to_handle.get(name).copied()
     }
 
-    /// Get struct definition index by name
-    pub fn get_struct_def_index(&self, name: &str) -> Option<StructDefinitionIndex> {
+    fn get_struct_def_index(&self, name: &str) -> Option<StructDefinitionIndex> {
         self.struct_name_to_def.get(name).copied()
     }
 
-    /// Get pre-computed type order map for an enum
-    pub fn get_type_order_map(
-        &self,
-        enum_name: &str,
-    ) -> Option<&BTreeMap<(u16, SignatureToken), u16>> {
+    fn get_type_order_map(&self, enum_name: &str) -> Option<&BTreeMap<(u16, SignatureToken), u16>> {
         self.enum_type_order_maps.get(enum_name)
     }
 
-    /// Get pre-computed variant indices map for an enum
-    pub fn get_variant_indices_map(
+    fn get_variant_indices_map(
         &self,
         enum_name: &str,
     ) -> Option<&BTreeMap<(u16, SignatureToken), Vec<u16>>> {
@@ -164,370 +175,28 @@ fn try_get_struct_api_attr(
     attrs: &[FunctionAttribute],
 ) -> PartialVMResult<Option<FunctionAttribute>> {
     use FunctionAttribute::*;
-    let mut count: usize = 0;
-    let mut attr_attribute = None;
+    let mut found = None;
     for attr in attrs {
-        let is_struct_api_attr = match attr {
+        let is_struct_api = match attr {
             Pack
             | PackVariant(_)
             | Unpack
             | UnpackVariant(_)
             | TestVariant(_)
             | BorrowFieldImmutable(_)
-            | BorrowFieldMutable(_) => {
-                attr_attribute = Some(attr.clone());
-                true
-            },
+            | BorrowFieldMutable(_) => true,
             Persistent | ModuleLock => false,
         };
-        if is_struct_api_attr {
-            count += 1;
-            if count > 1 {
-                return Err(
-                    PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                        "function has multiple struct API attributes; at most one is allowed",
-                    ),
-                );
+        if is_struct_api {
+            if found.is_some() {
+                return Err(struct_api_err(
+                    "function has multiple struct API attributes; at most one is allowed",
+                ));
             }
+            found = Some(attr.clone());
         }
     }
-    Ok(attr_attribute)
-}
-
-/// Validated struct API name information.
-/// Contains only the parsed and validated components that are actually used in Phase 2 validation.
-#[derive(Debug, Clone)]
-enum StructApiNameInfo {
-    Pack {
-        struct_handle_idx: StructHandleIndex,
-        struct_def_idx: StructDefinitionIndex,
-    },
-    PackVariant {
-        struct_handle_idx: StructHandleIndex,
-        struct_def_idx: StructDefinitionIndex,
-        variant_name: String,
-    },
-    Unpack {
-        struct_handle_idx: StructHandleIndex,
-        struct_def_idx: StructDefinitionIndex,
-    },
-    UnpackVariant {
-        struct_handle_idx: StructHandleIndex,
-        struct_def_idx: StructDefinitionIndex,
-        variant_name: String,
-    },
-    TestVariant {
-        struct_handle_idx: StructHandleIndex,
-        struct_def_idx: StructDefinitionIndex,
-        variant_name: String,
-    },
-    BorrowField {
-        struct_name: String,
-        struct_handle_idx: StructHandleIndex,
-        struct_def_idx: StructDefinitionIndex,
-        offset: u16,
-        type_order: Option<u16>,
-        is_mutable: bool,
-    },
-}
-
-impl StructApiNameInfo {
-    /// Get the expected attribute type string for this struct API.
-    fn expected_attr_type(&self) -> &str {
-        match self {
-            StructApiNameInfo::Pack { .. } => PACK,
-            StructApiNameInfo::PackVariant { .. } => PACK_VARIANT,
-            StructApiNameInfo::Unpack { .. } => UNPACK,
-            StructApiNameInfo::UnpackVariant { .. } => UNPACK_VARIANT,
-            StructApiNameInfo::TestVariant { .. } => TEST_VARIANT,
-            StructApiNameInfo::BorrowField { is_mutable, .. } => {
-                if *is_mutable {
-                    BORROW_MUT
-                } else {
-                    BORROW
-                }
-            },
-        }
-    }
-}
-
-/// Parse and validate a struct API function name.
-///
-/// Struct/enum names and variant names may contain '$' (for example, in hand-crafted
-/// bytecode or in modules published before the struct API checker existed). This creates
-/// an inherent ambiguity: `pack$A$B` could mean Pack for struct `A$B`, or PackVariant for
-/// enum `A` variant `B`. Neither shortest-match nor longest-match alone is universally
-/// correct. We resolve it with attribute-guided matching via `expect_variant_in_name`:
-///
-/// - `expect_variant_in_name = true` (PackVariant/UnpackVariant/TestVariant attributes):
-///   use **shortest match** so that the remaining parts become the variant name.
-///   Example: `pack$A$B` with enum `A` variant `B` → shortest match → struct `A`, variant `B` ✓
-///
-/// - `expect_variant_in_name = false` (Pack/Unpack/Borrow* attributes, or no attribute):
-///   use **longest match** so that struct names containing `$` are found correctly.
-///   Example: `pack$A$B` with struct `A$B` → longest match → struct `A$B`, no remaining ✓
-///
-/// If no locally defined struct matches any prefix of the name parts, the function is
-/// treated as a regular (non-API) function and Ok(None) is returned. Failures in parsing
-/// the remaining parts (variant name, offset, type_order) also return Ok(None) rather
-/// than an error, so that functions with unusual names in older modules are never
-/// incorrectly rejected.
-///
-/// Returns:
-/// - Ok(Some(info)) if the name unambiguously matches a struct API pattern
-/// - Ok(None) if the name doesn't match any struct API pattern
-/// - Err only if a structural invariant is violated (e.g., overflow in index conversion)
-fn parse_and_validate_struct_api_name(
-    function_name: &str,
-    ctx: &StructApiContext,
-    expect_variant_in_name: bool,
-) -> PartialVMResult<Option<StructApiNameInfo>> {
-    let parts: Vec<&str> = function_name.split(PUBLIC_STRUCT_DELIMITER).collect();
-
-    // Need at least 2 parts for any struct API function (e.g., "pack$S")
-    if parts.len() < 2 {
-        return Ok(None);
-    }
-
-    let prefix = parts[0];
-
-    // Check if this looks like a struct API prefix
-    if !matches!(prefix, PACK | UNPACK | TEST_VARIANT | BORROW | BORROW_MUT) {
-        return Ok(None);
-    }
-
-    // Find the struct name by trying increasingly longer combinations of '$'-separated parts.
-    // - Shortest match (expect_variant_in_name=true): stop at first matching struct so the
-    //   remaining parts form the variant name. Correct when the attribute expects a variant.
-    // - Longest match (expect_variant_in_name=false): keep going to find the longest struct
-    //   name. Correct for Pack/Unpack/Borrow where no variant name follows the struct name.
-    let mut candidate = String::new();
-    let mut struct_name = String::new();
-    let mut struct_end = 0usize; // index into parts[] of first remaining part after struct name
-    for (i, part) in parts.iter().enumerate().skip(1) {
-        if i > 1 {
-            candidate.push_str(PUBLIC_STRUCT_DELIMITER);
-        }
-        candidate.push_str(part);
-        if ctx.get_struct_handle(&candidate).is_some() {
-            struct_end = i + 1;
-            struct_name = candidate.clone();
-            if expect_variant_in_name {
-                break; // shortest match: stop here so remaining parts form the variant name
-            }
-        }
-    }
-
-    if struct_end == 0 {
-        // No locally defined struct matches — not a struct API function.
-        return Ok(None);
-    }
-
-    let struct_handle_idx = ctx.get_struct_handle(&struct_name).unwrap();
-    let struct_def_idx = match ctx.get_struct_def_index(&struct_name) {
-        Some(idx) => idx,
-        None => return Ok(None),
-    };
-
-    // Remaining parts after the struct name (variant, offset, type_order, etc.)
-    let remaining = &parts[struct_end..];
-
-    match prefix {
-        PACK => {
-            if remaining.is_empty() {
-                // pack$S
-                Ok(Some(StructApiNameInfo::Pack {
-                    struct_handle_idx,
-                    struct_def_idx,
-                }))
-            } else {
-                // pack$S$Variant  (variant name may itself contain '$')
-                Ok(Some(StructApiNameInfo::PackVariant {
-                    struct_handle_idx,
-                    struct_def_idx,
-                    variant_name: remaining.join(PUBLIC_STRUCT_DELIMITER),
-                }))
-            }
-        },
-        UNPACK => {
-            if remaining.is_empty() {
-                // unpack$S
-                Ok(Some(StructApiNameInfo::Unpack {
-                    struct_handle_idx,
-                    struct_def_idx,
-                }))
-            } else {
-                // unpack$S$Variant
-                Ok(Some(StructApiNameInfo::UnpackVariant {
-                    struct_handle_idx,
-                    struct_def_idx,
-                    variant_name: remaining.join(PUBLIC_STRUCT_DELIMITER),
-                }))
-            }
-        },
-        TEST_VARIANT => {
-            if remaining.is_empty() {
-                // test_variant requires a variant name — not a struct API
-                return Ok(None);
-            }
-            Ok(Some(StructApiNameInfo::TestVariant {
-                struct_handle_idx,
-                struct_def_idx,
-                variant_name: remaining.join(PUBLIC_STRUCT_DELIMITER),
-            }))
-        },
-        BORROW | BORROW_MUT => {
-            let is_mutable = prefix == BORROW_MUT;
-            // Offsets and type_orders are numeric and cannot contain '$', so
-            // remaining[0] is always the offset and remaining[1] (if present) is type_order.
-            match remaining.len() {
-                1 => {
-                    let offset: u16 = match remaining[0].parse() {
-                        Ok(o) => o,
-                        Err(_) => return Ok(None),
-                    };
-                    Ok(Some(StructApiNameInfo::BorrowField {
-                        struct_name,
-                        struct_handle_idx,
-                        struct_def_idx,
-                        offset,
-                        type_order: None,
-                        is_mutable,
-                    }))
-                },
-                2 => {
-                    let offset: u16 = match remaining[0].parse() {
-                        Ok(o) => o,
-                        Err(_) => return Ok(None),
-                    };
-                    let type_order: u16 = match remaining[1].parse() {
-                        Ok(t) => t,
-                        Err(_) => return Ok(None),
-                    };
-                    Ok(Some(StructApiNameInfo::BorrowField {
-                        struct_name,
-                        struct_handle_idx,
-                        struct_def_idx,
-                        offset,
-                        type_order: Some(type_order),
-                        is_mutable,
-                    }))
-                },
-                _ => Ok(None), // wrong number of remaining parts
-            }
-        },
-        _ => Ok(None),
-    }
-}
-
-/// Validate that the parameter type matches the StructName type.
-/// Used for unpack$StructName and test_variant$StructName$VariantName functions.
-/// - Unpack/UnpackVariant: parameter must be the struct by value (Struct or StructInstantiation)
-/// - TestVariant: parameter must be an immutable reference (&Struct)
-fn validate_struct_parameter_type(
-    module: &CompiledModule,
-    handle: &FunctionHandle,
-    attr: &FunctionAttribute,
-    struct_handle_idx: StructHandleIndex,
-) -> PartialVMResult<()> {
-    // Get the parameter signature
-    let param_sig = module.signature_at(handle.parameters);
-
-    // Must have exactly one parameter
-    if param_sig.0.len() != 1 {
-        let api_name = match attr {
-            FunctionAttribute::TestVariant(_) => "test_variant",
-            FunctionAttribute::Unpack => "unpack",
-            FunctionAttribute::UnpackVariant(_) => "unpack_variant",
-            _ => "struct API",
-        };
-        return Err(
-            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(format!(
-                "{} function must have exactly one parameter",
-                api_name
-            )),
-        );
-    }
-
-    // Check parameter type based on attribute:
-    // - Unpack/UnpackVariant: must be struct by value
-    // - TestVariant: must be immutable reference to struct
-    let param_type = &param_sig.0[0];
-
-    match attr {
-        FunctionAttribute::TestVariant(_) => {
-            // TestVariant must take immutable reference (&Struct)
-            match param_type {
-                SignatureToken::Reference(inner) => match **inner {
-                    SignatureToken::Struct(idx) if idx == struct_handle_idx => Ok(()),
-                    SignatureToken::StructInstantiation(idx, _) if idx == struct_handle_idx => {
-                        Ok(())
-                    },
-                    _ => Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                        .with_message("test_variant function parameter inner type does not match the struct")),
-                },
-                _ => Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("test_variant function parameter must be an immutable reference to the struct")),
-            }
-        },
-        FunctionAttribute::Unpack | FunctionAttribute::UnpackVariant(_) => {
-            // Unpack/UnpackVariant must take struct by value (not a reference)
-            match param_type {
-                SignatureToken::Struct(idx) if *idx == struct_handle_idx => Ok(()),
-                SignatureToken::StructInstantiation(idx, _) if *idx == struct_handle_idx => Ok(()),
-                _ => Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("unpack function parameter type does not match the struct")),
-            }
-        },
-        _ => {
-            // Should not reach here - only Unpack/UnpackVariant/TestVariant call this function
-            Err(
-                PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                    "internal error: unexpected attribute in validate_struct_parameter_type",
-                ),
-            )
-        },
-    }
-}
-
-/// Validate that the variant index in PackVariant/UnpackVariant/TestVariant attribute matches the variant name
-/// parsed from the function name.
-fn validate_variant_index(
-    module: &CompiledModule,
-    struct_def_idx: StructDefinitionIndex,
-    variant_name: &str,
-    variant_index: VariantIndex,
-) -> PartialVMResult<()> {
-    let struct_def = &module.struct_defs()[struct_def_idx.0 as usize];
-
-    // Get the variants from the struct definition
-    let variants = match &struct_def.field_information {
-        StructFieldInformation::DeclaredVariants(variants) => variants,
-        _ => {
-            // Struct doesn't have variants, but PackVariant attribute is present
-            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("pack_variant/unpack_variant/test_variant attribute used on a struct without variants"));
-        },
-    };
-
-    // Find the variant by name and check its index
-    let found_variant_index = variants
-        .iter()
-        .enumerate()
-        .find(|(_, variant)| {
-            let name = module.identifier_at(variant.name).as_str();
-            name == variant_name
-        })
-        .and_then(|(idx, _)| u16::try_from(idx).ok());
-
-    match found_variant_index {
-        Some(idx) if idx == variant_index => Ok(()),
-        _ => Err(
-            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                "variant name in function name does not match the variant index in the attribute",
-            ),
-        ),
-    }
+    Ok(found)
 }
 
 /// Build mappings for enum variants:
@@ -580,16 +249,14 @@ fn build_variant_type_order_and_indices_map(
     for (variant_idx, variant) in variants.iter().enumerate() {
         // Convert variant index to u16 with checked conversion
         let variant_idx_u16 = u16::try_from(variant_idx).map_err(|_| {
-            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("enum has too many variants; variant index overflows u16")
+            struct_api_err("enum has too many variants; variant index overflows u16")
         })?;
 
         for (field_offset, field) in variant.fields.iter().enumerate() {
             let field_type = field.signature.0.clone();
             // Convert field offset to u16 with checked conversion
             let field_offset = u16::try_from(field_offset).map_err(|_| {
-                PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("enum variant has too many fields; field offset overflows u16")
+                struct_api_err("enum variant has too many fields; field offset overflows u16")
             })?;
             let key = (field_offset, field_type.clone());
 
@@ -601,8 +268,7 @@ fn build_variant_type_order_and_indices_map(
                 // using checked arithmetic makes the code more robust to future changes.
                 next_order = next_order
                     .checked_add(1)
-                    .ok_or_else(|| PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                        .with_message("type order counter overflows u16 (too many distinct field types across variants)"))?;
+                    .ok_or_else(|| struct_api_err("type order counter overflows u16 (too many distinct field types across variants)"))?;
             }
 
             // Add this variant index to the list for this (offset, type) combination
@@ -616,412 +282,416 @@ fn build_variant_type_order_and_indices_map(
     Ok((order_map, variant_indices_map))
 }
 
-/// Validate the parameter of a borrow field function.
-/// The parameter must be a reference to the correct struct type with matching mutability.
-fn validate_borrow_param(
-    module: &CompiledModule,
-    handle: &FunctionHandle,
-    struct_handle_idx: StructHandleIndex,
-    is_mutable: bool,
-) -> PartialVMResult<()> {
-    let param_sig = module.signature_at(handle.parameters);
+// ── Canonical-type-parameter helpers ─────────────────────────────────────────
 
-    // Must have exactly one parameter
-    if param_sig.0.len() != 1 {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow field function must have exactly one parameter"));
+/// Errors with `INVALID_STRUCT_API_CODE` if `type_args` is not the canonical identity
+/// instantiation `[TypeParameter(0), ..., TypeParameter(n-1)]`.
+fn ensure_canonical_type_params(type_args: &[SignatureToken], n: usize) -> PartialVMResult<()> {
+    let is_canonical = type_args.len() == n
+        && type_args
+            .iter()
+            .enumerate()
+            .all(|(i, t)| matches!(t, SignatureToken::TypeParameter(j) if *j as usize == i));
+    if is_canonical {
+        Ok(())
+    } else {
+        Err(struct_api_err(
+            "non-canonical type parameters in generic struct API wrapper",
+        ))
+    }
+}
+
+/// Recursively checks a single signature token: for every `StructInstantiation` whose handle
+/// equals `struct_handle_idx`, the type arguments must be canonical `[T0, ..., Tn-1]`.
+fn check_token_canonical_type_params(
+    token: &SignatureToken,
+    struct_handle_idx: StructHandleIndex,
+    n: usize,
+) -> PartialVMResult<()> {
+    match token {
+        SignatureToken::StructInstantiation(idx, type_args) => {
+            if *idx == struct_handle_idx {
+                ensure_canonical_type_params(type_args, n)?;
+            }
+            for arg in type_args {
+                check_token_canonical_type_params(arg, struct_handle_idx, n)?;
+            }
+            Ok(())
+        },
+        SignatureToken::Reference(inner)
+        | SignatureToken::MutableReference(inner)
+        | SignatureToken::Vector(inner) => {
+            check_token_canonical_type_params(inner, struct_handle_idx, n)
+        },
+        SignatureToken::Function(params, returns, _) => {
+            for t in params.iter().chain(returns.iter()) {
+                check_token_canonical_type_params(t, struct_handle_idx, n)?;
+            }
+            Ok(())
+        },
+        SignatureToken::Bool
+        | SignatureToken::U8
+        | SignatureToken::U16
+        | SignatureToken::U32
+        | SignatureToken::U64
+        | SignatureToken::U128
+        | SignatureToken::U256
+        | SignatureToken::I8
+        | SignatureToken::I16
+        | SignatureToken::I32
+        | SignatureToken::I64
+        | SignatureToken::I128
+        | SignatureToken::I256
+        | SignatureToken::Address
+        | SignatureToken::Signer
+        | SignatureToken::Struct(_)
+        | SignatureToken::TypeParameter(_) => Ok(()),
+    }
+}
+
+// ── Parsed name ───────────────────────────────────────────────────────────────
+
+/// The operation kind inferred from a function name's prefix.
+///
+/// `Pack` and `Unpack` each cover both the plain and variant forms — the distinction
+/// comes from `ParsedApiData::variant_name` being `None` (plain) or `Some` (variant).
+/// `Borrow` covers both immutable and mutable — the distinction comes from
+/// `ParsedApiData::is_mutable`.
+#[derive(PartialEq)]
+enum NamePrefix {
+    Pack,
+    Unpack,
+    TestVariant,
+    Borrow,
+}
+
+/// Data parsed and validated from a struct API function name.
+/// This is a flat data bag — the operation kind is recorded in `prefix`/`is_mutable`
+/// and used only to verify consistency with the `FunctionAttribute`. All subsequent
+/// dispatch is on the `FunctionAttribute` directly.
+struct ParsedApiData {
+    prefix: NamePrefix,
+    /// `true` iff the prefix string was `"borrow_mut"`.
+    is_mutable: bool,
+    struct_def_idx: StructDefinitionIndex,
+    struct_handle_idx: StructHandleIndex,
+    /// Needed for enum type-order map lookups during borrow validation.
+    struct_name: String,
+    /// `Some` for variant operations (PackVariant, UnpackVariant, TestVariant).
+    variant_name: Option<String>,
+    /// `Some` for borrow operations.
+    offset: Option<u16>,
+    /// `Some` for borrow operations on enums.
+    type_order: Option<u16>,
+}
+
+impl ParsedApiData {
+    /// Returns `true` if this parsed name is compatible with the given `FunctionAttribute`.
+    /// Used to verify that the name prefix agrees with the attribute kind before dispatching
+    /// on the attribute in Phase 2.
+    fn matches_attr(&self, attr: &FunctionAttribute) -> bool {
+        match attr {
+            FunctionAttribute::Pack => {
+                self.prefix == NamePrefix::Pack && self.variant_name.is_none()
+            },
+            FunctionAttribute::PackVariant(_) => {
+                self.prefix == NamePrefix::Pack && self.variant_name.is_some()
+            },
+            FunctionAttribute::Unpack => {
+                self.prefix == NamePrefix::Unpack && self.variant_name.is_none()
+            },
+            FunctionAttribute::UnpackVariant(_) => {
+                self.prefix == NamePrefix::Unpack && self.variant_name.is_some()
+            },
+            FunctionAttribute::TestVariant(_) => self.prefix == NamePrefix::TestVariant,
+            FunctionAttribute::BorrowFieldImmutable(_) => {
+                self.prefix == NamePrefix::Borrow && !self.is_mutable
+            },
+            FunctionAttribute::BorrowFieldMutable(_) => {
+                self.prefix == NamePrefix::Borrow && self.is_mutable
+            },
+            // Non-struct-API attributes: these are filtered out by try_get_struct_api_attr
+            // before matches_attr is ever called, so they can never be a match.
+            FunctionAttribute::Persistent | FunctionAttribute::ModuleLock => false,
+        }
+    }
+}
+
+/// Parse and validate a struct API function name.
+///
+/// Struct/enum names and variant names may contain '$' (for example, in hand-crafted
+/// bytecode or in modules published before the struct API checker existed). This creates
+/// an inherent ambiguity: `pack$A$B` could mean Pack for struct `A$B`, or PackVariant for
+/// enum `A` variant `B`. Neither shortest-match nor longest-match alone is universally
+/// correct. We resolve it with attribute-guided matching via `expect_variant_in_name`:
+///
+/// - `expect_variant_in_name = true` (PackVariant/UnpackVariant/TestVariant attributes):
+///   use **shortest match** so that the remaining parts become the variant name.
+///   Example: `pack$A$B` with enum `A` variant `B`: shortest match gives struct `A`, variant `B`///
+/// - `expect_variant_in_name = false` (Pack/Unpack/Borrow* attributes, or no attribute):
+///   use **longest match** so that struct names containing `$` are found correctly.
+///   Example: `pack$A$B` with struct `A$B`: longest match gives struct `A$B`, no remaining parts///
+/// If no locally defined struct matches any prefix of the name parts, the function is
+/// treated as a regular (non-API) function and Ok(None) is returned. Failures in parsing
+/// the remaining parts (variant name, offset, type_order) also return Ok(None) rather
+/// than an error, so that functions with unusual names in older modules are never
+/// incorrectly rejected.
+///
+/// Returns `Some(data)` if the name unambiguously matches a struct API pattern,
+/// or `None` if the name doesn't match any struct API pattern.
+fn parse_struct_api_name(
+    function_name: &str,
+    ctx: &StructApiContext,
+    expect_variant_in_name: bool,
+) -> Option<ParsedApiData> {
+    let parts: Vec<&str> = function_name.split(PUBLIC_STRUCT_DELIMITER).collect();
+
+    // Need at least 2 parts for any struct API function (e.g., "pack$S")
+    if parts.len() < 2 {
+        return None;
     }
 
-    // Extract struct index and mutability from the reference
-    let param_type = &param_sig.0[0];
-    let param_info = match param_type {
-        SignatureToken::Reference(inner) => match **inner {
-            SignatureToken::Struct(idx) => Some((idx, false)),
-            SignatureToken::StructInstantiation(idx, _) => Some((idx, false)),
-            _ => None,
+    let prefix_str = parts[0];
+
+    let name_prefix = match prefix_str {
+        PACK => NamePrefix::Pack,
+        UNPACK => NamePrefix::Unpack,
+        TEST_VARIANT => NamePrefix::TestVariant,
+        BORROW | BORROW_MUT => NamePrefix::Borrow,
+        _ => return None,
+    };
+    let is_mutable = prefix_str == BORROW_MUT;
+
+    // Find the struct name by trying increasingly longer combinations of '$'-separated parts.
+    // - Shortest match (expect_variant_in_name=true): stop at first matching struct so the
+    //   remaining parts form the variant name. Correct when the attribute expects a variant.
+    // - Longest match (expect_variant_in_name=false): keep going to find the longest struct
+    //   name. Correct for Pack/Unpack/Borrow where no variant name follows the struct name.
+    let mut candidate = String::new();
+    let mut struct_name = String::new();
+    let mut struct_end = 0usize;
+    let mut struct_handle_idx = None;
+    for (i, part) in parts.iter().enumerate().skip(1) {
+        if i > 1 {
+            candidate.push_str(PUBLIC_STRUCT_DELIMITER);
+        }
+        candidate.push_str(part);
+        if let Some(h) = ctx.get_struct_handle(&candidate) {
+            struct_end = i + 1;
+            struct_name = candidate.clone();
+            struct_handle_idx = Some(h);
+            if expect_variant_in_name {
+                break; // shortest match: stop here so remaining parts form the variant name
+            }
+        }
+    }
+
+    if struct_end == 0 {
+        // No locally defined struct matches — not a struct API function.
+        return None;
+    }
+
+    // struct_handle_idx is always set when struct_end != 0 (they are assigned together in the
+    // loop above), so ? here only propagates None if the invariant is somehow violated.
+    let struct_handle_idx = struct_handle_idx?;
+    let struct_def_idx = ctx.get_struct_def_index(&struct_name)?;
+
+    // Remaining parts after the struct name (variant, offset, type_order, etc.)
+    let remaining = &parts[struct_end..];
+
+    let (variant_name, offset, type_order) = match name_prefix {
+        NamePrefix::Pack | NamePrefix::Unpack => {
+            if remaining.is_empty() {
+                // pack$S / unpack$S
+                (None, None, None)
+            } else {
+                // pack$S$Variant / unpack$S$Variant (variant name may itself contain '$')
+                (Some(remaining.join(PUBLIC_STRUCT_DELIMITER)), None, None)
+            }
         },
-        SignatureToken::MutableReference(inner) => match **inner {
-            SignatureToken::Struct(idx) => Some((idx, true)),
-            SignatureToken::StructInstantiation(idx, _) => Some((idx, true)),
-            _ => None,
+        NamePrefix::TestVariant => {
+            if remaining.is_empty() {
+                // test_variant requires a variant name — not a struct API function
+                return None;
+            }
+            (Some(remaining.join(PUBLIC_STRUCT_DELIMITER)), None, None)
         },
-        _ => None,
+        NamePrefix::Borrow => {
+            // Offsets and type_orders are numeric and cannot contain '$', so
+            // remaining[0] is always the offset and remaining[1] (if present) is type_order.
+            let (offset, type_order) = match remaining {
+                [o] => (o.parse::<u16>().ok()?, None),
+                [o, t] => (o.parse::<u16>().ok()?, Some(t.parse::<u16>().ok()?)),
+                _ => return None,
+            };
+            (None, Some(offset), type_order)
+        },
     };
 
-    match param_info {
-        Some((idx, param_is_mut)) => {
-            // Verify the reference points to the correct struct
-            if idx != struct_handle_idx {
-                return Err(
-                    PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                        "borrow field function parameter does not reference the correct struct",
-                    ),
-                );
-            }
-            // Verify mutability matches: borrow requires &S, borrow_mut requires &mut S
-            if is_mutable != param_is_mut {
-                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("borrow field function parameter mutability does not match the attribute (borrow vs borrow_mut)"));
-            }
-            Ok(())
-        },
-        None => Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow field function parameter must be a reference type")),
-    }
+    Some(ParsedApiData {
+        prefix: name_prefix,
+        is_mutable,
+        struct_def_idx,
+        struct_handle_idx,
+        struct_name,
+        variant_name,
+        offset,
+        type_order,
+    })
 }
 
-/// Extract the inner type from a reference return type.
-/// Returns the type that the reference points to, checking that mutability matches expectations.
-fn extract_return_inner_type(
-    return_sig: &[SignatureToken],
-    is_mutable: bool,
-) -> PartialVMResult<&SignatureToken> {
-    // Must return exactly one value
-    if return_sig.len() != 1 {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow field function must return exactly one value"));
-    }
+// ── Shared field-level helpers ────────────────────────────────────────────────
 
-    // Extract and validate the reference type
-    match &return_sig[0] {
-        SignatureToken::Reference(inner) if !is_mutable => Ok(&**inner),
-        SignatureToken::MutableReference(inner) if is_mutable => Ok(&**inner),
-        _ => Err(
-            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                "borrow field function return type mutability does not match the attribute",
-            ),
-        ),
-    }
-}
-
-/// Validate that borrow field function has correct parameter and return types.
-///
-/// Checks:
-/// 1. Parameter is a reference to the struct (&S or &mut S) with correct mutability
-/// 2. Return type is a reference (&FieldType or &mut FieldType) with correct mutability
-/// 3. Return type matches the specific field type at the given offset
-/// 4. For variants: type_order determines which field type to validate against
-/// 5. Offset is within valid bounds for the struct/variant
-fn validate_borrow_field_types(
-    module: &CompiledModule,
-    handle: &FunctionHandle,
-    struct_name: &str,
-    struct_handle_idx: StructHandleIndex,
-    struct_def_idx: StructDefinitionIndex,
-    offset: u16,
-    type_order: Option<u16>,
-    is_mutable: bool,
-    ctx: &StructApiContext,
-) -> PartialVMResult<()> {
-    // Validate parameter: must be a reference to the struct with correct mutability
-    validate_borrow_param(module, handle, struct_handle_idx, is_mutable)?;
-
-    // Validate return type: must be a reference with correct mutability
-    let return_sig = module.signature_at(handle.return_);
-    let actual_return_type = extract_return_inner_type(&return_sig.0, is_mutable)?;
-
-    let struct_def = &module.struct_defs()[struct_def_idx.0 as usize];
-
-    // Validate field type based on whether this is a regular struct or variant
-    match &struct_def.field_information {
-        StructFieldInformation::Native => {
-            // Native structs don't have accessible fields
-            Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("borrow field function cannot be used on a native struct"))
-        },
-
-        StructFieldInformation::Declared(fields) => {
-            // Regular struct: type_order must be None (3-part name: borrow$S$offset)
-            if type_order.is_some() {
-                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("borrow field function on a regular struct must not include a type_order component"));
-            }
-
-            // Validate offset is within bounds
-            if (offset as usize) >= fields.len() {
-                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("borrow field offset is out of bounds for the struct"));
-            }
-
-            // Validate field type matches return type
-            let expected_field_type = &fields[offset as usize].signature.0;
-            if actual_return_type != expected_field_type {
-                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("borrow field function return type does not match the field type at the given offset"));
-            }
-
+/// Validates that `token` is `Struct(expected)` or `StructInstantiation(expected, _)`.
+/// Canonical type parameter order is guaranteed by the upfront
+/// `check_signature_canonical_type_params` call in `check_struct_api_impl`.
+fn check_struct_token(token: &SignatureToken, expected: StructHandleIndex) -> PartialVMResult<()> {
+    match token {
+        SignatureToken::Struct(idx) | SignatureToken::StructInstantiation(idx, _)
+            if *idx == expected =>
+        {
             Ok(())
         },
-
-        StructFieldInformation::DeclaredVariants(_) => {
-            // Variant: require type_order in function name
-            let type_order = type_order
-                .ok_or_else(|| PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("borrow field function on an enum must include a type_order component in its name"))?;
-
-            let order_map = ctx.get_type_order_map(struct_name).ok_or_else(|| {
-                PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("internal error: no type order map found for enum")
-            })?;
-
-            // Find the expected field type for this (offset, type_order) combination
-            let expected_field_type = order_map
-                .iter()
-                .find(|((field_offset, _), order)| *field_offset == offset && **order == type_order)
-                .map(|((_, field_type), _)| field_type)
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                        "borrow field (offset, type_order) combination not found in the enum",
-                    )
-                })?;
-
-            // Verify the return type matches the expected field type
-            if actual_return_type != expected_field_type {
-                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("borrow field function return type does not match the field type at the given offset and type_order"));
-            }
-
-            Ok(())
-        },
+        _ => Err(struct_api_err("type does not match expected struct")),
     }
 }
 
 /// Helper to validate that a signature's types match a list of field definitions.
 /// Checks both count and type equality in order.
 fn validate_signature_against_fields(
-    sig: &move_binary_format::file_format::Signature,
-    fields: &[move_binary_format::file_format::FieldDefinition],
+    sig: &Signature,
+    fields: &[FieldDefinition],
 ) -> PartialVMResult<()> {
-    // Signature count must match field count
     if sig.0.len() != fields.len() {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("struct API function parameter or return count does not match the number of struct fields"));
+        return Err(struct_api_err("struct API function parameter or return count does not match the number of struct fields"));
     }
-
-    // Each signature type must match the corresponding field type in order
     for (i, field) in fields.iter().enumerate() {
         if sig.0[i] != field.signature.0 {
-            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message(format!("struct API function parameter or return type at position {} does not match the field type", i)));
+            return Err(struct_api_err(format!("struct API function parameter or return type at position {} does not match the field type", i)));
         }
     }
-
     Ok(())
 }
 
-/// Helper to validate that signature types match struct or variant field types in order.
-/// Used by both pack (validates parameters) and unpack (validates return types).
-///
-/// - For regular structs: validates against Declared fields
-/// - For enums with variant_name: validates against specific variant's fields
-/// - Rejects Native structs and mismatched struct/enum usage
-fn validate_signature_matches_fields(
+// ── Bytecode-level field-handle resolvers ─────────────────────────────────────
+//
+// Each resolver checks that the field/variant handle belongs to `expected` struct,
+// and (for generic instructions) that the type-parameter instantiation is canonical.
+
+fn resolve_field(
     module: &CompiledModule,
-    sig_idx: move_binary_format::file_format::SignatureIndex,
-    struct_def_idx: StructDefinitionIndex,
-    variant_name: Option<&str>,
-) -> PartialVMResult<()> {
-    let sig = module.signature_at(sig_idx);
-    let struct_def = &module.struct_defs()[struct_def_idx.0 as usize];
-
-    match &struct_def.field_information {
-        StructFieldInformation::Native => {
-            // Native structs cannot be packed/unpacked
-            Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("cannot pack/unpack a native struct"))
-        },
-        StructFieldInformation::Declared(fields) => {
-            // Regular struct: variant operations not allowed
-            if variant_name.is_some() {
-                return Err(
-                    PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                        "pack_variant/unpack_variant cannot be used on a regular (non-enum) struct",
-                    ),
-                );
-            }
-
-            validate_signature_against_fields(sig, fields)
-        },
-        StructFieldInformation::DeclaredVariants(variants) => {
-            // Enum: variant operations required
-            let variant_name = variant_name
-                .ok_or_else(|| PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("pack/unpack cannot be used on an enum; use pack_variant/unpack_variant instead"))?;
-
-            // Find the variant by name
-            let variant = variants
-                .iter()
-                .find(|v| {
-                    let name = module.identifier_at(v.name);
-                    name.as_str() == variant_name
-                })
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                        .with_message("variant name in function name not found in the enum")
-                })?;
-
-            validate_signature_against_fields(sig, &variant.fields)
-        },
+    idx: FieldHandleIndex,
+    expected: StructDefinitionIndex,
+) -> PartialVMResult<MemberCount> {
+    let fh = module.field_handle_at(idx);
+    if fh.owner != expected {
+        return Err(struct_api_err(
+            "borrow field instruction references a field belonging to a different struct",
+        ));
     }
+    Ok(fh.field)
 }
 
-/// Validate that the return type of pack$StructName matches the StructName type.
-/// The function should return exactly one value of the struct type.
-fn validate_pack_return_type(
+fn resolve_field_generic(
     module: &CompiledModule,
-    handle: &FunctionHandle,
-    struct_handle_idx: StructHandleIndex,
-) -> PartialVMResult<()> {
-    // Get the return signature
-    let return_sig = module.signature_at(handle.return_);
-
-    // Pack functions should return exactly one value
-    if return_sig.0.len() != 1 {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("pack function must return exactly one value"));
+    idx: FieldInstantiationIndex,
+    expected: StructDefinitionIndex,
+    n: usize,
+) -> PartialVMResult<MemberCount> {
+    let inst = module.field_instantiation_at(idx);
+    let fh = module.field_handle_at(inst.handle);
+    if fh.owner != expected {
+        return Err(struct_api_err(
+            "borrow field instruction references a field belonging to a different struct",
+        ));
     }
+    ensure_canonical_type_params(&module.signature_at(inst.type_parameters).0, n)?;
+    Ok(fh.field)
+}
 
-    // Check that the return type is the struct type
-    let return_type = &return_sig.0[0];
-    match return_type {
-        SignatureToken::Struct(idx) => {
-            if *idx != struct_handle_idx {
-                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("pack function return type does not match the struct"));
-            }
-        },
-        SignatureToken::StructInstantiation(idx, _) => {
-            if *idx != struct_handle_idx {
-                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("pack function return type does not match the struct"));
-            }
-        },
-        _ => {
-            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("pack function must return the struct type"));
-        },
+fn resolve_variant_field(
+    module: &CompiledModule,
+    idx: VariantFieldHandleIndex,
+    expected: StructDefinitionIndex,
+) -> PartialVMResult<MemberCount> {
+    let vfh = module.variant_field_handle_at(idx);
+    if vfh.struct_index != expected {
+        return Err(struct_api_err(
+            "borrow variant field instruction references a field belonging to a different struct",
+        ));
     }
-
-    Ok(())
+    Ok(vfh.field)
 }
 
-/// Validate that the parameters of pack$StructName match the struct field types in order.
-/// The function should take N parameters matching the N field types of the struct.
-fn validate_pack_parameters(
+fn resolve_variant_field_generic(
     module: &CompiledModule,
-    handle: &FunctionHandle,
-    struct_def_idx: StructDefinitionIndex,
-) -> PartialVMResult<()> {
-    validate_signature_matches_fields(module, handle.parameters, struct_def_idx, None)
+    idx: VariantFieldInstantiationIndex,
+    expected: StructDefinitionIndex,
+    n: usize,
+) -> PartialVMResult<MemberCount> {
+    let inst = module.variant_field_instantiation_at(idx);
+    let vfh = module.variant_field_handle_at(inst.handle);
+    if vfh.struct_index != expected {
+        return Err(struct_api_err(
+            "borrow variant field instruction references a field belonging to a different struct",
+        ));
+    }
+    ensure_canonical_type_params(&module.signature_at(inst.type_parameters).0, n)?;
+    Ok(vfh.field)
 }
 
-/// Validate that the parameters of pack$StructName$VariantName match the variant field types in order.
-/// The function should take N parameters matching the N field types of the specific variant.
-fn validate_pack_variant_parameters(
-    module: &CompiledModule,
-    handle: &FunctionHandle,
-    struct_def_idx: StructDefinitionIndex,
-    variant_name: &str,
-) -> PartialVMResult<()> {
-    validate_signature_matches_fields(
-        module,
-        handle.parameters,
-        struct_def_idx,
-        Some(variant_name),
-    )
-}
+// ── Bytecode pattern checker ──────────────────────────────────────────────────
 
-/// Validate that the return types of unpack$StructName match the struct field types in order.
-/// The function should return a tuple of N values matching the N field types of the struct.
-fn validate_unpack_return_types(
-    module: &CompiledModule,
-    handle: &FunctionHandle,
-    struct_def_idx: StructDefinitionIndex,
-) -> PartialVMResult<()> {
-    validate_signature_matches_fields(module, handle.return_, struct_def_idx, None)
-}
-
-/// Validate that the return types of unpack$StructName$VariantName match the variant field types in order.
-/// The function should return a tuple of N values matching the N field types of the specific variant.
-fn validate_unpack_variant_return_types(
-    module: &CompiledModule,
-    handle: &FunctionHandle,
-    struct_def_idx: StructDefinitionIndex,
-    variant_name: &str,
-) -> PartialVMResult<()> {
-    validate_signature_matches_fields(module, handle.return_, struct_def_idx, Some(variant_name))
-}
-
-/// Helper function to check bytecode patterns of the form:
+/// Verifies that a struct API wrapper's code unit matches the canonical pattern:
 /// MoveLoc(0), MoveLoc(1), ..., MoveLoc(n-1)
 /// <expected_bytecode>
 /// Ret
 ///
-/// `num_move_locs`: if `Some(n)`, exactly `n` MoveLoc instructions are required before the
-/// operation; if `None`, any number of MoveLoc instructions is accepted (pack-like, where n
-/// equals the number of fields). In both cases the MoveLoc instructions must use consecutive
-/// local indices starting from 0, matching the order in which the compiler emits struct API
-/// wrappers. This prevents hand-crafted bytecode from reordering arguments and still passing
-/// verification.
-fn pattern_check_for_pack_like<F>(
+/// Requires exactly `num_move_locs` MoveLoc instructions before the operation, using
+/// consecutive local indices starting from 0, matching the order in which the compiler
+/// emits struct API wrappers. This prevents hand-crafted bytecode from reordering arguments
+/// and still passing verification.
+fn check_struct_api_bytecode_pattern<F>(
     api_name: &str,
     code: &CodeUnit,
-    num_move_locs: Option<usize>,
+    num_move_locs: usize,
     is_expected_bytecode: F,
 ) -> PartialVMResult<()>
 where
     F: Fn(&Bytecode) -> bool,
 {
-    if code.code.len() < 2 {
-        return Err(
-            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(format!(
-                "{} function bytecode must have at least 2 instructions",
-                api_name
-            )),
-        );
+    if code.code.len() != num_move_locs + 2 {
+        return Err(struct_api_err(format!(
+            "{} function must have exactly {} bytecode instructions (MoveLoc*, <op>, Ret)",
+            api_name,
+            num_move_locs + 2
+        )));
     }
 
-    if let Some(n) = num_move_locs {
-        if code.code.len() != n + 2 {
-            return Err(
-                PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(format!(
-                    "{} function must have exactly {} bytecode instructions (MoveLoc, <op>, Ret)",
-                    api_name,
-                    n + 2
-                )),
-            );
-        }
-    }
-
-    // Check last bytecode is Ret
     if !matches!(code.code[code.code.len() - 1], Bytecode::Ret) {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message(format!("{} function bytecode must end with Ret", api_name)));
+        return Err(struct_api_err(format!(
+            "{} function bytecode must end with Ret",
+            api_name
+        )));
     }
 
-    // Check second-to-last bytecode is the expected operation
     if !is_expected_bytecode(&code.code[code.code.len() - 2]) {
-        return Err(
-            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(format!(
-                "{} function bytecode must have the expected operation second-to-last",
-                api_name
-            )),
-        );
+        return Err(struct_api_err(format!(
+            "{} function bytecode must have the expected operation second-to-last",
+            api_name
+        )));
     }
 
     // Check all preceding bytecodes are MoveLoc with indices 0, 1, 2, ... in order.
-    // The number of MoveLoc instructions equals the number of fields/parameters.
     let num_actual_move_locs = code.code.len() - 2;
     for (i, bc) in code.code[..num_actual_move_locs].iter().enumerate() {
         match bc {
             Bytecode::MoveLoc(idx) if *idx as usize == i => {},
             _ => {
-                return Err(
-                    PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(format!(
-                        "{} function must load arguments in sequential order starting from local 0",
-                        api_name
-                    )),
-                )
+                return Err(struct_api_err(format!(
+                    "{} function must load arguments in sequential order starting from local 0",
+                    api_name
+                )))
             },
         }
     }
@@ -1029,334 +699,578 @@ where
     Ok(())
 }
 
-/// Check the pattern of the pack API.
-/// Pattern:
-/// MoveLoc(...)
-/// Pack(...) | PackGeneric(...)
-/// Ret
-fn pattern_check_for_pack(code: &CodeUnit) -> PartialVMResult<()> {
-    pattern_check_for_pack_like("pack", code, None, |bc| {
-        // don't need to check the struct definition index because the return type is already checked.
-        matches!(bc, Bytecode::Pack(_) | Bytecode::PackGeneric(_))
-    })
-}
-
 /// Enum to represent either a direct variant handle index or a generic variant instantiation index
 enum VariantIndexRef {
-    Direct(move_binary_format::file_format::StructVariantHandleIndex),
-    Generic(move_binary_format::file_format::StructVariantInstantiationIndex),
+    Direct(StructVariantHandleIndex),
+    Generic(StructVariantInstantiationIndex),
 }
 
-/// Helper to extract and validate variant index from bytecode.
-/// Takes a matcher closure that identifies the relevant variant bytecode instructions
-/// and returns the appropriate index type (direct or generic).
-fn extract_and_validate_variant_index<F>(
-    resolver: &BinaryIndexedView,
-    expected_variant_idx: u16,
-    code: &CodeUnit,
-    matcher: F,
-) -> PartialVMResult<()>
-where
-    F: Fn(&Bytecode) -> Option<VariantIndexRef>,
-{
-    // Find the variant instruction and extract its index
-    let mut bytecode_variant_idx = None;
-    for bc in &code.code {
-        if let Some(idx_ref) = matcher(bc) {
-            bytecode_variant_idx = Some(match idx_ref {
-                VariantIndexRef::Direct(idx) => {
-                    // For non-generic variants, resolve directly
-                    resolver.struct_variant_handle_at(idx)?.variant
-                },
-                VariantIndexRef::Generic(idx) => {
-                    // For generic variants, resolve through instantiation
-                    let inst = resolver.struct_variant_instantiation_at(idx)?;
-                    resolver.struct_variant_handle_at(inst.handle)?.variant
-                },
-            });
-            break;
+// ── Per-function validator ────────────────────────────────────────────────────
+
+/// Holds all the per-function context needed for Phase 2 validation, so it does not need to
+/// be threaded as individual parameters through every helper.
+struct StructApiWrapperValidator<'m> {
+    module: &'m CompiledModule,
+    ctx: &'m StructApiContext,
+    handle: &'m FunctionHandle,
+    code: &'m CodeUnit,
+    struct_def_idx: StructDefinitionIndex,
+    struct_handle_idx: StructHandleIndex,
+    num_type_params: usize,
+}
+
+impl<'m> StructApiWrapperValidator<'m> {
+    // ── Signature-level checks ────────────────────────────────────────────────
+
+    /// Verifies that every `StructInstantiation(struct_handle_idx, ...)` appearing in the
+    /// function's declared parameter and return signatures uses canonical type parameters.
+    ///
+    /// This covers signature-level instantiations. Bytecode-level instantiations (in the
+    /// struct-def, field, and variant instantiation pools) are checked separately at their
+    /// respective call sites via `ensure_canonical_type_params`.
+    fn check_signature_canonical_type_params(&self) -> PartialVMResult<()> {
+        for sig_idx in [self.handle.parameters, self.handle.return_] {
+            for token in &self.module.signature_at(sig_idx).0 {
+                check_token_canonical_type_params(
+                    token,
+                    self.struct_handle_idx,
+                    self.num_type_params,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Validates that signature types (parameters or returns) match the struct or variant field
+    /// types in order. `sig_idx` is `handle.parameters` for pack and `handle.return_` for unpack.
+    ///
+    /// - For regular structs: validates against Declared fields
+    /// - For enums with variant_name: validates against specific variant's fields
+    /// - Rejects Native structs and mismatched struct/enum usage
+    fn validate_signature_matches_fields(
+        &self,
+        sig_idx: SignatureIndex,
+        variant_name: Option<&str>,
+    ) -> PartialVMResult<()> {
+        let sig = self.module.signature_at(sig_idx);
+        let struct_def = &self.module.struct_defs()[self.struct_def_idx.0 as usize];
+
+        match &struct_def.field_information {
+            StructFieldInformation::Native => {
+                Err(struct_api_err("cannot pack/unpack a native struct"))
+            },
+            StructFieldInformation::Declared(fields) => {
+                if variant_name.is_some() {
+                    return Err(struct_api_err(
+                        "pack_variant/unpack_variant cannot be used on a regular (non-enum) struct",
+                    ));
+                }
+                validate_signature_against_fields(sig, fields)
+            },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                let variant_name = variant_name.ok_or_else(|| {
+                    struct_api_err(
+                        "pack/unpack cannot be used on an enum; use pack_variant/unpack_variant instead",
+                    )
+                })?;
+                let variant = variants
+                    .iter()
+                    .find(|v| self.module.identifier_at(v.name).as_str() == variant_name)
+                    .ok_or_else(|| {
+                        struct_api_err("variant name in function name not found in the enum")
+                    })?;
+                validate_signature_against_fields(sig, &variant.fields)
+            },
         }
     }
 
-    // Ensure we found a variant instruction
-    let bytecode_variant_idx = bytecode_variant_idx.ok_or_else(|| {
-        PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("could not find variant instruction in struct API function bytecode")
-    })?;
-
-    // Validate the extracted index matches the expected index
-    if bytecode_variant_idx != expected_variant_idx {
-        return Err(
-            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                "variant index in bytecode does not match the variant index in the attribute",
-            ),
-        );
+    /// Checks that the return signature is exactly one value of the expected struct type.
+    /// Used for pack and pack_variant functions.
+    fn check_pack_return_type(&self) -> PartialVMResult<()> {
+        let ret = self.module.signature_at(self.handle.return_);
+        if ret.0.len() != 1 {
+            return Err(struct_api_err(
+                "pack function must return exactly one value",
+            ));
+        }
+        check_struct_token(&ret.0[0], self.struct_handle_idx)
     }
 
-    Ok(())
-}
+    /// Checks that the parameter signature is exactly one value of the expected struct type
+    /// (by value for unpack/unpack_variant, by immutable reference for test_variant).
+    fn check_struct_param(&self, as_ref: bool) -> PartialVMResult<()> {
+        let param_sig = self.module.signature_at(self.handle.parameters);
+        if param_sig.0.len() != 1 {
+            return Err(struct_api_err("function must have exactly one parameter"));
+        }
+        let param_type = &param_sig.0[0];
+        if as_ref {
+            match param_type {
+                SignatureToken::Reference(inner) => {
+                    check_struct_token(inner, self.struct_handle_idx)
+                },
+                _ => Err(struct_api_err(
+                    "test_variant function parameter must be an immutable reference to the struct",
+                )),
+            }
+        } else {
+            check_struct_token(param_type, self.struct_handle_idx)
+        }
+    }
 
-/// Check the pattern of the pack variant API.
-/// Pattern:
-/// MoveLoc(...)
-/// PackVariant(...) | PackVariantGeneric(...)
-/// Ret
-/// Also validates that the variant index in the bytecode matches the expected variant index.
-fn pattern_check_for_pack_variant(
-    resolver: &BinaryIndexedView,
-    expected_variant_idx: u16,
-    code: &CodeUnit,
-) -> PartialVMResult<()> {
-    // Check the basic pattern
-    pattern_check_for_pack_like("pack_variant", code, None, |bc| {
-        matches!(
-            bc,
-            Bytecode::PackVariant(_) | Bytecode::PackVariantGeneric(_)
+    /// Checks that the parameter signature is exactly one reference to the expected struct type,
+    /// with the given mutability.
+    fn check_borrow_param(&self, is_mutable: bool) -> PartialVMResult<()> {
+        let param_sig = self.module.signature_at(self.handle.parameters);
+        if param_sig.0.len() != 1 {
+            return Err(struct_api_err(
+                "borrow field function must have exactly one parameter",
+            ));
+        }
+        let param_type = &param_sig.0[0];
+        let (idx, param_is_mutable) = match param_type {
+            SignatureToken::Reference(inner) | SignatureToken::MutableReference(inner) => {
+                let param_is_mutable = matches!(param_type, SignatureToken::MutableReference(_));
+                match inner.as_ref() {
+                    SignatureToken::Struct(idx) | SignatureToken::StructInstantiation(idx, _) => {
+                        (*idx, param_is_mutable)
+                    },
+                    _ => {
+                        return Err(struct_api_err(
+                            "borrow field function parameter must be a reference type",
+                        ))
+                    },
+                }
+            },
+            _ => {
+                return Err(struct_api_err(
+                    "borrow field function parameter must be a reference type",
+                ))
+            },
+        };
+        if idx != self.struct_handle_idx {
+            return Err(struct_api_err(
+                "borrow field function parameter does not reference the correct struct",
+            ));
+        }
+        if is_mutable != param_is_mutable {
+            return Err(struct_api_err("borrow field function parameter mutability does not match the attribute (borrow vs borrow_mut)"));
+        }
+        Ok(())
+    }
+
+    /// Validates that the variant index stored in a PackVariant/UnpackVariant/TestVariant
+    /// attribute matches the variant named in the function name. Returns the validated index.
+    fn validate_variant_index(
+        &self,
+        variant_name: &str,
+        attr_variant_idx: VariantIndex,
+    ) -> PartialVMResult<VariantIndex> {
+        let struct_def = &self.module.struct_defs()[self.struct_def_idx.0 as usize];
+        let variants = match &struct_def.field_information {
+            StructFieldInformation::DeclaredVariants(variants) => variants,
+            StructFieldInformation::Declared(_) | StructFieldInformation::Native => {
+                return Err(struct_api_err("pack_variant/unpack_variant/test_variant attribute used on a struct without variants"));
+            },
+        };
+        let found = variants
+            .iter()
+            .enumerate()
+            .find(|(_, v)| self.module.identifier_at(v.name).as_str() == variant_name)
+            .and_then(|(idx, _)| u16::try_from(idx).ok());
+        match found {
+            Some(idx) if idx == attr_variant_idx => Ok(idx),
+            _ => Err(struct_api_err(
+                "variant name in function name does not match the variant index in the attribute",
+            )),
+        }
+    }
+
+    /// Validates the return type of a borrow field function.
+    ///
+    /// Checks that the return type is a reference with the correct mutability, and that
+    /// the referenced type matches the field type at `(offset, type_order)` in the struct.
+    /// Returns the validated field type (cloned) so the bytecode checker can use it as a
+    /// trusted anchor for the completeness check.
+    fn validate_borrow_return_type(
+        &self,
+        struct_name: &str,
+        offset: u16,
+        type_order: Option<u16>,
+        is_mutable: bool,
+    ) -> PartialVMResult<SignatureToken> {
+        let ret = self.module.signature_at(self.handle.return_);
+        if ret.0.len() != 1 {
+            return Err(struct_api_err(
+                "borrow field function must return exactly one value",
+            ));
+        }
+        let actual_inner = match &ret.0[0] {
+            SignatureToken::Reference(inner) if !is_mutable => inner.as_ref(),
+            SignatureToken::MutableReference(inner) if is_mutable => inner.as_ref(),
+            _ => {
+                return Err(struct_api_err(
+                    "borrow field function return type mutability does not match the attribute",
+                ))
+            },
+        };
+
+        let struct_def = &self.module.struct_defs()[self.struct_def_idx.0 as usize];
+        let expected: &SignatureToken = match &struct_def.field_information {
+            StructFieldInformation::Native => {
+                return Err(struct_api_err(
+                    "borrow field function cannot be used on a native struct",
+                ))
+            },
+            StructFieldInformation::Declared(fields) => {
+                if type_order.is_some() {
+                    return Err(struct_api_err("borrow field function on a regular struct must not include a type_order component"));
+                }
+                if (offset as usize) >= fields.len() {
+                    return Err(struct_api_err(
+                        "borrow field offset is out of bounds for the struct",
+                    ));
+                }
+                &fields[offset as usize].signature.0
+            },
+            StructFieldInformation::DeclaredVariants(_) => {
+                let type_order = type_order.ok_or_else(|| {
+                    struct_api_err("borrow field function on an enum must include a type_order component in its name")
+                })?;
+                let order_map = self.ctx.get_type_order_map(struct_name).ok_or_else(|| {
+                    struct_api_err("internal error: no type order map found for enum")
+                })?;
+                order_map
+                    .iter()
+                    .find(|((fo, _), ord)| *fo == offset && **ord == type_order)
+                    .map(|((_, ft), _)| ft)
+                    .ok_or_else(|| {
+                        struct_api_err(
+                            "borrow field (offset, type_order) combination not found in the enum",
+                        )
+                    })?
+            },
+        };
+
+        if actual_inner != expected {
+            return Err(struct_api_err(
+                "borrow field function return type does not match the field type at the given offset",
+            ));
+        }
+        Ok(expected.clone())
+    }
+
+    // ── Bytecode-level checks ─────────────────────────────────────────────────
+
+    /// Validates that the `StructDefInstantiation` at `sdi_idx` references this struct's
+    /// definition index and uses canonical type parameters `[TypeParam(0), ..., TypeParam(n-1)]`.
+    fn check_struct_def_instantiation(
+        &self,
+        sdi_idx: StructDefInstantiationIndex,
+    ) -> PartialVMResult<()> {
+        let sdi = self.module.struct_instantiation_at(sdi_idx);
+        if sdi.def != self.struct_def_idx {
+            return Err(struct_api_err(
+                "generic struct instruction references wrong struct definition",
+            ));
+        }
+        ensure_canonical_type_params(
+            &self.module.signature_at(sdi.type_parameters).0,
+            self.num_type_params,
         )
-    })?;
-
-    // Extract and validate variant index
-    extract_and_validate_variant_index(resolver, expected_variant_idx, code, |bc| match bc {
-        Bytecode::PackVariant(idx) => Some(VariantIndexRef::Direct(*idx)),
-        Bytecode::PackVariantGeneric(idx) => Some(VariantIndexRef::Generic(*idx)),
-        _ => None,
-    })
-}
-
-/// Check the pattern of the unpack API.
-/// Pattern:
-/// MoveLoc(...)
-/// Unpack(...) | UnpackGeneric(...)
-/// Ret
-fn pattern_check_for_unpack(code: &CodeUnit) -> PartialVMResult<()> {
-    pattern_check_for_pack_like("unpack", code, Some(1), |bc| {
-        // don't need to check the struct definition index because the parameter type is already checked.
-        matches!(bc, Bytecode::Unpack(_) | Bytecode::UnpackGeneric(_))
-    })
-}
-
-/// Check the pattern of the unpack variant API.
-/// Pattern:
-/// MoveLoc(...)
-/// UnpackVariant(...) | UnpackVariantGeneric(...)
-/// Ret
-/// Also validates that the variant index in the bytecode matches the expected variant index.
-fn pattern_check_for_unpack_variant(
-    resolver: &BinaryIndexedView,
-    expected_variant_idx: u16,
-    code: &CodeUnit,
-) -> PartialVMResult<()> {
-    // Check the basic pattern
-    pattern_check_for_pack_like("unpack_variant", code, Some(1), |bc| {
-        matches!(
-            bc,
-            Bytecode::UnpackVariant(_) | Bytecode::UnpackVariantGeneric(_)
-        )
-    })?;
-
-    // Extract and validate variant index
-    extract_and_validate_variant_index(resolver, expected_variant_idx, code, |bc| match bc {
-        Bytecode::UnpackVariant(idx) => Some(VariantIndexRef::Direct(*idx)),
-        Bytecode::UnpackVariantGeneric(idx) => Some(VariantIndexRef::Generic(*idx)),
-        _ => None,
-    })
-}
-
-/// Check the pattern of the test variant API.
-/// Pattern:
-/// MoveLoc(...)
-/// TestVariant(...) | TestVariantGeneric(...)
-/// Ret
-/// Also validates that the variant index in the bytecode matches the expected variant index.
-fn pattern_check_for_test_variant(
-    resolver: &BinaryIndexedView,
-    expected_variant_idx: u16,
-    code: &CodeUnit,
-) -> PartialVMResult<()> {
-    // Check the basic pattern
-    pattern_check_for_pack_like("test_variant", code, Some(1), |bc| {
-        matches!(
-            bc,
-            Bytecode::TestVariant(_) | Bytecode::TestVariantGeneric(_)
-        )
-    })?;
-
-    // Extract and validate variant index
-    extract_and_validate_variant_index(resolver, expected_variant_idx, code, |bc| match bc {
-        Bytecode::TestVariant(idx) => Some(VariantIndexRef::Direct(*idx)),
-        Bytecode::TestVariantGeneric(idx) => Some(VariantIndexRef::Generic(*idx)),
-        _ => None,
-    })
-}
-
-/// Extract field offset from a borrow field bytecode and check mutability.
-/// Returns the field offset if the bytecode is a valid borrow field operation
-/// with the expected mutability, or an error otherwise.
-fn get_borrow_field_offset(
-    resolver: &BinaryIndexedView,
-    bytecode: &Bytecode,
-    expected_is_mutable: bool,
-) -> PartialVMResult<MemberCount> {
-    // Extract (is_mutable, offset) pair based on bytecode type
-    let (is_mutable, offset) = match bytecode {
-        Bytecode::ImmBorrowField(fh) => (false, resolver.field_handle_at(*fh)?.field),
-        Bytecode::MutBorrowField(fh) => (true, resolver.field_handle_at(*fh)?.field),
-        Bytecode::ImmBorrowFieldGeneric(fi) => {
-            let inst = resolver.field_instantiation_at(*fi)?;
-            (false, resolver.field_handle_at(inst.handle)?.field)
-        },
-        Bytecode::MutBorrowFieldGeneric(fi) => {
-            let inst = resolver.field_instantiation_at(*fi)?;
-            (true, resolver.field_handle_at(inst.handle)?.field)
-        },
-        Bytecode::ImmBorrowVariantField(vfh) => {
-            (false, resolver.variant_field_handle_at(*vfh)?.field)
-        },
-        Bytecode::MutBorrowVariantField(vfh) => {
-            (true, resolver.variant_field_handle_at(*vfh)?.field)
-        },
-        Bytecode::ImmBorrowVariantFieldGeneric(vfi) => {
-            let inst = resolver.variant_field_instantiation_at(*vfi)?;
-            (false, resolver.variant_field_handle_at(inst.handle)?.field)
-        },
-        Bytecode::MutBorrowVariantFieldGeneric(vfi) => {
-            let inst = resolver.variant_field_instantiation_at(*vfi)?;
-            (true, resolver.variant_field_handle_at(inst.handle)?.field)
-        },
-        _ => return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("struct API function contains an unexpected instruction (expected a borrow field operation)")),
-    };
-
-    // Validate mutability matches expected
-    if is_mutable != expected_is_mutable {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow field instruction mutability does not match the attribute (borrow vs borrow_mut)"));
     }
 
-    Ok(offset)
-}
-
-/// Validates that a BorrowVariantField instruction contains the complete and ordered
-/// set of variants for the given offset and type.
-///
-/// For BorrowVariantField instructions, the VariantFieldHandle.variants must contain:
-/// 1. ALL variants that have a field at the given offset with the same type (completeness)
-/// 2. The variants must be in ascending order by their variant index (ordering)
-///
-/// This function uses the pre-computed variant_indices_map from StructApiContext to efficiently
-/// validate variant completeness without recomputing the variant list.
-fn validate_variant_field_completeness(
-    resolver: &BinaryIndexedView,
-    module: &CompiledModule,
-    bytecode: &Bytecode,
-    ctx: &StructApiContext,
-) -> PartialVMResult<()> {
-    // Extract variant field handle based on bytecode type
-    let variant_field_handle = match bytecode {
-        Bytecode::ImmBorrowVariantField(vfh) | Bytecode::MutBorrowVariantField(vfh) => {
-            resolver.variant_field_handle_at(*vfh)?
-        },
-        Bytecode::ImmBorrowVariantFieldGeneric(vfi)
-        | Bytecode::MutBorrowVariantFieldGeneric(vfi) => {
-            let inst = resolver.variant_field_instantiation_at(*vfi)?;
-            resolver.variant_field_handle_at(inst.handle)?
-        },
-        _ => return Ok(()), // Not a variant field borrow, nothing to check
-    };
-
-    let struct_def = resolver.struct_def_at(variant_field_handle.struct_index)?;
-
-    // Get the enum variants
-    let enum_variants = match &struct_def.field_information {
-        StructFieldInformation::DeclaredVariants(variants) => variants,
-        _ => {
-            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("borrow variant field instruction used on a non-enum struct"))
-        }, // Should be enum
-    };
-
-    // Get struct name to look up the pre-computed variant indices map
-    let struct_handle = module.struct_handle_at(struct_def.struct_handle);
-    let struct_name = module.identifier_at(struct_handle.name).as_str();
-
-    let variant_indices_map = ctx.get_variant_indices_map(struct_name).ok_or_else(|| {
-        PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("internal error: no variant indices map found for enum")
-    })?;
-
-    let offset = variant_field_handle.field;
-    let actual_variants = &variant_field_handle.variants;
-
-    if actual_variants.is_empty() {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow variant field instruction must specify at least one variant"));
+    /// Check the bytecode pattern for pack:
+    /// MoveLoc(0), ..., MoveLoc(n-1), Pack/PackGeneric, Ret
+    fn check_pack_pattern(&self) -> PartialVMResult<()> {
+        let struct_def = &self.module.struct_defs()[self.struct_def_idx.0 as usize];
+        let num_fields = match &struct_def.field_information {
+            StructFieldInformation::Declared(fields) => fields.len(),
+            StructFieldInformation::Native => {
+                return Err(struct_api_err(
+                    "internal error: pack pattern check reached for native struct",
+                ))
+            },
+            StructFieldInformation::DeclaredVariants(_) => {
+                return Err(struct_api_err(
+                    "internal error: pack pattern check reached for enum struct",
+                ))
+            },
+        };
+        // Pre-validate the PackGeneric instantiation outside the closure.
+        let generic_ok = match self.code.code.get(self.code.code.len().wrapping_sub(2)) {
+            Some(Bytecode::PackGeneric(sdi_idx)) => {
+                self.check_struct_def_instantiation(*sdi_idx)?;
+                true
+            },
+            _ => false,
+        };
+        check_struct_api_bytecode_pattern(PACK, self.code, num_fields, |bc| match bc {
+            Bytecode::Pack(def_idx) => *def_idx == self.struct_def_idx,
+            Bytecode::PackGeneric(_) => generic_ok,
+            _ => false,
+        })
     }
 
-    // Get the type for the first variant in actual_variants to determine which type group
-    let first_variant_idx = actual_variants[0];
-
-    // Safety: the bounds checker (which runs before this verifier phase) already validates
-    // that all variant indices in VariantFieldHandle.variants are within bounds, so
-    // first_variant_idx is guaranteed to be a valid index into enum_variants. The check
-    // below is an extra defensive layer.
-    if (first_variant_idx as usize) >= enum_variants.len() {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow variant field instruction variant index is out of bounds"));
+    /// Check the bytecode pattern for unpack:
+    /// MoveLoc(0), Unpack/UnpackGeneric, Ret
+    fn check_unpack_pattern(&self) -> PartialVMResult<()> {
+        // Pre-validate the UnpackGeneric instantiation outside the closure.
+        let generic_ok = match self.code.code.get(self.code.code.len().wrapping_sub(2)) {
+            Some(Bytecode::UnpackGeneric(sdi_idx)) => {
+                self.check_struct_def_instantiation(*sdi_idx)?;
+                true
+            },
+            _ => false,
+        };
+        check_struct_api_bytecode_pattern(UNPACK, self.code, 1, |bc| match bc {
+            Bytecode::Unpack(def_idx) => *def_idx == self.struct_def_idx,
+            Bytecode::UnpackGeneric(_) => generic_ok,
+            _ => false,
+        })
     }
 
-    let first_variant_def = &enum_variants[first_variant_idx as usize];
-    let first_variant_fields = &first_variant_def.fields;
-
-    if (offset as usize) >= first_variant_fields.len() {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow variant field instruction field offset is out of bounds"));
-    }
-
-    let expected_type = &first_variant_fields[offset as usize].signature.0;
-
-    // Look up the expected variants from the pre-computed map
-    // Note: expected_variants is guaranteed to be in ascending order by construction
-    // (see build_variant_type_order_and_indices_map)
-    let expected_variants = variant_indices_map
-        .get(&(offset, expected_type.clone()))
-        .ok_or_else(|| {
-            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                "internal error: (offset, type) pair not found in variant indices map",
-            )
+    /// Shared pattern check for variant operations (pack_variant, unpack_variant, test_variant).
+    ///
+    /// Runs the MoveLoc*–<op>–Ret shape check, then scans the code for the variant instruction,
+    /// verifies that the handle belongs to `self.struct_def_idx`, and checks that the variant
+    /// index matches `expected_variant_idx`.
+    fn check_variant_op_pattern(
+        &self,
+        api_name: &str,
+        num_move_locs: usize,
+        expected_variant_idx: VariantIndex,
+        to_variant_ref: impl Fn(&Bytecode) -> Option<VariantIndexRef>,
+    ) -> PartialVMResult<()> {
+        check_struct_api_bytecode_pattern(api_name, self.code, num_move_locs, |bc| {
+            to_variant_ref(bc).is_some()
         })?;
 
-    // Check both completeness and ordering in one comparison:
-    // Since expected_variants is already sorted in ascending order, we just need to
-    // verify that actual_variants exactly matches expected_variants.
-    if actual_variants != expected_variants.as_slice() {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow variant field instruction does not cover exactly the required set of variants (must include all variants with this field type at this offset, in ascending order)"));
+        // Scan for the variant instruction and validate struct ownership + variant index.
+        let mut found_idx = None;
+        for bc in &self.code.code {
+            if let Some(idx_ref) = to_variant_ref(bc) {
+                let (variant_idx, struct_idx) = match idx_ref {
+                    VariantIndexRef::Direct(idx) => {
+                        let handle = self.module.struct_variant_handle_at(idx);
+                        (handle.variant, handle.struct_index)
+                    },
+                    VariantIndexRef::Generic(idx) => {
+                        let inst = self.module.struct_variant_instantiation_at(idx);
+                        let handle = self.module.struct_variant_handle_at(inst.handle);
+                        ensure_canonical_type_params(
+                            &self.module.signature_at(inst.type_parameters).0,
+                            self.num_type_params,
+                        )?;
+                        (handle.variant, handle.struct_index)
+                    },
+                };
+                if struct_idx != self.struct_def_idx {
+                    return Err(struct_api_err(
+                        "variant instruction references a variant belonging to a different struct",
+                    ));
+                }
+                found_idx = Some(variant_idx);
+                break;
+            }
+        }
+
+        let found_idx = found_idx.ok_or_else(|| {
+            struct_api_err("could not find variant instruction in struct API function bytecode")
+        })?;
+        if found_idx != expected_variant_idx {
+            return Err(struct_api_err(
+                "variant index in bytecode does not match the variant index in the attribute",
+            ));
+        }
+        Ok(())
     }
 
-    Ok(())
-}
+    /// Check the bytecode pattern for pack_variant:
+    /// MoveLoc(0), ..., MoveLoc(n-1), PackVariant/PackVariantGeneric, Ret
+    fn check_pack_variant_pattern(
+        &self,
+        expected_variant_idx: VariantIndex,
+    ) -> PartialVMResult<()> {
+        let struct_def = &self.module.struct_defs()[self.struct_def_idx.0 as usize];
+        let num_fields = match &struct_def.field_information {
+            StructFieldInformation::DeclaredVariants(variants) => variants
+                .get(expected_variant_idx as usize)
+                .map(|v| v.fields.len())
+                .ok_or_else(|| {
+                    struct_api_err("internal error: could not resolve variant field count")
+                })?,
+            StructFieldInformation::Declared(_) | StructFieldInformation::Native => {
+                return Err(struct_api_err(
+                    "internal error: pack_variant pattern check reached for non-enum struct",
+                ))
+            },
+        };
+        self.check_variant_op_pattern(
+            PACK_VARIANT,
+            num_fields,
+            expected_variant_idx,
+            |bc| match bc {
+                Bytecode::PackVariant(idx) => Some(VariantIndexRef::Direct(*idx)),
+                Bytecode::PackVariantGeneric(idx) => Some(VariantIndexRef::Generic(*idx)),
+                _ => None,
+            },
+        )
+    }
 
-/// Check the pattern of the borrow field API.
-/// Pattern:
-/// MoveLoc(...)
-/// if is_mutable is false:
-///     ImmBorrowField(...) | ImmBorrowFieldGeneric(...) | ImmBorrowVariantField(...) | ImmBorrowVariantFieldGeneric(...)
-/// else:
-///     MutBorrowField(...) | MutBorrowFieldGeneric(...) | MutBorrowVariantField(...) | MutBorrowVariantFieldGeneric(...)
-/// Ret
-fn pattern_check_for_borrow_field(
-    is_mutable: bool,
-    resolver: &BinaryIndexedView,
-    module: &CompiledModule,
-    offset: &MemberCount,
-    code: &CodeUnit,
-    ctx: &StructApiContext,
-) -> PartialVMResult<()> {
-    // Check the basic pattern using the shared helper
-    let api_name = if is_mutable { "borrow_mut" } else { "borrow" };
-    pattern_check_for_pack_like(api_name, code, Some(1), |bc| {
-        // Check if it's a borrow field operation with the correct mutability
-        match bc {
+    /// Check the bytecode pattern for unpack_variant:
+    /// MoveLoc(0), UnpackVariant/UnpackVariantGeneric, Ret
+    fn check_unpack_variant_pattern(
+        &self,
+        expected_variant_idx: VariantIndex,
+    ) -> PartialVMResult<()> {
+        self.check_variant_op_pattern(UNPACK_VARIANT, 1, expected_variant_idx, |bc| match bc {
+            Bytecode::UnpackVariant(idx) => Some(VariantIndexRef::Direct(*idx)),
+            Bytecode::UnpackVariantGeneric(idx) => Some(VariantIndexRef::Generic(*idx)),
+            _ => None,
+        })
+    }
+
+    /// Check the bytecode pattern for test_variant:
+    /// MoveLoc(0), TestVariant/TestVariantGeneric, Ret
+    fn check_test_variant_pattern(
+        &self,
+        expected_variant_idx: VariantIndex,
+    ) -> PartialVMResult<()> {
+        self.check_variant_op_pattern(TEST_VARIANT, 1, expected_variant_idx, |bc| match bc {
+            Bytecode::TestVariant(idx) => Some(VariantIndexRef::Direct(*idx)),
+            Bytecode::TestVariantGeneric(idx) => Some(VariantIndexRef::Generic(*idx)),
+            _ => None,
+        })
+    }
+
+    /// Extracts the field offset from a borrow-field bytecode instruction, checking struct
+    /// ownership, mutability, and (for generic instructions) canonical type parameters.
+    fn get_borrow_field_offset(
+        &self,
+        bytecode: &Bytecode,
+        expected_is_mutable: bool,
+    ) -> PartialVMResult<MemberCount> {
+        let (is_mutable, offset) = match bytecode {
+            Bytecode::ImmBorrowField(h) => (false, resolve_field(self.module, *h, self.struct_def_idx)?),
+            Bytecode::MutBorrowField(h) => (true, resolve_field(self.module, *h, self.struct_def_idx)?),
+            Bytecode::ImmBorrowFieldGeneric(h) => (false, resolve_field_generic(self.module, *h, self.struct_def_idx, self.num_type_params)?),
+            Bytecode::MutBorrowFieldGeneric(h) => (true, resolve_field_generic(self.module, *h, self.struct_def_idx, self.num_type_params)?),
+            Bytecode::ImmBorrowVariantField(h) => (false, resolve_variant_field(self.module, *h, self.struct_def_idx)?),
+            Bytecode::MutBorrowVariantField(h) => (true, resolve_variant_field(self.module, *h, self.struct_def_idx)?),
+            Bytecode::ImmBorrowVariantFieldGeneric(h) => (false, resolve_variant_field_generic(self.module, *h, self.struct_def_idx, self.num_type_params)?),
+            Bytecode::MutBorrowVariantFieldGeneric(h) => (true, resolve_variant_field_generic(self.module, *h, self.struct_def_idx, self.num_type_params)?),
+            _ => return Err(struct_api_err("struct API function contains an unexpected instruction (expected a borrow field operation)")),
+        };
+        if is_mutable != expected_is_mutable {
+            return Err(struct_api_err("borrow field instruction mutability does not match the attribute (borrow vs borrow_mut)"));
+        }
+        Ok(offset)
+    }
+
+    /// Validates that a BorrowVariantField instruction covers exactly the complete and ordered
+    /// set of variants for the given offset and type.
+    ///
+    /// `expected_field_type` is the type already validated by `validate_borrow_return_type`.
+    /// Using this trusted value prevents a hand-crafted variant field handle whose first variant
+    /// has a different type from redirecting the lookup to a different completeness set.
+    fn check_borrow_variant_completeness(
+        &self,
+        bytecode: &Bytecode,
+        struct_name: &str,
+        expected_field_type: &SignatureToken,
+    ) -> PartialVMResult<()> {
+        let variant_field_handle = match bytecode {
+            Bytecode::ImmBorrowVariantField(vfh) | Bytecode::MutBorrowVariantField(vfh) => {
+                self.module.variant_field_handle_at(*vfh)
+            },
+            Bytecode::ImmBorrowVariantFieldGeneric(vfi)
+            | Bytecode::MutBorrowVariantFieldGeneric(vfi) => {
+                let inst = self.module.variant_field_instantiation_at(*vfi);
+                self.module.variant_field_handle_at(inst.handle)
+            },
+            _ => return Ok(()), // Not a variant field borrow, nothing to check
+        };
+
+        let struct_def = &self.module.struct_defs()[self.struct_def_idx.0 as usize];
+        let enum_variants = match &struct_def.field_information {
+            StructFieldInformation::DeclaredVariants(variants) => variants,
+            StructFieldInformation::Declared(_) | StructFieldInformation::Native => {
+                return Err(struct_api_err(
+                    "borrow variant field instruction used on a non-enum struct",
+                ))
+            },
+        };
+
+        let variant_indices_map =
+            self.ctx
+                .get_variant_indices_map(struct_name)
+                .ok_or_else(|| {
+                    struct_api_err("internal error: no variant indices map found for enum")
+                })?;
+
+        let offset = variant_field_handle.field;
+        let actual_variants = &variant_field_handle.variants;
+
+        if actual_variants.is_empty() {
+            return Err(struct_api_err(
+                "borrow variant field instruction must specify at least one variant",
+            ));
+        }
+
+        // Safety: the bounds checker (which runs before this verifier phase) already validates
+        // that all variant indices in VariantFieldHandle.variants are within bounds.
+        let first_variant_idx = actual_variants[0];
+        if (first_variant_idx as usize) >= enum_variants.len() {
+            return Err(struct_api_err(
+                "borrow variant field instruction variant index is out of bounds",
+            ));
+        }
+
+        let first_variant_fields = &enum_variants[first_variant_idx as usize].fields;
+        if (offset as usize) >= first_variant_fields.len() {
+            return Err(struct_api_err(
+                "borrow variant field instruction field offset is out of bounds",
+            ));
+        }
+
+        // Assert that the type derived from the bytecode's first variant matches the
+        // validated return type, binding the completeness check to the same type group.
+        let derived_type = &first_variant_fields[offset as usize].signature.0;
+        if derived_type != expected_field_type {
+            return Err(struct_api_err(
+                "borrow variant field instruction type group does not match the validated return type",
+            ));
+        }
+
+        // Look up expected variants using the trusted type.
+        // expected_variants is guaranteed to be in ascending order by construction.
+        let expected_variants = variant_indices_map
+            .get(&(offset, expected_field_type.clone()))
+            .ok_or_else(|| {
+                struct_api_err(
+                    "internal error: (offset, type) pair not found in variant indices map",
+                )
+            })?;
+
+        if actual_variants != expected_variants.as_slice() {
+            return Err(struct_api_err("borrow variant field instruction does not cover exactly the required set of variants (must include all variants with this field type at this offset, in ascending order)"));
+        }
+
+        Ok(())
+    }
+
+    /// Check the bytecode pattern for borrow/borrow_mut:
+    /// MoveLoc(0), <BorrowField op>, Ret
+    fn check_borrow_pattern(
+        &self,
+        is_mutable: bool,
+        struct_name: &str,
+        expected_offset: u16,
+        expected_field_type: &SignatureToken,
+    ) -> PartialVMResult<()> {
+        let api_name = if is_mutable { BORROW_MUT } else { BORROW };
+        check_struct_api_bytecode_pattern(api_name, self.code, 1, |bc| match bc {
             Bytecode::ImmBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
             | Bytecode::ImmBorrowVariantField(_)
@@ -1366,21 +1280,99 @@ fn pattern_check_for_borrow_field(
             | Bytecode::MutBorrowVariantField(_)
             | Bytecode::MutBorrowVariantFieldGeneric(_) => is_mutable,
             _ => false,
-        }
-    })?;
+        })?;
 
-    // Validate borrow field bytecode and check offset
-    let actual_offset = get_borrow_field_offset(resolver, &code.code[1], is_mutable)?;
-    if actual_offset != *offset {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("borrow field instruction field offset does not match the offset in the function name"));
+        let actual_offset = self.get_borrow_field_offset(&self.code.code[1], is_mutable)?;
+        if actual_offset != expected_offset as MemberCount {
+            return Err(struct_api_err(
+                "borrow field instruction field offset does not match the offset in the function name",
+            ));
+        }
+
+        // For variant field borrows, validate completeness and ordering of variants.
+        self.check_borrow_variant_completeness(&self.code.code[1], struct_name, expected_field_type)
     }
 
-    // For variant field borrows, validate completeness and ordering of variants
-    validate_variant_field_completeness(resolver, module, &code.code[1], ctx)?;
+    // ── Top-level dispatch ────────────────────────────────────────────────────
 
-    Ok(())
+    /// Dispatch to the appropriate validation based on the `FunctionAttribute`.
+    /// `data` carries fields parsed from the function name; `attr` is the source of truth
+    /// for which operation this is and carries index payloads (variant index, borrow offset).
+    fn validate(&self, data: ParsedApiData, attr: FunctionAttribute) -> PartialVMResult<()> {
+        match attr {
+            FunctionAttribute::Pack => {
+                self.validate_signature_matches_fields(self.handle.parameters, None)?;
+                self.check_pack_return_type()?;
+                self.check_pack_pattern()
+            },
+
+            FunctionAttribute::PackVariant(attr_variant_idx) => {
+                let variant_name = data.variant_name.as_deref().ok_or_else(|| {
+                    struct_api_err("internal error: variant_name is None for PackVariant")
+                })?;
+                self.validate_signature_matches_fields(self.handle.parameters, Some(variant_name))?;
+                self.check_pack_return_type()?;
+                let idx = self.validate_variant_index(variant_name, attr_variant_idx)?;
+                self.check_pack_variant_pattern(idx)
+            },
+
+            FunctionAttribute::Unpack => {
+                self.check_struct_param(false)?;
+                self.validate_signature_matches_fields(self.handle.return_, None)?;
+                self.check_unpack_pattern()
+            },
+
+            FunctionAttribute::UnpackVariant(attr_variant_idx) => {
+                let variant_name = data.variant_name.as_deref().ok_or_else(|| {
+                    struct_api_err("internal error: variant_name is None for UnpackVariant")
+                })?;
+                self.check_struct_param(false)?;
+                self.validate_signature_matches_fields(self.handle.return_, Some(variant_name))?;
+                let idx = self.validate_variant_index(variant_name, attr_variant_idx)?;
+                self.check_unpack_variant_pattern(idx)
+            },
+
+            FunctionAttribute::TestVariant(attr_variant_idx) => {
+                let variant_name = data.variant_name.as_deref().ok_or_else(|| {
+                    struct_api_err("internal error: variant_name is None for TestVariant")
+                })?;
+                self.check_struct_param(true)?;
+                let idx = self.validate_variant_index(variant_name, attr_variant_idx)?;
+                self.check_test_variant_pattern(idx)
+            },
+
+            FunctionAttribute::BorrowFieldImmutable(attr_offset)
+            | FunctionAttribute::BorrowFieldMutable(attr_offset) => {
+                let is_mutable = data.is_mutable;
+                let name_offset = data.offset.ok_or_else(|| {
+                    struct_api_err("internal error: offset is None for BorrowField attribute")
+                })?;
+                if attr_offset != name_offset {
+                    return Err(struct_api_err(
+                        "borrow field attribute offset does not match the offset in the function name",
+                    ));
+                }
+                self.check_borrow_param(is_mutable)?;
+                let ft = self.validate_borrow_return_type(
+                    &data.struct_name,
+                    attr_offset,
+                    data.type_order,
+                    is_mutable,
+                )?;
+                self.check_borrow_pattern(is_mutable, &data.struct_name, attr_offset, &ft)
+            },
+
+            // Persistent and ModuleLock are not struct API attributes and are filtered out
+            // by try_get_struct_api_attr before validate() is called. Unreachable in practice,
+            // but listed exhaustively so adding future FunctionAttribute variants is a compile error.
+            FunctionAttribute::Persistent | FunctionAttribute::ModuleLock => Err(struct_api_err(
+                "internal error: non-struct-API attribute reached validation dispatch",
+            )),
+        }
+    }
 }
+
+// ── Entry point ───────────────────────────────────────────────────────────────
 
 /// Check well-formedness of struct API attributes.
 ///
@@ -1399,8 +1391,7 @@ fn pattern_check_for_borrow_field(
 /// - Validate bytecode pattern implementation
 ///
 /// Note: Struct operations can only happen in the module where the struct is defined.
-pub fn check_struct_api_impl(
-    resolver: &BinaryIndexedView,
+pub(crate) fn check_function(
     module: &CompiledModule,
     function_definition: &FunctionDefinition,
     ctx: &StructApiContext,
@@ -1408,18 +1399,10 @@ pub fn check_struct_api_impl(
     let handle = module.function_handle_at(function_definition.function);
     let function_name = module.identifier_at(handle.name).as_str();
 
-    // ========================================================================
-    // Phase 1: Parse and validate function name, check attribute correspondence
-    // ========================================================================
-
-    // Read the attribute first so we can guide name parsing when struct names contain '$'.
+    // ── Phase 1: name / attribute correspondence ──────────────────────────────
+    // Read the attribute first to guide name parsing (variant attrs use shortest-match
+    // to leave room for the variant name; everything else uses longest-match).
     let struct_api_attr = try_get_struct_api_attr(&handle.attributes)?;
-
-    // Attribute-guided name parsing: variant-type attributes (PackVariant/UnpackVariant/
-    // TestVariant) expect a variant name after the struct name, so use shortest-match to
-    // leave room for the remaining parts. All others use longest-match to handle struct
-    // names that contain '$'. When there is no attribute we fall back to longest-match
-    // (the function will be rejected anyway if it has a struct API name but no attribute).
     let expect_variant_in_name = matches!(
         struct_api_attr,
         Some(
@@ -1428,243 +1411,66 @@ pub fn check_struct_api_impl(
                 | FunctionAttribute::TestVariant(_)
         )
     );
-    // Parse and comprehensively validate the function name
-    // This validates: struct exists, variant index valid, offset valid, type_order valid
-    let name_info = parse_and_validate_struct_api_name(function_name, ctx, expect_variant_in_name)?;
+    let name_data = parse_struct_api_name(function_name, ctx, expect_variant_in_name);
 
-    // Enforce 1-to-1 relationship: both directions must match
-    let info = match (name_info, struct_api_attr.as_ref()) {
-        (Some(info), Some(attr)) => {
-            // Both name and attribute present - validate they match
-
-            // Get the attribute type string
-            let actual_type = match attr {
-                FunctionAttribute::Pack => PACK,
-                FunctionAttribute::PackVariant(_) => PACK_VARIANT,
-                FunctionAttribute::Unpack => UNPACK,
-                FunctionAttribute::UnpackVariant(_) => UNPACK_VARIANT,
-                FunctionAttribute::TestVariant(_) => TEST_VARIANT,
-                FunctionAttribute::BorrowFieldImmutable(_) => BORROW,
-                FunctionAttribute::BorrowFieldMutable(_) => BORROW_MUT,
-                _ => return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                    .with_message("internal error: unexpected non-struct-API attribute in struct API type resolution")),
-            };
-
-            // Verify attribute type matches the name pattern
-            if info.expected_attr_type() != actual_type {
-                // ERROR: Attribute type doesn't match name pattern
-                return Err(
-                    PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                        "struct API attribute type does not match the function name pattern",
-                    ),
-                );
+    let (data, attr) = match (name_data, struct_api_attr) {
+        (None, None) => return Ok(()),
+        (Some(_), None) => return Err(struct_api_err("function name matches a struct API pattern but is missing the corresponding struct API attribute")),
+        (None, Some(_)) => return Err(struct_api_err("function has a struct API attribute but its name does not match the expected struct API pattern")),
+        (Some(data), Some(attr)) => {
+            if !data.matches_attr(&attr) {
+                return Err(struct_api_err(
+                    "struct API attribute type does not match the function name pattern",
+                ));
             }
-
-            // Both match - proceed to Phase 2 validation
-            info
-        },
-        (Some(_), None) => {
-            // ERROR: Name matches struct API pattern but no attribute present
-            // This enforces: Name → Attribute
-            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("function name matches a struct API pattern but is missing the corresponding struct API attribute"));
-        },
-        (None, Some(_)) => {
-            // ERROR: Has struct API attribute but name doesn't match pattern
-            // This enforces: Attribute → Name
-            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("function has a struct API attribute but its name does not match the expected struct API pattern"));
-        },
-        (None, None) => {
-            // Neither name nor attribute matches struct API - regular function, OK
-            return Ok(());
+            (data, attr)
         },
     };
 
-    // ========================================================================
-    // Phase 2: Validate struct API implementation
-    // ========================================================================
-    // At this point, we know:
-    // - Function name has been fully parsed and validated (Phase 1)
-    // - Struct exists, variant exists (if applicable), offset/type_order parsed
-    // - Corresponding attribute is present and matches the name pattern
-    // Now validate the implementation details: signature types and bytecode patterns.
-
-    let attr = struct_api_attr.unwrap(); // Safe: we checked above
+    // ── Phase 2: implementation validation ───────────────────────────────────
+    let struct_handle = module.struct_handle_at(data.struct_handle_idx);
 
     // Structs with the key ability cannot have struct APIs.
-    // The key ability marks a struct as a top-level resource intended for global storage
-    // (move_to/move_from), which is incompatible with being passed as a transaction argument
-    // via pack/unpack/borrow wrappers.
-    let struct_handle_idx = match &info {
-        StructApiNameInfo::Pack {
-            struct_handle_idx, ..
-        }
-        | StructApiNameInfo::PackVariant {
-            struct_handle_idx, ..
-        }
-        | StructApiNameInfo::Unpack {
-            struct_handle_idx, ..
-        }
-        | StructApiNameInfo::UnpackVariant {
-            struct_handle_idx, ..
-        }
-        | StructApiNameInfo::TestVariant {
-            struct_handle_idx, ..
-        }
-        | StructApiNameInfo::BorrowField {
-            struct_handle_idx, ..
-        } => *struct_handle_idx,
-    };
-    if module
-        .struct_handle_at(struct_handle_idx)
-        .abilities
-        .has_key()
-    {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("struct with key ability cannot have struct APIs"));
+    if struct_handle.abilities.has_key() {
+        return Err(struct_api_err(
+            "struct with key ability cannot have struct APIs",
+        ));
     }
 
-    // Validate signature types based on the parsed name information
-    match &info {
-        StructApiNameInfo::Pack {
-            struct_handle_idx,
-            struct_def_idx,
-        } => {
-            // Validate both parameters and return type for pack
-            validate_pack_parameters(module, handle, *struct_def_idx)?;
-            validate_pack_return_type(module, handle, *struct_handle_idx)?;
-        },
-        StructApiNameInfo::PackVariant {
-            struct_handle_idx,
-            struct_def_idx,
-            variant_name,
-        } => {
-            // Validate both parameters and return type for pack_variant
-            validate_pack_variant_parameters(module, handle, *struct_def_idx, variant_name)?;
-            validate_pack_return_type(module, handle, *struct_handle_idx)?;
-        },
-        StructApiNameInfo::Unpack {
-            struct_handle_idx,
-            struct_def_idx,
-        } => {
-            // Validate both parameter and return types for unpack
-            validate_struct_parameter_type(module, handle, &attr, *struct_handle_idx)?;
-            validate_unpack_return_types(module, handle, *struct_def_idx)?;
-        },
-        StructApiNameInfo::UnpackVariant {
-            struct_handle_idx,
-            struct_def_idx,
-            variant_name,
-        } => {
-            // Validate both parameter and return types for unpack_variant
-            validate_struct_parameter_type(module, handle, &attr, *struct_handle_idx)?;
-            validate_unpack_variant_return_types(module, handle, *struct_def_idx, variant_name)?;
-        },
-        StructApiNameInfo::TestVariant {
-            struct_handle_idx, ..
-        } => {
-            // TestVariant only needs parameter validation (returns bool)
-            validate_struct_parameter_type(module, handle, &attr, *struct_handle_idx)?;
-        },
-        StructApiNameInfo::BorrowField {
-            struct_name,
-            struct_handle_idx,
-            struct_def_idx,
-            offset,
-            type_order,
-            is_mutable,
-        } => {
-            validate_borrow_field_types(
-                module,
-                handle,
-                struct_name,
-                *struct_handle_idx,
-                *struct_def_idx,
-                *offset,
-                *type_order,
-                *is_mutable,
-                ctx,
-            )?;
-        },
+    let num_type_params = struct_handle.type_parameters.len();
+
+    // The wrapper function must have exactly as many type parameters as the struct it wraps.
+    // Without this check a wrapper with extra type params (e.g. pack$Box<T,U> for Box<T>) would
+    // pass: the canonical-type-params check only validates the struct's own N params, so the
+    // extra U is invisible to it.
+    // Note: ability-constraint mismatches on individual type params are caught by the general
+    // bytecode type checker (CONSTRAINT_NOT_SATISFIED) before this point, so we need only
+    // verify the count here.
+    if handle.type_parameters.len() != num_type_params {
+        return Err(struct_api_err(
+            "struct API wrapper function has a different number of type parameters than the struct",
+        ));
     }
 
-    // Validate variant index for variant-based attributes
-    match &info {
-        StructApiNameInfo::PackVariant {
-            struct_def_idx,
-            variant_name,
-            ..
-        }
-        | StructApiNameInfo::UnpackVariant {
-            struct_def_idx,
-            variant_name,
-            ..
-        }
-        | StructApiNameInfo::TestVariant {
-            struct_def_idx,
-            variant_name,
-            ..
-        } => {
-            // Get the attribute's variant_index for validation
-            let attr_variant_index = match attr {
-                FunctionAttribute::PackVariant(idx)
-                | FunctionAttribute::UnpackVariant(idx)
-                | FunctionAttribute::TestVariant(idx) => idx,
-                _ => unreachable!(), // Already validated in Phase 1
-            };
-            validate_variant_index(module, *struct_def_idx, variant_name, attr_variant_index)?;
-        },
-        _ => {},
-    }
-
-    // Validate offset for borrow field attributes
-    // The offset parsed from the function name must match the offset in the attribute
-    if let StructApiNameInfo::BorrowField {
-        offset: name_offset,
-        ..
-    } = &info
-    {
-        let attr_offset = match attr {
-            FunctionAttribute::BorrowFieldImmutable(offset)
-            | FunctionAttribute::BorrowFieldMutable(offset) => offset,
-            _ => unreachable!(), // Already validated in Phase 1
-        };
-        if *name_offset != attr_offset {
-            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("borrow field offset in function name does not match the offset in the attribute"));
-        }
-    }
-
-    // Validate bytecode pattern implementation
     let Some(code) = function_definition.code.as_ref() else {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("struct API function must have a code body (cannot be native)"));
+        return Err(struct_api_err(
+            "struct API function must have a code body (cannot be native)",
+        ));
     };
 
-    match attr {
-        FunctionAttribute::Pack => pattern_check_for_pack(code),
-        FunctionAttribute::PackVariant(variant_idx) => {
-            pattern_check_for_pack_variant(resolver, variant_idx, code)
-        },
-        FunctionAttribute::Unpack => pattern_check_for_unpack(code),
-        FunctionAttribute::UnpackVariant(variant_idx) => {
-            pattern_check_for_unpack_variant(resolver, variant_idx, code)
-        },
-        FunctionAttribute::TestVariant(variant_idx) => {
-            pattern_check_for_test_variant(resolver, variant_idx, code)
-        },
-        FunctionAttribute::BorrowFieldImmutable(offset) => {
-            pattern_check_for_borrow_field(false, resolver, module, &offset, code, ctx)
-        },
-        FunctionAttribute::BorrowFieldMutable(offset) => {
-            pattern_check_for_borrow_field(true, resolver, module, &offset, code, ctx)
-        },
-        FunctionAttribute::Persistent | FunctionAttribute::ModuleLock => {
-            // These should never reach here - try_get_struct_api_attr only returns struct API attributes.
-            // If we reach this, Phase 1 validation failed to filter properly.
-            Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-                .with_message("internal error: non-struct-API attribute reached the bytecode validation phase"))
-        },
-    }
+    let v = StructApiWrapperValidator {
+        module,
+        ctx,
+        handle,
+        code,
+        struct_def_idx: data.struct_def_idx,
+        struct_handle_idx: data.struct_handle_idx,
+        num_type_params,
+    };
+
+    // Verify canonical type params in the function's declared parameter and return signatures.
+    // Bytecode-level instantiation pool entries are checked separately at their use sites.
+    v.check_signature_canonical_type_params()?;
+
+    v.validate(data, attr)
 }

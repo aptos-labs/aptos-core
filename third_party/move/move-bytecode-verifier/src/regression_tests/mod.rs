@@ -7,3 +7,5 @@
 mod bounds_check;
 #[cfg(test)]
 mod reference_analysis;
+#[cfg(test)]
+mod struct_api;
