@@ -1266,39 +1266,9 @@ impl RoundManager {
             .context("[RoundManager] Failed to insert the block into BlockStore")?;
 
         // Register block → traced txn hashes at proposal time (before execution).
-        // This ensures block_txns is populated for ExecutionStart and Executed stages.
         if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
-            use aptos_consensus_types::{
-                common::Payload,
-                payload::OptQuorumStorePayload,
-                proof_of_store::TBatchInfo,
-            };
-            use aptos_transaction_tracing::types::BatchInclusionType;
-
             if let Some(payload) = proposal.payload() {
-                macro_rules! collect_batches {
-                    ($p:expr, $out:expr) => {{
-                        for b in $p.inline_batches().iter() {
-                            $out.push((*b.info().digest(), BatchInclusionType::Inline));
-                        }
-                        for b in $p.opt_batches().iter() {
-                            $out.push((*b.digest(), BatchInclusionType::Opt));
-                        }
-                        for b in $p.proof_with_data().iter() {
-                            $out.push((*b.info().digest(), BatchInclusionType::Proof));
-                        }
-                    }};
-                }
-                let mut batch_digests = Vec::new();
-                match payload {
-                    Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
-                        collect_batches!(p, batch_digests);
-                    },
-                    Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
-                        collect_batches!(p, batch_digests);
-                    },
-                    _ => {},
-                }
+                let batch_digests = extract_batch_digests(payload);
                 aptos_transaction_tracing::store::TransactionTraceStore::global()
                     .process_proposed_block(
                         proposal.id(),
@@ -2258,4 +2228,37 @@ impl RoundManager {
             Ok(())
         }
     }
+}
+
+/// Extract (batch_digest, inclusion_type) pairs from a block payload for tracing.
+fn extract_batch_digests(
+    payload: &aptos_consensus_types::common::Payload,
+) -> Vec<(aptos_crypto::HashValue, aptos_transaction_tracing::types::BatchInclusionType)> {
+    use aptos_consensus_types::{payload::OptQuorumStorePayload, proof_of_store::TBatchInfo};
+    use aptos_transaction_tracing::types::BatchInclusionType;
+
+    let mut out = Vec::new();
+    macro_rules! collect {
+        ($p:expr) => {{
+            for b in $p.inline_batches().iter() {
+                out.push((*b.info().digest(), BatchInclusionType::Inline));
+            }
+            for b in $p.opt_batches().iter() {
+                out.push((*b.digest(), BatchInclusionType::Opt));
+            }
+            for b in $p.proof_with_data().iter() {
+                out.push((*b.info().digest(), BatchInclusionType::Proof));
+            }
+        }};
+    }
+    match payload {
+        aptos_consensus_types::common::Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
+            collect!(p);
+        },
+        aptos_consensus_types::common::Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+            collect!(p);
+        },
+        _ => {},
+    }
+    out
 }
