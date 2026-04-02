@@ -617,6 +617,11 @@ pub const IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM: &[u8] = include_by
     "/src/json_transactions/imported_devnet_txns/19922017_token_v1_offer_claim.json"
 ));
 
+pub const IMPORTED_DEVNET_TXNS_455382_ENCRYPTED_TRANSACTION: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_devnet_txns/455382_encrypted_transaction.json"
+));
+
 pub const IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_devnet_txns/78753832_token_v2_mint_transfer_with_v2_events.json"));
 
 pub const IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_devnet_txns/78753831_token_v1_mint_transfer_with_v2_events.json"));
@@ -626,16 +631,12 @@ pub const IMPORTED_DEVNET_TXNS_133807428_SIGNED_INTEGERS: &[u8] = include_bytes!
     "/src/json_transactions/imported_devnet_txns/133807428_signed_integers.json"
 ));
 
-pub const IMPORTED_DEVNET_TXNS_2637980_ENCRYPTED_TRANSACTION: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/json_transactions/imported_devnet_txns/2637980_encrypted_transaction.json"
-));
 pub const ALL_IMPORTED_DEVNET_TXNS: &[&[u8]] = &[
     IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM,
+    IMPORTED_DEVNET_TXNS_455382_ENCRYPTED_TRANSACTION,
     IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
     IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
     IMPORTED_DEVNET_TXNS_133807428_SIGNED_INTEGERS,
-    IMPORTED_DEVNET_TXNS_2637980_ENCRYPTED_TRANSACTION,
 ];
 
 pub const SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT4: &[u8] = include_bytes!(concat!(
@@ -684,7 +685,6 @@ pub fn get_transaction_name(const_data: &[u8]) -> Option<&'static str> {
         SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT2 => Some("simple_user_script2"),
         SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT3 => Some("simple_user_script3"),
         SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT1 => Some("simple_user_script1"),
-
         _ => None,
     }
 }
