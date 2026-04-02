@@ -140,11 +140,18 @@ async fn serve_requests(
         PEER_INFORMATION_PATH => {
             // /peer_information
             // Exposes the peer information
-            peer_information::handle_peer_information_request(
-                &node_config,
-                aptos_data_client.unwrap(),
-                peers_and_metadata,
-            )
+            match aptos_data_client {
+                Some(client) => peer_information::handle_peer_information_request(
+                    &node_config,
+                    client,
+                    peers_and_metadata,
+                ),
+                None => (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Body::from("Peer information is not available (no data client configured)"),
+                    CONTENT_TYPE_TEXT.into(),
+                ),
+            }
         },
         SYSTEM_INFORMATION_PATH => {
             // /system_information
