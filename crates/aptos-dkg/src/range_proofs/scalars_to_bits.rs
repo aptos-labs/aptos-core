@@ -53,7 +53,7 @@ mod tests {
 
         let bits = scalars_to_bits_le::<Fr>(&scalars, number_of_bits);
         let transposed = transpose_bit_matrix(&bits);
-        assert_eq!(transposed.len(), number_of_bits as usize);
+        assert_eq!(transposed.len(), number_of_bits);
         assert_eq!(transposed[0].len(), scalars.len());
         // Roundtrip: transpose(transpose(bits)) should match bits
         let bits_rt = transpose_bit_matrix(&transposed);
