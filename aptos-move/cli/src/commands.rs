@@ -2307,13 +2307,9 @@ pub struct Simulate {
     #[clap(long)]
     local: bool,
 
-    /// Include simulated events in the output.
+    /// Include simulated events and state changes in the output.
     #[clap(long)]
-    show_events: bool,
-
-    /// Include simulated state changes in the output.
-    #[clap(long)]
-    show_changes: bool,
+    show_details: bool,
 
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
@@ -2335,12 +2331,12 @@ impl CliCommand<TransactionSummary> for Simulate {
 
         if self.local {
             self.txn_options
-                .simulate_locally(payload, &self.env, self.show_events, self.show_changes)
+                .simulate_locally(payload, &self.env, self.show_details)
                 .await
         } else {
             let mut rng = rand::rngs::StdRng::from_entropy();
             self.txn_options
-                .simulate_remotely(&mut rng, payload, self.show_events, self.show_changes)
+                .simulate_remotely(&mut rng, payload, self.show_details)
                 .await
         }
     }
@@ -2376,8 +2372,7 @@ mod simulate_flag_tests {
             "address:0x1",
             "u64:1",
         ]);
-        assert!(!simulate.show_events);
-        assert!(!simulate.show_changes);
+        assert!(!simulate.show_details);
     }
 
     #[test]
@@ -2389,11 +2384,9 @@ mod simulate_flag_tests {
             "--args",
             "address:0x1",
             "u64:1",
-            "--show-events",
-            "--show-changes",
+            "--show-details",
         ]);
-        assert!(simulate.show_events);
-        assert!(simulate.show_changes);
+        assert!(simulate.show_details);
     }
 }
 

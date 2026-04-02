@@ -27,10 +27,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutput};
 use clap::Parser;
-use move_core_types::{
-    value::{MoveTypeLayout, MoveValue},
-    vm_status::VMStatus,
-};
+use move_core_types::{value::MoveTypeLayout, vm_status::VMStatus};
 use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -38,39 +35,17 @@ fn serialize_as_json<T: Serialize>(value: &T) -> CliTypedResult<serde_json::Valu
     serde_json::to_value(value).map_err(|err| CliError::UnexpectedError(err.to_string()))
 }
 
-fn event_data_to_json(
-    event_data: &[u8],
-    layout: Option<&MoveTypeLayout>,
-    raw_data_hex: &str,
-) -> serde_json::Value {
-    if let Some(layout) = layout
-        && let Ok(decoded) = MoveValue::simple_deserialize(event_data, layout)
-        && let Ok(decoded_json) = serde_json::to_value(decoded)
-    {
-        return decoded_json;
-    }
-    serde_json::json!(raw_data_hex)
-}
-
-fn contract_event_to_json(event: &ContractEvent) -> serde_json::Value {
-    let decode_layout = event.type_tag().to_simple_layout();
-    let raw_data_hex = hex::encode(event.event_data());
-    serde_json::json!({
-        "event_key": event.event_key().map(|key| key.to_string()),
-        "sequence_number": event.v1().ok().map(|v1| v1.sequence_number()),
-        "type": event.type_tag().to_canonical_string(),
-        "data": event_data_to_json(event.event_data(), decode_layout.as_ref(), &raw_data_hex),
-        "raw_data_hex": raw_data_hex,
-    })
-}
-
-fn local_events_to_json(events: &[(ContractEvent, Option<MoveTypeLayout>)]) -> serde_json::Value {
-    serde_json::Value::Array(
-        events
-            .iter()
-            .map(|(event, _layout)| contract_event_to_json(event))
-            .collect(),
-    )
+fn local_events_to_json(
+    state_view: &impl aptos_types::state_store::StateView,
+    events: &[(ContractEvent, Option<MoveTypeLayout>)],
+) -> CliTypedResult<serde_json::Value> {
+    let events = events
+        .iter()
+        .map(|(event, _layout)| event.clone())
+        .collect::<Vec<_>>();
+    let parsed_events = aptos_api_types::try_into_events_with_state_view(state_view, &events)
+        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+    serialize_as_json(&parsed_events)
 }
 
 fn write_op_kind_to_str(write_op: &WriteOp) -> &'static str {
@@ -240,8 +215,7 @@ impl TxnOptions {
         &self,
         rng: &mut rand::rngs::StdRng,
         payload: TransactionPayload,
-        show_events: bool,
-        show_changes: bool,
+        show_details: bool,
     ) -> CliTypedResult<TransactionSummary> {
         let client = self.rest_client()?;
         let sender_address = self.get_address()?;
@@ -328,10 +302,8 @@ impl TxnOptions {
             events: None,
             changes: None,
         };
-        if show_events {
+        if show_details {
             summary.events = Some(serialize_as_json(&simulated_txn.events)?);
-        }
-        if show_changes {
             summary.changes = Some(serialize_as_json(&simulated_txn.info.changes)?);
         }
 
@@ -343,8 +315,7 @@ impl TxnOptions {
         &self,
         payload: TransactionPayload,
         env: &MoveEnv,
-        show_events: bool,
-        show_changes: bool,
+        show_details: bool,
         execute: F,
     ) -> CliTypedResult<TransactionSummary>
     where
@@ -426,10 +397,9 @@ impl TxnOptions {
             events: None,
             changes: None,
         };
-        if show_events {
-            summary.events = Some(local_events_to_json(vm_output.events()));
-        }
-        if show_changes {
+        if show_details {
+            let state_view = debugger.state_view_at_version(version);
+            summary.events = Some(local_events_to_json(&state_view, vm_output.events())?);
             summary.changes = Some(local_changes_to_json(&vm_output));
         }
 
@@ -441,8 +411,7 @@ impl TxnOptions {
         &self,
         payload: TransactionPayload,
         env: &MoveEnv,
-        show_events: bool,
-        show_changes: bool,
+        show_details: bool,
     ) -> CliTypedResult<TransactionSummary> {
         println!();
         println!("Simulating transaction locally...");
@@ -450,8 +419,7 @@ impl TxnOptions {
         self.simulate_using_debugger(
             payload,
             env,
-            show_events,
-            show_changes,
+            show_details,
             local_simulation::run_transaction_using_debugger,
         )
         .await
@@ -463,6 +431,7 @@ mod tests {
     use super::{encode_state_key_for_output, local_events_to_json, serialize_as_json};
     use aptos_cli_common::TransactionSummary;
     use aptos_crypto::HashValue;
+    use aptos_transaction_simulation::EmptyStateView;
     use aptos_types::{
         account_address::AccountAddress, event::EventKey, state_store::state_key::StateKey,
     };
@@ -523,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    fn local_events_decode_data_from_type_tag() {
+    fn local_events_use_api_event_shape() {
         let key = EventKey::new(9, AccountAddress::from_hex_literal("0x1").unwrap());
         let event = aptos_types::contract_event::ContractEvent::new_v1(
             key,
@@ -533,11 +502,14 @@ mod tests {
         )
         .unwrap();
 
-        let json = local_events_to_json(&[(event, None)]);
+        let state_view = EmptyStateView;
+        let json = local_events_to_json(&state_view, &[(event, None)]).unwrap();
         let first = json.as_array().unwrap().first().unwrap();
-        assert_eq!(first.get("sequence_number").unwrap().as_u64(), Some(7));
+        assert!(first.get("guid").is_some());
+        assert_eq!(first.get("sequence_number").unwrap().as_str(), Some("7"));
         assert_eq!(first.get("type").unwrap().as_str(), Some("u64"));
-        assert_eq!(first.get("data").unwrap().as_u64(), Some(42));
+        assert_eq!(first.get("data").unwrap().as_str(), Some("42"));
+        assert!(first.get("raw_data_hex").is_none());
     }
 
     #[test]

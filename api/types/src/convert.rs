@@ -63,6 +63,19 @@ use std::{
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
 const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 
+pub fn try_into_events_with_state_view(
+    state_view: &impl StateView,
+    events: &[ContractEvent],
+) -> Result<Vec<Event>> {
+    let annotator = AptosValueAnnotator::new(state_view);
+    let mut ret = vec![];
+    for event in events {
+        let data = annotator.view_value(event.type_tag(), event.event_data())?;
+        ret.push((event, MoveValue::try_from(data)?.json()?).into());
+    }
+    Ok(ret)
+}
+
 /// Recursively substitute generic type parameters in a MoveType with actual type arguments.
 fn substitute_type_in_move_type(
     move_type: &crate::move_types::MoveType,
@@ -112,6 +125,7 @@ fn substitute_type_in_move_type(
 /// This reads the underlying BCS types and ABIs to convert them into
 /// JSON outputs
 pub struct MoveConverter<'a, S> {
+    state_view: &'a S,
     inner: AptosValueAnnotator<'a, S>,
     db: Arc<dyn DbReader>,
     indexer_reader: Option<Arc<dyn IndexerReader>>,
@@ -124,6 +138,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> Self {
         Self {
+            state_view: inner,
             inner: AptosValueAnnotator::new(inner),
             db,
             indexer_reader,
@@ -752,14 +767,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     }
 
     pub fn try_into_events(&self, events: &[ContractEvent]) -> Result<Vec<Event>> {
-        let mut ret = vec![];
-        for event in events {
-            let data = self
-                .inner
-                .view_value(event.type_tag(), event.event_data())?;
-            ret.push((event, MoveValue::try_from(data)?.json()?).into());
-        }
-        Ok(ret)
+        try_into_events_with_state_view(self.state_view, events)
     }
 
     pub fn try_into_versioned_events(
@@ -1521,5 +1529,58 @@ fn abort_location_to_str(loc: &AbortLocation) -> String {
             format!("{}::{}", mid.address().to_hex_literal(), mid.name())
         },
         _ => loc.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::try_into_events_with_state_view;
+    use aptos_types::{
+        account_address::AccountAddress,
+        contract_event::ContractEvent,
+        event::EventKey,
+        state_store::{
+            state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+            StateViewResult, TStateView,
+        },
+        transaction::Version,
+    };
+    use move_core_types::language_storage::TypeTag;
+
+    struct TestStateView;
+
+    impl TStateView for TestStateView {
+        type Key = StateKey;
+
+        fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
+            Ok(StateStorageUsage::Untracked)
+        }
+
+        fn get_state_value(&self, _state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
+            Ok(None)
+        }
+
+        fn next_version(&self) -> Version {
+            0
+        }
+    }
+
+    #[test]
+    fn try_into_events_with_state_view_decodes_u64_event() {
+        let key = EventKey::new(9, AccountAddress::ONE);
+        let event =
+            ContractEvent::new_v1(key, 7, TypeTag::U64, bcs::to_bytes(&42u64).unwrap()).unwrap();
+
+        let events = try_into_events_with_state_view(&TestStateView, &[event]).unwrap();
+        assert_eq!(events.len(), 1);
+
+        let value = serde_json::to_value(&events[0]).unwrap();
+        assert_eq!(value.get("type").and_then(|v| v.as_str()), Some("u64"));
+        assert_eq!(value.get("data").and_then(|v| v.as_str()), Some("42"));
+        assert!(value.get("guid").is_some());
+        assert_eq!(
+            value.get("sequence_number").and_then(|v| v.as_str()),
+            Some("7")
+        );
     }
 }
