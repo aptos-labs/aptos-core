@@ -87,7 +87,7 @@ impl<E: Pairing> From<ProofProjective<E>> for Proof<E> {
 impl<E: Pairing> Proof<E> {
     /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through derive macros etc
-    pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
+    pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: usize, rng: &mut R) -> Self {
         Self {
             hat_C: unsafe_random_point(rng),
             pi_PoK: two_term_msm::Proof::generate(rng),
@@ -300,7 +300,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     #[allow(non_snake_case)]
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
-        max_ell: u8,
+        max_ell: usize,
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
@@ -417,7 +417,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     fn prove<R: RngCore + CryptoRng>(
         pk: &ProverKey<E>,
         values: &[Self::Input],
-        ell: u8,
+        ell: usize,
         comm: &Self::CommitmentNormalised,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
@@ -453,7 +453,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = pk;
 
         let n = values.len();
-        let max_ell: u8 = prover_precomputed.powers_of_two.len().try_into().unwrap();
+        let max_ell: usize = prover_precomputed.powers_of_two.len();
 
         assert!(
             n <= *max_n,
@@ -836,7 +836,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         &self,
         vk: &Self::VerificationKey,
         n: usize,
-        ell: u8,
+        ell: usize,
         comm: &Self::CommitmentNormalised,
         rng: &mut R,
     ) -> Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {

@@ -19,7 +19,7 @@ pub fn transpose_bit_matrix(bit_matrix: &[Vec<bool>]) -> Vec<Vec<bool>> {
 }
 
 /// Converts each field scalar to its first `number_of_bits` bits in little-endian order.
-pub fn scalars_to_bits_le<F: PrimeField>(scalars: &[F], number_of_bits: u8) -> Vec<Vec<bool>> {
+pub fn scalars_to_bits_le<F: PrimeField>(scalars: &[F], number_of_bits: usize) -> Vec<Vec<bool>> {
     scalars
         .iter()
         .map(|scalar| {
@@ -49,7 +49,7 @@ mod tests {
             Fr::from(1u64),
             Fr::from(100u64),
         ];
-        let number_of_bits: u8 = 8;
+        let number_of_bits = 8;
 
         let bits = scalars_to_bits_le::<Fr>(&scalars, number_of_bits);
         let transposed = transpose_bit_matrix(&bits);

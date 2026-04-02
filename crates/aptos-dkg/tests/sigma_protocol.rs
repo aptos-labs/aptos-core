@@ -290,7 +290,7 @@ fn test_chunked_scalar_mul() {
     use chunked_scalar_mul::make_inhomogeneous_scalar_mul;
 
     let mut rng = thread_rng();
-    let ell = 16u8;
+    let ell = 16;
 
     let scalars = sample_field_elements(1, &mut rng);
     let chunked_values: Vec<Vec<Scalar<Fr>>> = scalars

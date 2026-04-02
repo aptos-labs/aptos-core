@@ -14,6 +14,6 @@ pub mod traits;
 #[derive(CanonicalSerialize)]
 pub struct PublicStatement<E: Pairing> {
     pub n: usize,
-    pub ell: u8,
+    pub ell: usize,
     pub comm: univariate_hiding_kzg::Commitment<E>,
 }

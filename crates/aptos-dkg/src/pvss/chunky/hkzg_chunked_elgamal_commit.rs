@@ -72,7 +72,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         G2_table: &'a BatchMulPreprocessing<E::G2>,
         eks: &'a [E::G1Affine],
         base: E::G2Affine,
-        ell: u8,
+        ell: usize,
     ) -> Self {
         // Set up the HKZG-EG homomorphism, and use a projection map to lift it to HkzgElgamalCommitWitness
         let hkzg_el_hom = hkzg_chunked_elgamal::Homomorphism::<E>::new(lagr_g1, xi_1, pp, eks);
