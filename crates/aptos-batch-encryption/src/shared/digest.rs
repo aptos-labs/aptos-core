@@ -154,14 +154,10 @@ impl DigestKey {
             .map(|gs| gs.iter().map(|g| G1Projective::from(*g)).collect())
             .collect();
 
-        let fk_domain = FKDomain::new(
-            batch_size,
-            batch_size,
-            randomized_tau_powers_g1_projective,
-        )
-        .ok_or(BatchEncryptionError::DigestInitError(
-            DigestKeyInitError::FKDomainInitFailure,
-        ))?;
+        let fk_domain = FKDomain::new(batch_size, batch_size, randomized_tau_powers_g1_projective)
+            .ok_or(BatchEncryptionError::DigestInitError(
+                DigestKeyInitError::FKDomainInitFailure,
+            ))?;
 
         Ok(Self {
             tau_g2,
