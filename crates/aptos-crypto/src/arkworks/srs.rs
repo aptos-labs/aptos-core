@@ -15,6 +15,7 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
     Write,
 };
+use std::ops::Sub;
 
 /// Represents the type of Structured Reference String (SRS) basis.
 ///
@@ -132,7 +133,7 @@ impl<C: CurveGroup> CanonicalDeserialize for SrsBasis<C> {
 /// returning the result in affine form.
 #[allow(non_snake_case)]
 pub fn lagrange_basis<C: CurveGroup>(
-    G: C,
+    group_generator: C,
     tau: C::ScalarField,
     n: usize,
     eval_dom: Radix2EvaluationDomain<C::ScalarField>,
@@ -141,7 +142,7 @@ pub fn lagrange_basis<C: CurveGroup>(
     let lagr_basis_scalars = eval_dom.ifft(&powers_of_tau);
     debug_assert!(lagr_basis_scalars.iter().sum::<C::ScalarField>() == C::ScalarField::ONE);
 
-    G.batch_mul(&lagr_basis_scalars)
+    group_generator.batch_mul(&lagr_basis_scalars)
 }
 
 /// Constructs a Structured Reference String (SRS) in the Powers-of-Tau basis.
@@ -150,7 +151,11 @@ pub fn lagrange_basis<C: CurveGroup>(
 /// `[G, G·τ, G·τ², …, G·τ^(n - 1)]`,
 /// returning the result in affine form.
 #[allow(non_snake_case)]
-pub fn powers_of_tau<C: CurveGroup>(G: C, tau: C::ScalarField, n: usize) -> Vec<C::Affine> {
+pub fn powers_of_tau<C: CurveGroup>(
+    group_generator: C,
+    tau: C::ScalarField,
+    n: usize,
+) -> Vec<C::Affine> {
     // We have to work over `CurveGroup` instead of `AffineRepr` here and in the above function `lagrange_basis()`
     // because for some reason only the former has `batch_mul()` implemented for its elements, and this is much
     // faster than doing the naive approach:
@@ -164,5 +169,64 @@ pub fn powers_of_tau<C: CurveGroup>(G: C, tau: C::ScalarField, n: usize) -> Vec<
 
     let powers_of_tau = utils::powers(tau, n);
 
-    G.batch_mul(&powers_of_tau)
+    group_generator.batch_mul(&powers_of_tau)
+}
+
+/// Converts a SRS in coefficient basis to one in Lagrange basis.
+pub fn convert_to_lagrange_basis<C: CurveGroup>(
+    powers_of_tau: &[C::Affine],
+    eval_dom: Radix2EvaluationDomain<C::ScalarField>,
+) -> Vec<C::Affine>
+where
+    C::Affine: Sub<Output = C>,
+{
+    let powers_of_tau_projective: Vec<C> = powers_of_tau.iter().map(|elt| C::from(*elt)).collect();
+    eval_dom
+        .ifft(&powers_of_tau_projective)
+        .into_iter()
+        .map(|elt| C::Affine::from(elt))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::arkworks::srs::{convert_to_lagrange_basis, lagrange_basis, powers_of_tau};
+    use ark_bls12_381::{Fr, G1Affine, G1Projective};
+    use ark_ec::PrimeGroup as _;
+    use ark_ff::UniformRand;
+    use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
+    use ark_std::rand::thread_rng;
+
+    #[test]
+    fn test_pot_lagrange_basis_equivalence() {
+        let n = 8;
+        let mut rng = thread_rng();
+        let tau = Fr::rand(&mut rng);
+        let eval_domain = Radix2EvaluationDomain::new(n).unwrap();
+
+        let pot: Vec<G1Affine> = powers_of_tau(G1Projective::generator(), tau, n);
+        let lagrange: Vec<G1Affine> =
+            lagrange_basis(G1Projective::generator(), tau, n, eval_domain);
+        let lagrange_converted: Vec<G1Affine> =
+            convert_to_lagrange_basis::<G1Projective>(&pot, eval_domain);
+        assert_eq!(lagrange_converted.len(), lagrange.len());
+        assert_eq!(lagrange_converted, lagrange);
+    }
+
+    #[test]
+    fn test_pot_lagrange_basis_equivalence_random_generator() {
+        let n = 8;
+        let mut rng = thread_rng();
+        let tau = Fr::rand(&mut rng);
+        let eval_domain = Radix2EvaluationDomain::new(n).unwrap();
+
+        let generator = G1Projective::rand(&mut rng);
+
+        let pot: Vec<G1Affine> = powers_of_tau(generator, tau, n);
+        let lagrange: Vec<G1Affine> = lagrange_basis(generator, tau, n, eval_domain);
+        let lagrange_converted: Vec<G1Affine> =
+            convert_to_lagrange_basis::<G1Projective>(&pot, eval_domain);
+        assert_eq!(lagrange_converted.len(), lagrange.len());
+        assert_eq!(lagrange_converted, lagrange);
+    }
 }
