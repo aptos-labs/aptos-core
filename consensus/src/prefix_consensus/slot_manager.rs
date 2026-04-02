@@ -1155,6 +1155,16 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
         // Build OrderedBlocks with ordered_proof covering the last block
         let last_block_info = blocks.last().unwrap().block_info();
+
+        // Keep Arc references to all blocks so we can send commit_proof_tx after
+        // execution completes (needed for executor.commit_ledger() to fire).
+        let blocks_for_commit: Vec<Arc<PipelinedBlock>> =
+            if self.pipeline_builder.is_some() {
+                blocks.iter().cloned().collect()
+            } else {
+                vec![]
+            };
+
         let ordered = OrderedBlocks {
             ordered_blocks: blocks,
             ordered_proof: LedgerInfoWithSignatures::new(
@@ -1179,6 +1189,49 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 is_final_wave = finalize_with_v_high.is_some(),
                 "Wave committed — blocks sent to execution pipeline"
             );
+
+            // Spawn a task to send commit_proof_tx after execution completes.
+            // This mirrors Jolteon's persisting_phase: the commit proof must contain
+            // the real BlockInfo (version, root_hash) from execution results so that
+            // executor.commit_ledger() works with both FakeAptosDB and real AptosDB.
+            if !blocks_for_commit.is_empty() {
+                let last_block = blocks_for_commit.last().unwrap().clone();
+                let epoch = self.epoch;
+                tokio::spawn(async move {
+                    match last_block.wait_for_compute_result().await {
+                        Ok((compute_result, _)) => {
+                            let block_info = last_block.block().gen_block_info(
+                                compute_result.root_hash(),
+                                compute_result.last_version_or_0(),
+                                compute_result.epoch_state().clone(),
+                            );
+                            let commit_proof = LedgerInfoWithSignatures::new(
+                                LedgerInfo::new(block_info, HashValue::zero()),
+                                AggregateSignature::empty(),
+                            );
+                            for b in &blocks_for_commit {
+                                if let Some(tx) = b.pipeline_tx().lock().as_mut() {
+                                    if let Some(commit_tx) = tx.commit_proof_tx.take() {
+                                        if commit_tx.send(commit_proof.clone()).is_err() {
+                                            error!(
+                                                epoch = epoch,
+                                                "Failed to send commit_proof — receiver dropped"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            error!(
+                                epoch = epoch,
+                                error = ?e,
+                                "Failed to get compute result for commit proof"
+                            );
+                        },
+                    }
+                });
+            }
         }
 
         // Record commit_wave metrics
