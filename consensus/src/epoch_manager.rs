@@ -1087,6 +1087,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let proxy_enabled = !proxy_addresses.is_empty();
         let is_proxy_validator = proxy_enabled && proxy_addresses.contains(&self.author);
 
+        // When proxy is enabled, restrict primary proposer election to proxy validators only.
+        // Proxy validators have all proxy blocks locally and can include more per primary block.
+        // Primary-only validators need to fetch proxy blocks over the network, producing sparser proposals.
+        let proposer_election: Arc<dyn ProposerElection + Send + Sync> = if proxy_enabled {
+            info!(
+                epoch = epoch,
+                proxy_count = proxy_addresses.len(),
+                "Overriding primary ProposerElection to proxy-only RotatingProposer"
+            );
+            Arc::new(RotatingProposer::new(proxy_addresses.clone(), 1))
+        } else {
+            proposer_election
+        };
+
         info!(
             epoch = epoch,
             proxy_enabled = proxy_enabled,
