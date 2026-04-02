@@ -13,6 +13,7 @@ use aptos_cli_common::{
     TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_rest_client::Client;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
@@ -39,11 +40,15 @@ fn local_events_to_json(
     state_view: &impl aptos_types::state_store::StateView,
     events: &[(ContractEvent, Option<MoveTypeLayout>)],
 ) -> CliTypedResult<serde_json::Value> {
-    let events = events
+    let annotator = AptosValueAnnotator::new(state_view);
+    let parsed_events = events
         .iter()
-        .map(|(event, _layout)| event.clone())
-        .collect::<Vec<_>>();
-    let parsed_events = aptos_api_types::try_into_events_with_state_view(state_view, &events)
+        .map(|(event, _layout)| {
+            let data = annotator.view_value(event.type_tag(), event.event_data())?;
+            let data = aptos_api_types::MoveValue::try_from(data)?.json()?;
+            Ok::<_, anyhow::Error>(aptos_api_types::Event::from((event, data)))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
     serialize_as_json(&parsed_events)
 }
