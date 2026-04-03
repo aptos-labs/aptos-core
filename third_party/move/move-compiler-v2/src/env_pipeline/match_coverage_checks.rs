@@ -275,9 +275,9 @@ fn split_range_at_matrix_boundaries(
 
 /// Collect Range intervals from a set of constructors and sort by lower bound
 /// (None = -infinity comes first).
-fn collect_and_sort_intervals<'a>(
-    seen: &'a BTreeSet<MConstructor>,
-) -> Vec<(&'a Option<BigInt>, &'a Option<BigInt>)> {
+fn collect_and_sort_intervals(
+    seen: &BTreeSet<MConstructor>,
+) -> Vec<(&Option<BigInt>, &Option<BigInt>)> {
     let mut intervals: Vec<(&Option<BigInt>, &Option<BigInt>)> = seen
         .iter()
         .filter_map(|c| {
@@ -709,8 +709,7 @@ fn contains_range_witness(w: &WitnessPat) -> bool {
     match w {
         WitnessPat::Wild => false,
         WitnessPat::Ctor { ctor, args, .. } => {
-            matches!(ctor, MConstructor::Range(_, _))
-                || args.iter().any(contains_range_witness)
+            matches!(ctor, MConstructor::Range(_, _)) || args.iter().any(contains_range_witness)
         },
     }
 }
