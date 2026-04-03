@@ -292,7 +292,7 @@ impl<E: Pairing> PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G_1 = *pp_elgamal.message_base();
         let pk_range_proof = maybe_dekart_prover_key.unwrap_or_else(|| {
-            dekart_univariate_v2::Proof::setup(max_num_chunks_padded, ell, group_generators, rng).0
+            dekart_univariate_v2::Proof::setup_for_testing(max_num_chunks_padded, ell, group_generators, rng).0
         });
 
         let pp = Self {

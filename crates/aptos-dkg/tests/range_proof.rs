@@ -146,7 +146,7 @@ where
 {
     let mut rng = thread_rng();
     let group_generators = GroupGenerators::default();
-    let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
+    let (pk, vk) = B::setup_for_testing(n, ell, group_generators, &mut rng);
     RangeProofUniversalSetup { pk, vk }
 }
 
