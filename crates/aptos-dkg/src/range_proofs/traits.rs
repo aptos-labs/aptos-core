@@ -33,7 +33,6 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     /// Setup generates the prover and verifier keys used in the batched range proof.
     #[allow(non_snake_case)]
     fn setup<R: RngCore + CryptoRng>(
-        max_n: usize,
         max_ell: usize,
         vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
         ck_S: univariate_hiding_kzg::CommitmentKey<E>,

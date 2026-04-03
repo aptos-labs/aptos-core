@@ -299,13 +299,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
     #[allow(non_snake_case)]
     fn setup<R: RngCore + CryptoRng>(
-        max_n: usize,
         max_ell: usize,
         vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
         ck_S: univariate_hiding_kzg::CommitmentKey<E>,
     ) -> (ProverKey<E>, VerificationKey<E>) {
-        let num_omegas = max_n + 1;
-        assert!(num_omegas.is_power_of_two());
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
@@ -334,8 +331,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
         let prk = ProverKey {
             vk: vk.clone(),
+            max_n: ck_S.msm_basis.size() - 1,
             ck_S,
-            max_n,
             prover_precomputed,
         };
 
