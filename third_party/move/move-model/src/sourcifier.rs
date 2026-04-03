@@ -3213,6 +3213,20 @@ impl<'a> ExpSourcifier<'a> {
                 let ty = self.env().get_node_type(*node_id);
                 self.parent.print_value(val, Some(&ty), self.for_spec);
             },
+            Pattern::Range(node_id, lo, hi, inclusive) => {
+                let ty = self.env().get_node_type(*node_id);
+                if let Some(l) = lo {
+                    self.parent.print_value(l, Some(&ty), self.for_spec);
+                }
+                if *inclusive {
+                    emit!(self.wr(), "..=");
+                } else {
+                    emit!(self.wr(), "..");
+                }
+                if let Some(h) = hi {
+                    self.parent.print_value(h, Some(&ty), self.for_spec);
+                }
+            },
             Pattern::Error(_) => emit!(self.wr(), "*error*"),
         }
     }

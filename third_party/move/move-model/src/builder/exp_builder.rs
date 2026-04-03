@@ -2932,6 +2932,42 @@ impl ExpTranslator<'_, '_, '_> {
                     self.new_error_pat(loc)
                 }
             },
+            EA::LValue_::Range(lo_val, hi_val, inclusive) => {
+                // Translate range pattern. Strip reference from expected type.
+                let inner_expected = expected_type.skip_reference();
+                // Range patterns only allowed on integer types.
+                if !inner_expected.is_number() {
+                    self.error(
+                        loc,
+                        &format!(
+                            "range patterns are only allowed on integer types, found `{}`",
+                            inner_expected.display(&self.type_display_context())
+                        ),
+                    );
+                    return self.new_error_pat(loc);
+                }
+                let lo = lo_val
+                    .as_ref()
+                    .map(|v| self.translate_value(v, inner_expected, context));
+                let hi = hi_val
+                    .as_ref()
+                    .map(|v| self.translate_value(v, inner_expected, context));
+                // Check if any bound translation failed.
+                if lo.as_ref().is_some_and(|r| r.is_none())
+                    || hi.as_ref().is_some_and(|r| r.is_none())
+                {
+                    return self.new_error_pat(loc);
+                }
+                let lo_value = lo.and_then(|r| r.map(|(v, _)| v));
+                let hi_value = hi.and_then(|r| r.map(|(v, _)| v));
+                let pat_ty = if expected_type.is_reference() {
+                    expected_type.clone()
+                } else {
+                    inner_expected.clone()
+                };
+                let id = self.new_node_id_with_type_loc(&pat_ty, loc);
+                Pattern::Range(id, lo_value, hi_value, *inclusive)
+            },
         }
     }
 

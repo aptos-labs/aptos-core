@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unreachable pattern
+  ┌─ tests/match-checks/range_union_unreachable.move:7:13
+  │
+7 │             5..15 => 3,
+  │             ^^^^^
+
+error: unreachable pattern
+   ┌─ tests/match-checks/range_union_unreachable.move:17:13
+   │
+17 │             (5..15, false) => 3,
+   │             ^^^^^^^^^^^^^^

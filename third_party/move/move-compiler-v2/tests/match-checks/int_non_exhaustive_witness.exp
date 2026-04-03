@@ -6,4 +6,4 @@ error: match not exhaustive
 3 │         match (x) {
   │                ^
   │
-  = missing `_`
+  = missing at least `3..`

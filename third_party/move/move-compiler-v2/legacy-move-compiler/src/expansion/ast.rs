@@ -491,6 +491,8 @@ pub enum LValue_ {
     PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueOrDotDotList),
     // Literal value pattern (for primitive pattern matching)
     Literal(Value),
+    // Range pattern: (lo, hi, inclusive_upper)
+    Range(Option<Value>, Option<Value>, bool),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
@@ -2259,6 +2261,19 @@ impl AstDebug for LValue_ {
             },
             L::Literal(val) => {
                 val.value.ast_debug(w);
+            },
+            L::Range(lo, hi, inclusive) => {
+                if let Some(l) = lo {
+                    l.value.ast_debug(w);
+                }
+                if *inclusive {
+                    w.write("..=");
+                } else {
+                    w.write("..");
+                }
+                if let Some(h) = hi {
+                    h.value.ast_debug(w);
+                }
             },
         }
     }
