@@ -1085,13 +1085,31 @@ impl PipelineBuilder {
     ) -> TaskResult<CommitLedgerResult> {
         let mut tracker = Tracker::start_waiting("commit_ledger", &block);
         parent_block_commit_fut.await?;
-        pre_commit_fut.await?;
-        let ledger_info_with_sigs = commit_proof_fut.await?;
+        let compute_result = pre_commit_fut.await?;
+        let commit_proof = commit_proof_fut.await?;
 
         // it's committed as prefix
-        if ledger_info_with_sigs.commit_info().id() != block.id() {
+        if commit_proof.commit_info().id() != block.id() {
             return Ok(None);
         }
+
+        // Reconstruct LedgerInfo with real values from execution results.
+        // The commit proof's block_id identifies which block to commit, but
+        // its version/root_hash may be placeholders (prefix consensus sends
+        // the proof before execution completes). Using compute_result ensures
+        // correct values for both FakeAptosDB and real AptosDB validation.
+        let block_info = block.gen_block_info(
+            compute_result.root_hash(),
+            compute_result.last_version_or_0(),
+            compute_result.epoch_state().clone(),
+        );
+        let ledger_info_with_sigs = LedgerInfoWithSignatures::new(
+            LedgerInfo::new(
+                block_info,
+                commit_proof.ledger_info().consensus_data_hash(),
+            ),
+            commit_proof.signatures().clone(),
+        );
 
         tracker.start_working();
         let ledger_info_with_sigs_clone = ledger_info_with_sigs.clone();
