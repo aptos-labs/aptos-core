@@ -116,6 +116,10 @@ pub struct ConsensusConfig {
     /// round-time performance so that validators that commit quorums faster are elected
     /// as leaders proportionally more often.
     pub use_latency_weighted_leader: bool,
+    /// Exponent for latency-weighted leader selection. The weight for an active validator is
+    /// `active_weight * (max_median / median_rt)^multiplier`. Higher values more aggressively
+    /// favor low-latency proposers. Default 1 gives linear scaling.
+    pub latency_weight_multiplier: f64,
 }
 
 /// Deprecated
@@ -410,6 +414,7 @@ impl Default for ConsensusConfig {
             enable_optimistic_proposal_tx: true,
             num_tokio_worker_threads: 0,
             use_latency_weighted_leader: false,
+            latency_weight_multiplier: 1.0,
         }
     }
 }
