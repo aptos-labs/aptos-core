@@ -344,6 +344,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 Box::new(LatencyWeightedHeuristic::new(
                                     inner_heuristic,
                                     proposer_and_voter_config.active_weight,
+                                    self.config.latency_weight_multiplier,
                                 ))
                             } else {
                                 Box::new(inner_heuristic)

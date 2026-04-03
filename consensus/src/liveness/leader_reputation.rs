@@ -560,20 +560,22 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
 /// Concretely, for every active validator we compute the median interval between consecutive
 /// committed blocks in the history window.  The weight is then:
 ///
-///   active_weight * max_median_round_time_us / validator_median_round_time_us
+///   active_weight * (max_median_round_time_us / validator_median_round_time_us)^multiplier
 ///
 /// Inactive / failed validators keep their base weights unchanged.
 /// If there is not enough history to compute a median the base active weight is used.
 pub struct LatencyWeightedHeuristic {
     inner: ProposerAndVoterHeuristic,
     active_weight: u64,
+    multiplier: f64,
 }
 
 impl LatencyWeightedHeuristic {
-    pub fn new(inner: ProposerAndVoterHeuristic, active_weight: u64) -> Self {
+    pub fn new(inner: ProposerAndVoterHeuristic, active_weight: u64, multiplier: f64) -> Self {
         Self {
             inner,
             active_weight,
+            multiplier: if multiplier > 0.0 { multiplier } else { 1.0 },
         }
     }
 
@@ -661,8 +663,9 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
                 }
                 match medians.get(author) {
                     Some(&median_rt) if median_rt > 0 => {
-                        // Scale proportionally: fastest gets active_weight, others get less.
-                        (self.active_weight * max_median) / median_rt
+                        // Scale by (max_median / median_rt)^multiplier.
+                        let ratio = (max_median as f64 / median_rt as f64).powf(self.multiplier);
+                        (self.active_weight as f64 * ratio) as u64
                     },
                     _ => base,
                 }

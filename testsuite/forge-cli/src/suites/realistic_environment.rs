@@ -747,6 +747,7 @@ pub(crate) fn realistic_env_p90_latency_test() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.consensus.use_latency_weighted_leader = true;
+            config.consensus.latency_weight_multiplier = 1.0;
         }))
         .with_success_criteria(
             SuccessCriteria::new(3000)
