@@ -154,11 +154,7 @@ impl TransactionTraceStore {
                 },
                 StageMetadata::BatchPull(_) => stage.as_ref().to_string(),
             };
-            observe_stage_latency(
-                trace.insertion_time_usecs,
-                &trace.sender_str,
-                &stage_label,
-            );
+            observe_stage_latency(trace.insertion_time_usecs, &trace.sender_str, &stage_label);
             trace.record_with_metadata(stage, timestamp_usecs, metadata);
         }
     }
@@ -669,8 +665,7 @@ fn log_trace(trace: &TransactionTrace) {
                 if let Some(info) = first_pull_per_attempt.get(&display_attempt) {
                     // Find the QsBatchPull timestamp for this attempt.
                     if let Some(pull_record) = sorted_stages.iter().find(|r| {
-                        r.stage == TransactionStage::QsBatchPull
-                            && r.attempt == display_attempt
+                        r.stage == TransactionStage::QsBatchPull && r.attempt == display_attempt
                     }) {
                         stage_parts.push(build_wait_summary(
                             info,

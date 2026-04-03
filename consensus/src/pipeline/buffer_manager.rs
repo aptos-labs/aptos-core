@@ -518,8 +518,7 @@ impl BufferManager {
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // Record Certified tracing stage — uses block_txns mapping (no payload iteration)
                 if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
-                    let store =
-                        aptos_transaction_tracing::store::TransactionTraceStore::global();
+                    let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
                     for eb in &aggregated_item.executed_blocks {
                         store.record_block_stage(
                             &eb.id(),

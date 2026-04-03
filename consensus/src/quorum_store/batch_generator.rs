@@ -78,7 +78,8 @@ pub struct BatchGenerator {
     total_batches_created: u64,
     /// Recent batch creation events, capped at 500 entries (~37s at 75ms/round).
     /// Each entry = one pull round that produced batches, with gas bucket breakdown.
-    recent_batch_records: std::collections::VecDeque<aptos_transaction_tracing::types::BatchCreationRecord>,
+    recent_batch_records:
+        std::collections::VecDeque<aptos_transaction_tracing::types::BatchCreationRecord>,
     /// Cached Arc of batch bucket boundaries for tracing records (avoids cloning per record).
     tracing_bucket_boundaries: std::sync::Arc<Vec<u64>>,
 }
@@ -494,10 +495,7 @@ impl BatchGenerator {
         self.pull_round += 1;
         let excluded_count = self.txns_in_progress_sorted.len();
         counters::BATCH_PULL_EXCLUDED_TXNS.observe(excluded_count as f64);
-        trace!(
-            "QS: excluding txs len: {:?}",
-            excluded_count
-        );
+        trace!("QS: excluding txs len: {:?}", excluded_count);
 
         let mut pulled_txns = self
             .mempool_proxy
@@ -534,7 +532,9 @@ impl BatchGenerator {
                             excluded_txn_count: excluded_count as u64,
                             bp_txn: self.back_pressure.txn_count,
                             bp_proof: self.back_pressure.proof_count,
-                            recent_batches: Arc::new(self.recent_batch_records.iter().cloned().collect()),
+                            recent_batches: Arc::new(
+                                self.recent_batch_records.iter().cloned().collect(),
+                            ),
                         })
                     });
                     store.set_gas_unit_price(&hash, txn.gas_unit_price());
@@ -586,8 +586,8 @@ impl BatchGenerator {
                 .map(|b| (b.batch_info().gas_bucket_start(), b.batch_info().num_txns()))
                 .collect();
             let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
-            self.recent_batch_records
-                .push_back(aptos_transaction_tracing::types::BatchCreationRecord {
+            self.recent_batch_records.push_back(
+                aptos_transaction_tracing::types::BatchCreationRecord {
                     timestamp_usecs: now,
                     num_batches: batches.len() as u64,
                     pulled_txn_count: pulled_count,
@@ -596,7 +596,8 @@ impl BatchGenerator {
                     bp_proof: self.back_pressure.proof_count,
                     gas_bucket_txn_counts,
                     bucket_boundaries: self.tracing_bucket_boundaries.clone(),
-                });
+                },
+            );
             while self.recent_batch_records.len() > 500 {
                 self.recent_batch_records.pop_front();
             }

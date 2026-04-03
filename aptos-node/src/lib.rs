@@ -707,7 +707,12 @@ pub fn setup_environment_and_start_node(
         if tracing_cfg.enabled && !tracing_cfg.filter.sender_allowlist.is_empty() {
             let filter = aptos_transaction_tracing::filter::TransactionFilter::new(
                 true,
-                tracing_cfg.filter.sender_allowlist.iter().copied().collect(),
+                tracing_cfg
+                    .filter
+                    .sender_allowlist
+                    .iter()
+                    .copied()
+                    .collect(),
                 tracing_cfg.batch_sample_rate,
                 tracing_cfg.txn_sample_rate,
             );

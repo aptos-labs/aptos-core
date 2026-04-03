@@ -2233,7 +2233,10 @@ impl RoundManager {
 /// Extract (batch_digest, inclusion_type) pairs from a block payload for tracing.
 fn extract_batch_digests(
     payload: &aptos_consensus_types::common::Payload,
-) -> Vec<(aptos_crypto::HashValue, aptos_transaction_tracing::types::BatchInclusionType)> {
+) -> Vec<(
+    aptos_crypto::HashValue,
+    aptos_transaction_tracing::types::BatchInclusionType,
+)> {
     use aptos_consensus_types::{payload::OptQuorumStorePayload, proof_of_store::TBatchInfo};
     use aptos_transaction_tracing::types::BatchInclusionType;
 
