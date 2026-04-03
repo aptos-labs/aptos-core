@@ -64,7 +64,7 @@ pub fn mempool_incoming_transactions_strategy() -> impl Strategy<
     )
 }
 
-pub fn test_mempool_process_incoming_transactions_impl(
+pub async fn test_mempool_process_incoming_transactions_impl(
     txns: Vec<(
         SignedTransaction,
         Option<u64>,
@@ -93,7 +93,7 @@ pub fn test_mempool_process_incoming_transactions_impl(
         NodeType::extract_from_config(&config),
     );
 
-    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);
+    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false).await;
 }
 
 proptest! {
@@ -101,6 +101,9 @@ proptest! {
 
     #[test]
     fn test_mempool_process_incoming_transactions((txns, timeline_state) in mempool_incoming_transactions_strategy()) {
-        test_mempool_process_incoming_transactions_impl(txns, timeline_state);
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(
+            test_mempool_process_incoming_transactions_impl(txns, timeline_state),
+        );
     }
 }

@@ -328,12 +328,12 @@ pub trait MalleableTranscript: Transcript {
 
 /// This is needed instead of Default because `max_n` influences the public parameters of the DeKARTv2 range proof, and hence the public parameters of `chunky`
 pub trait WithMaxNumShares {
-    fn with_max_num_shares(n: u32) -> Self;
+    fn with_max_num_shares(n: usize) -> Self;
 
     // TODO: rethink this function and the next one
-    fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self;
+    fn with_max_num_shares_and_bit_size(n: usize, ell: u8) -> Self;
 
     /// This is a modified function which might create public parameters that are fairly nonsensical, but which are sufficient for `generate()`
     /// TODO: Not sure we need `n` here
-    fn with_max_num_shares_for_generate(n: u32) -> Self;
+    fn with_max_num_shares_for_generate(n: usize) -> Self;
 }

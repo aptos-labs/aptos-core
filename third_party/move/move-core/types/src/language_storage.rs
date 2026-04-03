@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     ability::AbilitySet,
@@ -508,6 +509,18 @@ impl<'a> hashbrown::Equivalent<(&'a AccountAddress, &'a IdentStr)> for ModuleId 
 impl<'a> hashbrown::Equivalent<ModuleId> for (&'a AccountAddress, &'a IdentStr) {
     fn equivalent(&self, other: &ModuleId) -> bool {
         self.0 == &other.address && self.1 == other.name.as_ident_str()
+    }
+}
+
+impl From<&ModuleId> for ModuleId {
+    fn from(id: &ModuleId) -> Self {
+        id.clone()
+    }
+}
+
+impl<'a> From<&(&'a AccountAddress, &'a IdentStr)> for ModuleId {
+    fn from(key: &(&'a AccountAddress, &'a IdentStr)) -> Self {
+        ModuleId::new(*key.0, key.1.to_owned())
     }
 }
 

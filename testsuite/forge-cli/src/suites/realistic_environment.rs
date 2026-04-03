@@ -548,6 +548,7 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
+        .with_decryption_setup_blob_url("https://github.com/aptos-labs/aptos-networks/raw/87459ef53acfbb38e0f5b4209d52ad22ac0e8fa4/devnet/decryption_setup.blob")
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;
@@ -555,6 +556,8 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
             config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
             config.consensus_observer.enable_v2_message_sending = true;
+            config.consensus.decryption_setup_blob_path =
+                Some("/opt/aptos/genesis/decryption_setup.blob".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;

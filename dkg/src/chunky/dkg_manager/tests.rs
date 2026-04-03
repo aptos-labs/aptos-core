@@ -106,12 +106,14 @@ async fn test_chunky_dkg_state_transition() {
     // Initial state should be Init.
     assert_eq!(manager.state_name(), "NotStarted");
 
-    // Transcript request should fail in Init state.
+    // Transcript request should return error response in Init state.
     let rpc_response_collector = Arc::new(RwLock::new(vec![]));
     let rpc_req =
         new_chunky_transcript_rpc_request(999, setup.addrs[3], rpc_response_collector.clone());
     let result = manager.process_peer_rpc_msg(rpc_req).await;
-    assert!(result.is_err()); // transcript request fails in Init state
+    assert!(result.is_ok()); // handler returns Ok, but sends error via response_sender
+    let last_responses = std::mem::take(&mut *rpc_response_collector.write());
+    assert!(last_responses.len() == 1 && last_responses[0].is_err());
 
     // process_dkg_start_event should transition to AwaitSubtranscriptAggregation.
     let event = ChunkyDKGStartEvent {
@@ -135,9 +137,10 @@ async fn test_chunky_dkg_state_transition() {
     assert!(result.is_err());
 
     // process_aggregated_subtranscript should transition to AwaitAggregatedSubtranscriptCertification.
-    let agg_subtrx = setup.aggregate_subtranscripts(&[0, 1, 2]);
+    let agg_with_hashes = setup.aggregate_subtranscripts_with_hashes(&[0, 1, 2]);
+    let agg_subtrx = agg_with_hashes.aggregated_subtranscript.clone();
     let result = manager
-        .process_aggregated_subtranscript(agg_subtrx.clone())
+        .process_aggregated_subtranscript(agg_with_hashes)
         .await;
     assert!(result.is_ok());
     assert_eq!(
@@ -158,7 +161,7 @@ async fn test_chunky_dkg_state_transition() {
         .aggregate_signatures(sigs.iter())
         .unwrap();
     let certified = CertifiedAggregatedSubtranscript {
-        aggregated_subtranscript: agg_subtrx,
+        aggregated_subtranscript: Arc::new(agg_subtrx),
         aggregate_signature,
     };
     let result = manager
@@ -231,9 +234,10 @@ async fn test_close_and_notifications() {
     };
     manager.process_dkg_start_event(event).await.unwrap();
 
-    let agg_subtrx = setup.aggregate_subtranscripts(&[0, 1, 2]);
+    let agg_with_hashes = setup.aggregate_subtranscripts_with_hashes(&[0, 1, 2]);
+    let agg_subtrx = agg_with_hashes.aggregated_subtranscript.clone();
     manager
-        .process_aggregated_subtranscript(agg_subtrx.clone())
+        .process_aggregated_subtranscript(agg_with_hashes)
         .await
         .unwrap();
 
@@ -248,7 +252,7 @@ async fn test_close_and_notifications() {
         .aggregate_signatures(sigs.iter())
         .unwrap();
     let certified = CertifiedAggregatedSubtranscript {
-        aggregated_subtranscript: agg_subtrx,
+        aggregated_subtranscript: Arc::new(agg_subtrx),
         aggregate_signature,
     };
     manager

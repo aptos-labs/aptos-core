@@ -1,0 +1,17 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_field_wrong_struct_ownership
+
+struct Pair
+    first: u64
+    second: u64
+
+struct Decoy
+    first: u64
+    second: u64
+
+// Invalid: borrow$Pair$0 borrows from Decoy's field handle (owned by Decoy, not Pair).
+// The field type and offset match, but the field handle owner is the wrong struct.
+#[borrow(0)] public fun borrow$Pair$0(l0: &Pair): &u64
+    move_loc l0
+    borrow_field Decoy, first
+    ret

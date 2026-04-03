@@ -1,6 +1,6 @@
 # MonoMove: Design Document
 
-MonoMove is a Move Virtual Machine (VM) designed for performance and safety. At its core, it relies on monomorphization in order to handle Move generics and maximize efficiency. MonoMove design follows the following principles:
+MonoMove is a Move Virtual Machine (VM) designed for performance and safety. At its core, it relies on monomorphization in order to handle Move generics and maximize efficiency. MonoMove design follows the following principles:
 
 1. **Stateless VM**: VM does not store any long-living context. For execution, VM requires an external local (per-transaction) and global contexts.
 2. **Performance Built-in by Design**: Value system uses a flat memory representation. Hot execution paths have minimal pointer chasing: hot data is tightly packed, cold data is separated. Execution operates on monomorphized basic blocks or fully-monomorphized functions. Gas charges are aggregated per basic block, for better efficiency.
@@ -9,7 +9,7 @@ MonoMove is a Move Virtual Machine (VM) designed for performance and safety. 
 
 ## **Execution Model**
 
-Throughout the document, the following execution model is used.
+Throughout the document, the following execution model is used.
 
 1. There is a single executor instance that runs blocks (validator nodes) or chunks (state syncing nodes) of transactions. There is only parallelism within each block, but any two distinct blocks are sequential.
 2. For each transaction block, a Block-STM instance is created to run transactions in the block in parallel. Block-STM is using a fixed number of workers that execute different tasks (executing transactions speculatively, validating execution, running post-processing hooks for committed transactions).
@@ -17,7 +17,7 @@ Throughout the document, the following execution model is used.
 
 # **1. Global Execution Context**
 
-Throughout transaction block execution, a global context is owned by executor that stores long-living caches for code-related data and configs. Memory allocations for these caches are managed in epoch-based reclamation style, so that garbage collection (GC) only runs between transaction blocks. With this design, only concurrent allocations to the cache need to be supported, but not deallocations.
+Throughout transaction block execution, a global context is owned by executor that stores long-living caches for code-related data and configs. Memory allocations for these caches are managed in epoch-based reclamation style, so that garbage collection (GC) only runs between transaction blocks. With this design, only concurrent allocations to the cache need to be supported, but not deallocations.
 
 <aside>
 💡
@@ -33,15 +33,15 @@ Throughout transaction block execution, a global context is owned by executor 
 
 ### **Data Structures**
 
-The global context is a 2-phase state machine that can either be in **Execution** or **Maintenance** states:
+The global context is a 2-phase state machine that can either be in **Execution** or **Maintenance** states:
 
 1. **Execution**: multiple workers can hold allocation and read data concurrently.
 2. **Maintenance**: no workers allowed; context is checked if GC is needed, data may be deallocated.
 
-To enforce these states at compile time, a guard pattern is used. There are two distinct RAII guards:
+To enforce these states at compile time, a guard pattern is used. There are two distinct RAII guards:
 
 - **`ExecutionGuard`**: obtained by workers during block execution. Holding this guard means it is safe to hand out references tied to the guard's lifetime, and it is legal to allocate new cache entries through the guard.
-- **`MaintenanceGuard`**: obtained by the single-threaded executor *between blocks*. While held, no new `ExecutionGuard` can be created. This provides a clear "border" when deallocation finishes.
+- **`MaintenanceGuard`**: obtained by the single-threaded executor *between blocks*. While held, no new `ExecutionGuard` can be created. This provides a clear "border" when deallocation finishes.
 
 ```jsx
     End of block i                                                Start of block i+1
@@ -109,21 +109,21 @@ impl GlobalExecutionContext {
 
 # **2. Global Identifiers**
 
-Module address-name pairs, function/struct identifiers, and fully-instantiated types (and type lists) are interned using stable pointers to allocated data. Interning is managed by the global context, which owns the interner tables. Interning is an executor-only implementation detail with the following properties:
+Module address-name pairs, function/struct identifiers, and fully-instantiated types (and type lists) are interned using stable pointers to allocated data. Interning is managed by the global context, which owns the interner tables. Interning is an executor-only implementation detail with the following properties:
 
 1. Interned data is never written to storage and is never included in transaction outputs.
 2. Pointer addresses for the same data can vary across nodes and process runs.
 3. Interned data is not invalidated by module upgrades.
-4. `ExecutionGuard` can read from interner tables and can allocate more data. `MaintenanceGuard` checks allocation limits at transaction block boundaries so that allocation always succeeds during block execution time. `ExecutionGuard` returns `&'a T` references (not owned IDs) with lifetimes tied to the guard, so Rust enforces at compile-time that these references cannot be stored in long-lived state that outlives block execution (the safety requirement). The pointer-backed representation also allows storing additional cached data behind `T`.
-5. Only `MaintenanceGuard` can deallocate interned data. For example, this guard can reset interner tables at transaction block boundaries to reclaim memory. A reset may invalidate **all** dependent interner tables and loaded code.
+4. `ExecutionGuard` can read from interner tables and can allocate more data. `MaintenanceGuard` checks allocation limits at transaction block boundaries so that allocation always succeeds during block execution time. `ExecutionGuard` returns `&'a T` references (not owned IDs) with lifetimes tied to the guard, so Rust enforces at compile-time that these references cannot be stored in long-lived state that outlives block execution (the safety requirement). The pointer-backed representation also allows storing additional cached data behind `T`.
+5. Only `MaintenanceGuard` can deallocate interned data. For example, this guard can reset interner tables at transaction block boundaries to reclaim memory. A reset may invalidate **all** dependent interner tables and loaded code.
 
 ### **2.1 String Identifiers**
 
-All string data (module names, function names, struct names) is interned. Data structures owned by global context store raw pointers (`NonNull<str>`). External APIs do not see these pointers directly.
+All string data (module names, function names, struct names) is interned. Data structures owned by global context store raw pointers (`NonNull<str>`). External APIs do not see these pointers directly.
 
 ### **2.2 Module Identifiers**
 
-Identifiers for modules are interned as `ExecutableId`s. When interning, the module name is interned using the string interner first. Then, `ExecutableId` is created and allocated in the module interning table and the reference to the allocated data is returned.
+Identifiers for modules are interned as `ExecutableId`s. When interning, the module name is interned using the string interner first. Then, `ExecutableId` is created and allocated in the module interning table and the reference to the allocated data is returned.
 
 ```rust
 // Intentionally non-`Copy` and non-`Clone`.
@@ -157,7 +157,7 @@ Interning can happen in 2 scenarios:
 1. When a module is loaded for the first time (or a script is loaded), all addresses, and module names are interned.
 2. When transaction payload is executed in Aptos VM, entry function module identifier is interned. As a result, even if modules are cached, at least 1 lookup is done per user transaction.
 
-This design allows to obtain module address or name directly from the `ExecutableId` reference, e.g., when setting the location of an error or getting debug information context-free. `ExecutableIdData` can also store cached information about the module. For example, when publishing modules, gas is charged proportionally to storage key sizes. To speed up the computation, the key size can be cached in `ExecutableIdData`.
+This design allows to obtain module address or name directly from the `ExecutableId` reference, e.g., when setting the location of an error or getting debug information context-free. `ExecutableIdData` can also store cached information about the module. For example, when publishing modules, gas is charged proportionally to storage key sizes. To speed up the computation, the key size can be cached in `ExecutableIdData`.
 
 ### **2.3 Fully-Instantiated Types**
 
@@ -206,15 +206,15 @@ impl ExecutionGuard<'_> {
 }
 ```
 
-All fully-instantiated signature tokens are converted to a cononical `Type` representation via `ExecutionGuard`. All primitive types such as `u64`, `address` are pre-defined static values and are not stored in the interning table. This makes checks like "is this type a vector of `u8`" cheaper (no extra pointer dereference to get vector element type).
+All fully-instantiated signature tokens are converted to a cononical `Type` representation via `ExecutionGuard`. All primitive types such as `u64`, `address` are pre-defined static values and are not stored in the interning table. This makes checks like "is this type a vector of `u8`" cheaper (no extra pointer dereference to get vector element type).
 
 ```rust
 static U8_TYPE: Type = Type(TypeImpl::U8);
 ```
 
-Like with execution IDs, `ExecutionGuard` owns all types and provides the only way to obtain type reference. This design makes it impoossible for types to leak across execution boundaries.
+Like with execution IDs, `ExecutionGuard` owns all types and provides the only way to obtain type reference. This design makes it impoossible for types to leak across execution boundaries.
 
-Every list of types (e.g., type argument list) is also interned as `TypeList` in a seprate interner table. It stores a pointer to list allocation which stores pointers to types in type interner table. Only `ExecutionGuard` can create and give out references to type lists. As a result,it is also safe for `TypeList` to provides a safe Rust API to obtain a reference to a type at specified index. Empty type list cam be set statically to null to avoid empty list allocations, prevent lookups, etc.
+Every list of types (e.g., type argument list) is also interned as `TypeList` in a seprate interner table. It stores a pointer to list allocation which stores pointers to types in type interner table. Only `ExecutionGuard` can create and give out references to type lists. As a result,it is also safe for `TypeList` to provides a safe Rust API to obtain a reference to a type at specified index. Empty type list cam be set statically to null to avoid empty list allocations, prevent lookups, etc.
 
 ```rust
 static EMPTY_TYPE_LIST: TypeList = TypeList(core::ptr::null());
@@ -226,17 +226,17 @@ Pointer-based design has the following benefits:
 2. Structural information is preserved. For example, for runtime checks one can obtain element type of a vector via pointer dereference (no extra lookups or synchronization).
 3. Data behind the pointer can cache more information. For example, type abilities can be computed during interning.
 
-Note that pointer-based approach still does not eliminate possibility of "type confusion" entirely. If there is a bug in interner, pointer equality may be broken and lead to structurally same types being different, etc.
+Note that pointer-based approach still does not eliminate possibility of "type confusion" entirely. If there is a bug in interner, pointer equality may be broken and lead to structurally same types being different, etc.
 
 ### **2.4 Struct and Function Identifiers**
 
-Structs and functions are uniquely identified by IDs obtained via interning table.
+Structs and functions are uniquely identified by IDs obtained via interning table.
 
-Like `ExecutionId`s, function and struct IDs are obtained:
+Like `ExecutionId`s, function and struct IDs are obtained:
 
 1. When a module is loaded for the first time (or a script is loaded). All data in the module is interned and the loaded module is cached.
 2. When transaction payload is executed in Aptos VM, entry function identifiers and type argument tags are interned:
-    - Entry function payload arguments are collapsed to do 1 lookup in cache for `NonNull<FunctionId>`.
+    - Entry function payload arguments are collapsed to do 1 lookup in cache for `NonNull<FunctionId>`.
     - On a miss, intern type arguments and generic function Id.
     - Worst-case number of lookups is still 5+ (because of type tags). As an optimization, composite hashes can be pre-computed when decoding the payload (when in validaotr's mempool).
 
@@ -269,22 +269,22 @@ pub struct GenericStructId { .. }
 pub struct StructId { .. };
 ```
 
-`ExecutionGuard` gives out references to all these identifiers. As a result, keys are still compact (pointer-size) integers. At the same time, the structural data can be obtained through pointer dereferences (e.g., for debugging).
+`ExecutionGuard` gives out references to all these identifiers. As a result, keys are still compact (pointer-size) integers. At the same time, the structural data can be obtained through pointer dereferences (e.g., for debugging).
 
 # **3. Executables**
 
 ### **Executables**
 
-When a module or a script are loaded, verified `CompiledModule` and `CompiledScript` are converted into `Executable`. Executable stores:
+When a module or a script are loaded, verified `CompiledModule` and `CompiledScript` are converted into `Executable`. Executable stores:
 
 1. Monomorphized function and struct definitions. These include non-generics as well as fully-monomorphized generics.
 2. Generic function and struct definitions (to be monomorphized lazily at runtime).
 3. A constant pool for large non-inlined constants (e.g., vectors).
 4. A bump-allocated arena where all executable data is stored.
 
-During load-time, all data structures (e.g., Move bytecode, constants, types) are allocated in the arena, and raw pointers are used. Executable can give out references to this data with the lifetime bounded by the lifetime of the executable (via unsafe Rust). This is safe as it is guaranteed that no data is re-allocated when executing transactions - only new allocations can be added due to monomorphization.
+During load-time, all data structures (e.g., Move bytecode, constants, types) are allocated in the arena, and raw pointers are used. Executable can give out references to this data with the lifetime bounded by the lifetime of the executable (via unsafe Rust). This is safe as it is guaranteed that no data is re-allocated when executing transactions - only new allocations can be added due to monomorphization.
 
-When executable is dropped, memory used by maps and other data structures storing pointers to arena is freed. Then, memory from arena is deallocated in constant-time. *Invariant: executable is never dropped during the execution of a transaction block.* This design ensures raw pointers are stable, and simplifies memory management and concurrency.
+When executable is dropped, memory used by maps and other data structures storing pointers to arena is freed. Then, memory from arena is deallocated in constant-time. *Invariant: executable is never dropped during the execution of a transaction block.* This design ensures raw pointers are stable, and simplifies memory management and concurrency.
 
 ```rust
 struct Executable {
@@ -305,64 +305,45 @@ struct Executable {
 }
 ```
 
-A non-generic or monomorphized function is represented via `Function` struct. Function stores the following:
+A non-generic or monomorphized function is represented via `Function` struct. The runtime's current `Function` representation (in `mono-move-core`) is a post-monomorphization, type-erased form focused on execution:
 
-1. Its type signature: parameter and return types that are pointers to arena-allocated type vectors.
-2. `Code` and related structure for this function. Code can be native, in which case a function pointer is stored to the actual Rust implementation. Code can also be a pointer to Move execution instructions (translated from file-format bytecode during monomorphization) and a pointer to local types is also stored (for runtime type checks). Note that parameter types are the prefix of local types, and so the pointer to locals points to the same location as the pointer for parameter types (but slice has different length).
-3. Visibility of this function (enum): private, package, public. This information is *only needed for runtime checks*.
-4. Attributes for this function, stored as a bitset:
+```rust
+pub struct Function {
+   pub name: GlobalArenaPtr<str>,
+   pub code: Vec<MicroOp>,
+   /// Size of the argument region at the start of the frame.
+   pub args_size: usize,
+   /// Size of the arguments + locals region.
+   pub args_and_locals_size: usize,
+   /// Total frame footprint including metadata and callee slots.
+   pub extended_frame_size: usize,
+   /// Whether the runtime must zero-init the region beyond args on frame creation.
+   pub zero_frame: bool,
+   /// Frame byte-offsets of slots that may hold heap pointers (GC roots).
+   pub pointer_offsets: Vec<FrameOffset>,
+}
+```
+
+Key points:
+
+- **Type-erased**: After monomorphization, type signatures (`param_types`, `return_types`) are no longer needed at runtime. All type information is baked into concrete micro-op operand sizes and offsets.
+- **`pointer_offsets` for GC**: Each function declares which frame offsets may hold heap pointers. The GC uses these as root sets when scanning the call stack — no per-PC stack maps are needed (see `docs/heap_and_gc.md`). When `zero_frame` is true, the runtime zeroes non-argument slots on frame creation so pointer slots start as null.
+- **Frame sizing**: `args_size`, `args_and_locals_size`, and `extended_frame_size` define the frame layout precisely, including a callee arg/return region at the end for non-leaf functions.
+
+The full `Function` struct will eventually also include:
+
+1. Visibility of this function (enum): private, package, public. This information is *only needed for runtime checks*.
+2. Attributes for this function, stored as a bitset:
     - If this function is an entry function.
     - If this function is persistent.
     - If this function has re-entrancy module lock.
     - If this function is trusted (resides at special address).
     
-    Any future attributes are part of this set. Note that non-private struct APIs are translated to execution instructions and are not calls.
-    
+    Any future attributes are part of this set. Note that non-private struct APIs are translated to execution instructions and are not calls.
 
-```rust
-/// A fully-instantiated function definition.
-struct Function {
-   // Stores function attributes and other miscellaneous information.
-   metadata: FunctionMetadata,
+Instructions that call non-generic functions are set at load- or execution- time in the following way:
 
-   // Type signature of this function. 
-   param_types: NonNull<[Type]>,
-   return_types: NonNull<[Type]>,
-
-   // The code to execute. Wrapped in atomic pointer to be able to change the
-   // representaton during execution.
-   code: ArcSwap<Code>,
-}
-
-/// Function metadata, shared between generic and non-generic functions.
-struct FunctionMetadata {
-   attributes: u8,
-   visibility: u8,
-}
-
-/// Code for function definition. Can be native or non-native. For non-native
-/// code, stores additional metadata for interpretation. 
-enum Code {
-   Native {
-      // Function pointer.
-      ptr: NativeFunction,
-   },
-   MoveExecIR {
-      // Pointer to local types. This points to the same start as the parameter
-      // types slice but can be larger in size if there are more locals.
-      locals: NonNull<[Type]>,
-
-      // Raw instructions (fixed-size).
-      instructions: NonNull<[Instruction]>,
-
-      // TODO: inline caches, or other data ...
-   },
-}
-```
-
-Instructions that call non-generic functions are set at load- or execution- time in the following way:
-
-1. Every instruction that calls to function *local to this module* embeds the pointer to this function at load-time:
+1. Every instruction that calls to function *local to this module* embeds the pointer to this function at load-time:
     
     ```rust
     Instruction::CallLocal {
@@ -370,9 +351,9 @@ Instructions that call non-generic functions are set at load- or execution- ti
     },
     ```
     
-    This is safe in case of module upgrades: the caller is upgraded together with the callee. The overhead of function dispatch is 1 memory load.
+    This is safe in case of module upgrades: the caller is upgraded together with the callee. The overhead of function dispatch is 1 memory load.
     
-2. Every instruction that calls to function *external to this Move module* embeds the "link" to the function (indirection layer):
+2. Every instruction that calls to function *external to this Move module* embeds the "link" to the function (indirection layer):
     
     ```rust
     Instruction::CallExternal {
@@ -392,27 +373,27 @@ Instructions that call non-generic functions are set at load- or execution- ti
     }
     ```
     
-    This link allows to update the function pointer to the newest version after module upgrade, without any changes to the caller's code. The algorithm works as follows:
+    This link allows to update the function pointer to the newest version after module upgrade, without any changes to the caller's code. The algorithm works as follows:
     
-    - When executable is loaded for the first time, a `FunctionLink` is created for a specified function ID with null `ptr` value. The link is stored in a map stored in global context. If link already exists in context, it is embedded in the call.
-    - During execution, the following is checked. If `ptr` is null, it means the function was not yet cached. Based on the `idx` to side-table, executable is loaded, function pointer extracted and link sets to point to it. If `ptr` is not null, only the executable ID is recorded in the read-set (note: for some additional bookkeeping, might be a full executable load). and the call dispatches to the `ptr`. Upgrade implementation guarantees that the executable points to the newest function.
+    - When executable is loaded for the first time, a `FunctionLink` is created for a specified function ID with null `ptr` value. The link is stored in a map stored in global context. If link already exists in context, it is embedded in the call.
+    - During execution, the following is checked. If `ptr` is null, it means the function was not yet cached. Based on the `idx` to side-table, executable is loaded, function pointer extracted and link sets to point to it. If `ptr` is not null, only the executable ID is recorded in the read-set (note: for some additional bookkeeping, might be a full executable load). and the call dispatches to the `ptr`. Upgrade implementation guarantees that the executable points to the newest function.
     - During upgrade, for every executable, for every function the corresponding links are set to null. Because upgrade happens at Block-STM commit-time, linking to older versions is not needed. Alternative to this approach is storing version in the link so that the caller checks it to invalidate. Because upgrades are rare, doing more work on upgrade is preferred.
         
-        NOTE: For replay during post-commit hook, links **cannot** be used because they store most recent code versions. Hence, replay needs to always run on top of its executable read-set and resolve calls via `idx` to fetch function from that version. This can be mitigated by having a flag in the link to specify if it was ever upgraded (if not, link is safe to use during replay).
+        NOTE: For replay during post-commit hook, links **cannot** be used because they store most recent code versions. Hence, replay needs to always run on top of its executable read-set and resolve calls via `idx` to fetch function from that version. This can be mitigated by having a flag in the link to specify if it was ever upgraded (if not, link is safe to use during replay).
         
     
-    The overheads of this approach at execution are 2 loads and additional executable look-up (to record in read-set: unavoidable).
+    The overheads of this approach at execution are 2 loads and additional executable look-up (to record in read-set: unavoidable).
     
-    An alternative is to store `AtomicPtr<(u32, Function)>` in the caller (initially set to null). During resolution, the pointer of the callee is saved along with the executable version in the instruction (via atomic swap). However, then every function call needs to check the version against the most recent read, and upgraded code is made visible only for callers that executed (on-demand re-linking). This approach has slightly lower overhead of only 1 load, but it is not clear saving 1 extra load is worth it.
+    An alternative is to store `AtomicPtr<(u32, Function)>` in the caller (initially set to null). During resolution, the pointer of the callee is saved along with the executable version in the instruction (via atomic swap). However, then every function call needs to check the version against the most recent read, and upgraded code is made visible only for callers that executed (on-demand re-linking). This approach has slightly lower overhead of only 1 load, but it is not clear saving 1 extra load is worth it.
     
 
-In order to avoid 2 loads on every function call, the followng optimization is possible (which keeps upgradability correct).
+In order to avoid 2 loads on every function call, the followng optimization is possible (which keeps upgradability correct).
 
-(1) When a package of modules is published, during Block-STM commit time, all executables are directly linked to each other before being added to cache. This is safe to do because modules cannot be removed from packages.
+(1) When a package of modules is published, during Block-STM commit time, all executables are directly linked to each other before being added to cache. This is safe to do because modules cannot be removed from packages.
 
-(2) When modules are pre-fetched into executable cache (e.g., framework to avoid cold starts), this is done in package granularity. All calls within the same package are linked to each other.
+(2) When modules are pre-fetched into executable cache (e.g., framework to avoid cold starts), this is done in package granularity. All calls within the same package are linked to each other.
 
-With (1) and (2), framework code never uses links within the same package. For other modules loads, in order to do this optimization, information needs to be obtained if callee belongs to the same package. This can be done by storing package information in `ModuleHandle` in file format or via "shallow" loading of immediate dependencies. Then, instruction like this can be used:
+With (1) and (2), framework code never uses links within the same package. For other modules loads, in order to do this optimization, information needs to be obtained if callee belongs to the same package. This can be done by storing package information in `ModuleHandle` in file format or via "shallow" loading of immediate dependencies. Then, instruction like this can be used:
 
 ```rust
 Instruction::CallLocal {
@@ -421,11 +402,11 @@ Instruction::CallLocal {
 },
 ```
 
-It is also worth mentioning the impact of this design on any Block-STM's post-commit replays (for asynchronous runtime checks). Because linking eagerly changes to newer versions of the code, replay, if done naively, can also link to version not from the original execution state but to the newer version. Hence, for cross-module (or cross-package, if optimization is used) replay, calls need to be resolved via: 1) fetching the module from read-set (correct version), 2) lookup of the `Function` via map.
+It is also worth mentioning the impact of this design on any Block-STM's post-commit replays (for asynchronous runtime checks). Because linking eagerly changes to newer versions of the code, replay, if done naively, can also link to version not from the original execution state but to the newer version. Hence, for cross-module (or cross-package, if optimization is used) replay, calls need to be resolved via: 1) fetching the module from read-set (correct version), 2) lookup of the `Function` via map.
 
 ### **Generic Types**
 
-In the file format, generics are represented as `TypeParam(u16)` variant in `SignatureToken`. MonoMove still needs to manage generics. It uses a flattened format to avoid pointer chasing and ensure memory is managed more efficiently (a compressed tree where instantiated leaves are `TypeId`s and only truly generic leaves are kept as type parameters). This efficient representation is needed because some instantiations may happen at runtime and are not cached.
+In the file format, generics are represented as `TypeParam(u16)` variant in `SignatureToken`. MonoMove still needs to manage generics. It uses a flattened format to avoid pointer chasing and ensure memory is managed more efficiently (a compressed tree where instantiated leaves are `TypeId`s and only truly generic leaves are kept as type parameters). This efficient representation is needed because some instantiations may happen at runtime and are not cached.
 
 1. Primitives: 1 byte header.
 2. Vectors or references: 1 byte header, followed by element encoding.
@@ -454,541 +435,50 @@ impl GlobalExecutionContextGuard<'_> {
 }
 ```
 
-# **4. Transaction Memory Management & Value Representation**
+# **4. Execution Engine**
 
-During execution, the VM needs to manage memory for values — vectors (dynamically sized), structs (large ones may need to be on the heap), and global values (may need a separate region).
+## 4.1 Runtime Instruction Set
 
-This is distinct from memory for types, code and global context, which is covered in earlier sections.
+The runtime executes **micro-ops** — a low-level, flat instruction set produced by the specializer from Move bytecode after monomorphization and destackification. Micro-ops operate on frame-relative byte offsets rather than a virtual operand stack. Categories include arithmetic, data movement, control flow (fused compare-and-branch), call/return, vector operations, heap object operations, reference operations, and gas metering.
 
-MonoMove uses a **two-level memory management system** organized around the BlockSTM execution model:
+The instruction set design (principles, addressing modes, naming conventions, open questions) is documented alongside the code in `mono-move-core/src/instruction/mod.rs`.
 
-1. **Block Level**: Manages shared state across all transactions -- the storage cache and allocation of memory subspaces for individual transactions.
-2. **Transaction Level**: Each transaction receives a dedicated memory region with its own allocator.
+## 4.2 Stack Memory Model & Calling Convention
 
-*Note*: We may also want some data to live across blocks in the future. The block-level cache could potentially be retained (rather than discarded) for use in subsequent blocks. TBD.
+The VM uses a unified linear stack where frame data and frame metadata coexist in one contiguous buffer. Each frame contains: arguments (written by caller), locals, 24-byte metadata (`saved_pc`, `saved_fp`, `saved_func_ptr`), and callee arg/return slots. The frame pointer (`fp`) points past the metadata, so operand access is a single `fp + offset`.
 
-This separation enables bounding total memory usage and supports parallel transaction execution with shared access to global values.
+Call dispatch writes the 24-byte metadata at the end of the caller’s frame, places arguments for the callee, and advances `fp`. Return reads the metadata at `fp - 24` to restore the caller’s state. Local access uses compile-time byte offsets — no index lookups.
 
-### **4.1 Block Memory Manager**
+See `docs/stack_and_calling_convention.md` for the full design: frame layout diagram, call/return protocol, unified vs. separate stack trade-offs, per-function calling convention customization, and security considerations (stack overflow, control flow hijacking, uninitialized memory, etc.).
 
-The block memory manager owns two key responsibilities:
+## 4.3 Heap and Garbage Collection
 
-1. **Storage Cache**: Caches resources loaded from storage, shared across all transactions within the block. The cached version is the resource state at the beginning of the block. This avoids redundant storage reads and BCS deserialization for frequently accessed resources.
-2. **Transaction Memory Allocation**: Hands out memory subspaces to individual transactions. Each transaction receives a dedicated region that is then managed by its own transaction-level memory manager.
+The runtime uses a two-level memory architecture: a block-level manager that owns the storage cache and hands out per-transaction memory subspaces, and a transaction-level bump allocator paired with Cheney's copying GC. The common path is pure bump allocation with zero overhead; the collector is a safety net for when the heap fills.
 
-### **Sharing Global Values Across Transactions**
+See `docs/heap_and_gc.md` for the full design: block/transaction memory management, global value sharing, per-block memory limits, GC design space analysis (four approaches evaluated), and memory safety considerations.
 
-While temporary values created during execution (local variables, intermediate results, newly allocated structs and vectors) are exclusively local to a transaction, writes to global values need to be made visible to subsequent transactions.
+## 4.4 Value Representation
 
-Two approaches can enable this sharing:
+Values are represented flat in memory. Primitives are N bytes flat. Structs and enums support both inline and heap representations. Vectors are heap-allocated with an 8-byte header, length, and element data. References are 16-byte fat pointers `(base_ptr, byte_offset)`.
 
-**Option 1: Freeze-on-Finish**
+See `docs/value_representation.md` for the full design: memory layouts with diagrams, inline vs. heap trade-offs for structs and enums, vector layout and growth semantics, fat pointer mechanics, and reference alternatives.
 
-After a transaction finishes, freeze its memory space and expose it as read-only to subsequent transactions.
+# 5. Native Functions
 
-- *Pros*: Simple to implement; less error-prone; provides a consistent view to readers.
-- *Cons*: Coarse granularity; read-write conflicts are detected late.
+Native functions are first-class citizens in MonoMove — they have direct access to VM internals and follow the same calling convention as Move functions.
 
-**Option 2: Concurrent Data Structures**
+See `docs/native_functions.md` for the full design: calling convention, error handling, gas metering strategies, generics/monomorphization, security considerations, and distributed ownership concerns.
 
-Use a multi-version data structure to provide concurrent shared access to global values.
+# 6. VM Security & Correctness
 
-- *Pros*: Read-write conflicts are detected immediately.
-- *Cons*: More complex -- requires a separate shared mutable subspace at the block level (similar to the storage cache, but mutable); may expose inconsistent views to readers; may require copying data between memory regions; interacts poorly with GC-managed memory (references held by block-level structures must be updated when GC moves memory, unlike freeze-on-finish where frozen regions are not subject to GC).
+See `docs/vm_security_and_correctness.md` for the full set of security principles, vulnerability categories, and key invariants (arithmetic safety, type/memory safety, gas metering, boundedness, determinism, cache consistency, reference aliasing, panic safety, etc.).
 
-*TODO*: Analyze mainnet transaction history to better understand real-world read/write patterns and inform the choice between these approaches.
+# 7. Extension Points
 
-### **Per-Block Memory Limits**
+TBA: Gas Metering, Gas Profiling, Runtime Instrumentation Interfaces
 
-A per-block memory limit sets the upper bound of memory a node may use for values at any given time. This is important for resource planning and preventing out-of-memory conditions.
-
-**Why This Matters**
-
-Current node configuration uses a few dozen transactions per block to ensure low latency. However, throughput-focused benchmarks may run hundreds or thousands of transactions per block.
-
-Consider a default maximum of 10 MB per transaction (for values only — this excludes code and other global context data):
-
-- 1,000 transactions × 10 MB = 10 GB baseline memory usage.
-
-This is already high, and several factors can further increase memory consumption:
-
-- **Memory freezing + re-execution**: A transaction under re-execution may require two memory spaces -- one frozen (finished state) and one active (speculative execution).
-- **Garbage collection**: A copying GC requires an additional "to-space", effectively doubling the memory footprint during collection.
-
-In the worst case (all factors combined), peak memory usage could reach 30–40 GB. Typical usage would be significantly lower, but we need to plan for adversarial conditions.
-
-Such limits may be acceptable today, but pose concerns for future scalability. As VM execution speed improves, we may want to include more transactions per block without compromising latency significantly.
-
-**Mitigations**
-
-1. **Conservative initial allocation**: Start with a small allocation per transaction and grow as needed (e.g., 1 MB -> 4 MB -> 10 MB). The idea is that typical high-frequency transactions fit comfortably in the default allocation. Transactions with higher memory demands can request more, but may require pre-declaration or incur significant memory fees.
-2. **Hard per-block memory limit**: Enforce a block-level cap and cut off remaining transactions if approaching the limit. We already have a per-block gas limit that functions in a similar way.
-3. **Compact-on-freeze**: When freezing a transaction's memory space, retain only the global value writes and discard temporary values. This significantly reduces the footprint of frozen regions for typical transactions, but has limited effect on malicious transactions that maximize global value writes. Note: we may need to do this anyway for write-set generation This scan may also be required for gas metering purposes.
-
-### **4.2 Transaction Memory Manager**
-
-Each transaction gets its own memory manager for its subspace. The design has two major goals:
-
-1. **Blazingly fast allocation**: Allocation is on the hot path and must be minimal overhead.
-2. **Bulk deallocation**: Reclaim memory in batches rather than per-object — both at transaction end (discarding temporaries) and during GC runs (if needed).
-
-Two designs are under consideration:
-
-**Option 1: Simple Bump Allocator**
-
-Allocate by advancing a pointer; never deallocate individual objects. At transaction end, destroy everything at once.
-
-- *Pros*: Simplicity; speed — allocation is just a pointer bump.
-- *Cons*: Limited scalability — if the allocator needs to grow, why not also run GC? Cannot handle pathological cases (e.g., a loop allocating large amounts of temporary data that could otherwise be reclaimed). Though some nuance here: (1) if these cases are truly pathological, is handling them important? (2) real-world Move code should be examined for compelling examples; (3) these considerations may be moot if GC is justified for other reasons.
-
-**Option 2: Compacting GC**
-
-A compacting garbage collector is well-suited for MonoMove because we only care about latency at the block level. Pausing the world within a single transaction is a non-issue, provided that the cost of running is GC is accounted for (e.g. via gas).
-
-- *Pros*: Similar allocation speed (bump allocation) and bulk deallocation capabilities as Option 1, but with much better scalability — can reclaim memory mid-transaction or grow the heap, with defragmentation as a free byproduct of each GC run.
-- *Cons*: Complexity — requires tracking of live set, and either pointer fixup or indirection.
-
-Two implementation approaches are under consideration:
-
-**Design A: Direct Pointers with Pointer Fixup**
-
-References are raw pointers. During garbage collection, the collector traverses values recursively to move them into the to-space while fixing all internal pointers.
-
-- The memory manager must understand value layouts to locate and update pointers.
-- Live set discovery starts from externally-managed roots (e.g., the operand stack, locals).
-- *Pros*: No indirection overhead on value access.
-- *Cons*: Tight coupling between memory manager and runtime; pointer fixup adds complexity and cost to each GC cycle; memory may need to be moved in fragmented pieces rather than large contiguous chunks.
-
-**Design B: Handle-Based Indirection**
-
-References are handle IDs. Each handle stores: (1) the actual memory address and size, and (2) a parent field indicating ownership status.
-
-```rust
-enum Parent {
-    None,            // Dead — memory can be reclaimed
-    Root,            // Owned externally (e.g., on the operand stack)
-    Handle(HandleId) // Owned by another managed value (e.g., element in a vector)
-}
-
-struct Handle {
-    mem_ptr: *mut u8,
-    size: usize,
-    parent: Parent,
-}
-```
-
-Key properties:
-
-- **Index stability**: Once allocated, a handle's ID never changes while alive. This allows safe references via handle IDs. *TODO*: How do cross-transaction reads work here? If stable data must be copied on read, this could be expensive for read-heavy workloads. A CoW-like approach may be worth considering.
-- **Liveness via parent chains**: A handle is alive if its parent is `Root`, or if its parent is another handle that is itself alive. This can be computed efficiently via memoization.
-- **Handle recycling**: Dead handles are recycled to prevent the handle table from growing unboundedly.
-
-During GC, the collector scans the handle table to partition handles into alive and dead sets. Live memory is moved to the to-space in bulk; only the `mem_ptr` fields in handles need updating. Dead handles are recycled, and their memory is implicitly reclaimed by not copying it.
-
-- *Pros*: Decouples memory manager from value layout; simpler and faster GC; enables moving whole chunks without fragmentation.
-- *Cons*: Adds an indirection layer on every access; requires the runtime to report ownership changes (e.g., when a value moves into or out of a container).
-
-### **Design Considerations**
-
-The choice between Design A and Design B involves several trade-offs:
-
-| **Aspect** | **Design A (Direct Pointers)** | **Design B (Handles)** |
-| --- | --- | --- |
-| Access speed | No indirection | One extra pointer chase per access |
-| GC complexity | Must traverse values, fix pointers | Scan handle table, follow parent chains |
-| Memory movement | Fragmented pieces | Large contiguous chunks |
-| Coupling | Memory manager must know value layouts | Memory manager is layout-agnostic |
-| Runtime burden | Must figure out root set | Must report ownership changes |
-
-Design A favors raw access speed at the cost of tighter coupling and more complex GC. Design B favors architectural simplicity and bulk operations at the cost of indirection.
-
-The indirection cost in Design B is predictable and may actually be cache-friendly (the handle table is likely to stay hot). Whether this overhead is acceptable depends on workload characteristics and should be validated with benchmarks. The ownership reporting burden in Design B aligns naturally with Move's explicit ownership semantics, but adds plumbing throughout the runtime.
-
-A decision will need to be made based on performance measurements and implementation complexity assessment.
-
-### **Handling Global Values**
-
-Beyond temporary values, the transaction memory manager also handles operations on global resources (e.g., `move_from`, `move_to`, `borrow_global`).
-
-**Reading global values**: When a transaction reads a global resource, the value may come from:
-
-- The block-level storage cache (base value at block start), or
-- Another transaction's writes or modifications (if using concurrent sharing).
-
-The transaction tracks what it has read for later validation (BlockSTM needs to detect read-write conflicts). *Possible optimization*: track not just values but also read constraints (e.g., "checked that resource exists" vs "read the actual contents") for finer-grained conflict detection.
-
-An open question is whether reads require copying the value into local memory, or whether the transaction can reference the source directly. This depends on the memory manager design and the sharing approach.
-
-**Modifying global values**: When a transaction modifies a global resource, it performs a copy-on-write (CoW) into its own memory subspace. This keeps all modifications isolated, which:
-
-- Enables rollback if the transaction aborts or needs re-execution.
-- Allows other transactions to reference these modifications (the local memory holds the authoritative version of the transaction's writes).
-
-In BlockSTM, each transaction's modifications integrate with `MVHashMap` — the transaction's local memory effectively becomes a slot in the multi-version structure, replacing the current `Arc<Value>` approach.
-
-Open questions:
-
-- **CoW timing**: Should CoW happen eagerly on `borrow_global_mut`, or lazily on actual write? Lazy CoW avoids unnecessary copies but requires tracking borrowed references to detect when a write occurs.
-- **GC interaction**: If GC runs mid-transaction, references to the transaction's modified values (held by block-level structures for sharing) must be updated to reflect moved memory locations. This is likely not a concern if using freeze-on-finish (Section 4.1), since frozen memory is not subject to additional GC runs.
-
-### **4.3 Value Representation**
-
-Values are represented flat in memory. All values created by the VM and any modifications are allocated in the transaction's memory region. Primitives (`u8`, `u64`, `bool`, `address`, etc.) are trivially represented as raw bytes of the specified size.
-
-**Structs**
-
-The naive approach is to store structs on the heap, with a reference (pointer or handle) on the stack pointing to the heap-allocated data.
-
-However, inline structs have merits worth considering:
-
-- **Field access**: With heap-allocated structs, accessing a field at a certain offset requires dynamic pointer arithmetic at load-time. Inline structs allow direct access to inner memory without pointer chasing.
-- **Performance**: Pointer chasing everywhere is not ideal for performance and also complicates GC (more pointers to track/update).
-- **Copyable structs**: For these, `memcpy` is fast, making inline storage attractive.
-- **Trade-off**: The main concern is added complexity — supporting both inline and heap representations means two code paths to maintain. Inline structs may also require padding to a fixed size (though this does give predictable stack frame sizes).
-
-Understanding struct size distributions in real-world Move code would help inform this decision (what fraction are "small"? what threshold makes sense?).
-
-*Possible optimization*: Small structs could be stored inline on the stack to avoid heap allocation and indirection. This keeps the stack frame predictable in size (small structs would be padded to a fixed size). For copyable structs this is particularly attractive since `memcpy` is fast. The threshold size and whether this optimization is worthwhile depends on complexity analysis.
-
-**Enums**
-
-Similar considerations apply as with structs. The naive approach stores enums on the heap, with a reference on the stack pointing to the discriminant and variant payload.
-
-Inline enums would need zero-padding so all variants occupy the same size (important for monomorphization). The same trade-offs apply: better field access performance vs. added complexity from dual representations.
-
-*Note*: For simple enums with explicit representation (e.g., `#[repr(u64)]`), heap allocation should be avoided entirely — this could be enforced at the language level.
-
-**Vectors**
-
-Vectors use a layout similar to Rust's `Vec`: a header containing a reference to heap-allocated element storage, length, and capacity. The reference is a pointer (Design A) or handle (Design B).
-
-```rust
-Stack: [ref | len | capacity]
-        |
-        v
-Heap:  [elem 0][elem 1][elem 2]...
-```
-
-The underlying memory address can be used to distinguish whether the vector's storage resides in transaction-local memory or in the global storage cache.
-
-**Function Values**
-
-Function values are represented as a pointer to a `Function` object. The object may initially be shallow (unresolved), with full resolution deferred until the function is actually invoked.
-
-*Note*: Embedding function pointers directly works within a block, but if we implement a cross-block value cache, cached values containing function pointers would need updating when function metadata is invalidated or relocated.
-
-**References**
-
-The representation of references depends on the memory manager design:
-
-- **Design A (Direct Pointers)**: References are raw pointers into managed memory. Interior references (e.g., to a struct field or vector element) are simply pointers to that location.
-- **Design B (Handles)**: References are handle IDs, requiring a table lookup to obtain the actual memory address. Interior references require an additional offset field to locate data within the handle's managed memory.
-
-### **4.4 Memory Safety**
-
-The memory management design should consider safety at runtime — preventing memory corruption, invalid access, and undefined behavior. Below are some areas worth considering -- this list is not exhaustive.
-
-### **Reference Validity**
-
-Move's bytecode verifier provides static guarantees about reference safety (no dangling references, proper borrow semantics). However, runtime checks may be valuable as defense-in-depth against verifier bugs or interpreter errors.
-
-Potential runtime checks to consider:
-
-- **Epoch/generation counters**: Each handle or allocated memory chunk tracks a generation number. References include the expected generation; access fails if they don't match. This could catch use-after-free when handles are recycled.
-- **Bounds checking**: Reference accesses validate indices/offsets are within bounds.
-
-The cost of these checks would need to be weighed against the safety benefit. They could potentially be disabled in production once the implementation is mature.
-
-### **Memory Region Isolation**
-
-Transactions should only access:
-
-- Their own local memory region.
-- The block-level storage cache (read-only base values).
-- Other transactions' frozen memory (if using freeze-on-finish sharing).
-
-Violations would indicate serious bugs in the interpreter.
-
-### **GC Safety**
-
-If using a compacting GC:
-
-- **Design A**: All pointers must be updated after memory moves. Missing a pointer could lead to dangling references.
-- **Design B**: Only handle table entries need updating. References via handle IDs remain valid as long as the handle is alive.
-
-Design B may provide stronger GC safety guarantees since the indirection layer isolates application code from memory movement.
-
-### **Type Safety**
-
-With flat memory representation, values are raw bytes interpreted according to type information. The runtime should ensure values are accessed with the correct type.
-
-TBD: Anything the memory manager can do to help mitigate this risk?
-
-# **5. Execution Engine (WIP)**
-
-## 5.1 Runtime Instruction Set
-
+# 8. Translations within the VM
 TBA
 
-## 5.2 Stack Memory Model & Calling Convention
-
-The VM’s interpreter loop manages a single flat linear memory buffer as its unified call stack. Both frame data (arguments, locals) and frame metadata (return address, saved frame pointer, function identifier) reside in this buffer. The frame pointer (`fp`) points to the beginning of the current callee’s frame.
-
-```
-              caller frame                           callee frame
-  ┌──────────────────────────────────┐   ┌──────────────────────────────────┐
-  │                        │ saved  ││   │                                  │
-  │  caller locals         │  pc    ││   │  args  │  callee locals  │ ...   │
-  │                        │  fp    ││   │                                  │
-  │                        │func_id ││   │                                  │
-  └──────────────────────────────────┘   └──────────────────────────────────┘
-                           ▲             ▲
-                      metadata (24B)     fp
-```
-
-**Call sequence.** When the caller invokes a function:
-
-1. The caller writes a 24-byte metadata section `(pc, fp, func_id)` at the end of its own frame. This records the return address (program counter), the caller’s frame pointer, and the callee’s function identifier.
-2. The arguments to the callee are placed in a contiguous region immediately following the metadata, at the beginning of the callee’s frame.
-3. `fp` is set to the start of the callee’s frame.
-
-*Open question*: is `func_id` strictly necessary, or can `pc` be stored as a raw pointer directly into the bytecode buffer, eliminating the need for a separate function identifier?
-
-**Return sequence.** When the callee returns:
-
-1. The callee stores all return values at the beginning of its frame, contiguously, potentially overwriting some of its own arguments or locals.
-2. The interpreter reads the saved metadata at `fp - 24` to restore the caller’s `pc`, `fp` and `func_id`.
-
-**Local access.** Instructions access locals via `fp + offset`, where offsets are computed at compile time (during monomorphization). This avoids runtime index lookups and keeps the common case — reading or writing a local — to a single base-plus-offset memory access.
-
-**Comparison with x86-64.** This calling convention resembles x86-64, with one difference: x86-64 uses a mirrored layout (locals at `rbp - offset`, metadata at `rbp + offset`) because the stack grows downward. MonoMove’s stack grows upward, so both metadata and locals are at positive offsets from the frame boundary.
-
-**Trade-offs of the unified stack.**
-
-|  | Unified Stack | Separate Call Stack |
-| --- | --- | --- |
-| **Memory locality** | All frame data in one contiguous buffer — better cache behavior | Metadata and data in separate allocations — worse locality |
-| **Return overhead** | 3 loads from a known offset — no lookup needed | Requires a `Vec<Frame>` pop on every return |
-| **Bookkeeping** | No auxiliary data structures | Additional `Vec` management |
-| **Security** | Mixing control flow metadata with data means a memory corruption bug could lead to control flow hijacking | Clear separation — data corruption cannot hijack control flow |
-| **Measured performance** | ~1.28x faster on a recursive Fibonacci (call-heavy) benchmark | Baseline |
-
-### Alternative Approach: Separate Call Stack
-
-The alternative is to store frame metadata `(pc, fp, func_id)` in a separate `Vec<Frame>`, while keeping frame data (arguments, locals) in the flat linear buffer. 
-
-- This cleanly separates control flow metadata from data, which provides a stronger security property: data corruption (e.g., from a VM bug or a crafted value) cannot directly hijack the control flow.
-- The cost is additional overhead from maintaining the separate structure (a vector push/pop per call/return) and worse cache locality.
-
-### Optional Optimization: Per-Function Calling Convention Customization
-
-Rather than requiring arguments and return values to occupy the beginning of the frame in a fixed contiguous layout, each function could declare custom offsets for its arguments and return values, determined at compile time. This could eliminate some unnecessary moves.
-
-However, the benefits may not justify the complexity:
-
-- Small, simple functions benefit more from being inlined entirely.
-- Complex functions are unlikely to see meaningful gains from saving a few moves relative to the cost of the function body itself.
-
-### Security Considerations
-
-The stack is a high-value attack surface because it holds both execution state and user-controlled data. The following concerns are specific to the stack memory model and calling convention (see Section 7 for general VM security invariants).
-
-- **Stack overflow.** Unbounded or deeply recursive Move calls can exhaust the stack buffer. The VM must enforce a stack depth or size limit and abort the transaction cleanly when it is exceeded — never allow a write past the end of the allocated buffer.
-- **Control flow hijacking (unified stack only).** When frame metadata and frame data coexist in the same buffer, a bug that corrupts stack memory (e.g., an out-of-bounds write to a local) could overwrite the saved `pc` or `fp`, redirecting execution to an arbitrary location. This is the primary security argument for the separate call stack alternative. If the unified stack is chosen, defense-in-depth measures should be considered, such as frame canaries or integrity checks on metadata at return time.
-- **Out-of-bounds local access.** Since locals are accessed via `fp + offset` with compile-time offsets, an incorrect offset (e.g., from a monomorphization bug or a malformed instruction) could read or write outside the current frame. Bounds checking against the frame size at access time would catch this, at some performance cost.
-- **Uninitialized memory.** When a new frame is allocated, the memory region may contain leftover data from a previous frame. If a local is read before being written, the VM could expose stale values. Either zero-initialize frame memory on allocation, or ensure the bytecode verifier guarantees all locals are assigned before use (the current verifier does this, but MonoMove should preserve this guarantee).
-- **Return value overwrites.** The calling convention allows the callee to overwrite its own arguments and locals when writing return values. This is safe by construction if offsets are correct, but an off-by-one in the return value layout could corrupt the caller’s metadata (in the unified stack) or adjacent data. The compiler must guarantee that return value writes stay within the callee’s frame.
-
-# 6. Native Functions
-
-### 6.1 Core Principle
-
-Native functions are first-class citizens in MonoMove. They should have direct access to VM internals — stack and heap memory, the loader, the gas meter, etc. — and conceptually behave like VM instructions rather than opaque external calls. This ensures that native functions are efficient, composable with the rest of the execution engine, and subject to the same safety and metering guarantees.
-
-### 6.2 Calling Convention
-
-Native functions follow the same calling convention as Move functions (Section 5.2):
-
-- **Arguments** are read directly from the stack frame via `fp + offset`, just as with any other function call.
-- **Return values** are written to the beginning of the callee’s frame, following the same layout as Move function returns.
-
-This uniformity means the interpreter does not need a separate dispatch protocol for native calls — the only difference is that the “body” is a Rust function pointer rather than a sequence of Move instructions.
-
-### 6.3 Error Handling
-
-All errors produced by native functions are transaction-aborting — they terminate execution immediately. Because the entire transaction’s execution state (stack, heap, locals) is discarded on abort, there is no need for natives to clean up the stack or restore frame data.
-
-Native functions can produce the following categories of errors:
-
-- **User abort.** The Move-level equivalent of `abort`: the native signals a user-facing failure with an abort code. Gas is charged for the work performed. Example: a deserialization native receiving malformed input.
-- **Out of gas.** The native exhausts (or would exhaust) the transaction’s gas budget. A partial gas charge may apply for work already done.
-- **Invariant violation.** An internal error indicating a broken assumption — e.g., receiving an argument of unexpected type, arity mismatch, or a failed internal assertion. These should never be reachable from valid user code.
-- **Limit exceeded.** An execution, memory, or dependency limit is breached. Depending on the specific limit, this may be treated as out-of-gas or as an invariant violation.
-
-Conversely, if a native function returns successfully, it must guarantee that the correct number of return values have been written at the expected offsets in the callee’s frame. The interpreter proceeds unconditionally after a successful return — there is no post-call validation of the return layout.
-
-### 6.4 Gas Metering
-
-- **Constant-cost natives.** Some natives have a fixed cost that is known before execution (e.g., `signer::borrow_address`). These can charge gas upfront before doing any work, and may even be batched with the surrounding basic block’s gas charge — though the added complexity may not be justified for the marginal savings.
-- **Data-dependent cost.** Many natives have costs proportional to their input size (e.g., vector operations, serialization). These can inspect the input size, compute the charge, and pay upfront before performing the work.
-- **Iterative or unpredictable cost.** Some natives have no closed-form formula for their gas cost, or the formula is expensive to compute ahead of time. These must charge gas incrementally — e.g., per iteration within a loop. Charging per iteration/step can still satisfy the charge-before-work rule (Section 7.3), but there are cases where the cost is most naturally computed after the work is done. Such transient violations should be minimized, bounded by a small constant, carefully documented and reviewed.
-
-### 6.5 Generics
-
-By default, native functions are **not monomorphized**. 
-
-- When the caller (a Move function) is monomorphized, the type arguments to the native callee are fully resolved, but the native itself remains a single generic Rust implementation.
-- These resolved type arguments are passed to the native at call time, either as explicit type descriptors or via the execution context.
-
-**Selective native monomorphization.** As an optimization, a small number of performance-critical natives may be monomorphized — i.e., the VM selects a specialized Rust implementation based on the concrete type arguments at load time or call time. 
-
-- This is practical only when the set of possible instantiations is bounded and known ahead of time. For example, the crypto algebra natives operate over a fixed set of curve types and can be statically dispatched.
-- However, some generic natives (e.g., `bcs::to_bytes<T>`) accept an open set of types and cannot be meaningfully monomorphized. For these, common patterns (e.g., primitive types) may be specialized as fast paths while the generic fallback handles the rest.
-
-**Dynamic dispatch on type arguments.** Some natives perform fundamentally different logic depending on their type arguments (e.g., serialization format selection, type tag construction, layout-dependent operations). These require runtime type inspection regardless of whether monomorphization is used. The native function interface should make this type introspection ergonomic without sacrificing safety — e.g., by providing structured access to type metadata.
-
-### 6.6 Security Considerations
-
-Native functions are trusted Rust code that bypasses the bytecode verifier. Every native effectively extends the VM’s trusted computing base. A bug in a native can violate any of the invariants in Section 7 — type safety, memory safety, gas metering, determinism — without any static check catching it. This makes natives a disproportionate source of risk relative to their code volume.
-
-The following concerns are specific to native functions:
-
-- **Memory and type safety.** Natives access the stack and heap directly. An incorrect read or write can silently corrupt execution state.
-- **Reference safety.** Borrow semantics for natives are modeled but not verified at runtime (Section 7.8). The number of natives that receive or return references should be minimized.
-- **Gas metering.** Unlike Move bytecode, natives are responsible for their own gas charges. A native that undercharges is a denial-of-service vector. The asymptotic safety invariant (Section 7.3) must hold for every native.
-- **Determinism.** Natives must not introduce non-determinism (Section 7.6). This is especially relevant for natives that call into external libraries (e.g., cryptographic crates), where determinism depends on the library’s guarantees.
-- **Boundedness.** Any loop, recursion, or allocation within a native must be bounded (Section 7.4). External library calls that may internally recurse or allocate unboundedly are especially dangerous. Natives that manage their own shadow memory spaces are particularly hazardous — they bypass global memory limits and make it impossible to account for resource consumption centrally.
-- **Panic safety.** A panic inside a native crashes the node. This includes panics from dependencies — e.g., `unwrap`, out-of-bounds indexing, or assertion failures in third-party crates (Section 7.5).
-- **Calling convention violations.** A native that fails to honor the calling convention — e.g., writing return values at incorrect offsets, returning the wrong number of values, or leaving the frame in an inconsistent state — can corrupt the caller’s execution. The interpreter trusts the native unconditionally on successful return.
-
-**Distributed ownership.** Unlike the rest of the VM, not all natives are maintained by the core VM team. For example, cryptographic natives are typically owned by the cryptography team, and other domain-specific natives may be contributed by their respective teams. Yet every native runs inside the VM’s trust boundary with full access to execution state. This creates a gap: the teams writing the code may not be deeply familiar with the VM’s invariants, and the VM team may not be deeply familiar with the domain logic. Clear documentation of the native interface contract, along with review processes that bridge this gap, are essential.
-
-**Mitigation.** A constrained native interface (akin to the current `SafeNative` layer) can help — e.g., safe memory accessors, structured return value writing. However, because natives are by design low-level and powerful (they are first-class citizens of the trusted computing base), the protection such an interface can provide is inherently limited. Careful auditing remains essential.
-
-# 7. VM Security & Correctness
-
-### Core Principles
-
-1. **Assume all vulnerabilities will be discovered.** Any exploitable flaw will eventually be found and exploited or reported — increasingly so with the aid of AI-assisted auditing tools.
-2. **Security must be integral to the core design.** Retrofitting security guarantees into an existing implementation is far more difficult and error-prone than building them in from day one.
-
-### Common Vulnerability Categories
-
-The following are the primary categories of VM vulnerabilities:
-
-1. **Minting / Data Transmutation / Loss of Funds** — Unauthorized creation, destruction, or corruption of on-chain assets. This is the most severe class.
-2. **Non-determinism** — Bugs that result in chain halt.
-3. **Crashing** — Unhandled errors that cause the node process to terminate.
-4. **Reentrancy** — Unexpected re-entrant calls that result in contract-level bypasses or failures.
-5. **Slow-down** — Adversarial inputs that degrade performance.
-
-### Key Invariants
-
-The following invariants must be upheld throughout the VM implementation.
-
-### 7.1 Arithmetic Safety
-
-All arithmetic operations and numeric conversions must be checked. Unchecked arithmetic (wrapping, overflowing) is not permitted.
-
-### 7.2 Type and Memory Safety
-
-Values in MonoMove are stored as untyped raw bytes. The VM must prevent type confusion and data transmutation at all times.
-
-**Pointer validity.** Every pointer dereference must satisfy the following:
-
-- The pointer must target a memory region that the transaction is authorized to access — specifically, the transaction’s own memory region, or frozen global state shared by a previously committed transaction.
-- No use-after-free: pointers to deallocated or recycled memory must never be dereferenced.
-- No off-by-one or other incorrect offset computations.
-- No out-of-bounds access into containers (vectors, structs, etc.).
-
-**Allocation failure handling.** Stack overflow and heap allocation failure must be treated as errors and handled gracefully (i.e., abort the transaction), never ignored.
-
-**Centralized memory management.** All significant memory allocation must go through the VM’s memory manager. Native functions, in particular, should not maintain independent shadow memory spaces, as this makes it difficult to enforce global memory limits and opens the door to untracked resource consumption.
-
-### 7.3 Gas Metering
-
-Gas must be charged for every unit of work the VM performs.
-
-**Asymptotic safety.** At any point during execution, the cumulative gas charged must be proportional to the cumulative work performed. This is the non-negotiable baseline.
-
-**Charge-before-work.** As a general rule, gas should be charged before the corresponding work is carried out. This is not always feasible — the rule may be transiently violated when necessary — but any such violation must be bounded by a small constant.
-
-### 7.4 Boundedness
-
-All data structures, algorithms, and resource consumption within the VM must be explicitly bounded. Unboundedness in any dimension (space or time) is a potential denial-of-service vector.
-
-**Data and storage bounds.** The following must all have enforced upper limits:
-
-- Loader data, including code size (accounting for monomorphization expansion).
-- Memory consumption: stack, heap, and code regions.
-- Type name lengths and data layout sizes.
-- Cache sizes (for all caches in the global and per-transaction contexts).
-- All fields and structures within the binary format (note: existing limits are enforced by the deserializer, but these must be reviewed for completeness).
-- Write set size.
-
-**Recursion bounds.** Recursion is particularly important and difficult to guard against. Three distinct sources of unbounded recursion must be addressed:
-
-1. ***Move-level recursion:*** The transaction must be aborted if stack memory is exhausted.
-2. ***Rust-level recursion:*** Any Rust algorithm that operates over deeply nested data is vulnerable to stack overflow. 
-    1. This includes `Drop` implementations on recursive types, which are especially dangerous because the programmer has limited control over when and how they are invoked.
-    2. `Clone` is similarly hazardous due to its prevalence — recursive clones can easily go unnoticed in otherwise innocuous code paths. 
-    3. The goal should be to eliminate recursive algorithms entirely, or at minimum to have a clear, documented mitigation plan before production.
-3. ***Recursive library calls:*** Any call into a library function that is internally recursive must also respect depth limits. Examples include topological sort and strongly connected component analysis.
-
-**Algorithm running time.** All algorithms — in the loader, monomorphizer, bytecode verifier, and elsewhere — must have bounded running time relative to their input sizes.
-
-**Value bounds.** The current inclination is that values (including closures) do not require explicit depth or size bounds, provided that no recursive traversals operate over them — i.e., no recursive display, drop, or other recursive algorithms that walk value structures. If any such traversal is unavoidable, the traversal itself must be depth-limited rather than relying on value-level bounds. This decision is to be finalized once the set of operations over values is fully determined.
-
-### 7.5 No Undocumented Panics
-
-A panic in VM code is equivalent to a crash, which is a vulnerability. The following rules apply:
-
-- Bare `unwrap()` calls are banned.
-- Any API that may panic must use `expect()`, `unreachable!()`, or equivalent, with a message documenting why the panic condition is believed to be unreachable.
-
-### 7.6 Strict Determinism
-
-The VM must produce identical results for identical inputs across all nodes, platforms, and runs.
-
-- **No floating-point arithmetic (IEEE 754).** Cross-platform determinism of floating-point operations is not guaranteed.
-- **No OS or thread-local randomness.** The only permissible source of randomness is the block context (e.g., block-level randomness seed).
-- **No unordered enumeration.** Hash maps and other data structures with non-deterministic iteration order must never be enumerated unless a deterministic ordering is explicitly guaranteed. Possible mitigation: provide a vetted safe data structure crate for the VM, e.g., a wrapper around `HashMap` that prohibits iteration entirely or requires `unsafe` to enumerate.
-
-### 7.7 Cache Consistency
-
-All caches must maintain consistency at all times: a stale cache entry that is silently served is a correctness bug, and in the worst case a security vulnerability. The VM maintains multiple layers of cached state — verified modules, struct layouts, interned types, type tags, etc. — and the following are common areas where consistency is at risk:
-
-- **Code upgrades.** Publishing or upgrading a module invalidates all cached data derived from it: the module itself, its definitions, type layouts, and any cross-module dependents.
-- **Intra-block visibility.** Under Block-STM, when a transaction publishes a module, correctness must still be guaranteed for all speculatively executed transactions that read that module. The interaction between the global cache, per-block cache, and per-transaction read sets is a major source of complexity in the current VM.
-- **Cross-block cache lifecycle.** Caches that persist across blocks must remain valid as conditions change (non-consecutive transaction slices, VM config changes, size limit breaches). Each such condition is a consistency hazard if missed. MonoMove’s `MaintenanceGuard` (Section 1) provides a single enforcement point for this.
-- **Derived data coherence.** Caches often store data derived from other cached data (e.g., struct layouts depend on type definitions, which depend on loaded modules). Invalidating one layer without propagating to dependents leads to incoherence.
-- **Enum layouts.** Enums deserve special attention: adding a variant is a compatible module upgrade, but it changes the type’s layout. Layout caches must therefore be invalidated even when the upgrade itself is valid. In the current VM, this is handled by flushing the entire layout cache on any module publish.
-- **Read-set tracking.** Every module or code artifact read during execution must be recorded in the transaction’s read set for Block-STM correctness, even if served from a cache. Cache hits must be indistinguishable from storage reads in this regard.
-
-### 7.8 Reference Aliasing
-
-Move’s linear type system prohibits aliasing of mutable references. This invariant must be preserved at runtime. Violations can directly lead to loss of funds (e.g., double-spending via aliased mutable access to a coin resource).
-
-### 7.9 Safe Formatting and Display
-
-Formatting values or internal data structures (e.g., for error messages or logging) is a hazard. Values and data structures can be very large, or worse, deeply nested — leading to excessive memory allocation, stack overflow, or stalling.
-
-- Error messages should not include full dumps of values or complex internal state.
-- `Clone` on values carries the same risks and should be treated with equal caution.
-- Consider disallowing `#[derive(...)]` on certain VM internal types to prevent accidentally introducing recursive or expensive trait implementations.
-
-### 7.10 Transaction Argument Validation
-
-Transaction arguments must not be exempt from validation. All inputs — including arguments supplied in the transaction payload — must pass through the same safety checks as any other data entering the VM.
-
-TBA: Closure-specific things
-
-# **8. Extension Points**
-
-TBA: Gas Metering, Gas Profiling, Runtime Instrumentation Interfaces
-
-# 9. Translations within the VM
-TBA
-
-# 10. Gas metering
+# 9. Gas metering
 TBA

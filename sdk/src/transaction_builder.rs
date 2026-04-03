@@ -487,6 +487,7 @@ impl TransactionFactory {
             ciphertext,
             extra_config,
             payload_hash,
+            claimed_entry_fun: None,
         })
     }
 

@@ -568,9 +568,7 @@ fn pvss_transcript_random<T: Transcript, M: Measurement>(
         b.iter(|| {
             T::generate(
                 &sc,
-                &T::PublicParameters::with_max_num_shares(
-                    sc.get_total_num_shares().try_into().unwrap(),
-                ),
+                &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
                 &mut rng,
             )
         })

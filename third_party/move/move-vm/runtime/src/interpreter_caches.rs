@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Interpreter caches keep a record of cached data for each function call observed during
 //! execution (e.g., caching [FrameTypeCache]). As a result, when calling function `foo<u64>`

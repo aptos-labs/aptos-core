@@ -211,7 +211,7 @@ fn chunky_sizes() -> ChunkySizes {
     let max_weight = 7;
     let ell = 16;
 
-    let num_chunks = num_chunks_per_scalar::<ArkFr>(ell) as usize;
+    let num_chunks = num_chunks_per_scalar::<ArkFr>(ell);
 
     let g2 = 2 * n + 1 + 1 + n * num_chunks + num_chunks * max_weight;
     let g1 = 2 * (n * num_chunks + num_chunks * max_weight) + ell as usize + 2 + 2 + 2;

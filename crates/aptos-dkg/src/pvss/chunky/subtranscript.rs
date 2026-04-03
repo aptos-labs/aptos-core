@@ -110,14 +110,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let Cs = &self.Cs[player.id];
         debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
 
-        if !Cs.is_empty() {
-            if let Some(first_key) = self.Rs.first() {
-                debug_assert_eq!(
-                    first_key.len(),
-                    Cs[0].len(),
-                    "Number of ephemeral keys does not match the number of ciphertext chunks"
-                );
-            }
+        if !Cs.is_empty()
+            && let Some(first_key) = self.Rs.first()
+        {
+            debug_assert_eq!(
+                first_key.len(),
+                Cs[0].len(),
+                "Number of ephemeral keys does not match the number of ciphertext chunks"
+            );
         }
 
         let pk_shares = self.get_public_key_share(sc, player);

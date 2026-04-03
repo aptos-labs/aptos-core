@@ -207,11 +207,13 @@ members = [
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",
+    "third_party/move/mono-move/alloc",
+    "third_party/move/mono-move/core",
     "third_party/move/mono-move/gas",
     "third_party/move/mono-move/global-context",
-    "third_party/move/mono-move/micro-ops",
     "third_party/move/mono-move/programs",
     "third_party/move/mono-move/runtime",
+    "third_party/move/mono-move/specializer",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -226,10 +228,7 @@ members = [
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-core/types",
     "third_party/move/move-examples",
-    "third_party/move/move-ir-compiler",
     "third_party/move/move-ir-compiler/move-bytecode-source-map",
-    "third_party/move/move-ir-compiler/move-ir-to-bytecode",
-    "third_party/move/move-ir-compiler/move-ir-to-bytecode/syntax",
     "third_party/move/move-ir/types",
     "third_party/move/move-model",
     "third_party/move/move-model/bytecode",
@@ -646,7 +645,7 @@ google-cloud-storage = "0.13.0"
 group = "0.13"
 guppy = "0.17.5"
 handlebars = "4.2.2"
-hashbrown = "0.14.3"
+hashbrown = { version = "0.14.3", features = ["equivalent"] }
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hex-literal = "0.3.4"
@@ -810,6 +809,7 @@ set_env = "1.3.4"
 shadow-rs = "0.16.2"
 smallbitvec = "2.5.1"
 smallvec = "1.8.0"
+specializer = { path = "third_party/move/mono-move/specializer" }
 static_assertions = "1.1.0"
 status-line = "0.2.0"
 strum = "0.27.1"
@@ -878,8 +878,9 @@ x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cd
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
+mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
+mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-gas = { path = "third_party/move/mono-move/gas" }
-mono-move-micro-ops = { path = "third_party/move/mono-move/micro-ops" }
 mono-move-programs = { path = "third_party/move/mono-move/programs" }
 mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 move-abigen = { path = "third_party/move/tools/move-abigen" }
@@ -899,8 +900,6 @@ move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
-move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
-move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-bytecode" }
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
@@ -948,6 +947,14 @@ lto = "thin"
 codegen-units = 1
 
 [profile.cli]
+inherits = "release"
+debug = false
+opt-level = "z"
+lto = "thin"
+strip = true
+codegen-units = 1
+
+[profile.tool]
 inherits = "release"
 debug = false
 opt-level = "z"

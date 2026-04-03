@@ -122,7 +122,7 @@ module aptos_framework::object_code_deployment {
         code::check_code_publishing_permission(publisher);
         let publisher_address = signer::address_of(publisher);
         assert!(
-            code_object.is_owner(publisher_address),
+            object::is_owner(code_object, publisher_address),
             error::permission_denied(ENOT_CODE_OBJECT_OWNER),
         );
 
@@ -154,7 +154,7 @@ module aptos_framework::object_code_deployment {
         code::check_code_publishing_permission(publisher);
         let publisher_address = signer::address_of(publisher);
         assert!(
-            code_object.is_owner(publisher_address),
+            object::is_owner(code_object, publisher_address),
             error::permission_denied(ENOT_CODE_OBJECT_OWNER),
         );
 

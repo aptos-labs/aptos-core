@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -78,8 +79,6 @@ pub fn run_model_builder_in_compiler_mode(
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
-    warn_of_deprecation_use: bool,
-    warn_of_deprecation_use_in_aptos_libs: bool,
     compile_test_code: bool,
     compile_verify_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
@@ -100,8 +99,6 @@ pub fn run_model_builder_in_compiler_mode(
             compile_for_testing: compile_test_code,
         },
         Flags::model_compilation()
-            .set_warn_of_deprecation_use(warn_of_deprecation_use)
-            .set_warn_of_deprecation_use_in_aptos_libs(warn_of_deprecation_use_in_aptos_libs)
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)

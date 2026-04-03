@@ -14,9 +14,12 @@ use StateSlotKind::*;
 
 /// Represents the content of a state slot along with its key and information about
 /// whether the slot is present in the cold or/and hot state.
+///
+/// `state_key` is `None` when the slot is loaded from the persisted hot state KV DB,
+/// which stores only the key hash, not the full key.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateSlot {
-    state_key: StateKey,
+    state_key: Option<StateKey>,
     kind: StateSlotKind,
 }
 
@@ -44,13 +47,61 @@ pub enum StateSlotKind {
     },
 }
 
+impl StateSlotKind {
+    /// Returns a copy of this kind with the LRU info replaced. Panics on cold variants.
+    pub fn with_lru_info(self, lru_info: LRUEntry<HashValue>) -> Self {
+        match self {
+            StateSlotKind::HotOccupied {
+                value_version,
+                value,
+                hot_since_version,
+                ..
+            } => StateSlotKind::HotOccupied {
+                value_version,
+                value,
+                hot_since_version,
+                lru_info,
+            },
+            StateSlotKind::HotVacant {
+                hot_since_version, ..
+            } => StateSlotKind::HotVacant {
+                hot_since_version,
+                lru_info,
+            },
+            _ => panic!("with_lru_info called on cold variant"),
+        }
+    }
+}
+
 impl StateSlot {
     pub fn new(state_key: StateKey, kind: StateSlotKind) -> Self {
-        Self { state_key, kind }
+        Self {
+            state_key: Some(state_key),
+            kind,
+        }
     }
 
-    pub fn state_key(&self) -> &StateKey {
-        &self.state_key
+    /// Creates a `StateSlot` without a `StateKey`. Used when loading from the hot state
+    /// KV DB, which only stores the key hash.
+    pub fn new_without_state_key(kind: StateSlotKind) -> Self {
+        Self {
+            state_key: None,
+            kind,
+        }
+    }
+
+    pub fn state_key(&self) -> Option<&StateKey> {
+        self.state_key.as_ref()
+    }
+
+    pub fn set_state_key(&mut self, state_key: StateKey) {
+        self.state_key = Some(state_key);
+    }
+
+    pub fn expect_state_key(&self) -> &StateKey {
+        self.state_key
+            .as_ref()
+            .expect("StateSlot: state_key is None (loaded from DB without key)")
     }
 
     pub fn kind(&self) -> &StateSlotKind {
@@ -99,10 +150,11 @@ impl StateSlot {
         &self,
         min_version: Version,
     ) -> Option<(HashValue, Option<(HashValue, StateKey)>)> {
+        let state_key = self.expect_state_key();
         self.maybe_update_cold_state(min_version).map(|value_opt| {
             (
-                *self.state_key.crypto_hash_ref(),
-                value_opt.map(|v| (CryptoHash::hash(v), self.state_key.clone())),
+                *state_key.crypto_hash_ref(),
+                value_opt.map(|v| (CryptoHash::hash(v), state_key.clone())),
             )
         })
     }
@@ -116,7 +168,10 @@ impl StateSlot {
                 value,
             },
         };
-        Self { state_key, kind }
+        Self {
+            state_key: Some(state_key),
+            kind,
+        }
     }
 
     pub fn into_state_value_and_version_opt(self) -> Option<(Version, StateValue)> {

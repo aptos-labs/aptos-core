@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Names of well-known functions or attributes.
 //!
@@ -27,6 +28,7 @@ pub fn is_verify_only_attribute_name(s: &str) -> bool {
 
 pub const VECTOR_MODULE: &str = "vector";
 pub const SIGNER_MODULE: &str = "signer";
+pub const VECTOR_BORROW: &str = "vector::borrow";
 pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";
 /// Functions in the std::vector module that are implemented as bytecode instructions.

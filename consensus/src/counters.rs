@@ -1443,6 +1443,15 @@ pub static RAND_AGGREGATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
+pub static SECRET_SHARE_BAD_SHARES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_secret_share_bad_shares_count",
+        "Number of bad secret shares detected during post-aggregate fallback verification.",
+        &["author"]
+    )
+    .unwrap()
+});
+
 pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_proposal_payload_availability_count",

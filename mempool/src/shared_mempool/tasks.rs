@@ -15,10 +15,10 @@ use crate::{
         },
         use_case_history::UseCaseHistory,
     },
-    thread_pool::{IO_POOL, VALIDATION_POOL},
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
+use aptos_bounded_executor::par_map_blocking;
 use aptos_config::{config::TransactionFilterConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_crypto::HashValue;
@@ -37,7 +37,6 @@ use aptos_types::{
 };
 use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 use futures::{channel::oneshot, stream::FuturesUnordered};
-use rayon::prelude::*;
 use std::{
     cmp,
     sync::Arc,
@@ -150,7 +149,8 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
             vec![(transaction, None, Some(BroadcastPeerPriority::Primary))],
             timeline_state,
             true,
-        );
+        )
+        .await;
     log_txn_process_results(&statuses, None);
 
     if let Some(status) = statuses.first() {
@@ -223,11 +223,11 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
     timer: HistogramTimer,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
-    TransactionValidator: TransactionValidation,
+    TransactionValidator: TransactionValidation + 'static,
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
-    let results = process_incoming_transactions(&smp, transactions, timeline_state, false);
+    let results = process_incoming_transactions(&smp, transactions, timeline_state, false).await;
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(message_id, results, &peer);
@@ -301,7 +301,7 @@ pub(crate) fn update_ack_counter(
 
 /// Submits a list of SignedTransaction to the local mempool
 /// and returns a vector containing [SubmissionStatusBundle].
-pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>(
+pub(crate) async fn process_incoming_transactions<NetworkClient, TransactionValidator>(
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     transactions: Vec<(
         SignedTransaction,
@@ -313,7 +313,7 @@ pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>
 ) -> Vec<SubmissionStatusBundle>
 where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
-    TransactionValidator: TransactionValidation,
+    TransactionValidator: TransactionValidation + 'static,
 {
     // Filter out any disallowed transactions
     let mut statuses = vec![];
@@ -332,22 +332,23 @@ where
         .expect("Failed to get latest state checkpoint view.");
 
     // Track latency: fetching seq number
-    let account_seq_numbers = IO_POOL.install(|| {
-        transactions
-            .par_iter()
-            .map(|(t, _, _)| match t.replay_protector() {
-                ReplayProtector::Nonce(_) => Ok(None),
-                ReplayProtector::SequenceNumber(_) => {
-                    get_account_sequence_number(&state_view, t.sender())
-                        .map(Some)
-                        .inspect_err(|e| {
-                            error!(LogSchema::new(LogEntry::DBError).error(e));
-                            counters::DB_ERROR.inc();
-                        })
-                },
-            })
-            .collect::<Vec<_>>()
-    });
+    let items: Vec<_> = transactions
+        .iter()
+        .map(|(t, _, _)| (t.replay_protector(), t.sender()))
+        .collect();
+    let account_seq_numbers = par_map_blocking(items, num_cpus::get(), {
+        let state_view = state_view.clone();
+        move |(replay_protector, sender)| match replay_protector {
+            ReplayProtector::Nonce(_) => Ok(None),
+            ReplayProtector::SequenceNumber(_) => get_account_sequence_number(&state_view, sender)
+                .map(Some)
+                .inspect_err(|e| {
+                    error!(LogSchema::new(LogEntry::DBError).error(e));
+                    counters::DB_ERROR.inc();
+                }),
+        }
+    })
+    .await;
 
     // Track latency for storage read fetching sequence number
     let storage_read_latency = start_storage_read.elapsed();
@@ -398,7 +399,8 @@ where
         timeline_state,
         &mut statuses,
         client_submitted,
-    );
+    )
+    .await;
     notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
     statuses
 }
@@ -468,7 +470,7 @@ fn filter_transactions(
 /// Perfoms VM validation on the transactions and inserts those that passes
 /// validation into the mempool.
 #[cfg(not(feature = "consensus-only-perf-test"))]
-fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
+async fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     transactions: Vec<(
         SignedTransaction,
         Option<u64>,
@@ -481,26 +483,27 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     client_submitted: bool,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
-    TransactionValidator: TransactionValidation,
+    TransactionValidator: TransactionValidation + 'static,
 {
     // Track latency: VM validation
     let vm_validation_timer = counters::PROCESS_TXN_BREAKDOWN_LATENCY
         .with_label_values(&[counters::VM_VALIDATION_LABEL])
         .start_timer();
-    let validation_results = VALIDATION_POOL.install(|| {
-        transactions
-            .par_iter()
-            .map(|t| {
-                let result = smp.validator.read().validate_transaction(t.0.clone());
-                // Pre-compute the hash and length if the transaction is valid, before locking mempool
-                if result.is_ok() {
-                    t.0.committed_hash();
-                    t.0.txn_bytes_len();
-                }
-                result
-            })
-            .collect::<Vec<_>>()
-    });
+    let results = par_map_blocking(transactions, num_cpus::get(), {
+        let validator = Arc::clone(&smp.validator);
+        move |t| {
+            let result = validator.read().validate_transaction(t.0.clone());
+            // Pre-compute the hash and length on the original transaction before
+            // locking mempool. We return `t` so the cached values survive.
+            if result.is_ok() {
+                t.0.committed_hash();
+                t.0.txn_bytes_len();
+            }
+            (t, result)
+        }
+    })
+    .await;
+    let (transactions, validation_results): (Vec<_>, Vec<_>) = results.into_iter().unzip();
     vm_validation_timer.stop_and_record();
     {
         let mut mempool = smp.mempool.lock();
@@ -553,7 +556,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
 /// this because validation has some overhead and the validator bounds the number of
 /// outstanding sequence numbers.
 #[cfg(feature = "consensus-only-perf-test")]
-fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
+async fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     transactions: Vec<(SignedTransaction, Option<u64>, Option<u64>)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,

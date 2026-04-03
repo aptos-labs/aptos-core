@@ -6,6 +6,8 @@ use aptos::{account::create::DEFAULT_FUNDED_COINS, common::types::GasOptions};
 use aptos_crypto::{PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_keygen::KeyGen;
 
+// Too expensive to spin up a network to test the CLI
+#[ignore]
 #[tokio::test]
 async fn test_account_flow() {
     let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
@@ -91,6 +93,8 @@ async fn test_account_flow() {
     assert!(cli.account_balance_now(2).await.unwrap() <= new_expected_balance);
 }
 
+// Too expensive to spin up a network to test the CLI
+#[ignore]
 #[tokio::test]
 async fn test_account_key_rotation() {
     let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)

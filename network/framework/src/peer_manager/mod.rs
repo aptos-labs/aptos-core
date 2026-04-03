@@ -825,19 +825,22 @@ where
         );
         self.executor.spawn(peer.start());
 
-        // Save PeerRequest sender to `active_peers`.
-        self.active_peers
-            .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
+        // Save connection metadata to peers_and_metadata and active_peers.
+        // We insert into peers_and_metadata first (requires a clone), then
+        // move conn_meta into active_peers to avoid an extra clone.
         self.peers_and_metadata.insert_connection_metadata(
             PeerNetworkId::new(self.network_context.network_id(), peer_id),
             conn_meta.clone(),
         )?;
-        // Send NewPeer notification to connection event handlers.
+        // Send NewPeer notification to connection event handlers before consuming conn_meta.
         if send_new_peer_notification {
-            let notif =
-                ConnectionNotification::NewPeer(conn_meta, self.network_context.network_id());
+            let notif = ConnectionNotification::NewPeer(
+                conn_meta.clone(),
+                self.network_context.network_id(),
+            );
             self.send_conn_notification(peer_id, notif);
         }
+        self.active_peers.insert(peer_id, (conn_meta, peer_reqs_tx));
 
         Ok(())
     }

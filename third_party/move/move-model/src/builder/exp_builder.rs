@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     ast::{
@@ -22,7 +23,7 @@ use crate::{
     },
     model::{
         FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
-        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter,
+        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
         TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
@@ -2389,6 +2390,9 @@ impl ExpTranslator<'_, '_, '_> {
         } else {
             // Error reported
         }
+        // Record that this call originated from receiver-style syntax.
+        self.env()
+            .set_surface_syntax(id, SurfaceSyntax::ReceiverCall);
         // Construct result
         RewriteResult::RewrittenAndDescend(
             ExpData::Call(
@@ -2916,10 +2920,19 @@ impl ExpTranslator<'_, '_, '_> {
                 )
             },
             EA::LValue_::Literal(val) => {
-                // Translate literal value pattern (for primitive pattern matching)
-                if let Some((value, ty)) = self.translate_value(val, expected_type, context) {
-                    let id = self.new_node_id_with_type_loc(&ty, loc);
-                    self.check_type_with_order(expected_order, loc, &ty, expected_type, context);
+                // Translate literal value pattern (for primitive pattern matching).
+                // Strip reference from expected type so `translate_value` sees the
+                // base type (e.g. `u64` instead of `&u64`), then assign the pattern
+                // node the original (possibly reference) type for AST consistency.
+                let inner_expected = expected_type.skip_reference();
+                if let Some((value, ty)) = self.translate_value(val, inner_expected, context) {
+                    let ty = self.check_type(loc, &ty, inner_expected, context);
+                    let pat_ty = if let Type::Reference(kind, _) = expected_type {
+                        Type::Reference(*kind, Box::new(ty))
+                    } else {
+                        ty
+                    };
+                    let id = self.new_node_id_with_type_loc(&pat_ty, loc);
                     Pattern::LiteralValue(id, value)
                 } else {
                     self.new_error_pat(loc)
@@ -4209,6 +4222,8 @@ impl ExpTranslator<'_, '_, '_> {
         );
         self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
         if let (Some(mid), Some(fid)) = self.get_vector_borrow(mutable) {
+            self.env()
+                .set_surface_syntax(node_id, SurfaceSyntax::IndexNotation);
             let call = ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
                 vec_exp_e.into_exp(),
                 idx_exp_e.clone().into_exp(),
@@ -4227,6 +4242,8 @@ impl ExpTranslator<'_, '_, '_> {
                 if let Some(borrow_fun_entry) = self.parent.parent.fun_table.get(borrow_symbol) {
                     let mid = borrow_fun_entry.module_id;
                     let fid = borrow_fun_entry.fun_id;
+                    self.env()
+                        .set_surface_syntax(node_id, SurfaceSyntax::IndexNotation);
                     return ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
                         vec_exp_e.into_exp(),
                         idx_exp_e.clone().into_exp(),

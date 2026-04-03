@@ -109,7 +109,7 @@ fn test_pvss_all_weighted() {
         .map(|wc| wc.get_total_weight())
         .max()
         .expect("no configs");
-    let pp = chunky::PublicParameters::<Bn254>::with_max_num_shares(n_max.try_into().unwrap());
+    let pp = chunky::PublicParameters::<Bn254>::with_max_num_shares(n_max);
     let mut rng = thread_rng();
     for wc in wcs {
         println!("\nTesting {wc} PVSS");
@@ -405,9 +405,7 @@ fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
 
     let trx = T::generate(
         &sc,
-        &T::PublicParameters::with_max_num_shares_for_generate(
-            sc.get_total_num_shares().try_into().unwrap(),
-        ),
+        &T::PublicParameters::with_max_num_shares_for_generate(sc.get_total_num_shares()),
         &mut rng,
     );
     let actual_size = trx.to_bytes().len();

@@ -16,7 +16,8 @@ async fn move_package_query_function_usage_bad_module() {
         "move_package_query",
         serde_json::json!({
             "package_path": dir,
-            "query": { "function_usage": { "function": "nonexistent::greet" } }
+            "query": "function_usage",
+            "function": "nonexistent::greet"
         }),
     )
     .await;

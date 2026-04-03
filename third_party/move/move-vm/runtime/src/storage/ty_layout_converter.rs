@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     config::VMConfig,
@@ -17,7 +17,7 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     int256,
-    language_storage::{LEGACY_OPTION_VEC, OPTION_STRUCT_NAME},
+    language_storage::LEGACY_OPTION_VEC,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -160,7 +160,6 @@ where
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         ty: &Type,
-        check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
         let ty_pool = self.runtime_environment().ty_pool();
         if self.vm_config().enable_layout_caches {
@@ -198,7 +197,6 @@ where
                     traversal_context,
                     &mut modules,
                     ty,
-                    check_option_type,
                 )?;
                 let cache_entry = LayoutCacheEntry::new(layout.clone(), modules);
                 self.struct_definition_loader
@@ -212,7 +210,6 @@ where
             traversal_context,
             &mut DefiningModules::new(),
             ty,
-            check_option_type,
         )
     }
 
@@ -230,7 +227,6 @@ where
             traversal_context,
             &mut DefiningModules::new(),
             ty,
-            false,
         )
     }
 
@@ -305,7 +301,6 @@ where
         traversal_context: &mut TraversalContext,
         modules: &mut DefiningModules,
         ty: &Type,
-        check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
         let _timer = VM_TIMER.timer_with_label("type_to_type_layout_with_delayed_fields");
 
@@ -320,7 +315,6 @@ where
             ty,
             &mut count,
             1,
-            check_option_type,
             &mut struct_layout_cache,
         )?;
         Ok(LayoutWithDelayedFields {
@@ -340,7 +334,6 @@ where
         ty: &Type,
         count: &mut u64,
         depth: u64,
-        check_option_type: bool,
         struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         self.check_depth_and_increment_count(count, depth)?;
@@ -370,7 +363,6 @@ where
                     ty,
                     count,
                     depth + 1,
-                    check_option_type,
                     struct_layout_cache,
                 )
                 .map(|(elem_layout, contains_delayed_fields)| {
@@ -385,7 +377,6 @@ where
                 &[],
                 count,
                 depth + 1,
-                check_option_type,
                 struct_layout_cache,
             )?,
             Type::StructInstantiation { idx, ty_args, .. } => self
@@ -397,7 +388,6 @@ where
                     ty_args,
                     count,
                     depth + 1,
-                    check_option_type,
                     struct_layout_cache,
                 )?,
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -419,7 +409,6 @@ where
         tys: &[Type],
         count: &mut u64,
         depth: u64,
-        check_option_type: bool,
         struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(Vec<MoveTypeLayout>, bool)> {
         let mut contains_delayed_fields = false;
@@ -434,7 +423,6 @@ where
                         ty,
                         count,
                         depth,
-                        check_option_type,
                         struct_layout_cache,
                     )?;
                 contains_delayed_fields |= ty_contains_delayed_fields;
@@ -461,7 +449,6 @@ where
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
-        check_option_type: bool,
         struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let use_local_cache = self.vm_config().enable_struct_layout_local_cache;
@@ -494,25 +481,15 @@ where
 
         // METERING SAFETY:
         //   Module has already been loaded because we got the struct definition.
-        let module_hash = self
-            .struct_definition_loader
-            .unmetered_get_module_hash(
-                struct_identifier.module().address(),
-                struct_identifier.module().name(),
-            )
-            .map_err(|err| err.to_partial())?;
-
-        modules.insert(struct_identifier.module(), module_hash);
-
-        if check_option_type && !self.runtime_environment().vm_config().enable_capture_option {
-            if struct_identifier.module().is_option()
-                && struct_identifier.name() == &*OPTION_STRUCT_NAME
-            {
-                return Err(
-                    PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_OPTION_TYPE)
-                        .with_message("Option type cannot be captured".to_string()),
-                );
-            }
+        if !modules.contains(struct_identifier.module()) {
+            let (hash, _) = self
+                .struct_definition_loader
+                .unmetered_get_module_hash_and_size(
+                    struct_identifier.module().address(),
+                    struct_identifier.module().name(),
+                )
+                .map_err(|err| err.to_partial())?;
+            modules.insert(struct_identifier.module(), hash);
         }
 
         let result = match &struct_definition.layout {
@@ -545,7 +522,6 @@ where
                                 &[field_type],
                                 count,
                                 depth + 1,
-                                check_option_type,
                                 struct_layout_cache,
                             )?;
                         variant_contains_delayed_fields |= delayed_fields;
@@ -580,7 +556,6 @@ where
                                 &self.apply_subst_for_field_tys(&variant.1, ty_args)?,
                                 count,
                                 depth,
-                                check_option_type,
                                 struct_layout_cache,
                             )?;
                         variant_contains_delayed_fields |= variant_fields_contain_delayed_fields;
@@ -608,7 +583,6 @@ where
                         &self.apply_subst_for_field_tys(fields, ty_args)?,
                         count,
                         depth,
-                        check_option_type,
                         struct_layout_cache,
                     )?;
 
@@ -890,7 +864,6 @@ mod tests {
                 &mut gas_meter,
                 &mut traversal_context,
                 ty,
-                false,
             )
         }
     }

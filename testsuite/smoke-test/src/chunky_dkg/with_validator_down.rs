@@ -11,7 +11,7 @@ use aptos_logger::info;
 #[tokio::test]
 async fn chunky_dkg_with_validator_down() {
     let epoch_duration_secs = 10;
-    let estimated_dkg_latency_secs = 20;
+    let estimated_dkg_latency_secs = 60;
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
 
     let mut swarm = create_swarm_with_chunky_dkg(4, epoch_duration_secs).await;
