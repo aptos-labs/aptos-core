@@ -167,9 +167,6 @@ impl ProverOptions {
         known_attributes: &BTreeSet<String>,
         experiments: &[String],
     ) -> anyhow::Result<()> {
-        if compiler_version.is_some_and(|v| v == CompilerVersion::V1) {
-            return Err(anyhow::Error::msg("Compiler v1 is not supported"));
-        }
         let now = Instant::now();
         let for_test = self.for_test;
         let benchmark = self.benchmark;

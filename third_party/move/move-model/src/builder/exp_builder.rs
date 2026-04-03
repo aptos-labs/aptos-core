@@ -4364,10 +4364,6 @@ impl ExpTranslator<'_, '_, '_> {
                 .parent
                 .spec_schema_table
                 .contains_key(&global_var_sym)
-                && self
-                    .env()
-                    .language_version
-                    .is_at_least(LanguageVersion::V2_0)
             {
                 self.error(loc, "indexing can only be applied to a vector or a resource type (a struct type which has key ability)");
                 call = Some(self.new_error_exp());

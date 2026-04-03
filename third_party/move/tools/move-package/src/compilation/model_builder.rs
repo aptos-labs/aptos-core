@@ -136,7 +136,6 @@ impl ModelBuilder {
             .compiler_config
             .known_attributes;
         match self.model_config.compiler_version {
-            CompilerVersion::V1 => anyhow::bail!("Compiler v1 is no longer supported"),
             CompilerVersion::V2_0 | CompilerVersion::V2_1 => {
                 let mut options = make_options_for_v2_compiler(all_targets, all_deps);
                 options.language_version = self
