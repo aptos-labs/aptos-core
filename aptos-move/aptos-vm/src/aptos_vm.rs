@@ -1286,13 +1286,15 @@ impl AptosVM {
                 return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
             },
             TransactionExecutableRef::Encrypted => {
-                // TODO(ibalajiarun): Revisit this. I think this should lead to an abort due to failed
-                // decryption.
-                let s = VMStatus::error(
-                    StatusCode::FEATURE_UNDER_GATING,
-                    Some("Multisig transaction does not support encrypted payload".to_string()),
-                );
-                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
+                // Decryption failed. Return an error so the caller runs the failure epilogue,
+                // which increments the sequence number and charges gas.
+                return Err(VMStatus::error(
+                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                    Some(
+                        "Encrypted multisig transaction decryption failed; payload not available"
+                            .to_string(),
+                    ),
+                ));
             },
         };
         // Failures here will be propagated back.

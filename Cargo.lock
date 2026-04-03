@@ -18066,7 +18066,6 @@ dependencies = [
  "bcs 0.1.4",
  "blake2-rfc",
  "digest 0.9.0",
- "env_logger",
  "ethers",
  "futures",
  "hex",
