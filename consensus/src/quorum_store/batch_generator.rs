@@ -281,9 +281,12 @@ impl BatchGenerator {
             .with_label_values(&[batch_version, kind_str])
             .inc_by(txns.len() as u64);
 
-        // Collect hashes before txns are consumed, only for sampled batch rounds.
+        // Always collect hashes for register_batch when tracing is enabled.
+        // register_batch is cheap (filters against traces DashMap), and ensures
+        // all traced txns get complete pipeline coverage (BlockProposed → Committed).
+        // Only the expensive QsBatchPull metadata loop is gated by should_sample_batch.
         let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-        let txn_hashes: Option<Vec<_>> = if store.should_sample_batch(self.pull_round) {
+        let txn_hashes: Option<Vec<_>> = if store.is_enabled() {
             Some(txns.iter().map(|t| t.committed_hash()).collect())
         } else {
             None
