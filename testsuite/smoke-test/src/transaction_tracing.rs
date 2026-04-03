@@ -43,11 +43,11 @@ async fn test_transaction_tracing() {
             config.transaction_tracing.enabled = true;
             config.transaction_tracing.batch_sample_rate = 1.0;
             config.transaction_tracing.txn_sample_rate = 1.0;
-            config.transaction_tracing.filter.sender_allowlist = addrs.iter().cloned().collect();
+            config.transaction_tracing.filter.sender_allowlist = addrs.to_vec();
         },
     );
 
-    let mut swarm = SwarmBuilder::new_local(4)
+    let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(init_config)
         .build()
