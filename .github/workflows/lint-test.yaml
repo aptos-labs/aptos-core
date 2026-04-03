@@ -128,13 +128,13 @@ jobs:
   # that branch protection rules expect, while the actual work happens in smoke-tests.yaml.
   rust-smoke-tests:
     needs: rust-smoke-tests-workflow
-    if: | # Only run on each PR once an appropriate event occurs
-      (
+    if: | # Always evaluate so failures are reported, but only when smoke tests are expected
+      always() && (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'push' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null) ||
-        contains(github.event.pull_request.body, '#e2e'
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
       )
     runs-on: ubuntu-latest
     steps:
