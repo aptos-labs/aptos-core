@@ -727,13 +727,14 @@ pub(crate) fn process_committed_transactions(
 
     // Collect traced txn hashes while holding the lock, finalize after releasing.
     let mut traced_commit_hashes = Vec::new();
-    let tracing_enabled = aptos_transaction_tracing::store::TransactionTraceStore::global()
-        .is_enabled();
+    let tracing_enabled =
+        aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled();
 
     for transaction in transactions {
         if tracing_enabled {
-            if let Some(txn) =
-                pool.transactions.get(&transaction.sender, transaction.replay_protector)
+            if let Some(txn) = pool
+                .transactions
+                .get(&transaction.sender, transaction.replay_protector)
             {
                 traced_commit_hashes.push(txn.committed_hash());
             }
@@ -773,8 +774,8 @@ pub(crate) fn process_rejected_transactions(
 ) {
     let mut pool = mempool.lock();
 
-    let tracing_enabled = aptos_transaction_tracing::store::TransactionTraceStore::global()
-        .is_enabled();
+    let tracing_enabled =
+        aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled();
     let mut traced_reject_hashes = Vec::new();
 
     for transaction in transactions {

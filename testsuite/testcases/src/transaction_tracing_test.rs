@@ -140,7 +140,11 @@ impl NetworkTest for TransactionTracingTest {
             // untraced traffic. Validator 0 = traced, validators 1..N = control.
             let rest_clients: Vec<RestClient> = {
                 let swarm = ctx.swarm.read().await;
-                swarm.validators().take(1).map(|v| v.rest_client()).collect()
+                swarm
+                    .validators()
+                    .take(1)
+                    .map(|v| v.rest_client())
+                    .collect()
             };
             let txn_factory = pub_info.transaction_factory();
 
@@ -166,7 +170,13 @@ impl NetworkTest for TransactionTracingTest {
                 traced_failed.clone(),
             );
 
-            (stop, traced_submitted, traced_failed, handle, std::time::Instant::now())
+            (
+                stop,
+                traced_submitted,
+                traced_failed,
+                handle,
+                std::time::Instant::now(),
+            )
         };
 
         // Step 2: Run the inner test (TwoTrafficsTest with MaxLoad + geo-distribution).
