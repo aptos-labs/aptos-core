@@ -67,6 +67,10 @@ pub struct McpArgs {
     /// Compiler experiments to enable.
     #[arg(long)]
     pub experiments: Vec<String>,
+
+    /// Global timeout (seconds) for any single MCP tool call. Default: 120.
+    #[arg(long, default_value_t = 120)]
+    pub tool_timeout: u64,
 }
 
 fn setup() {

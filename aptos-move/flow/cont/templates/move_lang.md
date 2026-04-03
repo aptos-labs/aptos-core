@@ -26,7 +26,7 @@ double-spending at compile time.
   compilation errors, fix them before proceeding with further changes.
 
 
-## Reference
+### Links
 
 - [The Move Book](https://aptos.dev/move/book/SUMMARY)
 - [Aptos Framework Reference](https://aptos.dev/reference/move/?branch=mainnet&page=aptos-framework/doc/overview.md)

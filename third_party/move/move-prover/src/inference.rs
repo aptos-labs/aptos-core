@@ -134,7 +134,9 @@ fn run_spec_inference_inner<W: WriteColor>(
             info!("preparing module {}", module_env.get_full_name_str());
         }
         for func_env in module_env.get_functions() {
-            targets.add_target(&func_env)
+            if !func_env.is_test_only() {
+                targets.add_target(&func_env)
+            }
         }
     }
 
@@ -225,7 +227,7 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
             continue;
         }
         for fun in module.get_functions() {
-            if fun.is_native() || fun.is_intrinsic() {
+            if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
                 continue;
             }
             let spec = fun.get_spec();
@@ -246,6 +248,11 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
 }
 
 /// Output inferred specs to per-module `.spec.move` files.
+///
+/// If a `.spec.move` file already exists and was compiled as part of the module,
+/// inferred conditions are merged into it (appended to existing spec blocks or
+/// inserted as new blocks) — mirroring the merge logic in `output_unified`.
+/// Otherwise, a fresh file is generated from scratch.
 fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> anyhow::Result<()> {
     for module in env.get_modules() {
         if !module.is_target() {
@@ -254,7 +261,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
 
         // Check if this module has any functions with inferred specs.
         let has_any_inferred = module.get_functions().any(|fun| {
-            if fun.is_native() || fun.is_intrinsic() {
+            if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
                 return false;
             }
             let spec = fun.get_spec();
@@ -280,41 +287,142 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
             source_dir.join(format!("{}.spec.move", stem.to_string_lossy()))
         };
 
-        // Generate spec content for this module.
-        let sourcifier = Sourcifier::new(env, true);
-        emitln!(
-            sourcifier.writer(),
-            "spec {} {{",
-            module.get_full_name_str()
-        );
-        sourcifier.writer().indent();
+        // Check if an existing .spec.move was compiled as part of this module
+        // by looking for its path among the env's source files.
+        let spec_path_str = output_path.to_string_lossy();
+        let spec_file_id = env
+            .get_source_file_ids()
+            .into_iter()
+            .find(|&fid| env.get_file(fid).to_string_lossy() == spec_path_str);
 
-        for fun in module.get_functions() {
-            if fun.is_native() || fun.is_intrinsic() {
-                continue;
+        let result = if let Some(spec_fid) = spec_file_id {
+            // Merge into the existing .spec.move file, same strategy as output_unified.
+            let source = env.get_file_source(spec_fid).to_string();
+            let spec_block_infos = module.get_spec_block_infos();
+            let module_id = module.get_id();
+
+            let mut insertions: Vec<(usize, String)> = Vec::new();
+
+            // Find the position before the last `}` in the spec file — this is
+            // the closing brace of the outer `spec module_name { }` block and
+            // serves as the insertion point for new spec blocks.
+            let module_close_insert_pos = source.rfind('}').and_then(|brace_pos| {
+                source[..brace_pos]
+                    .rfind('\n')
+                    .map(|p| p + 1)
+                    .or(Some(brace_pos))
+            });
+
+            for fun in module.get_functions() {
+                if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                    continue;
+                }
+                let has_inferred = {
+                    let spec = fun.get_spec();
+                    spec.conditions
+                        .iter()
+                        .any(|c| c.properties.contains_key(&inferred_sym))
+                };
+                if !has_inferred {
+                    continue;
+                }
+
+                let fun_id = fun.get_id();
+
+                // Look for an existing spec block for this function in the spec file.
+                let existing_spec_block = spec_block_infos.iter().find(|info| {
+                    info.loc.file_id() == spec_fid
+                        && matches!(&info.target, SpecBlockTarget::Function(mid, fid)
+                            if *mid == module_id && *fid == fun_id)
+                });
+
+                if let Some(spec_info) = existing_spec_block {
+                    // Append inferred conditions inside the existing spec block,
+                    // same logic as output_unified.
+                    let block_end = spec_info.loc.span().end().to_usize();
+                    let block_start = spec_info.loc.span().start().to_usize();
+                    let brace_pos = source[..block_end]
+                        .rfind('}')
+                        .expect("spec block should have closing brace");
+
+                    let open_brace_pos = source[block_start..block_end]
+                        .find('{')
+                        .map(|p| block_start + p)
+                        .expect("spec block should have opening brace");
+                    let is_single_line = !source[open_brace_pos..brace_pos].contains('\n');
+
+                    let insert_pos = if is_single_line {
+                        brace_pos
+                    } else {
+                        source[..brace_pos]
+                            .rfind('\n')
+                            .map(|p| p + 1)
+                            .unwrap_or(brace_pos)
+                    };
+                    let indent = detect_indent(&source, block_start);
+                    let inner_indent = format!("{}    ", indent);
+
+                    let original_prop_keys: std::collections::BTreeSet<Symbol> = {
+                        let block_src = &source[spec_info.loc.span().start().to_usize()
+                            ..spec_info.loc.span().end().to_usize()];
+                        fun.get_spec()
+                            .properties
+                            .keys()
+                            .filter(|k| {
+                                let name = env.symbol_pool().string(**k);
+                                block_src.contains(&format!("pragma {}", name.as_str()))
+                            })
+                            .copied()
+                            .collect()
+                    };
+
+                    let cond_text = generate_inferred_conditions(
+                        env,
+                        &fun,
+                        inferred_sym,
+                        &inner_indent,
+                        &original_prop_keys,
+                    );
+
+                    let final_text = if is_single_line && !cond_text.is_empty() {
+                        format!("\n{}{}", cond_text, indent)
+                    } else {
+                        cond_text
+                    };
+
+                    insertions.push((insert_pos, final_text));
+                } else if let Some(insert_pos) = module_close_insert_pos {
+                    // No existing spec block for this function — insert a full block
+                    // before the closing `}` of the outer `spec module { }` block.
+                    let indent = "    ";
+                    let spec_text = generate_full_spec_block(env, &fun, inferred_sym, indent);
+                    insertions.push((insert_pos, format!("{}\n", spec_text)));
+                }
             }
-            // Filter conditions to only inferred ones, print, then restore.
-            let original_conditions = {
-                let mut spec = fun.get_mut_spec();
-                let original = std::mem::take(&mut spec.conditions);
-                spec.conditions = original
-                    .iter()
-                    .filter(|c| c.properties.contains_key(&inferred_sym))
-                    .cloned()
-                    .collect();
-                original
-            };
-            if !fun.get_spec().conditions.is_empty() {
-                sourcifier.print_fun_spec(&fun);
+
+            // Sort insertions in reverse byte-offset order so earlier offsets
+            // aren't invalidated by prior insertions. For equal offsets (e.g.
+            // multiple new spec blocks all targeting `module_close_insert_pos`),
+            // stable sort preserves declaration order — concatenate them into a
+            // single insertion so `insert_str` produces the correct order.
+            insertions.sort_by(|a, b| b.0.cmp(&a.0));
+            let mut merged = source;
+            let mut i = 0;
+            while i < insertions.len() {
+                let offset = insertions[i].0;
+                let mut combined = String::new();
+                while i < insertions.len() && insertions[i].0 == offset {
+                    combined.push_str(&insertions[i].1);
+                    i += 1;
+                }
+                merged.insert_str(offset, &combined);
             }
-            // Restore original conditions.
-            fun.get_mut_spec().conditions = original_conditions;
-        }
+            merged
+        } else {
+            // No existing spec file — generate from scratch.
+            generate_fresh_spec_file(env, &module, inferred_sym)
+        };
 
-        sourcifier.writer().unindent();
-        emitln!(sourcifier.writer(), "}");
-
-        let result = sourcifier.result();
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -322,6 +430,45 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
         info!("wrote inferred specs to {}", output_path.display());
     }
     Ok(())
+}
+
+/// Generate a fresh `.spec.move` file from scratch (no existing file to merge into).
+fn generate_fresh_spec_file(
+    env: &GlobalEnv,
+    module: &move_model::model::ModuleEnv,
+    inferred_sym: Symbol,
+) -> String {
+    let sourcifier = Sourcifier::new(env, true);
+    emitln!(
+        sourcifier.writer(),
+        "spec {} {{",
+        module.get_full_name_str()
+    );
+    sourcifier.writer().indent();
+
+    for fun in module.get_functions() {
+        if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+            continue;
+        }
+        let original_conditions = {
+            let mut spec = fun.get_mut_spec();
+            let original = std::mem::take(&mut spec.conditions);
+            spec.conditions = original
+                .iter()
+                .filter(|c| c.properties.contains_key(&inferred_sym))
+                .cloned()
+                .collect();
+            original
+        };
+        if !fun.get_spec().conditions.is_empty() {
+            sourcifier.print_fun_spec(&fun);
+        }
+        fun.get_mut_spec().conditions = original_conditions;
+    }
+
+    sourcifier.writer().unindent();
+    emitln!(sourcifier.writer(), "}");
+    sourcifier.result()
 }
 
 /// Output inferred specs as enriched source files: the original source with
@@ -335,7 +482,7 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
 
         // Check if this module has any functions with inferred specs.
         let has_any_inferred = module.get_functions().any(|fun| {
-            if fun.is_native() || fun.is_intrinsic() {
+            if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
                 return false;
             }
             let spec = fun.get_spec();
@@ -359,7 +506,7 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
         let module_id = module.get_id();
 
         for fun in module.get_functions() {
-            if fun.is_native() || fun.is_intrinsic() {
+            if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
                 continue;
             }
             // Check for inferred conditions/frame_spec without keeping the Ref alive,

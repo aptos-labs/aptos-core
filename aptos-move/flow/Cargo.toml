@@ -1,7 +1,7 @@
 [package]
 name = "aptos-move-flow"
 description = "MoveFlow: agent support for Move"
-version = "1.0.0"
+version = "1.0.4"
 
 authors = { workspace = true }
 edition = { workspace = true }

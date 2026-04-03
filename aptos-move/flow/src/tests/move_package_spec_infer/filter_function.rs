@@ -25,7 +25,7 @@ async fn move_package_spec_infer_filter_function() {
     let client = common::make_client().await;
     let result = common::call_tool(
         &client,
-        "move_package_spec_infer",
+        "move_package_wp",
         serde_json::json!({ "package_path": dir, "filter": "multi::add_one" }),
     )
     .await;
