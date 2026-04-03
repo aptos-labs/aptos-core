@@ -1322,11 +1322,120 @@ impl RoundManager {
                 .block_store
                 .add_certs(sync_info, self.create_block_retriever(author))
                 .await;
+            // Proxy fast-sync: if sync failed and this looks like a proxy RM
+            // (no execution pipeline, i.e. pipeline_builder is None),
+            // try rebuilding from just the recent blocks.
+            if result.is_err() && !self.block_store.has_pipeline() {
+                warn!(
+                    local_round = self.block_store.ordered_root().round(),
+                    remote_round = sync_info.highest_round(),
+                    "Proxy sync_up failed, attempting fast-forward sync"
+                );
+                return self.proxy_fast_forward_sync(sync_info, author).await;
+            }
             self.process_certificates().await?;
             result
         } else {
             Ok(())
         }
+    }
+
+    /// Proxy fast-forward sync: when the proxy RM is far behind and block retrieval
+    /// fails (pruned blocks), fetch just the recent blocks and rebuild the block store.
+    /// This allows a late-joining proxy validator to jump to the current round without
+    /// needing all intermediate blocks.
+    async fn proxy_fast_forward_sync(
+        &mut self,
+        sync_info: &SyncInfo,
+        author: Author,
+    ) -> anyhow::Result<()> {
+        use crate::block_storage::TargetBlockRetrieval;
+        use crate::persistent_liveness_storage::{RootInfo, RootMetadata};
+        use aptos_consensus_types::wrapped_ledger_info::WrappedLedgerInfo;
+
+        let highest_qc = sync_info.highest_quorum_cert().clone();
+        let target_round = highest_qc.certified_block().round();
+
+        info!(
+            target_round = target_round,
+            "Proxy fast-forward sync: fetching recent blocks"
+        );
+
+        // Fetch 3 blocks from the highest QC (recent blocks should not be pruned)
+        let mut retriever = self.create_block_retriever(author);
+        let blocks = retriever
+            .retrieve_blocks_in_range(
+                highest_qc.certified_block().id(),
+                3,
+                TargetBlockRetrieval::TargetBlockId(
+                    highest_qc.certified_block().id(),
+                ),
+                highest_qc
+                    .ledger_info()
+                    .get_voters(&retriever.validator_addresses()),
+            )
+            .await
+            .context("Proxy fast-forward: failed to fetch recent blocks")?;
+
+        if blocks.is_empty() {
+            anyhow::bail!("Proxy fast-forward: no blocks returned");
+        }
+
+        // The deepest block (last in the vec) becomes the new root
+        let root_block = blocks.last().unwrap().clone();
+        let root_qc = if blocks.len() > 1 {
+            blocks[blocks.len() - 2].quorum_cert().clone()
+        } else {
+            highest_qc.clone()
+        };
+
+        // Build quorum certs from the fetched blocks
+        let mut quorum_certs: Vec<QuorumCert> = vec![highest_qc.clone()];
+        for block in blocks.iter().take(blocks.len() - 1) {
+            quorum_certs.push(block.quorum_cert().clone());
+        }
+
+        // For proxy, ordered_cert and commit_cert use the QC's ledger info
+        // (proxy has no execution, so commit = ordered = the QC itself)
+        let commit_li = highest_qc.ledger_info().clone();
+        let ordered_cert = WrappedLedgerInfo::new(
+            highest_qc.vote_data().clone(),
+            commit_li.clone(),
+        );
+        let commit_cert = ordered_cert.clone();
+
+        let root_info = RootInfo {
+            commit_root_block: Box::new(root_block),
+            window_root_block: None,
+            quorum_cert: root_qc,
+            ordered_cert,
+            commit_cert,
+        };
+
+        // Proxy doesn't execute, so use placeholder metadata
+        let root_metadata = RootMetadata {
+            accu_hash: *aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH,
+            frozen_root_hashes: vec![],
+            num_leaves: 0,
+        };
+
+        // Non-root blocks to insert after rebuild (exclude the root = last element)
+        let mut non_root_blocks = blocks;
+        non_root_blocks.pop(); // remove the root block (deepest)
+
+        info!(
+            root_round = root_info.commit_root_block.round(),
+            non_root_blocks = non_root_blocks.len(),
+            quorum_certs = quorum_certs.len(),
+            "Proxy fast-forward sync: rebuilding block store"
+        );
+
+        self.block_store
+            .rebuild(root_info, root_metadata, non_root_blocks, quorum_certs)
+            .await;
+
+        self.process_certificates().await?;
+        Ok(())
     }
 
     /// The function makes sure that it ensures the message_round equal to what we have locally,

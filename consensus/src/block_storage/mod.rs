@@ -11,7 +11,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 pub use block_store::{
-    sync_manager::{BlockRetriever, NeedFetchResult},
+    sync_manager::{BlockRetriever, NeedFetchResult, TargetBlockRetrieval},
     BlockStore,
 };
 use std::{collections::HashSet, sync::Arc, time::Duration};

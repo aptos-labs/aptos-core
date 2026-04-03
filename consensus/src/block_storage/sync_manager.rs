@@ -901,7 +901,7 @@ impl BlockRetriever {
     }
 
     /// Retrieve chain of n blocks for given QC
-    async fn retrieve_blocks_in_range(
+    pub(crate) async fn retrieve_blocks_in_range(
         &mut self,
         initial_block_id: HashValue,
         num_blocks: u64,

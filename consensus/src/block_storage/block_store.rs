@@ -718,6 +718,12 @@ impl BlockStore {
             .check_denied_inline_transactions(block, block_txn_filter_config)
     }
 
+    /// Returns true if this BlockStore has an execution pipeline (primary RM).
+    /// Proxy RM has pipeline_builder: None.
+    pub fn has_pipeline(&self) -> bool {
+        self.pipeline_builder.is_some()
+    }
+
     pub fn check_payload(&self, proposal: &Block) -> Result<(), BitVec> {
         self.payload_manager.check_payload_availability(proposal)
     }
