@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+mod secret_share_rpc_path;
+
 use crate::{
     smoke_test_environment::SwarmBuilder, txn_emitter::generate_traffic,
     utils::create_and_fund_account,

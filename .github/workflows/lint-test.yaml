@@ -128,13 +128,20 @@ jobs:
   # that branch protection rules expect, while the actual work happens in smoke-tests.yaml.
   rust-smoke-tests:
     needs: rust-smoke-tests-workflow
-    if: always()
+    if: | # Always evaluate so failures are reported, but only when smoke tests are expected
+      always() && (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Check smoke test results
         run: |
-          if [ "${{ needs.rust-smoke-tests-workflow.result }}" = "success" ] || [ "${{ needs.rust-smoke-tests-workflow.result }}" = "skipped" ]; then
-            echo "Smoke tests passed or were skipped"
+          if [ "${{ needs.rust-smoke-tests-workflow.result }}" = "success" ]; then
+            echo "Smoke tests passed"
           else
             echo "Smoke tests failed: ${{ needs.rust-smoke-tests-workflow.result }}"
             exit 1
