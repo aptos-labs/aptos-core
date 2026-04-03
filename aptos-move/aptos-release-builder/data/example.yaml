@@ -62,6 +62,7 @@ proposals:
                   voter_window_num_validators_multiplier: 1
                   weight_by_voting_power: true
                   use_history_from_previous_epoch_max_count: 5
+                  failure_window_num_validators_multiplier: 0
             max_failed_authors_to_store: 10
       - Execution:
           V1:

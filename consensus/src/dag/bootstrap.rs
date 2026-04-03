@@ -406,12 +406,21 @@ impl DagBootstrapper {
                 )
             })
             .collect();
+        let failure_window_multiplier = if config.failure_window_num_validators_multiplier > 0 {
+            config.failure_window_num_validators_multiplier
+        } else {
+            config.proposer_window_num_validators_multiplier
+        };
         let metadata_adapter = Arc::new(MetadataBackendAdapter::new(
             num_validators
-                * std::cmp::max(
+                * [
                     config.proposer_window_num_validators_multiplier,
                     config.voter_window_num_validators_multiplier,
-                ),
+                    failure_window_multiplier,
+                ]
+                .into_iter()
+                .max()
+                .unwrap(),
             epoch_to_validator_map,
         ));
         let heuristic: Box<dyn ReputationHeuristic> = Box::new(ProposerAndVoterHeuristic::new(
@@ -422,6 +431,7 @@ impl DagBootstrapper {
             config.failure_threshold_percent,
             num_validators * config.voter_window_num_validators_multiplier,
             num_validators * config.proposer_window_num_validators_multiplier,
+            num_validators * failure_window_multiplier,
             false,
         ));
 

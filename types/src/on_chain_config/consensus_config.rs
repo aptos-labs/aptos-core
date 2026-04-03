@@ -480,6 +480,7 @@ impl Default for ConsensusConfigV1 {
                     voter_window_num_validators_multiplier: 1,
                     weight_by_voting_power: true,
                     use_history_from_previous_epoch_max_count: 5,
+                    failure_window_num_validators_multiplier: 0,
                 }),
             ),
         }
@@ -553,6 +554,12 @@ pub struct ProposerAndVoterConfig {
     // representing a number of historical epochs (beyond the current one)
     // to consider.
     pub use_history_from_previous_epoch_max_count: u32,
+    // Window into history considered for failure statistics, multiplier
+    // on top of number of validators. When 0, falls back to proposer_window_num_validators_multiplier.
+    // A larger failure window keeps failed validators penalized for longer,
+    // preventing oscillation between failed/inactive/active states.
+    #[serde(default)]
+    pub failure_window_num_validators_multiplier: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -583,6 +590,7 @@ impl Default for DagConsensusConfigV1 {
                     voter_window_num_validators_multiplier: 1,
                     weight_by_voting_power: true,
                     use_history_from_previous_epoch_max_count: 5,
+                    failure_window_num_validators_multiplier: 0,
                 }),
             ),
         }
