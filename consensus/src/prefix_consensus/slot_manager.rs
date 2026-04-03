@@ -23,6 +23,8 @@ use aptos_consensus_types::{
     payload_pull_params::PayloadPullParameters,
     pipelined_block::{PipelineFutures, PipelinedBlock},
     utils::PayloadTxnsSize,
+    vote_data::VoteData,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::state_compute_result::StateComputeResult;
@@ -1078,15 +1080,12 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 StateComputeResult::new_dummy(),
             ));
 
-            // Set up execution pipeline futures.
-            // build_for_prefix_consensus resolves order_proof_tx immediately
-            // during construction so the pipeline's pre_commit stage proceeds
-            // without waiting for an external signal.
+            // Set up execution pipeline futures
             if let Some(pipeline_builder) = &self.pipeline_builder {
                 if let Some(parent_futs) = self.parent_pipeline_futs.take() {
                     let tx = self.committed_slot_tx.clone();
                     let cb_slot = slot;
-                    pipeline_builder.build_for_prefix_consensus(
+                    pipeline_builder.build_for_consensus(
                         &pipelined,
                         parent_futs,
                         Box::new(move |_, _| { let _ = tx.send(cb_slot); }),
@@ -1099,6 +1098,27 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                         round = round,
                         "Missing parent pipeline futs, block execution may fail"
                     );
+                }
+            }
+
+            // Resolve order_proof_tx so the pipeline's signing future can proceed
+            let wrapped_li = WrappedLedgerInfo::new(
+                VoteData::dummy(),
+                LedgerInfoWithSignatures::new(
+                    LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                    AggregateSignature::empty(),
+                ),
+            );
+            if let Some(tx) = pipelined.pipeline_tx().lock().as_mut() {
+                if let Some(tx) = tx.order_proof_tx.take() {
+                    if tx.send(wrapped_li).is_err() {
+                        error!(
+                            epoch = self.epoch,
+                            slot = slot,
+                            round = round,
+                            "Failed to send order_proof — pipeline receiver dropped"
+                        );
+                    }
                 }
             }
 
@@ -1135,29 +1155,6 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
         // Build OrderedBlocks with ordered_proof covering the last block
         let last_block_info = blocks.last().unwrap().block_info();
-
-        // Send commit_proof_tx synchronously for each block so the pipeline's
-        // commit_ledger stage can proceed. The commit proof only needs the correct
-        // last-block ID for the pipeline's ID check; pipeline_builder reconstructs
-        // the real LedgerInfo from compute results after execution completes.
-        let commit_proof = LedgerInfoWithSignatures::new(
-            LedgerInfo::new(last_block_info.clone(), HashValue::zero()),
-            AggregateSignature::empty(),
-        );
-        for b in &blocks {
-            if let Some(tx) = b.pipeline_tx().lock().as_mut() {
-                if let Some(commit_tx) = tx.commit_proof_tx.take() {
-                    if commit_tx.send(commit_proof.clone()).is_err() {
-                        error!(
-                            epoch = self.epoch,
-                            slot = slot,
-                            "Failed to send commit_proof — pipeline receiver dropped"
-                        );
-                    }
-                }
-            }
-        }
-
         let ordered = OrderedBlocks {
             ordered_blocks: blocks,
             ordered_proof: LedgerInfoWithSignatures::new(

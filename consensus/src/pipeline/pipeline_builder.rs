@@ -24,7 +24,6 @@ use aptos_consensus_types::{
         PrepareResult, RandResult, TaskError, TaskFuture, TaskResult,
     },
     quorum_cert::QuorumCert,
-    vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
@@ -36,7 +35,6 @@ use aptos_resource_viewer::module_view::CachedModuleView;
 use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
-    aggregate_signature::AggregateSignature,
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
@@ -404,42 +402,6 @@ impl PipelineBuilder {
             block_store_callback,
             false,
         );
-    }
-
-    /// Build pipeline for prefix consensus blocks.
-    ///
-    /// Like [`build_for_consensus`](Self::build_for_consensus), but immediately
-    /// resolves `order_proof_tx` with a dummy value.  Prefix consensus doesn't
-    /// use the Jolteon order-proof mechanism; the slot manager decides ordering
-    /// directly.
-    pub fn build_for_prefix_consensus(
-        &self,
-        pipelined_block: &PipelinedBlock,
-        parent_futs: PipelineFutures,
-        block_store_callback: Box<
-            dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
-        >,
-    ) {
-        let (futs, mut tx, abort_handles) = self.build_internal(
-            parent_futs,
-            Arc::new(pipelined_block.block().clone()),
-            block_store_callback,
-            false,
-        );
-        // Resolve order_proof immediately so pre_commit proceeds without
-        // waiting for an external signal that prefix consensus doesn't use.
-        if let Some(sender) = tx.order_proof_tx.take() {
-            let _ = sender.send(WrappedLedgerInfo::new(
-                VoteData::dummy(),
-                LedgerInfoWithSignatures::new(
-                    LedgerInfo::dummy(),
-                    AggregateSignature::empty(),
-                ),
-            ));
-        }
-        pipelined_block.set_pipeline_futs(futs);
-        pipelined_block.set_pipeline_tx(tx);
-        pipelined_block.set_pipeline_abort_handles(abort_handles);
     }
 
     fn build(
@@ -1080,13 +1042,10 @@ impl PipelineBuilder {
         pre_commit_status: Arc<Mutex<PreCommitStatus>>,
     ) -> TaskResult<PreCommitResult> {
         let mut tracker = Tracker::start_waiting("pre_commit", &block);
-        info!("[Pipeline] pre_commit waiting for ledger_update (block {})", block.id());
         let (compute_result, _, _) = ledger_update_fut.await?;
-        info!("[Pipeline] pre_commit waiting for parent pre_commit (block {})", block.id());
         parent_block_pre_commit_fut.await?;
-        info!("[Pipeline] pre_commit waiting for order_proof (block {})", block.id());
+
         order_proof_fut.await?;
-        info!("[Pipeline] pre_commit all deps resolved, calling pre_commit_block (block {})", block.id());
 
         let wait_for_proof = {
             let mut status_guard = pre_commit_status.lock();
@@ -1126,31 +1085,13 @@ impl PipelineBuilder {
     ) -> TaskResult<CommitLedgerResult> {
         let mut tracker = Tracker::start_waiting("commit_ledger", &block);
         parent_block_commit_fut.await?;
-        let compute_result = pre_commit_fut.await?;
-        let commit_proof = commit_proof_fut.await?;
+        pre_commit_fut.await?;
+        let ledger_info_with_sigs = commit_proof_fut.await?;
 
         // it's committed as prefix
-        if commit_proof.commit_info().id() != block.id() {
+        if ledger_info_with_sigs.commit_info().id() != block.id() {
             return Ok(None);
         }
-
-        // Reconstruct LedgerInfo with real values from execution results.
-        // The commit proof's block_id identifies which block to commit, but
-        // its version/root_hash may be placeholders (prefix consensus sends
-        // the proof before execution completes). Using compute_result ensures
-        // correct values for both FakeAptosDB and real AptosDB validation.
-        let block_info = block.gen_block_info(
-            compute_result.root_hash(),
-            compute_result.last_version_or_0(),
-            compute_result.epoch_state().clone(),
-        );
-        let ledger_info_with_sigs = LedgerInfoWithSignatures::new(
-            LedgerInfo::new(
-                block_info,
-                commit_proof.ledger_info().consensus_data_hash(),
-            ),
-            commit_proof.signatures().clone(),
-        );
 
         tracker.start_working();
         let ledger_info_with_sigs_clone = ledger_info_with_sigs.clone();
