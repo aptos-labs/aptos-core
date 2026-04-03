@@ -4,16 +4,13 @@
 //! This submodule implements the *public parameters* for this "chunked_elgamal_field" PVSS scheme.
 
 use crate::{
-    dlog::BabyStepTable,
-    pvss::{
+    dlog::BabyStepTable, pcs::univariate_hiding_kzg, pvss::{
         chunky::{
             chunked_elgamal::num_chunks_per_scalar, chunked_elgamal_pp, input_secret::InputSecret,
             keys,
         },
         traits,
-    },
-    range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
-    traits::transcript::WithMaxNumShares,
+    }, range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof}, traits::transcript::WithMaxNumShares
 };
 use aptos_crypto::{
     arkworks::{
@@ -259,7 +256,10 @@ impl<E: Pairing> PublicParameters<E> {
         ell: usize,
         max_aggregation: usize,
         commitment_base: E::G2Affine,
-        dekart_prover_key: dekart_univariate_v2::ProverKey<E>,
+        hiding_kzg_setup: (
+            univariate_hiding_kzg::CommitmentKey<E>,
+            univariate_hiding_kzg::VerificationKey<E>,
+        ),
         rng: &mut R,
     ) -> Self {
         Self::new_internal(
@@ -267,7 +267,7 @@ impl<E: Pairing> PublicParameters<E> {
             ell,
             max_aggregation,
             commitment_base,
-            Some(dekart_prover_key),
+            Some(hiding_kzg_setup),
             rng,
         )
     }
@@ -277,10 +277,13 @@ impl<E: Pairing> PublicParameters<E> {
         ell: usize,
         max_aggregation: usize,
         commitment_base: E::G2Affine,
-        maybe_dekart_prover_key: Option<dekart_univariate_v2::ProverKey<E>>,
+        maybe_hiding_kzg_setup: Option<(
+            univariate_hiding_kzg::CommitmentKey<E>,
+            univariate_hiding_kzg::VerificationKey<E>,
+        )>,
         rng: &mut R,
     ) -> Self {
-        // ell >= means a BabyStepTable of size >= 2^32, which causes an overflow:
+        // ell >= 48 means a BabyStepTable of size >= 2^32, which causes an overflow:
         // - in build_dlog_table(..), table_size_exp = 4 + ((48 + 8) / 2) = 32
         // - BabyStepTable stores exponents as u32
         assert!(ell > 0 && ell <= 47);
@@ -291,9 +294,13 @@ impl<E: Pairing> PublicParameters<E> {
         let group_generators = GroupGenerators::default();
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G_1 = *pp_elgamal.message_base();
-        let pk_range_proof = maybe_dekart_prover_key.unwrap_or_else(|| {
+        let pk_range_proof = match maybe_hiding_kzg_setup {
+            Some((ck, vk)) =>
+            dekart_univariate_v2::Proof::setup(ell, vk, ck).0,
+            None =>
             dekart_univariate_v2::Proof::setup_for_testing(max_num_chunks_padded, ell, group_generators, rng).0
-        });
+        };
+
 
         let pp = Self {
             max_num_shares,

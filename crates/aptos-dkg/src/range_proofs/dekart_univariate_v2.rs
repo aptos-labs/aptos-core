@@ -298,7 +298,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 
     #[allow(non_snake_case)]
-    fn setup<R: RngCore + CryptoRng>(
+    fn setup(
         max_ell: usize,
         vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
         ck_S: univariate_hiding_kzg::CommitmentKey<E>,
