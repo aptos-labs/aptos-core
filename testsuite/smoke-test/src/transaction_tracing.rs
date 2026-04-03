@@ -43,7 +43,7 @@ async fn test_transaction_tracing() {
             config.transaction_tracing.enabled = true;
             config.transaction_tracing.batch_sample_rate = 1.0;
             config.transaction_tracing.txn_sample_rate = 1.0;
-            config.transaction_tracing.sender_allowlist = addrs.iter().cloned().collect();
+            config.transaction_tracing.filter.sender_allowlist = addrs.iter().cloned().collect();
         },
     );
 

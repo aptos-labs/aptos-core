@@ -171,7 +171,7 @@ pub(crate) fn transaction_tracing_test(duration: Duration, test_cmd: &TestComman
             config.transaction_tracing.enabled = true;
             config.transaction_tracing.batch_sample_rate = 1.0;
             config.transaction_tracing.txn_sample_rate = 1.0;
-            config.transaction_tracing.sender_allowlist =
+            config.transaction_tracing.filter.sender_allowlist =
                 transaction_tracing_test::traced_account_addresses();
         }))
         .with_pfn_override_node_config_fn(Arc::new(|config, _| {
