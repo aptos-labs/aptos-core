@@ -1382,7 +1382,7 @@ impl RoundManager {
         }
 
         // The deepest block (last in the vec) becomes the new root
-        let root_block = blocks.last().unwrap().clone();
+        let root_block = blocks.last().expect("blocks verified non-empty above").clone();
         let root_qc = if blocks.len() > 1 {
             blocks[blocks.len() - 2].quorum_cert().clone()
         } else {
