@@ -27,6 +27,7 @@ use aptos_testcases::{
     multi_region_network_test::{MultiRegionNetworkEmulationConfig, MultiRegionNetworkEmulationTest},
     performance_test::PerformanceBenchmark,
     two_traffics_test::TwoTrafficsTest,
+    validator_reboot_stress_test::FixedValidatorDownTest,
     CompositeNetworkTest,
 };
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
@@ -54,6 +55,9 @@ pub(crate) fn get_realistic_env_test(
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "realistic_env_max_load_encrypted" => realistic_env_max_load_encrypted_test(duration),
         "realistic_env_p90_latency" => realistic_env_p90_latency_test(),
+        "realistic_env_p90_latency_with_faults" => {
+            realistic_env_p90_latency_with_faults_test()
+        },
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -752,6 +756,48 @@ pub(crate) fn realistic_env_p90_latency_test() -> ForgeConfig {
                 .add_latency_threshold(1.5, LatencyType::P50)
                 .add_latency_threshold(2.5, LatencyType::P90)
                 .add_latency_threshold(4.0, LatencyType::P99)
+                .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD.clone()),
+        )
+}
+
+/// Same as `realistic_env_p90_latency_test` but with periodic validator failures
+/// to simulate mainnet proposer faults (~2% round timeout rate).
+/// Kills 1 validator at a time for 15s, then restarts, with 15s pause between cycles.
+pub(crate) fn realistic_env_p90_latency_with_faults_test() -> ForgeConfig {
+    let num_validators = 20;
+
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .add_network_test(CompositeNetworkTest::new(
+            MultiRegionNetworkEmulationTest::new_with_config(
+                MultiRegionNetworkEmulationConfig::four_regions_mainnet_like(num_validators),
+            ),
+            FixedValidatorDownTest {
+                num_targets: 2,
+                down_time_secs: 15.0,
+                pause_secs: 15.0,
+            },
+        ))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 3500 })
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(2500)
+                .add_wait_for_catchup_s(120)
+                .add_latency_threshold(2.0, LatencyType::P50)
+                .add_latency_threshold(3.5, LatencyType::P90)
+                .add_latency_threshold(6.0, LatencyType::P99)
                 .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD.clone()),
         )
 }

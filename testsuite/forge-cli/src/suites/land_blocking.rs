@@ -3,7 +3,7 @@
 
 use super::ungrouped::mixed_compatible_emit_job;
 use crate::{
-    suites::realistic_environment::realistic_env_p90_latency_test,
+    suites::realistic_environment::realistic_env_p90_latency_with_faults_test,
     TestCommand,
 };
 use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
@@ -20,7 +20,7 @@ pub(crate) fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" | "realistic_env_p90_latency" => {
-            realistic_env_p90_latency_test()
+            realistic_env_p90_latency_with_faults_test()
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),

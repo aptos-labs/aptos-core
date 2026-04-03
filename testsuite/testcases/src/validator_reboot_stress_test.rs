@@ -14,6 +14,13 @@ pub struct ValidatorRebootStressTest {
     pub pause_secs: f32,
 }
 
+/// Repeatedly kills and restarts the same fixed set of validators throughout the test.
+pub struct FixedValidatorDownTest {
+    pub num_targets: usize,
+    pub down_time_secs: f32,
+    pub pause_secs: f32,
+}
+
 impl Test for ValidatorRebootStressTest {
     fn name(&self) -> &'static str {
         "validator reboot stress test"
@@ -73,6 +80,62 @@ impl NetworkLoadTest for ValidatorRebootStressTest {
 
 #[async_trait]
 impl NetworkTest for ValidatorRebootStressTest {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
+    }
+}
+
+impl Test for FixedValidatorDownTest {
+    fn name(&self) -> &'static str {
+        "fixed validator down test"
+    }
+}
+
+#[async_trait]
+impl NetworkLoadTest for FixedValidatorDownTest {
+    async fn test(
+        &self,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+        _report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
+        let start = Instant::now();
+
+        let targets: Vec<_> = {
+            swarm
+                .read()
+                .await
+                .validators()
+                .map(|v| v.peer_id())
+                .take(self.num_targets)
+                .collect()
+        };
+
+        while start.elapsed() < duration {
+            for target in &targets {
+                let swarm = swarm.read().await;
+                let validator = swarm.validator(*target).unwrap();
+                validator.stop().await?;
+            }
+            if self.down_time_secs > 0.0 {
+                tokio::time::sleep(Duration::from_secs_f32(self.down_time_secs)).await;
+            }
+            for target in &targets {
+                let swarm = swarm.read().await;
+                let validator = swarm.validator(*target).unwrap();
+                validator.start().await?;
+            }
+            if self.pause_secs > 0.0 {
+                tokio::time::sleep(Duration::from_secs_f32(self.pause_secs)).await;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl NetworkTest for FixedValidatorDownTest {
     async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx).await
     }
