@@ -2755,8 +2755,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
                     for f in fields.values() {
-                        // In Aptos Move 2.0 and above, field `self` is omitted from local bindings
-                        // so `self` can be used to refer to `self` parameter.
+                        // Field `self` is omitted from local bindings
+                        // so `self` can be used to refer to the `self` parameter.
                         if f.name.display(et.symbol_pool()).to_string()
                             == well_known::RECEIVER_PARAM_NAME
                         {

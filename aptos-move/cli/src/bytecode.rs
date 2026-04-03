@@ -229,12 +229,6 @@ impl BytecodeCommand {
                 "Script blob at {} can't be deserialized",
                 bytecode_path.display()
             ))?;
-            if let Some(data) = get_compilation_metadata(&script) {
-                serde_json::to_string_pretty(&data).expect("expect compilation metadata")
-            } else {
-                serde_json::to_string_pretty(&legacy_compiler_metadata)
-                    .expect("expect compilation metadata")
-            };
             BytecodeMetadata {
                 aptos_metadata: get_metadata_from_compiled_code(&script),
                 bytecode_version: script.version,
