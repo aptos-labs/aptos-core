@@ -381,6 +381,11 @@ impl NetworkSender {
         self.broadcast_without_self(msg);
     }
 
+    pub fn broadcast_secret_share(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::broadcast_secret_share", |_| ());
+        self.broadcast_without_self(msg);
+    }
+
     pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
         fail_point!("consensus::send::any", |_| ());
 
@@ -931,7 +936,15 @@ impl NetworkTask {
                                 warn!(error = ?e, "aptos channel closed");
                             };
                         },
-                        _ => {
+                        // RPC-only and response variants — unexpected as direct sends.
+                        ConsensusMsg::DeprecatedBlockRetrievalRequest(_)
+                        | ConsensusMsg::BlockRetrievalResponse(_)
+                        | ConsensusMsg::BlockRetrievalRequest(_)
+                        | ConsensusMsg::BatchRequestMsg(_)
+                        | ConsensusMsg::BatchResponse(_)
+                        | ConsensusMsg::BatchResponseV2(_)
+                        | ConsensusMsg::DAGMessage(_)
+                        | ConsensusMsg::CommitMessage(_) => {
                             warn!(remote_peer = peer_id, "Unexpected direct send msg");
                             continue;
                         },
@@ -1009,8 +1022,35 @@ impl NetworkTask {
                                 response_sender: callback,
                             })
                         },
-                        _ => {
-                            warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
+                        ConsensusMsg::SecretShareMsg(req) => {
+                            IncomingRpcRequest::SecretShareRequest(IncomingSecretShareRequest {
+                                req,
+                                sender: peer_id,
+                                protocol,
+                                response_sender: callback,
+                            })
+                        },
+                        // Direct-send-only and response variants — unexpected as RPCs.
+                        ConsensusMsg::ProposalMsg(_)
+                        | ConsensusMsg::OptProposalMsg(_)
+                        | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::OrderVoteMsg(_)
+                        | ConsensusMsg::RoundTimeoutMsg(_)
+                        | ConsensusMsg::SyncInfo(_)
+                        | ConsensusMsg::EpochRetrievalRequest(_)
+                        | ConsensusMsg::EpochChangeProof(_)
+                        | ConsensusMsg::CommitVoteMsg(_)
+                        | ConsensusMsg::CommitDecisionMsg(_)
+                        | ConsensusMsg::SignedBatchInfo(_)
+                        | ConsensusMsg::SignedBatchInfoMsgV2(_)
+                        | ConsensusMsg::BatchMsg(_)
+                        | ConsensusMsg::BatchMsgV2(_)
+                        | ConsensusMsg::ProofOfStoreMsg(_)
+                        | ConsensusMsg::ProofOfStoreMsgV2(_)
+                        | ConsensusMsg::BlockRetrievalResponse(_)
+                        | ConsensusMsg::BatchResponse(_)
+                        | ConsensusMsg::BatchResponseV2(_) => {
+                            warn!(remote_peer = peer_id, "Unexpected RPC msg: {:?}", msg);
                             continue;
                         },
                     };
