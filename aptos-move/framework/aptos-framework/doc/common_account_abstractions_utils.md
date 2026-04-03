@@ -5,7 +5,11 @@
 
 
 
+-  [Resource `AuthorizedDomains`](#0x1_common_account_abstractions_utils_AuthorizedDomains)
 -  [Constants](#@Constants_0)
+-  [Function `authorize_domain`](#0x1_common_account_abstractions_utils_authorize_domain)
+-  [Function `revoke_domain`](#0x1_common_account_abstractions_utils_revoke_domain)
+-  [Function `verify_delegation`](#0x1_common_account_abstractions_utils_verify_delegation)
 -  [Function `network_name`](#0x1_common_account_abstractions_utils_network_name)
 -  [Function `entry_function_name`](#0x1_common_account_abstractions_utils_entry_function_name)
 -  [Function `construct_message`](#0x1_common_account_abstractions_utils_construct_message)
@@ -13,6 +17,7 @@
 
 
 <pre><code><b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils">0x1::string_utils</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
@@ -20,6 +25,33 @@
 </code></pre>
 
 
+
+<a id="0x1_common_account_abstractions_utils_AuthorizedDomains"></a>
+
+## Resource `AuthorizedDomains`
+
+
+
+<pre><code><b>struct</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>domains: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a id="@Constants_0"></a>
 
@@ -35,6 +67,106 @@ Entry function payload is missing.
 </code></pre>
 
 
+
+<a id="0x1_common_account_abstractions_utils_EUNAUTHORIZED_DOMAIN"></a>
+
+Domain not authorized for delegation.
+
+
+<pre><code><b>const</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_EUNAUTHORIZED_DOMAIN">EUNAUTHORIZED_DOMAIN</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_common_account_abstractions_utils_authorize_domain"></a>
+
+## Function `authorize_domain`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_authorize_domain">authorize_domain</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, domain: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_authorize_domain">authorize_domain</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, domain: String) <b>acquires</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a> {
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (!<b>exists</b>&lt;<a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a>&gt;(addr)) {
+        <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a> { domains: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] });
+    };
+    <b>let</b> authorized = <b>borrow_global_mut</b>&lt;<a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a>&gt;(addr);
+    <b>if</b> (!authorized.domains.contains(&domain)) {
+        authorized.domains.push_back(domain);
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_common_account_abstractions_utils_revoke_domain"></a>
+
+## Function `revoke_domain`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_revoke_domain">revoke_domain</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, domain: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_revoke_domain">revoke_domain</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, domain: String) <b>acquires</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a> {
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (<b>exists</b>&lt;<a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a>&gt;(addr)) {
+        <b>let</b> authorized = <b>borrow_global_mut</b>&lt;<a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a>&gt;(addr);
+        <b>let</b> (found, idx) = authorized.domains.index_of(&domain);
+        <b>if</b> (found) {
+            authorized.domains.remove(idx);
+        };
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_common_account_abstractions_utils_verify_delegation"></a>
+
+## Function `verify_delegation`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_verify_delegation">verify_delegation</a>(sender_addr: <b>address</b>, delegated_domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_verify_delegation">verify_delegation</a>(sender_addr: <b>address</b>, delegated_domain: &String) <b>acquires</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a> {
+    <b>assert</b>!(<b>exists</b>&lt;<a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a>&gt;(sender_addr), <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_EUNAUTHORIZED_DOMAIN">EUNAUTHORIZED_DOMAIN</a>);
+    <b>assert</b>!(
+        <b>borrow_global</b>&lt;<a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_AuthorizedDomains">AuthorizedDomains</a>&gt;(sender_addr).domains.contains(delegated_domain),
+        <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_EUNAUTHORIZED_DOMAIN">EUNAUTHORIZED_DOMAIN</a>
+    );
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_common_account_abstractions_utils_network_name"></a>
 

@@ -19,10 +19,12 @@
 module aptos_framework::sui_derivable_account {
 
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::{construct_message, daa_authenticate};
+    use aptos_framework::common_account_abstractions_utils::{construct_message, daa_authenticate, verify_delegation};
     use aptos_std::ed25519::{ Self, new_signature_from_bytes, new_validated_public_key_from_bytes, public_key_into_unvalidated };
     use std::bcs_stream::{ Self, deserialize_u8 };
     use std::bcs;
+    use std::signer;
+    use std::string::{Self, String};
     use std::string_utils;
     use std::vector;
     use aptos_std::aptos_hash;
@@ -48,6 +50,12 @@ module aptos_framework::sui_derivable_account {
 
     enum SuiAbstractSignature has drop {
         MessageV1 {
+            /// The signature of the message in raw bytes
+            signature: vector<u8>,
+        },
+        DelegatedV1 {
+            /// The delegated domain authorized to sign on behalf of the master domain
+            delegated_domain: String,
             /// The signature of the message in raw bytes
             signature: vector<u8>,
         },
@@ -126,6 +134,14 @@ module aptos_framework::sui_derivable_account {
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
             SuiAbstractSignature::MessageV1 { signature }
+        } else if (signature_type == 0x01) {
+            let delegated_domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
+            SuiAbstractSignature::DelegatedV1 {
+                delegated_domain: string::utf8(delegated_domain),
+                signature,
+            }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
         }
@@ -203,39 +219,28 @@ module aptos_framework::sui_derivable_account {
         abort(EDEPRECATED)
     }
 
-    spec authenticate_auth_data_internal {
-        // TODO: Issue with `cannot appear in both arithmetic and bitwise
-        // operation`
+    spec verify_sui_signature {
         pragma verify = false;
     }
 
-    fun authenticate_auth_data_internal(
-        aa_auth_data: AbstractionAuthData,
-        entry_function_name: &vector<u8>
+    fun verify_sui_signature(
+        expected_account_address: &vector<u8>,
+        domain: &vector<u8>,
+        entry_function_name: &vector<u8>,
+        digest_utf8: &vector<u8>,
+        signature_bytes: &vector<u8>,
     ) {
-        let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
-        let (signing_scheme, abstract_signature_signature, abstract_signature_public_key) = split_signature_bytes(&abstract_signature.signature);
-
-        // Check siging scheme is Ed25519 as we currently only support this scheme
+        let (signing_scheme, sig_bytes, pubkey_bytes) = split_signature_bytes(signature_bytes);
         assert!(get_signing_scheme(signing_scheme) == SuiSigningScheme::ED25519, EINVALID_SIGNING_SCHEME_TYPE);
 
-        // Derive the account address from the public key
-        let sui_account_address = derive_account_address_from_public_key(signing_scheme, abstract_signature_public_key);
+        let sui_account_address = derive_account_address_from_public_key(signing_scheme, pubkey_bytes);
+        assert!(&sui_account_address == expected_account_address, EACCOUNT_ADDRESS_MISMATCH);
 
-        let derivable_abstract_public_key = aa_auth_data.derivable_abstract_public_key();
-        let abstract_public_key = deserialize_abstract_public_key(derivable_abstract_public_key);
-
-        // Check the account address matches the abstract public key
-        assert!(&sui_account_address == &abstract_public_key.sui_account_address, EACCOUNT_ADDRESS_MISMATCH);
-
-        let public_key = new_validated_public_key_from_bytes(abstract_signature_public_key);
+        let public_key = new_validated_public_key_from_bytes(pubkey_bytes);
         assert!(public_key.is_some(), EINVALID_PUBLIC_KEY);
 
-        let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
-        // Build the raw message
-        let raw_message = construct_message(&b"Sui", &sui_account_address, &abstract_public_key.domain, entry_function_name, digest_utf8);
+        let raw_message = construct_message(&b"Sui", &sui_account_address, domain, entry_function_name, digest_utf8);
 
-        // Prepend Intent to the message
         let intent = Intent {
             scope: PersonalMessage,
             version: V0,
@@ -245,14 +250,10 @@ module aptos_framework::sui_derivable_account {
             intent,
             value: raw_message,
         };
-        // Serialize the whole struct
         let bcs_bytes = bcs::to_bytes<IntentMessage>(&msg);
-
-        // Hash full_message with blake2b256
         let hash = aptos_hash::blake2b_256(bcs_bytes);
 
-        let signature = new_signature_from_bytes(abstract_signature_signature);
-
+        let signature = new_signature_from_bytes(sig_bytes);
         assert!(
             ed25519::signature_verify_strict(
                 &signature,
@@ -263,6 +264,45 @@ module aptos_framework::sui_derivable_account {
         );
     }
 
+    spec authenticate_auth_data_internal {
+        // TODO: Issue with `cannot appear in both arithmetic and bitwise
+        // operation`
+        pragma verify = false;
+    }
+
+    fun authenticate_auth_data_internal(
+        aa_auth_data: AbstractionAuthData,
+        entry_function_name: &vector<u8>,
+        sender_addr: address,
+    ) {
+        let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
+        let derivable_abstract_public_key = aa_auth_data.derivable_abstract_public_key();
+        let abstract_public_key = deserialize_abstract_public_key(derivable_abstract_public_key);
+        let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
+
+        match (abstract_signature) {
+            SuiAbstractSignature::MessageV1 { signature } => {
+                verify_sui_signature(
+                    &abstract_public_key.sui_account_address,
+                    &abstract_public_key.domain,
+                    entry_function_name,
+                    digest_utf8,
+                    &signature,
+                );
+            },
+            SuiAbstractSignature::DelegatedV1 { delegated_domain, signature } => {
+                verify_delegation(sender_addr, &delegated_domain);
+                verify_sui_signature(
+                    &abstract_public_key.sui_account_address,
+                    delegated_domain.bytes(),
+                    entry_function_name,
+                    digest_utf8,
+                    &signature,
+                );
+            },
+        };
+    }
+
     spec authenticate {
         // TODO: Issue with spec for authenticate_auth_data_internal
         pragma verify = false;
@@ -270,7 +310,8 @@ module aptos_framework::sui_derivable_account {
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data_internal(auth_data, entry_name))
+        let sender_addr = signer::address_of(&account);
+        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data_internal(auth_data, entry_name, sender_addr))
     }
 
     #[test_only]
@@ -314,6 +355,7 @@ module aptos_framework::sui_derivable_account {
         assert!(sui_abstract_signature is SuiAbstractSignature::MessageV1);
         match (sui_abstract_signature) {
             SuiAbstractSignature::MessageV1 { signature } => assert!(signature == signature_bytes),
+            SuiAbstractSignature::DelegatedV1 { .. } => abort(0),
         };
     }
 
@@ -342,7 +384,7 @@ module aptos_framework::sui_derivable_account {
 
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
-        authenticate_auth_data_internal(auth_data, &entry_function_name);
+        authenticate_auth_data_internal(auth_data, &entry_function_name, @0x1);
     }
 
     #[test(framework = @0x1)]
@@ -362,7 +404,7 @@ module aptos_framework::sui_derivable_account {
 
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
-        authenticate_auth_data_internal(auth_data, &entry_function_name);
+        authenticate_auth_data_internal(auth_data, &entry_function_name, @0x1);
     }
 
     #[test(framework = @0x1)]
@@ -382,7 +424,7 @@ module aptos_framework::sui_derivable_account {
 
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
-        authenticate_auth_data_internal(auth_data, &entry_function_name);
+        authenticate_auth_data_internal(auth_data, &entry_function_name, @0x1);
     }
 
 
@@ -403,7 +445,7 @@ module aptos_framework::sui_derivable_account {
 
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
 
-        authenticate_auth_data_internal(auth_data, &entry_function_name);
+        authenticate_auth_data_internal(auth_data, &entry_function_name, @0x1);
     }
 
     #[test]
@@ -433,6 +475,72 @@ module aptos_framework::sui_derivable_account {
         abstract_public_key.push_back(0xEF);
         // This should fail with EMALFORMED_DATA due to trailing bytes
         deserialize_abstract_public_key(&abstract_public_key);
+    }
+
+    #[test_only]
+    use std::string::utf8;
+
+    #[test_only]
+    fun create_delegated_signature(delegated_domain: String, signature: vector<u8>): vector<u8> {
+        let abstract_signature = SuiAbstractSignature::DelegatedV1 { delegated_domain, signature };
+        bcs::to_bytes(&abstract_signature)
+    }
+
+    #[test(framework = @0x1)]
+    fun test_authenticate_auth_data_delegated(framework: &signer) {
+        chain_id::initialize_for_test(framework, 2);
+        aptos_framework::common_account_abstractions_utils::authorize_domain(framework, utf8(b"localhost:3001"));
+
+        let sui_account_address = b"0x8d6ce7a3c13617b29aaf7ec58bee5a611606a89c62c5efbea32e06d8d167bd49";
+        let domain = b"master.com";
+        let abstract_public_key = create_abstract_public_key(sui_account_address, domain);
+
+        let signature_bytes = vector[0, 140, 147, 99, 142, 194, 60, 242, 45, 231, 203, 175, 182, 126, 202, 88, 32, 157, 255, 80, 200, 28, 135, 142, 3, 1, 58, 192, 53, 166, 235, 171, 168, 32, 163, 200, 137, 125, 161, 149, 149, 159, 254, 116, 51, 159, 23, 11, 196, 173, 127, 7, 214, 231, 235, 171, 224, 221, 229, 219, 27, 31, 80, 173, 12, 25, 200, 235, 92, 139, 72, 175, 189, 40, 0, 65, 76, 215, 148, 94, 194, 78, 134, 60, 189, 212, 116, 40, 134, 179, 104, 31, 249, 222, 84, 104, 202];
+        let abstract_signature = create_delegated_signature(utf8(b"localhost:3001"), signature_bytes);
+
+        let entry_function_name = b"0x1::aptos_account::transfer";
+        let digest = x"717843972d0491ba7b80fbb4e60708d87f7926c439972138062934c9dc1fc17b";
+
+        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
+
+        authenticate_auth_data_internal(auth_data, &entry_function_name, @0x1);
+    }
+
+    #[test(framework = @0x1)]
+    #[expected_failure(abort_code = 2)]
+    fun test_authenticate_auth_data_delegated_unauthorized(framework: &signer) {
+        chain_id::initialize_for_test(framework, 2);
+
+        let sui_account_address = b"0x8d6ce7a3c13617b29aaf7ec58bee5a611606a89c62c5efbea32e06d8d167bd49";
+        let domain = b"master.com";
+        let abstract_public_key = create_abstract_public_key(sui_account_address, domain);
+
+        let signature_bytes = vector[0, 140, 147, 99, 142, 194, 60, 242, 45, 231, 203, 175, 182, 126, 202, 88, 32, 157, 255, 80, 200, 28, 135, 142, 3, 1, 58, 192, 53, 166, 235, 171, 168, 32, 163, 200, 137, 125, 161, 149, 149, 159, 254, 116, 51, 159, 23, 11, 196, 173, 127, 7, 214, 231, 235, 171, 224, 221, 229, 219, 27, 31, 80, 173, 12, 25, 200, 235, 92, 139, 72, 175, 189, 40, 0, 65, 76, 215, 148, 94, 194, 78, 134, 60, 189, 212, 116, 40, 134, 179, 104, 31, 249, 222, 84, 104, 202];
+        let abstract_signature = create_delegated_signature(utf8(b"localhost:3001"), signature_bytes);
+
+        let entry_function_name = b"0x1::aptos_account::transfer";
+        let digest = x"717843972d0491ba7b80fbb4e60708d87f7926c439972138062934c9dc1fc17b";
+
+        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
+
+        authenticate_auth_data_internal(auth_data, &entry_function_name, @0x1);
+    }
+
+    #[test]
+    fun test_deserialize_delegated_signature() {
+        let signature_bytes = vector[0, 151, 47, 171, 144, 115, 16, 129, 17, 202, 212, 180, 155, 213, 223, 249, 203, 195, 0, 84, 142, 121, 167, 29, 113, 159, 33, 177, 108, 137, 113, 160, 118, 41, 246, 199, 202, 79, 151, 27, 86, 235, 219, 123, 168, 152, 38, 124, 147, 146, 118, 101, 37, 187, 223, 206, 120, 101, 148, 33, 141, 80, 60, 155, 13, 25, 200, 235, 92, 139, 72, 175, 189, 40, 0, 65, 76, 215, 148, 94, 194, 78, 134, 60, 189, 212, 116, 40, 134, 179, 104, 31, 249, 222, 84, 104, 202];
+        let abstract_signature = create_delegated_signature(utf8(b"other-dapp.com"), signature_bytes);
+        let sui_abstract_signature = deserialize_abstract_signature(&abstract_signature);
+        assert!(sui_abstract_signature is SuiAbstractSignature::DelegatedV1);
+        match (sui_abstract_signature) {
+            SuiAbstractSignature::DelegatedV1 { delegated_domain, signature } => {
+                assert!(delegated_domain == utf8(b"other-dapp.com"));
+                assert!(signature == signature_bytes);
+            },
+            _ => {
+                abort(0)
+            },
+        };
     }
 
 }

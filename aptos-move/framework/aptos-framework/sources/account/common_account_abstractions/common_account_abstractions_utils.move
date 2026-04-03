@@ -1,6 +1,8 @@
 module aptos_framework::common_account_abstractions_utils {
     use aptos_framework::auth_data::AbstractionAuthData;
     use std::chain_id;
+    use std::signer;
+    use std::string::String;
     use std::string_utils;
     use std::transaction_context::{Self, EntryFunctionPayload};
 
@@ -10,6 +12,42 @@ module aptos_framework::common_account_abstractions_utils {
 
     /// Entry function payload is missing.
     const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 1;
+    /// Domain not authorized for delegation.
+    const EUNAUTHORIZED_DOMAIN: u64 = 2;
+
+    struct AuthorizedDomains has key {
+        domains: vector<String>,
+    }
+
+    public entry fun authorize_domain(account: &signer, domain: String) acquires AuthorizedDomains {
+        let addr = signer::address_of(account);
+        if (!exists<AuthorizedDomains>(addr)) {
+            move_to(account, AuthorizedDomains { domains: vector[] });
+        };
+        let authorized = borrow_global_mut<AuthorizedDomains>(addr);
+        if (!authorized.domains.contains(&domain)) {
+            authorized.domains.push_back(domain);
+        };
+    }
+
+    public entry fun revoke_domain(account: &signer, domain: String) acquires AuthorizedDomains {
+        let addr = signer::address_of(account);
+        if (exists<AuthorizedDomains>(addr)) {
+            let authorized = borrow_global_mut<AuthorizedDomains>(addr);
+            let (found, idx) = authorized.domains.index_of(&domain);
+            if (found) {
+                authorized.domains.remove(idx);
+            };
+        };
+    }
+
+    public(friend) fun verify_delegation(sender_addr: address, delegated_domain: &String) acquires AuthorizedDomains {
+        assert!(exists<AuthorizedDomains>(sender_addr), EUNAUTHORIZED_DOMAIN);
+        assert!(
+            borrow_global<AuthorizedDomains>(sender_addr).domains.contains(delegated_domain),
+            EUNAUTHORIZED_DOMAIN
+        );
+    }
 
     public(friend) fun network_name(): vector<u8> {
         let chain_id = chain_id::get();
@@ -153,5 +191,23 @@ module aptos_framework::common_account_abstractions_utils {
         let digest_utf8 = b"0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279";
         let message = construct_message(&b"Solana", &base58_public_key, &domain, &entry_function_name, &digest_utf8);
         assert!(message == b"localhost:3000 wants you to sign in with your Solana account:\nG56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV\n\nPlease confirm you explicitly initiated this request from localhost:3000. You are approving to execute transaction 0x1::coin::transfer on Aptos blockchain (testnet).\n\nNonce: 0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279");
+    }
+
+    #[test(account = @0x42)]
+    fun test_authorize_and_revoke_domain(account: &signer) acquires AuthorizedDomains {
+        authorize_domain(account, utf8(b"other-dapp.com"));
+        let addr = signer::address_of(account);
+        assert!(exists<AuthorizedDomains>(addr));
+        assert!(borrow_global<AuthorizedDomains>(addr).domains.contains(&utf8(b"other-dapp.com")));
+
+        authorize_domain(account, utf8(b"another-dapp.com"));
+        assert!(borrow_global<AuthorizedDomains>(addr).domains.length() == 2);
+
+        authorize_domain(account, utf8(b"other-dapp.com"));
+        assert!(borrow_global<AuthorizedDomains>(addr).domains.length() == 2);
+
+        revoke_domain(account, utf8(b"other-dapp.com"));
+        assert!(!borrow_global<AuthorizedDomains>(addr).domains.contains(&utf8(b"other-dapp.com")));
+        assert!(borrow_global<AuthorizedDomains>(addr).domains.length() == 1);
     }
 }

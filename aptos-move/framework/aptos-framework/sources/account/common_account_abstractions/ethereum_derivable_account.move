@@ -25,12 +25,13 @@
 
 module aptos_framework::ethereum_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::{network_name, daa_authenticate};
+    use aptos_framework::common_account_abstractions_utils::{network_name, daa_authenticate, verify_delegation};
     use aptos_framework::base16::base16_utf8_to_vec_u8;
     use aptos_std::secp256k1;
     use aptos_std::aptos_hash;
     use std::bcs_stream::{Self, deserialize_u8};
     use std::chain_id;
+    use std::signer;
     use std::string_utils;
     use std::string::{Self, String};
 
@@ -55,6 +56,16 @@ module aptos_framework::ethereum_derivable_account {
         },
         MessageV2 {
             /// The scheme in the URI of the message, e.g. the scheme of the website that requested the signature (http, https, etc.)
+            scheme: String,
+            /// The date and time when the signature was issued
+            issued_at: String,
+            /// The signature of the message
+            signature: vector<u8>,
+        },
+        DelegatedV1 {
+            /// The delegated domain authorized to sign on behalf of the master domain
+            delegated_domain: String,
+            /// The scheme in the URI of the message
             scheme: String,
             /// The date and time when the signature was issued
             issued_at: String,
@@ -93,6 +104,17 @@ module aptos_framework::ethereum_derivable_account {
             let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             SIWEAbstractSignature::MessageV2 { scheme: string::utf8(scheme), issued_at: string::utf8(issued_at), signature }
+        } else if (signature_type == 0x02) {
+            let delegated_domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            let scheme = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            SIWEAbstractSignature::DelegatedV1 {
+                delegated_domain: string::utf8(delegated_domain),
+                scheme: string::utf8(scheme),
+                issued_at: string::utf8(issued_at),
+                signature,
+            }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
         }
@@ -176,37 +198,79 @@ module aptos_framework::ethereum_derivable_account {
     }
 
 
+    fun verify_ethereum_signature(
+        ethereum_address: &vector<u8>,
+        domain: &vector<u8>,
+        entry_function_name: &vector<u8>,
+        digest_utf8: &vector<u8>,
+        issued_at: &vector<u8>,
+        scheme: &vector<u8>,
+        signature_bytes: &vector<u8>,
+    ) {
+        let message = construct_message(ethereum_address, domain, entry_function_name, digest_utf8, issued_at, scheme);
+        let hashed_message = aptos_hash::keccak256(message);
+        let public_key_bytes = recover_public_key(signature_bytes, &hashed_message);
+
+        let public_key_without_prefix = public_key_bytes.slice(1, public_key_bytes.length());
+        let kex_hash = aptos_hash::keccak256(public_key_without_prefix);
+        let recovered_addr = kex_hash.slice(12, 32);
+        let ethereum_address_without_prefix = ethereum_address.slice(2, ethereum_address.length());
+
+        let account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
+        assert!(recovered_addr == account_address_vec, EADDR_MISMATCH);
+    }
+
     fun authenticate_auth_data(
         aa_auth_data: AbstractionAuthData,
-        entry_function_name: &vector<u8>
+        entry_function_name: &vector<u8>,
+        sender_addr: address,
     ) {
         let derivable_abstract_public_key = aa_auth_data.derivable_abstract_public_key();
         let abstract_public_key = deserialize_abstract_public_key(derivable_abstract_public_key);
         let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
         let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
-        let issued_at = abstract_signature.issued_at.bytes();
-        let scheme = abstract_signature.scheme.bytes();
-        let message = construct_message(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at, scheme);
-        let hashed_message = aptos_hash::keccak256(message);
-        let public_key_bytes = recover_public_key(&abstract_signature.signature, &hashed_message);
-
-        // 1. Skip the 0x04 prefix (take the bytes after the first byte)
-        let public_key_without_prefix = public_key_bytes.slice(1, public_key_bytes.length());
-        // 2. Run Keccak256 on the public key (without the 0x04 prefix)
-        let kexHash = aptos_hash::keccak256(public_key_without_prefix);
-        // 3. Slice the last 20 bytes (this is the Ethereum address)
-        let recovered_addr = kexHash.slice(12, 32);
-        // 4. Remove the 0x prefix from the utf8 account address
-        let ethereum_address_without_prefix = abstract_public_key.ethereum_address.slice(2, abstract_public_key.ethereum_address.length());
-
-        let account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
-        // Verify that the recovered address matches the domain account identity
-        assert!(recovered_addr == account_address_vec, EADDR_MISMATCH);
+        match (abstract_signature) {
+            SIWEAbstractSignature::MessageV1 { issued_at, signature } => {
+                verify_ethereum_signature(
+                    &abstract_public_key.ethereum_address,
+                    &abstract_public_key.domain,
+                    entry_function_name,
+                    digest_utf8,
+                    issued_at.bytes(),
+                    &b"https",
+                    &signature,
+                );
+            },
+            SIWEAbstractSignature::MessageV2 { scheme, issued_at, signature } => {
+                verify_ethereum_signature(
+                    &abstract_public_key.ethereum_address,
+                    &abstract_public_key.domain,
+                    entry_function_name,
+                    digest_utf8,
+                    issued_at.bytes(),
+                    scheme.bytes(),
+                    &signature,
+                );
+            },
+            SIWEAbstractSignature::DelegatedV1 { delegated_domain, scheme, issued_at, signature } => {
+                verify_delegation(sender_addr, &delegated_domain);
+                verify_ethereum_signature(
+                    &abstract_public_key.ethereum_address,
+                    delegated_domain.bytes(),
+                    entry_function_name,
+                    digest_utf8,
+                    issued_at.bytes(),
+                    scheme.bytes(),
+                    &signature,
+                );
+            },
+        };
     }
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name))
+        let sender_addr = signer::address_of(&account);
+        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name, sender_addr))
     }
 
 
@@ -228,6 +292,12 @@ module aptos_framework::ethereum_derivable_account {
     #[test_only]
     fun create_raw_signature(scheme: String, issued_at: String, signature: vector<u8>): vector<u8> {
         let abstract_signature = SIWEAbstractSignature::MessageV2 { scheme, issued_at, signature };
+        bcs::to_bytes(&abstract_signature)
+    }
+
+    #[test_only]
+    fun create_delegated_raw_signature(delegated_domain: String, scheme: String, issued_at: String, signature: vector<u8>): vector<u8> {
+        let abstract_signature = SIWEAbstractSignature::DelegatedV1 { delegated_domain, scheme, issued_at, signature };
         bcs::to_bytes(&abstract_signature)
     }
 
@@ -263,6 +333,9 @@ module aptos_framework::ethereum_derivable_account {
                 assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
                 assert!(signature == signature_bytes);
             },
+            SIWEAbstractSignature::DelegatedV1 { .. } => {
+                abort(0)
+            },
         };
     }
 
@@ -287,6 +360,9 @@ module aptos_framework::ethereum_derivable_account {
                 assert!(scheme == utf8(b"http"));
                 assert!(issued_at == utf8(b"2025-05-08T23:39:00.000Z"));
                 assert!(signature == signature_bytes);
+            },
+            SIWEAbstractSignature::DelegatedV1 { .. } => {
+                abort(0)
             },
         };
     }
@@ -350,7 +426,7 @@ module aptos_framework::ethereum_derivable_account {
         let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
-        authenticate_auth_data(auth_data, &entry_function_name);
+        authenticate_auth_data(auth_data, &entry_function_name, @0x1);
     }
 
     #[test(framework = @0x1)]
@@ -372,6 +448,78 @@ module aptos_framework::ethereum_derivable_account {
         let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
-        authenticate_auth_data(auth_data, &entry_function_name);
+        authenticate_auth_data(auth_data, &entry_function_name, @0x1);
+    }
+
+    #[test(framework = @0x1)]
+    fun test_authenticate_auth_data_delegated(framework: &signer) {
+        chain_id::initialize_for_test(framework, 4);
+        aptos_framework::common_account_abstractions_utils::authorize_domain(framework, utf8(b"localhost:3001"));
+
+        let digest = x"705f1f57dd8399bf134e649981af43b5c42e59f985c4e4335ab70ce3f96bcd27";
+        let signature = vector[
+            162, 57, 230, 98, 9, 139, 202, 15, 110, 61, 237, 54, 252, 234, 202, 13,
+            181, 196, 174, 19, 226, 50, 151, 63, 137, 229, 144, 15, 4, 56, 1, 122,
+            42, 51, 191, 43, 162, 155, 55, 227, 62, 164, 247, 18, 154, 68, 59, 82,
+            108, 124, 83, 72, 224, 158, 79, 20, 123, 172, 105, 71, 12, 114, 208, 246, 27
+        ];
+        let abstract_signature = create_delegated_raw_signature(utf8(b"localhost:3001"), utf8(b"https"), utf8(b"2025-05-02T16:17:10.714Z"), signature);
+        let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
+        let domain = b"master.com";
+        let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
+        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
+        let entry_function_name = b"0x1::aptos_account::transfer";
+        authenticate_auth_data(auth_data, &entry_function_name, @0x1);
+    }
+
+    #[test(framework = @0x1)]
+    #[expected_failure(abort_code = 2)]
+    fun test_authenticate_auth_data_delegated_unauthorized(framework: &signer) {
+        chain_id::initialize_for_test(framework, 4);
+
+        let digest = x"705f1f57dd8399bf134e649981af43b5c42e59f985c4e4335ab70ce3f96bcd27";
+        let signature = vector[
+            162, 57, 230, 98, 9, 139, 202, 15, 110, 61, 237, 54, 252, 234, 202, 13,
+            181, 196, 174, 19, 226, 50, 151, 63, 137, 229, 144, 15, 4, 56, 1, 122,
+            42, 51, 191, 43, 162, 155, 55, 227, 62, 164, 247, 18, 154, 68, 59, 82,
+            108, 124, 83, 72, 224, 158, 79, 20, 123, 172, 105, 71, 12, 114, 208, 246, 27
+        ];
+        let abstract_signature = create_delegated_raw_signature(utf8(b"localhost:3001"), utf8(b"https"), utf8(b"2025-05-02T16:17:10.714Z"), signature);
+        let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
+        let domain = b"master.com";
+        let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
+        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
+        let entry_function_name = b"0x1::aptos_account::transfer";
+        authenticate_auth_data(auth_data, &entry_function_name, @0x1);
+    }
+
+    #[test]
+    fun test_deserialize_delegated_signature() {
+        let signature_bytes = vector[
+            249, 247, 194, 250, 31, 233, 100, 234, 109, 142, 6, 193, 203, 33, 147, 199,
+            236, 117, 69, 119, 252, 219, 150, 143, 28, 112, 33, 9, 95, 53, 0, 69,
+            123, 17, 207, 53, 69, 203, 213, 208, 13, 98, 225, 170, 28, 183, 181, 53,
+            58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
+            28
+        ];
+        let abstract_signature = create_delegated_raw_signature(
+            utf8(b"other-dapp.com"),
+            utf8(b"https"),
+            utf8(b"2025-01-01T00:00:00.000Z"),
+            signature_bytes,
+        );
+        let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
+        assert!(siwe_abstract_signature is SIWEAbstractSignature::DelegatedV1);
+        match (siwe_abstract_signature) {
+            SIWEAbstractSignature::DelegatedV1 { delegated_domain, scheme, issued_at, signature } => {
+                assert!(delegated_domain == utf8(b"other-dapp.com"));
+                assert!(scheme == utf8(b"https"));
+                assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
+                assert!(signature == signature_bytes);
+            },
+            _ => {
+                abort(0)
+            },
+        };
     }
 }

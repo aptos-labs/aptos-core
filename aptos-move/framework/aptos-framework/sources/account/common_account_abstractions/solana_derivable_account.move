@@ -18,7 +18,7 @@
 /// - OKX
 module aptos_framework::solana_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::{construct_message, daa_authenticate};
+    use aptos_framework::common_account_abstractions_utils::{construct_message, daa_authenticate, verify_delegation};
     use aptos_std::ed25519::{
         Self,
         new_signature_from_bytes,
@@ -26,6 +26,8 @@ module aptos_framework::solana_derivable_account {
         public_key_into_unvalidated,
     };
     use std::bcs_stream::{Self, deserialize_u8};
+    use std::signer;
+    use std::string::{Self, String};
     use std::string_utils;
 
     /// Signature failed to verify.
@@ -47,6 +49,12 @@ module aptos_framework::solana_derivable_account {
 
     enum SIWSAbstractSignature has drop {
         MessageV1 {
+            signature: vector<u8>,
+        },
+        DelegatedV1 {
+            /// The delegated domain authorized to sign on behalf of the master domain
+            delegated_domain: String,
+            /// The signature of the message
             signature: vector<u8>,
         },
     }
@@ -72,6 +80,13 @@ module aptos_framework::solana_derivable_account {
         if (signature_type == 0x00) {
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             SIWSAbstractSignature::MessageV1 { signature }
+        } else if (signature_type == 0x01) {
+            let delegated_domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            SIWSAbstractSignature::DelegatedV1 {
+                delegated_domain: string::utf8(delegated_domain),
+                signature,
+            }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
         }
@@ -132,7 +147,8 @@ module aptos_framework::solana_derivable_account {
 
     fun authenticate_auth_data(
         aa_auth_data: AbstractionAuthData,
-        entry_function_name: &vector<u8>
+        entry_function_name: &vector<u8>,
+        sender_addr: address,
     ) {
         let abstract_public_key = aa_auth_data.derivable_abstract_public_key();
         let (base58_public_key, domain) = deserialize_abstract_public_key(abstract_public_key);
@@ -145,7 +161,19 @@ module aptos_framework::solana_derivable_account {
         match (abstract_signature) {
             SIWSAbstractSignature::MessageV1 { signature: signature_bytes } => {
                 let message = construct_message(&b"Solana", &base58_public_key, &domain, entry_function_name, digest_utf8);
-
+                let signature = new_signature_from_bytes(signature_bytes);
+                assert!(
+                    ed25519::signature_verify_strict(
+                        &signature,
+                        &public_key_into_unvalidated(public_key.destroy_some()),
+                        message,
+                    ),
+                    EINVALID_SIGNATURE
+                );
+            },
+            SIWSAbstractSignature::DelegatedV1 { delegated_domain, signature: signature_bytes } => {
+                verify_delegation(sender_addr, &delegated_domain);
+                let message = construct_message(&b"Solana", &base58_public_key, delegated_domain.bytes(), entry_function_name, digest_utf8);
                 let signature = new_signature_from_bytes(signature_bytes);
                 assert!(
                     ed25519::signature_verify_strict(
@@ -166,13 +194,14 @@ module aptos_framework::solana_derivable_account {
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name))
+        let sender_addr = signer::address_of(&account);
+        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name, sender_addr))
     }
 
     #[test_only]
     use std::bcs;
     #[test_only]
-    use std::string::{String, utf8};
+    use std::string::utf8;
     #[test_only]
     use aptos_framework::auth_data::{create_derivable_auth_data};
     #[test_only]
@@ -217,6 +246,7 @@ module aptos_framework::solana_derivable_account {
         assert!(siws_abstract_signature is SIWSAbstractSignature::MessageV1);
         match (siws_abstract_signature) {
             SIWSAbstractSignature::MessageV1 { signature } => assert!(signature == signature_bytes),
+            SIWSAbstractSignature::DelegatedV1 { .. } => abort(0),
         };
     }
 
@@ -242,7 +272,7 @@ module aptos_framework::solana_derivable_account {
         let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
-        authenticate_auth_data(auth_data, &entry_function_name);
+        authenticate_auth_data(auth_data, &entry_function_name, @0x1);
     }
 
     #[test(framework = @0x1)]
@@ -258,6 +288,61 @@ module aptos_framework::solana_derivable_account {
         let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
-        authenticate_auth_data(auth_data, &entry_function_name);
+        authenticate_auth_data(auth_data, &entry_function_name, @0x1);
+    }
+
+    #[test_only]
+    fun create_delegated_signature(delegated_domain: String, signature: vector<u8>): vector<u8> {
+        let abstract_signature = SIWSAbstractSignature::DelegatedV1 { delegated_domain, signature };
+        bcs::to_bytes(&abstract_signature)
+    }
+
+    #[test(framework = @0x1)]
+    fun test_authenticate_auth_data_delegated(framework: &signer) {
+        chain_id::initialize_for_test(framework, 4);
+        aptos_framework::common_account_abstractions_utils::authorize_domain(framework, utf8(b"localhost:3001"));
+
+        let digest = x"9800ae3d949260dedd01573b2903e9de06abe914530ba5d21f068f8823bfdfa3";
+        let signature = vector[70, 135, 9, 250, 23, 189, 162, 119, 77, 133, 195, 66, 102, 105, 116, 86, 29, 118, 226, 100, 94, 120, 138, 219, 252, 134, 231, 139, 47, 77, 19, 201, 4, 88, 255, 64, 185, 96, 134, 50, 27, 30, 110, 125, 251, 89, 57, 156, 17, 170, 16, 102, 107, 40, 46, 234, 15, 162, 156, 69, 132, 70, 135, 11];
+        let abstract_signature = create_delegated_signature(utf8(b"localhost:3001"), signature);
+        let base58_public_key = b"Awrh7Cfvx5gc7Ua93hdmmni6KWvkJgH4HwMkixTxmxe";
+        let domain = b"master.com";
+        let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
+        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
+        let entry_function_name = b"0x1::aptos_account::transfer";
+        authenticate_auth_data(auth_data, &entry_function_name, @0x1);
+    }
+
+    #[test(framework = @0x1)]
+    #[expected_failure(abort_code = 2)]
+    fun test_authenticate_auth_data_delegated_unauthorized(framework: &signer) {
+        chain_id::initialize_for_test(framework, 4);
+
+        let digest = x"9800ae3d949260dedd01573b2903e9de06abe914530ba5d21f068f8823bfdfa3";
+        let signature = vector[70, 135, 9, 250, 23, 189, 162, 119, 77, 133, 195, 66, 102, 105, 116, 86, 29, 118, 226, 100, 94, 120, 138, 219, 252, 134, 231, 139, 47, 77, 19, 201, 4, 88, 255, 64, 185, 96, 134, 50, 27, 30, 110, 125, 251, 89, 57, 156, 17, 170, 16, 102, 107, 40, 46, 234, 15, 162, 156, 69, 132, 70, 135, 11];
+        let abstract_signature = create_delegated_signature(utf8(b"localhost:3001"), signature);
+        let base58_public_key = b"Awrh7Cfvx5gc7Ua93hdmmni6KWvkJgH4HwMkixTxmxe";
+        let domain = b"master.com";
+        let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
+        let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
+        let entry_function_name = b"0x1::aptos_account::transfer";
+        authenticate_auth_data(auth_data, &entry_function_name, @0x1);
+    }
+
+    #[test]
+    fun test_deserialize_delegated_signature() {
+        let signature_bytes = vector[129, 0, 6, 135, 53, 153, 88, 201, 243, 227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189, 83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237, 66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39, 128, 78, 62, 81, 73, 167, 235, 1];
+        let abstract_signature = create_delegated_signature(utf8(b"other-dapp.com"), signature_bytes);
+        let siws_abstract_signature = deserialize_abstract_signature(&abstract_signature);
+        assert!(siws_abstract_signature is SIWSAbstractSignature::DelegatedV1);
+        match (siws_abstract_signature) {
+            SIWSAbstractSignature::DelegatedV1 { delegated_domain, signature } => {
+                assert!(delegated_domain == utf8(b"other-dapp.com"));
+                assert!(signature == signature_bytes);
+            },
+            _ => {
+                abort(0)
+            },
+        };
     }
 }

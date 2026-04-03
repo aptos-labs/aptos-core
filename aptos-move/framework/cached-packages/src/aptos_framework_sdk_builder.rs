@@ -437,6 +437,14 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    CommonAccountAbstractionsUtilsAuthorizeDomain {
+        domain: Vec<u8>,
+    },
+
+    CommonAccountAbstractionsUtilsRevokeDomain {
+        domain: Vec<u8>,
+    },
+
     /// Add `amount` of coins to the delegation pool `pool_address`.
     DelegationPoolAddStake {
         pool_address: AccountAddress,
@@ -1483,6 +1491,12 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            CommonAccountAbstractionsUtilsAuthorizeDomain { domain } => {
+                common_account_abstractions_utils_authorize_domain(domain)
+            },
+            CommonAccountAbstractionsUtilsRevokeDomain { domain } => {
+                common_account_abstractions_utils_revoke_domain(domain)
+            },
             DelegationPoolAddStake {
                 pool_address,
                 amount,
@@ -3058,6 +3072,36 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+pub fn common_account_abstractions_utils_authorize_domain(domain: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("common_account_abstractions_utils").to_owned(),
+        ),
+        ident_str!("authorize_domain").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&domain).unwrap()],
+    ))
+}
+
+pub fn common_account_abstractions_utils_revoke_domain(domain: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("common_account_abstractions_utils").to_owned(),
+        ),
+        ident_str!("revoke_domain").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&domain).unwrap()],
     ))
 }
 
@@ -6101,6 +6145,34 @@ mod decoder {
         }
     }
 
+    pub fn common_account_abstractions_utils_authorize_domain(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::CommonAccountAbstractionsUtilsAuthorizeDomain {
+                    domain: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn common_account_abstractions_utils_revoke_domain(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::CommonAccountAbstractionsUtilsRevokeDomain {
+                    domain: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolAddStake {
@@ -7717,6 +7789,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "common_account_abstractions_utils_authorize_domain".to_string(),
+            Box::new(decoder::common_account_abstractions_utils_authorize_domain),
+        );
+        map.insert(
+            "common_account_abstractions_utils_revoke_domain".to_string(),
+            Box::new(decoder::common_account_abstractions_utils_revoke_domain),
         );
         map.insert(
             "delegation_pool_add_stake".to_string(),

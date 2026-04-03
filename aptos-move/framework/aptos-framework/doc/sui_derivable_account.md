@@ -37,11 +37,13 @@ Nonce: <digest>
 -  [Function `split_signature_bytes`](#0x1_sui_derivable_account_split_signature_bytes)
 -  [Function `derive_account_address_from_public_key`](#0x1_sui_derivable_account_derive_account_address_from_public_key)
 -  [Function `authenticate_auth_data`](#0x1_sui_derivable_account_authenticate_auth_data)
+-  [Function `verify_sui_signature`](#0x1_sui_derivable_account_verify_sui_signature)
 -  [Function `authenticate_auth_data_internal`](#0x1_sui_derivable_account_authenticate_auth_data_internal)
 -  [Function `authenticate`](#0x1_sui_derivable_account_authenticate)
 -  [Specification](#@Specification_1)
     -  [Function `derive_account_address_from_public_key`](#@Specification_1_derive_account_address_from_public_key)
     -  [Function `authenticate_auth_data`](#@Specification_1_authenticate_auth_data)
+    -  [Function `verify_sui_signature`](#@Specification_1_verify_sui_signature)
     -  [Function `authenticate_auth_data_internal`](#@Specification_1_authenticate_auth_data_internal)
     -  [Function `authenticate`](#@Specification_1_authenticate)
 
@@ -53,6 +55,7 @@ Nonce: <digest>
 <b>use</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils">0x1::common_account_abstractions_utils</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">0x1::ed25519</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils">0x1::string_utils</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
@@ -85,6 +88,34 @@ Nonce: <digest>
 
 
 <dl>
+<dt>
+<code>signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+ The signature of the message in raw bytes
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>DelegatedV1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>delegated_domain: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The delegated domain authorized to sign on behalf of the master domain
+</dd>
 <dt>
 <code>signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
@@ -569,6 +600,14 @@ Returns a tuple of the signature.
         <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
         <b>assert</b>!(!<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream), <a href="sui_derivable_account.md#0x1_sui_derivable_account_EMALFORMED_DATA">EMALFORMED_DATA</a>);
         SuiAbstractSignature::MessageV1 { signature }
+    } <b>else</b> <b>if</b> (signature_type == 0x01) {
+        <b>let</b> delegated_domain = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        <b>assert</b>!(!<a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_has_remaining">bcs_stream::has_remaining</a>(&<b>mut</b> stream), <a href="sui_derivable_account.md#0x1_sui_derivable_account_EMALFORMED_DATA">EMALFORMED_DATA</a>);
+        SuiAbstractSignature::DelegatedV1 {
+            delegated_domain: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(delegated_domain),
+            signature,
+        }
     } <b>else</b> {
         <b>abort</b>(<a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>)
     }
@@ -700,13 +739,74 @@ Derives the account address from the public key and returns it is a hex string w
 
 </details>
 
+<a id="0x1_sui_derivable_account_verify_sui_signature"></a>
+
+## Function `verify_sui_signature`
+
+
+
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_verify_sui_signature">verify_sui_signature</a>(expected_account_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature_bytes: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_verify_sui_signature">verify_sui_signature</a>(
+    expected_account_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    signature_bytes: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+) {
+    <b>let</b> (signing_scheme, sig_bytes, pubkey_bytes) = <a href="sui_derivable_account.md#0x1_sui_derivable_account_split_signature_bytes">split_signature_bytes</a>(signature_bytes);
+    <b>assert</b>!(<a href="sui_derivable_account.md#0x1_sui_derivable_account_get_signing_scheme">get_signing_scheme</a>(signing_scheme) == SuiSigningScheme::ED25519, <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNING_SCHEME_TYPE">EINVALID_SIGNING_SCHEME_TYPE</a>);
+
+    <b>let</b> sui_account_address = <a href="sui_derivable_account.md#0x1_sui_derivable_account_derive_account_address_from_public_key">derive_account_address_from_public_key</a>(signing_scheme, pubkey_bytes);
+    <b>assert</b>!(&sui_account_address == expected_account_address, <a href="sui_derivable_account.md#0x1_sui_derivable_account_EACCOUNT_ADDRESS_MISMATCH">EACCOUNT_ADDRESS_MISMATCH</a>);
+
+    <b>let</b> public_key = new_validated_public_key_from_bytes(pubkey_bytes);
+    <b>assert</b>!(public_key.is_some(), <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>);
+
+    <b>let</b> raw_message = construct_message(&b"Sui", &sui_account_address, domain, entry_function_name, digest_utf8);
+
+    <b>let</b> intent = <a href="sui_derivable_account.md#0x1_sui_derivable_account_Intent">Intent</a> {
+        scope: PersonalMessage,
+        <a href="version.md#0x1_version">version</a>: V0,
+        app_id: Sui,
+    };
+    <b>let</b> msg = <a href="sui_derivable_account.md#0x1_sui_derivable_account_IntentMessage">IntentMessage</a> {
+        intent,
+        value: raw_message,
+    };
+    <b>let</b> bcs_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;<a href="sui_derivable_account.md#0x1_sui_derivable_account_IntentMessage">IntentMessage</a>&gt;(&msg);
+    <b>let</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_blake2b_256">aptos_hash::blake2b_256</a>(bcs_bytes);
+
+    <b>let</b> signature = new_signature_from_bytes(sig_bytes);
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
+            &signature,
+            &public_key_into_unvalidated(public_key.destroy_some()),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>,
+        ),
+        <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
+    );
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_sui_derivable_account_authenticate_auth_data_internal"></a>
 
 ## Function `authenticate_auth_data_internal`
 
 
 
-<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data_internal">authenticate_auth_data_internal</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data_internal">authenticate_auth_data_internal</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, sender_addr: <b>address</b>)
 </code></pre>
 
 
@@ -717,56 +817,35 @@ Derives the account address from the public key and returns it is a hex string w
 
 <pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data_internal">authenticate_auth_data_internal</a>(
     aa_auth_data: AbstractionAuthData,
-    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    sender_addr: <b>address</b>,
 ) {
     <b>let</b> abstract_signature = <a href="sui_derivable_account.md#0x1_sui_derivable_account_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
-    <b>let</b> (signing_scheme, abstract_signature_signature, abstract_signature_public_key) = <a href="sui_derivable_account.md#0x1_sui_derivable_account_split_signature_bytes">split_signature_bytes</a>(&abstract_signature.signature);
-
-    // Check siging scheme is Ed25519 <b>as</b> we currently only support this scheme
-    <b>assert</b>!(<a href="sui_derivable_account.md#0x1_sui_derivable_account_get_signing_scheme">get_signing_scheme</a>(signing_scheme) == SuiSigningScheme::ED25519, <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNING_SCHEME_TYPE">EINVALID_SIGNING_SCHEME_TYPE</a>);
-
-    // Derive the <a href="account.md#0x1_account">account</a> <b>address</b> from the <b>public</b> key
-    <b>let</b> sui_account_address = <a href="sui_derivable_account.md#0x1_sui_derivable_account_derive_account_address_from_public_key">derive_account_address_from_public_key</a>(signing_scheme, abstract_signature_public_key);
-
     <b>let</b> derivable_abstract_public_key = aa_auth_data.derivable_abstract_public_key();
     <b>let</b> abstract_public_key = <a href="sui_derivable_account.md#0x1_sui_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(derivable_abstract_public_key);
-
-    // Check the <a href="account.md#0x1_account">account</a> <b>address</b> matches the abstract <b>public</b> key
-    <b>assert</b>!(&sui_account_address == &abstract_public_key.sui_account_address, <a href="sui_derivable_account.md#0x1_sui_derivable_account_EACCOUNT_ADDRESS_MISMATCH">EACCOUNT_ADDRESS_MISMATCH</a>);
-
-    <b>let</b> public_key = new_validated_public_key_from_bytes(abstract_signature_public_key);
-    <b>assert</b>!(public_key.is_some(), <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>);
-
     <b>let</b> digest_utf8 = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(aa_auth_data.digest()).bytes();
-    // Build the raw message
-    <b>let</b> raw_message = construct_message(&b"Sui", &sui_account_address, &abstract_public_key.domain, entry_function_name, digest_utf8);
 
-    // Prepend <a href="sui_derivable_account.md#0x1_sui_derivable_account_Intent">Intent</a> <b>to</b> the message
-    <b>let</b> intent = <a href="sui_derivable_account.md#0x1_sui_derivable_account_Intent">Intent</a> {
-        scope: PersonalMessage,
-        <a href="version.md#0x1_version">version</a>: V0,
-        app_id: Sui,
+    match (abstract_signature) {
+        SuiAbstractSignature::MessageV1 { signature } =&gt; {
+            <a href="sui_derivable_account.md#0x1_sui_derivable_account_verify_sui_signature">verify_sui_signature</a>(
+                &abstract_public_key.sui_account_address,
+                &abstract_public_key.domain,
+                entry_function_name,
+                digest_utf8,
+                &signature,
+            );
+        },
+        SuiAbstractSignature::DelegatedV1 { delegated_domain, signature } =&gt; {
+            verify_delegation(sender_addr, &delegated_domain);
+            <a href="sui_derivable_account.md#0x1_sui_derivable_account_verify_sui_signature">verify_sui_signature</a>(
+                &abstract_public_key.sui_account_address,
+                delegated_domain.bytes(),
+                entry_function_name,
+                digest_utf8,
+                &signature,
+            );
+        },
     };
-    <b>let</b> msg = <a href="sui_derivable_account.md#0x1_sui_derivable_account_IntentMessage">IntentMessage</a> {
-        intent,
-        value: raw_message,
-    };
-    // Serialize the whole <b>struct</b>
-    <b>let</b> bcs_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;<a href="sui_derivable_account.md#0x1_sui_derivable_account_IntentMessage">IntentMessage</a>&gt;(&msg);
-
-    // Hash full_message <b>with</b> blake2b256
-    <b>let</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_blake2b_256">aptos_hash::blake2b_256</a>(bcs_bytes);
-
-    <b>let</b> signature = new_signature_from_bytes(abstract_signature_signature);
-
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
-            &signature,
-            &public_key_into_unvalidated(public_key.destroy_some()),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>,
-        ),
-        <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
-    );
 }
 </code></pre>
 
@@ -791,7 +870,8 @@ Authorization function for domain account abstraction.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data_internal">authenticate_auth_data_internal</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name))
+    <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data_internal">authenticate_auth_data_internal</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name, sender_addr))
 }
 </code></pre>
 
@@ -836,12 +916,28 @@ Authorization function for domain account abstraction.
 
 
 
+<a id="@Specification_1_verify_sui_signature"></a>
+
+### Function `verify_sui_signature`
+
+
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_verify_sui_signature">verify_sui_signature</a>(expected_account_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature_bytes: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
 <a id="@Specification_1_authenticate_auth_data_internal"></a>
 
 ### Function `authenticate_auth_data_internal`
 
 
-<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data_internal">authenticate_auth_data_internal</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data_internal">authenticate_auth_data_internal</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, sender_addr: <b>address</b>)
 </code></pre>
 
 

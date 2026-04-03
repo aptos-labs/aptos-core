@@ -41,6 +41,7 @@ Nonce: <aptos_txn_digest>
 <b>use</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils">0x1::common_account_abstractions_utils</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">0x1::ed25519</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils">0x1::string_utils</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
@@ -78,6 +79,34 @@ Nonce: <aptos_txn_digest>
 </dt>
 <dd>
 
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>DelegatedV1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>delegated_domain: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The delegated domain authorized to sign on behalf of the master domain
+</dd>
+<dt>
+<code>signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+ The signature of the message
 </dd>
 </dl>
 
@@ -226,6 +255,13 @@ Returns a tuple of the signature type and the signature.
     <b>if</b> (signature_type == 0x00) {
         <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
         SIWSAbstractSignature::MessageV1 { signature }
+    } <b>else</b> <b>if</b> (signature_type == 0x01) {
+        <b>let</b> delegated_domain = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        SIWSAbstractSignature::DelegatedV1 {
+            delegated_domain: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(delegated_domain),
+            signature,
+        }
     } <b>else</b> {
         <b>abort</b>(<a href="solana_derivable_account.md#0x1_solana_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>)
     }
@@ -305,7 +341,7 @@ Returns a tuple of the signature type and the signature.
 
 
 
-<pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, sender_addr: <b>address</b>)
 </code></pre>
 
 
@@ -316,7 +352,8 @@ Returns a tuple of the signature type and the signature.
 
 <pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(
     aa_auth_data: AbstractionAuthData,
-    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    sender_addr: <b>address</b>,
 ) {
     <b>let</b> abstract_public_key = aa_auth_data.derivable_abstract_public_key();
     <b>let</b> (base58_public_key, domain) = <a href="solana_derivable_account.md#0x1_solana_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(abstract_public_key);
@@ -329,7 +366,19 @@ Returns a tuple of the signature type and the signature.
     match (abstract_signature) {
         SIWSAbstractSignature::MessageV1 { signature: signature_bytes } =&gt; {
             <b>let</b> message = construct_message(&b"Solana", &base58_public_key, &domain, entry_function_name, digest_utf8);
-
+            <b>let</b> signature = new_signature_from_bytes(signature_bytes);
+            <b>assert</b>!(
+                <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
+                    &signature,
+                    &public_key_into_unvalidated(public_key.destroy_some()),
+                    message,
+                ),
+                <a href="solana_derivable_account.md#0x1_solana_derivable_account_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
+            );
+        },
+        SIWSAbstractSignature::DelegatedV1 { delegated_domain, signature: signature_bytes } =&gt; {
+            verify_delegation(sender_addr, &delegated_domain);
+            <b>let</b> message = construct_message(&b"Solana", &base58_public_key, delegated_domain.bytes(), entry_function_name, digest_utf8);
             <b>let</b> signature = new_signature_from_bytes(signature_bytes);
             <b>assert</b>!(
                 <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
@@ -365,7 +414,8 @@ Authorization function for domain account abstraction.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name))
+    <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name, sender_addr))
 }
 </code></pre>
 
@@ -399,7 +449,7 @@ Authorization function for domain account abstraction.
 ### Function `authenticate_auth_data`
 
 
-<pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, sender_addr: <b>address</b>)
 </code></pre>
 
 

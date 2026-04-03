@@ -36,6 +36,7 @@ Issued At: <issued_at>
 -  [Function `deserialize_abstract_signature`](#0x1_ethereum_derivable_account_deserialize_abstract_signature)
 -  [Function `construct_message`](#0x1_ethereum_derivable_account_construct_message)
 -  [Function `recover_public_key`](#0x1_ethereum_derivable_account_recover_public_key)
+-  [Function `verify_ethereum_signature`](#0x1_ethereum_derivable_account_verify_ethereum_signature)
 -  [Function `authenticate_auth_data`](#0x1_ethereum_derivable_account_authenticate_auth_data)
 -  [Function `authenticate`](#0x1_ethereum_derivable_account_authenticate)
 
@@ -48,6 +49,7 @@ Issued At: <issued_at>
 <b>use</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils">0x1::common_account_abstractions_utils</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/secp256k1.md#0x1_secp256k1">0x1::secp256k1</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils">0x1::string_utils</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
@@ -113,6 +115,46 @@ Issued At: <issued_at>
 </dt>
 <dd>
  The scheme in the URI of the message, e.g. the scheme of the website that requested the signature (http, https, etc.)
+</dd>
+<dt>
+<code>issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The date and time when the signature was issued
+</dd>
+<dt>
+<code>signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+ The signature of the message
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>DelegatedV1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>delegated_domain: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The delegated domain authorized to sign on behalf of the master domain
+</dd>
+<dt>
+<code>scheme: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The scheme in the URI of the message
 </dd>
 <dt>
 <code>issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
@@ -281,6 +323,17 @@ We include the issued_at in the signature as it is a required field in the SIWE 
         <b>let</b> issued_at = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
         <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
         SIWEAbstractSignature::MessageV2 { scheme: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(scheme), issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(issued_at), signature }
+    } <b>else</b> <b>if</b> (signature_type == 0x02) {
+        <b>let</b> delegated_domain = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        <b>let</b> scheme = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        <b>let</b> issued_at = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
+        SIWEAbstractSignature::DelegatedV1 {
+            delegated_domain: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(delegated_domain),
+            scheme: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(scheme),
+            issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(issued_at),
+            signature,
+        }
     } <b>else</b> {
         <b>abort</b>(<a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>)
     }
@@ -406,13 +459,55 @@ We include the issued_at in the signature as it is a required field in the SIWE 
 
 </details>
 
+<a id="0x1_ethereum_derivable_account_verify_ethereum_signature"></a>
+
+## Function `verify_ethereum_signature`
+
+
+
+<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_verify_ethereum_signature">verify_ethereum_signature</a>(ethereum_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, issued_at: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scheme: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature_bytes: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_verify_ethereum_signature">verify_ethereum_signature</a>(
+    ethereum_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    issued_at: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    scheme: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    signature_bytes: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+) {
+    <b>let</b> message = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(ethereum_address, domain, entry_function_name, digest_utf8, issued_at, scheme);
+    <b>let</b> hashed_message = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(message);
+    <b>let</b> public_key_bytes = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_recover_public_key">recover_public_key</a>(signature_bytes, &hashed_message);
+
+    <b>let</b> public_key_without_prefix = public_key_bytes.slice(1, public_key_bytes.length());
+    <b>let</b> kex_hash = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(public_key_without_prefix);
+    <b>let</b> recovered_addr = kex_hash.slice(12, 32);
+    <b>let</b> ethereum_address_without_prefix = ethereum_address.slice(2, ethereum_address.length());
+
+    <b>let</b> account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
+    <b>assert</b>!(recovered_addr == account_address_vec, <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EADDR_MISMATCH">EADDR_MISMATCH</a>);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_ethereum_derivable_account_authenticate_auth_data"></a>
 
 ## Function `authenticate_auth_data`
 
 
 
-<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, sender_addr: <b>address</b>)
 </code></pre>
 
 
@@ -423,30 +518,49 @@ We include the issued_at in the signature as it is a required field in the SIWE 
 
 <pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(
     aa_auth_data: AbstractionAuthData,
-    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    sender_addr: <b>address</b>,
 ) {
     <b>let</b> derivable_abstract_public_key = aa_auth_data.derivable_abstract_public_key();
     <b>let</b> abstract_public_key = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_public_key">deserialize_abstract_public_key</a>(derivable_abstract_public_key);
     <b>let</b> digest_utf8 = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(aa_auth_data.digest()).bytes();
     <b>let</b> abstract_signature = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
-    <b>let</b> issued_at = abstract_signature.issued_at.bytes();
-    <b>let</b> scheme = abstract_signature.scheme.bytes();
-    <b>let</b> message = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at, scheme);
-    <b>let</b> hashed_message = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(message);
-    <b>let</b> public_key_bytes = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_recover_public_key">recover_public_key</a>(&abstract_signature.signature, &hashed_message);
-
-    // 1. Skip the 0x04 prefix (take the bytes after the first byte)
-    <b>let</b> public_key_without_prefix = public_key_bytes.slice(1, public_key_bytes.length());
-    // 2. Run Keccak256 on the <b>public</b> key (without the 0x04 prefix)
-    <b>let</b> kexHash = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(public_key_without_prefix);
-    // 3. Slice the last 20 bytes (this is the Ethereum <b>address</b>)
-    <b>let</b> recovered_addr = kexHash.slice(12, 32);
-    // 4. Remove the 0x prefix from the utf8 <a href="account.md#0x1_account">account</a> <b>address</b>
-    <b>let</b> ethereum_address_without_prefix = abstract_public_key.ethereum_address.slice(2, abstract_public_key.ethereum_address.length());
-
-    <b>let</b> account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
-    // Verify that the recovered <b>address</b> matches the domain <a href="account.md#0x1_account">account</a> identity
-    <b>assert</b>!(recovered_addr == account_address_vec, <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EADDR_MISMATCH">EADDR_MISMATCH</a>);
+    match (abstract_signature) {
+        SIWEAbstractSignature::MessageV1 { issued_at, signature } =&gt; {
+            <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_verify_ethereum_signature">verify_ethereum_signature</a>(
+                &abstract_public_key.ethereum_address,
+                &abstract_public_key.domain,
+                entry_function_name,
+                digest_utf8,
+                issued_at.bytes(),
+                &b"https",
+                &signature,
+            );
+        },
+        SIWEAbstractSignature::MessageV2 { scheme, issued_at, signature } =&gt; {
+            <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_verify_ethereum_signature">verify_ethereum_signature</a>(
+                &abstract_public_key.ethereum_address,
+                &abstract_public_key.domain,
+                entry_function_name,
+                digest_utf8,
+                issued_at.bytes(),
+                scheme.bytes(),
+                &signature,
+            );
+        },
+        SIWEAbstractSignature::DelegatedV1 { delegated_domain, scheme, issued_at, signature } =&gt; {
+            verify_delegation(sender_addr, &delegated_domain);
+            <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_verify_ethereum_signature">verify_ethereum_signature</a>(
+                &abstract_public_key.ethereum_address,
+                delegated_domain.bytes(),
+                entry_function_name,
+                digest_utf8,
+                issued_at.bytes(),
+                scheme.bytes(),
+                &signature,
+            );
+        },
+    };
 }
 </code></pre>
 
@@ -471,7 +585,8 @@ Authorization function for domain account abstraction.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name))
+    <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name, sender_addr))
 }
 </code></pre>
 
