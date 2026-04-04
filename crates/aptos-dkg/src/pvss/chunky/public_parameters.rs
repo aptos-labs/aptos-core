@@ -29,17 +29,13 @@ use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Mul;
 
-pub const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
-pub const DEFAULT_ELL_FOR_DEPLOYMENT: u8 = 32; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
+pub const DEFAULT_ELL_FOR_TESTING: usize = 16;
+pub const DEFAULT_ELL_FOR_DEPLOYMENT: usize = 32;
 const DEFAULT_MAX_AGGREGATION: usize = 166;
-const DLOG_EXTRA_BITS: u8 = 4;
+const DLOG_EXTRA_BITS: usize = 4;
 
-/// Default extra bits for the dlog table when deserializing legacy PublicParameters that did not store this field.
-fn default_dlog_extra_bits() -> u8 {
-    DLOG_EXTRA_BITS
-}
-
-fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
+fn compute_powers_of_radix<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
+    assert!(ell < 64);
     utils::powers(
         E::ScalarField::from(1u64 << ell),
         num_chunks_per_scalar::<E::ScalarField>(ell),
@@ -58,18 +54,13 @@ pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se")]
     G_2: E::G2Affine,
 
-    pub ell: u8, // Should be below 64 to prevent overflows etc
+    pub ell: usize, // Should be below 64 to prevent overflows etc
 
     pub max_num_shares: usize,
 
     // Max number of transcripts that can be aggregated. Used to determine the BSGS dlog table
     // size, since aggregation doubles the max possible exponent size that needs to be decrypted.
     pub max_aggregation: usize,
-
-    /// Extra bits for the dlog baby-step table size. Must be serialized so clone/deserialize rebuild the same table.
-    /// TODO(Rex): Check if we actually still need this.
-    #[serde(default = "default_dlog_extra_bits")]
-    pub dlog_extra_bits: u8,
 
     pub dlog_table: BabyStepTable<E::G1Affine>,
 
@@ -89,7 +80,6 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             G_2: self.G_2,
             ell: self.ell,
             max_aggregation: self.max_aggregation,
-            dlog_extra_bits: self.dlog_extra_bits,
             dlog_table: self.dlog_table.clone(),
             G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
@@ -105,7 +95,6 @@ impl<E: Pairing> PartialEq for PublicParameters<E> {
             && self.ell == other.ell
             && self.max_num_shares == other.max_num_shares
             && self.max_aggregation == other.max_aggregation
-            && self.dlog_extra_bits == other.dlog_extra_bits
             && self.dlog_table == other.dlog_table
         // table, G2_table, and powers_of_radix are ignored
     }
@@ -121,7 +110,6 @@ impl<E: Pairing> std::fmt::Debug for PublicParameters<E> {
             .field("G_2", &self.G_2)
             .field("ell", &self.ell)
             .field("max_aggregation", &self.max_aggregation)
-            .field("dlog_extra_bits", &self.dlog_extra_bits)
             .field("table", &"<skipped>")
             .field("G2_table", &"<skipped>")
             .field("powers_of_radix", &"<skipped>")
@@ -150,11 +138,9 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             pk_range_proof: dekart_univariate_v2::ProverKey<E>,
             #[serde(deserialize_with = "ark_de")]
             G_2: E::G2Affine,
-            ell: u8,
+            ell: usize,
             max_num_shares: usize,
             max_aggregation: usize,
-            #[serde(default = "default_dlog_extra_bits")]
-            dlog_extra_bits: u8,
             dlog_table: BabyStepTable<E::G1Affine>,
         }
 
@@ -162,10 +148,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::from_bases(
             serialized.pp_elgamal.G,
             serialized.pp_elgamal.H,
-            serialized
-                .max_num_shares
-                .try_into()
-                .expect("Should always fit in u32"),
+            serialized.max_num_shares,
         );
 
         Ok(Self {
@@ -175,7 +158,6 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             G_2: serialized.G_2,
             ell: serialized.ell,
             max_aggregation: serialized.max_aggregation,
-            dlog_extra_bits: serialized.dlog_extra_bits,
             G2_table: BatchMulPreprocessing::new(serialized.G_2.into(), serialized.max_num_shares),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
             dlog_table: serialized.dlog_table,
@@ -191,16 +173,18 @@ impl<E: Pairing> PublicParameters<E> {
     #[allow(non_snake_case)]
     pub(crate) fn build_dlog_table(
         G: E::G1,
-        ell: u8,
+        ell: usize,
         max_aggregation: usize,
-        extra_bits: u8,
+        extra_bits: usize,
     ) -> BabyStepTable<E::G1Affine> {
-        let table_size_exp: u8 = extra_bits + ((ell + log2(max_aggregation) as u8) / 2); // TODO: I think we need the floor of log_2 here, not the ceiling?
+        let table_size_exp: usize = extra_bits + ((ell + log2(max_aggregation) as usize) / 2);
+        assert!(table_size_exp < 32); // BabyStepTable stores exps as u32, so supports table size at most 2^32-1
+
         eprintln!(
             "[build_dlog_table] table_size = {} (ell={}, max_aggregation={}, extra_bits={})",
             table_size_exp, ell, max_aggregation, extra_bits
         );
-        let tbl = BabyStepTable::new(G.into_affine(), 1u32 << table_size_exp);
+        let tbl = BabyStepTable::new(G.into_affine(), 1 << table_size_exp);
         eprintln!("[build_dlog_table] table_size = {}", tbl.table_size);
         tbl
     }
@@ -254,7 +238,7 @@ impl<E: Pairing> PublicParameters<E> {
     /// insecurely. Should be used only for testing.
     pub fn new_for_testing<R: RngCore + CryptoRng>(
         max_num_shares: usize,
-        ell: u8,
+        ell: usize,
         max_aggregation: usize,
         commitment_base: E::G2Affine,
         rng: &mut R,
@@ -272,7 +256,7 @@ impl<E: Pairing> PublicParameters<E> {
     /// Creates public parameters for chunky, with the provided DeKart prover key.
     pub fn new<R: RngCore + CryptoRng>(
         max_num_shares: usize,
-        ell: u8,
+        ell: usize,
         max_aggregation: usize,
         commitment_base: E::G2Affine,
         dekart_prover_key: dekart_univariate_v2::ProverKey<E>,
@@ -290,36 +274,25 @@ impl<E: Pairing> PublicParameters<E> {
 
     fn new_internal<R: RngCore + CryptoRng>(
         max_num_shares: usize,
-        ell: u8,
+        ell: usize,
         max_aggregation: usize,
         commitment_base: E::G2Affine,
         maybe_dekart_prover_key: Option<dekart_univariate_v2::ProverKey<E>>,
         rng: &mut R,
     ) -> Self {
-        assert!(ell > 0, "ell must be greater than zero");
+        // ell >= means a BabyStepTable of size >= 2^32, which causes an overflow:
+        // - in build_dlog_table(..), table_size_exp = 4 + ((48 + 8) / 2) = 32
+        // - BabyStepTable stores exponents as u32
+        assert!(ell > 0 && ell <= 47);
 
         let num_chunks = num_chunks_per_scalar::<E::ScalarField>(ell);
-        let max_num_chunks_padded = max_num_shares
-            .checked_mul(num_chunks)
-            .and_then(|v| v.checked_add(1))
-            .map(|v| (v as u64).next_power_of_two().saturating_sub(1) as u32)
-            .expect("Overflow computing max_num_chunks_padded");
+        let max_num_chunks_padded = (max_num_shares * num_chunks + 1).next_power_of_two() - 1;
 
         let group_generators = GroupGenerators::default();
-        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(
-            max_num_shares
-                .try_into()
-                .expect("should always fit into u32"),
-        );
+        let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G_1 = *pp_elgamal.message_base();
         let pk_range_proof = maybe_dekart_prover_key.unwrap_or_else(|| {
-            dekart_univariate_v2::Proof::setup(
-                max_num_chunks_padded.try_into().unwrap(),
-                ell,
-                group_generators,
-                rng,
-            )
-            .0
+            dekart_univariate_v2::Proof::setup(max_num_chunks_padded, ell, group_generators, rng).0
         });
 
         let pp = Self {
@@ -329,7 +302,6 @@ impl<E: Pairing> PublicParameters<E> {
             G_2: commitment_base,
             ell,
             max_aggregation,
-            dlog_extra_bits: DLOG_EXTRA_BITS,
             dlog_table: Self::build_dlog_table(G_1.into(), ell, max_aggregation, DLOG_EXTRA_BITS),
             G2_table: BatchMulPreprocessing::new(commitment_base.into(), max_num_shares),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
@@ -375,7 +347,7 @@ impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
         )
     }
 
-    fn with_max_num_shares_and_bit_size(n: usize, ell: u8) -> Self {
+    fn with_max_num_shares_and_bit_size(n: usize, ell: usize) -> Self {
         use ark_ec::AffineRepr;
         let mut rng = thread_rng();
         Self::new_for_testing(

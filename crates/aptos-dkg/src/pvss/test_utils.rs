@@ -55,7 +55,7 @@ pub struct DealingArgs<T: Transcript> {
 /// Useful in tests and benchmarks when wanting to quickly deal & verify a transcript.
 pub fn setup_dealing<T: Transcript, R: RngCore + CryptoRng>(
     sc: &T::SecretSharingConfig,
-    ell: Option<u8>,
+    ell: Option<usize>,
     mut rng: &mut R,
 ) -> DealingArgs<T> {
     println!(
@@ -129,7 +129,7 @@ pub fn setup_dealing_weighted<
 /// are generated separately for each variant (key types are not cloneable).
 pub fn setup_dealing_chunky_both<const N: usize, P, E, R>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
-    ell: Option<u8>,
+    ell: Option<usize>,
     rng: &mut R,
 ) -> (
     DealingArgs<UnsignedWeightedTranscript<E>>,

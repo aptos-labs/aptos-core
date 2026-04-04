@@ -21,7 +21,7 @@ pub struct BabyStepTable<A: AffineRepr> {
     /// Baby steps: compressed(point) -> exponent j (so that point = affinisation of j*G).
     table: HashMap<Vec<u8>, u32>,
     /// Number of baby steps (table length).
-    pub table_size: u32,
+    pub table_size: usize,
     /// Precomputed -table_size*G for giant steps.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub G_neg_table_size: A,
@@ -33,21 +33,21 @@ impl<A: AffineRepr> BabyStepTable<A> {
     /// Computes all points [0, G, 2*G, ...] in projective form, batch-normalizes once,
     /// then inserts each affine point into the table using compressed serialization.
     #[allow(non_snake_case)]
-    pub fn new(G: A, table_size: u32) -> Self {
-        let table_size_as_usize = table_size as usize;
-        let mut points: Vec<A::Group> = Vec::with_capacity(table_size_as_usize);
+    pub fn new(G: A, table_size: usize) -> Self {
+        assert!(table_size < 1 << 32);
+        let mut points: Vec<A::Group> = Vec::with_capacity(table_size);
         let mut current = A::Group::zero();
         for _ in 0..table_size {
             points.push(current);
             current += G;
         }
         let normalized = A::Group::normalize_batch(&points);
-        let mut table = HashMap::with_capacity(table_size_as_usize);
+        let mut table = HashMap::with_capacity(table_size);
         for (j, aff) in normalized.into_iter().enumerate() {
             let key = compressed_bytes(&aff).expect("baby-step table: serialization failed");
             table.insert(key, j as u32);
         }
-        let G_neg_table_size = (G * -A::ScalarField::from(table_size)).into_affine();
+        let G_neg_table_size = (G * -A::ScalarField::from(table_size as u64)).into_affine();
         Self {
             G,
             table,
@@ -87,15 +87,20 @@ mod tests {
     #[test]
     fn table_entries_correct() {
         let G = G1Affine::generator();
-        let table_size = 32u32;
+        let table_size = 32;
         let tbl = BabyStepTable::<G1Affine>::new(G, table_size);
 
         assert_eq!(tbl.table_size, table_size);
 
         for j in 0..table_size {
-            let point = (G * Fr::from(j)).into_affine();
+            let point = (G * Fr::from(j as u64)).into_affine();
             let stored = tbl.get(&point);
-            assert_eq!(stored, Some(j), "table should map j*G -> j for j = {}", j);
+            assert_eq!(
+                stored,
+                Some(j as u32),
+                "table should map j*G -> j for j = {}",
+                j
+            );
         }
     }
 }

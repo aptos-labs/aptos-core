@@ -57,6 +57,7 @@ ouroboros = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+tokio = { workspace = true }
 triomphe = { workspace = true }
 
 [dev-dependencies]

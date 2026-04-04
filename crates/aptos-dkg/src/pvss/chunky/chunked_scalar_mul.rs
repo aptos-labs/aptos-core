@@ -35,7 +35,7 @@ pub const DST: &[u8; 34] = b"APTOS_CHUNKED_COMMIT_HOM_SIGMA_DST";
 pub struct Homomorphism<'a, C: CurveGroup> {
     pub base: C::Affine,
     pub table: &'a BatchMulPreprocessing<C>, // TODO: use Arc instead?
-    pub ell: u8,
+    pub ell: usize,
 }
 
 impl<'a, C: CurveGroup> Clone for Homomorphism<'a, C> {
@@ -214,7 +214,7 @@ mod tests {
         let mut rng = thread_rng();
 
         // Parameters
-        let ell: u8 = 16;
+        let ell = 16;
         let num_scalars = 8;
 
         // Random base

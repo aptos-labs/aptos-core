@@ -37,7 +37,7 @@ use move_core_types::{
 };
 use once_cell::sync::Lazy;
 use ring::signature;
-use std::sync::Arc;
+
 mod utils;
 use utils::{
     authenticator::{
@@ -52,26 +52,12 @@ use utils::{
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
 
 const FUZZER_CONCURRENCY_LEVEL: usize = 1;
-static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(FUZZER_CONCURRENCY_LEVEL)
-            .build()
-            .unwrap(),
-    )
-});
 
 fn run_case(input: TransactionState) -> Result<(), Corpus> {
     tdbg!(&input);
 
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
-    let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
-        &VM,
-        ChainId::mainnet(),
-        Arc::clone(&TP),
-        None,
-    )
-    .set_not_parallel();
+    let mut vm = FakeExecutor::from_genesis(&VM, ChainId::mainnet()).set_not_parallel();
 
     let sender_acc = if true {
         // create sender pub/priv key. initialize and fund account
