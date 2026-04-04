@@ -129,9 +129,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             .into_iter()
             .map(|txn| txn.into_txn().into_txn())
             .collect();
-        let executor_thread_pool_clone = executor_thread_pool.clone();
+        let async_drop_pool = executor_thread_pool.clone();
 
-        executor_thread_pool.clone().scope(|s| {
+        executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(
                     cross_shard_state_view_clone,
@@ -142,8 +142,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             s.spawn(move |_| {
                 let txn_provider =
                     DefaultTxnProvider::new_without_info(signature_verified_transactions);
-                let ret = AptosVMBlockExecutorWrapper::execute_block_on_thread_pool(
-                    executor_thread_pool,
+                let ret = AptosVMBlockExecutorWrapper::execute_block(
                     &txn_provider,
                     aggr_overridden_state_view.as_ref(),
                     // Since we execute blocks in parallel, we cannot share module caches, so each
@@ -172,7 +171,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     cross_shard_client_clone.send_global_msg(CrossShardMsg::StopMsg);
                 }
                 callback.send(ret).unwrap();
-                executor_thread_pool_clone.spawn(move || {
+                async_drop_pool.spawn(move || {
                     // Explicit async drop
                     drop(txn_provider);
                 });
