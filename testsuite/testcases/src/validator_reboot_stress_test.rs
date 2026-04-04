@@ -130,6 +130,15 @@ impl NetworkLoadTest for FixedValidatorDownTest {
             }
         }
 
+        // Ensure all targets are running before exiting, so catchup checks don't hang.
+        for target in &targets {
+            let swarm = swarm.read().await;
+            let validator = swarm.validator(*target).unwrap();
+            if !validator.health_check().await.is_ok() {
+                validator.start().await?;
+            }
+        }
+
         Ok(())
     }
 }
