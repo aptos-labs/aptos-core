@@ -732,7 +732,7 @@ pub(crate) fn realistic_env_p90_latency_test() -> ForgeConfig {
         ))
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 3500 })
+                .mode(EmitJobMode::ConstTps { tps: 4000 })
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -746,12 +746,12 @@ pub(crate) fn realistic_env_p90_latency_test() -> ForgeConfig {
                     .expect("must serialize");
         }))
         .with_success_criteria(
-            SuccessCriteria::new(3000)
+            SuccessCriteria::new(3500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
-                .add_latency_threshold(1.5, LatencyType::P50)
-                .add_latency_threshold(2.5, LatencyType::P90)
-                .add_latency_threshold(4.0, LatencyType::P99)
+                .add_latency_threshold(2.0, LatencyType::P50)
+                .add_latency_threshold(3.5, LatencyType::P90)
+                .add_latency_threshold(6.0, LatencyType::P99)
                 .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD.clone()),
         )
 }

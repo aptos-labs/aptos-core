@@ -490,7 +490,7 @@ impl RoundManager {
             let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
             let n = ordered.len();
             let idx = ordered.iter().position(|a| *a == author);
-            matches!(idx, Some(i) if i >= n - 2) && new_round_event.round % 2 == 0
+            matches!(idx, Some(i) if i >= n - 1) && new_round_event.round % 2 == 0
         };
         if should_skip_proposal {
             warn!(
