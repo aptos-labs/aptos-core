@@ -19,8 +19,10 @@ use aptos_forge::{
     EmitJobMode, EmitJobRequest, ForgeConfig, NetworkTest, NodeResourceOverride,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainConsensusConfig,
-    OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
+    BlockGasLimitType, ConsensusAlgorithmConfig, FeatureFlag, Features, LeaderReputationType,
+    OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+    OnChainRandomnessConfig, ProposerAndVoterConfig, ProposerElectionType,
+    TransactionShufflerType,
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
@@ -785,9 +787,32 @@ pub(crate) fn realistic_env_p90_latency_with_faults_test() -> ForgeConfig {
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+            // Use a longer failure window (50x) so failed validators stay penalized
+            // even after they restart and vote, preventing the failed→inactive→active oscillation.
+            let mut consensus_config = OnChainConsensusConfig::default_for_genesis();
+            // Set failure_window_num_validators_multiplier to 50 so failed validators
+            // stay penalized even after restart, preventing failed→inactive→active oscillation.
+            if let OnChainConsensusConfig::V5 {
+                alg: ConsensusAlgorithmConfig::JolteonV2 { ref mut main, .. },
+                ..
+            } = consensus_config
+            {
+                main.proposer_election_type = ProposerElectionType::LeaderReputation(
+                    LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
+                        active_weight: 1000,
+                        inactive_weight: 10,
+                        failed_weight: 1,
+                        failure_threshold_percent: 10,
+                        proposer_window_num_validators_multiplier: 10,
+                        voter_window_num_validators_multiplier: 1,
+                        weight_by_voting_power: true,
+                        use_history_from_previous_epoch_max_count: 5,
+                        failure_window_num_validators_multiplier: 50,
+                    }),
+                );
+            }
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(consensus_config).expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
