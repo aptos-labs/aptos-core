@@ -6,8 +6,8 @@ use crate::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockTask},
         resource_tests::{
-            create_executor_thread_pool, execute_block_parallel,
-            generate_universe_and_transactions, get_gas_limit_variants,
+            create_executor_runtime, execute_block_parallel, generate_universe_and_transactions,
+            get_gas_limit_variants,
         },
         types::{DeltaDataView, KeyType, MockTransaction},
     },
@@ -27,7 +27,7 @@ fn run_transactions_deltas(
     num_executions: usize,
     num_random_generations: usize,
 ) {
-    let executor_thread_pool = create_executor_thread_pool();
+    let executor_runtime = create_executor_runtime();
 
     // The delta threshold controls how many keys / paths are guaranteed r/w resources even
     // in the presence of deltas.
@@ -66,7 +66,7 @@ fn run_transactions_deltas(
                         AuxiliaryInfo,
                     >,
                 >(
-                    executor_thread_pool.clone(),
+                    executor_runtime.handle().clone(),
                     maybe_block_gas_limit,
                     &txn_provider,
                     &data_view,

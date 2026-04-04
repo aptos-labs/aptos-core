@@ -67,15 +67,11 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_stat
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
-use rayon::ThreadPool;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::{PhantomData, Sync},
-    sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 use triomphe::Arc as TriompheArc;
 
@@ -98,11 +94,33 @@ where
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
 }
 
+/// Spawns a closure on tokio's blocking thread pool, allowing it to borrow
+/// non-`'static` data from the enclosing scope.
+///
+/// # Safety
+///
+/// The caller must ensure all data borrowed by the closure outlives the spawned
+/// task. This is typically done by `.await`-ing the returned [`JoinHandle`]
+/// before the borrowed data goes out of scope.
+unsafe fn spawn_scoped_blocking<R: Send + 'static>(
+    f: impl FnOnce() -> R + Send,
+) -> tokio::task::JoinHandle<R> {
+    // Erase the closure's lifetime by transmuting through a boxed trait object.
+    // Sound because a closure's in-memory representation is lifetime-independent,
+    // and the caller guarantees borrowed data outlives the task.
+    let f: Box<dyn FnOnce() -> R + Send + 'static> = unsafe {
+        std::mem::transmute::<Box<dyn FnOnce() -> R + Send>, Box<dyn FnOnce() -> R + Send + 'static>>(
+            Box::new(f),
+        )
+    };
+    tokio::task::spawn_blocking(f)
+}
+
 pub struct BlockExecutor<T, E, S, L, TP, A> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    executor_runtime: tokio::runtime::Handle,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<fn() -> (T, E, S, L, TP, A)>,
 }
@@ -120,7 +138,7 @@ where
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
         config: BlockExecutorConfig,
-        executor_thread_pool: Arc<ThreadPool>,
+        executor_runtime: tokio::runtime::Handle,
         transaction_commit_hook: Option<L>,
     ) -> Self {
         let num_cpus = num_cpus::get();
@@ -132,7 +150,7 @@ where
         );
         Self {
             config,
-            executor_thread_pool,
+            executor_runtime,
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -1852,48 +1870,57 @@ where
         );
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        let worker_ids: Vec<u32> = (0..num_workers).collect();
         let maybe_executor = ExplicitSyncWrapper::new(None);
-        self.executor_thread_pool.scope(|s| {
-            for worker_id in &worker_ids {
-                s.spawn(|_| {
-                    let environment = module_cache_manager_guard.environment();
-                    let executor = {
-                        let _init_timer = VM_INIT_SECONDS.start_timer();
-                        E::init(
-                            &environment.clone(),
-                            shared_sync_params.base_view,
-                            async_runtime_checks_enabled,
-                        )
-                    };
+        self.executor_runtime.block_on(async {
+            let mut handles = Vec::with_capacity(num_workers as usize);
+            for worker_id in 0..num_workers {
+                // SAFETY: All data borrowed by this closure lives on the stack of
+                // execute_transactions_parallel_v2, which does not return until all
+                // handles are awaited below.
+                let handle = unsafe {
+                    spawn_scoped_blocking(|| {
+                        let environment = module_cache_manager_guard.environment();
+                        let executor = {
+                            let _init_timer = VM_INIT_SECONDS.start_timer();
+                            E::init(
+                                &environment.clone(),
+                                shared_sync_params.base_view,
+                                async_runtime_checks_enabled,
+                            )
+                        };
 
-                    if let Err(err) = self.worker_loop_v2(
-                        &executor,
-                        signature_verified_block,
-                        environment,
-                        *worker_id,
-                        num_workers,
-                        &scheduler,
-                        &shared_sync_params,
-                    ) {
-                        // If there are multiple errors, they all get logged: FatalVMError is
-                        // logged at construction, below we log CodeInvariantErrors.
-                        if let PanicOr::CodeInvariantError(err_msg) = err {
-                            alert!(
-                                "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
-                                err_msg
-                            );
+                        if let Err(err) = self.worker_loop_v2(
+                            &executor,
+                            signature_verified_block,
+                            environment,
+                            worker_id,
+                            num_workers,
+                            &scheduler,
+                            &shared_sync_params,
+                        ) {
+                            // If there are multiple errors, they all get logged: FatalVMError is
+                            // logged at construction, below we log CodeInvariantErrors.
+                            if let PanicOr::CodeInvariantError(err_msg) = err {
+                                alert!(
+                                    "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
+                                    err_msg
+                                );
+                            }
+                            shared_maybe_error.store(true, Ordering::SeqCst);
+
+                            // Make sure to halt the scheduler if it hasn't already been halted.
+                            scheduler.halt();
                         }
-                        shared_maybe_error.store(true, Ordering::SeqCst);
 
-                        // Make sure to halt the scheduler if it hasn't already been halted.
-                        scheduler.halt();
-                    }
-
-                    if *worker_id == 0 {
-                        maybe_executor.acquire().replace(executor);
-                    }
-                });
+                        if worker_id == 0 {
+                            maybe_executor.acquire().replace(executor);
+                        }
+                    })
+                };
+                handles.push(handle);
+            }
+            for handle in handles {
+                handle.await.unwrap();
             }
         });
         drop(timer);
@@ -2024,44 +2051,54 @@ where
             worker_ids.len() as u32,
         );
 
-        self.executor_thread_pool.scope(|s| {
-            for worker_id in &worker_ids {
-                s.spawn(|_| {
-                    let environment = module_cache_manager_guard.environment();
-                    let executor = {
-                        let _init_timer = VM_INIT_SECONDS.start_timer();
-                        E::init(
-                            &environment.clone(),
-                            base_view,
-                            async_runtime_checks_enabled,
-                        )
-                    };
+        self.executor_runtime.block_on(async {
+            let mut handles = Vec::with_capacity(num_workers);
+            for &worker_id in &worker_ids {
+                // SAFETY: All data borrowed by this closure lives on the stack of
+                // execute_transactions_parallel, which does not return until all
+                // handles are awaited below.
+                let handle = unsafe {
+                    spawn_scoped_blocking(|| {
+                        let environment = module_cache_manager_guard.environment();
+                        let executor = {
+                            let _init_timer = VM_INIT_SECONDS.start_timer();
+                            E::init(
+                                &environment.clone(),
+                                base_view,
+                                async_runtime_checks_enabled,
+                            )
+                        };
 
-                    if let Err(err) = self.worker_loop(
-                        &executor,
-                        environment,
-                        signature_verified_block,
-                        &scheduler,
-                        &skip_module_reads_validation,
-                        &shared_sync_params,
-                        num_workers,
-                    ) {
-                        // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
-                        // and below we log CodeInvariantErrors.
-                        if let PanicOr::CodeInvariantError(err_msg) = err {
-                            alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                        if let Err(err) = self.worker_loop(
+                            &executor,
+                            environment,
+                            signature_verified_block,
+                            &scheduler,
+                            &skip_module_reads_validation,
+                            &shared_sync_params,
+                            num_workers,
+                        ) {
+                            // If there are multiple errors, they all get logged:
+                            // ModulePathReadWriteError and FatalVMError variant is logged at construction,
+                            // and below we log CodeInvariantErrors.
+                            if let PanicOr::CodeInvariantError(err_msg) = err {
+                                alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                            }
+                            shared_maybe_error.store(true, Ordering::SeqCst);
+
+                            // Make sure to halt the scheduler if it hasn't already been halted.
+                            scheduler.halt();
                         }
-                        shared_maybe_error.store(true, Ordering::SeqCst);
 
-                        // Make sure to halt the scheduler if it hasn't already been halted.
-                        scheduler.halt();
-                    }
-
-                    if *worker_id == 0 {
-                        maybe_executor.acquire().replace(executor);
-                    }
-                });
+                        if worker_id == 0 {
+                            maybe_executor.acquire().replace(executor);
+                        }
+                    })
+                };
+                handles.push(handle);
+            }
+            for handle in handles {
+                handle.await.unwrap();
             }
         });
         drop(timer);
