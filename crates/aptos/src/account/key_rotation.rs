@@ -124,17 +124,17 @@ impl CliCommand<RotateSummary> for RotateKey {
                 ));
             };
 
-            // Verify that config exists by attempting to load it.
-            let config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
-
-            // Verify that the new profile name does not already exist in the config.
-            if let Some(profiles) = config.profiles {
-                if profiles.contains_key(new_profile_name) {
-                    return Err(CliError::CommandArgumentError(format!(
-                        "Profile {} already exists",
-                        new_profile_name
-                    )));
-                };
+            // If a config exists, verify that the new profile name does not already exist.
+            if CliConfig::config_exists(ConfigSearchMode::CurrentDirAndParents) {
+                let config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
+                if let Some(profiles) = config.profiles {
+                    if profiles.contains_key(new_profile_name) {
+                        return Err(CliError::CommandArgumentError(format!(
+                            "Profile {} already exists",
+                            new_profile_name
+                        )));
+                    };
+                }
             }
         };
 
@@ -292,20 +292,28 @@ impl CliCommand<RotateSummary> for RotateKey {
         // specified, then it will have already been error checked above.
         let new_profile_name = self.new_profile_options.save_to_profile.unwrap();
 
-        // If no config exists, then the error should've been caught earlier during the profile
-        // name verification step.
-        let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
+        // If no config exists, create a default one instead of erroring out.
+        let mut config = if CliConfig::config_exists(ConfigSearchMode::CurrentDirAndParents) {
+            CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?
+        } else {
+            CliConfig::default()
+        };
         if config.profiles.is_none() {
             config.profiles = Some(BTreeMap::new());
         }
 
-        // Create new config.
+        // Create new config. Fall back to default if no existing profile is available.
+        let base_profile = self
+            .txn_options
+            .profile_options
+            .profile()
+            .unwrap_or_default();
         let mut new_profile_config = ProfileConfig {
             public_key: Some(new_public_key),
             account: Some(current_address),
             private_key: new_private_key,
             derivation_path: new_derivation_path,
-            ..self.txn_options.profile_options.profile()?
+            ..base_profile
         };
 
         if let Some(url) = self.txn_options.rest_options.url {
