@@ -482,7 +482,7 @@ impl ExpData {
                             );
                         }
                     },
-                    Iff => {
+                    Iff | Or => {
                         // Both sides conditional
                         for arg in args {
                             arg.as_ref().collect_strict_labels(false, labels);
@@ -503,6 +503,9 @@ impl ExpData {
             Match(_, matched, arms) => {
                 matched.as_ref().collect_strict_labels(strict, labels);
                 for arm in arms {
+                    if let Some(cond) = &arm.condition {
+                        cond.as_ref().collect_strict_labels(false, labels);
+                    }
                     arm.body.as_ref().collect_strict_labels(false, labels);
                 }
             },

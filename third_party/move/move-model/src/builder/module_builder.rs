@@ -7,9 +7,9 @@ use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, BehaviorKind, Condition,
         ConditionKind, Exp, ExpData, FrameSpec, FriendDecl, FunParamAccessOf, LemmaDecl, LemmaId,
-        MemoryRange, ModuleName, Operation, Pattern, Proof, PropertyBag, PropertyValue,
-        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
-        UseDecl, Value,
+        MemoryLabel, MemoryRange, ModuleName, Operation, Pattern, Proof, PropertyBag,
+        PropertyValue, QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl,
+        SpecVarDecl, TempIndex, UseDecl, Value,
     },
     builder::{
         exp_builder::{ExpTranslator, OldExpStatus},
@@ -24,9 +24,8 @@ use crate::{
     metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
-        GlobalId, Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter,
-        SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
-        UserId,
+        Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
+        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind, UserId,
     },
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
@@ -106,7 +105,7 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     /// Shared state label map for the current spec block. Ensures that the same label name
     /// (e.g. `S`) used in different conditions within the same spec block maps to the same
     /// MemoryLabel (GlobalId).
-    pub spec_block_state_labels: BTreeMap<Symbol, GlobalId>,
+    pub spec_block_state_labels: BTreeMap<Symbol, MemoryLabel>,
     /// Translated lemma declarations.
     pub lemmas: Vec<LemmaDecl>,
     /// Map from lemma name to index in `lemmas` vec (used for resolution during proof analysis).

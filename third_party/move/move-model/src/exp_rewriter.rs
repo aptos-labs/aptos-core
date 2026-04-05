@@ -922,27 +922,32 @@ pub trait ExpRewriterFunctions {
 // =================================================================================================
 // Memory Label Freshener
 
-/// Rewrites all `MemoryLabel` values in an expression tree to fresh, globally unique labels.
+/// Rewrites all `MemoryLabel` values in an expression tree to fresh labels.
 /// Used when inlining opaque function specs at call sites to avoid label collisions
 /// between different inlining instances.
-pub struct MemoryLabelFreshener<'a> {
-    env: &'a GlobalEnv,
+///
+/// Uses a local counter rather than `GlobalEnv::new_global_id()` to ensure
+/// deterministic label IDs regardless of prior global allocations — the global
+/// counter depends on compilation order which can vary across machines.
+pub struct MemoryLabelFreshener {
+    counter: usize,
     label_map: BTreeMap<MemoryLabel, MemoryLabel>,
 }
 
-impl<'a> MemoryLabelFreshener<'a> {
-    pub fn new(env: &'a GlobalEnv) -> Self {
+impl MemoryLabelFreshener {
+    pub fn new(start: usize) -> Self {
         Self {
-            env,
+            counter: start,
             label_map: BTreeMap::new(),
         }
     }
 
     fn freshen(&mut self, label: MemoryLabel) -> MemoryLabel {
-        *self
-            .label_map
-            .entry(label)
-            .or_insert_with(|| self.env.new_global_id())
+        *self.label_map.entry(label).or_insert_with(|| {
+            let id = MemoryLabel::new(self.counter);
+            self.counter += 1;
+            id
+        })
     }
 
     fn freshen_range(&mut self, range: &MemoryRange) -> MemoryRange {
@@ -955,9 +960,14 @@ impl<'a> MemoryLabelFreshener<'a> {
     pub fn label_map(&self) -> &BTreeMap<MemoryLabel, MemoryLabel> {
         &self.label_map
     }
+
+    /// Returns the next available counter value for chaining multiple freshenings.
+    pub fn next_counter(&self) -> usize {
+        self.counter
+    }
 }
 
-impl ExpRewriterFunctions for MemoryLabelFreshener<'_> {
+impl ExpRewriterFunctions for MemoryLabelFreshener {
     fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         let new_oper = match oper {
             Operation::Global(Some(l)) => Some(Operation::Global(Some(self.freshen(*l)))),

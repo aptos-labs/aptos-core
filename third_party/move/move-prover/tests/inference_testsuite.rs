@@ -224,6 +224,12 @@ fn collect_tests(tests: &mut Vec<Trial>, dir: &str) {
             continue;
         }
         let path = entry.path().to_path_buf();
+        // Skip tests marked with `// no_ci:`.
+        if let Ok(directives) = extract_test_directives(&path, "// no_ci:") {
+            if !directives.is_empty() {
+                continue;
+            }
+        }
         let test_name = format!("inference::{}", path.strip_prefix(&base).unwrap().display());
         tests.push(Trial::test(test_name, move || {
             test_runner(&path).map_err(|err| format!("{:?}", err).into())

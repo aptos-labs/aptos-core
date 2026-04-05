@@ -6,8 +6,9 @@
 use crate::{
     ast::{
         AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, BehaviorKind,
-        Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryRange, ModuleName, Operation, Pattern,
-        QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
+        Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryLabel, MemoryRange, ModuleName, Operation,
+        Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex,
+        Value,
     },
     builder::{
         model_builder::{
@@ -22,8 +23,8 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
-        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter,
+        QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
         TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
@@ -116,7 +117,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub loop_stack: Vec<Option<PA::Label>>,
     /// Map from state label names to their GlobalId, ensuring the same label name
     /// always resolves to the same MemoryLabel across behavior predicates.
-    pub state_label_map: BTreeMap<Symbol, GlobalId>,
+    pub state_label_map: BTreeMap<Symbol, MemoryLabel>,
 }
 
 #[derive(Debug)]
@@ -5935,7 +5936,7 @@ impl ExpTranslator<'_, '_, '_> {
     /// if the same name was already used. Uses the parent `ModuleBuilder`'s shared
     /// `spec_block_state_labels` map so that the same label name across different conditions
     /// in the same spec block resolves to the same MemoryLabel.
-    fn translate_state_label(&mut self, label: &PA::Label) -> GlobalId {
+    fn translate_state_label(&mut self, label: &PA::Label) -> MemoryLabel {
         let sym = self.symbol_pool().make(label.value().as_str());
         // Check the spec-block-level shared map first
         if let Some(&id) = self.parent.spec_block_state_labels.get(&sym) {
@@ -5946,7 +5947,7 @@ impl ExpTranslator<'_, '_, '_> {
             self.parent.spec_block_state_labels.insert(sym, id);
             id
         } else {
-            let id = self.env().new_global_id();
+            let id = MemoryLabel::new(self.env().new_global_id().as_usize());
             self.state_label_map.insert(sym, id);
             self.parent.spec_block_state_labels.insert(sym, id);
             self.env().set_memory_label_name(id, sym);
@@ -5973,7 +5974,9 @@ impl ExpTranslator<'_, '_, '_> {
                         pre: existing_range.pre.or(self.range.pre),
                         post: existing_range.post.or(self.range.post),
                     };
-                    Call(*id, Behavior(*kind, merged), args.clone()).into_exp()
+                    let rewritten_args: Vec<Exp> =
+                        args.iter().map(|a| self.rewrite_exp(a.clone())).collect();
+                    Call(*id, Behavior(*kind, merged), rewritten_args).into_exp()
                 } else if let Call(
                     id,
                     op @ (SpecPublish(existing_range)
@@ -5996,7 +5999,9 @@ impl ExpTranslator<'_, '_, '_> {
                         SpecUpdate(_) => SpecUpdate(merged),
                         _ => unreachable!(),
                     };
-                    Call(*id, new_op, args.clone()).into_exp()
+                    let rewritten_args: Vec<Exp> =
+                        args.iter().map(|a| self.rewrite_exp(a.clone())).collect();
+                    Call(*id, new_op, rewritten_args).into_exp()
                 } else if let Call(id, Old, args) = exp.as_ref() {
                     // Handle Old before descent so inside_old is set when children are visited.
                     // If this were in rewrite_call, children would be rewritten first and

@@ -365,6 +365,9 @@ struct Instrumenter<'a> {
     /// AttrIds are stable across optimization passes, unlike bytecode offsets.
     /// The optional guard is a path condition from enclosing `if` in the proof block.
     split_points: Vec<(AttrId, Exp, Option<Exp>)>,
+    /// Counter for deterministic label freshening across opaque call sites.
+    /// Starts at 0 so that freshened labels are independent of the global counter.
+    freshen_counter: usize,
 }
 
 // =================================================================================================
@@ -465,6 +468,7 @@ impl<'a> Instrumenter<'a> {
             can_abort: false,
             mem_info: &mem_info,
             split_points: vec![],
+            freshen_counter: 0,
         };
         instrumenter.instrument(&spec, &inlined_props);
 
@@ -724,8 +728,9 @@ impl<'a> Instrumenter<'a> {
             &dests,
         );
 
-        // Freshen memory labels to avoid collisions between different inlining sites.
-        callee_spec.freshen_labels(env);
+        // Freshen state labels to avoid collisions between different inlining sites.
+        // Uses a function-scoped counter for deterministic label IDs.
+        callee_spec.freshen_labels(&mut self.freshen_counter);
 
         self.builder.set_loc_from_attr(id);
 

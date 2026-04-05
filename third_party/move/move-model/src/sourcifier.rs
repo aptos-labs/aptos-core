@@ -2072,7 +2072,10 @@ impl<'a> ExpSourcifier<'a> {
                     let captured_args: Vec<Exp> = args
                         .iter()
                         .map(|arg| {
-                            if matches!(arg.as_ref(), ExpData::LocalVar(..) | ExpData::Value(..)) {
+                            if matches!(
+                                arg.as_ref(),
+                                ExpData::LocalVar(..) | ExpData::Value(..) | ExpData::Temporary(..)
+                            ) {
                                 arg.clone()
                             } else {
                                 let arg_ty = self.env().get_node_type(arg.node_id());

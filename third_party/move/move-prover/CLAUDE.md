@@ -242,9 +242,21 @@ invocation with a separate `GlobalEnv` instance — no state carries over.
 ```
 cargo run -p move-prover -- \
     --language-version 2.4 \
-    -d <rooot>/third_party/move/move-stdlib/sources \
+    -d <root>/third_party/move/move-stdlib/sources \
     -a std=0x1 \
     <source-files>
+```
+
+- To verify files from the Aptos framework that depend on multiple packages, provide each package's
+  sources directory as a separate `-d` flag. For example, to verify a file in `aptos-stdlib`:
+
+```
+cargo run -p move-prover -- \
+    --language-version 2.4 \
+    -d aptos-move/framework/move-stdlib/sources \
+    -d aptos-move/framework/aptos-stdlib/sources \
+    -a std=0x1 aptos_std=0x1 \
+    -- <source-files-or-directory>
 ```
 
 - In order to inspect generated Boogie, use `--keep`. The following output will be generated:

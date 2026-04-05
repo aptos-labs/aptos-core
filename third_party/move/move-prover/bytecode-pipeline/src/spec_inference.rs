@@ -1588,9 +1588,8 @@ struct SpecInferenceAnalyzer<'env> {
     current_loc: Loc,
     /// Label for the function entry state (before any mutations).
     at_entry_label: MemoryLabel,
-    /// Label for the function exit state (post-return). Determined by the
-    /// forward state boundary analysis: equals the forward state at `Ret`.
-    /// Uses `Cell` because it's set after construction (by the forward analysis).
+    /// Label for the function exit state (post-return). Created during
+    /// construction; never reassigned. Uses `Cell` for `.get()` from `&self`.
     at_end_label: Cell<MemoryLabel>,
     /// Cache of labels per code offset (for fixpoint stability)
     offset_labels: RefCell<BTreeMap<CodeOffset, MemoryLabel>>,
@@ -2804,12 +2803,12 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         let env = fun_env.module_env.env;
 
         // Create the entry label representing the function's initial state.
-        let at_entry_label = env.new_global_id();
+        let at_entry_label = MemoryLabel::new(env.new_global_id().as_usize());
         let at_entry_sym = env.symbol_pool().make("at_entry");
         env.set_memory_label_name(at_entry_label, at_entry_sym);
 
         // Create the "at_end" label representing the final state (post-return).
-        let at_end_label = env.new_global_id();
+        let at_end_label = MemoryLabel::new(env.new_global_id().as_usize());
         let at_end_sym = env.symbol_pool().make("at_end");
         env.set_memory_label_name(at_end_label, at_end_sym);
 
@@ -2847,7 +2846,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         let mut cache = self.offset_labels.borrow_mut();
         *cache.entry(offset).or_insert_with(|| {
             let env = self.global_env();
-            let label = env.new_global_id();
+            let label = MemoryLabel::new(env.new_global_id().as_usize());
             let seq = self.label_counter.get() + 1;
             self.label_counter.set(seq);
             let name = format!("{}{}", INFERRED_LABEL_PREFIX, seq);

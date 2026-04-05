@@ -231,11 +231,12 @@ impl TranslatedSpec {
         }
     }
 
-    /// Freshen all memory labels in this translated spec by replacing them with globally
-    /// unique new labels. This is used when inlining opaque function specs at call sites
-    /// to prevent label collisions between different inlining instances.
-    pub fn freshen_labels(&mut self, env: &GlobalEnv) {
-        let mut freshener = MemoryLabelFreshener::new(env);
+    /// Freshen all memory labels in this translated spec by replacing them with
+    /// deterministic new labels starting from `counter`. The counter is advanced
+    /// past all allocated labels and returned so that subsequent freshenings can
+    /// continue from a non-colliding value.
+    pub fn freshen_labels(&mut self, counter: &mut usize) {
+        let mut freshener = MemoryLabelFreshener::new(*counter);
         for (_, exp) in &mut self.post {
             *exp = freshener.rewrite_exp(exp.clone());
         }
@@ -279,6 +280,9 @@ impl TranslatedSpec {
         for (_, _, exp) in &mut self.invariants {
             *exp = freshener.rewrite_exp(exp.clone());
         }
+        for (_, _, exp) in &mut self.debug_traces {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
         // Freshen labels in saved_memory and saved_spec_vars
         let map = freshener.label_map();
         self.saved_memory = self
@@ -291,6 +295,7 @@ impl TranslatedSpec {
             .iter()
             .map(|(k, v)| (k.clone(), map.get(v).copied().unwrap_or(*v)))
             .collect();
+        *counter = freshener.next_counter();
     }
 }
 
@@ -687,7 +692,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         if let Some(label) = self.shared_old_label {
             label
         } else {
-            let label = self.builder.global_env().new_global_id();
+            let label = MemoryLabel::new(self.builder.global_env().new_global_id().as_usize());
             self.shared_old_label = Some(label);
             label
         }

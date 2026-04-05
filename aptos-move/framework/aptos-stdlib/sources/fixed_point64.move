@@ -338,12 +338,7 @@ module aptos_std::fixed_point64 {
         ensures result == spec_floor(self);
     }
     spec fun spec_floor(self: FixedPoint64): u128 {
-        let fractional = self.value % (1 << 64);
-        if (fractional == 0) {
-            self.value >> 64
-        } else {
-            (self.value - fractional) >> 64
-        }
+        self.value >> 64
     }
 
     /// Rounds up the given FixedPoint64 to the next largest integer.
@@ -356,20 +351,13 @@ module aptos_std::fixed_point64 {
         (val >> 64 as u128)
     }
     spec ceil {
-        // TODO: set because of timeout (property proved).
-        pragma verify_duration_estimate = 1000;
         pragma opaque;
         aborts_if false;
         ensures result == spec_ceil(self);
     }
     spec fun spec_ceil(self: FixedPoint64): u128 {
-        let fractional = self.value % (1 << 64);
-        let one = 1 << 64;
-        if (fractional == 0) {
-            self.value >> 64
-        } else {
-            (self.value - fractional + one) >> 64
-        }
+        if (self.value % (1 << 64) == 0) { self.value >> 64 }
+        else { (self.value >> 64) + 1 }
     }
 
     /// Returns the value of a FixedPoint64 to the nearest integer.
@@ -388,14 +376,8 @@ module aptos_std::fixed_point64 {
         ensures result == spec_round(self);
     }
     spec fun spec_round(self: FixedPoint64): u128 {
-        let fractional = self.value % (1 << 64);
-        let boundary = (1 << 64) / 2;
-        let one = 1 << 64;
-        if (fractional < boundary) {
-            (self.value - fractional) >> 64
-        } else {
-            (self.value - fractional + one) >> 64
-        }
+        if (self.value % (1 << 64) < (1 << 64) / 2) { self.value >> 64 }
+        else { (self.value >> 64) + 1 }
     }
 
     // **************** SPECIFICATIONS ****************

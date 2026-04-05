@@ -2639,7 +2639,21 @@ pub enum Operation {
 }
 
 /// A label used for referring to a specific memory in Global and Exists expressions.
-pub type MemoryLabel = GlobalId;
+/// This is a function-scoped identifier — labels are only meaningful within the
+/// context of a single function's spec. When inlining specs across functions,
+/// labels are freshened to avoid collisions.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub struct MemoryLabel(usize);
+
+impl MemoryLabel {
+    pub fn new(idx: usize) -> Self {
+        Self(idx)
+    }
+
+    pub fn as_usize(self) -> usize {
+        self.0
+    }
+}
 
 /// Describes the memory state range for an operation that accesses global state.
 /// - `pre`: which memory snapshot `old()` references resolve to
