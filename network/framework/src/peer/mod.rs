@@ -20,6 +20,7 @@ use crate::{
         DECLINED_LABEL, FAILED_LABEL, RECEIVED_LABEL, SENT_LABEL, UNKNOWN_LABEL,
     },
     logging::NetworkSchema,
+    peer::rate_limiter::InboundMessageRateLimiter,
     peer_manager::{PeerManagerError, TransportNotification},
     protocols::{
         direct_send::Message,
@@ -60,6 +61,8 @@ mod test;
 
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing;
+
+pub(crate) mod rate_limiter;
 
 /// Requests [`Peer`] receives from the [`PeerManager`](crate::peer_manager::PeerManager).
 #[derive(Debug)]
@@ -139,6 +142,8 @@ pub struct Peer<TSocket> {
     max_message_size: usize,
     /// Inbound stream buffer
     inbound_stream: InboundStreamBuffer,
+    /// Optional per-peer inbound rate limiter
+    inbound_rate_limiter: Option<InboundMessageRateLimiter>,
 }
 
 impl<TSocket> Peer<TSocket>
@@ -161,6 +166,7 @@ where
         max_concurrent_outbound_rpcs: u32,
         max_frame_size: usize,
         max_message_size: usize,
+        inbound_rate_limiter: Option<InboundMessageRateLimiter>,
     ) -> Self {
         let Connection {
             metadata: connection_metadata,
@@ -199,6 +205,7 @@ where
             max_frame_size,
             max_message_size,
             inbound_stream: InboundStreamBuffer::new(max_fragments),
+            inbound_rate_limiter,
         }
     }
 
@@ -238,6 +245,10 @@ where
             self.max_message_size,
         );
 
+        // TODO: split up the main event loop into multiple tasks (e.g., one for handling
+        // inbound messages, one for handling outbound requests, etc.). This would allow
+        // us to parallelize the handling of different events and avoid task blocking.
+
         // Start main Peer event loop.
         let reason = loop {
             if let State::ShuttingDown(reason) = self.state {
@@ -259,6 +270,22 @@ where
                 maybe_message = reader.next() => {
                     match maybe_message {
                         Some(message) =>  {
+                            // Apply inbound rate limiting (if required)
+                            if let Some(rate_limiter) = &mut self.inbound_rate_limiter {
+                                if let Err(err) = rate_limiter.throttle(&message).await {
+                                    warn!(
+                                        NetworkSchema::new(&self.network_context)
+                                            .connection_metadata(&self.connection_metadata),
+                                        error = %err,
+                                        "{} Error handling inbound message from peer {} during rate limiting! Dropping message!",
+                                        self.network_context,
+                                        remote_peer_id.short_str(),
+                                    );
+                                    continue;
+                                }
+                            }
+
+                            // Handle the inbound message
                             if let Err(err) = self.handle_inbound_message(message, &mut write_reqs_tx) {
                                 warn!(
                                     NetworkSchema::new(&self.network_context)

@@ -14,7 +14,7 @@ use crate::{
     constants,
     counters::{self},
     logging::*,
-    peer::{DisconnectReason, Peer, PeerRequest},
+    peer::{rate_limiter::InboundMessageRateLimiter, DisconnectReason, Peer, PeerRequest},
     transport::{
         Connection, ConnectionId, ConnectionMetadata, TSocket as TransportTSocket,
         TRANSPORT_TIMEOUT,
@@ -23,7 +23,7 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::AccessControlPolicy,
+    config::{AccessControlPolicy, RateLimitConfig},
     network_id::{NetworkContext, PeerNetworkId},
 };
 use aptos_logger::prelude::*;
@@ -125,6 +125,8 @@ where
     /// Priority inbound peers that can bypass inbound connection
     /// limits (by evicting lower-priority connections).
     priority_inbound_peers: Vec<PeerId>,
+    /// Rate limiting configuration for inbound network traffic per peer
+    inbound_rate_limit_config: Option<RateLimitConfig>,
 }
 
 impl<TTransport, TSocket> PeerManager<TTransport, TSocket>
@@ -154,6 +156,7 @@ where
         inbound_connection_limit: usize,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
         priority_inbound_peers: Vec<PeerId>,
+        inbound_rate_limit_config: Option<RateLimitConfig>,
     ) -> Self {
         let (transport_notifs_tx, transport_notifs_rx) = aptos_channels::new(
             channel_size,
@@ -197,6 +200,7 @@ where
             inbound_connection_limit,
             access_control_policy,
             priority_inbound_peers,
+            inbound_rate_limit_config,
         }
     }
 
@@ -808,6 +812,15 @@ where
             Some(&counters::PENDING_NETWORK_REQUESTS),
         );
 
+        // Create a per-peer inbound rate limiter (if configured)
+        let inbound_rate_limiter = self.inbound_rate_limit_config.as_ref().and_then(|config| {
+            InboundMessageRateLimiter::new(
+                config.inbound_messages_per_second,
+                config.inbound_bytes_per_second,
+                self.time_service.clone(),
+            )
+        });
+
         // Initialize a new Peer actor for this connection.
         let peer = Peer::new(
             self.network_context,
@@ -822,6 +835,7 @@ where
             constants::MAX_CONCURRENT_OUTBOUND_RPCS,
             self.max_frame_size,
             self.max_message_size,
+            inbound_rate_limiter,
         );
         self.executor.spawn(peer.start());
 

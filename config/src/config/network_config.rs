@@ -74,6 +74,16 @@ impl AccessControlPolicy {
     }
 }
 
+/// Rate limiting configuration for inbound network traffic
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RateLimitConfig {
+    /// Max inbound bytes/sec per peer. None = unlimited.
+    pub inbound_bytes_per_second: Option<u64>,
+    /// Max inbound messages/sec per peer. None = unlimited.
+    pub inbound_messages_per_second: Option<u64>,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkConfig {
@@ -148,6 +158,9 @@ pub struct NetworkConfig {
     pub access_control_policy: Option<AccessControlPolicy>,
     /// Priority inbound peers that can bypass connection limits
     pub priority_inbound_peers: Vec<PeerId>,
+    /// Rate limiting configuration for inbound network traffic (per peer).
+    /// If None, inbound rate limiting is disabled.
+    pub inbound_rate_limit_config: Option<RateLimitConfig>,
 }
 
 impl Default for NetworkConfig {
@@ -194,6 +207,7 @@ impl NetworkConfig {
             enable_latency_aware_dialing: true,
             access_control_policy: None,
             priority_inbound_peers: Vec::new(),
+            inbound_rate_limit_config: None,
         };
 
         // Configure the number of parallel deserialization tasks

@@ -42,6 +42,9 @@ pub enum PeerManagerError {
 
     #[error("Error writing to wire: {0}")]
     WireWriteError(#[from] wire::WriteError),
+
+    #[error("Inbound message exceeds rate limiter capacity")]
+    RateLimitCapacityExceeded,
 }
 
 impl PeerManagerError {
