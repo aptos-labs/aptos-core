@@ -231,6 +231,9 @@ pub struct NewBlockEventAggregation {
     // dependig on how many failures we have.
     voter_window_size: usize,
     proposer_window_size: usize,
+    // Separate window for counting failed proposals. When larger than proposer_window_size,
+    // failures are remembered for longer, preventing oscillation between failed/inactive/active.
+    failure_window_size: usize,
     reputation_window_from_stale_end: bool,
 }
 
@@ -238,11 +241,13 @@ impl NewBlockEventAggregation {
     pub fn new(
         voter_window_size: usize,
         proposer_window_size: usize,
+        failure_window_size: usize,
         reputation_window_from_stale_end: bool,
     ) -> Self {
         Self {
             voter_window_size,
             proposer_window_size,
+            failure_window_size,
             reputation_window_from_stale_end,
         }
     }
@@ -433,7 +438,7 @@ impl NewBlockEventAggregation {
         Self::history_iter(
             history,
             epoch_to_candidates,
-            self.proposer_window_size,
+            self.failure_window_size,
             self.reputation_window_from_stale_end,
         )
         .fold(HashMap::new(), |mut map, meta| {
@@ -501,6 +506,7 @@ impl ProposerAndVoterHeuristic {
         failure_threshold_percent: u32,
         voter_window_size: usize,
         proposer_window_size: usize,
+        failure_window_size: usize,
         reputation_window_from_stale_end: bool,
     ) -> Self {
         Self {
@@ -512,6 +518,7 @@ impl ProposerAndVoterHeuristic {
             aggregation: NewBlockEventAggregation::new(
                 voter_window_size,
                 proposer_window_size,
+                failure_window_size,
                 reputation_window_from_stale_end,
             ),
         }

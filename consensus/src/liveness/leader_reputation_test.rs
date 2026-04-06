@@ -145,7 +145,7 @@ fn test_aggregation_counting() {
     let mut example1 = Example1::new(5);
     let validators0 = example1.validators0.clone();
     let epoch_to_validators = HashMap::from([(0u64, validators0.clone())]);
-    let aggregation = NewBlockEventAggregation::new(2, 5, false);
+    let aggregation = NewBlockEventAggregation::new(2, 5, 5, false);
 
     example1.step1();
 
@@ -244,7 +244,7 @@ fn test_proposer_and_voter_heuristic() {
     let validators0 = example1.validators0.clone();
     let epoch_to_validators0 = HashMap::from([(0u64, validators0.clone())]);
     let heuristic =
-        ProposerAndVoterHeuristic::new(example1.validators0[0], 100, 10, 1, 49, 2, 5, false);
+        ProposerAndVoterHeuristic::new(example1.validators0[0], 100, 10, 1, 49, 2, 5, 5, false);
 
     example1.step1();
     assert_eq!(
@@ -332,6 +332,7 @@ fn test_api(use_root_hash: bool) {
                 inactive_weight,
                 0,
                 10,
+                proposers.len(),
                 proposers.len(),
                 proposers.len(),
                 false,
