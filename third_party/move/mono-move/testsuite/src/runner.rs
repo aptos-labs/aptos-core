@@ -24,7 +24,7 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Execution output from a VM, carrying both the display string and the
 /// number of return values so that mono-move can avoid reparsing.
