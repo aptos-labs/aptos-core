@@ -24,7 +24,7 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Execution output from a VM, carrying both the display string and the
 /// number of return values so that mono-move can avoid reparsing.
@@ -112,7 +112,7 @@ pub fn compile_move_modules(sources: &str) -> Vec<CompiledModule> {
 }
 
 /// Returns default compiler options used in the test.
-fn compiler_options(sources_path: &PathBuf) -> Options {
+fn compiler_options(sources_path: &Path) -> Options {
     Options {
         sources: vec![sources_path.to_string_lossy().into_owned()],
         dependencies: vec![],
