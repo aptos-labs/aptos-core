@@ -125,7 +125,7 @@ pub(crate) fn transaction_tracing_test(duration: Duration, test_cmd: &TestComman
         )
     }
 
-    let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
+    let mempool_backlog = if ha_proxy { 14000 } else { 19000 };
 
     // Same TwoTrafficsTest as land-blocking, wrapped with TransactionTracingTest
     // which adds 500 TPS traced traffic from pre-generated accounts.
@@ -151,7 +151,7 @@ pub(crate) fn transaction_tracing_test(duration: Duration, test_cmd: &TestComman
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_vfns)
         .add_network_test(CompositeNetworkTest::new(
-            MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
+            MultiRegionNetworkEmulationTest::mainnet_calibrated_for_validator_count(num_validators),
             tracing_test,
         ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
