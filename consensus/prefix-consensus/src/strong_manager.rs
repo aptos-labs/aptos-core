@@ -585,14 +585,20 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
             // Best case: start immediately with the optimal (shortest) input vector
             self.pc_start_trigger = "enter_view_immediate";
             self.start_pc_now(view).await;
-        } else {
-            // Set timer fallback: if the first-ranked cert doesn't arrive within
-            // VIEW_START_TIMEOUT, start with whatever certs are available.
-            self.view_start_timer = Some((
-                view,
-                Box::pin(tokio::time::sleep(VIEW_START_TIMEOUT)),
-            ));
         }
+        // VIEW_START_TIMEOUT disabled — the inner PC starts only when the rank-0
+        // party's certificate arrives (via try_start_pc called from
+        // process_proposal). The catch-up mechanism in process_proposal
+        // (adopting future-view proposals) ensures liveness even if
+        // rank-0 is Byzantine.
+        //
+        // To re-enable the timer fallback, uncomment:
+        // else {
+        //     self.view_start_timer = Some((
+        //         view,
+        //         Box::pin(tokio::time::sleep(VIEW_START_TIMEOUT)),
+        //     ));
+        // }
     }
 
     /// Check if the first-ranked party's certificate is available for a view.
