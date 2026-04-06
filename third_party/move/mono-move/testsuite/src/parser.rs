@@ -3,18 +3,45 @@
 
 //! Parser for differential test files.
 //!
-//! Directives are embedded inline comments:
-//! - `// RUN: publish`:
-//!   Lines until the next directive are parsed as Move or MASM source files
-//!   and added to the local storage.
-//! - `// RUN: execute <addr>::<module>::<func> --args <v1>, <v2>`:
-//!   Execute the specified function with comma-separated argument list.
-//! - `// CHECK: <pattern>`:
-//!   Expected output for both VMs.
-//! - `// CHECK-V1: <pattern>`:
-//!   Expected output for legacy Move VM.
-//! - `// CHECK-V2: <pattern>`:
-//!   Expected output for MonoMove VM.
+//! # Directive semantics
+//!
+//! Directives are embedded as inline comments (`// DIRECTIVE: ...`).
+//! A test file is a sequence of **publish** and **execute** steps processed
+//! in order. Each step may have **check** directives attached.
+//!
+//! ## `// RUN: publish`
+//!
+//! All non-directive lines following this marker (until the next `// RUN:`
+//! directive or EOF) are collected verbatim as Move source text, compiled
+//! into one or more modules, and published into the test storage for both
+//! VMs. Multiple publish blocks accumulate modules across the test.
+//!
+//! ## `// RUN: execute <addr>::<module>::<func> [--args <v1>, <v2>, ...]`
+//!
+//! Invokes `<func>` in the given module on both VMs. Arguments are
+//! comma-separated literal values (currently only `u64` is supported).
+//! The execution produces a result string of the form `results: v1, v2`
+//! on success, or `error: <message>` on failure (e.g., abort).
+//!
+//! ## `// CHECK: <literal>`
+//!
+//! Must immediately follow an execute directive. The literal string is
+//! compared **exactly** (after trimming) against the normalized output of
+//! **both** VMs. Use this when V1 and V2 should agree.
+//!
+//! ## `// CHECK-V1: <literal>` / `// CHECK-V2: <literal>`
+//!
+//! Like `CHECK`, but applies to only the legacy Move VM (V1) or MonoMove
+//! VM (V2) respectively. Use these when the two VMs intentionally diverge
+//! (e.g., different error messages for aborts).
+//!
+//! Multiple check directives may follow a single execute step; each is
+//! verified independently.
+//!
+//! # Future extensions
+//!
+//! - Regex or substring matching for CHECK patterns.
+//! - Abort-specific checks (e.g., `// CHECK: error: ... ABORTED ...`).
 
 use anyhow::{anyhow, bail};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};

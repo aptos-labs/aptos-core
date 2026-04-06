@@ -3,6 +3,8 @@
 
 //! File-driven differential test harness: discovers `.move` files under
 //! `tests/test_cases/` and runs both MoveVM and mono-move, comparing results.
+//!
+//! TODO: extend to support `.masm` files (mono-move assembly).
 
 use libtest_mimic::{Arguments, Trial};
 use std::path::PathBuf;

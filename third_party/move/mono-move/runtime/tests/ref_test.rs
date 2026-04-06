@@ -213,7 +213,8 @@ fn ref_cross_frame() {
 
     let descriptors = vec![ObjectDescriptor::Trivial];
     let functions = [Some(main_func), Some(callee_func)];
-    Function::resolve_calls(&functions);
+    // SAFETY: Exclusive access during test setup; arena is alive.
+    unsafe { Function::resolve_calls(&functions) };
     let mut ctx = InterpreterContext::new(&descriptors, unsafe {
         functions[0].unwrap().as_ref_unchecked()
     });

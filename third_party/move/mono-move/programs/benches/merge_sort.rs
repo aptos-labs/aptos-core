@@ -35,7 +35,8 @@ fn bench_merge_sort(c: &mut Criterion) {
         });
 
         let (functions, descriptors, _arena) = micro_op_merge_sort();
-        mono_move_core::Function::resolve_calls(&functions);
+        // SAFETY: Exclusive access during bench setup; arena is alive.
+        unsafe { mono_move_core::Function::resolve_calls(&functions) };
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {

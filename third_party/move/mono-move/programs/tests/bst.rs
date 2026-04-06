@@ -162,7 +162,8 @@ mod micro_op {
     /// as `native_run_ops_with_results`.
     fn micro_op_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
         let (functions, descriptors, _arena) = micro_op_bst();
-        mono_move_core::Function::resolve_calls(&functions);
+        // SAFETY: Exclusive access during test setup; arena is alive.
+        unsafe { mono_move_core::Function::resolve_calls(&functions) };
         // SAFETY: Arena is alive for the duration of this function.
         let fn_new = unsafe { functions[FN_NEW].unwrap().as_ref_unchecked() };
         let fn_insert = unsafe { functions[FN_INSERT].unwrap().as_ref_unchecked() };

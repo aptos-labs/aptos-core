@@ -21,7 +21,8 @@ mod micro_op {
     fn run(n: u64) -> Vec<u64> {
         let values = shuffled_range(n, 42);
         let (functions, descriptors, _arena) = micro_op_merge_sort();
-        mono_move_core::Function::resolve_calls(&functions);
+        // SAFETY: Exclusive access during test setup; arena is alive.
+        unsafe { mono_move_core::Function::resolve_calls(&functions) };
         let mut ctx = InterpreterContext::new(&descriptors, unsafe {
             functions[0].unwrap().as_ref_unchecked()
         });

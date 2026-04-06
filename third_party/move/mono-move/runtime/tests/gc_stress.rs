@@ -298,7 +298,8 @@ fn gc_stress() {
 
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_gc_stress_program(&arena, n, max_len);
-    Function::resolve_calls(&functions);
+    // SAFETY: Exclusive access during test setup; arena is alive.
+    unsafe { Function::resolve_calls(&functions) };
     let mut ctx = InterpreterContext::with_heap_size(
         &descriptors,
         unsafe { functions[0].unwrap().as_ref_unchecked() },

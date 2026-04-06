@@ -176,10 +176,9 @@ impl FunctionVerifier<'_> {
             MicroOp::Return | MicroOp::ForceGC => {},
 
             MicroOp::CallFunc { .. } => {
-                // TODO: re-implement once functions are arena-allocated in verifier.
-                // if func_id as usize >= self.all_functions.len() {
-                //     self.err(Some(pc), format!("func_id {} out of bounds", func_id));
-                // }
+                // TODO: Verify that func_id is a valid function definition
+                // index. Requires passing the function table (or its length)
+                // into the verifier so we can bounds-check the callee index.
             },
             MicroOp::CallLocalFunc { .. } => {},
 

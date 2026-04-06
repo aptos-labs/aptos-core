@@ -50,7 +50,9 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
                     module
                         .serialize(&mut blob)
                         .map_err(|err| anyhow!("Failed to serialize module: {}", err))?;
-                    ();
+                    // Directly insert into in-memory storage rather than going
+                    // through the full publishing workflow (compatibility checks,
+                    // etc.) — sufficient for differential testing.
                     storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
 
                     // V2 path.
@@ -212,7 +214,7 @@ fn execute_function_v2(
 ) -> Output {
     // Look up the executable from the context's cache.
     let id = guard.intern_address_name(address, module_name);
-    let function_name = guard.intern_identifier(&function_name);
+    let function_name = guard.intern_identifier(function_name);
     let function = guard
         .get_executable(id)
         .and_then(|executable| executable.get_function(function_name))

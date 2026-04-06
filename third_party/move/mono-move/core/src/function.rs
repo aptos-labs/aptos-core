@@ -90,9 +90,9 @@ impl Function {
     /// The caller must have exclusive access to the functions and their
     /// arena-allocated code. The arena must outlive all uses of the patched
     /// code.
-    pub fn resolve_calls(func_ptrs: &[Option<ExecutableArenaPtr<Function>>]) {
-        for i in 0..func_ptrs.len() {
-            let Some(mut func_ptr) = func_ptrs[i] else {
+    pub unsafe fn resolve_calls(func_ptrs: &[Option<ExecutableArenaPtr<Function>>]) {
+        for func_ptr in func_ptrs {
+            let Some(mut func_ptr) = *func_ptr else {
                 continue;
             };
             // SAFETY: We have exclusive access during build — no concurrent

@@ -214,7 +214,9 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         }
 
         // Patch CallFunc to CallLocalFunc using definition-indexed func_ptrs.
-        Function::resolve_calls(&func_ptrs);
+        // SAFETY: We have exclusive access — the executable is being built
+        // and no concurrent readers exist. The arena outlives the executable.
+        unsafe { Function::resolve_calls(&func_ptrs) };
 
         Ok(Box::new(Executable {
             data: self.data,
