@@ -482,8 +482,25 @@ impl RoundManager {
                 .expect("Sending to a self loopback unbounded channel cannot fail");
         }
 
+        // HACK: Simulate proposer failures. The last 2 validators (by ordered index)
+        // skip their proposal 10% of the time (round % 10 == 0).
+        let should_skip_proposal = {
+            let author = self.proposal_generator.author();
+            let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
+            let n = ordered.len();
+            let idx = ordered.iter().position(|a| *a == author);
+            matches!(idx, Some(i) if i >= n - 2) && new_round_event.round % 10 == 0
+        };
+        if should_skip_proposal {
+            warn!(
+                self.new_log(LogEvent::NewRound),
+                "HACK: skipping proposal for round {}", new_round_event.round
+            );
+        }
+
         // If the current proposer is the leading, try to propose a regular block if not opt proposed already
         if is_current_proposer
+            && !should_skip_proposal
             && self
                 .proposal_generator
                 .can_propose_in_round(new_round_event.round)
@@ -1427,9 +1444,19 @@ impl RoundManager {
 
         let parent = parent_vote.vote_data().proposed().clone();
         let opt_proposal_round = parent.round() + 1;
-        if self
-            .proposer_election
-            .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
+        // HACK: Skip opt proposal for faulty validators too.
+        let should_skip_opt = {
+            let author = self.proposal_generator.author();
+            let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
+            let n = ordered.len();
+            let idx = ordered.iter().position(|a| *a == author);
+            matches!(idx, Some(i) if i >= n - 2) && opt_proposal_round % 10 == 0
+        };
+
+        if !should_skip_opt
+            && self
+                .proposer_election
+                .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
         {
             let expected_grandparent_round = parent
                 .round()

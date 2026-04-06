@@ -10,7 +10,7 @@ use aptos_config::config::{
     OverrideNodeConfig,
 };
 use aptos_framework::ReleaseBundle;
-use std::{num::NonZeroUsize, sync::Arc};
+use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 /// A PFN deployment configuration. Each entry maps to one helm release via the PFN deployer.
 pub struct PfnDeployment {
@@ -71,6 +71,9 @@ pub struct ForgeConfig {
 
     /// Retain debug logs and above for all nodes instead of just the first 5 nodes
     pub retain_debug_logs: bool,
+
+    /// Override the CLI-specified test duration
+    pub duration_override: Option<Duration>,
 
     /// URL to download the trusted setup blob for chunky DKG into the validator init-container
     pub decryption_setup_blob_url: Option<String>,
@@ -196,6 +199,11 @@ impl ForgeConfig {
 
     pub fn with_decryption_setup_blob_url(mut self, url: impl Into<String>) -> Self {
         self.decryption_setup_blob_url = Some(url.into());
+        self
+    }
+
+    pub fn with_duration_override(mut self, duration: Duration) -> Self {
+        self.duration_override = Some(duration);
         self
     }
 
@@ -435,6 +443,7 @@ impl Default for ForgeConfig {
             fullnode_resource_override: NodeResourceOverride::default(),
             retain_debug_logs: false,
             decryption_setup_blob_url: None,
+            duration_override: None,
         }
     }
 }
