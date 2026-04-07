@@ -4,7 +4,7 @@
 //! Lint check for `friend` or `package` entry functions.
 //!
 //! When a function is marked `entry`, it becomes callable by anyone via a transaction,
-//! regardless of its visibility modifier. A `public(friend) entry` or
+//! regardless of its visibility modifier. A `friend entry` or
 //! `public(package) entry` function therefore does NOT restrict callers to friends
 //! or the same package - the `entry` modifier overrides that restriction.
 
