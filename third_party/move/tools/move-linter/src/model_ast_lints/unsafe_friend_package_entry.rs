@@ -5,7 +5,7 @@
 //!
 //! When a function is marked `entry`, it becomes callable by anyone via a transaction,
 //! regardless of its visibility modifier. A `friend entry` or
-//! `public(package) entry` function therefore does NOT restrict callers to friends
+//! `package entry` function therefore does NOT restrict callers to friends
 //! or the same package - the `entry` modifier overrides that restriction.
 
 use move_binary_format::file_format::Visibility;
