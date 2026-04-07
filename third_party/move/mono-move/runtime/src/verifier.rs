@@ -66,7 +66,7 @@ impl FunctionVerifier<'_> {
         // SAFETY: The function's code is allocated in an executable arena that
         // is alive for the duration of verification.
         let code = unsafe { self.func.code.as_ref_unchecked() };
-        let base_offsets = unsafe { self.func.frame_layout.pointer_offsets.as_ref_unchecked() };
+        let base_offsets = unsafe { self.func.frame_layout.heap_ptr_offsets.as_ref_unchecked() };
         let safe_point_layouts = unsafe { self.func.safe_point_layouts.entries() };
 
         // --- Function-level sanity ---
@@ -136,7 +136,7 @@ impl FunctionVerifier<'_> {
                 );
             }
 
-            let sp_offsets = unsafe { entry.layout.pointer_offsets.as_ref_unchecked() };
+            let sp_offsets = unsafe { entry.layout.heap_ptr_offsets.as_ref_unchecked() };
             self.check_pointer_offsets(Some(co as usize), sp_offsets);
 
             for &off in sp_offsets {

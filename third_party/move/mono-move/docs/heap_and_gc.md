@@ -192,8 +192,8 @@ Stale pointers (logically dead but not yet overwritten) in the pointer region ca
 
 **Status:** Implemented as a hybrid of Approach A and B. Each `Function` declares two levels of pointer-slot information:
 
-1. `frame_layout: FrameLayoutMap` — frame offsets that always hold heap pointers, scanned at every PC (Approach B).
-2. `safe_point_layouts: SafePointMap` — additional per-safe-point pointer offsets, scanned only when the frame's PC matches a safe-point entry (Approach A).
+1. `frame_layout: FrameLayoutInfo` — frame offsets that always hold heap pointers, scanned at every PC (Approach B).
+2. `safe_point_layouts: SortedSafePointEntries` — additional per-safe-point pointer offsets, scanned only when the frame's PC matches a safe-point entry (Approach A).
 
 At any given safe point, the GC scans the union of both. When `zero_frame` is true, the runtime zeroes the region beyond args (`args_size..extended_frame_size`) at `CallFunc` time so pointer slots start as null. Safe points are allocating instructions (at their own PC) and call return sites (`call_pc + 1`).
 

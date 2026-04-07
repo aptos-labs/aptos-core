@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
-use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 
 /// ---------------------------------------------------------------------------
 // Function representation
@@ -14,34 +14,38 @@ use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
 /// scanning). Designed to be extended with additional per-slot type or
 /// layout information in the future — e.g., slot type tags for stronger
 /// runtime verification or debugging.
-pub struct FrameLayoutMap {
-    /// Frame byte-offsets of slots that hold heap pointers (GC roots).
+pub struct FrameLayoutInfo {
+    /// Frame byte-offsets of slots that may hold pointers (GC roots).
     ///
-    /// Each entry is the offset of an 8-byte slot that holds a heap
-    /// pointer (or null). For a 16-byte fat pointer `(base, offset)` at
-    /// frame offset `X`, list `X` here — the base is the heap pointer;
-    /// `X+8` is a scalar offset and is not listed.
+    /// Each entry is the offset of an 8-byte slot that holds a pointer
+    /// (heap pointer, or pointer to a stack local via a Move reference)
+    /// or null. The GC scans these slots and safely ignores any pointer
+    /// that does not point into the heap.
+    ///
+    /// For a 16-byte fat pointer `(base, offset)` at frame offset `X`,
+    /// list `X` here — the base is the pointer; `X+8` is a scalar
+    /// offset and is not listed.
     ///
     /// Offsets must not fall in the metadata segment
     /// (`args_and_locals_size..args_and_locals_size + FRAME_METADATA_SIZE`).
-    pub pointer_offsets: ExecutableArenaPtr<[FrameOffset]>,
+    pub heap_ptr_offsets: ExecutableArenaPtr<[FrameOffset]>,
 }
 
-impl FrameLayoutMap {
-    /// Create a `FrameLayoutMap` from an iterator of pointer offsets,
+impl FrameLayoutInfo {
+    /// Create a `FrameLayoutInfo` from an iterator of pointer offsets,
     /// allocating into the given arena.
-    pub fn new<I>(arena: &mono_move_alloc::ExecutableArena, offsets: I) -> Self
+    pub fn new<I>(arena: &ExecutableArena, offsets: I) -> Self
     where
         I: IntoIterator<Item = FrameOffset>,
         I::IntoIter: ExactSizeIterator,
     {
         Self {
-            pointer_offsets: arena.alloc_slice_fill_iter(offsets),
+            heap_ptr_offsets: arena.alloc_slice_fill_iter(offsets),
         }
     }
 
-    /// Create an empty `FrameLayoutMap` (no pointer offsets).
-    pub fn empty(arena: &mono_move_alloc::ExecutableArena) -> Self {
+    /// Create an empty `FrameLayoutInfo` (no pointer offsets).
+    pub fn empty(arena: &ExecutableArena) -> Self {
         Self::new(arena, std::iter::empty::<FrameOffset>())
     }
 }
@@ -59,7 +63,7 @@ impl FrameLayoutMap {
 ///   arg/return region holds return values, not args.
 pub struct SafePointEntry {
     pub code_offset: CodeOffset,
-    pub layout: FrameLayoutMap,
+    pub layout: FrameLayoutInfo,
 }
 
 /// A sorted collection of per-safe-point frame layouts.
@@ -67,17 +71,17 @@ pub struct SafePointEntry {
 /// Wraps `ExecutableArenaPtr<[SafePointEntry]>` and provides O(log n)
 /// lookup by code offset. Entries must be strictly sorted by
 /// `code_offset`.
-pub struct SafePointMap {
+pub struct SortedSafePointEntries {
     entries: ExecutableArenaPtr<[SafePointEntry]>,
 }
 
-impl SafePointMap {
-    /// Create a `SafePointMap` from an iterator of entries, allocating
-    /// into the given arena.
+impl SortedSafePointEntries {
+    /// Create a `SortedSafePointEntries` from an iterator of entries,
+    /// allocating into the given arena.
     ///
     /// The caller must ensure entries are strictly sorted by `code_offset`
     /// and that pointer offsets are disjoint from `frame_layout`.
-    pub fn new<I>(arena: &mono_move_alloc::ExecutableArena, entries: I) -> Self
+    pub fn new<I>(arena: &ExecutableArena, entries: I) -> Self
     where
         I: IntoIterator<Item = SafePointEntry>,
         I::IntoIter: ExactSizeIterator,
@@ -87,8 +91,8 @@ impl SafePointMap {
         }
     }
 
-    /// Create an empty `SafePointMap`.
-    pub fn empty(arena: &mono_move_alloc::ExecutableArena) -> Self {
+    /// Create an empty `SortedSafePointEntries`.
+    pub fn empty(arena: &ExecutableArena) -> Self {
         Self::new(arena, std::iter::empty::<SafePointEntry>())
     }
 
@@ -97,7 +101,7 @@ impl SafePointMap {
     /// # Safety
     ///
     /// `entries` must be a valid arena pointer.
-    pub unsafe fn layout_at(&self, pc: usize) -> Option<&FrameLayoutMap> {
+    pub unsafe fn layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
         let entries = unsafe { self.entries.as_ref_unchecked() };
         if entries.is_empty() {
             return None;
@@ -150,9 +154,12 @@ pub struct Function {
     pub extended_frame_size: usize,
     /// Whether the runtime must zero-initialize the region beyond args
     /// (`args_size..extended_frame_size`) when a new frame is created.
-    /// This is required when pointer slots exist so the GC sees null
-    /// instead of garbage. Functions with no heap pointer slots (beyond
-    /// args) can set this to `false` to skip the memset.
+    /// This is required when `frame_layout` has pointer slots so the GC
+    /// sees null instead of garbage. Functions with no heap pointer slots
+    /// in `frame_layout` (beyond args) can set this to `false` to skip
+    /// the memset. Not needed if the function uses only per-PC layouts
+    /// and the specializer ensures slots are written before becoming
+    /// visible as pointers.
     pub zero_frame: bool,
     /// Base frame layout — pointer offsets that are valid at every point
     /// in the function's execution. The GC always scans these.
@@ -175,16 +182,16 @@ pub struct Function {
     /// overlaps with the callee's frame during GC traversal — both
     /// frames may scan the same memory. The forwarding markers in
     /// `gc_copy_object` handle double-scans correctly.
-    pub frame_layout: FrameLayoutMap,
+    pub frame_layout: FrameLayoutInfo,
     /// Per-safe-point frame layouts.
     ///
-    /// At a given safe point, the GC scans the union of
-    /// `frame_layout.pointer_offsets` and the matching entry's
-    /// `pointer_offsets`. If no entry matches the current PC, only
-    /// `frame_layout` is used.
+    /// During GC, for each frame on the call stack, the GC scans the
+    /// union of `frame_layout.heap_ptr_offsets` (always) and the
+    /// matching safe-point entry's `heap_ptr_offsets` (if the frame's
+    /// current PC has a corresponding entry).
     ///
     /// The offsets in each safe-point entry must be disjoint from
-    /// `frame_layout.pointer_offsets` — a slot that is always a pointer
+    /// `frame_layout.heap_ptr_offsets` — a slot that is always a pointer
     /// belongs in `frame_layout`, not in individual safe-point entries.
     ///
     /// This supplements `frame_layout` for slots whose pointer status
@@ -194,7 +201,7 @@ pub struct Function {
     ///
     /// Empty when the function needs no per-PC distinction (all pointer
     /// slots are stable across the entire function body).
-    pub safe_point_layouts: SafePointMap,
+    pub safe_point_layouts: SortedSafePointEntries,
 }
 
 impl Function {
@@ -211,7 +218,7 @@ impl Function {
     /// # Safety
     ///
     /// Arena pointers in `safe_point_layouts` must be valid.
-    pub unsafe fn safe_point_layout_at(&self, pc: usize) -> Option<&FrameLayoutMap> {
+    pub unsafe fn safe_point_layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
         unsafe { self.safe_point_layouts.layout_at(pc) }
     }
 

@@ -63,8 +63,8 @@ pub fn native_merge_sort(v: &mut [u64]) {
 mod micro_op {
     use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
     use mono_move_core::{
-        CodeOffset as CO, DescriptorId, FrameLayoutMap, FrameOffset as FO, Function, MicroOp::*,
-        SafePointMap, FRAME_METADATA_SIZE,
+        CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
+        SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::ObjectDescriptor;
 
@@ -116,8 +116,8 @@ mod micro_op {
                 args_and_locals_size: args_and_locals_size as usize,
                 extended_frame_size: (callee_hi + 8) as usize,
                 zero_frame: true,
-                frame_layout: FrameLayoutMap::new(&arena, vec![FO(vec), FO(vec_ref)]),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(vec_ref)]),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
         };
 
@@ -184,8 +184,8 @@ mod micro_op {
                 args_and_locals_size: args_and_locals_size as usize,
                 extended_frame_size: (callee_3 + 8) as usize,
                 zero_frame: true,
-                frame_layout: FrameLayoutMap::new(&arena, vec![FO(vec)]),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec)]),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
         };
 
@@ -295,13 +295,13 @@ mod micro_op {
                 args_and_locals_size: 120,
                 extended_frame_size: 144,
                 zero_frame: true,
-                frame_layout: FrameLayoutMap::new(&arena, vec![
+                frame_layout: FrameLayoutInfo::new(&arena, vec![
                     FO(vec),
                     FO(tmp),
                     FO(vec_ref),
                     FO(tmp_ref),
                 ]),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
         };
 

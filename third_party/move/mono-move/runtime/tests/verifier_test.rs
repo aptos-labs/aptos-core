@@ -5,8 +5,8 @@
 
 use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameLayoutMap, FrameOffset as FO, Function, MicroOp,
-    SafePointMap,
+    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries,
 };
 use mono_move_runtime::{verify_function, ObjectDescriptor};
 
@@ -26,8 +26,8 @@ fn minimal_func(arena: &ExecutableArena) -> &Function {
                 args_and_locals_size: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(arena),
-                safe_point_layouts: SafePointMap::empty(arena),
+                frame_layout: FrameLayoutInfo::empty(arena),
+                safe_point_layouts: SortedSafePointEntries::empty(arena),
             })
             .as_ref_unchecked()
     }
@@ -68,8 +68,8 @@ fn valid_with_arithmetic_and_jumps() {
                 args_and_locals_size: 16,
                 extended_frame_size: 40,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -101,8 +101,8 @@ fn valid_with_vec_and_pointer_slots() {
                 args_and_locals_size: 32,
                 extended_frame_size: 56,
                 zero_frame: true,
-                frame_layout: FrameLayoutMap::new(&arena, vec![FO(0)]),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -128,8 +128,8 @@ fn frame_bounds_store_u64() {
                 extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
                 args_size: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -163,8 +163,8 @@ fn frame_bounds_mov() {
                 extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
                 args_size: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -196,8 +196,8 @@ fn frame_bounds_fat_ptr_write() {
                 extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
                 args_size: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -222,8 +222,8 @@ fn frame_bounds_callfunc_metadata() {
                 extended_frame_size: 16, // args_and_locals_size 8 + 24 = 32 > 16
                 args_size: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -251,8 +251,8 @@ fn pointer_slots_offset_out_of_bounds() {
                 args_and_locals_size: 8,
                 extended_frame_size: 32,
                 zero_frame: true,
-                frame_layout: FrameLayoutMap::new(&arena, vec![FO(100)]), // offset 100 + 8 > extended_frame_size 32
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(100)]), // offset 100 + 8 > extended_frame_size 32
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -276,8 +276,8 @@ fn pointer_slots_overlaps_metadata() {
                 args_and_locals_size: 8,
                 extended_frame_size: 40,
                 zero_frame: true,
-                frame_layout: FrameLayoutMap::new(&arena, vec![FO(8)]), // offset 8 overlaps metadata [8, 32) since args_and_locals_size = 8
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(8)]), // offset 8 overlaps metadata [8, 32) since args_and_locals_size = 8
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -301,8 +301,8 @@ fn args_size_exceeds_data_size() {
                 extended_frame_size: 32,
                 args_size: 16, // > args_and_locals_size 8
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -332,8 +332,8 @@ fn invalid_jump_target() {
                 args_and_locals_size: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -363,8 +363,8 @@ fn invalid_conditional_jump_target() {
                 args_and_locals_size: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -392,8 +392,8 @@ fn invalid_callfunc_func_id() {
                 args_and_locals_size: 0,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -438,8 +438,8 @@ fn invalid_descriptor_id() {
                 args_and_locals_size: 32,
                 extended_frame_size: 56,
                 zero_frame: true,
-                frame_layout: FrameLayoutMap::new(&arena, vec![FO(0)]),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -473,8 +473,8 @@ fn zero_size_mov() {
                 args_and_locals_size: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -515,8 +515,8 @@ fn zero_elem_size_vec_push() {
                 args_and_locals_size: 32,
                 extended_frame_size: 56,
                 zero_frame: true,
-                frame_layout: FrameLayoutMap::new(&arena, vec![FO(0)]),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -542,8 +542,8 @@ fn empty_code() {
                 args_and_locals_size: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -565,8 +565,8 @@ fn zero_frame_size() {
                 args_and_locals_size: 0,
                 extended_frame_size: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };
@@ -600,8 +600,8 @@ fn multiple_errors_collected() {
                 args_and_locals_size: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutMap::empty(&arena),
-                safe_point_layouts: SafePointMap::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
             .as_ref_unchecked()
     };

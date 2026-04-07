@@ -13,7 +13,9 @@ use crate::{
 use anyhow::{anyhow, bail};
 use fxhash::FxBuildHasher;
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
-use mono_move_core::{ExecutableId, FrameLayoutMap, Function, SafePointMap, FRAME_METADATA_SIZE};
+use mono_move_core::{
+    ExecutableId, FrameLayoutInfo, Function, SortedSafePointEntries, FRAME_METADATA_SIZE,
+};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex},
@@ -201,8 +203,8 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                     extended_frame_size,
                     // TODO: hardcoded for now.
                     zero_frame: false,
-                    frame_layout: FrameLayoutMap::empty(&self.arena),
-                    safe_point_layouts: SafePointMap::empty(&self.arena),
+                    frame_layout: FrameLayoutInfo::empty(&self.arena),
+                    safe_point_layouts: SortedSafePointEntries::empty(&self.arena),
                 };
                 let ptr = self.arena.alloc(func);
                 self.data.functions.insert(name, ptr);

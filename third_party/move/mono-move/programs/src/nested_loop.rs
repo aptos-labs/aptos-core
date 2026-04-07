@@ -61,7 +61,8 @@ pub fn native_nested_loop(n: u64) -> u64 {
 mod micro_op {
     use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
     use mono_move_core::{
-        CodeOffset as CO, FrameLayoutMap, FrameOffset as FO, Function, MicroOp::*, SafePointMap,
+        CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
+        SortedSafePointEntries,
     };
     use mono_move_runtime::ObjectDescriptor;
 
@@ -114,8 +115,8 @@ mod micro_op {
             extended_frame_size: args_and_locals_size as usize
                 + mono_move_core::FRAME_METADATA_SIZE,
             zero_frame: false,
-            frame_layout: FrameLayoutMap::empty(&arena),
-            safe_point_layouts: SafePointMap::empty(&arena),
+            frame_layout: FrameLayoutInfo::empty(&arena),
+            safe_point_layouts: SortedSafePointEntries::empty(&arena),
         });
 
         (vec![func], vec![ObjectDescriptor::Trivial], arena)

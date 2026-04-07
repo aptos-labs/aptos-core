@@ -5,7 +5,7 @@
 
 use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
 use mono_move_core::{
-    DescriptorId, FrameLayoutMap, FrameOffset as FO, Function, MicroOp, SafePointMap,
+    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
     STRUCT_DATA_OFFSET,
 };
 use mono_move_runtime::{
@@ -40,8 +40,8 @@ fn struct_inline() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: false,
-        frame_layout: FrameLayoutMap::empty(&arena),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::empty(&arena),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -83,8 +83,8 @@ fn struct_inline_borrow() {
         args_and_locals_size: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(r#ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(r#ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -126,8 +126,8 @@ fn struct_heap_basic() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(entry)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -173,8 +173,8 @@ fn struct_heap_survives_gc() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(entry)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -236,13 +236,13 @@ fn struct_with_vector_field() {
         args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![
+        frame_layout: FrameLayoutInfo::new(&arena, vec![
             FO(ctr),
             FO(items),
             FO(vec_ref),
             FO(ctr_ref),
         ]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![
         ObjectDescriptor::Struct {
@@ -306,8 +306,8 @@ fn struct_borrow_field() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -359,8 +359,8 @@ fn struct_borrow_survives_gc() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,

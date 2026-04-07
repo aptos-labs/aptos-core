@@ -71,28 +71,24 @@ However, the benefits may not justify the complexity:
 
 The garbage collector needs to find all live heap pointers on the call stack. The runtime uses a two-level scheme:
 
-1. **`frame_layout`** (`FrameLayoutMap`) — a per-function list of frame byte-offsets that *always* hold heap pointers, regardless of the current PC. The GC scans these offsets in every live frame.
+1. **`frame_layout`** (`FrameLayoutInfo`) — a per-function list of frame byte-offsets that *always* hold heap pointers, regardless of the current PC. The GC scans these offsets in every live frame.
 
 2. **`safe_point_layouts`** (`[SafePointEntry]`) — per-safe-point lists of *additional* frame offsets that hold heap pointers at specific code offsets. The GC looks up the entry matching the frame's current PC (via binary search) and scans those offsets too.
 
-At any given safe point, the full set of GC roots on the frame is the union of `frame_layout.pointer_offsets` and the matching safe-point entry's `pointer_offsets` (if any).
+At any given safe point, the full set of GC roots on the frame is the union of `frame_layout.heap_ptr_offsets` and the matching safe-point entry's `heap_ptr_offsets` (if any).
 
 **Safe points** are the only instructions where GC can trigger:
 
 - **Allocating instructions** (`HeapNew`, `VecPushBack`, `ForceGC`): GC runs during the instruction, so the safe point is at that instruction's own PC.
 - **Call return sites**: when a callee triggers GC, the caller's saved PC is `call_pc + 1`. The safe point for a caller frame is the instruction *after* the call — at that point, the shared arg/return region holds return values, not arguments.
 
-When `zero_frame` is true, pointer slots are zeroed on entry so the GC always sees either a valid heap pointer or null — never stale data. `FrameLayoutMap` is designed to be extended with additional per-slot type or layout information in the future (e.g., slot type tags for debugging or stronger runtime verification).
+When `zero_frame` is true, pointer slots are zeroed on entry so the GC always sees either a valid heap pointer or null — never stale data. `FrameLayoutInfo` is designed to be extended with additional per-slot type or layout information in the future (e.g., slot type tags for debugging or stronger runtime verification).
 
-### Tension with the calling convention (resolved)
+The two-level scheme exists because the calling convention requires arguments and return values to share the same space at the beginning of the frame. A slot might hold a heap pointer as an argument on entry, but later be overwritten with a scalar return value (or vice versa). Similarly, callee argument slots may hold pointers for one callee but scalars for another. A single per-function list cannot describe both states. The `safe_point_layouts` mechanism handles this: slots that change type across call boundaries are listed in the appropriate safe-point entries rather than in `frame_layout`. The specializer emits safe-point entries only at PCs where the pointer set differs from the base `frame_layout` — functions with no type-changing slots leave `safe_point_layouts` empty.
 
-The calling convention requires arguments and return values to share the same space at the beginning of the frame. A slot at the beginning might hold a heap pointer as an argument on entry, but later be overwritten with a scalar return value (or vice versa). Similarly, callee argument slots may hold pointers for one callee but scalars for another.
+If we move toward **strongly-typed slots** (where each frame offset has a fixed type for the duration of the frame), the safe-point mechanism provides the necessary per-PC type information to support this.
 
-The `safe_point_layouts` mechanism resolves this: slots that change type across call boundaries are listed in the appropriate safe-point entries rather than in `frame_layout`. The specializer emits safe-point entries only at PCs where the pointer set differs from the base `frame_layout` — functions with no type-changing slots leave `safe_point_layouts` empty.
-
-This problem would be more acute under **strongly-typed slots**, where each frame offset has a fixed type for the duration of the frame — something we are exploring for additional safety guarantees. The safe-point mechanism provides the necessary per-PC type information to support this.
-
-See `docs/heap_and_gc.md` for the full GC design space (Approaches A–D) and the rationale for the current approach (Approach B).
+This approach was chosen because it is well understood, stable, and known to work. We may revisit this and explore alternatives in the future — for example, removing the per-function layout entirely in favor of per-PC-only layouts, or moving some of the work into the runtime (e.g., having the runtime reconstruct per-PC layout info rather than requiring the specializer to emit it). See `docs/heap_and_gc.md` for the full GC design space (Approaches A–D) and the rationale.
 
 ## Security Considerations
 

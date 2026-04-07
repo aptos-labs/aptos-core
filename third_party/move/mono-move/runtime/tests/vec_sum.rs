@@ -3,8 +3,8 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameLayoutMap, FrameOffset as FO, Function, MicroOp,
-    SafePointMap,
+    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries,
 };
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 
@@ -54,8 +54,8 @@ fn make_vec_sum_program(
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(arena, vec![FO(slot_vec), FO(slot_vec_ref)]),
-        safe_point_layouts: SafePointMap::empty(arena),
+        frame_layout: FrameLayoutInfo::new(arena, vec![FO(slot_vec), FO(slot_vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(arena),
     });
 
     let descriptors = vec![ObjectDescriptor::Trivial];

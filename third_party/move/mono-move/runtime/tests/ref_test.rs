@@ -6,7 +6,7 @@
 
 use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
 use mono_move_core::{
-    DescriptorId, FrameLayoutMap, FrameOffset as FO, Function, MicroOp, SafePointMap,
+    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
     FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
 };
 use mono_move_runtime::{
@@ -56,8 +56,8 @@ fn ref_basic() {
         args_and_locals_size: 72,
         extended_frame_size: 96,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(vec), FO(r#ref), FO(vec_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(r#ref), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -117,8 +117,8 @@ fn ref_survives_gc() {
         args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -167,8 +167,8 @@ fn ref_cross_frame() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(c_ref_base)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(c_ref_base)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     });
 
     // -- Function 0: main --
@@ -203,8 +203,12 @@ fn ref_cross_frame() {
         args_and_locals_size: 48,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![
+            FO(m_vec),
+            FO(m_vec_ref),
+            FO(m_callee_ref),
+        ]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     });
 
     let descriptors = vec![ObjectDescriptor::Trivial];
@@ -283,13 +287,13 @@ fn ref_multiple_borrows() {
         args_and_locals_size: 88,
         extended_frame_size: 112,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![
+        frame_layout: FrameLayoutInfo::new(&arena, vec![
             FO(vec),
             FO(ref_a_base),
             FO(ref_b_base),
             FO(vec_ref),
         ]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -352,8 +356,8 @@ fn ref_borrow_local() {
         // ref_base holds a stack address → is_heap_ptr returns false, GC skips it.
         // vec is a genuine heap root.
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(ref_base), FO(vec), FO(vec_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(ref_base), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -430,14 +434,14 @@ fn ref_nested_vectors() {
         args_and_locals_size: 96,
         extended_frame_size: 120,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![
+        frame_layout: FrameLayoutInfo::new(&arena, vec![
             FO(outer),
             FO(inner_ptr),
             FO(ref_base),
             FO(outer_ref),
             FO(inner_ref),
         ]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
         elem_size: 8,
@@ -521,8 +525,8 @@ fn ref_survives_double_gc() {
         args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -579,8 +583,8 @@ fn ref_struct_field_borrow() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -635,8 +639,8 @@ fn ref_struct_field_survives_gc() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
-        safe_point_layouts: SafePointMap::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,

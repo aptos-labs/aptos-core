@@ -267,8 +267,8 @@ pub fn native_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
 mod micro_op {
     use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
     use mono_move_core::{
-        CodeOffset as CO, DescriptorId, FrameLayoutMap, FrameOffset as FO, Function, MicroOp as Op,
-        MicroOp::*, SafePointMap, FRAME_METADATA_SIZE,
+        CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
+        MicroOp as Op, MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::ObjectDescriptor;
 
@@ -354,8 +354,8 @@ mod micro_op {
             args_and_locals_size: 24,
             extended_frame_size: 24 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            frame_layout: FrameLayoutMap::new(arena, vec![FO(bst), FO(nodes), FO(free_list)]),
-            safe_point_layouts: SafePointMap::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(nodes), FO(free_list)]),
+            safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
 
@@ -420,8 +420,8 @@ mod micro_op {
             args_and_locals_size: 96,
             extended_frame_size: 96 + FRAME_METADATA_SIZE,
             zero_frame: false,
-            frame_layout: FrameLayoutMap::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
-            safe_point_layouts: SafePointMap::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
 
@@ -531,8 +531,8 @@ mod micro_op {
             args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
-            frame_layout: FrameLayoutMap::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
-            safe_point_layouts: SafePointMap::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
 
@@ -605,13 +605,13 @@ mod micro_op {
             args_and_locals_size: 120,
             extended_frame_size: 120 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            frame_layout: FrameLayoutMap::new(arena, vec![
+            frame_layout: FrameLayoutInfo::new(arena, vec![
                 FO(bst),
                 FO(bst_ref),
                 FO(nodes_ref),
                 FO(free_list_ref),
             ]),
-            safe_point_layouts: SafePointMap::empty(arena),
+            safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
 
@@ -708,8 +708,8 @@ mod micro_op {
             args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c1 + 8) as usize,
             zero_frame: true,
-            frame_layout: FrameLayoutMap::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
-            safe_point_layouts: SafePointMap::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
 
@@ -816,13 +816,13 @@ mod micro_op {
             args_and_locals_size: 136,
             extended_frame_size: 136 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            frame_layout: FrameLayoutMap::new(arena, vec![
+            frame_layout: FrameLayoutInfo::new(arena, vec![
                 FO(bst),
                 FO(bst_ref),
                 FO(nodes_ref),
                 FO(free_list_ref),
             ]),
-            safe_point_layouts: SafePointMap::empty(arena),
+            safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
 
@@ -914,8 +914,8 @@ mod micro_op {
             args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
-            frame_layout: FrameLayoutMap::new(arena, vec![FO(ops), FO(bst), FO(ops_ref)]),
-            safe_point_layouts: SafePointMap::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, vec![FO(ops), FO(bst), FO(ops_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
 }

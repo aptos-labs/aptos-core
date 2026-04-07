@@ -141,7 +141,7 @@ impl InterpreterContext<'_> {
     /// `fp` must point to a valid frame. `vec_ref_offset` must be the byte
     /// offset of a 16-byte fat pointer `(base, offset)` whose target holds
     /// the current vector heap pointer. `alloc_vec` may trigger GC which
-    /// relocates objects; the fat pointer's base in `pointer_offsets` and the
+    /// relocates objects; the fat pointer's base in `heap_ptr_offsets` and the
     /// vector pointer in the struct's `pointer_offsets` are updated by the GC.
     /// We re-read through the fat pointer after allocation.
     pub(crate) fn grow_vec_ref(
@@ -223,7 +223,7 @@ impl InterpreterContext<'_> {
         // Phase 1: scan roots from the call stack.
         //
         // For each frame we scan two sets of pointer offsets:
-        //   1. `frame_layout.pointer_offsets` — always applies.
+        //   1. `frame_layout.heap_ptr_offsets` — always applies.
         //   2. The matching `safe_point_layouts` entry for the frame's
         //      current PC, if any — provides additional pointer offsets
         //      that are only valid at that specific safe point.
@@ -244,12 +244,12 @@ impl InterpreterContext<'_> {
             let func = unsafe { func_ptr.as_ref() };
             unsafe {
                 // Scan base pointer offsets (always active).
-                let base_offsets = func.frame_layout.pointer_offsets.as_ref_unchecked();
+                let base_offsets = func.frame_layout.heap_ptr_offsets.as_ref_unchecked();
                 self.gc_scan_frame_roots(fp, base_offsets, &mut free_ptr);
 
                 // Scan safe-point-specific pointer offsets, if any.
                 if let Some(sp_layout) = func.safe_point_layout_at(pc) {
-                    let sp_offsets = sp_layout.pointer_offsets.as_ref_unchecked();
+                    let sp_offsets = sp_layout.heap_ptr_offsets.as_ref_unchecked();
                     self.gc_scan_frame_roots(fp, sp_offsets, &mut free_ptr);
                 }
 

@@ -23,8 +23,8 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameLayoutMap, FrameOffset as FO, Function, MicroOp,
-    SafePointMap, STRUCT_DATA_OFFSET,
+    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries, STRUCT_DATA_OFFSET,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
@@ -132,12 +132,12 @@ fn make_gc_stress_program(
         args_and_locals_size: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(arena, vec![
+        frame_layout: FrameLayoutInfo::new(arena, vec![
             FO(callee_vec),
             FO(callee_entry),
             FO(callee_vec_ref),
         ]),
-        safe_point_layouts: SafePointMap::empty(arena),
+        safe_point_layouts: SortedSafePointEntries::empty(arena),
     });
 
     // -- Function 0: main --
@@ -238,12 +238,12 @@ fn make_gc_stress_program(
         args_and_locals_size: 64,
         extended_frame_size: 128,
         zero_frame: true,
-        frame_layout: FrameLayoutMap::new(arena, vec![
+        frame_layout: FrameLayoutInfo::new(arena, vec![
             FO(outer_vec),
             FO(outer_vec_ref),
             FO(entry_ptr),
         ]),
-        safe_point_layouts: SafePointMap::empty(arena),
+        safe_point_layouts: SortedSafePointEntries::empty(arena),
     });
 
     let descriptors = vec![
