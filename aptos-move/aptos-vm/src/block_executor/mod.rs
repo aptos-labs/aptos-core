@@ -19,6 +19,7 @@ use aptos_block_executor::{
     txn_provider::TxnProvider,
     types::InputOutputKey,
 };
+use aptos_logger::info;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
@@ -45,24 +46,23 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
 
-static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
+/// Thread pool used by `execute_block` for parallel transaction execution.
+///
+/// Stores `(pool, num_threads)` so we can detect when the requested concurrency level
+/// changes and recreate the pool. In production the concurrency level is set once at
+/// startup, so the pool is created once and the mutex is uncontended thereafter.
+/// Benchmarking and debugging tools may iterate over multiple concurrency levels in the
+/// same process, which requires replacing the pool.
+static RAYON_EXEC_POOL: Mutex<Option<(Arc<rayon::ThreadPool>, usize)>> = Mutex::new(None);
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -598,8 +598,24 @@ impl<
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+        let num_threads = std::cmp::min(config.local.concurrency_level, num_cpus::get());
+        let pool = match &mut *RAYON_EXEC_POOL.lock().unwrap() {
+            Some((pool, n)) if *n == num_threads => Arc::clone(pool),
+            slot => {
+                info!(num_threads = num_threads, "Creating par_exec thread pool");
+                let pool = Arc::new(
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(num_threads)
+                        .thread_name(|index| format!("par_exec-{}", index))
+                        .build()
+                        .unwrap(),
+                );
+                *slot = Some((Arc::clone(&pool), num_threads));
+                pool
+            },
+        };
         Self::execute_block_on_thread_pool::<S, L, TP>(
-            Arc::clone(&RAYON_EXEC_POOL),
+            pool,
             signature_verified_block,
             state_view,
             module_cache_manager,
