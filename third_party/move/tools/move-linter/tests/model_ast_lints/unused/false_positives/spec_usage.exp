@@ -1,0 +1,51 @@
+
+Diagnostics:
+warning: [lint] function `spec_helper` is unused
+  ┌─ tests/model_ast_lints/unused/false_positives/spec_usage.move:5:9
+  │
+5 │     fun spec_helper(): u64 {
+  │         ^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).
+
+warning: [lint] constant `SPEC_CONST` is unused
+  ┌─ tests/model_ast_lints/unused/false_positives/spec_usage.move:9:5
+  │
+9 │     const SPEC_CONST: u64 = 100;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).
+
+warning: [lint] struct `SpecStruct` is unused
+   ┌─ tests/model_ast_lints/unused/false_positives/spec_usage.move:11:5
+   │
+11 │ ╭     struct SpecStruct has key {
+12 │ │         x: u64
+13 │ │     }
+   │ ╰─────^
+   │
+   = Remove it (if not published), or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_struct)]` (if for spec-only or otherwise needed).
+
+warning: [lint] constant `INVARIANT_BOUND` is unused
+   ┌─ tests/model_ast_lints/unused/false_positives/spec_usage.move:31:5
+   │
+31 │     const INVARIANT_BOUND: u64 = 1000;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).
+
+warning: [lint] constant `SPEC_FUN_CONST` is unused
+   ┌─ tests/model_ast_lints/unused/false_positives/spec_usage.move:48:5
+   │
+48 │     const SPEC_FUN_CONST: u64 = 50;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).
+
+warning: [lint] function `helper_for_spec` is unused
+   ┌─ tests/model_ast_lints/unused/false_positives/spec_usage.move:55:9
+   │
+55 │     fun helper_for_spec(): u64 {
+   │         ^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).

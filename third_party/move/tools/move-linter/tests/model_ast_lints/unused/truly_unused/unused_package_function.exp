@@ -1,0 +1,25 @@
+
+Diagnostics:
+warning: [lint] package function `unused_pkg_func` is unused
+  ┌─ tests/model_ast_lints/unused/truly_unused/unused_package_function.move:3:17
+  │
+3 │     package fun unused_pkg_func(): u64 { 1 }
+  │                 ^^^^^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).
+
+warning: [lint] package function `self_recursive_pkg` is unused
+  ┌─ tests/model_ast_lints/unused/truly_unused/unused_package_function.move:6:17
+  │
+6 │     package fun self_recursive_pkg(n: u64): u64 {
+  │                 ^^^^^^^^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).
+
+warning: [lint] package function `same_module_only_pkg` is only called from the same module: package visibility is not needed
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_package_function.move:12:17
+   │
+12 │     package fun same_module_only_pkg(): u64 { 2 }
+   │                 ^^^^^^^^^^^^^^^^^^^^
+   │
+   = Consider removing the visibility modifier, or suppress with `#[lint::skip(needless_visibility)]`.

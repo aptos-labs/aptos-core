@@ -8,7 +8,8 @@ use crate::{
         internal_indexer_db_config::InternalIndexerDBConfig,
         jwk_consensus_config::JWKConsensusConfig, node_config_loader::NodeConfigLoader,
         node_startup_config::NodeStartupConfig, persistable_config::PersistableConfig,
-        transaction_filters_config::TransactionFiltersConfig, utils::RootPath, AdminServiceConfig,
+        transaction_filters_config::TransactionFiltersConfig,
+        transaction_tracing_config::TransactionTracingConfig, utils::RootPath, AdminServiceConfig,
         ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerGrpcConfig,
         InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
         PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
@@ -83,6 +84,8 @@ pub struct NodeConfig {
     pub telemetry_service: TelemetryServiceConfig,
     #[serde(default)]
     pub transaction_filters: TransactionFiltersConfig,
+    #[serde(default)]
+    pub transaction_tracing: TransactionTracingConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
     #[serde(default)]

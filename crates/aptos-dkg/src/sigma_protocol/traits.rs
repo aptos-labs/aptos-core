@@ -12,7 +12,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::ensure;
+use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::arkworks::{
     msm::{merge_msm_inputs, MsmInput},
     random::sample_field_element,
@@ -24,6 +24,8 @@ use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::fmt::Debug;
 
+/// We can construct a sigma protocol proof with any homomorphism. In the proving
+/// process, we need the two methods of the `Witness` trait.
 pub trait Trait:
     homomorphism::Trait<Domain: Witness<Self::Scalar>, CodomainNormalized: Statement> + Sized
 // Need `Sized` here because of `Proof<Self::Scalar, Self>`
@@ -36,23 +38,24 @@ pub trait Trait:
 
     /// Construct a sigma protocol proof. Returns the proof and the normalized statement.
     ///
-    /// We're returning the normalised statement, because here the statement can be first normalised
-    /// together with A for more efficiency
+    /// We're returning the normalised statement, because here in prove() might be the first
+    /// time that the statement needs to be normalised; we can then do it together with normalising
+    /// A for more efficiency
     #[allow(non_snake_case)]
     fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         witness: &Self::Domain,
         statement: Self::Codomain, // TODO: should allow to either submit H::Codomain or H::CodomainNormalized
-        cntxt: &Ct,                // for SoK purposes
+        cntxt: &Ct,                // needed for SoK purposes
         rng: &mut R,
-    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized) {
-        let store_prover_commitment = true; // TODO: should move this to the method input when code is ready
+    ) -> Result<(Proof<Self::Scalar, Self>, Self::CodomainNormalized)> {
+        let store_prover_commitment = true; // TODO: should change this into a parameter when code is ready
 
         // Step 1: Sample randomness. Here the `witness` is only used to make sure that `r` has the right dimensions
         let r = witness.rand(rng);
 
         // Step 2: Compute commitment A = Ψ(r)
-        let A_proj = self.apply(&r);
+        let A_proj = self.apply(&r)?;
         let A = self.normalize(A_proj);
         let normalized_statement = self.normalize(statement); // TODO: combine these two normalisations
 
@@ -69,13 +72,13 @@ pub trait Trait:
             FirstProofItem::Challenge(c)
         };
 
-        (
+        Ok((
             Proof {
                 first_proof_item,
                 z,
             },
             normalized_statement,
-        )
+        ))
     }
 
     /// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
@@ -84,7 +87,7 @@ pub trait Trait:
     /// protocol-specific data to a Merlin transcript. In the abstraction used here,
     /// the protocol proves knowledge of a preimage under a homomorphism. Therefore,
     /// all public data relevant to that homomorphism (e.g., its MSM bases) and
-    /// the image under consideration are included in the transcript.
+    /// the homomorphism image under consideration are included in the transcript.
     ///
     /// # Arguments
     /// - `cntxt`: Extra "context" material that needs to be hashed for the challenge.
@@ -110,12 +113,12 @@ pub trait Trait:
             &mut fs_t, cntxt,
         );
 
-        // Append the homomorphism data (e.g. MSM bases) to the transcript. // TODO: (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
+        // Append the homomorphism data (e.g. MSM bases) to the transcript. // TODO: If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?
         <merlin::Transcript as fiat_shamir::SigmaProtocol<Self::Scalar, Self>>::append_sigma_protocol_msm_bases(
             &mut fs_t, self,
         );
 
-        // Append the public statement (the image of the witness) to the transcript
+        // Append the public statement (the homomorphism image of the witness) to the transcript
         <merlin::Transcript as fiat_shamir::SigmaProtocol<Self::Scalar, Self>>::append_sigma_protocol_public_statement(
             &mut fs_t,
             &statement,
@@ -140,10 +143,11 @@ pub trait Trait:
         proof: &Proof<Self::Scalar, Self>,
         cntxt: &Ct,
         rng: &mut R,
-    ) -> anyhow::Result<()> {
-        let prover_first_message = proof
-            .prover_commitment()
-            .expect("proof must contain commitment for Fiat–Shamir"); // TODO: implement required function for this
+    ) -> Result<()> {
+        let prover_first_message = match proof.prover_commitment() {
+            Some(m) => m,
+            None => bail!("proof must contain commitment for Fiat–Shamir"),
+        };
         let c = self.fiat_shamir_challenge_for_sigma_protocol(
             cntxt,
             public_statement,
@@ -163,7 +167,7 @@ pub trait Trait:
         challenge: Self::Scalar,
         response: &Self::Domain,
         rng: &mut R,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 }
 
 // Specialised version where the homomorphism consists of fixed-base MSMs over one elliptic curve.
@@ -191,8 +195,8 @@ pub trait CurveGroupTrait:
             <Self::Group as CurveGroup>::Affine,
             <Self::Group as PrimeGroup>::ScalarField,
         >,
-    ) -> anyhow::Result<()> {
-        let result = Self::msm_eval(input);
+    ) -> Result<()> {
+        let result = Self::msm_eval(input)?;
         ensure!(result == <Self::Group as AdditiveGroup>::ZERO);
         Ok(())
     }
@@ -204,29 +208,84 @@ pub trait CurveGroupTrait:
         prover_first_message: &Self::CodomainNormalized,
         prover_response: &Self::Domain,
         challenge: <Self::Group as PrimeGroup>::ScalarField,
-    ) -> Vec<MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>>
-    {
-        let msm_terms_for_prover_response = self.msm_terms(&prover_response);
+    ) -> Result<
+        Vec<
+            MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
+        >,
+    > {
+        let msm_terms_for_prover_response = self.msm_terms(&prover_response)?;
 
         let minus_one = -<Self::Group as PrimeGroup>::ScalarField::ONE;
         let minus_challenge = -challenge;
 
-        let msm_terms = msm_terms_for_prover_response
-            .into_iter()
-            .zip(prover_first_message.clone().into_iter()) // TODO: not sure the cloning is ideal here
-            .zip(public_statement.clone().into_iter())
-            .map(|((term, A), P)| {
-                let mut bases = term.bases().to_vec();
-                bases.push(A);
-                bases.push(P);
-                let mut scalars = term.scalars().to_vec();
-                scalars.push(minus_one);
-                scalars.push(minus_challenge);
-                MsmInput::new(bases, scalars).expect("sigma protocol MSM term")
-            })
-            .collect();
+        let mut it_msm = msm_terms_for_prover_response.into_iter();
+        let mut it_commitment = prover_first_message.clone().into_iter(); // not sure the cloning is efficient here
+        let mut it_statement = public_statement.clone().into_iter();
 
-        msm_terms
+        let msm_terms = std::iter::from_fn(|| {
+            match (it_msm.next(), it_commitment.next(), it_statement.next()) {
+                (Some(term), Some(A), Some(P)) => {
+                    let mut bases = term.bases().to_vec();
+                    bases.push(A);
+                    bases.push(P);
+                    let mut scalars = term.scalars().to_vec();
+                    scalars.push(minus_one);
+                    scalars.push(minus_challenge);
+                    Some(MsmInput::new(bases, scalars))
+                }
+                (None, None, None) => None,
+                _ => Some(Err(anyhow!(
+                    "length mismatch: msm_terms, prover_first_message, and public_statement must have the same arity"
+                ))),
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(msm_terms)
+    }
+
+    /// Returns the MSM terms that `verify()` needs, computing the Fiat–Shamir challenge
+    /// from the transcript (context, statement, prover commitment) and then calling
+    /// `msm_terms_for_verify_with_challenge()`.
+    ///
+    /// Accepts a proof produced with any homomorphism type `H2` that has the same
+    /// `Domain` and `CodomainNormalized` as `Self`. This allows verifying a proof
+    /// stored as `Proof<..., Homomorphism<'static, E>>` using a locally built
+    /// `Homomorphism<'a, E>` (with a short lifetime `'a`) without forcing `'static`.
+    ///
+    /// We're not using this at the moment, but it could be useful when batching in the MSMs
+    /// of a proper `CurveGroup`-style homomorphism (i.e., one that is not part of a tuple).
+    fn msm_terms_for_verify<Ct: Serialize, H2>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<<Self::Group as PrimeGroup>::ScalarField, H2>,
+        cntxt: &Ct,
+    ) -> Result<
+        Vec<
+            MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
+        >,
+    >
+    where
+        H2: homomorphism::Trait<
+            Domain = Self::Domain,
+            CodomainNormalized = Self::CodomainNormalized,
+        >,
+    {
+        let prover_first_message = match proof.prover_commitment() {
+            Some(m) => m,
+            None => bail!("proof must contain commitment for Fiat–Shamir"),
+        };
+        let c = self.fiat_shamir_challenge_for_sigma_protocol(
+            cntxt,
+            public_statement,
+            prover_first_message,
+        );
+        self.msm_terms_for_verify_with_challenge(
+            public_statement,
+            prover_first_message,
+            &proof.z,
+            c,
+        )
     }
 }
 
@@ -245,14 +304,14 @@ impl<T: CurveGroupTrait> Trait for T {
         challenge: Self::Scalar,
         response: &Self::Domain,
         rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let msm_terms = self.msm_terms_for_verify_with_challenge(
             public_statement,
             prover_commitment,
             response,
             challenge,
-        );
-        let merged = merge_msm_inputs(&msm_terms, rng);
+        )?;
+        let merged = merge_msm_inputs(&msm_terms, rng)?;
         self.check_msm_eval_zero(merged)?;
         Ok(())
     }

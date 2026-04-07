@@ -19,7 +19,8 @@ pub trait PolynomialCommitmentScheme {
     type Commitment: Clone + Into<Self::CommitmentNormalised>;
     /// Commitment representation accepted by the verifier (e.g. `MsmInput` so it can be merged into one MSM).
     type CommitmentNormalised: Clone;
-    type Proof: Clone;
+    type OpeningProofProjective: Clone + Into<Self::OpeningProof>;
+    type OpeningProof: Clone;
 
     fn setup<R: RngCore + CryptoRng>(
         // security_bits: usize, // make this an Option<usize> ??
@@ -43,7 +44,7 @@ pub trait PolynomialCommitmentScheme {
         r: Option<Self::WitnessField>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> Self::Proof;
+    ) -> Self::OpeningProofProjective;
 
     fn batch_open<R: RngCore + CryptoRng>(
         ck: Self::CommitmentKey,
@@ -53,14 +54,14 @@ pub trait PolynomialCommitmentScheme {
         rs: Option<Vec<Self::WitnessField>>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> Self::Proof;
+    ) -> Self::OpeningProofProjective;
 
     fn verify(
         vk: &Self::VerificationKey,
         com: impl Into<Self::CommitmentNormalised>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
-        proof: Self::Proof,
+        proof: Self::OpeningProof,
         trs: &mut merlin::Transcript,
         batch: bool,
     ) -> anyhow::Result<()>;

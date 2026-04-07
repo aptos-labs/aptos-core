@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+mod coverage_filter_covered;
+mod coverage_filter_uncovered;
 mod coverage_invalid_path;
 mod establish_baseline;
 mod get_uncovered;

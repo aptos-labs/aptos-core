@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Instrumentation pass which injects global invariants into the bytecode.
 
@@ -115,7 +116,7 @@ impl FunctionTargetProcessor for GlobalInvariantInstrumentationProcessor {
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if fun_env.is_native() || fun_env.is_intrinsic() {
+        if fun_env.no_verified_bytecode() {
             // nothing to do
             return data;
         }
@@ -126,6 +127,7 @@ impl FunctionTargetProcessor for GlobalInvariantInstrumentationProcessor {
         debug_assert!(matches!(
             data.variant,
             FunctionVariant::Verification(VerificationFlavor::Regular)
+                | FunctionVariant::Verification(VerificationFlavor::Split(..))
         ));
 
         // retrieve and transpose the analysis result

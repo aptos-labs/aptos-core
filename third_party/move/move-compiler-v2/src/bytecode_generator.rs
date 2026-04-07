@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{Options, COMPILER_BUG_REPORT_MSG};
 use codespan_reporting::diagnostic::Severity;
@@ -1045,7 +1044,10 @@ impl Generator<'_> {
             | Operation::ExtendEventStore
             | Operation::EventStoreIncludes
             | Operation::EventStoreIncludedIn
-            | Operation::Behavior(..) => self.internal_error(
+            | Operation::Behavior(..)
+            | Operation::SpecPublish(..)
+            | Operation::SpecRemove(..)
+            | Operation::SpecUpdate(..) => self.internal_error(
                 id,
                 format!("unsupported specification construct: `{:?}`", op),
             ),

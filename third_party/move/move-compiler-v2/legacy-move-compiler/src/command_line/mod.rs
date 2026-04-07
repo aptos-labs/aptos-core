@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use move_command_line_common::env::read_bool_env_var;
 
@@ -53,12 +54,6 @@ pub const DEBUG_FLAG: &str = "debug";
 // (usually for debugging situations where compiler flags are hard to reach)
 pub const MOVE_COMPILER_DUMP_ENV_VAR: &str = "MOVE_COMPILER_DUMP";
 pub const MVC_DUMP_ENV_VAR: &str = "MVC_DUMP";
-
-pub const MOVE_COMPILER_WARN_OF_DEPRECATION_USE: &str = "MOVE_COMPILER_WARN_OF_DEPRECATION_USE";
-pub const MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG: &str = "Wdeprecation";
-
-pub const WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS: &str = "WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS";
-pub const WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG: &str = "Wdeprecation-aptos";
 
 pub const WARN_UNUSED_FLAG: &str = "Wunused";
 

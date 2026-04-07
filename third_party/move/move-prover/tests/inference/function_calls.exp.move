@@ -8,8 +8,9 @@ module 0x42::function_calls {
     spec callee {
         ensures result == x + 1;
         aborts_if x == 18446744073709551615; // MAX_U64
+        pragma opaque = true;
         ensures [inferred] x != 18446744073709551615 ==> result == x + 1;
-        aborts_if [inferred] x > MAX_U64 - 1;
+        aborts_if [inferred] x == MAX_U64;
     }
 
     // Direct function call - should infer using ensures_of/aborts_of
@@ -17,7 +18,8 @@ module 0x42::function_calls {
         callee(x)
     }
     spec test_call(x: u64): u64 {
-        ensures [inferred] result == result_of<callee>(x);
+        pragma opaque = true;
+        ensures [inferred] result == callee(x);
         aborts_if [inferred] aborts_of<callee>(x);
     }
 
@@ -27,8 +29,9 @@ module 0x42::function_calls {
         callee(callee(x))
     }
     spec test_call_chain(x: u64): u64 {
-        ensures [inferred] result == at_3@result_of<callee>(result_of<callee>(x)@at_3);
-        aborts_if [inferred] at_3@aborts_of<callee>(result_of<callee>(x)@at_3);
+        pragma opaque = true;
+        ensures [inferred] result == callee(callee(x));
+        aborts_if [inferred] aborts_of<callee>(callee(x));
         aborts_if [inferred] aborts_of<callee>(x);
     }
 
@@ -39,7 +42,8 @@ module 0x42::function_calls {
         y
     }
     spec test_call_assign(x: u64): u64 {
-        ensures [inferred] result == result_of<callee>(x);
+        pragma opaque = true;
+        ensures [inferred] result == callee(x);
         aborts_if [inferred] aborts_of<callee>(x);
     }
 
@@ -49,6 +53,7 @@ module 0x42::function_calls {
         f(x)
     }
     spec apply(f: |u64|u64, x: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == result_of<f>(x);
         aborts_if [inferred] aborts_of<f>(x);
     }
@@ -59,6 +64,7 @@ module 0x42::function_calls {
         apply(|v| callee(v), x)
     }
     spec test_higher_order(x: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == result_of<apply>(|arg0| callee(arg0), x);
         aborts_if [inferred] aborts_of<apply>(|arg0| callee(arg0), x);
     }
@@ -88,10 +94,10 @@ module 0x42::function_calls {
     spec factorial {
         pragma opaque;
         ensures [inferred] n == 0 ==> result == 1;
-        ensures [inferred] n != 0 ==> result == n * result_of<factorial>(n - 1);
-        aborts_if [inferred] n != 0 && n * result_of<factorial>(n - 1) > MAX_U64;
+        ensures [inferred] n != 0 ==> result == n * factorial(n - 1);
+        aborts_if [inferred] n != 0 && n * factorial(n - 1) > MAX_U64;
         aborts_if [inferred] n != 0 && aborts_of<factorial>(n - 1);
-        aborts_if [inferred] n != 0 && n < 1;
+        aborts_if [inferred] n != 0 && n == 0;
     }
 
     // Caller of recursive function - should infer using behavioral predicates
@@ -99,7 +105,8 @@ module 0x42::function_calls {
         factorial(n)
     }
     spec test_factorial_call(n: u64): u64 {
-        ensures [inferred] result == result_of<factorial>(n);
+        pragma opaque = true;
+        ensures [inferred] result == factorial(n);
         aborts_if [inferred] aborts_of<factorial>(n);
     }
 
@@ -115,9 +122,9 @@ module 0x42::function_calls {
     spec is_even {
         pragma opaque;
         ensures [inferred] n == 0 ==> result == true;
-        ensures [inferred] n != 0 ==> result == result_of<is_odd>(n - 1);
+        ensures [inferred] n != 0 ==> result == is_odd(n - 1);
         aborts_if [inferred] n != 0 && aborts_of<is_odd>(n - 1);
-        aborts_if [inferred] n != 0 && n < 1;
+        aborts_if [inferred] n != 0 && n == 0;
     }
 
     fun is_odd(n: u64): bool {
@@ -130,9 +137,9 @@ module 0x42::function_calls {
     spec is_odd {
         pragma opaque;
         ensures [inferred] n == 0 ==> result == false;
-        ensures [inferred] n != 0 ==> result == result_of<is_even>(n - 1);
+        ensures [inferred] n != 0 ==> result == is_even(n - 1);
         aborts_if [inferred] n != 0 && aborts_of<is_even>(n - 1);
-        aborts_if [inferred] n != 0 && n < 1;
+        aborts_if [inferred] n != 0 && n == 0;
     }
 
     // Caller of mutually recursive functions
@@ -144,15 +151,14 @@ module 0x42::function_calls {
         }
     }
     spec test_parity(n: u64): bool {
-        ensures [inferred] result_of<is_even>(n)@at_5 ==> result == !at_5@result_of<is_odd>(n);
-        ensures [inferred] !result_of<is_even>(n)@at_5 ==> result == at_5@result_of<is_odd>(n);
-        aborts_if [inferred] at_5@aborts_of<is_odd>(n);
+        pragma opaque = true;
+        ensures [inferred] is_even(n) ==> result == !is_odd(n);
+        ensures [inferred] !is_even(n) ==> result == is_odd(n);
+        aborts_if [inferred] aborts_of<is_odd>(n);
         aborts_if [inferred] aborts_of<is_even>(n);
     }
 
 }
-// TODO(#18762): opaque recursive functions produce expected boogie errors
-// in the verification step because Boogie doesn't generate procedure bodies for them.
 /*
 Verification: Succeeded.
 */

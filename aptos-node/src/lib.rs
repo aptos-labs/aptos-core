@@ -701,6 +701,31 @@ pub fn setup_environment_and_start_node(
     // Starts the admin service
     let mut admin_service = services::start_admin_service(&node_config);
 
+    // Initialize transaction tracing from config
+    {
+        let tracing_cfg = &node_config.transaction_tracing;
+        if tracing_cfg.enabled && !tracing_cfg.filter.sender_allowlist.is_empty() {
+            let filter = aptos_transaction_tracing::filter::TransactionFilter::new(
+                true,
+                tracing_cfg
+                    .filter
+                    .sender_allowlist
+                    .iter()
+                    .copied()
+                    .collect(),
+                tracing_cfg.batch_sample_rate,
+                tracing_cfg.txn_sample_rate,
+            );
+            aptos_transaction_tracing::store::TransactionTraceStore::global().update_filter(filter);
+            aptos_logger::info!(
+                "Transaction tracing enabled for {} sender(s), batch_sample_rate={}, txn_sample_rate={}",
+                tracing_cfg.filter.sender_allowlist.len(),
+                tracing_cfg.batch_sample_rate,
+                tracing_cfg.txn_sample_rate,
+            );
+        }
+    }
+
     // Set up the storage database and any RocksDB checkpoints
     let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
@@ -715,6 +740,12 @@ pub fn setup_environment_and_start_node(
 
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
+
+    // Initialize the DigestKey for chunky DKG
+    aptos_dkg_runtime::initialize_digest_key_with_counters(
+        node_config.consensus.decryption_setup_blob_path.as_ref(),
+        chain_id,
+    );
 
     // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(

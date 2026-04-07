@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+module 0x66::test_generic_pack_swapped_type_params
+
+struct Pair<A, B>
+    first: A
+    second: B
+
+// Invalid: pack$Pair returns Pair<T1, T0> — the return type has non-canonical type
+// params. The bytecode is correct (pack Pair<T0, T1>); only the declared return type is wrong.
+#[pack] public fun pack$Pair<A, B>(l0: A, l1: B): Pair<B, A>
+    move_loc l0
+    move_loc l1
+    pack Pair<A, B>
+    ret

@@ -88,7 +88,7 @@ fn benchmark_commitment_scheme<PCS: PolynomialCommitmentScheme>(c: &mut Criterio
                     let mut rng = rand::thread_rng();
                     let r = PCS::random_witness(&mut rng);
                     let mut trs = merlin::Transcript::new(b"pcs-bench");
-                    let proof = PCS::open(
+                    let proof_projective = PCS::open(
                         &ck,
                         poly.clone(),
                         challenge.clone(),
@@ -96,6 +96,7 @@ fn benchmark_commitment_scheme<PCS: PolynomialCommitmentScheme>(c: &mut Criterio
                         &mut rng,
                         &mut trs,
                     );
+                    let proof = proof_projective.into();
                     (challenge, val, com, proof, trs)
                 },
                 |(challenge, val, com, proof, mut trs)| {

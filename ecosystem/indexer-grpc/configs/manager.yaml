@@ -1,0 +1,18 @@
+health_check_port: 8091
+server_config:
+  chain_id: 4
+  service_config:
+    listen_address: 0.0.0.0:50052
+  cache_config:
+    max_cache_size: 1073741824
+    target_cache_size: 536870912
+  file_store_config:
+    file_store_type: LocalFileStore
+    local_file_store_path: /tmp/indexer_grpc_filestore
+  self_advertised_address: "http://127.0.0.1:50052"
+  grpc_manager_addresses:
+    - "http://127.0.0.1:50052"
+  fullnode_addresses:
+    - "http://127.0.0.1:50055"
+  is_master: true
+  allow_fn_fallback: true

@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     diag, diagnostics::Diagnostic, parser::syntax::make_loc, shared::CompilationEnv,
@@ -51,6 +52,7 @@ pub enum Tok {
     XorEqual,
     ShlEqual,
     ShrEqual,
+    PipeTilde,
     EqualEqual,
     EqualGreater,
     EqualEqualGreater,
@@ -126,6 +128,7 @@ impl fmt::Display for Tok {
             XorEqual => "^=",
             ShlEqual => "<<=",
             ShrEqual => ">>=",
+            PipeTilde => "|~",
             Comma => ",",
             Minus => "-",
             Period => ".",
@@ -560,6 +563,8 @@ fn find_token(
         '|' => {
             if text.starts_with("||") {
                 (Tok::PipePipe, 2)
+            } else if text.starts_with("|~") {
+                (Tok::PipeTilde, 2)
             } else if text.starts_with("|=") {
                 (Tok::BitOrEqual, 2)
             } else {

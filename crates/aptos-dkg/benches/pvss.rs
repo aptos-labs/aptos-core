@@ -26,43 +26,81 @@ use criterion::{
 };
 use more_asserts::assert_le;
 use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
+use std::collections::HashSet;
 
 // const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 
+/// If set, only run these benchmark groups (comma-separated). Avoids expensive setup for groups
+/// you're not running. Values: `unweighted_das`, `chunky_v1`, `chunky_v2`, `weighted_das`. Unset or `all` = run all.
+fn enabled_bench_groups() -> Option<HashSet<String>> {
+    let v = std::env::var("DKG_BENCH_GROUP").ok()?;
+    let v = v.trim();
+    if v.is_empty() || v.eq_ignore_ascii_case("all") {
+        return None;
+    }
+    Some(
+        v.split(',')
+            .map(|s| s.trim().to_ascii_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect(),
+    )
+}
+
+fn group_enabled(groups: &Option<HashSet<String>>, name: &str) -> bool {
+    match groups {
+        None => true,
+        Some(set) => set.contains(&name.to_ascii_lowercase()),
+    }
+}
+
 pub fn all_groups(c: &mut Criterion) {
     println!("Rayon num threads: {}", rayon::current_num_threads());
-
-    // weighted PVSS with aggregatable subtranscript; only doing one at the moment because large configs are a bit slow and not relevant anyway
-    // Chunky_v1
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(16u8), BLS12_381);
-    }
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
-    }
-
-    // Chunky_v2
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(16u8), BLS12_381);
-    }
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
-    }
+    let enabled = enabled_bench_groups();
 
     // unweighted aggregatable PVSS, `blstrs` only so this is BLS12-381
-    for tc in get_threshold_configs_for_benchmarking() {
-        aggregatable_pvss_group::<das::Transcript>(&tc, c);
+    if group_enabled(&enabled, "unweighted_das") {
+        for tc in get_threshold_configs_for_benchmarking() {
+            aggregatable_pvss_group::<das::Transcript>(&tc, c);
+        }
     }
 
     // weighted aggregatable PVSS, `blstrs` only so this is BLS12-381
-    for wc in get_weighted_configs_for_benchmarking() {
-        let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
-        weighted_pvss_group(&wc, d, c);
+    if group_enabled(&enabled, "weighted_das") {
+        for wc in get_weighted_configs_for_benchmarking() {
+            let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
+            weighted_pvss_group(&wc, d, c);
 
-        // Note: Insecure, so not interested in benchmarks.
-        // let d = pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
-        // weighted_pvss_group(&wc, d, c);
+            // Note: Insecure, so not interested in benchmarks.
+            // let d = pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
+            // weighted_pvss_group(&wc, d, c);
+        }
+    }
+
+    // Chunky_v1 and Chunky_v2 share the same setup (config, keys, PP); run it once and reuse.
+    let chunky_v1_enabled = group_enabled(&enabled, "chunky_v1");
+    let chunky_v2_enabled = group_enabled(&enabled, "chunky_v2");
+    if chunky_v1_enabled || chunky_v2_enabled {
+        let configs: Vec<_> = get_weighted_configs_for_benchmarking()
+            .into_iter()
+            .take(1)
+            .collect();
+        for tc in &configs {
+            let mut rng = StdRng::seed_from_u64(42);
+            let ell = Some(32);
+            // Single PP setup (table + dekart); keys/secrets generated once per variant.
+            let (d1, d2) = test_utils::setup_dealing_chunky_both(tc, ell, &mut rng);
+            if chunky_v1_enabled {
+                subaggregatable_pvss_group_with_dealing::<Chunky_v1<Bls12_381>>(
+                    tc, c, ell, BLS12_381, &d1,
+                );
+            }
+            if chunky_v2_enabled {
+                subaggregatable_pvss_group_with_dealing::<Chunky_v2<Bls12_381>>(
+                    tc, c, ell, BLS12_381, &d2,
+                );
+            }
+        }
     }
 }
 
@@ -79,7 +117,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
-    pvss_aggregate::<T, WallTime>(sc, &mut group);
+    pvss_aggregate::<T, WallTime>(sc, &d.pp, &mut group);
     pvss_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
         sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
@@ -94,10 +132,31 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 pub fn subaggregatable_pvss_group<T>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
-    ell: Option<u8>,
+    ell: Option<usize>,
     curve_name: &str,
 ) -> DealingArgs<T>
 where
+    T: MalleableTranscript
+        + HasAggregatableSubtranscript<
+            Subtranscript: Aggregatable<
+                SecretSharingConfig = <T as TranscriptCore>::SecretSharingConfig,
+            >,
+        >,
+{
+    let mut rng = StdRng::seed_from_u64(42);
+    let d = test_utils::setup_dealing::<T, _>(sc, ell, &mut rng);
+    subaggregatable_pvss_group_with_dealing(sc, c, ell, curve_name, &d);
+    d
+}
+
+/// Same benchmarks as `subaggregatable_pvss_group` but use pre-computed dealing args (e.g. shared with another chunky variant).
+pub fn subaggregatable_pvss_group_with_dealing<T>(
+    sc: &T::SecretSharingConfig,
+    c: &mut Criterion,
+    ell: Option<usize>,
+    curve_name: &str,
+    d: &DealingArgs<T>,
+) where
     T: MalleableTranscript
         + HasAggregatableSubtranscript<
             Subtranscript: Aggregatable<
@@ -111,23 +170,16 @@ where
         None => format!("pvss/{}/{}", name, curve_name),
     };
     let mut group = c.benchmark_group(group_name);
-    let mut rng = StdRng::seed_from_u64(42);
 
-    // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
-    let d = test_utils::setup_dealing::<T, _>(sc, ell, &mut rng);
-
-    // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_nonaggregate_serialize::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
-    pvss_subaggregate::<T, WallTime>(sc, &mut group);
+    pvss_subaggregate::<T, WallTime>(sc, &d.pp, &mut group);
     pvss_nonaggregate_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
         sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
     );
 
     group.finish();
-
-    d
 }
 
 pub fn weighted_pvss_group<
@@ -193,6 +245,7 @@ fn pvss_deal<T: Transcript, M: Measurement>(
 
 fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
     sc: &<T as TranscriptCore>::SecretSharingConfig,
+    pp: &T::PublicParameters,
     g: &mut BenchmarkGroup<M>,
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
@@ -201,13 +254,7 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
     g.bench_function(format!("aggregate/{}", sc), move |b| {
         b.iter_with_setup(
             || {
-                let trx = T::generate(
-                    &sc,
-                    &T::PublicParameters::with_max_num_shares(
-                        sc.get_total_num_shares().try_into().unwrap(),
-                    ),
-                    &mut rng,
-                );
+                let trx = T::generate(&sc, &pp, &mut rng);
                 (trx.clone(), trx)
             },
             |(first, second)| {
@@ -218,8 +265,11 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
     });
 }
 
-fn pvss_subaggregate<T, M: Measurement>(sc: &T::SecretSharingConfig, g: &mut BenchmarkGroup<M>)
-where
+fn pvss_subaggregate<T, M: Measurement>(
+    sc: &T::SecretSharingConfig,
+    pp: &T::PublicParameters,
+    g: &mut BenchmarkGroup<M>,
+) where
     T: HasAggregatableSubtranscript<
         Subtranscript: Aggregatable<
             SecretSharingConfig = <T as TranscriptCore>::SecretSharingConfig,
@@ -232,13 +282,7 @@ where
     g.bench_function(format!("aggregate/{}", sc), move |b| {
         b.iter_with_setup(
             || {
-                let trs = T::generate(
-                    &sc,
-                    &T::PublicParameters::with_max_num_shares(
-                        sc.get_total_num_shares().try_into().unwrap(),
-                    ),
-                    &mut rng,
-                );
+                let trs = T::generate(&sc, &pp, &mut rng);
                 (trs.clone(), trs)
             },
             |(first, second)| {
@@ -374,7 +418,7 @@ fn pvss_nonaggregate_verify<T: HasAggregatableSubtranscript, M: Measurement>(
                 // we have to serialize and deserialize because otherwise verify gets a transcript with "non-normalised" projective group elements
             },
             |trx| {
-                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux, &mut rng2)
+                trx.verify(&sc, &pp, spks, &eks, &NoAux, &mut rng2)
                     .expect("PVSS transcript verification should succeed");
             },
         )
@@ -466,8 +510,10 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
         &mut rng,
     );
 
-    // TODO: the following code is obviously messy. Easiest fix is to extend `get_player_weight()`
+    // TODO_1: the following code is obviously messy. Easiest fix is to extend `get_player_weight()`
     // to `SecretSharingConfig`
+    // TODO_2: it is also inaccurate, it should be aggregating transactions first which means the
+    // actual bit size of the decrypted shares is much higher!!
     g.bench_function(format!("decrypt-share/{}", sc), move |b| {
         // Pre-compute valid player indices by checking if get_public_key_share
         // returns non-empty results. For weighted transcripts, DealtPubKeyShare is Vec,
@@ -522,9 +568,7 @@ fn pvss_transcript_random<T: Transcript, M: Measurement>(
         b.iter(|| {
             T::generate(
                 &sc,
-                &T::PublicParameters::with_max_num_shares(
-                    sc.get_total_num_shares().try_into().unwrap(),
-                ),
+                &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
                 &mut rng,
             )
         })
@@ -533,7 +577,6 @@ fn pvss_transcript_random<T: Transcript, M: Measurement>(
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().sample_size(50);
-    //config = Criterion::default();
+    config = Criterion::default().sample_size(10);
     targets = all_groups);
 criterion_main!(benches);

@@ -41,10 +41,6 @@ pub trait BatchThresholdEncryption {
         + Send
         + Sync;
 
-    /// The round number used when generating a digest. For security to hold, validators must only
-    /// generate a single decryption key corresponding to a round number.
-    type Round;
-
     /// The succinct commitment to the set of ciphertexts.
     type Digest: Sized + Send + Sync;
 
@@ -123,7 +119,7 @@ pub trait BatchThresholdEncryption {
     fn digest(
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
-        round: Self::Round,
+        round: u64,
     ) -> Result<(Self::Digest, Self::EvalProofsPromise)>;
 
     /// Validators *must* verify each ciphertext before approving it to be decrypted, in order to
@@ -227,6 +223,6 @@ pub trait VerificationKey: Serialize + DeserializeOwned {
     fn player(&self) -> Player;
 }
 
-pub trait DecryptionKeyShare: Serialize + DeserializeOwned {
+pub trait DecryptionKeyShare: Serialize + DeserializeOwned + Clone {
     fn player(&self) -> Player;
 }

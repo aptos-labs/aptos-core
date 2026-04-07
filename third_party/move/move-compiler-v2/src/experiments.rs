@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Defines 'experiments' (flags) for the compiler. Most phases of the
 //! compiler can be enabled or disabled via an experiment. An experiment
@@ -132,6 +131,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::SPEC_REWRITE_PURE_FUNS.to_string(),
+            description: "Derive spec functions for all pure Move functions (prover only)"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::LAMBDA_LIFTING_INLINE.to_string(),
             description: "Whether inline functions shall be included in lambda lifting".to_string(),
             default: Given(false),
@@ -187,21 +192,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             name: Experiment::UNUSED_ASSIGNMENT_CHECK.to_string(),
             description: "Whether to check for unused assignments".to_string(),
             default: Inherited(Experiment::CHECKS.to_string()),
-        },
-        Experiment {
-            name: Experiment::UNUSED_CONSTANT_CHECK.to_string(),
-            description: "Whether to check for unused constants".to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::UNUSED_FUNCTION_CHECK.to_string(),
-            description: "Whether to check for unused private functions".to_string(),
-            default: Given(false),
-        },
-        Experiment {
-            name: Experiment::UNUSED_STRUCT_CHECK.to_string(),
-            description: "Whether to check for unused private structs".to_string(),
-            default: Given(false),
         },
         Experiment {
             name: Experiment::VARIABLE_COALESCING.to_string(),
@@ -366,6 +356,7 @@ impl Experiment {
     pub const SKIP_INLINING_INLINE_FUNS: &'static str = "skip-inlining-inline-funs";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
+    pub const SPEC_REWRITE_PURE_FUNS: &'static str = "spec-rewrite-pure-funs";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
     pub const STOP_AFTER_EXTENDED_CHECKS: &'static str = "stop-after-extended-checks";
     pub const STOP_BEFORE_EXTENDED_CHECKS: &'static str = "stop-before-extended-checks";
@@ -374,9 +365,6 @@ impl Experiment {
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
     pub const UNSAFE_PACKAGE_VISIBILITY: &'static str = "unsafe-package-visibility";
     pub const UNUSED_ASSIGNMENT_CHECK: &'static str = "unused-assignment-check";
-    pub const UNUSED_CONSTANT_CHECK: &'static str = "unused-constant-check";
-    pub const UNUSED_FUNCTION_CHECK: &'static str = "unused-function-check";
-    pub const UNUSED_STRUCT_CHECK: &'static str = "unused-struct-check";
     pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";
     pub const USAGE_CHECK: &'static str = "usage-check";
     pub const VARIABLE_COALESCING: &'static str = "variable-coalescing";

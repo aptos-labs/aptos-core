@@ -366,18 +366,21 @@ fn native_format_impl(
                     && type_.module.as_str() == "string"
                     && type_.address == AccountAddress::ONE
                 {
-                    let v = strct.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
+                    let v = strct
+                        .unpack()?
+                        .next()
+                        .ok_or_else(|| {
+                            PartialVMError::new_invariant_violation("String has one field")
+                        })?
+                        .value_as::<Vec<u8>>()?;
                     if context.should_charge_gas {
                         context
                             .context
                             .charge(STRING_UTILS_PER_BYTE * NumBytes::new(v.len() as u64))?;
                     }
-                    write!(
-                        out,
-                        "\"{}\"",
-                        bytes_as_escaped_string(std::str::from_utf8(&v).unwrap())
-                    )
-                    .unwrap();
+                    let string = std::str::from_utf8(&v)
+                        .map_err(|_| PartialVMError::new_invariant_violation("Non-UTF8 string"))?;
+                    write!(out, "\"{}\"", bytes_as_escaped_string(string)).unwrap();
                     return Ok(());
                 } else if type_.is_option() {
                     if context.context.get_feature_flags().is_enum_option_enabled() {
@@ -592,8 +595,7 @@ fn native_format_list(
         .map_err(SafeNativeError::InvariantViolation)?;
 
     let fmt_ref = safely_pop_arg!(arguments, VectorRef);
-    let fmt_ref2 = fmt_ref.as_bytes_ref();
-    // Could use unsafe here, but it's forbidden in this crate.
+    let fmt_ref2 = fmt_ref.as_bytes_ref()?;
     let fmt = std::str::from_utf8(fmt_ref2.as_slice())
         .map_err(|_| SafeNativeError::abort(EINVALID_FORMAT))?;
 

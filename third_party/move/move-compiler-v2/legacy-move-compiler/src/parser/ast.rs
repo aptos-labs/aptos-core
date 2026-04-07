@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::shared::{
     ast_debug::*, Identifier, Name, NamedAddressMap, NamedAddressMapIndex, NamedAddressMaps,
@@ -387,6 +388,38 @@ pub enum SpecApplyFragment_ {
 
 pub type SpecApplyFragment = Spanned<SpecApplyFragment_>;
 
+/// A proof statement inside a `proof { ... }` block.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Proof_ {
+    /// `let name = exp;` — introduce a local abbreviation.
+    Let(Name, Exp),
+    /// `if (cond) proof [else proof]` — conditional proof.
+    IfElse(Exp, Box<Proof>, Option<Box<Proof>>),
+    /// `{ proof_stmts }` — a block of proof statements.
+    Block(Vec<Proof>),
+    /// `assert exp;` — auxiliary lemma assertion.
+    Assert(Exp),
+    /// `assume [trusted] exp;` — guarded assumption (requires `[trusted]`).
+    Assume(Vec<PragmaProperty>, Exp),
+    /// `apply lemma(args);` — instantiate a lemma.
+    Apply(NameAccessChain, Vec<Exp>),
+    /// `forall bindings [triggers] apply lemma(args);` — quantified lemma instantiation.
+    ForallApply {
+        bindings: BindWithRangeList,
+        patterns: Vec<Vec<Exp>>,
+        lemma: NameAccessChain,
+        args: Vec<Exp>,
+    },
+    /// `calc(e1 relop e2 relop ... en);` — calculational proof chain.
+    Calc(Vec<(Exp, Option<BinOp>)>),
+    /// `post <proof_stmt>` — emit at return point instead of entry.
+    Post(Box<Proof>),
+    /// `split expr;` — case-split on boolean or enum expression.
+    Split(Exp),
+}
+
+pub type Proof = Spanned<Proof_>;
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum SpecBlockMember_ {
@@ -400,7 +433,30 @@ pub enum SpecBlockMember_ {
         uninterpreted: bool,
         name: FunctionName,
         signature: FunctionSignature,
+        modifies: Vec<Exp>,
+        reads: Vec<Type>,
         body: FunctionBody,
+    },
+    /// Declares which resources a function-typed parameter may modify.
+    /// `modifies_of<param>(formals) target1, target2, ...;`
+    ModifiesOf {
+        fun_param: Name,
+        params: Vec<(Var, Type)>,
+        targets: Vec<Exp>,
+    },
+    /// Declares which resource types a function-typed parameter may read.
+    /// `reads_of<param> Type1, Type2, ...;`
+    ReadsOf {
+        fun_param: Name,
+        types: Vec<Type>,
+    },
+    /// Declares which resources a function modifies: `modifies R[addr], S[addr];`
+    Modifies {
+        targets: Vec<Exp>,
+    },
+    /// Declares which resource types a function reads: `reads R, S;`
+    Reads {
+        types: Vec<Type>,
     },
     Variable {
         is_global: bool,
@@ -430,6 +486,17 @@ pub enum SpecBlockMember_ {
     Pragma {
         properties: Vec<PragmaProperty>,
     },
+    /// `proof { ... }` — a structured proof block guiding the SMT solver.
+    Proof {
+        body: Proof,
+    },
+    /// `spec lemma name(params) { requires; ensures; } proof { ... }`
+    Lemma {
+        name: FunctionName,
+        signature: FunctionSignature,
+        spec_members: Vec<SpecBlockMember>,
+        proof: Option<Proof>,
+    },
 }
 
 pub type SpecBlockMember = Spanned<SpecBlockMember_>;
@@ -443,7 +510,6 @@ pub enum SpecConditionKind_ {
     AbortsIf,
     AbortsWith,
     SucceedsIf,
-    Modifies,
     Emits,
     Ensures,
     Requires,
@@ -652,8 +718,6 @@ pub enum BehaviorKind {
     AbortsOf,
     /// `ensures_of<f>(x, y)` - the postcondition of function `f`
     EnsuresOf,
-    /// `modifies_of<f>(x)` - the modify clauses of function `f`
-    ModifiesOf,
     /// `result_of<f>(x)` - deterministic result selector based on `ensures_of`
     ResultOf,
 }
@@ -751,31 +815,26 @@ pub enum Exp_ {
     ),
     // spec only
     // Behavior predicate for function values in specifications:
-    // [pre_label@]requires_of<f[<T1, ..., Tn>]>(args)[@post_label]
-    // [pre_label@]aborts_of<f[<T1, ..., Tn>]>(args)[@post_label]
-    // [pre_label@]ensures_of<f[<T1, ..., Tn>]>(args)[@post_label]
-    // [pre_label@]modifies_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // requires_of<f[<T1, ..., Tn>]>(args)
+    // aborts_of<f[<T1, ..., Tn>]>(args)
+    // ensures_of<f[<T1, ..., Tn>]>(args)
+    // result_of<f[<T1, ..., Tn>]>(args)
     Behavior(
         BehaviorKind,
-        Option<Label>,     // pre-state label
         NameAccessChain,   // function name
         Option<Vec<Type>>, // optional type instantiation
         Spanned<Vec<Exp>>, // arguments
-        Option<Label>,     // post-state label
     ), // spec only
-    // Labeled resource access in specifications:
-    // label@global<R>(addr) or label@exists<R>(addr)
-    LabeledCall(
-        Label,             // memory state label
-        NameAccessChain,   // "global" or "exists"
-        Option<Vec<Type>>, // type arguments
-        Spanned<Vec<Exp>>, // call arguments
-    ), // spec only
-    // label@R[addr] — labeled resource index access
-    LabeledIndex(
-        Label,    // memory state label
-        Box<Exp>, // target (resource name expression)
-        Box<Exp>, // index (address expression)
+    // State-labeled expression in specifications:
+    //   label |~ expr              (single state)
+    //   pre.. |~ expr              (pre-only range)
+    //   ..post |~ expr             (post-only range)
+    //   pre..post |~ expr          (full range)
+    // Evaluates expr with memory operations resolved to labeled states.
+    StateLabeled(
+        Option<Label>, // pre-state label
+        Box<Exp>,      // inner expression
+        Option<Label>, // post-state label
     ), // spec only
     // (e1, ..., en)
     ExpList(Vec<Exp>),
@@ -1492,7 +1551,6 @@ impl AstDebug for SpecConditionKind_ {
             AbortsIf => w.write("aborts_if "),
             AbortsWith => w.write("aborts_with "),
             SucceedsIf => w.write("succeeds_if "),
-            Modifies => w.write("modifies "),
             Emits => w.write("emits "),
             Ensures => w.write("ensures "),
             Requires => w.write("requires "),
@@ -1535,6 +1593,8 @@ impl AstDebug for SpecBlockMember_ {
                 uninterpreted,
                 signature,
                 name,
+                modifies,
+                reads,
                 body,
             } => {
                 if *uninterpreted {
@@ -1545,10 +1605,63 @@ impl AstDebug for SpecBlockMember_ {
                 w.write("fun ");
                 w.write(format!("{}", name));
                 signature.ast_debug(w);
+                if !modifies.is_empty() {
+                    w.write(" modifies ");
+                    w.list(modifies, ", ", |w, e| {
+                        e.ast_debug(w);
+                        true
+                    });
+                }
+                if !reads.is_empty() {
+                    w.write(" reads ");
+                    w.list(reads, ", ", |w, ty| {
+                        ty.ast_debug(w);
+                        true
+                    });
+                }
                 match &body.value {
                     FunctionBody_::Defined(body) => w.block(|w| body.ast_debug(w)),
                     FunctionBody_::Native => w.writeln(";"),
                 }
+            },
+            SpecBlockMember_::ModifiesOf {
+                fun_param,
+                params,
+                targets,
+            } => {
+                w.write(format!("modifies_of<{}>", fun_param));
+                w.write("(");
+                w.list(params, ", ", |w, (v, ty)| {
+                    w.write(format!("{}: ", v));
+                    ty.ast_debug(w);
+                    true
+                });
+                w.write(") ");
+                w.list(targets, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+            },
+            SpecBlockMember_::ReadsOf { fun_param, types } => {
+                w.write(format!("reads_of<{}> ", fun_param));
+                w.list(types, ", ", |w, ty| {
+                    ty.ast_debug(w);
+                    true
+                });
+            },
+            SpecBlockMember_::Modifies { targets } => {
+                w.write("modifies ");
+                w.list(targets, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+            },
+            SpecBlockMember_::Reads { types } => {
+                w.write("reads ");
+                w.list(types, ", ", |w, ty| {
+                    ty.ast_debug(w);
+                    true
+                });
             },
             SpecBlockMember_::Variable {
                 is_global,
@@ -1615,6 +1728,139 @@ impl AstDebug for SpecBlockMember_ {
                     p.ast_debug(w);
                     true
                 });
+            },
+            SpecBlockMember_::Proof { body } => {
+                w.write("proof ");
+                body.ast_debug(w);
+            },
+            SpecBlockMember_::Lemma {
+                name,
+                signature,
+                spec_members,
+                proof,
+            } => {
+                w.write(format!("lemma {}", name));
+                signature.ast_debug(w);
+                w.write(" ");
+                w.block(|w| {
+                    for m in spec_members {
+                        m.ast_debug(w);
+                        w.new_line();
+                    }
+                });
+                if let Some(p) = proof {
+                    w.write(" proof ");
+                    p.ast_debug(w);
+                }
+            },
+        }
+    }
+}
+
+impl AstDebug for Proof_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        match self {
+            Proof_::Let(name, exp) => {
+                w.write(format!("let {} = ", name));
+                exp.ast_debug(w);
+                w.write(";");
+            },
+            Proof_::IfElse(cond, then_branch, else_branch) => {
+                w.write("if (");
+                cond.ast_debug(w);
+                w.write(") ");
+                then_branch.ast_debug(w);
+                if let Some(eb) = else_branch {
+                    w.write(" else ");
+                    eb.ast_debug(w);
+                }
+            },
+            Proof_::Block(stmts) => {
+                w.block(|w| {
+                    for stmt in stmts {
+                        stmt.ast_debug(w);
+                        w.new_line();
+                    }
+                });
+            },
+            Proof_::Assert(exp) => {
+                w.write("assert ");
+                exp.ast_debug(w);
+                w.write(";");
+            },
+            Proof_::Assume(props, exp) => {
+                w.write("assume ");
+                if !props.is_empty() {
+                    w.write("[");
+                    w.list(props, ", ", |w, p| {
+                        p.ast_debug(w);
+                        true
+                    });
+                    w.write("] ");
+                }
+                exp.ast_debug(w);
+                w.write(";");
+            },
+            Proof_::Apply(name, args) => {
+                w.write("apply ");
+                name.ast_debug(w);
+                w.write("(");
+                w.list(args, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+                w.write(");");
+            },
+            Proof_::ForallApply {
+                bindings,
+                patterns,
+                lemma,
+                args,
+            } => {
+                w.write("forall ");
+                w.list(&bindings.value, ", ", |w, sp!(_, (bind, range))| {
+                    bind.ast_debug(w);
+                    w.write(": ");
+                    range.ast_debug(w);
+                    true
+                });
+                for group in patterns {
+                    w.write(" {");
+                    w.list(group, ", ", |w, e| {
+                        e.ast_debug(w);
+                        true
+                    });
+                    w.write("}");
+                }
+                w.write(" apply ");
+                lemma.ast_debug(w);
+                w.write("(");
+                w.list(args, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+                w.write(");");
+            },
+            Proof_::Calc(steps) => {
+                w.write("calc(");
+                for (i, (exp, _op)) in steps.iter().enumerate() {
+                    if i > 0 {
+                        if let Some(op) = &steps[i - 1].1 {
+                            w.write(format!(" {} ", op));
+                        }
+                    }
+                    exp.ast_debug(w);
+                }
+                w.write(");");
+            },
+            Proof_::Post(inner) => {
+                w.write("post ");
+                inner.ast_debug(w);
+            },
+            Proof_::Split(exp) => {
+                w.write("split ");
+                exp.ast_debug(w);
+                w.write(";");
             },
         }
     }
@@ -2115,15 +2361,11 @@ impl AstDebug for Exp_ {
                 s.ast_debug(w);
                 w.write("}");
             },
-            E::Behavior(kind, pre_label, fn_name, type_args, sp!(_, args), post_label) => {
-                if let Some(label) = pre_label {
-                    w.write(format!("{}@", label.value().as_str()));
-                }
+            E::Behavior(kind, fn_name, type_args, sp!(_, args)) => {
                 let kind_str = match kind {
                     BehaviorKind::RequiresOf => "requires_of",
                     BehaviorKind::AbortsOf => "aborts_of",
                     BehaviorKind::EnsuresOf => "ensures_of",
-                    BehaviorKind::ModifiesOf => "modifies_of",
                     BehaviorKind::ResultOf => "result_of",
                 };
                 w.write(kind_str);
@@ -2137,28 +2379,15 @@ impl AstDebug for Exp_ {
                 w.write(">(");
                 w.comma(args, |w, e| e.ast_debug(w));
                 w.write(")");
+            },
+            E::StateLabeled(pre_label, inner, post_label) => {
+                if let Some(label) = pre_label {
+                    w.write(format!("{}@", label.value().as_str()));
+                }
+                inner.ast_debug(w);
                 if let Some(label) = post_label {
                     w.write(format!("@{}", label.value().as_str()));
                 }
-            },
-            E::LabeledCall(label, name, type_args, sp!(_, args)) => {
-                w.write(format!("{}@", label.value().as_str()));
-                name.ast_debug(w);
-                if let Some(tys) = type_args {
-                    w.write("<");
-                    w.comma(tys, |w, ty| ty.ast_debug(w));
-                    w.write(">");
-                }
-                w.write("(");
-                w.comma(args, |w, e| e.ast_debug(w));
-                w.write(")");
-            },
-            E::LabeledIndex(label, target, index) => {
-                w.write(format!("{}@", label.value().as_str()));
-                target.ast_debug(w);
-                w.write("[");
-                index.ast_debug(w);
-                w.write("]");
             },
             E::UnresolvedError => w.write("_|_"),
         }

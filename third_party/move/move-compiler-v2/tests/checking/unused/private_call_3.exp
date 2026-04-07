@@ -1,17 +1,5 @@
 
 Diagnostics:
-warning: function `inaccessible` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
-  ┌─ tests/checking/unused/private_call_3.move:8:16
-  │
-8 │     inline fun inaccessible(): u64 {
-  │                ^^^^^^^^^^^^
-
-warning: function `inaccessible` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
-   ┌─ tests/checking/unused/private_call_3.move:24:16
-   │
-24 │     inline fun inaccessible(): u64 {
-   │                ^^^^^^^^^^^^
-
 error: function `0x42::o::inaccessible` is private to module `0x42::o`
    ┌─ tests/checking/unused/private_call_3.move:46:16
    │

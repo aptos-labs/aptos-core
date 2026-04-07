@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    error::StateSyncError, network::NetworkSender, payload_manager::TPayloadManager,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher, error::StateSyncError,
+    network::NetworkSender, payload_manager::TPayloadManager,
     transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
@@ -51,6 +52,8 @@ pub trait StateComputer: Send + Sync {
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
         secret_share_config: Option<SecretShareConfig>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        enable_v2_observer_messages: bool,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

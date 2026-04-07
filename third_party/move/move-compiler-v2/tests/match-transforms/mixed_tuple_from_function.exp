@@ -1,0 +1,163 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Data {
+        V1 {
+            0: u8,
+        }
+        V2 {
+            0: u8,
+        }
+    }
+    private fun make_pair(x: u8): (Data, u8) {
+        Tuple(pack m::Data::V1(x), x)
+    }
+    private fun test_block_expr(x: u8): u8 {
+        {
+          let (_$disc_0: Data, _$disc_1: u8): (Data, u8) = {
+            let y: u8 = Add<u8>(x, 1);
+            Tuple(pack m::Data::V1(y), y)
+          };
+          {
+            let _$np_0: Data = _$disc_0;
+            {
+              let _$prim_0: u8 = _$disc_1;
+              match (_$np_0) {
+                m::Data::V1{ 0: a } if Eq(_$prim_0, 5) => {
+                  Add<u8>(a, 50)
+                }
+                m::Data::V2{ 0: a } => {
+                  a
+                }
+                _: Data => {
+                  0
+                }
+              }
+
+            }
+          }
+        }
+    }
+    private fun test_fn_call(x: u8): u8 {
+        {
+          let (_$disc_0: Data, _$disc_1: u8): (Data, u8) = m::make_pair(x);
+          {
+            let _$np_0: Data = _$disc_0;
+            {
+              let _$prim_0: u8 = _$disc_1;
+              match (_$np_0) {
+                m::Data::V1{ 0: a } if Eq(_$prim_0, 1) => {
+                  Add<u8>(a, 10)
+                }
+                m::Data::V2{ 0: a } if Eq(_$prim_0, 2) => {
+                  Add<u8>(a, 20)
+                }
+                _: Data => {
+                  99
+                }
+              }
+
+            }
+          }
+        }
+    }
+    private fun test_nested(x: u8): u8 {
+        {
+          let (_$disc_0: Data, _$disc_1: u8): (Data, u8) = m::make_pair(x);
+          {
+            let _$np_0: Data = _$disc_0;
+            {
+              let _$prim_0: u8 = _$disc_1;
+              match (_$np_0) {
+                m::Data::V1{ 0: a } if Eq(_$prim_0, 1) => {
+                  {
+                    let (_$disc_0: Data, _$disc_1: u8): (Data, u8) = m::make_pair(a);
+                    {
+                      let _$np_0: Data = _$disc_0;
+                      {
+                        let _$prim_0: u8 = _$disc_1;
+                        match (_$np_0) {
+                          m::Data::V1{ 0: b } if Eq(_$prim_0, 1) => {
+                            Add<u8>(b, 10)
+                          }
+                          m::Data::V2{ 0: b } => {
+                            Add<u8>(b, 20)
+                          }
+                          _: Data => {
+                            30
+                          }
+                        }
+
+                      }
+                    }
+                  }
+                }
+                m::Data::V2{ 0: a } => {
+                  a
+                }
+                _: Data => {
+                  99
+                }
+              }
+
+            }
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Data has drop {
+        V1 {
+            0: u8,
+        }
+        V2 {
+            0: u8,
+        }
+    }
+    fun make_pair(x: u8): (Data, u8) {
+        (Data::V1(x), x)
+    }
+    fun test_block_expr(x: u8): u8 {
+        let (__disc_0,__disc_1) = {
+            let y = x + 1u8;
+            (Data::V1(y), y)
+        };
+        let __np_0 = __disc_0;
+        let __prim_0 = __disc_1;
+        match (__np_0) {
+            Data::V1(a) if __prim_0 == 5u8 => a + 50u8,
+            Data::V2(a) => a,
+            _ => 0u8,
+        }
+    }
+    fun test_fn_call(x: u8): u8 {
+        let (__disc_0,__disc_1) = make_pair(x);
+        let __np_0 = __disc_0;
+        let __prim_0 = __disc_1;
+        match (__np_0) {
+            Data::V1(a) if __prim_0 == 1u8 => a + 10u8,
+            Data::V2(a) if __prim_0 == 2u8 => a + 20u8,
+            _ => 99u8,
+        }
+    }
+    fun test_nested(x: u8): u8 {
+        let (__disc_0,__disc_1) = make_pair(x);
+        let __np_0 = __disc_0;
+        let __prim_0 = __disc_1;
+        match (__np_0) {
+            Data::V1(a) if __prim_0 == 1u8 => {
+                let (__disc_0,__disc_1) = make_pair(a);
+                let __np_0 = __disc_0;
+                let __prim_0 = __disc_1;
+                match (__np_0) {
+                    Data::V1(b) if __prim_0 == 1u8 => b + 10u8,
+                    Data::V2(b) => b + 20u8,
+                    _ => 30u8,
+                }
+            },
+            Data::V2(a) => a,
+            _ => 99u8,
+        }
+    }
+}

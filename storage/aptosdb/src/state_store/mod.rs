@@ -9,6 +9,7 @@ use crate::{
     pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_state_value_by_key_hash::{HotStateEntry, HotStateValueByKeyHashSchema},
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
@@ -59,7 +60,7 @@ use aptos_storage_interface::{
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
-        HotStateUpdates,
+        HotStateShardUpdates, HotStateUpdates,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
@@ -67,7 +68,7 @@ use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
-        state_slot::StateSlot,
+        state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueByKeyHashIndex, StateValue, StateValueChunkWithProof},
         NUM_STATE_SHARDS,
@@ -103,6 +104,7 @@ pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 pub(crate) struct StatePruner {
     pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StaleNodeIndexSchema>>,
     pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>>,
+    pub hot_state_kv_pruner: Option<StateKvPrunerManager>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
     pub state_kv_pruner: StateKvPrunerManager,
@@ -112,6 +114,7 @@ impl StatePruner {
     pub fn new(
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
+        hot_state_kv_db: Option<Arc<StateKvDb>>,
         state_kv_db: Arc<StateKvDb>,
         config: PrunerConfig,
     ) -> Self {
@@ -121,6 +124,8 @@ impl StatePruner {
         let hot_epoch_snapshot_pruner = hot_state_merkle_db.map(|db| {
             StateMerklePrunerManager::new(db, config.epoch_snapshot_pruner_config.into())
         });
+        let hot_state_kv_pruner =
+            hot_state_kv_db.map(|db| StateKvPrunerManager::new(db, config.ledger_pruner_config));
         let state_merkle_pruner = StateMerklePrunerManager::new(
             Arc::clone(&state_merkle_db),
             config.state_merkle_pruner_config,
@@ -139,6 +144,7 @@ impl StatePruner {
         Self {
             hot_state_merkle_pruner,
             hot_epoch_snapshot_pruner,
+            hot_state_kv_pruner,
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
@@ -539,6 +545,7 @@ impl StateStore {
         let state_pruner = StatePruner::new(
             hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
+            hot_state_kv_db.clone(),
             Arc::clone(&state_kv_db),
             aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG,
         );
@@ -835,6 +842,93 @@ impl StateStore {
             })
     }
 
+    // TODO(HotState): multiple writes to the same key are batched (within `for_last_checkpoint`
+    // and `for_latest`) and only the last one is persisted. Revisit later if necessary.
+    pub fn put_hot_state_updates(
+        &self,
+        hot_state_updates: &HotStateUpdates,
+        sharded_hot_state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_hot_state_updates"]);
+
+        fn write_shard_updates(
+            shard_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
+            batches: &mut ShardedStateKvSchemaBatch,
+        ) -> Result<()> {
+            batches
+                .par_iter_mut()
+                .zip_eq(shard_updates.par_iter())
+                .try_for_each(|(batch, shard)| {
+                    for (key_hash, op) in &shard.insertions {
+                        let schema_value = match op.value.value_opt() {
+                            Some(value) => HotStateEntry::Occupied {
+                                value: value.clone(),
+                                value_version: op
+                                    .value_version
+                                    .expect("occupied must have value_version"),
+                            },
+                            None => {
+                                assert!(
+                                    op.value_version.is_none(),
+                                    "vacant must not have value_version"
+                                );
+                                HotStateEntry::Vacant
+                            },
+                        };
+                        batch.put::<HotStateValueByKeyHashSchema>(
+                            &(*key_hash, op.value.hot_since_version()),
+                            &Some(schema_value),
+                        )?;
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.value.hot_since_version(),
+                                version: op
+                                    .superseded_version
+                                    .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
+                    }
+                    for (key_hash, op) in &shard.evictions {
+                        batch.put::<HotStateValueByKeyHashSchema>(
+                            &(*key_hash, op.eviction_version),
+                            &None,
+                        )?;
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.eviction_version,
+                                version: op
+                                    .superseded_version
+                                    .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
+                        // Self-referential stale entry for the eviction tombstone itself.
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.eviction_version,
+                                version: op.eviction_version,
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
+                    }
+                    Ok(())
+                })
+        }
+
+        if let Some(updates) = &hot_state_updates.for_last_checkpoint {
+            write_shard_updates(updates, sharded_hot_state_kv_batches)?;
+        }
+        if let Some(updates) = &hot_state_updates.for_latest {
+            write_shard_updates(updates, sharded_hot_state_kv_batches)?;
+        }
+
+        Ok(())
+    }
+
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["get_usage"]);
         self.state_db.get_state_storage_usage(version)
@@ -945,7 +1039,7 @@ impl StateStore {
                     .insert(
                         (*key).clone(),
                         update_to_cold
-                            .to_result_slot()
+                            .to_result_slot((*key).clone())
                             .expect("hot state ops should have been filtered out above"),
                     )
                     .unwrap_or_else(|| {
@@ -953,7 +1047,7 @@ impl StateStore {
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
                         // is to allow some db tests without real execution layer to pass.
                         assert!(ignore_state_cache_miss, "Must cache read.");
-                        StateSlot::ColdVacant
+                        StateSlot::new((*key).clone(), StateSlotKind::ColdVacant)
                     });
 
                 let old_version = if old_entry.is_occupied() {

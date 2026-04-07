@@ -1,0 +1,18 @@
+health_check_port: 8083
+server_config:
+  chain_id: 4
+  service_config:
+    listen_address: 0.0.0.0:50054
+    tls_config: null
+  live_data_service_config:
+    enabled: true
+    num_slots: 100000
+    size_limit_bytes: 1073741824
+  historical_data_service_config:
+    enabled: true
+    file_store_config:
+      file_store_type: LocalFileStore
+      local_file_store_path: /tmp/indexer_grpc_filestore
+  grpc_manager_addresses:
+    - "http://127.0.0.1:50052"
+  self_advertised_address: "http://127.0.0.1:50054"

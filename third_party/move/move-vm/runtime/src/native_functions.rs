@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
@@ -351,7 +352,6 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                 &mut self.gas_meter,
                 self.traversal_context,
                 ty,
-                false,
             )
         })
     }
@@ -493,6 +493,10 @@ impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
 
     fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
         self.module_storage.store_struct_layout(key, entry)
+    }
+
+    fn remove_struct_layout(&self, key: &StructKey) {
+        self.module_storage.remove_struct_layout(key)
     }
 }
 

@@ -1,0 +1,141 @@
+module 0x42::generic_defs {
+    public enum Maybe<T: copy + drop> has copy, drop {
+        None,
+        Some {
+            val: T,
+        }
+    }
+    public enum Outcome<T: copy + drop, E: copy + drop> has copy, drop {
+        Ok {
+            value: T,
+        }
+        Err {
+            error: E,
+        }
+    }
+    public struct Pair<K: copy + drop, V: copy + drop> has copy, drop {
+        key: K,
+        value: V,
+    }
+    public struct Tagged<T: copy + drop> has copy, drop {
+        tag: u64,
+        inner: T,
+    }
+}
+module 0x42::generic_consumer {
+    use 0x42::generic_defs;
+    fun is_some(m: &generic_defs::Maybe<u64>): bool {
+        m is Some
+    }
+    fun end_to_end(): u64 {
+        let _v0 = make_pair(10, true);
+        let _v1 = get_key(&_v0);
+        let generic_defs::Pair<bool, u64>{key: _v2, value: _v3} = swap_pair(_v0);
+        let _v4 = tag_pair(99, 3, 7);
+        let _v5 = get_tagged_key(&_v4);
+        let _v6 = unwrap_or(map_ok(make_ok(42), 8), 0);
+        let _v7 = unwrap_maybe(some_u64(5));
+        _v1 + _v3 + _v5 + _v6 + _v7
+    }
+    fun make_pair(k: u64, v: bool): generic_defs::Pair<u64, bool> {
+        generic_defs::Pair<u64, bool>{key: k, value: v}
+    }
+    fun get_key(p: &generic_defs::Pair<u64, bool>): u64 {
+        *&p.key
+    }
+    fun swap_pair(p: generic_defs::Pair<u64, bool>): generic_defs::Pair<bool, u64> {
+        let generic_defs::Pair<u64, bool>{key: _v0, value: _v1} = p;
+        generic_defs::Pair<bool, u64>{key: _v1, value: _v0}
+    }
+    fun tag_pair(tag: u64, k: u64, v: u64): generic_defs::Tagged<generic_defs::Pair<u64, u64>> {
+        let _v0 = generic_defs::Pair<u64, u64>{key: k, value: v};
+        generic_defs::Tagged<generic_defs::Pair<u64, u64>>{tag: tag, inner: _v0}
+    }
+    fun get_tagged_key(t: &generic_defs::Tagged<generic_defs::Pair<u64, u64>>): u64 {
+        *&(&t.inner).key
+    }
+    fun make_ok(v: u64): generic_defs::Outcome<u64, u8> {
+        generic_defs::Outcome::Ok<u64, u8>{value: v}
+    }
+    fun map_ok(o: generic_defs::Outcome<u64, u8>, addend: u64): generic_defs::Outcome<u64, u8> {
+        let _v0 = &o;
+        loop {
+            if (!(_v0 is Ok)) {
+                if (_v0 is Err) break;
+                abort 14566554180833181697
+            };
+            let generic_defs::Outcome::Ok<u64, u8>{value: _v1} = o;
+            return generic_defs::Outcome::Ok<u64, u8>{value: _v1 + addend}
+        };
+        let generic_defs::Outcome::Err<u64, u8>{error: _v2} = o;
+        generic_defs::Outcome::Err<u64, u8>{error: _v2}
+    }
+    fun unwrap_or(o: generic_defs::Outcome<u64, u8>, default: u64): u64 {
+        let _v0 = &o;
+        loop {
+            if (!(_v0 is Ok)) {
+                if (_v0 is Err) break;
+                abort 14566554180833181697
+            };
+            let generic_defs::Outcome::Ok<u64, u8>{value: _v1} = o;
+            return _v1
+        };
+        let generic_defs::Outcome::Err<u64, u8>{error: _v2} = o;
+        default
+    }
+    fun some_u64(v: u64): generic_defs::Maybe<u64> {
+        generic_defs::Maybe::Some<u64>{val: v}
+    }
+    fun unwrap_maybe(m: generic_defs::Maybe<u64>): u64 {
+        let _v0 = &m;
+        loop {
+            if (!(_v0 is Some)) {
+                if (_v0 is None) break;
+                abort 14566554180833181697
+            };
+            let generic_defs::Maybe::Some<u64>{val: _v1} = m;
+            return _v1
+        };
+        let generic_defs::Maybe::None<u64>{} = m;
+        0
+    }
+    fun extract_inner(o: generic_defs::Outcome<generic_defs::Tagged<u64>, u8>): u64 {
+        let _v0 = &o;
+        loop {
+            if (!(_v0 is Ok)) {
+                if (_v0 is Err) break;
+                abort 14566554180833181697
+            };
+            let _v1 = &_v0.value;
+            let generic_defs::Outcome::Ok<generic_defs::Tagged<u64>, u8>{value: _v2} = o;
+            let generic_defs::Tagged<u64>{tag: _v3, inner: _v4} = _v2;
+            return _v4
+        };
+        let generic_defs::Outcome::Err<generic_defs::Tagged<u64>, u8>{error: _v5} = o;
+        0
+    }
+    fun is_ok(o: &generic_defs::Outcome<u64, u8>): bool {
+        o is Ok
+    }
+    fun make_err(e: u8): generic_defs::Outcome<u64, u8> {
+        generic_defs::Outcome::Err<u64, u8>{error: e}
+    }
+    fun none_u64(): generic_defs::Maybe<u64> {
+        generic_defs::Maybe::None<u64>{}
+    }
+    fun tag_value(tag: u64, inner: u64): generic_defs::Tagged<u64> {
+        generic_defs::Tagged<u64>{tag: tag, inner: inner}
+    }
+    fun tagged_ok(tag: u64, inner: u64): generic_defs::Outcome<generic_defs::Tagged<u64>, u8> {
+        generic_defs::Outcome::Ok<generic_defs::Tagged<u64>, u8>{value: generic_defs::Tagged<u64>{tag: tag, inner: inner}}
+    }
+    fun untag(t: generic_defs::Tagged<u64>): (u64, u64) {
+        let generic_defs::Tagged<u64>{tag: _v0, inner: _v1} = t;
+        (_v0, _v1)
+    }
+    fun wrap_pair(k: u64, v: u64): generic_defs::Maybe<generic_defs::Pair<u64, u64>> {
+        generic_defs::Maybe::Some<generic_defs::Pair<u64, u64>>{val: generic_defs::Pair<u64, u64>{key: k, value: v}}
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import dateparser
 from enum import Enum
 from google.cloud import storage
 import json
@@ -10,6 +11,7 @@ import os
 import sys
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 import time
+import urllib.error
 import urllib.parse
 import yaml
 
@@ -56,9 +58,9 @@ logger = logging.getLogger(__name__)
 
 
 def construct_humio_url(
-    labels_run: str, pod_name: str, start_time: float, end_time: float
+    pod_name: str, start_time: float, end_time: float
 ) -> str:
-    query = f'#k8s.cluster = "devinfra-usce1-0" | k8s.labels.run = "{labels_run}" | "k8s.pod_name" = "{pod_name}"'
+    query = f'#k8s.cluster = "devinfra-usce1-0" | "k8s.pod_name" = "{pod_name}"'
 
     params = {
         "live": "false",
@@ -310,7 +312,7 @@ class WorkerPod:
         return pod_status
 
     def get_humio_log_link(self):
-        return construct_humio_url(self.label, self.name, self.start_time, time.time())
+        return construct_humio_url(self.name, self.start_time, time.time())
 
 
 class TaskStats:
@@ -387,7 +389,7 @@ class ReplayScheduler:
         return f"{self.id}-{self.network}"
 
     def humio_hash_mismatch_url(self, start_time: float, end_time: float) -> str:
-        query = f'k8s.labels.run = "{self.get_label()}" | "TransactionOutput does not match"'
+        query = f'"k8s.pod_name" = "{self.get_label()}-replay-verify-*" | "TransactionOutput does not match"'
 
         params = {
             "live": "false",
@@ -505,11 +507,14 @@ class ReplayScheduler:
         pvc = self.create_one_pvc_from_snapshot(snapshot_name)
         self.pvcs = [pvc]
         # Wait for the PVC to be bound before creating other PVCs
-        logger.info(f"Waiting for the PVC {pvc} to be bound...")
+        logger.info(
+            f"Waiting for the PVC {pvc} to be bound. "
+            "This involves cloning a large disk volume from a snapshot and may take several minutes..."
+        )
         bound_status = self.get_pvc_bound_status()
         while not self.get_pvc_bound_status()[0]:
             time.sleep(QUERY_DELAY)
-        logger.info(f"PVC {pvc} has been bound...")
+        logger.info(f"PVC {pvc} is now bound. Proceeding to clone additional PVCs...")
         self.create_pvc_from_existing(snapshot_name, pvc)
 
     def create_one_pvc_from_snapshot(self, snapshot_name: str) -> str:
@@ -695,13 +700,56 @@ def read_skip_ranges(network: str) -> tuple[int, int, list[tuple[int, int]]]:
 
     end = int(
         json.loads(
-            urllib.request.urlopen(f"https://fullnode.{network}.aptoslabs.com/v1")
-            .read()
-            .decode()
+            urllib.request.urlopen(fullnode_api_url(network)).read().decode()
         )["ledger_version"]
     )
 
     return (data["start"], end, skip_ranges)
+
+
+def fullnode_api_url(network: str) -> str:
+    return f"https://fullnode.{network}.aptoslabs.com/v1"
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_fixed(2),
+    retry=retry_if_exception_type((urllib.error.HTTPError, urllib.error.URLError)),
+)
+def get_txn_timestamp_usecs(network: str, version: int) -> int:
+    """Get the timestamp (in microseconds) of a transaction by version."""
+    url = f"{fullnode_api_url(network)}/transactions/by_version/{version}"
+    data = json.loads(urllib.request.urlopen(url).read().decode())
+    return int(data["timestamp"])
+
+
+def timestamp_to_version(network: str, target_usecs: int, lo: int, hi: int) -> int:
+    """Binary search for the version closest to the target timestamp."""
+    while lo < hi:
+        mid = (lo + hi) // 2
+        mid_ts = get_txn_timestamp_usecs(network, mid)
+        if mid_ts < target_usecs:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+def parse_timestamp(s: str) -> int:
+    """Parse a timestamp string into microseconds since epoch.
+
+    Uses the dateparser library which supports a wide range of formats including:
+      - Relative:  "2 hours ago", "30 minutes ago", "1 day ago"
+      - Date only: "2026-03-19"
+      - Date+time: "2026-03-19 10:00", "2026-03-19 10:00:00"
+      - ISO 8601:  "2026-03-19T10:00:00Z", "2026-03-19T10:00:00+00:00"
+      - And many more natural language formats.
+    All inputs without explicit timezone are interpreted as UTC.
+    """
+    dt = dateparser.parse(s, settings={"TIMEZONE": "UTC", "RETURN_AS_TIMEZONE_AWARE": True})
+    if dt is None:
+        raise ValueError(f"Unable to parse timestamp: {s!r}")
+    return int(dt.timestamp() * 1_000_000)
 
 
 def parse_args() -> argparse.Namespace:
@@ -712,6 +760,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--network", required=True, choices=["testnet", "mainnet"])
     parser.add_argument("--start", required=False, type=int)
     parser.add_argument("--end", required=False, type=int)
+    parser.add_argument(
+        "--start-time",
+        required=False,
+        type=str,
+        help='Start time. Accepts any format supported by dateparser: relative '
+             '("2 hours ago", "1 day ago"), date ("2026-03-19"), datetime '
+             '("2026-03-19 10:00"), ISO 8601, etc. UTC assumed. '
+             "Mutually exclusive with --start.",
+    )
+    parser.add_argument(
+        "--end-time",
+        required=False,
+        type=str,
+        help='End time. Same formats as --start-time. Mutually exclusive with --end.',
+    )
     parser.add_argument("--worker_cnt", required=False, type=int)
     parser.add_argument("--range_size", required=False, type=int)
     parser.add_argument(
@@ -721,6 +784,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image_profile", required=False, type=str, default="performance")
     parser.add_argument("--cleanup", required=False, action="store_true", default=False)
     args = parser.parse_args()
+
+    if args.start is not None and args.start_time is not None:
+        parser.error("--start and --start-time are mutually exclusive")
+    if args.end is not None and args.end_time is not None:
+        parser.error("--end and --end-time are mutually exclusive")
+
     return args
 
 
@@ -766,6 +835,16 @@ if __name__ == "__main__":
     config = ReplayConfig(network)
     worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 10
     range_size = args.range_size if args.range_size else config.range_size
+
+    # Resolve time-based args to versions
+    if args.start_time is not None:
+        target_usecs = parse_timestamp(args.start_time)
+        args.start = timestamp_to_version(args.network, target_usecs, start, end)
+        logger.info(f"Resolved --start-time {args.start_time} to version {args.start}")
+    if args.end_time is not None:
+        target_usecs = parse_timestamp(args.end_time)
+        args.end = timestamp_to_version(args.network, target_usecs, start, end)
+        logger.info(f"Resolved --end-time {args.end_time} to version {args.end}")
 
     if args.start is not None:
         assert (

@@ -1,25 +1,48 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod model_ast_lints;
 mod stackless_bytecode_lints;
 mod utils;
 
-use move_compiler_v2::external_checks::{ExpChecker, ExternalChecks, StacklessBytecodeChecker};
-use std::{collections::BTreeMap, sync::Arc};
+use move_compiler_v2::external_checks::{
+    ConstantChecker, ExpChecker, ExternalChecks, FunctionChecker, StacklessBytecodeChecker,
+    StructChecker,
+};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 /// Holds collection of lint checks for Move.
 pub struct MoveLintChecks {
     config: BTreeMap<String, String>,
+    all_checker_names: BTreeSet<String>,
 }
 
 impl ExternalChecks for MoveLintChecks {
     fn get_exp_checkers(&self) -> Vec<Box<dyn ExpChecker>> {
-        model_ast_lints::get_default_linter_pipeline(&self.config)
+        model_ast_lints::get_default_exp_linter_pipeline(&self.config)
     }
 
     fn get_stackless_bytecode_checkers(&self) -> Vec<Box<dyn StacklessBytecodeChecker>> {
         stackless_bytecode_lints::get_default_linter_pipeline(&self.config)
+    }
+
+    fn get_constant_checkers(&self) -> Vec<Box<dyn ConstantChecker>> {
+        model_ast_lints::get_default_constant_linter_pipeline(&self.config)
+    }
+
+    fn get_struct_checkers(&self) -> Vec<Box<dyn StructChecker>> {
+        model_ast_lints::get_default_struct_linter_pipeline(&self.config)
+    }
+
+    fn get_function_checkers(&self) -> Vec<Box<dyn FunctionChecker>> {
+        model_ast_lints::get_default_function_linter_pipeline(&self.config)
+    }
+
+    fn get_all_checker_names(&self) -> BTreeSet<String> {
+        self.all_checker_names.clone()
     }
 }
 
@@ -39,6 +62,30 @@ impl MoveLintChecks {
         if !matches!(checks_value.as_str(), "default" | "strict" | "experimental") {
             panic!("Invalid value for `checks` key in the config, expected one of: `default`, `strict`, or `experimental`");
         }
-        Arc::new(MoveLintChecks { config })
+        // Precompute all checker names using the "experimental" tier config,
+        // which is the superset of all tiers, so that all checker names are
+        // recognized in `#[lint::skip(...)]` attributes.
+        let all_config = BTreeMap::from([("checks".to_string(), "experimental".to_string())]);
+        let mut all_checker_names = BTreeSet::new();
+        for c in model_ast_lints::get_default_exp_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        for c in stackless_bytecode_lints::get_default_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_constant_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_struct_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        for c in model_ast_lints::get_default_function_linter_pipeline(&all_config) {
+            all_checker_names.insert(c.get_name());
+        }
+        // TODO: instead of storing a key-value config map, store a typed representation.
+        Arc::new(MoveLintChecks {
+            config,
+            all_checker_names,
+        })
     }
 }

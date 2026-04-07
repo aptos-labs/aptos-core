@@ -43,7 +43,7 @@ impl TestContext {
 
         let secret_share_config = SecretShareConfig::new(
             Arc::new(validator_verifier),
-            dk,
+            Arc::new(dk),
             msk_shares[0].clone(),
             vks,
             tc,
@@ -70,6 +70,22 @@ pub fn create_secret_share(
 ) -> SecretShare {
     let share =
         FPTXWeighted::derive_decryption_key_share(&ctx.msk_shares[author_index], &metadata.digest)
+            .expect("Failed to derive key share");
+    SecretShare::new(ctx.authors[author_index], metadata.clone(), share)
+}
+
+/// Create a share that is structurally valid (correct author, metadata) but
+/// cryptographically invalid (derived with a different digest).
+pub fn create_bad_secret_share(
+    ctx: &TestContext,
+    author_index: usize,
+    metadata: &SecretShareMetadata,
+) -> SecretShare {
+    // Use a different msk_share to derive — this produces a share that
+    // won't verify against the correct verification key for this author.
+    let wrong_index = (author_index + 1) % ctx.msk_shares.len();
+    let share =
+        FPTXWeighted::derive_decryption_key_share(&ctx.msk_shares[wrong_index], &metadata.digest)
             .expect("Failed to derive key share");
     SecretShare::new(ctx.authors[author_index], metadata.clone(), share)
 }

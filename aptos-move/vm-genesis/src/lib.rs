@@ -16,10 +16,7 @@ use aptos_gas_schedule::{
 };
 use aptos_release_bundle::{ReleaseBundle, ReleasePackage};
 use aptos_types::{
-    account_config::{
-        self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS,
-        EXPERIMENTAL_CODE_ADDRESS,
-    },
+    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     executable::ModulePath,
@@ -505,27 +502,6 @@ fn exec_function(
         ty_args,
         args,
         CORE_CODE_ADDRESS,
-    );
-}
-
-fn exec_experimental_function(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
-    traversal_context: &mut TraversalContext,
-    module_name: &str,
-    function_name: &str,
-    ty_args: Vec<TypeTag>,
-    args: Vec<Vec<u8>>,
-) {
-    exec_function_internal(
-        session,
-        module_storage,
-        traversal_context,
-        module_name,
-        function_name,
-        ty_args,
-        args,
-        EXPERIMENTAL_CODE_ADDRESS,
     );
 }
 
@@ -1051,14 +1027,14 @@ fn initialize_confidential_asset(
     traversal_context: &mut TraversalContext,
 ) {
     if !chain_id.is_mainnet() && !chain_id.is_testnet() {
-        exec_experimental_function(
+        exec_function(
             session,
             module_storage,
             traversal_context,
             "confidential_asset",
-            "init_module_for_genesis",
+            "init_module_for_devnet",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(EXPERIMENTAL_CODE_ADDRESS)]),
+            serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
         );
     }
 }

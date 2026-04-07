@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Data structures for caching layouts of VM values in a long-living, concurrent cache. The design
 //! goal is to make sure that cache hit is semantically equivalent to layout construction. That is,
@@ -26,32 +28,41 @@ use triomphe::Arc as TriompheArc;
 /// the same order as when constructing layout. This is important for gas charging: if we traverse
 /// the set and run out of gas in the middle of traversal, the gas meter state is identical to not
 /// using cached layout and constructing and charging gas on cache miss.
+///
+/// Each entry also stores the SHA3-256 hash of the defining module's serialized bytes at the time
+/// the layout was computed. This allows stale layout entries from older module versions to be
+/// detected and evicted.
 #[derive(Debug, Default)]
 pub struct DefiningModules {
-    modules: HashSet<ModuleId>,
-    seen_modules: Vec<ModuleId>,
+    modules: HashSet<ModuleId, ahash::RandomState>,
+    seen_modules: Vec<(ModuleId, [u8; 32])>,
 }
 
 impl DefiningModules {
     /// Returns a new empty set of modules.
     pub fn new() -> Self {
         Self {
-            modules: HashSet::new(),
+            modules: HashSet::with_hasher(ahash::RandomState::new()),
             seen_modules: vec![],
         }
     }
 
-    /// If module is not in the set, adds it.
-    pub fn insert(&mut self, module_id: &ModuleId) {
+    /// Returns true if the module is already in the set.
+    pub fn contains(&self, module_id: &ModuleId) -> bool {
+        self.modules.contains(module_id)
+    }
+
+    /// If module is not in the set, adds it with its hash.
+    pub fn insert(&mut self, module_id: &ModuleId, hash: [u8; 32]) {
         if !self.modules.contains(module_id) {
             self.modules.insert(module_id.clone());
             // Preserve the visited order: later traversal over the module set is deterministic.
-            self.seen_modules.push(module_id.clone())
+            self.seen_modules.push((module_id.clone(), hash))
         }
     }
 
-    /// Returns an iterator over modules in their insertion order.
-    pub fn iter(&self) -> impl Iterator<Item = &ModuleId> {
+    /// Returns an iterator over (module_id, hash) pairs in their insertion order.
+    pub fn iter(&self) -> impl Iterator<Item = &(ModuleId, [u8; 32])> {
         self.seen_modules.iter()
     }
 }
@@ -91,6 +102,9 @@ pub trait LayoutCache {
 
     /// Stores layout into cache. If layout already exists (e.g., concurrent insertion) - a no-op.
     fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()>;
+
+    /// Removes the cached layout entry for the given key.
+    fn remove_struct_layout(&self, key: &StructKey);
 }
 
 /// Marker for no-op layout caches.
@@ -110,5 +124,9 @@ where
         _entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         Ok(())
+    }
+
+    fn remove_struct_layout(&self, _key: &StructKey) {
+        // No-op.
     }
 }

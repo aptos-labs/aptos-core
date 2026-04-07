@@ -89,6 +89,22 @@ public fun Test::test_borrow_mut_local(): 0x42::Test::R<u64> {
 
 ============ after pipeline `data_invariant_instrumentation` ================
 
+[variant baseline]
+public fun Test::test_borrow_imm<#0>(): u64 {
+     var $t0: address
+     var $t1: 0x42::Test::R<#0>
+     var $t2: num
+     var $t3: u64
+  0: $t0 := 0x1
+  1: $t1 := get_global<0x42::Test::R<#0>>($t0) on_abort goto 5 with $t2
+  2: $t3 := get_field<0x42::Test::R<#0>>.x($t1)
+  3: label L1
+  4: return $t3
+  5: label L2
+  6: abort($t2)
+}
+
+
 [variant verification]
 public fun Test::test_borrow_imm<#0>(): u64 {
      var $t0: address
@@ -103,6 +119,40 @@ public fun Test::test_borrow_imm<#0>(): u64 {
   5: return $t3
   6: label L2
   7: abort($t2)
+}
+
+
+[variant baseline]
+public fun Test::test_borrow_mut<#0>(): u64 {
+     var $t0|r: &mut 0x42::Test::R<#0> [unused]
+     var $t1: address
+     var $t2: &mut 0x42::Test::R<#0>
+     var $t3: num
+     var $t4: u64
+     var $t5: &mut 0x42::Test::S
+     var $t6: &mut u64
+     var $t7: u64
+     var $t8: &mut u64
+     var $t9: u64
+  0: $t1 := 0x1
+  1: $t2 := borrow_global<0x42::Test::R<#0>>($t1) on_abort goto 17 with $t3
+  2: $t4 := 2
+  3: $t5 := borrow_field<0x42::Test::R<#0>>.s($t2)
+  4: $t6 := borrow_field<0x42::Test::S>.y($t5)
+  5: write_ref($t6, $t4)
+  6: write_back[Reference($t5).y (u64)]($t6)
+  7: write_back[Reference($t2).s (0x42::Test::S)]($t5)
+  8: $t7 := 3
+  9: $t8 := borrow_field<0x42::Test::R<#0>>.x($t2)
+ 10: write_ref($t8, $t7)
+ 11: write_back[Reference($t2).x (u64)]($t8)
+ 12: $t9 := get_field<0x42::Test::R<#0>>.x($t2)
+ 13: pack_ref_deep($t2)
+ 14: write_back[0x42::Test::R<#0>@]($t2)
+ 15: label L1
+ 16: return $t9
+ 17: label L2
+ 18: abort($t3)
 }
 
 
@@ -143,6 +193,46 @@ public fun Test::test_borrow_mut<#0>(): u64 {
  18: return $t9
  19: label L2
  20: abort($t3)
+}
+
+
+[variant baseline]
+public fun Test::test_borrow_mut_local(): 0x42::Test::R<u64> {
+     var $t0|d: 0x42::Test::R<u64>
+     var $t1|r: &mut 0x42::Test::R<u64> [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: 0x42::Test::S
+     var $t5: u64
+     var $t6: &mut 0x42::Test::R<u64>
+     var $t7: u64
+     var $t8: &mut 0x42::Test::S
+     var $t9: &mut u64
+     var $t10: u64
+     var $t11: &mut u64
+     var $t12: 0x42::Test::R<u64>
+  0: $t2 := 2
+  1: $t3 := 1
+  2: $t4 := pack 0x42::Test::S($t3)
+  3: $t5 := 0
+  4: $t0 := pack 0x42::Test::R<u64>($t2, $t4, $t5)
+  5: $t6 := borrow_local($t0)
+  6: $t7 := 2
+  7: $t8 := borrow_field<0x42::Test::R<u64>>.s($t6)
+  8: $t9 := borrow_field<0x42::Test::S>.y($t8)
+  9: write_ref($t9, $t7)
+ 10: write_back[Reference($t8).y (u64)]($t9)
+ 11: write_back[Reference($t6).s (0x42::Test::S)]($t8)
+ 12: $t10 := 3
+ 13: $t11 := borrow_field<0x42::Test::R<u64>>.x($t6)
+ 14: write_ref($t11, $t10)
+ 15: write_back[Reference($t6).x (u64)]($t11)
+ 16: pack_ref_deep($t6)
+ 17: write_back[LocalRoot($t0)@]($t6)
+ 18: trace_local[d]($t0)
+ 19: $t12 := move($t0)
+ 20: label L1
+ 21: return $t12
 }
 
 

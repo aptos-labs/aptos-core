@@ -43,17 +43,12 @@ fn exceeding_max_num_dependencies_on_publish(
         });
     }
 
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p1"))
-    );
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p2"))
-    );
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("dependencies.data/p1")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("dependencies.data/p2")));
 
     // Since lazy loading only checks immediate dependencies, and p3 depends on p2 only, publishing
     // should succeed.
-    let res =
-        h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p3"));
+    let res = h.publish_package(&acc, &common::test_dir_path("dependencies.data/p3"));
     if enable_lazy_loading {
         assert_success!(res);
     } else {
@@ -70,9 +65,7 @@ fn exceeding_max_num_dependencies_on_publish(
             });
         }
 
-        assert_success!(
-            h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p3"))
-        );
+        assert_success!(h.publish_package(&acc, &common::test_dir_path("dependencies.data/p3")));
     }
 
     // Should be able to use module in both cases.
@@ -92,15 +85,9 @@ fn exceeding_max_num_dependencies(enable_lazy_loading: bool, change_max_num_depe
     let mut h = MoveHarness::new_with_lazy_loading(enable_lazy_loading);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p1"))
-    );
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p2"))
-    );
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p3"))
-    );
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("dependencies.data/p1")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("dependencies.data/p2")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("dependencies.data/p3")));
 
     assert_success!(h.run_entry_function(
         &acc,
@@ -154,9 +141,7 @@ fn test_script_with_dependencies() {
         FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::BothComparison);
     let mut h = MoveHarness::new_with_executor(executor);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p4"))
-    );
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("dependencies.data/p4")));
 
     // Extract the script from the package to run in multiple times in the block.
     let p3 = BuiltPackage::build(

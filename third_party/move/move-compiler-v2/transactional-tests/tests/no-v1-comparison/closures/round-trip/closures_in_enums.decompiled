@@ -15,7 +15,7 @@ module 0xc0ffee::m {
     }
     fun get_func(p0: &Function): &||(u64) has copy {
         assert!(p0 is NoParam, 42);
-        &p0._0
+        &p0.NoParam._0
     }
     fun get_func_recursive(p0: Function): ||(u64) {
         let _v0 = &p0;

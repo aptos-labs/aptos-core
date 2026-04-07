@@ -457,6 +457,13 @@ Ciphertext:
         TUPLEARRAY:
           CONTENT: U8
           SIZE: 64
+ClaimedEntryFunction:
+  STRUCT:
+    - module:
+        TYPENAME: ModuleId
+    - function:
+        OPTION:
+          TYPENAME: Identifier
 CommitDecision:
   STRUCT:
     - ledger_info:
@@ -631,6 +638,18 @@ DecKeyMetadata:
   STRUCT:
     - epoch: U64
     - round: U64
+DecryptionFailureReason:
+  ENUM:
+    0:
+      CryptoFailure: UNIT
+    1:
+      BatchLimitReached: UNIT
+    2:
+      ConfigUnavailable: UNIT
+    3:
+      DecryptionKeyUnavailable: UNIT
+    4:
+      ClaimedEntryFunctionMismatch: UNIT
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -649,6 +668,9 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - claimed_entry_fun:
+              OPTION:
+                TYPENAME: ClaimedEntryFunction
     1:
       FailedDecryption:
         STRUCT:
@@ -658,8 +680,14 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - claimed_entry_fun:
+              OPTION:
+                TYPENAME: ClaimedEntryFunction
           - eval_proof:
-              TYPENAME: EvalProof
+              OPTION:
+                TYPENAME: EvalProof
+          - reason:
+              TYPENAME: DecryptionFailureReason
     2:
       Decrypted:
         STRUCT:
@@ -669,6 +697,9 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - claimed_entry_fun:
+              OPTION:
+                TYPENAME: ClaimedEntryFunction
           - eval_proof:
               TYPENAME: EvalProof
           - executable:

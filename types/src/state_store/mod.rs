@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+#[cfg(any(test, feature = "testing"))]
+use crate::state_store::state_slot::StateSlotKind;
 use crate::{
     account_address::AccountAddress,
     state_store::{
@@ -149,7 +151,15 @@ impl<K: Eq + Hash> MockStateView<K> {
         Self {
             data: data
                 .into_iter()
-                .map(|(k, v)| (k, StateSlot::from_db_get(Some((0, v)))))
+                .map(|(k, v)| {
+                    (
+                        k,
+                        StateSlot::new_without_state_key(StateSlotKind::ColdOccupied {
+                            value_version: 0,
+                            value: v,
+                        }),
+                    )
+                })
                 .collect(),
         }
     }
@@ -168,7 +178,7 @@ impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
             .data
             .get(state_key)
             .cloned()
-            .unwrap_or(StateSlot::ColdVacant))
+            .unwrap_or_else(|| StateSlot::new_without_state_key(StateSlotKind::ColdVacant)))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

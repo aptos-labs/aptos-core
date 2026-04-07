@@ -1,0 +1,10 @@
+module 0x66::test
+
+fun identity(x: u64): u64
+    move_loc x
+    ret
+
+fun caller(): u64
+    ld_u64 10
+    call identity
+    ret

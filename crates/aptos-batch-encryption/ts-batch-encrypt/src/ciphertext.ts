@@ -71,14 +71,14 @@ export class BIBECiphertext extends Serializable {
 export class Ciphertext extends Serializable {
   vk: Uint8Array;
   bibe_ct: BIBECiphertext;
-  assocated_data_bytes: Uint8Array;
+  associated_data_bytes: Uint8Array;
   signature: Uint8Array;
 
   constructor(vk: Uint8Array, bibe_ct: BIBECiphertext, assocated_data_bytes: Uint8Array, signature: Uint8Array) {
     super();
     this.vk = vk;
     this.bibe_ct = bibe_ct;
-    this.assocated_data_bytes = assocated_data_bytes;
+    this.associated_data_bytes = assocated_data_bytes;
     this.signature = signature;
   }
 
@@ -86,7 +86,7 @@ export class Ciphertext extends Serializable {
     // For some reason, on the rust side, ed25519 VKs are serialized as variable bytes, even though they don't need to be.
     serializer.serializeBytes(this.vk);
     this.bibe_ct.serialize(serializer);
-    serializer.serializeBytes(this.assocated_data_bytes);
+    serializer.serializeBytes(this.associated_data_bytes);
     // Signatures, however, are serialized as fixed bytes on the rust side.
     serializer.serializeFixedBytes(this.signature);
   }

@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use clap::ValueEnum;
 use codespan::{ByteIndex, Span};
@@ -61,7 +62,9 @@ static REGEX_HTML_ELEMENTS_TO_SKIP: Lazy<Regex> = Lazy::new(|| {
 
 /// The output format of the docgen
 /// If the format is MDX, generated doc is mdx-compatible
-#[derive(ValueEnum, Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    ValueEnum, Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Serialize, Deserialize,
+)]
 pub enum OutputFormat {
     MD,
     MDX,

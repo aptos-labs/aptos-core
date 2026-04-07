@@ -1,0 +1,13 @@
+//# publish --print-bytecode
+module 0x66::test_generic_unpack_swapped_type_params
+
+struct Pair<A, B>
+    first: A
+    second: B
+
+// Invalid: unpack$Pair takes Pair<T1, T0> as parameter — the signature has non-canonical
+// type params. The bytecode is correct (unpack Pair<T0, T1>); only the declared param is wrong.
+#[unpack] public fun unpack$Pair<A, B>(l0: Pair<B, A>): (A, B)
+    move_loc l0
+    unpack Pair<A, B>
+    ret

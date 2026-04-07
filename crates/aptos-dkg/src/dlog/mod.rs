@@ -3,3 +3,5 @@
 
 pub mod bsgs;
 pub mod table;
+
+pub use table::BabyStepTable;

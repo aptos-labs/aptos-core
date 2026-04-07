@@ -32,6 +32,8 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     )
 }
 
+// Too expensive to spin up a local swarm and submit transactions via the REST client
+#[ignore]
 #[tokio::test]
 async fn test_error_report() {
     let swarm = new_local_swarm_with_aptos(1).await;

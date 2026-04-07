@@ -80,6 +80,7 @@ During serialization, we convert to more succinct $(x, y)$ affine coordinates.
 
 **TODOs**
 
+- Sometimes the `chunky` PVSS code uses `Pairing<ScalarField = Fp<P, N>>`, and sometimes it uses the `Scalar` wrapper. This is a bit inconsistent.
 - `accumulator_poly`: replace hard-coded FFT threshold for slow/fast switch; add multi-threading; reduce allocations.
 - Consider affine in-memory representation for `blstrs` transcript/VUF to speed up multiexps / multipairings.
 

@@ -1,9 +1,11 @@
 module 0xc0ffee::unnecessary_casts_test {
 
     const U8_VALUE: u8 = 255;
+    #[lint::skip(unused_constant)]
     const U64_VALUE: u64 = 1000;
 
     fun helper_u64(x: u64): u64 { x }
+    #[lint::skip(unused_function)]
     fun helper_u8(x: u8): u8 { x }
 
     // ========== POSITIVE TESTS (should warn) ==========

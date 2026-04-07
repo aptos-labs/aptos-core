@@ -2,8 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
-    SwarmExt, Validator, Version,
+    backend::local::node::run_restart_monitor, ChainInfo, FullNode, HealthCheckError, LocalNode,
+    LocalVersion, Node, Swarm, SwarmChaos, SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_config::{
@@ -17,6 +17,7 @@ use aptos_genesis::builder::{
 };
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
+use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType},
     types::{
@@ -34,7 +35,10 @@ use std::{
     num::NonZeroUsize,
     ops,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 use tempfile::TempDir;
@@ -98,6 +102,12 @@ pub struct LocalSwarm {
     root_account: Arc<LocalAccount>,
     chain_id: ChainId,
     root_key: ConfigKey<Ed25519PrivateKey>,
+    cpu_affinities: Vec<String>,
+    mem_binds: Vec<String>,
+
+    auto_restart: bool,
+    monitor_stop: Option<Arc<AtomicBool>>,
+    monitor_handle: Option<std::thread::JoinHandle<()>>,
 
     launched: bool,
     #[allow(dead_code)]
@@ -116,6 +126,10 @@ impl LocalSwarm {
         dir: Option<PathBuf>,
         genesis_framework: Option<ReleaseBundle>,
         guard: ActiveNodesGuard,
+        cpu_affinities: Vec<String>,
+        mem_binds: Vec<String>,
+        concurrency_level: u16,
+        auto_restart: bool,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -139,8 +153,7 @@ impl LocalSwarm {
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(move |index, config, base| {
-                // for local tests, turn off parallel execution:
-                config.execution.concurrency_level = 1;
+                config.execution.concurrency_level = concurrency_level;
 
                 // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
                 // which cause flakiness in tests.
@@ -186,6 +199,8 @@ impl LocalSwarm {
                     v.index,
                     v.dir,
                     v.account_private_key,
+                    cpu_affinities.get(v.index).cloned(),
+                    mem_binds.get(v.index).cloned(),
                 )?;
                 Ok((node.peer_id(), node))
             })
@@ -258,6 +273,11 @@ impl LocalSwarm {
             root_account,
             chain_id: ChainId::test(),
             root_key,
+            cpu_affinities,
+            mem_binds,
+            auto_restart,
+            monitor_stop: None,
+            monitor_handle: None,
             launched: false,
             guard,
         })
@@ -275,8 +295,28 @@ impl LocalSwarm {
         }
 
         self.wait_all_alive(Duration::from_secs(60)).await?;
+
+        if self.auto_restart {
+            self.start_auto_restart_monitor();
+        }
+
         info!("Swarm launched successfully.");
         Ok(())
+    }
+
+    fn start_auto_restart_monitor(&mut self) {
+        let stop = Arc::new(AtomicBool::new(false));
+        self.monitor_stop = Some(Arc::clone(&stop));
+
+        let monitors = self.validators.values().map(|v| v.monitor()).collect();
+
+        let handle = std::thread::Builder::new()
+            .name("restart-mon".to_string())
+            .spawn(move || run_restart_monitor(monitors, stop))
+            .expect("Failed to spawn auto-restart monitor thread");
+
+        self.monitor_handle = Some(handle);
+        info!("Auto-restart monitor enabled for validators");
     }
 
     pub async fn wait_all_alive(&mut self, timeout: Duration) -> Result<()> {
@@ -373,6 +413,8 @@ impl LocalSwarm {
             index,
             fullnode_config.dir,
             None,
+            self.cpu_affinities.get(index).cloned(),
+            self.mem_binds.get(index).cloned(),
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -403,6 +445,8 @@ impl LocalSwarm {
             index,
             fullnode_config.dir,
             None,
+            self.cpu_affinities.get(index).cloned(),
+            self.mem_binds.get(index).cloned(),
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -468,6 +512,14 @@ impl LocalSwarm {
 
 impl Drop for LocalSwarm {
     fn drop(&mut self) {
+        // Stop the auto-restart monitor before dropping validators
+        if let Some(ref stop) = self.monitor_stop {
+            stop.store(true, Ordering::Release);
+        }
+        if let Some(handle) = self.monitor_handle.take() {
+            handle.join().expect("Auto-restart monitor thread panicked");
+        }
+
         // If panicking, persist logs
         if std::env::var("LOCAL_SWARM_SAVE_LOGS").is_ok() || std::thread::panicking() {
             eprintln!("Logs located at {}", self.logs_location());
@@ -604,6 +656,14 @@ impl Swarm for LocalSwarm {
 
     async fn ensure_no_fullnode_restart(&self) -> Result<()> {
         todo!()
+    }
+
+    async fn ensure_no_pfn_restart(&self) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_pfn_rest_clients(&self, _client_timeout: Duration) -> Vec<RestClient> {
+        vec![] // Return an empty list (PFNs aren't supported for local swarms)
     }
 
     async fn query_metrics(

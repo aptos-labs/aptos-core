@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -42,6 +43,7 @@ pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod exp_simplifier;
 pub mod intrinsics;
+pub mod memory_labels;
 pub mod metadata;
 pub mod model;
 pub mod options;
@@ -78,8 +80,6 @@ pub fn run_model_builder_in_compiler_mode(
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
-    warn_of_deprecation_use: bool,
-    warn_of_deprecation_use_in_aptos_libs: bool,
     compile_test_code: bool,
     compile_verify_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
@@ -100,8 +100,6 @@ pub fn run_model_builder_in_compiler_mode(
             compile_for_testing: compile_test_code,
         },
         Flags::model_compilation()
-            .set_warn_of_deprecation_use(warn_of_deprecation_use)
-            .set_warn_of_deprecation_use_in_aptos_libs(warn_of_deprecation_use_in_aptos_libs)
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)
@@ -315,14 +313,44 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     Ok(env)
 }
 
+/// Pre-register lemma declarations for all modules so that cross-module lemma references
+/// resolve regardless of module processing order (spec-only imports don't affect
+/// `dependency_order`). This populates `lemma_decl_table` and `fun_table` with lemma
+/// entries for all modules before any definition analysis runs.
+fn pre_register_lemma_decls(
+    builder: &mut ModelBuilder<'_>,
+    sorted_modules: &[(usize, (ModuleIdent, E::ModuleDefinition))],
+) {
+    for &(module_count, (ref module_id, ref module_def)) in sorted_modules {
+        let loc = builder.to_loc(&module_def.loc);
+        let addr_bytes = builder.resolve_address(&loc, &module_id.value.address);
+        let module_name = ModuleName::from_address_bytes_and_name(
+            addr_bytes,
+            builder
+                .env
+                .symbol_pool()
+                .make(&module_id.value.module.0.value),
+        );
+        let mid = ModuleId::new(module_count);
+        let mut module_translator = ModuleBuilder::new(builder, mid, module_name);
+        module_translator.pre_register_lemma_decls(module_def);
+    }
+}
+
 fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
     let mut builder = ModelBuilder::new(env);
-    for (module_count, (module_id, module_def)) in program
+    let sorted_modules: Vec<_> = program
         .modules
         .into_iter()
         .sorted_by_key(|(_, def)| def.dependency_order)
         .enumerate()
-    {
+        .collect();
+
+    // Pre-register lemma declarations so cross-module lemma references resolve
+    // regardless of module processing order (spec-only imports don't affect dependency_order).
+    pre_register_lemma_decls(&mut builder, &sorted_modules);
+
+    for (module_count, (module_id, module_def)) in sorted_modules {
         let loc = builder.to_loc(&module_def.loc);
         let addr_bytes = builder.resolve_address(&loc, &module_id.value.address);
         let module_name = ModuleName::from_address_bytes_and_name(

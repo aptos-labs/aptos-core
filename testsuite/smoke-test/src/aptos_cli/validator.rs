@@ -742,9 +742,19 @@ async fn test_nodes_rewards() {
         .await
         .unwrap();
 
-    cli.leave_validator_set(validator_cli_indices[3], None)
-        .await
-        .unwrap();
+    // Retry leave_validator_set in case a reconfiguration is already in progress.
+    for attempt in 0..6 {
+        match cli
+            .leave_validator_set(validator_cli_indices[3], None)
+            .await
+        {
+            Ok(_) => break,
+            Err(e) if attempt < 5 && e.to_string().contains("ERECONFIGURATION_IN_PROGRESS") => {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            },
+            Err(e) => panic!("leave_validator_set failed: {e}"),
+        }
+    }
 
     reconfig(
         &rest_clients[0],

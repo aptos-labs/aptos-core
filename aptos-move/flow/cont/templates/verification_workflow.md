@@ -61,27 +61,29 @@ When the prover reports a counterexample or error:
   > paths. Every condition is assumed semantically correct; removing one hides
   > real properties and makes the specification unsound. If you are tempted to
   > remove a condition because verification is slow, you MUST instead rewrite
-  > it in a semantically equivalent form or add axioms/lemmas.
+  > it in a semantically equivalent form or add proofs.
 
   Timeout resolution strategies (all preserve existing conditions):
-  - Split complex `ensures` into multiple simpler clauses.
-  - Replace quantifiers with concrete bounds.
-  - Add helper lemma functions that break a proof into smaller steps.
-  - Add explicit axioms to guide the solver. When you add an axiom, ensure quantifiers have 
-    valid triggers. Move quantifiers support a disjunction of a conjunction of triggers.
+  - Add `proof { ... }` ([Proofs and Lemmas]) blocks to the function to guide the
+    solver. 
+  - Add explicit lemmas [Lemmas] to guide the solver and `apply` them in a proof.
+    You MUST not introduce axioms since they are unproven, but lemmas come with
+    a proof.
+  - When you use universal lemma application, always add triggers, as
+    in `forall x: u64 {f(x)} apply lemma_for_f(x)`. 
   - Restructure expressions while preserving their meaning (e.g. factor out common
     sub-expressions into `let` bindings, reorder conjuncts).
-  - Document every new helper or axiom with a `///` doc comment explaining
+  - Document every new helper function or lemma with a `///` doc comment explaining
     what property it captures and why it is needed.
 
   **Avoid non-linear arithmetic in spec helpers.** SMT solvers handle linear
   arithmetic well but struggle with multiplication, division, or modulo between
-  two non-constant expressions. When defining helper functions or axioms, prefer
+  two non-constant expressions. When defining helper functions or lemmas, prefer
   additive recurrences over closed-form formulas that involve products of
   variables. For example, use `sum_up_to(n) == sum_up_to(n - 1) + n` (linear)
   rather than the closed form `n * (n + 1) / 2` (non-linear). If a non-linear
   closed form is needed for the final specification, connect it to the recursive
-  helper via a separate lemma or axiom so the solver can reason about each step
+  helper via a separate lemma so the solver can reason about each step
   linearly.
 
   **Do not redefine built-in operations as spec helpers.** The SMT solver
@@ -93,11 +95,11 @@ When the prover reports a counterexample or error:
   built in — such as a loop accumulation pattern or a recursive
   data-structure traversal.
 
-  **Document every helper and axiom.** When introducing a spec helper function
-  or axiom, add a `///` doc comment explaining what property it captures and
+  **Document every function and lemma.** When introducing a spec helper function
+  or lemma, add a `///` doc comment explaining what property it captures and
   why it is needed (e.g. which loop or timeout it supports). Place new spec
   helper functions below the Move function and spec block that introduce them.
-  Place axioms for a helper function directly beneath that helper's
+  Place lemmas for a helper function directly beneath that helper's
   declaration.
 
 ### Verification Workflow
