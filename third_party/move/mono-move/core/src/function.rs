@@ -13,7 +13,7 @@ use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
 /// Currently tracks which frame offsets hold heap pointers (for GC root
 /// scanning). Designed to be extended with additional per-slot type or
 /// layout information in the future — e.g., slot type tags for stronger
-/// runtime verification, debugging, or reference-kind distinctions.
+/// runtime verification or debugging.
 pub struct FrameLayoutMap {
     /// Frame byte-offsets of slots that hold heap pointers (GC roots).
     ///
