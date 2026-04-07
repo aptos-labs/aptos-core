@@ -12,3 +12,4 @@ pub mod jwks;
 pub mod dkg;
 pub mod oracle_state;
 pub mod validator_performances;
+pub mod consensus_hardfork;

@@ -40,7 +40,7 @@ impl Waypoint {
     pub fn new_any(ledger_info: &LedgerInfo) -> Self {
         let converter = Ledger2WaypointConverter::new(ledger_info);
         Self {
-            version: ledger_info.version(),
+            version: ledger_info.waypoint_version(),
             value: converter.hash(),
         }
     }
@@ -62,10 +62,10 @@ impl Waypoint {
     /// Errors in case the given ledger info does not match the waypoint.
     pub fn verify(&self, ledger_info: &LedgerInfo) -> Result<()> {
         ensure!(
-            ledger_info.version() == self.version(),
+            ledger_info.waypoint_version() == self.version(),
             "Waypoint version mismatch: waypoint version = {}, given version = {}",
             self.version(),
-            ledger_info.version()
+            ledger_info.waypoint_version()
         );
         let converter = Ledger2WaypointConverter::new(ledger_info);
         ensure!(
@@ -90,7 +90,7 @@ impl Verifier for Waypoint {
     }
 
     fn is_ledger_info_stale(&self, ledger_info: &LedgerInfo) -> bool {
-        ledger_info.version() < self.version()
+        ledger_info.waypoint_version() < self.version()
     }
 }
 
@@ -141,7 +141,7 @@ impl Ledger2WaypointConverter {
         Self {
             epoch: ledger_info.epoch(),
             root_hash: ledger_info.transaction_accumulator_hash(),
-            version: ledger_info.version(),
+            version: ledger_info.waypoint_version(),
             timestamp_usecs: ledger_info.timestamp_usecs(),
             next_epoch_state: ledger_info.next_epoch_state().cloned(),
         }

@@ -143,6 +143,12 @@ impl LedgerInfo {
         self.commit_info.version()
     }
 
+    pub fn waypoint_version(&self) -> Version {
+        self.commit_info()
+            .epoch_block_info()
+            .map_or(self.version(), |info| info.block_number)
+    }
+
     pub fn timestamp_usecs(&self) -> u64 {
         self.commit_info.timestamp_usecs()
     }
