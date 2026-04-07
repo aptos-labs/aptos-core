@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Lint check for `#[view]` public functions that (directly or transitively)
+//! Lint check for `#[view]` functions that (directly or transitively)
 //! call state-mutating global operations (`borrow_global_mut`, `move_to`,
 //! `move_from`).
 //!
@@ -12,7 +12,6 @@
 //! mutate global state using reverse call-graph propagation. Each
 //! `check_function` call then does a simple set lookup.
 
-use move_binary_format::file_format::Bytecode as FileFormatBytecode;
 use move_compiler_v2::external_checks::FunctionChecker;
 use move_model::{
     ast::{Attribute, ExpData, Operation},
@@ -53,10 +52,7 @@ impl FunctionChecker for MutableViewFunction {
             .mutating_funs
             .get_or_init(|| compute_mutating_funs(env));
 
-        if func.visibility().is_public()
-            && has_view_attribute(func)
-            && mutating_funs.contains(&func.get_qualified_id())
-        {
+        if has_view_attribute(func) && mutating_funs.contains(&func.get_qualified_id()) {
             let name = func.get_name_str();
             let msg = format!(
                 "view function `{name}` should not modify state, but this function \
@@ -80,11 +76,8 @@ fn has_view_attribute(func: &FunctionEnv) -> bool {
 /// Algorithm:
 /// 1. Build a reverse call-graph (callee -> set of callers) using
 ///    `get_called_functions()` which is available for all functions.
-/// 2. Seed the worklist with functions that directly mutate global state.
-///    - Primary targets (have AST): scan `ExpData` for
-///      `BorrowGlobal(Mutable)`, `MoveTo`, `MoveFrom`.
-///    - Dependencies (have compiled bytecode): scan `file_format::Bytecode`
-///      for `MutBorrowGlobal*`, `MoveTo*`, `MoveFrom*`.
+/// 2. Seed the worklist with functions that directly mutate global state
+///    by scanning `ExpData` for `BorrowGlobal(Mutable)`, `MoveTo`, `MoveFrom`.
 /// 3. Propagate: any caller of a mutating function is also mutating.
 fn compute_mutating_funs(env: &GlobalEnv) -> BTreeSet<QualifiedId<FunId>> {
     let mut reverse_callees: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>> =
@@ -127,47 +120,20 @@ fn compute_mutating_funs(env: &GlobalEnv) -> BTreeSet<QualifiedId<FunId>> {
     mutating_funs
 }
 
-/// Check if a function directly mutates global state.
-///
-/// Uses AST scanning for primary targets (which have `get_def()`) and
-/// file-format bytecode scanning for dependencies (which have
-/// `get_bytecode()` from their pre-compiled module).
+/// Check if a function directly mutates global state by scanning its AST.
 fn mutates_global_state_directly(func: &FunctionEnv) -> bool {
-    if let Some(def) = func.get_def() {
-        let mut found = false;
-        def.as_ref().visit_pre_order(&mut |exp| {
-            if found {
-                return false;
-            }
-            if let ExpData::Call(_, op, _) = exp
-                && matches!(
-                    op,
+    func.get_def().is_some_and(|def| {
+        def.any(&mut |exp| {
+            matches!(
+                exp,
+                ExpData::Call(
+                    _,
                     Operation::BorrowGlobal(ReferenceKind::Mutable)
                         | Operation::MoveTo
-                        | Operation::MoveFrom
+                        | Operation::MoveFrom,
+                    _
                 )
-            {
-                found = true;
-                return false;
-            }
-            true
-        });
-        return found;
-    }
-
-    if let Some(code) = func.get_bytecode() {
-        return code.iter().any(|bc| {
-            matches!(
-                bc,
-                FileFormatBytecode::MutBorrowGlobal(_)
-                    | FileFormatBytecode::MutBorrowGlobalGeneric(_)
-                    | FileFormatBytecode::MoveTo(_)
-                    | FileFormatBytecode::MoveToGeneric(_)
-                    | FileFormatBytecode::MoveFrom(_)
-                    | FileFormatBytecode::MoveFromGeneric(_)
             )
-        });
-    }
-
-    false
+        })
+    })
 }
