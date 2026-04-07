@@ -1,0 +1,23 @@
+processed 2 tasks
+task 0 lines 1-14:  publish [module 0xAA::theirs {]
+task 1 lines 16-35:  publish [module 0xBB::mine {]
+Error: compilation errors:
+ error: Invalid operation: unpack on `theirs::Inner` can only be done within module `0xaa::theirs`
+   ┌─ TEMPFILE1:27:16
+   │
+27 │     public fun steal_via_nested_match(x: Wrapper): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^
+28 │         match (x) {
+29 │             Wrapper::Wrapped { field: Outer { inner: Inner { val } } } => val,
+   │                                                      ------------- unpack here
+
+error: Invalid operation: unpack on `theirs::Outer` can only be done within module `0xaa::theirs`
+   ┌─ TEMPFILE1:27:16
+   │
+27 │     public fun steal_via_nested_match(x: Wrapper): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^
+28 │         match (x) {
+29 │             Wrapper::Wrapped { field: Outer { inner: Inner { val } } } => val,
+   │                                       ------------------------------ unpack here
+
+

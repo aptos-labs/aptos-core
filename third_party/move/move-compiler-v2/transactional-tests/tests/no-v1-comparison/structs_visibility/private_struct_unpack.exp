@@ -1,0 +1,14 @@
+processed 2 tasks
+task 0 lines 1-10:  publish [module 0xAA::theirs {]
+task 1 lines 12-29:  publish [module 0xBB::mine {]
+Error: compilation errors:
+ error: Invalid operation: unpack on `theirs::Inner` can only be done within module `0xaa::theirs`
+   ┌─ TEMPFILE1:21:16
+   │
+21 │     public fun steal_via_match(x: Wrapper): u64 {
+   │                ^^^^^^^^^^^^^^^
+22 │         match (x) {
+23 │             Wrapper::Wrapped { field: Inner { val } } => val,
+   │                                       ------------- unpack here
+
+

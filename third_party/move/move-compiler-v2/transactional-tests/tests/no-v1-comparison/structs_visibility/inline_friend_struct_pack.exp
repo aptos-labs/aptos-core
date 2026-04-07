@@ -1,0 +1,16 @@
+processed 2 tasks
+task 0 lines 1-8:  publish [module 0xA::A {]
+task 1 lines 10-17:  publish [module 0xA::B {]
+Error: compilation errors:
+ error: Invalid operation: pack on `A::W` can only be done within module `0xa::A` or its friend modules
+   ┌─ TEMPFILE:6:9
+   │
+ 6 │         f
+   │         ^
+   │
+   ┌─ TEMPFILE1:14:9
+   │
+14 │         A::make_w()
+   │         ----------- from a call inlined at this callsite
+
+
