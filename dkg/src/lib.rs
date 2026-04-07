@@ -66,11 +66,15 @@ pub fn start_dkg_runtime(
 
 /// Initialize the DigestKey and emit Prometheus counters for the source.
 /// Spawns a background thread to eagerly load the key from file and record load duration.
-pub fn initialize_digest_key_with_counters(blob_path: Option<&PathBuf>, chain_id: ChainId) {
+pub fn initialize_digest_key_with_counters(
+    blob_path: Option<&PathBuf>,
+    chain_id: ChainId,
+    is_validator: bool,
+) {
     if let Some(path) = blob_path {
         set_digest_key_path(path.clone());
     }
-    let source = initialize_digest_key(chain_id);
+    let source = initialize_digest_key(chain_id, is_validator);
     match &source {
         DigestKeySource::WillLoadFromFile { file_size } => {
             counters::DIGEST_KEY_FILE_SIZE_BYTES.set(*file_size as i64);
