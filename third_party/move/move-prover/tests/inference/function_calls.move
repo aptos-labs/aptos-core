@@ -98,5 +98,3 @@ module 0x42::function_calls {
         }
     }
 }
-// TODO(#18762): opaque recursive functions produce expected boogie errors
-// in the verification step because Boogie doesn't generate procedure bodies for them.

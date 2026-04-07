@@ -11,8 +11,10 @@ edition = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ahash = { workspace = true }
 ambassador = { workspace = true }
 arc-swap = { workspace = true }
+bcs = { workspace = true }
 better_any = { workspace = true }
 bitvec = { workspace = true }
 bytes = { workspace = true }

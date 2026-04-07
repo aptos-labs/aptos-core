@@ -9,6 +9,10 @@ public intrinsic fun vector::index_of<#0>($t0|v: &vector<#0>, $t1|e: &#0): (bool
 
 
 [variant baseline]
+public intrinsic fun vector::remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64): #0;
+
+
+[variant baseline]
 public intrinsic fun vector::append<#0>($t0|lhs: &mut vector<#0>, $t1|other: vector<#0>);
 
 
@@ -42,10 +46,6 @@ public native fun vector::pop_back<#0>($t0|v: &mut vector<#0>): #0;
 
 [variant baseline]
 public native fun vector::push_back<#0>($t0|v: &mut vector<#0>, $t1|e: #0);
-
-
-[variant baseline]
-public intrinsic fun vector::remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64): #0;
 
 
 [variant baseline]
@@ -435,6 +435,10 @@ public intrinsic fun vector::index_of<#0>($t0|v: &vector<#0>, $t1|e: &#0): (bool
 
 
 [variant baseline]
+public intrinsic fun vector::remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64): #0;
+
+
+[variant baseline]
 public intrinsic fun vector::append<#0>($t0|lhs: &mut vector<#0>, $t1|other: vector<#0>);
 
 
@@ -468,10 +472,6 @@ public native fun vector::pop_back<#0>($t0|v: &mut vector<#0>): #0;
 
 [variant baseline]
 public native fun vector::push_back<#0>($t0|v: &mut vector<#0>, $t1|e: #0);
-
-
-[variant baseline]
-public intrinsic fun vector::remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64): #0;
 
 
 [variant baseline]

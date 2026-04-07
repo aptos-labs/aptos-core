@@ -67,7 +67,7 @@ pub const APTOS_PACKAGES: [&str; 6] = [
 ];
 
 /// Represents a set of options for building artifacts from Move.
-#[derive(Debug, Clone, Parser, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Parser, Serialize, Deserialize)]
 pub struct BuildOptions {
     /// Enables dev mode, which uses all dev-addresses and dev-dependencies
     ///
@@ -109,6 +109,9 @@ pub struct BuildOptions {
     pub skip_attribute_checks: bool,
     #[clap(long)]
     pub check_test_code: bool,
+    /// When true, compiles with test mode enabled, including #[test_only] code in the bytecode.
+    #[clap(long)]
+    pub with_test_mode: bool,
     #[clap(skip)]
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
@@ -138,6 +141,7 @@ impl Default for BuildOptions {
             language_version: None,
             skip_attribute_checks: false,
             check_test_code: true,
+            with_test_mode: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
         }
@@ -277,7 +281,7 @@ fn make_model_build_config(
             skip_attribute_checks,
             known_attributes,
             experiments,
-            print_errors: true,
+            print_errors: Some(true),
         },
     })
 }
@@ -323,8 +327,8 @@ impl BuiltPackage {
             generate_move_model: true,
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
-            test_mode: false,
             verify_mode: false,
+            test_mode: options.with_test_mode,
             override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,
@@ -336,7 +340,7 @@ impl BuiltPackage {
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
-                print_errors: true,
+                print_errors: Some(true),
             },
         })
     }

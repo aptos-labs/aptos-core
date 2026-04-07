@@ -9,3 +9,4 @@ pub mod secret_share_store;
 #[cfg(test)]
 mod test_utils;
 pub mod types;
+pub mod verifier;

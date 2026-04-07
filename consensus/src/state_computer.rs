@@ -2,10 +2,12 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    block_preparer::BlockPreparer, error::StateSyncError, monitor, network::NetworkSender,
-    payload_manager::TPayloadManager, pipeline::pipeline_builder::PipelineBuilder,
-    state_replication::StateComputer, transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler, txn_notifier::TxnNotifier,
+    block_preparer::BlockPreparer,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher, error::StateSyncError,
+    monitor, network::NetworkSender, payload_manager::TPayloadManager,
+    pipeline::pipeline_builder::PipelineBuilder, state_replication::StateComputer,
+    transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
+    txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
 use aptos_config::config::BlockTransactionFilterConfig;
@@ -49,6 +51,8 @@ struct MutableState {
     persisted_auxiliary_info_version: u8,
     network_sender: Arc<NetworkSender>,
     secret_share_config: Option<SecretShareConfig>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    enable_v2_observer_messages: bool,
 }
 
 /// Basic communication with the Execution module;
@@ -95,6 +99,8 @@ impl ExecutionProxy {
             persisted_auxiliary_info_version,
             network_sender,
             secret_share_config,
+            consensus_publisher,
+            enable_v2_observer_messages,
         } = self
             .state
             .read()
@@ -124,6 +130,8 @@ impl ExecutionProxy {
             persisted_auxiliary_info_version,
             network_sender,
             secret_share_config,
+            consensus_publisher,
+            enable_v2_observer_messages,
         )
     }
 }
@@ -247,6 +255,8 @@ impl StateComputer for ExecutionProxy {
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
         secret_share_config: Option<SecretShareConfig>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        enable_v2_observer_messages: bool,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -264,6 +274,8 @@ impl StateComputer for ExecutionProxy {
             persisted_auxiliary_info_version,
             network_sender,
             secret_share_config,
+            consensus_publisher,
+            enable_v2_observer_messages,
         });
     }
 

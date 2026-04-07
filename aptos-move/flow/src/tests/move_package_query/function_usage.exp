@@ -1,0 +1,16 @@
+{
+  "called": [
+    "0xcafe::math::double"
+  ],
+  "called_transitive": [
+    "0xcafe::math::add",
+    "0xcafe::math::double"
+  ],
+  "used": [
+    "0xcafe::math::double"
+  ],
+  "used_transitive": [
+    "0xcafe::math::add",
+    "0xcafe::math::double"
+  ]
+}

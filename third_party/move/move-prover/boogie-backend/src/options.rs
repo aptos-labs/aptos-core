@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::anyhow;
 use itertools::Itertools;
@@ -25,7 +26,7 @@ const MOD_SET_ANALYSIS_NEW_FLAG_SINCE_3_5_1: &str = "-inferModifies";
 /// but not always. Setting the max version allows Prover to warn users for the higher version of
 /// boogie and z3 because those may be incompatible.
 pub const MIN_BOOGIE_VERSION: Option<&str> = Some("3.0.1.0");
-pub const MAX_BOOGIE_VERSION: Option<&str> = Some("3.5.1.0");
+pub const MAX_BOOGIE_VERSION: Option<&str> = Some("3.5.6.0");
 pub const MIN_BOOGIE_VERSION_NEW_MOD_SET_ANALYSIS: Option<&str> = Some("3.5.1.0");
 
 pub const MIN_Z3_VERSION: Option<&str> = Some("4.11.2");

@@ -62,10 +62,10 @@ impl AptosDB {
         let state_merkle_db = Arc::new(state_merkle_db);
         let hot_state_kv_db = hot_state_kv_db.map(Arc::new);
         let state_kv_db = Arc::new(state_kv_db);
-        // TODO(HotState): hook up `hot_state_kv_db` with a pruner.
         let state_pruner = StatePruner::new(
             hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
+            hot_state_kv_db.clone(),
             Arc::clone(&state_kv_db),
             pruner_config,
         );
@@ -73,7 +73,7 @@ impl AptosDB {
             Arc::clone(&ledger_db),
             hot_state_merkle_db,
             Arc::clone(&state_merkle_db),
-            hot_state_kv_db,
+            hot_state_kv_db.clone(),
             Arc::clone(&state_kv_db),
             state_pruner,
             buffered_state_target_items,
@@ -92,6 +92,7 @@ impl AptosDB {
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_db),
+            hot_state_kv_db,
             state_kv_db: Arc::clone(&state_kv_db),
             event_store: Arc::new(EventStore::new(ledger_db.event_db().db_arc())),
             state_store,
@@ -141,7 +142,7 @@ impl AptosDB {
                 Some(&block_cache),
                 readonly,
                 max_num_nodes_per_lru_cache_shard,
-                hot_state_config.delete_on_restart,
+                hot_state_config,
             )?;
 
         let myself = Self::new_with_dbs(
@@ -168,6 +169,9 @@ impl AptosDB {
                     .state_pruner
                     .state_kv_pruner
                     .maybe_set_pruner_target_db_version(version);
+                if let Some(pruner) = &myself.state_store.state_pruner.hot_state_kv_pruner {
+                    pruner.maybe_set_pruner_target_db_version(version);
+                }
             }
             if let Some(version) = myself.get_latest_state_checkpoint_version()? {
                 myself
@@ -230,7 +234,11 @@ impl AptosDB {
                 None,  // block_cache
                 false, // readonly
                 0,     // max_num_nodes_per_lru_cache_shard
-                true,  // reset_hot_state
+                HotStateConfig {
+                    delete_on_restart: true,
+                    persist_hotness_in_write_set: false,
+                    ..HotStateConfig::default()
+                },
             )?;
 
         let ledger_db = Arc::new(ledger_db);

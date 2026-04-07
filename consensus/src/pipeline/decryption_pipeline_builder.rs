@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::pipeline::pipeline_builder::{PipelineBuilder, Tracker};
+use crate::{
+    counters, monitor,
+    pipeline::pipeline_builder::{PipelineBuilder, Tracker},
+};
 use anyhow::{anyhow, Context};
 use aptos_batch_encryption::{
     errors::MissingEvalProofError,
@@ -14,17 +17,23 @@ use aptos_consensus_types::{
     common::Author,
     pipelined_block::{DecryptionResult, MaterializeResult, TaskFuture, TaskResult},
 };
-use aptos_logger::{error, info};
+use aptos_logger::{error, info, warn};
 use aptos_types::{
-    decryption::{BlockTxnDecryptionKey, DecKeyMetadata},
+    decryption::BlockTxnDecryptionKey,
     secret_sharing::{
-        Ciphertext, DecryptionKey, SecretShare, SecretShareConfig, SecretShareMetadata,
+        Ciphertext, DecryptionKey, EvalProof, SecretShare, SecretShareConfig, SecretShareMetadata,
         SecretSharedKey,
     },
-    transaction::encrypted_payload::DecryptedPayload,
+    transaction::{
+        encrypted_payload::{DecryptedPayload, DecryptionFailureReason},
+        SignedTransaction,
+    },
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use tokio::sync::oneshot;
 
 impl PipelineBuilder {
@@ -39,204 +48,418 @@ impl PipelineBuilder {
         derived_self_key_share_tx: oneshot::Sender<Option<SecretShare>>,
         secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
         observer_enabled: bool,
+        observer_decrypted_txns: Option<Vec<SignedTransaction>>,
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
         let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = materialize_fut.await?;
-
         tracker.start_working();
 
-        // If decryption is disabled (by config or missing secret share config), pass through.
+        // Single partition point: split encrypted from regular transactions once
+        // so all downstream paths receive pre-partitioned vecs.
+        let (encrypted_txns, regular_txns): (Vec<_>, Vec<_>) = input_txns
+            .into_iter()
+            .partition(|txn| txn.is_encrypted_txn());
+
         if !is_decryption_enabled {
-            return Ok((
-                input_txns,
+            let _ = derived_self_key_share_tx.send(None);
+            let failed_txns = mark_txns_failed_decryption(
+                encrypted_txns,
+                DecryptionFailureReason::ConfigUnavailable,
+            );
+            return Ok(DecryptionResult {
+                decrypted_txns: failed_txns,
+                regular_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
-                None,
-            ));
+                decryption_key: None,
+            });
         }
-        // If the config is None, then we are on the observer path:
-        // no local secret share config available, so receive the pre-computed
-        // decryption key via channel instead of deriving locally.
-        // Assumption: `input_txns` is free of Encrypted Transactions
-        // due to VM validation checks
+
         let Some(secret_share_config) = maybe_secret_share_config else {
             let _ = derived_self_key_share_tx.send(None);
+
             // Consensus node without secret share config (e.g. bootstrapping
             // epoch where chunky DKG is newly enabled but hasn't completed yet).
             // Return immediately with no decryption key to avoid a circular
             // dependency: has_rand_txns_fut -> prepare -> decrypt (waiting for
             // secret_shared_key_rx) -> ordering (blocked on has_rand_txns_fut).
             if !observer_enabled {
-                return Ok((
-                    input_txns,
+                let failed_txns = mark_txns_failed_decryption(
+                    encrypted_txns,
+                    DecryptionFailureReason::ConfigUnavailable,
+                );
+                return Ok(DecryptionResult {
+                    decrypted_txns: failed_txns,
+                    regular_txns,
                     max_txns_from_block_to_execute,
                     block_gas_limit,
-                    Some(None),
-                ));
+                    decryption_key: Some(None),
+                });
             }
-            // Observer: wait for the decryption key from the ordering path.
-            let maybe_key = secret_shared_key_rx
-                .await
-                .map_err(|_| anyhow!("secret_shared_key_rx dropped in observer path"))?;
-            let dec_key = maybe_key.map(|key| {
-                BlockTxnDecryptionKey::new(
-                    DecKeyMetadata {
-                        epoch: key.metadata.epoch,
-                        round: key.metadata.round,
-                    },
-                    bcs::to_bytes(&key.key).expect("SecretSharedKey serialization"),
-                )
-            });
-            return Ok((
-                input_txns,
+
+            return decrypt_observer_path(
+                encrypted_txns,
+                regular_txns,
+                secret_shared_key_rx,
+                observer_decrypted_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
-                Some(dec_key),
-            ));
+            )
+            .await;
         };
 
-        let (encrypted_txns, unencrypted_txns): (Vec<_>, Vec<_>) = input_txns
-            .into_iter()
-            .partition(|txn| txn.is_encrypted_txn());
+        decrypt_validator_path(
+            encrypted_txns,
+            regular_txns,
+            &block,
+            author,
+            &secret_share_config,
+            derived_self_key_share_tx,
+            secret_shared_key_rx,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+        )
+        .await
+    }
+}
 
-        // TODO(ibalajiarun): figure out handling of empty encrypted txn vec
+/// Observer path: wait for the decryption key from the ordering path, then use
+/// pre-decrypted transactions provided by the validator.
+async fn decrypt_observer_path(
+    _encrypted_txns: Vec<SignedTransaction>,
+    regular_txns: Vec<SignedTransaction>,
+    secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+    observer_decrypted_txns: Option<Vec<SignedTransaction>>,
+    max_txns_from_block_to_execute: Option<u64>,
+    block_gas_limit: Option<u64>,
+) -> TaskResult<DecryptionResult> {
+    let maybe_key = secret_shared_key_rx
+        .await
+        .map_err(|_| anyhow!("secret_shared_key_rx dropped in observer path"))?;
 
-        // TODO(ibalajiarun): FIXME
-        let len = 32;
-        let encrypted_txns = if encrypted_txns.len() > len {
-            let mut to_truncate = encrypted_txns;
-            to_truncate.truncate(len);
-            to_truncate
-        } else {
-            encrypted_txns
-        };
+    // When the key is None the validator may still send failed-decryption txns
+    // (e.g. DecryptionKeyUnavailable) via V2. Accept them if present; only
+    // return an empty result when neither key nor txns are available.
+    let dec_key = maybe_key
+        .map(|key| BlockTxnDecryptionKey::from_secret_shared_key(&key))
+        .transpose()?;
 
-        let txn_ciphertexts: Vec<Ciphertext> = encrypted_txns
-            .iter()
-            .map(|txn| {
-                // TODO(ibalajiarun): Avoid clone and use reference instead
-                txn.payload()
-                    .as_encrypted_payload()
-                    .expect("must be a encrypted txn")
-                    .ciphertext()
-                    .clone()
+    let decrypted_txns = observer_decrypted_txns.unwrap_or_default();
+
+    Ok(DecryptionResult {
+        decrypted_txns,
+        regular_txns,
+        max_txns_from_block_to_execute,
+        block_gas_limit,
+        decryption_key: Some(dec_key),
+    })
+}
+
+/// Validator path: derive key share, prepare ciphertexts, await the shared
+/// decryption key, and decrypt all encrypted transactions.
+async fn decrypt_validator_path(
+    encrypted_txns: Vec<SignedTransaction>,
+    regular_txns: Vec<SignedTransaction>,
+    block: &Block,
+    author: Author,
+    secret_share_config: &SecretShareConfig,
+    derived_self_key_share_tx: oneshot::Sender<Option<SecretShare>>,
+    secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+    max_txns_from_block_to_execute: Option<u64>,
+    block_gas_limit: Option<u64>,
+) -> TaskResult<DecryptionResult> {
+    // Short-circuit if no encrypted transactions: skip all crypto operations
+    if encrypted_txns.is_empty() {
+        let _ = derived_self_key_share_tx.send(None);
+        return Ok(DecryptionResult {
+            decrypted_txns: Vec::new(),
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key: Some(None),
+        });
+    }
+
+    let max_encrypted_txns = secret_share_config.digest_key().max_batch_size();
+    let (encrypted_txns, batch_limit_exceeded_txns) = if encrypted_txns.len() > max_encrypted_txns {
+        warn!(
+            "Block {} has {} encrypted txns exceeding batch limit {}; marking excess as BatchLimitReached",
+            block.round(),
+            encrypted_txns.len(),
+            max_encrypted_txns,
+        );
+        let mut all = encrypted_txns;
+        let exceeded = all.split_off(max_encrypted_txns);
+        (all, exceeded)
+    } else {
+        (encrypted_txns, Vec::new())
+    };
+
+    // Mark batch-limit-exceeded txns as failed decryption with retry reason.
+    let batch_limit_exceeded_txns = mark_txns_failed_decryption(
+        batch_limit_exceeded_txns,
+        DecryptionFailureReason::BatchLimitReached,
+    );
+
+    let txn_ciphertexts: Vec<Ciphertext> = encrypted_txns
+        .iter()
+        .map(|txn| {
+            // TODO(ibalajiarun): Avoid clone and use reference instead
+            txn.payload()
+                .as_encrypted_payload()
+                .expect("must be a encrypted txn")
+                .ciphertext()
+                .clone()
+        })
+        .collect();
+
+    // TODO(ibalajiarun): Consider using commit block height to reduce trusted setup size
+    // TODO(ibalajiarun): Fix this wrapping
+    let num_rounds = secret_share_config.digest_key().num_rounds() as u64;
+    let encryption_round = block.round() % num_rounds;
+    let digest_key = secret_share_config.digest_key_arc();
+    let (txn_ciphertexts, digest, proofs_promise) = tokio::task::spawn_blocking(move || {
+        monitor!(
+            "decryption_digest",
+            FPTXWeighted::digest(&digest_key, &txn_ciphertexts, encryption_round)
+                .map(|(digest, proofs_promise)| (txn_ciphertexts, digest, proofs_promise))
+        )
+    })
+    .await
+    .map_err(|e| anyhow!("digest computation panicked: {e}"))??;
+
+    let metadata = SecretShareMetadata::new(
+        block.epoch(),
+        block.round(),
+        block.timestamp_usecs(),
+        block.id(),
+        digest.clone(),
+    );
+
+    let derived_key_share = monitor!(
+        "decryption_derive_key_share",
+        FPTXWeighted::derive_decryption_key_share(secret_share_config.msk_share(), &digest)?
+    );
+    if derived_self_key_share_tx
+        .send(Some(SecretShare::new(
+            author,
+            metadata.clone(),
+            derived_key_share,
+        )))
+        .is_err()
+    {
+        return Err(
+            anyhow!("derived_self_key_share_tx receiver dropped, pipeline likely aborted").into(),
+        );
+    }
+
+    // eval_proofs is CPU-heavy (O(n^2 log n)); spawn_blocking prevents starving the async runtime.
+    // Pipeline: eval_proofs ──→ prepare_ct ──┐
+    //           secret_shared_key_rx ─────────┴──→ decrypt
+    let digest_key = secret_share_config.digest_key_arc();
+    let proofs = monitor!(
+        "decryption_eval_proofs",
+        tokio::task::spawn_blocking(move || {
+            FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key)
+        })
+        .await
+        .map_err(|e| anyhow!("proof computation panicked: {e}"))?
+    );
+
+    // prepare_ct is expensive (parallel pairings) and doesn't need the decryption key,
+    // so run it concurrently with the remaining key wait.
+    let prepare_handle = {
+        let digest = digest.clone();
+        let proofs = proofs.clone();
+        tokio::task::spawn_blocking(move || {
+            monitor!(
+                "decryption_prepare_ct",
+                txn_ciphertexts
+                    .into_par_iter()
+                    .map(|ciphertext| {
+                        let prepared_or_err =
+                            FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs);
+                        let id: Id = prepared_or_err
+                            .as_ref()
+                            .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
+                        (id, prepared_or_err)
+                    })
+                    .collect::<Vec<_>>()
+            )
+        })
+    };
+
+    let (prepared_cts, maybe_decryption_key) = monitor!(
+        "decryption_wait_prepare_and_key",
+        tokio::try_join!(
+            async {
+                prepare_handle
+                    .await
+                    .map_err(|e| anyhow!("prepare_ct panicked: {e}"))
+            },
+            async {
+                secret_shared_key_rx
+                    .await
+                    .map_err(|_| anyhow!("secret_shared_key_rx dropped"))
+            },
+        )?
+    );
+
+    // Handle missing decryption key gracefully instead of panicking.
+    // Mark all encrypted txns as failed-decryption so downstream can handle them.
+    let Some(decryption_key) = maybe_decryption_key else {
+        error!(
+            "Decryption key unavailable for block {}; marking {} encrypted txns as failed",
+            block.round(),
+            encrypted_txns.len()
+        );
+        let num_failed = encrypted_txns.len();
+        let failed_txns: Vec<_> = encrypted_txns
+            .into_par_iter()
+            .zip(prepared_cts.into_par_iter())
+            .map(|(txn, (id, _prepared))| {
+                let eval_proof = proofs.get(&id).expect("must exist");
+                mark_txn_failed_decryption(
+                    txn,
+                    Some(eval_proof),
+                    DecryptionFailureReason::DecryptionKeyUnavailable,
+                )
             })
             .collect();
+        counters::DECRYPTION_PIPELINE_TXNS_COUNT
+            .with_label_values(&["failed_decryption"])
+            .inc_by(num_failed as u64);
+        counters::DECRYPTION_PIPELINE_TXNS_COUNT
+            .with_label_values(&["batch_limit_exceeded"])
+            .inc_by(batch_limit_exceeded_txns.len() as u64);
+        counters::DECRYPTION_PIPELINE_TXNS_COUNT
+            .with_label_values(&["unencrypted"])
+            .inc_by(regular_txns.len() as u64);
+        let decrypted_txns = [failed_txns, batch_limit_exceeded_txns].concat();
+        return Ok(DecryptionResult {
+            decrypted_txns,
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key: Some(None),
+        });
+    };
 
-        // TODO(ibalajiarun): Consider using commit block height to reduce trusted setup size
-        // TODO(ibalajiarun): Fix this wrapping
-        let encryption_round = block.round() % 200;
-        let (digest, proofs_promise) = FPTXWeighted::digest(
-            secret_share_config.digest_key(),
-            &txn_ciphertexts,
-            encryption_round,
-        )?;
+    info!(
+        "Successfully received decryption key for block {}: metadata={:?}",
+        block.round(),
+        decryption_key.metadata
+    );
 
-        let metadata = SecretShareMetadata::new(
-            block.epoch(),
-            block.round(),
-            block.timestamp_usecs(),
-            block.id(),
-            digest.clone(),
-        );
-
-        let derived_key_share =
-            FPTXWeighted::derive_decryption_key_share(secret_share_config.msk_share(), &digest)?;
-        if derived_self_key_share_tx
-            .send(Some(SecretShare::new(
-                author,
-                metadata.clone(),
-                derived_key_share,
-            )))
-            .is_err()
-        {
-            return Err(anyhow!(
-                "derived_self_key_share_tx receiver dropped, pipeline likely aborted"
-            )
-            .into());
-        }
-
-        // TODO(ibalajiarun): improve perf
-        let proofs = FPTXWeighted::eval_proofs_compute_all(
-            &proofs_promise,
-            secret_share_config.digest_key(),
-        );
-
-        let prepared_txn_ciphertexts: Vec<Result<PreparedCiphertext, MissingEvalProofError>> =
-            txn_ciphertexts
-                .into_par_iter()
-                .map(|ciphertext| FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs))
-                .collect();
-
-        let maybe_decryption_key = secret_shared_key_rx
-            .await
-            .map_err(|_| anyhow!("secret_shared_key_rx dropped"))?;
-        // TODO(ibalajiarun): account for the case where decryption key is not available
-        let decryption_key = maybe_decryption_key.expect("decryption key should be available");
-
-        info!(
-            "Successfully received decryption key for block {}: metadata={:?}",
-            block.round(),
-            decryption_key.metadata
-        );
-
-        let decrypted_txns: Vec<_> = encrypted_txns
+    // Final decryption pass — needs both prepared ciphertexts and the decryption key.
+    let num_failed_decryptions = AtomicUsize::new(0);
+    let decrypted_txns: Vec<_> = monitor!(
+        "decryption_decrypt",
+        encrypted_txns
             .into_par_iter()
-            .zip(prepared_txn_ciphertexts)
-            .map(|(mut txn, prepared_ciphertext_or_error)| {
-                let id: Id = prepared_ciphertext_or_error
-                    .as_ref()
-                    .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
+            .zip(prepared_cts.into_par_iter())
+            .map(|(mut txn, (id, prepared_ciphertext_or_error))| {
                 let eval_proof = proofs.get(&id).expect("must exist");
 
                 match do_final_decryption(&decryption_key.key, prepared_ciphertext_or_error) {
                     Ok(payload) => {
-                        let (executable, nonce) = payload.unwrap();
-                        txn.payload_mut()
+                        let encrypted_payload = txn.payload_mut()
                             .as_encrypted_payload_mut()
-                            .map(|p| {
-                                p.into_decrypted(eval_proof, executable, nonce)
-                                    .expect("must happen")
-                            })
-                            .expect("must exist");
+                            .expect("must happen");
+                        if !encrypted_payload.entry_fun_matches(&payload)
+                            .expect("must be encrypted") {
+                            warn!(
+                                "transaction with ciphertext id {:?} has mismatching entry function",
+                                id
+                            );
+                            num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
+                            mark_txn_failed_decryption(
+                                txn,
+                                Some(eval_proof),
+                                DecryptionFailureReason::ClaimedEntryFunctionMismatch,
+                            )
+                        } else {
+                            let (executable, nonce) = payload.unwrap();
+                            encrypted_payload.into_decrypted(eval_proof, executable, nonce)
+                                .expect("must happen");
+                            txn
+                        }
                     },
                     Err(e) => {
                         error!(
                             "Failed to decrypt transaction with ciphertext id {:?}: {:?}",
                             id, e
                         );
-                        txn.payload_mut()
-                            .as_encrypted_payload_mut()
-                            .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
-                            .expect("must exist");
+                        num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
+                        mark_txn_failed_decryption(
+                            txn,
+                            Some(eval_proof),
+                            DecryptionFailureReason::CryptoFailure,
+                        )
                     },
                 }
-                txn
             })
-            .collect();
-        info!(
-            "Decryption complete for block {}: {} encrypted, {} unencrypted",
-            block.round(),
-            decrypted_txns.len(),
-            unencrypted_txns.len()
-        );
-        let output_txns = [decrypted_txns, unencrypted_txns].concat();
+            .collect()
+    );
 
-        let block_txn_dec_key = BlockTxnDecryptionKey::new(
-            DecKeyMetadata {
-                epoch: decryption_key.metadata.epoch,
-                round: decryption_key.metadata.round,
-            },
-            bcs::to_bytes(&decryption_key.key).context("Decryption key serialization failed")?,
-        );
+    let num_failed = num_failed_decryptions.into_inner();
+    let num_decrypted = decrypted_txns.len() - num_failed;
+    counters::DECRYPTION_PIPELINE_TXNS_COUNT
+        .with_label_values(&["decrypted"])
+        .inc_by(num_decrypted as u64);
+    counters::DECRYPTION_PIPELINE_TXNS_COUNT
+        .with_label_values(&["failed_decryption"])
+        .inc_by(num_failed as u64);
+    counters::DECRYPTION_PIPELINE_TXNS_COUNT
+        .with_label_values(&["batch_limit_exceeded"])
+        .inc_by(batch_limit_exceeded_txns.len() as u64);
+    counters::DECRYPTION_PIPELINE_TXNS_COUNT
+        .with_label_values(&["unencrypted"])
+        .inc_by(regular_txns.len() as u64);
+    info!(
+        "Decryption complete for block {}: {} decrypted, {} failed, {} batch_limit_exceeded, {} unencrypted",
+        block.round(),
+        num_decrypted,
+        num_failed,
+        batch_limit_exceeded_txns.len(),
+        regular_txns.len(),
+    );
+    let decrypted_txns = [decrypted_txns, batch_limit_exceeded_txns].concat();
 
-        Ok((
-            output_txns,
-            max_txns_from_block_to_execute,
-            block_gas_limit,
-            Some(Some(block_txn_dec_key)),
-        ))
-    }
+    let block_txn_dec_key = BlockTxnDecryptionKey::from_secret_shared_key(&decryption_key)
+        .context("Decryption key serialization failed")?;
+
+    Ok(DecryptionResult {
+        decrypted_txns,
+        regular_txns,
+        max_txns_from_block_to_execute,
+        block_gas_limit,
+        decryption_key: Some(Some(block_txn_dec_key)),
+    })
+}
+
+fn mark_txns_failed_decryption(
+    txns: Vec<SignedTransaction>,
+    reason: DecryptionFailureReason,
+) -> Vec<SignedTransaction> {
+    txns.into_iter()
+        .map(|txn| mark_txn_failed_decryption(txn, None, reason.clone()))
+        .collect()
+}
+
+fn mark_txn_failed_decryption(
+    mut txn: SignedTransaction,
+    eval_proof: Option<EvalProof>,
+    reason: DecryptionFailureReason,
+) -> SignedTransaction {
+    txn.payload_mut()
+        .as_encrypted_payload_mut()
+        .map(|p| {
+            p.into_failed_decryption_with_reason(eval_proof, reason)
+                .expect("must be in Encrypted state")
+        })
+        .expect("must be encrypted txn");
+    txn
 }
 
 fn do_final_decryption(

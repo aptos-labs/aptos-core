@@ -813,6 +813,7 @@ fn create_encrypted_transaction(gas_unit_price: u64) -> SignedTransaction {
             replay_protection_nonce: None,
         },
         payload_hash: HashValue::random(),
+        claimed_entry_fun: None,
     };
 
     let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);

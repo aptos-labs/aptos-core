@@ -60,7 +60,10 @@ impl TStateView for DbStateView {
     }
 
     fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
-        Ok(StateSlot::from_db_get(self.get(state_key)?))
+        Ok(StateSlot::from_db_get(
+            state_key.clone(),
+            self.get(state_key)?,
+        ))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

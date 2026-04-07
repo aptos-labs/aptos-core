@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     ability::AbilitySet,
@@ -36,6 +37,9 @@ pub const OPTION_SOME_TAG: u16 = 1;
 pub const LEGACY_OPTION_VEC: &str = "vec";
 pub const OPTION_MODULE_NAME_STR: &str = "option";
 pub const OPTION_STRUCT_NAME_STR: &str = "Option";
+
+// Module path separator used in fully-qualified type names (e.g. "0x1::string::String")
+pub const MODULE_SEPARATOR: &str = "::";
 
 // Struct API constants for public struct/enum APIs
 pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
@@ -157,6 +161,32 @@ impl TypeTag {
             Vector(t) => format!("vector<{}>", t.to_canonical_string()),
             Struct(s) => s.to_canonical_string(),
             Function(f) => f.to_canonical_string(),
+        }
+    }
+
+    /// Returns a short string for the top-level type without any type parameters.
+    /// Useful for error messages where the full canonical string would be unbounded in size.
+    pub fn to_short_string(&self) -> &'static str {
+        use TypeTag::*;
+        match self {
+            Bool => "bool",
+            U8 => "u8",
+            U16 => "u16",
+            U32 => "u32",
+            U64 => "u64",
+            U128 => "u128",
+            U256 => "u256",
+            I8 => "i8",
+            I16 => "i16",
+            I32 => "i32",
+            I64 => "i64",
+            I128 => "i128",
+            I256 => "i256",
+            Address => "address",
+            Signer => "signer",
+            Vector(_) => "vector",
+            Struct(_) => "struct",
+            Function(_) => "function",
         }
     }
 
@@ -479,6 +509,18 @@ impl<'a> hashbrown::Equivalent<(&'a AccountAddress, &'a IdentStr)> for ModuleId 
 impl<'a> hashbrown::Equivalent<ModuleId> for (&'a AccountAddress, &'a IdentStr) {
     fn equivalent(&self, other: &ModuleId) -> bool {
         self.0 == &other.address && self.1 == other.name.as_ident_str()
+    }
+}
+
+impl From<&ModuleId> for ModuleId {
+    fn from(id: &ModuleId) -> Self {
+        id.clone()
+    }
+}
+
+impl<'a> From<&(&'a AccountAddress, &'a IdentStr)> for ModuleId {
+    fn from(key: &(&'a AccountAddress, &'a IdentStr)) -> Self {
+        ModuleId::new(*key.0, key.1.to_owned())
     }
 }
 

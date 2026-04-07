@@ -3,12 +3,12 @@ module 0x42::acquires_inferred {
     struct R {
         f: u64,
     }
-    private fun check(a: address): bool {
-        exists<R>(a)
-    }
     private fun publish(s: &signer) {
         MoveTo<R>(s, pack acquires_inferred::R(1));
         Tuple()
+    }
+    private fun check(a: address): bool {
+        exists<R>(a)
     }
     private fun read(a: address): u64 {
         {
@@ -30,11 +30,11 @@ module 0x42::acquires_inferred {
     struct R has store, key {
         f: u64,
     }
-    fun check(a: address): bool {
-        exists<R>(a)
-    }
     fun publish(s: &signer) {
         move_to<R>(s, R{f: 1});
+    }
+    fun check(a: address): bool {
+        exists<R>(a)
     }
     fun read(a: address): u64 {
         let r = borrow_global<R>(a);

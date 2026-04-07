@@ -580,7 +580,7 @@ pub struct WriteTableItem {
 pub struct TransactionPayload {
     #[prost(enumeration="transaction_payload::Type", tag="1")]
     pub r#type: i32,
-    #[prost(oneof="transaction_payload::Payload", tags="2, 3, 5, 6")]
+    #[prost(oneof="transaction_payload::Payload", tags="2, 3, 5, 6, 8")]
     pub payload: ::core::option::Option<transaction_payload::Payload>,
     #[prost(oneof="transaction_payload::ExtraConfig", tags="7")]
     pub extra_config: ::core::option::Option<transaction_payload::ExtraConfig>,
@@ -595,6 +595,7 @@ pub mod transaction_payload {
         ScriptPayload = 2,
         WriteSetPayload = 4,
         MultisigPayload = 5,
+        EncryptedTransactionPayload = 6,
     }
     impl Type {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -608,6 +609,7 @@ pub mod transaction_payload {
                 Type::ScriptPayload => "TYPE_SCRIPT_PAYLOAD",
                 Type::WriteSetPayload => "TYPE_WRITE_SET_PAYLOAD",
                 Type::MultisigPayload => "TYPE_MULTISIG_PAYLOAD",
+                Type::EncryptedTransactionPayload => "TYPE_ENCRYPTED_TRANSACTION_PAYLOAD",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -618,6 +620,7 @@ pub mod transaction_payload {
                 "TYPE_SCRIPT_PAYLOAD" => Some(Self::ScriptPayload),
                 "TYPE_WRITE_SET_PAYLOAD" => Some(Self::WriteSetPayload),
                 "TYPE_MULTISIG_PAYLOAD" => Some(Self::MultisigPayload),
+                "TYPE_ENCRYPTED_TRANSACTION_PAYLOAD" => Some(Self::EncryptedTransactionPayload),
                 _ => None,
             }
         }
@@ -633,6 +636,8 @@ pub mod transaction_payload {
         WriteSetPayload(super::WriteSetPayload),
         #[prost(message, tag="6")]
         MultisigPayload(super::MultisigPayload),
+        #[prost(message, tag="8")]
+        EncryptedTransactionPayload(super::EncryptedTransactionPayload),
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -648,6 +653,45 @@ pub struct ExtraConfigV1 {
     pub multisig_address: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(uint64, optional, tag="2")]
     pub replay_protection_nonce: ::core::option::Option<u64>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EncryptedTransactionPayload {
+    #[prost(oneof="encrypted_transaction_payload::State", tags="1, 2")]
+    pub state: ::core::option::Option<encrypted_transaction_payload::State>,
+}
+/// Nested message and enum types in `EncryptedTransactionPayload`.
+pub mod encrypted_transaction_payload {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum State {
+        #[prost(message, tag="1")]
+        FailedDecryption(super::FailedDecryptionPayloadState),
+        #[prost(message, tag="2")]
+        Decrypted(super::DecryptedPayloadState),
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FailedDecryptionPayloadState {
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DecryptedPayloadState {
+    #[prost(oneof="decrypted_payload_state::DecryptedPayload", tags="1, 2, 3")]
+    pub decrypted_payload: ::core::option::Option<decrypted_payload_state::DecryptedPayload>,
+}
+pub mod decrypted_payload_state {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum DecryptedPayload {
+        #[prost(message, tag="1")]
+        EntryFunctionPayload(super::EntryFunctionPayload),
+        #[prost(message, tag="2")]
+        ScriptPayload(super::ScriptPayload),
+        #[prost(message, tag="3")]
+        MultisigPayload(super::MultisigPayload),
+    }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

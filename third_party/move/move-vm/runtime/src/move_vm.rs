@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     data_cache::MoveVmDataCache,
@@ -193,7 +194,7 @@ fn deserialize_arg(
     // guaranteed by transaction argument validation but because it does not use layouts we better
     // double-check here.
     let layout = layout_converter
-        .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty, false)
+        .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty)
         .map_err(|err| {
             if layout_converter.is_lazy_loading_enabled() {
                 err
@@ -294,7 +295,7 @@ fn serialize_return_value(
 
     // Disallow delayed fields to escape through return values of a function.
     let layout = layout_converter
-        .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty, false)
+        .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty)
         .map_err(|err| {
             if layout_converter.is_lazy_loading_enabled() {
                 err

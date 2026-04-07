@@ -34,7 +34,7 @@ const BLS12_381: &str = "bls12-381";
 const BATCH_SIZES: [usize; 3] = [1023, 16383, 131071]; //[1048575]; // 1048575100000, 1000000];
 
 /// WARNING: These are the relevant bit widths we want benchmarked to compare against Bulletproofs
-const BIT_WIDTHS: [u8; 4] = [8, 16, 32, 64]; // [8, 16, 32, 64];
+const BIT_WIDTHS: [usize; 4] = [8, 16, 32, 64]; // [8, 16, 32, 64];
 
 fn bench_groups(c: &mut Criterion) {
     //    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, DEKART_RS_SCHEME_NAME, BN254);
@@ -60,7 +60,9 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
 ) {
     let mut group = c.benchmark_group(format!("{}/{}", scheme_name, curve_name));
 
-    let l = std::env::var("L").ok().and_then(|s| s.parse::<u8>().ok());
+    let l = std::env::var("L")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok());
     let n = std::env::var("N")
         .ok()
         .and_then(|s| s.parse::<usize>().ok());
@@ -83,7 +85,7 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
 
 fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
     group: &mut BenchmarkGroup<WallTime>,
-    ell: u8,
+    ell: usize,
     n: usize,
 ) {
     group.bench_function(
@@ -96,11 +98,15 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
                     let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
-                    let proof = B::prove(&pk, &values, ell, &comm.clone().into(), &r, &mut rng);
+                    let proof_projective =
+                        B::prove(&pk, &values, ell, &comm.clone().into(), &r, &mut rng);
+                    let proof = proof_projective.into();
                     (vk, n, ell, comm, proof, rng)
                 },
                 |(vk, n, ell, comm, proof, mut rng)| {
-                    proof.verify(&vk, n, ell, &comm, &mut rng).unwrap();
+                    proof
+                        .verify(&vk, n, ell, &comm.clone().into(), &mut rng)
+                        .unwrap();
                 },
             )
         },
@@ -109,7 +115,7 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
 
 fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
     group: &mut BenchmarkGroup<WallTime>,
-    ell: u8,
+    ell: usize,
     n: usize,
 ) {
     let proof_size = {
@@ -118,7 +124,8 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
         let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
         let (values, comm, r) =
             test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
-        let proof = B::prove(&pk, &values, ell, &comm.into(), &r, &mut rng);
+        let proof_projective = B::prove(&pk, &values, ell, &comm.into(), &r, &mut rng);
+        let proof = proof_projective.into();
         let mut bytes = Vec::new();
         proof
             .serialize_compressed(&mut bytes)

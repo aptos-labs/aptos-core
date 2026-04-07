@@ -656,20 +656,10 @@ module aptos_framework::fungible_asset {
         exists<ConcurrentFungibleBalance>(store)
     }
 
-    /// Return the underlying metadata object
-    public fun metadata_from_asset(self: &FungibleAsset): Object<Metadata> {
-        self.metadata
-    }
-
     #[view]
     /// Return the underlying metadata object.
     public fun store_metadata<T: key>(store: Object<T>): Object<Metadata> acquires FungibleStore {
         borrow_store_resource(&store).metadata
-    }
-
-    /// Return the `amount` of a given fungible asset.
-    public fun amount(fa: &FungibleAsset): u64 {
-        fa.amount
     }
 
     #[view]
@@ -747,6 +737,12 @@ module aptos_framework::fungible_asset {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = fa_store.metadata.object_address();
         exists<DispatchFunctionStore>(metadata_addr)
+    }
+
+    #[view]
+    public fun is_asset_type_dispatchable(metadata: Object<Metadata>): bool {
+        let metadata_addr = metadata.object_address();
+        exists<DispatchFunctionStore>(metadata_addr) || exists<DeriveSupply>(metadata_addr)
     }
 
     public fun deposit_dispatch_function<T: key>(
@@ -836,6 +832,19 @@ module aptos_framework::fungible_asset {
         }
     }
 
+    /// Return the `amount` of a given fungible asset.
+    public fun amount(self: &FungibleAsset): u64 {
+        self.amount
+    }
+
+    #[deprecated]
+    /// Return the underlying metadata object
+    /// Duplicate of `asset_metadata`
+    public fun metadata_from_asset(self: &FungibleAsset): Object<Metadata> {
+        self.metadata
+    }
+
+    /// Return the underlying metadata object from the `FungibleAsset`.
     public fun asset_metadata(self: &FungibleAsset): Object<Metadata> {
         self.metadata
     }
@@ -992,7 +1001,7 @@ module aptos_framework::fungible_asset {
         owner_address: address, store: Object<T>, abort_on_dispatch: bool
     ) {
         assert!(
-            store.owns(owner_address),
+            object::owns(store, owner_address),
             error::permission_denied(ENOT_STORE_OWNER)
         );
         let fa_store = borrow_store_resource(&store);
@@ -1071,7 +1080,7 @@ module aptos_framework::fungible_asset {
     /// Burns a fungible asset
     public fun burn(self: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
         assert!(
-            self.metadata == fa.metadata_from_asset(),
+            self.metadata == fa.asset_metadata(),
             error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH)
         );
         fa.burn_internal();
@@ -1428,7 +1437,7 @@ module aptos_framework::fungible_asset {
         owner: &signer, store: Object<T>
     ) acquires FungibleStore {
         assert!(
-            store.owns(signer::address_of(owner)),
+            object::owns(store, signer::address_of(owner)),
             error::permission_denied(ENOT_STORE_OWNER)
         );
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));

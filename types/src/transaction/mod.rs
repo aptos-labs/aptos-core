@@ -16,7 +16,7 @@ use crate::{
             AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature,
             SingleKeyAuthenticator, TransactionAuthenticator,
         },
-        encrypted_payload::EncryptedPayload,
+        encrypted_payload::{DecryptionFailureReason, EncryptedPayload},
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::{HotStateOp, WriteSet},
@@ -691,33 +691,36 @@ impl RawTransaction {
     /// Converts a RawTransaction with an EncryptedPayload into a variant that uses
     /// TransactionExecutable::Encrypted for signature verification.
     /// This is needed because signatures are verified over the executable, not the encrypted ciphertext.
-    pub fn into_encrypted_variant(self) -> Self {
-        match self.payload {
+    pub fn as_encrypted_variant(&self) -> Cow<'_, Self> {
+        match &self.payload {
             TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
                 ciphertext,
                 extra_config,
                 payload_hash,
+                claimed_entry_fun,
                 ..
             })
             | TransactionPayload::EncryptedPayload(EncryptedPayload::FailedDecryption {
                 ciphertext,
                 extra_config,
                 payload_hash,
+                claimed_entry_fun,
                 ..
-            }) => RawTransaction {
+            }) => Cow::Owned(RawTransaction {
                 sender: self.sender,
                 sequence_number: self.sequence_number,
                 payload: TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted {
-                    ciphertext,
-                    extra_config,
-                    payload_hash,
+                    ciphertext: ciphertext.clone(),
+                    extra_config: extra_config.clone(),
+                    payload_hash: *payload_hash,
+                    claimed_entry_fun: claimed_entry_fun.clone(),
                 }),
                 max_gas_amount: self.max_gas_amount,
                 gas_unit_price: self.gas_unit_price,
                 expiration_timestamp_secs: self.expiration_timestamp_secs,
                 chain_id: self.chain_id,
-            },
-            _ => self,
+            }),
+            _ => Cow::Borrowed(self),
         }
     }
 }
@@ -925,12 +928,7 @@ impl TransactionPayload {
     }
 
     pub fn replay_protection_nonce(&self) -> Option<u64> {
-        match self {
-            Self::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
-                extra_config.replay_protection_nonce()
-            },
-            _ => None,
-        }
+        self.extra_config().replay_protection_nonce()
     }
 
     pub fn executable(&self) -> Result<TransactionExecutable> {
@@ -989,6 +987,13 @@ impl TransactionPayload {
             TransactionPayload::EncryptedPayload(encrypted_payload) => {
                 encrypted_payload.extra_config().clone()
             },
+        }
+    }
+
+    pub fn decryption_failure_reason(&self) -> Option<&DecryptionFailureReason> {
+        match self {
+            TransactionPayload::EncryptedPayload(ep) => ep.decryption_failure_reason(),
+            _ => None,
         }
     }
 
@@ -1421,8 +1426,9 @@ impl SignedTransaction {
     pub fn raw_txn_bytes_len(&self) -> usize {
         *self.raw_txn_size.get_or_init(|| {
             if self.is_encrypted_txn() {
-                let enc_raw_txn = self.raw_txn.clone().into_encrypted_variant();
-                bcs::serialized_size(&enc_raw_txn).expect("Unable to serialize RawTransaction")
+                let enc_raw_txn = self.raw_txn.as_encrypted_variant();
+                bcs::serialized_size(enc_raw_txn.as_ref())
+                    .expect("Unable to serialize RawTransaction")
             } else {
                 bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
             }
@@ -1493,7 +1499,7 @@ impl SignedTransaction {
     /// This is needed because signatures are verified over the executable, not the encrypted ciphertext.
     pub fn into_encrypted_variant(self) -> Self {
         SignedTransaction {
-            raw_txn: self.raw_txn.into_encrypted_variant(),
+            raw_txn: self.raw_txn.as_encrypted_variant().into_owned(),
             authenticator: self.authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),

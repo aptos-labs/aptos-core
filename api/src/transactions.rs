@@ -1494,6 +1494,10 @@ impl TransactionsApi {
                 mempool_status.message,
                 AptosErrorCode::RejectedByFilter,
             )),
+            MempoolStatusCode::RateLimited => Err(AptosError::new_with_error_code(
+                mempool_status.message,
+                AptosErrorCode::RateLimited,
+            )),
         }
     }
 

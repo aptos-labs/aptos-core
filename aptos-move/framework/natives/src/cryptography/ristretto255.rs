@@ -2,8 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::cryptography::{ristretto255_point, ristretto255_scalar};
-use aptos_gas_algebra::GasExpression;
-use aptos_gas_schedule::{gas_params::natives::aptos_framework::*, NativeGasParameters};
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder,
     SafeNativeError, SafeNativeResult,
@@ -11,7 +9,6 @@ use aptos_native_interface::{
 use aptos_types::vm_status::StatusCode;
 use curve25519_dalek::scalar::Scalar;
 use move_binary_format::errors::PartialVMError;
-use move_core_types::gas_algebra::{InternalGasUnit, NumArgs};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::values::{Reference, StructRef, Value};
 use std::collections::VecDeque;
@@ -21,17 +18,6 @@ pub(crate) const SCALAR_NUM_BYTES: usize = 32;
 
 /// The size of a serialized compressed Ristretto point, in bytes.
 pub(crate) const COMPRESSED_POINT_NUM_BYTES: usize = 32;
-
-/// Returns gas costs for a variable-time multiscalar multiplication (MSM) of size-n. The MSM
-/// employed in curve25519 is:
-///  1. Strauss, when n <= 190, see <https://www.jstor.org/stable/2310929>
-///  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
-/// For simplicity, we estimate the complexity as O(n / log_2 n)
-pub fn multi_scalar_mul_gas(
-    size: usize,
-) -> impl GasExpression<NativeGasParameters, Unit = InternalGasUnit> {
-    RISTRETTO255_POINT_MUL * NumArgs::new((size as f64 / f64::log2(size as f64)).ceil() as u64)
-}
 
 pub fn make_all(
     builder: &SafeNativeBuilder,

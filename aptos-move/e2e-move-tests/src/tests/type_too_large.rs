@@ -1,18 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_abort, assert_success, tests::common, MoveHarness};
+use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use move_core_types::vm_status::StatusCode;
-use test_case::test_case;
 
-#[test_case(true)]
-#[test_case(false)]
-fn type_too_large(enable_lazy_loading: bool) {
-    let mut h = MoveHarness::new_with_lazy_loading(enable_lazy_loading);
+#[test]
+fn type_too_large() {
+    let mut h = MoveHarness::new();
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
@@ -28,17 +26,10 @@ fn type_too_large(enable_lazy_loading: bool) {
         vec![],
     );
 
-    // With lazy loading, layout construction errors with too many type nodes and the error is
-    // propagated. Without lazy loading, the error happens inside the serializer and is remapped
-    // to serialization failure error code (legacy behaviour).
-    if enable_lazy_loading {
-        assert!(matches!(
-            result,
-            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-                StatusCode::TOO_MANY_TYPE_NODES
-            )))
-        ));
-    } else {
-        assert_abort!(result, 0x1C5);
-    }
+    assert!(matches!(
+        result,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::TOO_MANY_TYPE_NODES
+        )))
+    ));
 }

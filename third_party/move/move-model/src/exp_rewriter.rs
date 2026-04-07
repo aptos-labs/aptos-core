@@ -1,11 +1,12 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     ast::{
-        Condition, Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryLabel, Operation, Pattern,
-        Spec, SpecBlockTarget, TempIndex, Value,
+        Condition, Exp, ExpData, FrameSpec, LambdaCaptureKind, MatchArm, MemoryLabel, MemoryRange,
+        Operation, Pattern, Proof, Spec, SpecBlockTarget, TempIndex, Value,
     },
     model::{GlobalEnv, Loc, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -698,12 +699,37 @@ pub trait ExpRewriterFunctions {
             changed |= this_changed
         }
 
+        // Rewrite frame_spec modifies targets
+        let frame_spec = spec.frame_spec.as_ref().map(|fs| {
+            let new_targets: Vec<_> = fs
+                .modifies_targets
+                .iter()
+                .map(|t| {
+                    let new_t = self.rewrite_exp(t.clone());
+                    changed |= !ExpData::ptr_eq(&new_t, t);
+                    new_t
+                })
+                .collect();
+            FrameSpec {
+                modifies_targets: new_targets,
+                // reads_targets are QualifiedInstId<StructId> (not Exps), so no
+                // expression rewriting needed — just clone the set.
+                reads_targets: fs.reads_targets.clone(),
+            }
+        });
+
         let new_spec = Spec {
             loc: spec.loc.clone(),
             conditions,
+            frame_spec,
             properties: spec.properties.clone(),
             on_impl,
             update_map,
+            proof: spec.proof.as_ref().map(|p| {
+                let (p_changed, new_p) = self.internal_rewrite_proof(p);
+                changed |= p_changed;
+                new_p
+            }),
         };
 
         if let Some(new_spec) = self.rewrite_spec(target, &new_spec) {
@@ -766,6 +792,116 @@ pub trait ExpRewriterFunctions {
         }
     }
 
+    fn internal_rewrite_proof(&mut self, proof: &Proof) -> (bool, Proof) {
+        match proof {
+            Proof::Let(loc, sym, exp) => {
+                let (changed, new_exp) = self.internal_rewrite_exp(exp);
+                (changed, Proof::Let(loc.clone(), *sym, new_exp))
+            },
+            Proof::Assert(loc, exp) => {
+                let (changed, new_exp) = self.internal_rewrite_exp(exp);
+                (changed, Proof::Assert(loc.clone(), new_exp))
+            },
+            Proof::Assume(loc, exp) => {
+                let (changed, new_exp) = self.internal_rewrite_exp(exp);
+                (changed, Proof::Assume(loc.clone(), new_exp))
+            },
+            Proof::Split(loc, exp) => {
+                let (changed, new_exp) = self.internal_rewrite_exp(exp);
+                (changed, Proof::Split(loc.clone(), new_exp))
+            },
+            Proof::IfElse(loc, cond, then_branch, else_branch) => {
+                let (mut changed, new_cond) = self.internal_rewrite_exp(cond);
+                let (t_changed, new_then) = self.internal_rewrite_proof(then_branch);
+                changed |= t_changed;
+                let new_else = else_branch.as_ref().map(|eb| {
+                    let (e_changed, new_eb) = self.internal_rewrite_proof(eb);
+                    changed |= e_changed;
+                    Box::new(new_eb)
+                });
+                (
+                    changed,
+                    Proof::IfElse(loc.clone(), new_cond, Box::new(new_then), new_else),
+                )
+            },
+            Proof::Block(loc, stmts) => {
+                let mut changed = false;
+                let new_stmts: Vec<_> = stmts
+                    .iter()
+                    .map(|s| {
+                        let (s_changed, new_s) = self.internal_rewrite_proof(s);
+                        changed |= s_changed;
+                        new_s
+                    })
+                    .collect();
+                (changed, Proof::Block(loc.clone(), new_stmts))
+            },
+            Proof::Apply(loc, lemma_id, args) => {
+                let mut changed = false;
+                let new_args: Vec<_> = args
+                    .iter()
+                    .map(|a| {
+                        let (a_changed, new_a) = self.internal_rewrite_exp(a);
+                        changed |= a_changed;
+                        new_a
+                    })
+                    .collect();
+                (changed, Proof::Apply(loc.clone(), *lemma_id, new_args))
+            },
+            Proof::ForallApply(loc, bindings, patterns, lemma_id, args) => {
+                let mut changed = false;
+                let new_patterns: Vec<Vec<_>> = patterns
+                    .iter()
+                    .map(|group| {
+                        group
+                            .iter()
+                            .map(|e| {
+                                let (e_changed, new_e) = self.internal_rewrite_exp(e);
+                                changed |= e_changed;
+                                new_e
+                            })
+                            .collect()
+                    })
+                    .collect();
+                let new_args: Vec<_> = args
+                    .iter()
+                    .map(|a| {
+                        let (a_changed, new_a) = self.internal_rewrite_exp(a);
+                        changed |= a_changed;
+                        new_a
+                    })
+                    .collect();
+                (
+                    changed,
+                    Proof::ForallApply(
+                        loc.clone(),
+                        bindings.clone(),
+                        new_patterns,
+                        *lemma_id,
+                        new_args,
+                    ),
+                )
+            },
+            Proof::Calc(loc, steps) => {
+                let mut changed = false;
+                let new_steps: Vec<_> = steps
+                    .iter()
+                    .map(|(lhs, op, rhs)| {
+                        let (l_changed, new_lhs) = self.internal_rewrite_exp(lhs);
+                        let (r_changed, new_rhs) = self.internal_rewrite_exp(rhs);
+                        changed |= l_changed || r_changed;
+                        (new_lhs, op.clone(), new_rhs)
+                    })
+                    .collect();
+                (changed, Proof::Calc(loc.clone(), new_steps))
+            },
+            Proof::Post(loc, inner) => {
+                let (changed, new_inner) = self.internal_rewrite_proof(inner);
+                (changed, Proof::Post(loc.clone(), Box::new(new_inner)))
+            },
+        }
+    }
+
     fn internal_rewrite_quant_ranges(
         &mut self,
         ranges: &[(Pattern, Exp)],
@@ -780,5 +916,79 @@ pub trait ExpRewriterFunctions {
             .unzip();
         let change = changevec.into_iter().any(|x| x);
         (change, new_ranges)
+    }
+}
+
+// =================================================================================================
+// Memory Label Freshener
+
+/// Rewrites all `MemoryLabel` values in an expression tree to fresh labels.
+/// Used when inlining opaque function specs at call sites to avoid label collisions
+/// between different inlining instances.
+///
+/// Uses a local counter rather than `GlobalEnv::new_global_id()` to ensure
+/// deterministic label IDs regardless of prior global allocations — the global
+/// counter depends on compilation order which can vary across machines.
+pub struct MemoryLabelFreshener {
+    counter: usize,
+    label_map: BTreeMap<MemoryLabel, MemoryLabel>,
+}
+
+impl MemoryLabelFreshener {
+    pub fn new(start: usize) -> Self {
+        Self {
+            counter: start,
+            label_map: BTreeMap::new(),
+        }
+    }
+
+    fn freshen(&mut self, label: MemoryLabel) -> MemoryLabel {
+        *self.label_map.entry(label).or_insert_with(|| {
+            let id = MemoryLabel::new(self.counter);
+            self.counter += 1;
+            id
+        })
+    }
+
+    fn freshen_range(&mut self, range: &MemoryRange) -> MemoryRange {
+        MemoryRange {
+            pre: range.pre.map(|l| self.freshen(l)),
+            post: range.post.map(|l| self.freshen(l)),
+        }
+    }
+
+    pub fn label_map(&self) -> &BTreeMap<MemoryLabel, MemoryLabel> {
+        &self.label_map
+    }
+
+    /// Returns the next available counter value for chaining multiple freshenings.
+    pub fn next_counter(&self) -> usize {
+        self.counter
+    }
+}
+
+impl ExpRewriterFunctions for MemoryLabelFreshener {
+    fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
+        let new_oper = match oper {
+            Operation::Global(Some(l)) => Some(Operation::Global(Some(self.freshen(*l)))),
+            Operation::Exists(Some(l)) => Some(Operation::Exists(Some(self.freshen(*l)))),
+            Operation::Behavior(k, r) if !r.is_default() => {
+                Some(Operation::Behavior(*k, self.freshen_range(r)))
+            },
+            Operation::SpecFunction(m, f, r) if !r.is_default() => {
+                Some(Operation::SpecFunction(*m, *f, self.freshen_range(r)))
+            },
+            Operation::SpecPublish(r) if !r.is_default() => {
+                Some(Operation::SpecPublish(self.freshen_range(r)))
+            },
+            Operation::SpecRemove(r) if !r.is_default() => {
+                Some(Operation::SpecRemove(self.freshen_range(r)))
+            },
+            Operation::SpecUpdate(r) if !r.is_default() => {
+                Some(Operation::SpecUpdate(self.freshen_range(r)))
+            },
+            _ => None,
+        };
+        new_oper.map(|op| ExpData::Call(id, op, args.to_vec()).into_exp())
     }
 }

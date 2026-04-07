@@ -1,10 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use anyhow::Result;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
-use std::fmt::Debug;
+use std::{convert::Infallible, fmt::Debug};
 
 pub mod fixed_base_msms;
 pub mod tuple;
@@ -38,7 +39,7 @@ pub trait Trait: CanonicalSerialize {
     type Codomain;
     type CodomainNormalized;
 
-    fn apply(&self, element: &Self::Domain) -> Self::Codomain;
+    fn apply(&self, element: &Self::Domain) -> Result<Self::Codomain>;
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized;
 }
 
@@ -103,7 +104,7 @@ where
     type CodomainNormalized = H::CodomainNormalized;
     type Domain = LargerDomain;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
         let projected = (self.projection)(input);
         self.hom.apply(&projected)
     }
@@ -117,13 +118,23 @@ where
 ///
 /// Given a value of this type, you can apply a function to each "entry" independently,
 /// producing a new value of the same shape but possibly with a different inner type.
-pub trait EntrywiseMap<T> {
+pub trait EntrywiseMap<T>: Sized {
     /// The resulting type after mapping the inner elements to type `U`.
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
+    /// Map each entry with `f`. Default implementation delegates to `try_map` with `Infallible`.
+    fn map<U, F>(self, mut f: F) -> Self::Output<U>
     where
         F: FnMut(T) -> U,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
+    {
+        self.try_map::<U, Infallible, _>(|x| Ok(f(x))).unwrap()
+    }
+
+    /// Like `map`, but the closure returns a `Result`; short-circuits on first error.
+    fn try_map<U, E, F>(self, f: F) -> Result<Self::Output<U>, E>
+    where
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 }
 
@@ -142,12 +153,12 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TrivialShape<U>;
 
-    fn map<U, F>(self, mut f: F) -> Self::Output<U>
+    fn try_map<U, E, F>(self, mut f: F) -> Result<Self::Output<U>, E>
     where
-        F: FnMut(T) -> U,
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
-        TrivialShape(f(self.0))
+        Ok(TrivialShape(f(self.0)?))
     }
 }
 

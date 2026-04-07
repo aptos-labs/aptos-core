@@ -5,6 +5,8 @@
 
 mod concurrent_stream;
 mod executor;
+mod par_map_blocking;
 
 pub use concurrent_stream::concurrent_map;
 pub use executor::BoundedExecutor;
+pub use par_map_blocking::par_map_blocking;

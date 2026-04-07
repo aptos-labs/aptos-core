@@ -1,0 +1,27 @@
+
+Diagnostics:
+warning: [lint] function `test_helper` is unused
+  ┌─ tests/model_ast_lints/unused/false_positives/test_only_items.move:5:9
+  │
+5 │     fun test_helper(): u64 {
+  │         ^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).
+
+warning: [lint] struct `TestStruct` is unused
+   ┌─ tests/model_ast_lints/unused/false_positives/test_only_items.move:9:5
+   │
+ 9 │ ╭     struct TestStruct {
+10 │ │         x: u64
+11 │ │     }
+   │ ╰─────^
+   │
+   = Remove it (if not published), or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_struct)]` (if for spec-only or otherwise needed).
+
+warning: [lint] constant `TEST_CONST` is unused
+   ┌─ tests/model_ast_lints/unused/false_positives/test_only_items.move:13:5
+   │
+13 │     const TEST_CONST: u64 = 100;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).

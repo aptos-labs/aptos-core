@@ -21,15 +21,9 @@ fn test_layout_cache_successful_reads() {
     let mut h = MoveHarness::new_with_executor(executor);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("layout_caches.data/p1"))
-    );
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("layout_caches.data/p2"))
-    );
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("layout_caches.data/p3"))
-    );
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("layout_caches.data/p1")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("layout_caches.data/p2")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("layout_caches.data/p3")));
 
     let mut txns = vec![];
     for i in 0..32 {
@@ -109,9 +103,10 @@ fn test_layout_cache_successful_reads() {
         let account =
             h.new_account_at(AccountAddress::from_hex_literal(&format!("0xcafe3{}", i)).unwrap());
         let txn = if i == 15 {
-            h.create_publish_package_cache_building(
+            h.create_publish_package(
                 &acc,
                 &common::test_dir_path("layout_caches.data/p3_upgraded"),
+                None,
                 |_| {},
             )
         } else {
@@ -151,4 +146,57 @@ fn test_layout_cache_successful_reads() {
     }
     assert_eq!(success_gas_usage.len(), 1);
     assert_eq!(failure_gas_usage.len(), 1);
+}
+
+#[test]
+fn test_stale_layouts_are_ignored() {
+    set_layout_caches(true);
+
+    let executor =
+        FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::BothComparison);
+    let mut h = MoveHarness::new_with_executor(executor);
+
+    let publisher = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    assert_success!(h.publish_package(&publisher, &common::test_dir_path("layout_caches.data/p1"),));
+    assert_success!(h.publish_package(&publisher, &common::test_dir_path("layout_caches.data/p2"),));
+    assert_success!(h.publish_package(&publisher, &common::test_dir_path("layout_caches.data/p3"),));
+    h.modify_gas_schedule(|gas_params| {
+        gas_params.vm.txn.max_num_dependencies = 8.into();
+    });
+
+    let accounts: Vec<_> = (0..200u64)
+        .map(|i| {
+            h.new_account_at(AccountAddress::from_hex_literal(&format!("0xbb{:04x}", i)).unwrap())
+        })
+        .collect();
+
+    let mut txns = Vec::with_capacity(201);
+    let mut reader_iter = accounts.iter();
+    for i in 0..201 {
+        if i == 2 {
+            txns.push(h.create_publish_package(
+                &publisher,
+                &common::test_dir_path("layout_caches.data/p3_upgraded"),
+                None,
+                |_| {},
+            ));
+        } else {
+            txns.push(h.create_transaction_payload(
+                reader_iter.next().unwrap(),
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    ModuleId::from_str("0xcafe::m3").unwrap(),
+                    ident_str!("load_m3_with_extra_module").to_owned(),
+                    vec![],
+                    vec![],
+                )),
+            ));
+        }
+    }
+
+    // Run multiple times to trigger the race condition. Upgraded module is also at
+    // position 2 - that maximizes the stale-cache exposure window.
+    for _ in 0..20 {
+        // Panics inside if sequential and parallel produce different statuses.
+        let _ = h.executor.execute_block(txns.clone());
+    }
 }

@@ -225,8 +225,8 @@ impl PeerManagerBuilder {
         }
     }
 
-    pub fn listen_address(&self) -> NetworkAddress {
-        self.listen_address.clone()
+    pub fn listen_address(&self) -> &NetworkAddress {
+        &self.listen_address
     }
 
     pub fn connection_reqs_tx(&self) -> aptos_channel::Sender<PeerId, ConnectionRequest> {

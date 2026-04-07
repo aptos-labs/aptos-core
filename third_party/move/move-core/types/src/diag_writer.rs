@@ -1,6 +1,7 @@
-// Copyright (c) Aptos Foundation
-// Parts of the project are originally copyright (c) Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Shared writer infrastructure for threading `WriteColor` through Move tools.
 //!
@@ -12,7 +13,8 @@ use std::{
     io::{self, Write},
     sync::{Arc, Mutex},
 };
-use termcolor::{Buffer, ColorChoice, ColorSpec, StandardStream, WriteColor};
+pub use termcolor::Buffer;
+use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 /// A clonable writer that delegates to an `Arc<Mutex<dyn WriteColor + Send>>`.
 ///
@@ -27,6 +29,11 @@ impl DiagWriter {
         Self(Arc::new(Mutex::new(StandardStream::stderr(
             ColorChoice::Auto,
         ))))
+    }
+
+    /// Create a writer that discards all output.
+    pub fn sink() -> Self {
+        Self(Arc::new(Mutex::new(std::io::sink())))
     }
 
     /// Create a writer backed by an in-memory [`Buffer`] with colors stripped.

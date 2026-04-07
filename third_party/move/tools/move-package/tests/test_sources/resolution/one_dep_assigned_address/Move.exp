@@ -36,7 +36,7 @@ ResolutionGraph {
             ),
             language_version: None,
             experiments: [],
-            print_errors: false,
+            print_errors: None,
         },
     },
     root_package: SourceManifest {

@@ -1,6 +1,7 @@
-// Copyright (c) Aptos Foundation
-// Parts of the project are originally copyright (c) Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -227,9 +228,15 @@ impl Decompiler {
         module_id: ModuleId,
         targets: &mut FunctionTargetsHolder,
     ) {
-        // Create FunctionTargetsHolder with stackless bytecode for all functions in the module,
+        // Create FunctionTargetsHolder with stackless bytecode for all functions in the module.
+        // Skip auto-generated struct API wrappers (pack$S, unpack$S, …) – they are
+        // reconstructed by the compiler for public structs and must not appear as regular
+        // function bodies in the decompiled output.
         let module_env = self.env.get_module(module_id);
         for func_env in module_env.get_functions() {
+            if func_env.is_struct_api() {
+                continue;
+            }
             targets.add_target(&func_env)
         }
     }

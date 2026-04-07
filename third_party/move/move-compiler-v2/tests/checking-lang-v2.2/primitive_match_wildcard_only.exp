@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: match over integers, booleans, or byte strings is not supported before language version 2.4-unstable
+  ┌─ tests/checking-lang-v2.2/primitive_match_wildcard_only.move:4:16
+  │
+4 │         match (x) {
+  │                ^

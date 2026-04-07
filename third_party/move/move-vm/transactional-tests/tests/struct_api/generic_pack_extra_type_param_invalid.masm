@@ -1,0 +1,12 @@
+//# publish --print-bytecode
+module 0x66::test_generic_pack_extra_type_param
+
+struct Box<T>
+    value: T
+
+// Invalid: pack$Box declares two type parameters (A, B) but Box has only one.
+// The extra type parameter B is invisible to the canonical check on the return type alone.
+#[pack] public fun pack$Box<A, B>(l0: A): Box<A>
+    move_loc l0
+    pack Box<A>
+    ret

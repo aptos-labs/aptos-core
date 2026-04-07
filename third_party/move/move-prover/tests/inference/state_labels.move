@@ -210,5 +210,3 @@ module 0x42::state_labels {
         publish_resource(account2, v2);
     }
 }
-// TODO(#18762): state labels do not yet work in verification pipeline and produce expected
-// boogie errors.

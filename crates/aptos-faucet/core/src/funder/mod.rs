@@ -43,15 +43,6 @@ pub trait FunderTrait: Sync + Send + 'static {
         did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError>;
 
-    /// Given a requested amount and any configuration internal to this funder,
-    /// determine the amount that can be funded.
-    fn get_amount(
-        &self,
-        amount: Option<u64>,
-        // True if a Bypasser let this request bypass the Checkers.
-        did_bypass_checkers: bool,
-    ) -> u64;
-
     /// This should return whether the Funder is healthy and able to accept
     /// requests. With this a Funder can indicate some issue that will get
     /// exposed at the `/` (the healthcheck endpoint), e.g. that that it

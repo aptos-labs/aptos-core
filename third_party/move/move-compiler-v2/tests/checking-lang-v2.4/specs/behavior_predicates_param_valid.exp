@@ -4,8 +4,8 @@ module 0x42::M {
         (f)(x)
     }
     spec {
-      ensures ensures_of@0($t0, $t1, result0());
-      ensures 1@ensures_of($t0, $t1, result0());
+      ensures ensures_of[post=@0]($t0, $t1, result0());
+      ensures ensures_of[pre=@0]($t0, $t1, result0());
     }
 
     private fun apply_aborts(f: |u64|u64,x: u64): u64 {
@@ -55,8 +55,8 @@ module 0x42::M {
     }
 
     spec apply2(f: |u64|u64, x: u64): u64 {
-        ensures ensures_of<f>(x, result)@s1;
-        ensures s1@ensures_of<f>(x, result);
+        ensures ..s1 |~ ensures_of<f>(x, result);
+        ensures s1.. |~ ensures_of<f>(x, result);
     }
 
     fun apply_aborts(f: |u64|u64, x: u64): u64 {
@@ -161,8 +161,8 @@ module 0x42::M {
         (f)(x)
     }
     spec {
-      ensures ensures_of@0($t0, $t1, result0());
-      ensures 1@ensures_of($t0, $t1, result0());
+      ensures ensures_of[post=@0]($t0, $t1, result0());
+      ensures ensures_of[pre=@0]($t0, $t1, result0());
     }
 
     private fun apply_aborts(f: |u64|u64,x: u64): u64 {

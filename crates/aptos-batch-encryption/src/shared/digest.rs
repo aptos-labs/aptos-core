@@ -9,7 +9,9 @@ use crate::{
     shared::{algebra::fk_algorithm::FKDomain, ids::UncomputedCoeffs},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
+use aptos_crypto::arkworks::serialization::{
+    ark_de, ark_de_uncompressed_no_validate, ark_se, ark_se_uncompressed,
+};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ark_std::{
     rand::{CryptoRng, RngCore},
@@ -23,11 +25,17 @@ use std::{
 };
 
 /// The digest public parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DigestKey {
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(
+        serialize_with = "ark_se_uncompressed",
+        deserialize_with = "ark_de_uncompressed_no_validate"
+    )]
     pub tau_g2: G2Affine,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(
+        serialize_with = "ark_se_uncompressed",
+        deserialize_with = "ark_de_uncompressed_no_validate"
+    )]
     pub tau_powers_g1: Vec<Vec<G1Affine>>,
     pub fk_domain: FKDomain<Fr, G1Projective>,
 }
@@ -111,8 +119,59 @@ impl DigestKey {
         })
     }
 
-    pub fn capacity(&self) -> usize {
+    pub fn with_randomized_powers_of_tau(
+        randomized_tau_powers_g1: Vec<Vec<G1Affine>>,
+        tau_g2: G2Affine,
+    ) -> Result<Self> {
+        if randomized_tau_powers_g1.is_empty() {
+            Err(BatchEncryptionError::DigestInitError(
+                DigestKeyInitError::NumRoundsMustBeNonzero,
+            ))?;
+        }
+
+        let batch_size = randomized_tau_powers_g1[0].len() - 1;
+
+        let mut i = batch_size;
+        while i > 1 {
+            i.is_multiple_of(2)
+                .then_some(())
+                .ok_or(BatchEncryptionError::DigestInitError(
+                    DigestKeyInitError::BatchSizeMustBePowerOfTwo,
+                ))?;
+            i >>= 1;
+        }
+
+        for powers in &randomized_tau_powers_g1 {
+            if powers.len() != batch_size + 1 {
+                Err(BatchEncryptionError::DigestInitError(
+                    DigestKeyInitError::RandomizedTauPowersMalformedShape,
+                ))?;
+            }
+        }
+
+        let randomized_tau_powers_g1_projective: Vec<Vec<G1Projective>> = randomized_tau_powers_g1
+            .iter()
+            .map(|gs| gs.iter().map(|g| G1Projective::from(*g)).collect())
+            .collect();
+
+        let fk_domain = FKDomain::new(batch_size, batch_size, randomized_tau_powers_g1_projective)
+            .ok_or(BatchEncryptionError::DigestInitError(
+                DigestKeyInitError::FKDomainInitFailure,
+            ))?;
+
+        Ok(Self {
+            tau_g2,
+            tau_powers_g1: randomized_tau_powers_g1,
+            fk_domain,
+        })
+    }
+
+    pub fn max_batch_size(&self) -> usize {
         self.tau_powers_g1[0].len() - 1
+    }
+
+    pub fn num_rounds(&self) -> usize {
+        self.tau_powers_g1.len()
     }
 
     pub fn digest(
@@ -188,7 +247,7 @@ impl EvalProofsPromise {
         }
     }
 
-    pub fn compute_all_vgzz_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs {
+    pub fn compute_all_vzgg_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs {
         EvalProofs {
             computed_proofs: self
                 .ids
@@ -250,10 +309,10 @@ pub(crate) mod tests {
 
     #[allow(unused)]
     pub(crate) fn digest_and_pfs_for_testing(dk: &DigestKey) -> (Digest, EvalProofsPromise) {
-        let mut ids = IdSet::with_capacity(dk.capacity());
+        let mut ids = IdSet::with_capacity(dk.max_batch_size());
         let mut counter = Fr::zero();
 
-        for _ in 0..dk.capacity() {
+        for _ in 0..dk.max_batch_size() {
             ids.add(&Id::new(counter));
             counter += Fr::one();
         }
@@ -292,6 +351,15 @@ pub(crate) mod tests {
     fn test_digest_key_capacity() {
         let mut rng = thread_rng();
         let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
-        assert_eq!(dk.capacity(), 8);
+        assert_eq!(dk.max_batch_size(), 8);
+    }
+
+    #[test]
+    fn test_with_randomized_powers_of_tau() {
+        let mut rng = thread_rng();
+        let dk = DigestKey::new(&mut rng, 8, 2).unwrap();
+        let dk2 =
+            DigestKey::with_randomized_powers_of_tau(dk.tau_powers_g1.clone(), dk.tau_g2).unwrap();
+        assert_eq!(dk, dk2);
     }
 }

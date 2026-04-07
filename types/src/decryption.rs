@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{block_info::Round, on_chain_config::OnChainConfig};
+use crate::{block_info::Round, on_chain_config::OnChainConfig, secret_sharing::SecretSharedKey};
+use anyhow::Context;
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveResource};
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +45,16 @@ impl BlockTxnDecryptionKey {
 
     pub fn decryption_key_cloned(&self) -> Vec<u8> {
         self.decryption_key.clone()
+    }
+
+    pub fn from_secret_shared_key(key: &SecretSharedKey) -> anyhow::Result<Self> {
+        Ok(Self::new(
+            DecKeyMetadata {
+                epoch: key.metadata.epoch,
+                round: key.metadata.round,
+            },
+            bcs::to_bytes(&key.key).context("SecretSharedKey serialization")?,
+        ))
     }
 }
 

@@ -19,11 +19,13 @@ use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::DbReader;
+use aptos_token_bucket::TokenBucket;
 use aptos_types::{
     account_address::AccountAddress, mempool_status::MempoolStatus, transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
 };
 use aptos_vm_validator::vm_validator::TransactionValidation;
+use dashmap::DashMap;
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
     future::Future,
@@ -56,6 +58,8 @@ pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub broadcast_within_validator_network: Arc<RwLock<bool>>,
     pub use_case_history: Arc<Mutex<UseCaseHistory>>,
     pub transaction_filter_config: TransactionFilterConfig,
+    /// Per-peer inbound rate limiters. Only used when inbound rate limiting is configured.
+    pub inbound_peer_rate_limiters: Arc<DashMap<PeerNetworkId, TokenBucket>>,
 }
 
 impl<
@@ -89,6 +93,7 @@ impl<
             broadcast_within_validator_network: Arc::new(RwLock::new(true)),
             use_case_history: Arc::new(Mutex::new(use_case_history)),
             transaction_filter_config,
+            inbound_peer_rate_limiters: Arc::new(DashMap::new()),
         }
     }
 

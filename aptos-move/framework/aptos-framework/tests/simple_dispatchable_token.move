@@ -1,5 +1,5 @@
 #[test_only]
-module 0xcafe::simple_token {
+module aptos_framework::simple_token {
     use aptos_framework::fungible_asset::{FungibleAsset, TransferRef};
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::object::{ConstructorRef, Object};
@@ -10,7 +10,7 @@ module 0xcafe::simple_token {
     use std::string;
 
     public fun initialize(account: &signer, constructor_ref: &ConstructorRef) {
-        assert!(signer::address_of(account) == @0xcafe, 1);
+        assert!(signer::address_of(account) == @aptos_framework, 1);
 
         let withdraw = function_info::new_function_info(
             account,

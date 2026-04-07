@@ -137,6 +137,7 @@ fn create_batch_coordinator(
         sender_to_batch_generator,
         batch_store,
         10_000,
+        64,
         10_000,
         10_000,
         10_000,

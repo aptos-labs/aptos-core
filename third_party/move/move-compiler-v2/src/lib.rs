@@ -1,6 +1,7 @@
-// Copyright (c) Aptos Foundation
-// Parts of the project are originally copyright (c) Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod bytecode_generator;
 pub mod diagnostics;
@@ -60,7 +61,7 @@ use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_model::{
-    metadata::{lang_feature_versions::LANGUAGE_VERSION_FOR_UNUSED_CHECK, LanguageVersion},
+    metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
     PackageInfo,
 };
@@ -290,8 +291,6 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             &options.known_attributes
         },
         options.language_version.unwrap_or_default(),
-        options.warn_deprecated,
-        options.warn_of_deprecation_use_in_aptos_libs,
         options.compile_test_code,
         options.compile_verify_code,
     )?;
@@ -369,7 +368,7 @@ pub fn run_stackless_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
             for fun in module.get_functions() {
                 let id = fun.get_qualified_id();
                 // Skip inline functions because invoke and lambda are not supported in the current code generator
-                if !fun.is_inline() {
+                if !fun.is_inline() && !fun.is_lemma() {
                     todo.insert(id);
                 }
             }
@@ -434,38 +433,6 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         });
     }
 
-    let unused_check_version = options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LANGUAGE_VERSION_FOR_UNUSED_CHECK);
-
-    if unused_check_version {
-        // checks for unused private functions, private structs, and constants
-        // Needs to run before inlining
-
-        if options.experiment_on(Experiment::UNUSED_CONSTANT_CHECK) {
-            env_pipeline.add("unused constant check", |env: &mut GlobalEnv| {
-                function_checker::check_unused_constants(env)
-            });
-        }
-
-        if options.experiment_on(Experiment::UNUSED_FUNCTION_CHECK) {
-            env_pipeline.add("unused function check", |env: &mut GlobalEnv| {
-                function_checker::check_unused_functions(env)
-            });
-        }
-
-        if options.experiment_on(Experiment::UNUSED_STRUCT_CHECK) {
-            env_pipeline.add(
-                "collect struct usage",
-                struct_usage_collector::collect_struct_usage,
-            );
-            env_pipeline.add("unused struct check", |env: &mut GlobalEnv| {
-                function_checker::check_unused_structs(env)
-            });
-        }
-    }
-
     if options.experiment_on(Experiment::ACCESS_CHECK) {
         env_pipeline.add("access check before inlining", |env: &mut GlobalEnv| {
             function_checker::check_access_before_inlining(env)
@@ -485,6 +452,11 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
     }
 
     if options.experiment_on(Experiment::LINT_CHECKS) {
+        // collect_struct_usage must run before lint checks for unused struct detection
+        env_pipeline.add(
+            "collect struct usage",
+            struct_usage_collector::collect_struct_usage,
+        );
         // Perform all the model AST lint checks before inlining, to be closer "in form"
         // to the user code.
         env_pipeline.add("model AST lints", model_ast_lints::checker);

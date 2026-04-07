@@ -117,8 +117,8 @@ function update_versions {
     $global:grcov_version = "0.8.2"
     $global:protoc_version = "21.4"
     $global:dotnet_version = "6.0"
-    $global:z3_version = "4.11.2"
-    $global:boogie_version = "3.0.1"
+    $global:z3_version = "4.13.0"
+    $global:boogie_version = "3.5.6"
   }
 }
 

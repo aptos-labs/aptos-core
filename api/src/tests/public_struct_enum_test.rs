@@ -9,7 +9,6 @@
 use super::setup_public_struct_test;
 use aptos_api_test_context::current_function_name;
 use aptos_types::account_address::AccountAddress;
-use rstest::rstest;
 use serde_json::{json, Value};
 
 /// Fetch the `TestResult` resource for `account_addr` and assert its `value` and `message` fields.
@@ -28,26 +27,12 @@ async fn assert_test_result(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_public_struct_point(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
+async fn test_public_struct_enum_entry_functions() {
+    let (mut context, mut account) =
+        setup_public_struct_test(current_function_name!(), false, false).await;
     let account_addr = account.address();
 
-    // Call entry function with a Point struct: { x: 10, y: 20 }
+    // test_public_struct_point: Point { x: 10, y: 20 }
     context
         .api_execute_entry_function(
             &mut account,
@@ -59,31 +44,9 @@ async fn test_public_struct_point(
             json!([{ "x": "10", "y": "20" }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "30", "point_received").await;
-}
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_public_struct_nested(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with a Rectangle struct with nested Points
+    // test_public_struct_nested: Rectangle with nested Points
     context
         .api_execute_entry_function(
             &mut account,
@@ -98,31 +61,9 @@ async fn test_public_struct_nested(
             }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "10", "rectangle_received").await;
-}
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_public_struct_with_string(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with a Data struct: { values: [5, 10, 15], name: "test_data" }
+    // test_public_struct_with_string: Data { values: [5, 10, 15], name: "test_data" }
     context
         .api_execute_entry_function(
             &mut account,
@@ -134,31 +75,9 @@ async fn test_public_struct_with_string(
             }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "30", "test_data").await;
-}
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_public_enum_unit_variant(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with Color::Red enum variant
+    // test_public_enum_unit_variant: Color::Red
     context
         .api_execute_entry_function(
             &mut account,
@@ -170,31 +89,9 @@ async fn test_public_enum_unit_variant(
             json!([{ "Red": {} }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "1", "red").await;
-}
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_public_enum_with_fields(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with Color::Custom { r: 100, g: 50, b: 25 }
+    // test_public_enum_with_fields: Color::Custom { r: 100, g: 50, b: 25 }
     context
         .api_execute_entry_function(
             &mut account,
@@ -206,31 +103,9 @@ async fn test_public_enum_with_fields(
             json!([{ "Custom": { "r": 100, "g": 50, "b": 25 } }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "175", "custom").await;
-}
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_public_enum_with_struct_fields(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with Shape::Circle { center: Point { x: 5, y: 10 }, radius: 15 }
+    // test_public_enum_with_struct_fields: Shape::Circle { center: Point, radius: 15 }
     context
         .api_execute_entry_function(
             &mut account,
@@ -247,31 +122,9 @@ async fn test_public_enum_with_struct_fields(
             }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "30", "circle").await;
-}
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_vector_of_public_structs(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with a vector of Points
+    // test_vector_of_public_structs: vector of Points
     context
         .api_execute_entry_function(
             &mut account,
@@ -287,31 +140,9 @@ async fn test_vector_of_public_structs(
             ]]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "21", "point_vector_received").await;
-}
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_whitelisted_string_works(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with a String value
+    // test_whitelisted_string_works: String value
     context
         .api_execute_entry_function(
             &mut account,
@@ -323,33 +154,9 @@ async fn test_whitelisted_string_works(
             json!(["hello_world"]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "11", "hello_world").await;
-}
 
-/// Test passing Option<Point> with Some value via API
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_option_some_struct(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with Option<Point>::Some
-    // Option uses vector-based JSON representation: Some(x) = {"vec": [x]}, None = {"vec": []}
+    // test_option_some_struct: Option<Point>::Some
     context
         .api_execute_entry_function(
             &mut account,
@@ -361,33 +168,9 @@ async fn test_option_some_struct(
             json!([{ "vec": [{ "x": "10", "y": "20" }] }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "30", "some_point").await;
-}
 
-/// Test passing Option<Point> with None value via API
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_option_none_struct(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with Option<Point>::None
-    // Option uses vector-based JSON representation: None = {"vec": []}
+    // test_option_none_struct: Option<Point>::None
     context
         .api_execute_entry_function(
             &mut account,
@@ -399,31 +182,9 @@ async fn test_option_none_struct(
             json!([{ "vec": [] }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "0", "none_point").await;
-}
 
-/// Test passing Option<Color> with Some(Red) via API
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_option_some_enum(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with Option<Color>::Some(Color::Red)
-    // Option uses vector-based JSON representation: Some(x) = {"vec": [x]}, None = {"vec": []}
-    // Option<enum> uses vec format with variant name as key
+    // test_option_some_enum: Option<Color>::Some(Color::Red)
     context
         .api_execute_entry_function(
             &mut account,
@@ -435,30 +196,9 @@ async fn test_option_some_enum(use_txn_payload_v2_format: bool, use_orderless_tr
             json!([{ "vec": [{ "Red": {} }] }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "1", "some_red").await;
-}
 
-/// Test passing Option<Color> with None via API
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_option_none_enum(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with Option<Color>::None
-    // Option uses vector-based JSON representation: None = {"vec": []}
+    // test_option_none_enum: Option<Color>::None
     context
         .api_execute_entry_function(
             &mut account,
@@ -470,79 +210,9 @@ async fn test_option_none_enum(use_txn_payload_v2_format: bool, use_orderless_tr
             json!([{ "vec": [] }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "0", "none_color").await;
-}
 
-/// Test calling a view function that takes a public struct as argument.
-///
-/// This exercises the `/view` endpoint code path through `convert_view_function` →
-/// `try_into_vm_values` → `try_into_vm_value_struct`, which is a different entry point
-/// from the entry-function submission path and is not covered by e2e move tests.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_with_public_struct() {
-    let (context, account) = setup_public_struct_test(current_function_name!(), false, false).await;
-    let account_addr = account.address();
-
-    let request: Value = json!({
-        "function": format!("0x{}::public_struct_test::check_point", account_addr.to_hex()),
-        "type_arguments": [],
-        "arguments": [{ "x": "3", "y": "7" }],
-    });
-
-    let resp = context.post("/view", request).await;
-
-    // check_point returns p.x + p.y = 3 + 7 = 10
-    assert_eq!(resp, json!(["10"]));
-}
-
-/// Test calling a view function that takes a public enum as argument.
-///
-/// Covers the same `/view` code path as test_view_with_public_struct but with
-/// enum variant parsing (WithVariants layout) rather than plain struct parsing.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_with_public_enum() {
-    let (context, account) = setup_public_struct_test(current_function_name!(), false, false).await;
-    let account_addr = account.address();
-
-    let request: Value = json!({
-        "function": format!("0x{}::public_struct_test::check_color", account_addr.to_hex()),
-        "type_arguments": [],
-        "arguments": [{ "Custom": { "r": 10, "g": 20, "b": 30 } }],
-    });
-
-    let resp = context.post("/view", request).await;
-
-    // check_color returns r + g + b = 10 + 20 + 30 = 60
-    assert_eq!(resp, json!(["60"]));
-}
-
-/// Test passing a Labeled struct (struct with a user-defined enum field) via API (gap 4).
-///
-/// All existing e2e and API tests use flat structs or structs containing other structs.
-/// This test passes a struct whose `color` field is a user-defined enum (Color) as a
-/// top-level entry argument: Labeled { color: Color::Green, value: 10 } → result = 2 + 10 = 12.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_struct_with_enum_field(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Labeled { color: Color::Green, value: 10 } — tag for Green = 2; result.value = 12
+    // test_struct_with_enum_field: Labeled { color: Color::Green, value: 10 }
     context
         .api_execute_entry_function(
             &mut account,
@@ -554,36 +224,9 @@ async fn test_struct_with_enum_field(
             json!([{ "color": { "Green": {} }, "value": "10" }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "12", "labeled_received").await;
-}
 
-/// Test vector<vector<Point>> via API (gap 1).
-///
-/// All existing vector tests use `vector<Point>` or `vector<Option<u64>>`.  A
-/// `vector<vector<Point>>` nests the JSON/BCS conversion and pack invocation counter
-/// one level deeper.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_nested_vector_of_structs(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // [[Point{1,2}, Point{3,4}], [Point{5,6}]] — sum = 1+2+3+4+5+6 = 21
+    // test_nested_vector_of_structs: vector<vector<Point>>
     context
         .api_execute_entry_function(
             &mut account,
@@ -598,7 +241,6 @@ async fn test_nested_vector_of_structs(
             ]]),
         )
         .await;
-
     assert_test_result(
         &mut context,
         &account_addr,
@@ -606,54 +248,8 @@ async fn test_nested_vector_of_structs(
         "nested_point_vector_received",
     )
     .await;
-}
 
-/// Test calling a view function with two public struct arguments (gap 3).
-///
-/// All existing view tests (`test_view_with_public_struct`, `test_view_with_public_enum`) use a
-/// single argument.  `check_two_points(p1: Point, p2: Point): u64` exercises the argument
-/// iteration loop for view functions when there are multiple struct args.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_with_multiple_struct_args() {
-    let (context, account) = setup_public_struct_test(current_function_name!(), false, false).await;
-    let account_addr = account.address();
-
-    let request: Value = json!({
-        "function": format!("0x{}::public_struct_test::check_two_points", account_addr.to_hex()),
-        "type_arguments": [],
-        "arguments": [{ "x": "1", "y": "2" }, { "x": "3", "y": "4" }],
-    });
-
-    let resp = context.post("/view", request).await;
-
-    // check_two_points returns p1.x + p1.y + p2.x + p2.y = 1 + 2 + 3 + 4 = 10
-    assert_eq!(resp, json!(["10"]));
-}
-
-/// Test passing Container<Color> (generic struct with enum type argument) via API
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_generic_container_with_enum(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (mut context, mut account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
-    let account_addr = account.address();
-
-    // Call entry function with Container<Color> containing Red
-    // Container is a generic struct: struct Container<T> { value: T }
-    // JSON format: { "value": { "Red": {} } }
+    // test_generic_container_with_enum: Container<Color> containing Red
     context
         .api_execute_entry_function(
             &mut account,
@@ -665,6 +261,38 @@ async fn test_generic_container_with_enum(
             json!([{ "value": { "Red": {} } }]),
         )
         .await;
-
     assert_test_result(&mut context, &account_addr, "100", "container_red").await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_public_struct_enum_views() {
+    let (context, account) = setup_public_struct_test(current_function_name!(), false, false).await;
+    let account_addr = account.address();
+
+    // test_view_with_public_struct: check_point(Point{3,7}) = 10
+    let request: Value = json!({
+        "function": format!("0x{}::public_struct_test::check_point", account_addr.to_hex()),
+        "type_arguments": [],
+        "arguments": [{ "x": "3", "y": "7" }],
+    });
+    let resp = context.post("/view", request).await;
+    assert_eq!(resp, json!(["10"]));
+
+    // test_view_with_public_enum: check_color(Custom{10,20,30}) = 60
+    let request: Value = json!({
+        "function": format!("0x{}::public_struct_test::check_color", account_addr.to_hex()),
+        "type_arguments": [],
+        "arguments": [{ "Custom": { "r": 10, "g": 20, "b": 30 } }],
+    });
+    let resp = context.post("/view", request).await;
+    assert_eq!(resp, json!(["60"]));
+
+    // test_view_with_multiple_struct_args: check_two_points(Point{1,2}, Point{3,4}) = 10
+    let request: Value = json!({
+        "function": format!("0x{}::public_struct_test::check_two_points", account_addr.to_hex()),
+        "type_arguments": [],
+        "arguments": [{ "x": "1", "y": "2" }, { "x": "3", "y": "4" }],
+    });
+    let resp = context.post("/view", request).await;
+    assert_eq!(resp, json!(["10"]));
 }

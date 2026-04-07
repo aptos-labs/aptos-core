@@ -2,8 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    network::TConsensusMsg, network_interface::ConsensusMsg,
-    rand::secret_sharing::types::RequestSecretShare,
+    network::TConsensusMsg,
+    network_interface::ConsensusMsg,
+    rand::secret_sharing::{types::RequestSecretShare, verifier::SecretShareVerifier},
 };
 use anyhow::{bail, ensure};
 use aptos_enum_conversion_derive::EnumConversion;
@@ -11,7 +12,7 @@ use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::RBMessage;
 use aptos_types::{
     epoch_state::EpochState,
-    secret_sharing::{SecretShare, SecretShareConfig},
+    secret_sharing::{Author, SecretShare},
 };
 use bytes::Bytes;
 use futures_channel::oneshot;
@@ -28,12 +29,13 @@ impl SecretShareMessage {
     pub fn verify(
         &self,
         epoch_state: &EpochState,
-        config: &SecretShareConfig,
+        verifier: &SecretShareVerifier,
+        sender: &Author,
     ) -> anyhow::Result<()> {
         ensure!(self.epoch() == epoch_state.epoch);
         match self {
             SecretShareMessage::RequestShare(_) => Ok(()),
-            SecretShareMessage::Share(share) => share.verify(config),
+            SecretShareMessage::Share(share) => verifier.optimistic_verify(share, sender),
         }
     }
 }

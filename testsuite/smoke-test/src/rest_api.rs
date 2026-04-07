@@ -27,6 +27,8 @@ use move_core_types::{
 };
 use std::{convert::TryFrom, str::FromStr, sync::Arc, time::Duration};
 
+// Trivial test that is already tested in the API tests
+#[ignore]
 #[tokio::test]
 async fn test_get_index() {
     let swarm = new_local_swarm_with_aptos(1).await;

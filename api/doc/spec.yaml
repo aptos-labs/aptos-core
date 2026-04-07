@@ -12892,6 +12892,7 @@ components:
       - rejected_by_filter
       - health_check_failed
       - mempool_is_full
+      - rate_limited
       - internal_error
       - web_framework_error
       - bcs_not_supported
@@ -13201,6 +13202,18 @@ components:
           $ref: '#/components/schemas/ExportedCertifiedAggregatedChunkySubtranscript'
         encryption_key:
           $ref: '#/components/schemas/HexEncodedBytes'
+    ClaimedEntryFunction:
+      type: object
+      description: |-
+        An encrypted payload's claim about the entry function. Specifies at least the module address,
+        and optionally the specific entry funtion.
+      required:
+      - module
+      properties:
+        module:
+          $ref: '#/components/schemas/MoveModuleId'
+        name:
+          $ref: '#/components/schemas/IdentifierWrapper'
     DKGResultTransaction:
       type: object
       required:
@@ -13269,6 +13282,27 @@ components:
         value_type:
           type: string
           description: Type of value
+    DecryptedPayload:
+      type: object
+      description: Payload has been successfully decrypted.
+      required:
+      - payload_hash
+      - ciphertext
+      - decrypted_payload
+      - decryption_nonce
+      properties:
+        payload_hash:
+          $ref: '#/components/schemas/HashValue'
+        ciphertext:
+          allOf:
+          - $ref: '#/components/schemas/HexEncodedBytes'
+          - description: BCS-serialized ciphertext bytes, hex-encoded.
+        claimed_entry_fun:
+          $ref: '#/components/schemas/ClaimedEntryFunction'
+        decrypted_payload:
+          $ref: '#/components/schemas/EncryptedTransactionInnerPayload'
+        decryption_nonce:
+          $ref: '#/components/schemas/U64'
     DeleteModule:
       type: object
       description: Delete a module
@@ -13391,6 +13425,125 @@ components:
           description: Secondary signer accounts of the request for Multi-agent
           items:
             $ref: '#/components/schemas/Address'
+    EncryptedPayload:
+      type: object
+      description: Payload is still encrypted and cannot be read.
+      required:
+      - payload_hash
+      - ciphertext
+      properties:
+        payload_hash:
+          $ref: '#/components/schemas/HashValue'
+        ciphertext:
+          allOf:
+          - $ref: '#/components/schemas/HexEncodedBytes'
+          - description: BCS-serialized ciphertext bytes, hex-encoded.
+        claimed_entry_fun:
+          $ref: '#/components/schemas/ClaimedEntryFunction'
+    EncryptedTransactionInnerPayload:
+      type: object
+      description: The inner payload of an encrypted transaction, present only when decrypted.
+      oneOf:
+      - $ref: '#/components/schemas/EncryptedTransactionInnerPayload_EntryFunctionPayload'
+      - $ref: '#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload'
+      - $ref: '#/components/schemas/EncryptedTransactionInnerPayload_MultisigPayload'
+      discriminator:
+        propertyName: type
+        mapping:
+          entry_function_payload: '#/components/schemas/EncryptedTransactionInnerPayload_EntryFunctionPayload'
+          script_payload: '#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload'
+          multisig_payload: '#/components/schemas/EncryptedTransactionInnerPayload_MultisigPayload'
+    EncryptedTransactionInnerPayload_EntryFunctionPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - entry_function_payload
+            example: entry_function_payload
+      - $ref: '#/components/schemas/EntryFunctionPayload'
+    EncryptedTransactionInnerPayload_MultisigPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - multisig_payload
+            example: multisig_payload
+      - $ref: '#/components/schemas/MultisigPayload'
+    EncryptedTransactionInnerPayload_ScriptPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - script_payload
+            example: script_payload
+      - $ref: '#/components/schemas/ScriptPayload'
+    EncryptedTransactionPayload:
+      type: object
+      description: |-
+        An encrypted transaction payload, discriminated by encrypted_state.
+
+        NOTE: multisig_address and replay_protection_nonce are not surfaced here.
+        They are part of extra_config and already exposed on UserTransactionRequest.
+        For Decrypted state, multisig_address is embedded in the MultisigPayload variant
+        of decrypted_payload.
+      oneOf:
+      - $ref: '#/components/schemas/EncryptedTransactionPayload_EncryptedPayload'
+      - $ref: '#/components/schemas/EncryptedTransactionPayload_FailedDecryptionPayload'
+      - $ref: '#/components/schemas/EncryptedTransactionPayload_DecryptedPayload'
+      discriminator:
+        propertyName: encrypted_state
+        mapping:
+          encrypted: '#/components/schemas/EncryptedTransactionPayload_EncryptedPayload'
+          failed_decryption: '#/components/schemas/EncryptedTransactionPayload_FailedDecryptionPayload'
+          decrypted: '#/components/schemas/EncryptedTransactionPayload_DecryptedPayload'
+    EncryptedTransactionPayload_DecryptedPayload:
+      allOf:
+      - type: object
+        required:
+        - encrypted_state
+        properties:
+          encrypted_state:
+            type: string
+            enum:
+            - decrypted
+            example: decrypted
+      - $ref: '#/components/schemas/DecryptedPayload'
+    EncryptedTransactionPayload_EncryptedPayload:
+      allOf:
+      - type: object
+        required:
+        - encrypted_state
+        properties:
+          encrypted_state:
+            type: string
+            enum:
+            - encrypted
+            example: encrypted
+      - $ref: '#/components/schemas/EncryptedPayload'
+    EncryptedTransactionPayload_FailedDecryptionPayload:
+      allOf:
+      - type: object
+        required:
+        - encrypted_state
+        properties:
+          encrypted_state:
+            type: string
+            enum:
+            - failed_decryption
+            example: failed_decryption
+      - $ref: '#/components/schemas/FailedDecryptionPayload'
     EntryFunctionId:
       type: string
       description: |
@@ -13519,6 +13672,21 @@ components:
           $ref: '#/components/schemas/ExportedProviderJWKs'
         multi_sig:
           $ref: '#/components/schemas/ExportedAggregateSignature'
+    FailedDecryptionPayload:
+      type: object
+      description: Decryption was attempted but failed.
+      required:
+      - payload_hash
+      - ciphertext
+      properties:
+        payload_hash:
+          $ref: '#/components/schemas/HashValue'
+        ciphertext:
+          allOf:
+          - $ref: '#/components/schemas/HexEncodedBytes'
+          - description: BCS-serialized ciphertext bytes, hex-encoded.
+        claimed_entry_fun:
+          $ref: '#/components/schemas/ClaimedEntryFunction'
     FederatedKeyless:
       type: object
       required:
@@ -14706,6 +14874,7 @@ components:
       - $ref: '#/components/schemas/TransactionPayload_ScriptPayload'
       - $ref: '#/components/schemas/TransactionPayload_DeprecatedModuleBundlePayload'
       - $ref: '#/components/schemas/TransactionPayload_MultisigPayload'
+      - $ref: '#/components/schemas/TransactionPayload_EncryptedTransactionPayload'
       discriminator:
         propertyName: type
         mapping:
@@ -14713,6 +14882,7 @@ components:
           script_payload: '#/components/schemas/TransactionPayload_ScriptPayload'
           module_bundle_payload: '#/components/schemas/TransactionPayload_DeprecatedModuleBundlePayload'
           multisig_payload: '#/components/schemas/TransactionPayload_MultisigPayload'
+          encrypted_transaction_payload: '#/components/schemas/TransactionPayload_EncryptedTransactionPayload'
     TransactionPayload_DeprecatedModuleBundlePayload:
       allOf:
       - type: object
@@ -14725,6 +14895,18 @@ components:
             - module_bundle_payload
             example: module_bundle_payload
       - $ref: '#/components/schemas/DeprecatedModuleBundlePayload'
+    TransactionPayload_EncryptedTransactionPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - encrypted_transaction_payload
+            example: encrypted_transaction_payload
+      - $ref: '#/components/schemas/EncryptedTransactionPayload'
     TransactionPayload_EntryFunctionPayload:
       allOf:
       - type: object

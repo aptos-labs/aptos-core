@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module implements the checker for verifying correctness of function bodies.
 //! The overall verification is split between stack_usage_verifier.rs and
@@ -60,10 +61,7 @@ impl<'a> CodeUnitVerifier<'a> {
         // whose names happen to contain '$' (the struct API delimiter), since those names are
         // structurally valid but carry no struct API attribute.
         let struct_api_ctx = if module.version() >= VERSION_10 {
-            Some((
-                struct_api_checker::StructApiContext::new(module)?,
-                BinaryIndexedView::Module(module),
-            ))
+            Some(struct_api_checker::StructApiContext::new(module)?)
         } else {
             None
         };
@@ -77,14 +75,9 @@ impl<'a> CodeUnitVerifier<'a> {
             // safely trust BorrowFieldMutable attributes, since they've been validated
             // to accurately match the bytecode before reference_safety sees them.
             // Only runs for VERSION_10+ modules (see guard above).
-            if let Some((ctx, resolver)) = &struct_api_ctx {
-                struct_api_checker::check_struct_api_impl(
-                    resolver,
-                    module,
-                    function_definition,
-                    ctx,
-                )
-                .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
+            if let Some(ctx) = &struct_api_ctx {
+                struct_api_checker::check_function(module, function_definition, ctx)
+                    .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
             }
 
             // Now reference_safety can safely trust that BorrowFieldMutable attributes

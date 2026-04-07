@@ -148,10 +148,10 @@ pub mod tests {
 
         let ek = AugmentedEncryptionKey::new(mpk, dk.tau_g2, (dk.tau_g2 * msk).into());
 
-        let mut ids = IdSet::with_capacity(dk.capacity());
+        let mut ids = IdSet::with_capacity(dk.max_batch_size());
         let mut counter = Fr::zero();
 
-        for _ in 0..dk.capacity() {
+        for _ in 0..dk.max_batch_size() {
             ids.add(&Id::new(counter));
             counter += Fr::one();
         }

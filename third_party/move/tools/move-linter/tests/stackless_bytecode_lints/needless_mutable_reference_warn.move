@@ -5,21 +5,25 @@ module 0xc0ffee::m {
 
     fun consume_immut(_x: &u64) {}
 
+    #[lint::skip(unused_function)]
     fun test1_no_warn(x: u64) {
         let y = &mut x;
         *y = 10;
     }
 
+    #[lint::skip(unused_function)]
     fun test1_warn(x: u64): u64 {
         let y = &mut x;
         *y
     }
 
+    #[lint::skip(unused_function)]
     fun test2_no_warn(x: u64) {
         let y = &mut x;
         consume_mut(y);
     }
 
+    #[lint::skip(unused_function)]
     fun test2_warn(x: u64) {
         let y = &mut x;
         consume_immut(y);
@@ -34,24 +38,29 @@ module 0xc0ffee::m {
         u: u64,
     }
 
+    #[lint::skip(unused_function)]
     fun test3_no_warn(s: &mut S) {
         s.y.u = 42;
     }
 
+    #[lint::skip(unused_function)]
     fun test3_warn(s: &mut S): u64 {
         s.y.u
     }
 
+    #[lint::skip(unused_function)]
     fun test4_no_warn(s: &mut S): u64 {
         s.y.u = 42;
         s.x
     }
 
+    #[lint::skip(unused_function)]
     fun test5_no_warn(s: &mut S) {
         let t = s;
         consume_mut(&mut t.y.u);
     }
 
+    #[lint::skip(unused_function)]
     fun test6_no_warn() {
         let x = 1;
         let z = 2;
@@ -116,6 +125,7 @@ module 0xc0ffee::n {
         y
     }
 
+    #[lint::skip(unused_function)]
     fun test_warn_3(s: &mut S, p: bool, addr: address): u64 acquires S {
         let ref = borrow_global_mut<S>(addr);
         if (p) {
@@ -124,6 +134,7 @@ module 0xc0ffee::n {
         ref.r.x
     }
 
+    #[lint::skip(unused_function)]
     fun test_no_warn_5(p: bool, a: address, s: &S): u64 acquires S {
         if (p) {
             s = borrow_global<S>(a);
@@ -139,6 +150,7 @@ module 0xc0ffee::o {
         B(u64),
     }
 
+    #[lint::skip(unused_function)]
     fun test_no_warn_1(e1: E, e2: E) {
         let a = &mut e1;
         let b = &mut a.0;
@@ -147,6 +159,7 @@ module 0xc0ffee::o {
         *b = 1;
     }
 
+    #[lint::skip(unused_function)]
     fun test_warn_1(e1: E, e2: E, p: bool): u64 {
         let a;
         if (p) {
@@ -157,6 +170,7 @@ module 0xc0ffee::o {
         *a
     }
 
+    #[lint::skip(unused_function)]
     fun test_warn_2(a: &mut E, b: &mut E) {
         let x = 1;
         loop {
@@ -181,7 +195,7 @@ module 0xc0ffee::o {
         *x = 5;
     }
 
-    #[lint::skip(needless_mutable_reference)]
+    #[lint::skip(needless_mutable_reference, unused_function)]
     fun test_no_warn_4(e1: E, e2: E, p: bool): u64 {
         let a;
         if (p) {
@@ -196,10 +210,12 @@ module 0xc0ffee::o {
         x: u64,
     }
 
+    #[lint::skip(unused_function)]
     fun test_warn_5(s: S): u64 {
         *&mut s.x
     }
 
+    #[lint::skip(unused_function)]
     fun test_no_warn_5(s: S): S {
         *&mut s
     }
@@ -208,11 +224,13 @@ module 0xc0ffee::o {
         x: u64,
     }
 
+    #[lint::skip(unused_function)]
     fun test_no_warn_6(u: U): U {
         *&mut u
     }
 
     // This should produce a warning once `vector::borrow_mut` is added to origins.
+    #[lint::skip(unused_function)]
     fun test_warn_7(): u64 {
         let x = vector[1, 5, 5];
         let y = &mut x[0];
@@ -233,21 +251,25 @@ module 0xc0ffee::more_struct_tests {
         s.x
     }
 
+    #[lint::skip(unused_function)]
     fun test1_no_warn(s: S) {
         let u = &mut s;
         *u = S { x: 10 };
     }
 
+    #[lint::skip(unused_function)]
     fun test1_warn(s: S): S {
         let u = &mut s;
         *u
     }
 
+    #[lint::skip(unused_function)]
     fun test2_no_warn(s: S) {
         let u = &mut s;
         consume_mut(u);
     }
 
+    #[lint::skip(unused_function)]
     fun test2_warn(s: S) {
         let u = &mut s;
         consume_immut(u);
@@ -255,6 +277,7 @@ module 0xc0ffee::more_struct_tests {
 }
 
 module 0xc0ffee::p {
+    #[lint::skip(unused_function)]
     fun no_warn_01(_x: &mut u64) {
         let x = 1;
         let _y = &mut x;

@@ -111,6 +111,16 @@ pub static STORAGE_ERRORS_ENCOUNTERED: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for rate limited storage service requests
+pub static STORAGE_REQUESTS_RATE_LIMITED: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_service_server_requests_rate_limited",
+        "Counters related to the storage server requests that were rate limited",
+        &["network_id", "request_type"]
+    )
+    .unwrap()
+});
+
 /// Counter for received storage service requests
 pub static STORAGE_REQUESTS_RECEIVED: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(

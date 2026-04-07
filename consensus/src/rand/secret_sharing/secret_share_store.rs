@@ -3,16 +3,36 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
-    rand::rand_gen::{rand_manager::Sender, types::FUTURE_ROUNDS_TO_ACCEPT},
+    monitor,
+    rand::{
+        rand_gen::{rand_manager::Sender, types::FUTURE_ROUNDS_TO_ACCEPT},
+        secret_sharing::verifier::SecretShareVerifier,
+    },
 };
 use anyhow::{bail, ensure};
+use aptos_batch_encryption::{
+    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::warn;
 use aptos_types::secret_sharing::{
-    SecretShare, SecretShareConfig, SecretShareMetadata, SecretSharedKey,
+    DecryptionKey, SecretShare, SecretShareMetadata, SecretSharedKey,
 };
 use itertools::Either;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
+};
+
+pub enum SecretShareAggregationResult {
+    Success(SecretSharedKey),
+    Failure {
+        round: Round,
+        epoch: u64,
+        metadata: SecretShareMetadata,
+        surviving_shares: HashMap<Author, SecretShare>,
+    },
+}
 
 pub struct SecretShareAggregator {
     self_author: Author,
@@ -36,19 +56,18 @@ impl SecretShareAggregator {
     }
 
     pub fn try_aggregate(
-        self,
-        secret_share_config: &SecretShareConfig,
+        mut self,
+        verifier: &Arc<SecretShareVerifier>,
         metadata: SecretShareMetadata,
-        decision_tx: Sender<SecretSharedKey>,
+        decision_tx: Sender<SecretShareAggregationResult>,
     ) -> Either<Self, SecretShare> {
-        if self.total_weight < secret_share_config.threshold() {
+        if self.total_weight < verifier.config().threshold() {
             return Either::Left(self);
         }
         observe_block(
             metadata.timestamp,
             BlockStage::SECRET_SHARING_ADD_ENOUGH_SHARE,
         );
-        let dec_config = secret_share_config.clone();
         let self_share = match self.get_self_share() {
             Some(share) => share,
             None => {
@@ -56,23 +75,93 @@ impl SecretShareAggregator {
                 return Either::Left(self);
             },
         };
+
+        let verifier = verifier.clone();
         tokio::task::spawn_blocking(move || {
-            let maybe_key = SecretShare::aggregate(self.shares.values(), &dec_config);
-            match maybe_key {
-                Ok(key) => {
-                    let dec_key = SecretSharedKey::new(metadata, key);
-                    let _ = decision_tx.unbounded_send(dec_key);
+            let round = metadata.round;
+            let epoch = metadata.epoch;
+
+            match Self::aggregate_and_verify(&verifier, &mut self.shares, &metadata) {
+                Ok(verified_key) => {
+                    let dec_key = SecretSharedKey::new(metadata, verified_key);
+                    let _ =
+                        decision_tx.unbounded_send(SecretShareAggregationResult::Success(dec_key));
                 },
                 Err(e) => {
                     warn!(
-                        epoch = metadata.epoch,
-                        round = metadata.round,
-                        "Aggregation error: {e}"
+                        epoch = epoch,
+                        round = round,
+                        "Aggregate-and-verify failed, evicting bad shares: {e}"
                     );
+
+                    verifier.evict_bad_shares(&mut self.shares);
+                    let remaining_weight: u64 = self
+                        .shares
+                        .keys()
+                        .filter_map(|a| verifier.config().get_peer_weight(a).ok())
+                        .sum();
+                    if remaining_weight < verifier.config().threshold() {
+                        warn!(
+                            epoch = epoch,
+                            round = round,
+                            "Remaining weight {} below threshold {} after eviction",
+                            remaining_weight,
+                            verifier.config().threshold()
+                        );
+                        let _ = decision_tx.unbounded_send(SecretShareAggregationResult::Failure {
+                            round,
+                            epoch,
+                            metadata: metadata.clone(),
+                            surviving_shares: self.shares,
+                        });
+                        return;
+                    }
+
+                    match Self::aggregate_and_verify(&verifier, &mut self.shares, &metadata) {
+                        Ok(verified_key) => {
+                            let dec_key = SecretSharedKey::new(metadata, verified_key);
+                            let _ = decision_tx
+                                .unbounded_send(SecretShareAggregationResult::Success(dec_key));
+                        },
+                        Err(e) => {
+                            warn!(
+                                epoch = epoch,
+                                round = round,
+                                "Retry after eviction also failed: {e}"
+                            );
+                            let _ =
+                                decision_tx.unbounded_send(SecretShareAggregationResult::Failure {
+                                    round,
+                                    epoch,
+                                    metadata,
+                                    surviving_shares: self.shares,
+                                });
+                        },
+                    }
                 },
             }
         });
         Either::Right(self_share)
+    }
+
+    fn aggregate_and_verify(
+        verifier: &SecretShareVerifier,
+        shares: &mut HashMap<Author, SecretShare>,
+        metadata: &SecretShareMetadata,
+    ) -> anyhow::Result<DecryptionKey> {
+        let key = monitor!(
+            "secret_share_aggregate",
+            SecretShare::aggregate(shares.values(), verifier.config())
+        )?;
+        monitor!(
+            "secret_share_post_aggregate_verify",
+            FPTXWeighted::verify_decryption_key(
+                verifier.config().encryption_key(),
+                &metadata.digest,
+                &key,
+            )
+        )?;
+        Ok(key)
     }
 
     fn retain(&mut self, metadata: &SecretShareMetadata, weights: &HashMap<Author, u64>) {
@@ -95,6 +184,11 @@ enum SecretShareItem {
         metadata: SecretShareMetadata,
         share_aggregator: SecretShareAggregator,
     },
+    Aggregating {
+        metadata: SecretShareMetadata,
+        self_share: SecretShare,
+        pending_shares: HashMap<Author, (SecretShare, u64)>,
+    },
     Decided {
         self_share: SecretShare,
     },
@@ -106,7 +200,10 @@ impl SecretShareItem {
     }
 
     fn has_decision(&self) -> bool {
-        matches!(self, SecretShareItem::Decided { .. })
+        matches!(
+            self,
+            SecretShareItem::Aggregating { .. } | SecretShareItem::Decided { .. }
+        )
     }
 
     fn add_share(&mut self, share: SecretShare, share_weight: u64) -> anyhow::Result<()> {
@@ -127,32 +224,91 @@ impl SecretShareItem {
                 share_aggregator.add_share(share, share_weight);
                 Ok(())
             },
+            SecretShareItem::Aggregating {
+                metadata,
+                pending_shares,
+                ..
+            } => {
+                ensure!(
+                    metadata == &share.metadata,
+                    "[SecretShareItem] SecretShare metadata from {} mismatch with block metadata!",
+                    share.author,
+                );
+                pending_shares.insert(*share.author(), (share, share_weight));
+                Ok(())
+            },
             SecretShareItem::Decided { .. } => Ok(()),
         }
     }
 
     fn try_aggregate(
         &mut self,
-        secret_share_config: &SecretShareConfig,
-        decision_tx: Sender<SecretSharedKey>,
+        verifier: &Arc<SecretShareVerifier>,
+        decision_tx: Sender<SecretShareAggregationResult>,
     ) {
         let item = std::mem::replace(self, Self::new(Author::ONE));
         let new_item = match item {
             SecretShareItem::PendingDecision {
                 share_aggregator,
                 metadata,
-            } => match share_aggregator.try_aggregate(
-                secret_share_config,
-                metadata.clone(),
-                decision_tx,
-            ) {
+            } => match share_aggregator.try_aggregate(verifier, metadata.clone(), decision_tx) {
                 Either::Left(share_aggregator) => Self::PendingDecision {
                     metadata,
                     share_aggregator,
                 },
-                Either::Right(self_share) => Self::Decided { self_share },
+                Either::Right(self_share) => Self::Aggregating {
+                    metadata,
+                    self_share,
+                    pending_shares: HashMap::new(),
+                },
             },
-            item @ (SecretShareItem::Decided { .. } | SecretShareItem::PendingMetadata(_)) => item,
+            item @ (SecretShareItem::Decided { .. }
+            | SecretShareItem::PendingMetadata(_)
+            | SecretShareItem::Aggregating { .. }) => item,
+        };
+        let _ = std::mem::replace(self, new_item);
+    }
+
+    fn aggregation_succeeded(&mut self) {
+        let item = std::mem::replace(self, Self::new(Author::ONE));
+        let new_item = match item {
+            SecretShareItem::Aggregating { self_share, .. } => Self::Decided { self_share },
+            other => other,
+        };
+        let _ = std::mem::replace(self, new_item);
+    }
+
+    fn aggregation_failed(
+        &mut self,
+        verifier: &Arc<SecretShareVerifier>,
+        surviving_shares: HashMap<Author, SecretShare>,
+    ) {
+        let item = std::mem::replace(self, Self::new(Author::ONE));
+        let new_item = match item {
+            SecretShareItem::Aggregating {
+                metadata,
+                self_share,
+                pending_shares,
+            } => {
+                let mut aggregator = SecretShareAggregator::new(*self_share.author());
+                // Add pending (unverified) first, then surviving (verified).
+                // HashMap::insert overwrites, so verified shares take priority.
+                for (_author, (share, weight)) in pending_shares {
+                    aggregator.add_share(share, weight);
+                }
+                for (_, share) in surviving_shares {
+                    let weight = verifier
+                        .config()
+                        .get_peer_weight(share.author())
+                        .unwrap_or(0);
+                    aggregator.add_share(share, weight);
+                }
+                Self::PendingDecision {
+                    metadata,
+                    share_aggregator: aggregator,
+                }
+            },
+            other => other,
         };
         let _ = std::mem::replace(self, new_item);
     }
@@ -179,7 +335,7 @@ impl SecretShareItem {
             SecretShareItem::PendingDecision { .. } => {
                 bail!("Cannot add self share in PendingDecision state");
             },
-            SecretShareItem::Decided { .. } => return Ok(()),
+            SecretShareItem::Aggregating { .. } | SecretShareItem::Decided { .. } => return Ok(()),
         };
         let _ = std::mem::replace(self, new_item);
         Ok(())
@@ -190,8 +346,9 @@ impl SecretShareItem {
             SecretShareItem::PendingDecision {
                 share_aggregator, ..
             } => Some(share_aggregator.shares.keys().cloned().collect()),
-            SecretShareItem::Decided { .. } => None,
-            SecretShareItem::PendingMetadata(_) => None,
+            SecretShareItem::Aggregating { .. }
+            | SecretShareItem::Decided { .. }
+            | SecretShareItem::PendingMetadata(_) => None,
         }
     }
 
@@ -201,7 +358,8 @@ impl SecretShareItem {
             SecretShareItem::PendingDecision {
                 share_aggregator, ..
             } => share_aggregator.get_self_share(),
-            SecretShareItem::Decided { self_share, .. } => Some(self_share.clone()),
+            SecretShareItem::Aggregating { self_share, .. }
+            | SecretShareItem::Decided { self_share, .. } => Some(self_share.clone()),
         }
     }
 }
@@ -216,23 +374,23 @@ impl SecretShareItem {
 pub struct SecretShareStore {
     epoch: u64,
     self_author: Author,
-    secret_share_config: SecretShareConfig,
+    verifier: Arc<SecretShareVerifier>,
     secret_share_map: BTreeMap<Round, SecretShareItem>,
     highest_known_round: u64,
-    decision_tx: Sender<SecretSharedKey>,
+    decision_tx: Sender<SecretShareAggregationResult>,
 }
 
 impl SecretShareStore {
     pub fn new(
         epoch: u64,
         author: Author,
-        dec_config: SecretShareConfig,
-        decision_tx: Sender<SecretSharedKey>,
+        verifier: Arc<SecretShareVerifier>,
+        decision_tx: Sender<SecretShareAggregationResult>,
     ) -> Self {
         Self {
             epoch,
             self_author: author,
-            secret_share_config: dec_config,
+            verifier,
             secret_share_map: BTreeMap::new(),
             highest_known_round: 0,
             decision_tx,
@@ -255,7 +413,7 @@ impl SecretShareStore {
             self.self_author == share.author,
             "Only self shares can be added with metadata"
         );
-        let peer_weights = self.secret_share_config.get_peer_weights();
+        let peer_weights = self.verifier.config().get_peer_weights();
         let metadata = share.metadata();
         ensure!(metadata.epoch == self.epoch, "Share from different epoch");
         ensure!(
@@ -268,12 +426,12 @@ impl SecretShareStore {
             .entry(metadata.round)
             .or_insert_with(|| SecretShareItem::new(self.self_author));
         item.add_share_with_metadata(share, peer_weights)?;
-        item.try_aggregate(&self.secret_share_config, self.decision_tx.clone());
+        item.try_aggregate(&self.verifier, self.decision_tx.clone());
         Ok(())
     }
 
     pub fn add_share(&mut self, share: SecretShare) -> anyhow::Result<bool> {
-        let weight = self.secret_share_config.get_peer_weight(share.author())?;
+        let weight = self.verifier.config().get_peer_weight(share.author())?;
         let metadata = share.metadata();
         ensure!(metadata.epoch == self.epoch, "Share from different epoch");
         ensure!(
@@ -287,8 +445,32 @@ impl SecretShareStore {
             .entry(metadata.round)
             .or_insert_with(|| SecretShareItem::new(self.self_author));
         item.add_share(share, weight)?;
-        item.try_aggregate(&self.secret_share_config, self.decision_tx.clone());
+        item.try_aggregate(&self.verifier, self.decision_tx.clone());
         Ok(item.has_decision())
+    }
+
+    pub fn handle_aggregation_success(&mut self, round: Round) {
+        if let Some(item) = self.secret_share_map.get_mut(&round) {
+            item.aggregation_succeeded();
+        }
+    }
+
+    pub fn handle_aggregation_failure(
+        &mut self,
+        round: Round,
+        surviving_shares: HashMap<Author, SecretShare>,
+    ) -> Option<HashSet<Author>> {
+        if let Some(item) = self.secret_share_map.get_mut(&round) {
+            item.aggregation_failed(&self.verifier, surviving_shares);
+            item.try_aggregate(&self.verifier, self.decision_tx.clone());
+            if item.has_decision() {
+                None
+            } else {
+                item.get_all_shares_authors()
+            }
+        } else {
+            None
+        }
     }
 
     /// This should only be called after the block is added, returns None if already decided
@@ -323,21 +505,36 @@ impl SecretShareStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rand::secret_sharing::test_utils::{
-        create_metadata, create_secret_share, TestContext,
+    use crate::rand::secret_sharing::{
+        test_utils::{create_bad_secret_share, create_metadata, create_secret_share, TestContext},
+        verifier::SecretShareVerifier,
     };
-    use aptos_types::secret_sharing::SecretSharedKey;
     use futures_channel::mpsc::{unbounded, UnboundedReceiver};
+    use std::sync::Arc;
 
-    fn make_store(ctx: &TestContext) -> (SecretShareStore, UnboundedReceiver<SecretSharedKey>) {
+    fn make_store(
+        ctx: &TestContext,
+    ) -> (
+        SecretShareStore,
+        UnboundedReceiver<SecretShareAggregationResult>,
+    ) {
         let (tx, rx) = unbounded();
-        let store = SecretShareStore::new(
-            ctx.epoch,
-            ctx.authors[0],
+        let verifier = Arc::new(SecretShareVerifier::new(
             ctx.secret_share_config.clone(),
-            tx,
-        );
+            true,
+        ));
+        let store = SecretShareStore::new(ctx.epoch, ctx.authors[0], verifier, tx);
         (store, rx)
+    }
+
+    /// Helper to extract SecretSharedKey from aggregation result, panics on Failure.
+    fn unwrap_success(result: SecretShareAggregationResult) -> SecretSharedKey {
+        match result {
+            SecretShareAggregationResult::Success(key) => key,
+            SecretShareAggregationResult::Failure { round, epoch, .. } => {
+                panic!("Expected Success but got Failure for epoch={epoch}, round={round}")
+            },
+        }
     }
 
     #[test]
@@ -422,11 +619,11 @@ mod tests {
 
         // Verify decision arrives on channel
         use futures::StreamExt;
-        let key = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
             .await
             .expect("Timed out waiting for decision")
             .expect("Channel closed unexpectedly");
-        assert_eq!(key.metadata, metadata);
+        assert_eq!(unwrap_success(result).metadata, metadata);
     }
 
     #[tokio::test]
@@ -449,11 +646,11 @@ mod tests {
 
         // Verify decision arrives on channel
         use futures::StreamExt;
-        let key = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
             .await
             .expect("Timed out waiting for decision")
             .expect("Channel closed unexpectedly");
-        assert_eq!(key.metadata, metadata);
+        assert_eq!(unwrap_success(result).metadata, metadata);
     }
 
     #[test]
@@ -506,5 +703,138 @@ mod tests {
         // Mismatched metadata returns None
         let other_meta = create_metadata(ctx.epoch, round);
         assert!(store.get_self_share(&other_meta).unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_store_aggregation_with_bad_share_evicted() {
+        // 5 validators, weights [1,1,1,1,1], threshold = 4
+        // Add self share (0) + 3 good peer shares (1,2,3) + 1 bad peer share (4)
+        // Pre-aggregate eviction should remove validator 4, leaving weight 4 >= threshold
+        // Aggregation should succeed with the 4 good shares
+        let ctx = TestContext::new(vec![1, 1, 1, 1, 1]);
+        let (mut store, mut rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        // Add self share
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        store.add_self_share(self_share).unwrap();
+
+        // Add 3 good peer shares
+        for i in 1..=3 {
+            let share = create_secret_share(&ctx, i, &metadata);
+            store.add_share(share).unwrap();
+        }
+
+        // Add 1 bad peer share — this should trigger aggregation (total weight 5 >= 4)
+        // Pre-aggregate eviction removes the bad share, leaving weight 4 >= 4
+        let bad_share = create_bad_secret_share(&ctx, 4, &metadata);
+        store.add_share(bad_share).unwrap();
+
+        // Verify decision arrives on channel (aggregation succeeded without the bad share)
+        use futures::StreamExt;
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for decision")
+            .expect("Channel closed unexpectedly");
+        assert_eq!(unwrap_success(result).metadata, metadata);
+    }
+
+    #[test]
+    fn test_aggregation_failed_merges_surviving_and_pending_shares() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let verifier = Arc::new(SecretShareVerifier::new(
+            ctx.secret_share_config.clone(),
+            true,
+        ));
+        let metadata = create_metadata(ctx.epoch, 5);
+
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        let surviving_share_1 = create_secret_share(&ctx, 1, &metadata);
+        let pending_share_2 = create_secret_share(&ctx, 2, &metadata);
+
+        let mut surviving = HashMap::new();
+        surviving.insert(ctx.authors[0], self_share.clone());
+        surviving.insert(ctx.authors[1], surviving_share_1);
+
+        let mut pending = HashMap::new();
+        let w2 = verifier.config().get_peer_weight(&ctx.authors[2]).unwrap();
+        pending.insert(ctx.authors[2], (pending_share_2, w2));
+
+        let mut item = SecretShareItem::Aggregating {
+            metadata: metadata.clone(),
+            self_share,
+            pending_shares: pending,
+        };
+
+        item.aggregation_failed(&verifier, surviving);
+
+        match &item {
+            SecretShareItem::PendingDecision {
+                share_aggregator, ..
+            } => {
+                assert_eq!(share_aggregator.shares.len(), 3);
+                assert!(share_aggregator.shares.contains_key(&ctx.authors[0]));
+                assert!(share_aggregator.shares.contains_key(&ctx.authors[1]));
+                assert!(share_aggregator.shares.contains_key(&ctx.authors[2]));
+            },
+            other => panic!("Expected PendingDecision, got {}", match other {
+                SecretShareItem::PendingMetadata(_) => "PendingMetadata",
+                SecretShareItem::Aggregating { .. } => "Aggregating",
+                SecretShareItem::Decided { .. } => "Decided",
+                SecretShareItem::PendingDecision { .. } => unreachable!(),
+            }),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_store_failure_recovery_with_new_share() {
+        // 3 validators, weights [1,1,1], threshold = 3
+        // self(0) + good(1) + bad(2) → aggregation triggers
+        // eviction removes bad(2), weight 2 < 3 → Failure with surviving {0, 1}
+        // handle_aggregation_failure merges surviving into PendingDecision
+        // add good(2) → threshold met → aggregation succeeds
+        let ctx = TestContext::new(vec![1, 1, 1]);
+        let (mut store, mut rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        store.add_self_share(self_share).unwrap();
+
+        let good_share = create_secret_share(&ctx, 1, &metadata);
+        store.add_share(good_share).unwrap();
+
+        let bad_share = create_bad_secret_share(&ctx, 2, &metadata);
+        store.add_share(bad_share).unwrap();
+
+        use futures::StreamExt;
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for result")
+            .expect("Channel closed unexpectedly");
+
+        match result {
+            SecretShareAggregationResult::Failure {
+                surviving_shares, ..
+            } => {
+                assert_eq!(surviving_shares.len(), 2);
+                store.handle_aggregation_failure(round, surviving_shares);
+            },
+            SecretShareAggregationResult::Success(_) => {
+                panic!("Expected Failure but got Success")
+            },
+        }
+
+        let good_share_2 = create_secret_share(&ctx, 2, &metadata);
+        store.add_share(good_share_2).unwrap();
+
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for decision")
+            .expect("Channel closed unexpectedly");
+        assert_eq!(unwrap_success(result).metadata, metadata);
     }
 }

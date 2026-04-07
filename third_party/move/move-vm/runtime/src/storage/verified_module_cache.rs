@@ -1,16 +1,35 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use cfg_if::cfg_if;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
-use std::num::NonZeroUsize;
+use std::{hash::Hash, num::NonZeroUsize};
+
+/// Cache key combining the module hash with the verifier config hash, so that modules verified
+/// under different configs get separate cache entries.
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub(crate) struct VerifierCacheKey {
+    module_hash: [u8; 32],
+    verifier_config_hash: [u8; 32],
+}
+
+impl VerifierCacheKey {
+    pub(crate) fn new(module_hash: [u8; 32], verifier_config_hash: [u8; 32]) -> Self {
+        Self {
+            module_hash,
+            verifier_config_hash,
+        }
+    }
+}
 
 /// Cache for already verified modules. Since loader V1 uses such a cache to not perform repeated
 /// verifications, possibly even across blocks, for comparative performance we need to have it as
 /// well. For now, we keep it as a separate cache to make sure there is no interference between V1
 /// and V2 implementations.
-pub(crate) struct VerifiedModuleCache(Mutex<lru::LruCache<[u8; 32], ()>>);
+pub(crate) struct VerifiedModuleCache(Mutex<lru::LruCache<VerifierCacheKey, ()>>);
 
 impl VerifiedModuleCache {
     /// Maximum size of the cache. When modules are cached, they can skip re-verification.
@@ -21,19 +40,19 @@ impl VerifiedModuleCache {
         Self(Mutex::new(lru::LruCache::new(Self::VERIFIED_CACHE_SIZE)))
     }
 
-    /// Returns true if the module hash is contained in the cache. For tests, the cache is treated
-    /// as empty at all times.
-    pub(crate) fn contains(&self, module_hash: &[u8; 32]) -> bool {
+    /// Returns true if the key is contained in the cache. For tests, the cache is treated as empty
+    /// at all times.
+    pub(crate) fn contains(&self, key: &VerifierCacheKey) -> bool {
         // Note: need to use get to update LRU queue.
-        verifier_cache_enabled() && self.0.lock().get(module_hash).is_some()
+        verifier_cache_enabled() && self.0.lock().get(key).is_some()
     }
 
-    /// Inserts the hash into the cache, marking the corresponding as locally verified. For tests,
-    /// entries are not added to the cache.
-    pub(crate) fn put(&self, module_hash: [u8; 32]) {
+    /// Inserts the key into the cache, marking the corresponding module as locally verified. For
+    /// tests, entries are not added to the cache.
+    pub(crate) fn put(&self, key: VerifierCacheKey) {
         if verifier_cache_enabled() {
             let mut cache = self.0.lock();
-            cache.put(module_hash, ());
+            cache.put(key, ());
         }
     }
 

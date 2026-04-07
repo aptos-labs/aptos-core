@@ -33,6 +33,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use derivative::Derivative;
+use hashbrown::Equivalent;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
@@ -42,11 +43,10 @@ use move_core_types::{
     value::MoveTypeLayout,
 };
 use move_vm_runtime::{
-    LayoutCache, LayoutCacheEntry, Module, ModuleStorage, RuntimeEnvironment, StructKey,
-    WithRuntimeEnvironment,
+    Module, ModuleStorage, NoOpLayoutCache, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::{
-    code::{ModuleCode, SyncModuleCache, WithAddress, WithBytes, WithName, WithSize},
+    code::{ModuleCode, SyncModuleCache, WithAddress, WithBytes, WithHash, WithName, WithSize},
     delayed_values::delayed_field_id::DelayedFieldID,
 };
 use std::{
@@ -1037,10 +1037,13 @@ where
     }
 
     /// If the module has been previously read, returns it.
-    pub(crate) fn get_module_read(
+    pub(crate) fn get_module_read<Q>(
         &self,
-        key: &K,
-    ) -> CacheRead<Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>> {
+        key: &Q,
+    ) -> CacheRead<Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>>
+    where
+        Q: Hash + Equivalent<K>,
+    {
         match self.module_reads.get(key) {
             Some(ModuleRead::PerBlockCache(read)) => CacheRead::Hit(read.clone()),
             Some(ModuleRead::GlobalCache(read)) => {
@@ -1350,21 +1353,8 @@ impl WithRuntimeEnvironment for SnapshotModuleView<'_> {
     }
 }
 
-impl LayoutCache for SnapshotModuleView<'_> {
-    fn get_struct_layout(&self, _key: &StructKey) -> Option<LayoutCacheEntry> {
-        // No-op: no need for layouts in snapshot.
-        None
-    }
-
-    fn store_struct_layout(
-        &self,
-        _key: &StructKey,
-        _entry: LayoutCacheEntry,
-    ) -> PartialVMResult<()> {
-        // No-op: no need for layouts in snapshot.
-        Ok(())
-    }
-}
+// No-op: no need for layouts in snapshot.
+impl NoOpLayoutCache for SnapshotModuleView<'_> {}
 
 impl ModuleStorage for SnapshotModuleView<'_> {
     fn unmetered_check_module_exists(
@@ -1388,6 +1378,22 @@ impl ModuleStorage for SnapshotModuleView<'_> {
             ModuleRead::PerBlockCache(code) => {
                 Ok(code.as_ref().map(|(c, _)| c.extension().bytes().clone()))
             },
+        }
+    }
+
+    fn unmetered_get_module_hash_and_size(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<([u8; 32], usize)>> {
+        match self.get_module_read(address, module_name)? {
+            ModuleRead::GlobalCache(code) => Ok(Some((
+                *code.extension().hash(),
+                code.extension().size_in_bytes(),
+            ))),
+            ModuleRead::PerBlockCache(code) => Ok(code
+                .as_ref()
+                .map(|(c, _)| (*c.extension().hash(), c.extension().size_in_bytes()))),
         }
     }
 

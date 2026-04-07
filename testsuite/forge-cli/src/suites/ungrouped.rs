@@ -213,7 +213,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
                 .txn_expiration_time_secs(5 * 60),
         )
         .add_network_test(CompositeNetworkTest::new(
-            MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
+            MultiRegionNetworkEmulationTest::mainnet_calibrated_for_validator_count(num_validators),
             CpuChaosTest::default(),
         ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {

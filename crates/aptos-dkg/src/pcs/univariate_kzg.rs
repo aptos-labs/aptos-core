@@ -5,6 +5,7 @@ use crate::sigma_protocol::{
     homomorphism,
     homomorphism::{fixed_base_msms, fixed_base_msms::Trait, TrivialShape as CodomainShape},
 };
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::arkworks::msm::MsmInput;
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -31,8 +32,8 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     /// Input domain: (blinding factor, remaining values)
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        self.apply_msm(self.msm_terms(input))
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
+        self.apply_msm(self.msm_terms(input)?)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -52,8 +53,8 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
-        debug_assert!(
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
+        ensure!(
             self.lagr_g1.len() > input.1.len(),
             "Not enough Lagrange basis elements for univariate KZG: required {}, got {}",
             input.1.len() + 1,
@@ -64,14 +65,15 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         scalars.push(input.0);
         scalars.extend_from_slice(&input.1);
 
-        CodomainShape(MsmInput {
+        Ok(CodomainShape(MsmInput {
             bases: self.lagr_g1[..1 + input.1.len()].to_vec(),
             scalars,
-        })
+        }))
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), input.scalars()).expect("MSM failed in univariate KZG")
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        E::G1::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {

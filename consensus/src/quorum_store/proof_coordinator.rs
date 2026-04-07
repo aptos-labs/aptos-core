@@ -194,9 +194,10 @@ impl IncrementalProofState {
             .aggregated_voting_power
             .saturating_mul(100)
             .saturating_div(validator_verifier.total_voting_power()) as u8;
-        let author = self.signature_aggregator.data().author();
+        let batch_info = self.signature_aggregator.data();
+        let author = batch_info.author();
         if pct >= self.last_increment_pct + 10 {
-            observe_batch_vote_pct(timestamp, author, pct);
+            observe_batch_vote_pct(timestamp, author, pct, &batch_info);
             self.last_increment_pct = pct;
         }
     }
@@ -480,7 +481,7 @@ impl ProofCoordinator {
                                 }
                             }).peekable();
                             if proofs_iter.peek().is_some() {
-                                observe_batch(approx_created_ts_usecs, self_peer_id, BatchStage::POS_FORMED);
+                                observe_batch(approx_created_ts_usecs, self_peer_id, BatchStage::POS_FORMED, &info);
                                 if enable_broadcast_proofs {
                                     if proofs_iter.peek().is_some_and(|p| p.info().is_v2()) {
                                         let proofs: Vec<_> = proofs_iter.collect();

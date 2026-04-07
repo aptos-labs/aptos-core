@@ -1,0 +1,80 @@
+processed 40 tasks
+task 0 lines 3-720:  publish [module 0xc0ffee::m {]
+task 1 lines 723-723:  run 0xc0ffee::m::test_ref_enum_hit
+return values: 1
+task 2 lines 725-725:  run 0xc0ffee::m::test_ref_enum_miss
+return values: 2
+task 3 lines 727-727:  run 0xc0ffee::m::test_ref_enum_other_variant
+return values: 3
+task 4 lines 729-729:  run 0xc0ffee::m::test_ref_multi_hit
+return values: 10
+task 5 lines 731-731:  run 0xc0ffee::m::test_ref_multi_partial
+return values: 20
+task 6 lines 733-733:  run 0xc0ffee::m::test_ref_mix_var
+return values: 105
+task 7 lines 735-735:  run 0xc0ffee::m::test_ref_mix_var_miss
+return values: 20
+task 8 lines 737-737:  run 0xc0ffee::m::test_ref_guard_pass
+return values: 50
+task 9 lines 739-739:  run 0xc0ffee::m::test_ref_guard_fail
+return values: 60
+task 10 lines 741-741:  run 0xc0ffee::m::test_ref_nested_hit
+return values: 100
+task 11 lines 743-743:  run 0xc0ffee::m::test_ref_nested_miss
+return values: 200
+task 12 lines 745-745:  run 0xc0ffee::m::test_ref_mut_hit
+return values: 1
+task 13 lines 747-747:  run 0xc0ffee::m::test_ref_mut_miss
+return values: 2
+task 14 lines 749-749:  run 0xc0ffee::m::test_ref_bytestring_hit
+return values: 1
+task 15 lines 751-751:  run 0xc0ffee::m::test_ref_bytestring_miss
+return values: 2
+task 16 lines 753-753:  run 0xc0ffee::m::test_ref_top_level_hit
+return values: 10
+task 17 lines 755-755:  run 0xc0ffee::m::test_ref_top_level_miss
+return values: 0
+task 18 lines 757-757:  run 0xc0ffee::m::test_mixed_ref_enum_hit
+return values: 10
+task 19 lines 759-759:  run 0xc0ffee::m::test_mixed_ref_enum_miss
+return values: 20
+task 20 lines 761-761:  run 0xc0ffee::m::test_mixed_ref_prim_hit
+return values: 10
+task 21 lines 763-763:  run 0xc0ffee::m::test_mixed_ref_prim_miss
+return values: 2
+task 22 lines 765-765:  run 0xc0ffee::m::test_ref_bool_hit
+return values: 1
+task 23 lines 767-767:  run 0xc0ffee::m::test_ref_bool_miss
+return values: 0
+task 24 lines 769-769:  run 0xc0ffee::m::test_ref_bytes_hit
+return values: 1
+task 25 lines 771-771:  run 0xc0ffee::m::test_ref_bytes_miss
+return values: 0
+task 26 lines 773-773:  run 0xc0ffee::m::test_all_ref_tuple_hit
+return values: 10
+task 27 lines 775-775:  run 0xc0ffee::m::test_all_ref_tuple_partial
+return values: 20
+task 28 lines 777-777:  run 0xc0ffee::m::test_all_ref_tuple_miss
+return values: 30
+task 29 lines 779-779:  run 0xc0ffee::m::test_all_ref_tuple_var_hit
+return values: 105
+task 30 lines 781-781:  run 0xc0ffee::m::test_all_ref_tuple_var_miss
+return values: 0
+task 31 lines 783-783:  run 0xc0ffee::m::test_ref_generic_hit
+return values: 10
+task 32 lines 785-785:  run 0xc0ffee::m::test_ref_generic_miss
+return values: 20
+task 33 lines 787-787:  run 0xc0ffee::m::test_ref_generic_other_variant
+return values: 30
+task 34 lines 789-789:  run 0xc0ffee::m::test_ref_generic_pair_hit
+return values: 10
+task 35 lines 791-791:  run 0xc0ffee::m::test_ref_generic_pair_partial
+return values: 20
+task 36 lines 793-793:  run 0xc0ffee::m::test_ref_generic_var_lit
+return values: 100
+task 37 lines 795-795:  run 0xc0ffee::m::test_ref_generic_var_lit_fallthrough
+return values: 99
+task 38 lines 797-797:  run 0xc0ffee::m::test_ref_enum_no_literal
+return values: 42
+task 39 lines 799-799:  run 0xc0ffee::m::test_ref_enum_no_literal_v2
+return values: 0

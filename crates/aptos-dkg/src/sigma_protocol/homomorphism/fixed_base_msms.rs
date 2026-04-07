@@ -5,6 +5,7 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{homomorphism, homomorphism::EntrywiseMap, Witness},
 };
+use anyhow::Result;
 use aptos_crypto::arkworks::msm::MsmInput;
 use ark_ec::PrimeGroup;
 use ark_ff::Zero;
@@ -74,24 +75,24 @@ pub trait Trait:
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>;
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>>;
 
     /// Evaluates a single MSM instance given slices of bases and scalars. Current instantiations always use E::G1Affine
     /// for the base, but we might want to use enums for the base and output in the future.
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput;
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput>;
 
     /// Applies `msm_eval` elementwise to a collection of MSM inputs.
     fn apply_msm(
         &self, // TODO: might be able to get rid of this?
         msms: Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>,
-    ) -> Self::CodomainShape<Self::MsmOutput>
+    ) -> Result<Self::CodomainShape<Self::MsmOutput>>
     where
         Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>: EntrywiseMap<
             MsmInput<Self::Base, Self::Scalar>,
             Output<Self::MsmOutput> = Self::CodomainShape<Self::MsmOutput>,
         >,
     {
-        msms.map(|msm_input| Self::msm_eval(msm_input))
+        msms.try_map(Self::msm_eval)
     }
 
     // Depending on the elliptic curve library (arkworks, blstrs, etc.), the implementatation
@@ -168,12 +169,12 @@ where
     fn msm_terms(
         &self,
         input: &Self::Domain,
-    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
         let projected = (self.projection)(input);
         self.hom.msm_terms(&projected)
     }
 
-    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
         H::msm_eval(input)
     }
 
