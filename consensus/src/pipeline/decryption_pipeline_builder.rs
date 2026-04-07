@@ -25,7 +25,7 @@ use aptos_types::{
         SecretSharedKey,
     },
     transaction::{
-        encrypted_payload::{DecryptedPayload, DecryptionFailureReason},
+        encrypted_payload::{DecryptedPayload, DecryptionFailureReason, EncryptedPayload},
         SignedTransaction,
     },
 };
@@ -40,6 +40,41 @@ impl PipelineBuilder {
     /// Precondition: Block is materialized and the transactions are available locally
     /// What it does: Decrypt encrypted transactions in the block
     pub(crate) async fn decrypt_encrypted_txns(
+        materialize_fut: TaskFuture<MaterializeResult>,
+        block: Arc<Block>,
+        author: Author,
+        is_decryption_enabled: bool,
+        maybe_secret_share_config: Option<SecretShareConfig>,
+        derived_self_key_share_tx: oneshot::Sender<Option<SecretShare>>,
+        secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+        observer_enabled: bool,
+        observer_decrypted_txns: Option<Vec<SignedTransaction>>,
+    ) -> TaskResult<DecryptionResult> {
+        let result = Self::decrypt_encrypted_txns_inner(
+            materialize_fut,
+            block,
+            author,
+            is_decryption_enabled,
+            maybe_secret_share_config,
+            derived_self_key_share_tx,
+            secret_shared_key_rx,
+            observer_enabled,
+            observer_decrypted_txns,
+        )
+        .await;
+        match &result {
+            Ok(res) => record_decryption_metrics(res),
+            Err(e) => {
+                warn!("decrypt_encrypted_txns failed: {:?}", e);
+                counters::DECRYPTION_PIPELINE_TXNS_COUNT
+                    .with_label_values(&["error"])
+                    .inc();
+            },
+        }
+        result
+    }
+
+    async fn decrypt_encrypted_txns_inner(
         materialize_fut: TaskFuture<MaterializeResult>,
         block: Arc<Block>,
         author: Author,
@@ -313,7 +348,6 @@ async fn decrypt_validator_path(
             block.round(),
             encrypted_txns.len()
         );
-        let num_failed = encrypted_txns.len();
         let failed_txns: Vec<_> = encrypted_txns
             .into_par_iter()
             .zip(prepared_cts.into_par_iter())
@@ -326,15 +360,6 @@ async fn decrypt_validator_path(
                 )
             })
             .collect();
-        counters::DECRYPTION_PIPELINE_TXNS_COUNT
-            .with_label_values(&["failed_decryption"])
-            .inc_by(num_failed as u64);
-        counters::DECRYPTION_PIPELINE_TXNS_COUNT
-            .with_label_values(&["batch_limit_exceeded"])
-            .inc_by(batch_limit_exceeded_txns.len() as u64);
-        counters::DECRYPTION_PIPELINE_TXNS_COUNT
-            .with_label_values(&["unencrypted"])
-            .inc_by(regular_txns.len() as u64);
         let decrypted_txns = [failed_txns, batch_limit_exceeded_txns].concat();
         return Ok(DecryptionResult {
             decrypted_txns,
@@ -404,18 +429,6 @@ async fn decrypt_validator_path(
 
     let num_failed = num_failed_decryptions.into_inner();
     let num_decrypted = decrypted_txns.len() - num_failed;
-    counters::DECRYPTION_PIPELINE_TXNS_COUNT
-        .with_label_values(&["decrypted"])
-        .inc_by(num_decrypted as u64);
-    counters::DECRYPTION_PIPELINE_TXNS_COUNT
-        .with_label_values(&["failed_decryption"])
-        .inc_by(num_failed as u64);
-    counters::DECRYPTION_PIPELINE_TXNS_COUNT
-        .with_label_values(&["batch_limit_exceeded"])
-        .inc_by(batch_limit_exceeded_txns.len() as u64);
-    counters::DECRYPTION_PIPELINE_TXNS_COUNT
-        .with_label_values(&["unencrypted"])
-        .inc_by(regular_txns.len() as u64);
     info!(
         "Decryption complete for block {}: {} decrypted, {} failed, {} batch_limit_exceeded, {} unencrypted",
         block.round(),
@@ -436,6 +449,52 @@ async fn decrypt_validator_path(
         block_gas_limit,
         decryption_key: Some(Some(block_txn_dec_key)),
     })
+}
+
+fn record_decryption_metrics(result: &DecryptionResult) {
+    let mut decrypted = 0u64;
+    let mut failed_decryption = 0u64;
+    let mut config_unavailable = 0u64;
+    let mut key_unavailable = 0u64;
+    let mut batch_limit_exceeded = 0u64;
+    let mut entry_fun_mismatch = 0u64;
+
+    for txn in &result.decrypted_txns {
+        let Some(ep) = txn.payload().as_encrypted_payload() else {
+            continue;
+        };
+        match ep {
+            EncryptedPayload::Decrypted { .. } => decrypted += 1,
+            EncryptedPayload::FailedDecryption { reason, .. } => match reason {
+                DecryptionFailureReason::CryptoFailure => failed_decryption += 1,
+                DecryptionFailureReason::BatchLimitReached => batch_limit_exceeded += 1,
+                DecryptionFailureReason::ConfigUnavailable => config_unavailable += 1,
+                DecryptionFailureReason::DecryptionKeyUnavailable => key_unavailable += 1,
+                DecryptionFailureReason::ClaimedEntryFunctionMismatch => entry_fun_mismatch += 1,
+            },
+            EncryptedPayload::Encrypted { .. } => {
+                // Still in encrypted state — shouldn't happen after decryption pipeline
+                failed_decryption += 1;
+            },
+        }
+    }
+
+    let unencrypted = result.regular_txns.len() as u64;
+
+    let pairs = [
+        ("decrypted", decrypted),
+        ("failed_decryption", failed_decryption),
+        ("config_unavailable", config_unavailable),
+        ("key_unavailable", key_unavailable),
+        ("batch_limit_exceeded", batch_limit_exceeded),
+        ("entry_fun_mismatch", entry_fun_mismatch),
+        ("unencrypted", unencrypted),
+    ];
+    for (label, count) in pairs {
+        counters::DECRYPTION_PIPELINE_TXNS_COUNT
+            .with_label_values(&[label])
+            .inc_by(count);
+    }
 }
 
 fn mark_txns_failed_decryption(
