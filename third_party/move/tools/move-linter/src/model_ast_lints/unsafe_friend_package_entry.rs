@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Lint check for `public(friend)` or `public(package)` entry functions.
+//! Lint check for `friend` or `package` entry functions.
 //!
 //! When a function is marked `entry`, it becomes callable by anyone via a transaction,
 //! regardless of its visibility modifier. A `public(friend) entry` or
