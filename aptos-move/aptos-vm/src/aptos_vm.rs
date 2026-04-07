@@ -861,10 +861,12 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
-                module_id.address(),
-                module_id.name(),
-            )])?;
+            check_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                [(module_id.address(), module_id.name())],
+            )?;
         }
 
         if self.gas_feature_version() >= RELEASE_V1_27 {
@@ -1978,7 +1980,9 @@ impl AptosVM {
             TransactionPayload::ModuleBundle(_) => {
                 unwrap_or_discard!(Err(deprecated_module_bundle!()))
             },
-            TransactionPayload::GTxnBytes(_) => todo!(),
+            TransactionPayload::GTxnBytes(_) => {
+                unwrap_or_discard!(Err(deprecated_module_bundle!()))
+            },
         };
         drop(payload_timer);
 
@@ -2589,7 +2593,7 @@ impl AptosVM {
 
             // Deprecated.
             TransactionPayload::ModuleBundle(_) => Err(deprecated_module_bundle!()),
-            TransactionPayload::GTxnBytes(_) => todo!(),
+            TransactionPayload::GTxnBytes(_) => Err(deprecated_module_bundle!()),
         }
     }
 

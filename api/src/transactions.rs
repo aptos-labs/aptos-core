@@ -1107,7 +1107,13 @@ impl TransactionsApi {
                         ))
                     },
 
-                    TransactionPayload::GTxnBytes(_) => todo!(),
+                    TransactionPayload::GTxnBytes(_) => {
+                        return Err(SubmitTransactionError::bad_request_with_code(
+                            "GTxnBytes payload is unsupported",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        ))
+                    },
                 }
                 // TODO: Verify script args?
 
@@ -1425,7 +1431,7 @@ impl TransactionsApi {
                     "Multisig::unknown".to_string()
                 }
             },
-            TransactionPayload::GTxnBytes(_) => todo!(),
+            TransactionPayload::GTxnBytes(_) => "GTxnBytes::unknown".to_string(),
         };
         self.context
             .simulate_txn_stats()
