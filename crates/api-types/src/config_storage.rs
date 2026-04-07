@@ -24,6 +24,7 @@ pub enum OnChainConfig {
     Features,
     DKGState,
     OracleState,
+    ValidatorPerformances,
 }
 
 impl FromStr for OnChainConfig {
@@ -49,6 +50,7 @@ impl FromStr for OnChainConfig {
             "Features" => Ok(OnChainConfig::Features),
             "DKGState" => Ok(OnChainConfig::DKGState),
             "OracleState" => Ok(OnChainConfig::OracleState),
+            "ValidatorPerformances" => Ok(OnChainConfig::ValidatorPerformances),
             _ => Err(format!("Unknown OnChainConfig variant: {}", s)),
         }
     }

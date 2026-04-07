@@ -11,3 +11,4 @@ pub mod consensus_config;
 pub mod jwks;
 pub mod dkg;
 pub mod oracle_state;
+pub mod validator_performances;

@@ -45,6 +45,7 @@ pub struct ExternalBlockMeta {
     pub block_hash: Option<ComputeRes>,
     /// The proposer's index in the active validator set (None for NIL blocks)
     pub proposer_index: Option<u64>,
+    pub failed_proposer_indices: Vec<u64>,
 }
 
 #[derive(Debug, Clone)]
