@@ -272,5 +272,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
 
         self.jwk_updated_event_txs = None;
+        self.jwk_rpc_msg_tx = None;
     }
 }
