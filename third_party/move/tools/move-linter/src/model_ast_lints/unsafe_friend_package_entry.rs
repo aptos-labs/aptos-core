@@ -37,7 +37,7 @@ impl FunctionChecker for UnsafeFriendPackageEntry {
         let msg = format!(
             "`{name}` is callable by anyone. \
              The `entry` modifier allows direct invocation via transactions, \
-             bypassing the {visibility} visibility restriction.",
+             bypassing the `{visibility}` visibility restriction.",
         );
 
         self.report(func.module_env.env, &func.get_id_loc(), &msg);
