@@ -120,28 +120,29 @@ fn native_insert_remove_sequence() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use mono_move_core::Function;
     use mono_move_programs::bst::{
         generate_ops, micro_op_bst, native_run_ops_with_results, FN_GET, FN_INSERT, FN_NEW,
         FN_REMOVE,
     };
     use mono_move_runtime::InterpreterContext;
 
-    fn bst_new(ctx: &mut InterpreterContext) -> u64 {
-        ctx.invoke(FN_NEW);
+    fn bst_new(ctx: &mut InterpreterContext, func: &Function) -> u64 {
+        ctx.invoke(func);
         ctx.run().unwrap();
         ctx.root_heap_ptr(0) as u64
     }
 
-    fn bst_insert(ctx: &mut InterpreterContext, bst: u64, key: u64, value: u64) {
-        ctx.invoke(FN_INSERT);
+    fn bst_insert(ctx: &mut InterpreterContext, func: &Function, bst: u64, key: u64, value: u64) {
+        ctx.invoke(func);
         ctx.set_root_arg(0, &bst.to_le_bytes());
         ctx.set_root_arg(8, &key.to_le_bytes());
         ctx.set_root_arg(16, &value.to_le_bytes());
         ctx.run().unwrap();
     }
 
-    fn bst_get(ctx: &mut InterpreterContext, bst: u64, key: u64) -> (u64, u64) {
-        ctx.invoke(FN_GET);
+    fn bst_get(ctx: &mut InterpreterContext, func: &Function, bst: u64, key: u64) -> (u64, u64) {
+        ctx.invoke(func);
         ctx.set_root_arg(0, &bst.to_le_bytes());
         ctx.set_root_arg(8, &key.to_le_bytes());
         ctx.run().unwrap();
@@ -150,8 +151,8 @@ mod micro_op {
         (found, value)
     }
 
-    fn bst_remove(ctx: &mut InterpreterContext, bst: u64, key: u64) {
-        ctx.invoke(FN_REMOVE);
+    fn bst_remove(ctx: &mut InterpreterContext, func: &Function, bst: u64, key: u64) {
+        ctx.invoke(func);
         ctx.set_root_arg(0, &bst.to_le_bytes());
         ctx.set_root_arg(8, &key.to_le_bytes());
         ctx.run().unwrap();
@@ -160,10 +161,16 @@ mod micro_op {
     /// Run the same ops on micro-op BST and return results in the same format
     /// as `native_run_ops_with_results`.
     fn micro_op_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
-        let (mut functions, descriptors) = micro_op_bst();
-        mono_move_programs::resolve_calls(&mut functions);
-        let mut ctx = InterpreterContext::new(&functions, &descriptors, FN_NEW);
-        let bst = bst_new(&mut ctx);
+        let (functions, descriptors, _arena) = micro_op_bst();
+        // SAFETY: Exclusive access during test setup; arena is alive.
+        unsafe { mono_move_core::Function::resolve_calls(&functions) };
+        // SAFETY: Arena is alive for the duration of this function.
+        let fn_new = unsafe { functions[FN_NEW].unwrap().as_ref_unchecked() };
+        let fn_insert = unsafe { functions[FN_INSERT].unwrap().as_ref_unchecked() };
+        let fn_get = unsafe { functions[FN_GET].unwrap().as_ref_unchecked() };
+        let fn_remove = unsafe { functions[FN_REMOVE].unwrap().as_ref_unchecked() };
+        let mut ctx = InterpreterContext::new(&descriptors, fn_new);
+        let bst = bst_new(&mut ctx, fn_new);
         let mut results = Vec::new();
         let mut i = 0;
         while i < ops.len() {
@@ -172,9 +179,9 @@ mod micro_op {
             let value = ops[i + 2];
             i += 3;
             match op {
-                0 => bst_insert(&mut ctx, bst, key, value),
-                1 => results.push(bst_get(&mut ctx, bst, key)),
-                2 => bst_remove(&mut ctx, bst, key),
+                0 => bst_insert(&mut ctx, fn_insert, bst, key, value),
+                1 => results.push(bst_get(&mut ctx, fn_get, bst, key)),
+                2 => bst_remove(&mut ctx, fn_remove, bst, key),
                 _ => {},
             }
         }

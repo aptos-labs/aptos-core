@@ -188,7 +188,7 @@ impl SecretShareManager {
             .author(self.author)
             .round(round));
         self.network_sender
-            .broadcast_without_self(SecretShareMessage::Share(share).into_network_message());
+            .broadcast_secret_share(SecretShareMessage::Share(share).into_network_message());
 
         let guard = self.spawn_share_requester_task(metadata);
         if let Some(item) = self.block_queue.item_mut(round) {

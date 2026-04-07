@@ -22,7 +22,7 @@ use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
 use num::{BigInt, Zero};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
 };
 //
@@ -38,6 +38,9 @@ pub struct Sourcifier<'a> {
     sym_alias_map: RefCell<BTreeMap<Symbol, String>>,
     // whether to amend the displayed results to be recompilable (e.g., remove `__` from lambda names) and more readable (e.g., local var names starting from `_v0`)
     amend: bool,
+    /// When set, state labels matching this label are suppressed during rendering.
+    /// Used to avoid redundant nested labels like `S1 |~ global<T>(..S1 |~ ...)`.
+    enclosing_state_label: Cell<Option<crate::ast::MemoryLabel>>,
 }
 
 /// Returns true if a quantifier is "simple" — all ranges use TypeDomain with
@@ -133,6 +136,7 @@ impl<'a> Sourcifier<'a> {
             writer: CodeWriter::new(env.unknown_loc()),
             amend,
             sym_alias_map: RefCell::new(BTreeMap::new()),
+            enclosing_state_label: Cell::new(None),
         }
     }
 
@@ -1137,6 +1141,56 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, ";");
     }
 
+    /// Print `use` declarations inside a spec block for external modules
+    /// referenced by SpecFunction calls that don't already have a module-level
+    /// import in the enclosing module.
+    fn print_spec_use_decls(
+        &self,
+        fun_env: &FunctionEnv,
+        spec: &Spec,
+        tctx: &mut TypeDisplayContext,
+    ) {
+        use crate::ast::Operation;
+        let current_mid = fun_env.module_env.get_id();
+        // Modules with module-level imports (members is empty)
+        let module_imports: BTreeSet<ModuleId> = fun_env
+            .module_env
+            .get_use_decls()
+            .iter()
+            .filter(|u| u.members.is_empty())
+            .filter_map(|u| u.module_id)
+            .collect();
+        let mut needed: BTreeSet<ModuleId> = BTreeSet::new();
+        for cond in &spec.conditions {
+            cond.exp.as_ref().visit_pre_order(&mut |e: &ExpData| {
+                if let ExpData::Call(_, Operation::SpecFunction(mid, _, _), _) = e {
+                    if *mid != current_mid && !module_imports.contains(mid) {
+                        needed.insert(*mid);
+                    }
+                }
+                true
+            });
+        }
+        if let Some(frame) = &spec.frame_spec {
+            for target in &frame.modifies_targets {
+                target.as_ref().visit_pre_order(&mut |e: &ExpData| {
+                    if let ExpData::Call(_, Operation::SpecFunction(mid, _, _), _) = e {
+                        if *mid != current_mid && !module_imports.contains(mid) {
+                            needed.insert(*mid);
+                        }
+                    }
+                    true
+                });
+            }
+        }
+        for mid in &needed {
+            let module_env = self.env().get_module(*mid);
+            emitln!(self.writer, "use {};", module_env.get_full_name_str());
+        }
+        // Add these modules to tctx so module_qualifier uses short names
+        tctx.used_modules.extend(needed);
+    }
+
     /// Prints a spec block for a function, including the repeated signature.
     pub fn print_fun_spec(&self, fun_env: &FunctionEnv) {
         let spec = fun_env.get_spec();
@@ -1158,7 +1212,12 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, " {");
 
         self.writer.indent();
-        let tctx = fun_env.get_type_display_ctx();
+        let mut tctx = fun_env.get_type_display_ctx();
+
+        // Print use declarations for external modules referenced by SpecFunction
+        // calls in the spec conditions (e.g., `use 0x1::signer;`).
+        // Also add these modules to tctx so module_qualifier uses short names.
+        self.print_spec_use_decls(fun_env, &spec, &mut tctx);
 
         self.print_pragmas(&spec.properties);
 
@@ -1998,12 +2057,37 @@ impl<'a> ExpSourcifier<'a> {
                     // We need to generate `|t| f(captured, t)` to represent the closure.
                     // For that, we first create the closure expression, then call
                     // sourcifier again.
+                    // Captured arguments are evaluated eagerly when the closure is
+                    // created, so complex captured expressions (e.g. containing
+                    // `old()`) must be hoisted into `let` bindings outside the lambda
+                    // to avoid unsupported constructs inside the lambda body.
                     let loc = self.env().get_node_loc(id);
                     let ty = self.env().get_node_type(id);
                     let Type::Fun(arg_ty, res_ty, _) = ty else {
                         emit!(self.wr(), "<<wrongly typed closure expression>>");
                         return;
                     };
+                    // Hoist non-trivial captured args into let bindings.
+                    let mut let_bindings: Vec<(Pattern, Exp)> = vec![];
+                    let captured_args: Vec<Exp> = args
+                        .iter()
+                        .map(|arg| {
+                            if matches!(
+                                arg.as_ref(),
+                                ExpData::LocalVar(..) | ExpData::Value(..) | ExpData::Temporary(..)
+                            ) {
+                                arg.clone()
+                            } else {
+                                let arg_ty = self.env().get_node_type(arg.node_id());
+                                let name = self.new_unique_name(args, "__cap");
+                                let local_id = self.env().new_node(loc.clone(), arg_ty);
+                                let pat = Pattern::Var(local_id, name);
+                                let var_exp = ExpData::LocalVar(local_id, name).into_exp();
+                                let_bindings.push((pat, arg.clone()));
+                                var_exp
+                            }
+                        })
+                        .collect();
                     let mut lambda_params = vec![];
                     let mut lambda_param_tys = vec![];
                     let mut lambda_param_exps = vec![];
@@ -2014,8 +2098,7 @@ impl<'a> ExpSourcifier<'a> {
                         lambda_param_exps.push(ExpData::LocalVar(local_id, name).into_exp());
                         lambda_param_tys.push(ty);
                     }
-                    let Some(all_args) = mask.compose(args.iter().cloned(), lambda_param_exps)
-                    else {
+                    let Some(all_args) = mask.compose(captured_args, lambda_param_exps) else {
                         emit!(self.wr(), "<<inconsistent closure mask>>");
                         return;
                     };
@@ -2036,18 +2119,21 @@ impl<'a> ExpSourcifier<'a> {
                     } else {
                         lambda_params.pop().unwrap()
                     };
-                    self.print_exp(
-                        context_prio,
-                        false,
-                        &ExpData::Lambda(
-                            id,
-                            lambda_pat,
-                            call_exp,
-                            LambdaCaptureKind::Default,
-                            None,
-                        )
-                        .into_exp(),
-                    )
+                    let lambda_exp =
+                        ExpData::Lambda(id, lambda_pat, call_exp, LambdaCaptureKind::Default, None)
+                            .into_exp();
+                    // Wrap in let bindings for hoisted captured args.
+                    let result_exp =
+                        let_bindings
+                            .into_iter()
+                            .rev()
+                            .fold(lambda_exp, |body, (pat, binding)| {
+                                let block_id = self
+                                    .env()
+                                    .new_node(loc.clone(), self.env().get_node_type(id));
+                                ExpData::Block(block_id, pat, Some(binding), body).into_exp()
+                            });
+                    self.print_exp(context_prio, false, &result_exp)
                 })
             },
             Operation::Pack(mid, sid, variant) => {
@@ -2101,15 +2187,31 @@ impl<'a> ExpSourcifier<'a> {
             },
             Operation::SelectVariants(mid, sid, fids) => {
                 let struct_env = self.env().get_module(*mid).into_struct(*sid);
-                // All field names are the same, so we can choose one representative
-                // on source level.
                 let fid = fids[0];
                 let field_env = struct_env.get_field(fid);
+                let field_name = field_env.get_name();
                 let result_ty = self.env().get_node_type(id);
+                // Check if the field name is ambiguous (different types across variants),
+                // requiring variant qualification in the output.
+                let needs_variant_qualification = struct_env.has_variants() && {
+                    let types: Vec<_> = struct_env
+                        .get_fields()
+                        .filter(|f| f.get_name() == field_name)
+                        .map(|f| f.get_type())
+                        .collect();
+                    types.len() > 1 && types.windows(2).any(|w| w[0] != w[1])
+                };
+                let variant_prefix = if needs_variant_qualification {
+                    field_env
+                        .get_variant()
+                        .map(|v| format!("{}.", self.sym(v)))
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
                 // In spec contexts, SelectVariants may have no receiver
                 if args.is_empty() {
-                    // Just print the field name
-                    emit!(self.wr(), "{}", self.sym(field_env.get_name()))
+                    emit!(self.wr(), "{}{}", variant_prefix, self.sym(field_name))
                 } else {
                     let given_prio = if result_ty.is_reference() {
                         Prio::Prefix
@@ -2123,7 +2225,7 @@ impl<'a> ExpSourcifier<'a> {
                             emit!(self.wr(), "&mut ");
                         }
                         self.print_exp(Prio::Postfix, false, &args[0]);
-                        emit!(self.wr(), ".{}", self.sym(field_env.get_name()))
+                        emit!(self.wr(), ".{}{}", variant_prefix, self.sym(field_name))
                     })
                 }
             },
@@ -2231,12 +2333,28 @@ impl<'a> ExpSourcifier<'a> {
             }),
             Operation::Exists(memory_label) => {
                 if let Some(label) = memory_label {
-                    self.parenthesize(context_prio, Prio::General, || {
-                        self.print_memory_label(label);
-                        emit!(self.wr(), " |~ exists");
-                        self.print_node_inst(id);
-                        self.print_exp_list("(", ")", args)
-                    })
+                    if self
+                        .parent
+                        .enclosing_state_label
+                        .get()
+                        .is_some_and(|ctx| ctx == *label)
+                    {
+                        // Suppress — matches enclosing context
+                        self.parenthesize(context_prio, Prio::Postfix, || {
+                            emit!(self.wr(), "exists");
+                            self.print_node_inst(id);
+                            self.print_exp_list("(", ")", args)
+                        })
+                    } else {
+                        self.parenthesize(context_prio, Prio::General, || {
+                            self.print_memory_label(label);
+                            emit!(self.wr(), " |~ exists");
+                            self.print_node_inst(id);
+                            let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                            self.print_exp_list("(", ")", args);
+                            self.parent.enclosing_state_label.set(prev);
+                        })
+                    }
                 } else {
                     self.parenthesize(context_prio, Prio::Postfix, || {
                         emit!(self.wr(), "exists");
@@ -2244,6 +2362,47 @@ impl<'a> ExpSourcifier<'a> {
                         self.print_exp_list("(", ")", args)
                     })
                 }
+            },
+            Operation::SpecPublish(range)
+            | Operation::SpecRemove(range)
+            | Operation::SpecUpdate(range) => {
+                // Use Postfix priority when there's no range prefix (bare call),
+                // General when there is one (the `|~` notation needs parentheses).
+                let prio = if range.pre.is_some() || range.post.is_some() {
+                    Prio::General
+                } else {
+                    Prio::Postfix
+                };
+                self.parenthesize(context_prio, prio, || {
+                    // Print two-state range prefix
+                    match (range.pre, range.post) {
+                        (None, Some(post)) => {
+                            emit!(self.wr(), "..");
+                            self.print_memory_label(&post);
+                            emit!(self.wr(), " |~ ");
+                        },
+                        (Some(pre), None) => {
+                            self.print_memory_label(&pre);
+                            emit!(self.wr(), ".. |~ ");
+                        },
+                        (Some(pre), Some(post)) => {
+                            self.print_memory_label(&pre);
+                            emit!(self.wr(), "..");
+                            self.print_memory_label(&post);
+                            emit!(self.wr(), " |~ ");
+                        },
+                        (None, None) => {},
+                    }
+                    let name = match oper {
+                        Operation::SpecPublish(_) => "publish",
+                        Operation::SpecRemove(_) => "remove",
+                        Operation::SpecUpdate(_) => "update",
+                        _ => unreachable!(),
+                    };
+                    emit!(self.wr(), "{}", name);
+                    self.print_node_inst(id);
+                    self.print_exp_list("(", ")", args);
+                })
             },
             Operation::BorrowGlobal(kind) => self.parenthesize(context_prio, Prio::Postfix, || {
                 if *kind == ReferenceKind::Mutable {
@@ -2295,14 +2454,40 @@ impl<'a> ExpSourcifier<'a> {
             }),
             Operation::Global(memory_label) => {
                 if let Some(label) = memory_label {
-                    self.parenthesize(context_prio, Prio::General, || {
-                        self.print_memory_label(label);
-                        emit!(self.wr(), " |~ global");
-                        self.print_node_inst(id);
-                        emit!(self.wr(), "(");
-                        self.print_exp(Prio::General, false, &args[0]);
-                        emit!(self.wr(), ")")
-                    })
+                    // Check if this label matches the enclosing context — if so,
+                    // suppress it and render as unlabeled (Move-2 index syntax).
+                    if self
+                        .parent
+                        .enclosing_state_label
+                        .get()
+                        .is_some_and(|ctx| ctx == *label)
+                    {
+                        self.parenthesize(context_prio, Prio::Postfix, || {
+                            if let Some(inst) = self.env().get_node_instantiation_opt(id) {
+                                if let Some(ty) = inst.first() {
+                                    emit!(self.wr(), "{}", self.ty(ty));
+                                }
+                            }
+                            emit!(self.wr(), "[");
+                            // Set this label as context for children
+                            let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                            self.print_exp(Prio::General, false, &args[0]);
+                            self.parent.enclosing_state_label.set(prev);
+                            emit!(self.wr(), "]")
+                        })
+                    } else {
+                        self.parenthesize(context_prio, Prio::General, || {
+                            self.print_memory_label(label);
+                            emit!(self.wr(), " |~ global");
+                            self.print_node_inst(id);
+                            emit!(self.wr(), "(");
+                            // Set this label as context for children
+                            let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                            self.print_exp(Prio::General, false, &args[0]);
+                            self.parent.enclosing_state_label.set(prev);
+                            emit!(self.wr(), ")")
+                        })
+                    }
                 } else {
                     // Print as Move-2 index syntax: Type[addr]
                     self.parenthesize(context_prio, Prio::Postfix, || {
@@ -2544,6 +2729,15 @@ impl<'a> ExpSourcifier<'a> {
                     }
                 };
                 if has_labels {
+                    // Check if all labels match enclosing state context — suppress if so
+                    if let Some(ctx) = self.parent.enclosing_state_label.get() {
+                        let pre_ok = range.pre.is_none() || range.pre == Some(ctx);
+                        let post_ok = range.post.is_none() || range.post == Some(ctx);
+                        if pre_ok && post_ok {
+                            print_behavior(self);
+                            return;
+                        }
+                    }
                     // aborts_of/requires_of only take a pre-state (single state form),
                     // ensures_of/result_of can have pre..post ranges.
                     let is_single_state = matches!(
@@ -2567,7 +2761,21 @@ impl<'a> ExpSourcifier<'a> {
                             }
                         }
                         emit!(self.wr(), " |~ ");
-                        print_behavior(self);
+                        // Set enclosing label context so inner behavioral
+                        // predicates with matching labels are suppressed.
+                        let repr_label = match (range.pre, range.post) {
+                            (Some(p), Some(q)) if p == q => Some(p),
+                            (Some(p), None) => Some(p),
+                            (None, Some(q)) => Some(q),
+                            _ => None,
+                        };
+                        if let Some(label) = repr_label {
+                            let prev = self.parent.enclosing_state_label.replace(Some(label));
+                            print_behavior(self);
+                            self.parent.enclosing_state_label.set(prev);
+                        } else {
+                            print_behavior(self);
+                        }
                     })
                 } else {
                     print_behavior(self);
@@ -2789,20 +2997,24 @@ impl<'a> ExpSourcifier<'a> {
     /// Print a labeled expression as if it had no label.
     fn print_exp_without_label(&self, prio: Priority, exp: &Exp) {
         match exp.as_ref() {
-            ExpData::Call(id, Operation::Global(Some(_)), args) => {
+            ExpData::Call(id, Operation::Global(Some(label)), args) => {
                 self.parenthesize(prio, Prio::Postfix, || {
                     emit!(self.wr(), "global");
                     self.print_node_inst(*id);
                     emit!(self.wr(), "(");
+                    let prev = self.parent.enclosing_state_label.replace(Some(*label));
                     self.print_exp(Prio::General, false, &args[0]);
+                    self.parent.enclosing_state_label.set(prev);
                     emit!(self.wr(), ")")
                 })
             },
-            ExpData::Call(id, Operation::Exists(Some(_)), args) => {
+            ExpData::Call(id, Operation::Exists(Some(label)), args) => {
                 self.parenthesize(prio, Prio::Postfix, || {
                     emit!(self.wr(), "exists");
                     self.print_node_inst(*id);
-                    self.print_exp_list("(", ")", args)
+                    let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                    self.print_exp_list("(", ")", args);
+                    self.parent.enclosing_state_label.set(prev);
                 })
             },
             ExpData::Call(_, Operation::Behavior(kind, _), args) => {

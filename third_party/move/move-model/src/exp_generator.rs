@@ -428,16 +428,15 @@ pub trait ExpGenerator<'env> {
     fn mk_field_select(&self, field_env: &FieldEnv<'_>, targs: &[Type], exp: Exp) -> Exp {
         let ty = field_env.get_type().instantiate(targs);
         let node_id = self.new_node(ty, None);
-        ExpData::Call(
-            node_id,
-            Operation::Select(
-                field_env.struct_env.module_env.get_id(),
-                field_env.struct_env.get_id(),
-                field_env.get_id(),
-            ),
-            vec![exp],
-        )
-        .into_exp()
+        let mid = field_env.struct_env.module_env.get_id();
+        let sid = field_env.struct_env.get_id();
+        let fid = field_env.get_id();
+        let op = if field_env.get_variant().is_some() {
+            Operation::SelectVariants(mid, sid, vec![fid])
+        } else {
+            Operation::Select(mid, sid, fid)
+        };
+        ExpData::Call(node_id, op, vec![exp]).into_exp()
     }
 
     /// Makes an expression which updates a field in a struct.
@@ -611,6 +610,68 @@ pub trait ExpGenerator<'env> {
     }
 
     // =================================================================================================
+    // Spec Mutation Builtin Helpers
+
+    /// Create `publish<R>(addr, value)` with given memory range.
+    /// Semantics: resource R is published at addr with the given value,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_publish(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        value: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecPublish(range), vec![addr, value]).into_exp()
+    }
+
+    /// Create `remove<R>(addr)` with given memory range.
+    /// Semantics: resource R is removed from addr,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_remove(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecRemove(range), vec![addr]).into_exp()
+    }
+
+    /// Create `update<R>(addr, value)` with given memory range.
+    /// Semantics: resource R at addr is updated to value,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_update(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        value: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecUpdate(range), vec![addr, value]).into_exp()
+    }
+
+    // =================================================================================================
     // Numeric Expression Helpers
 
     /// Make a numeric constant expression with NUM_TYPE (spec arbitrary precision).
@@ -727,27 +788,44 @@ pub trait ExpGenerator<'env> {
 
     /// Create a closure expression for a function reference.
     /// Returns the closure expression and the function's result type.
-    fn mk_closure(&self, module_id: ModuleId, fun_id: FunId, type_inst: &[Type]) -> (Exp, Type) {
+    /// When `mask` and `captured_args` are provided, the closure represents a
+    /// partial application where captured arguments are baked in and only the
+    /// remaining (non-captured) parameters form the closure's function type.
+    fn mk_closure(
+        &self,
+        module_id: ModuleId,
+        fun_id: FunId,
+        type_inst: &[Type],
+        mask: ClosureMask,
+        captured_args: Vec<Exp>,
+    ) -> (Exp, Type) {
         let fun_env = self
             .global_env()
             .get_module(module_id)
             .into_function(fun_id);
-        let param_types: Vec<Type> = fun_env
+        let all_param_types: Vec<Type> = fun_env
             .get_parameters()
             .iter()
             .map(|p| p.1.instantiate(type_inst))
             .collect();
+        // Only non-captured parameters appear in the closure's function type.
+        let provided_param_types: Vec<Type> = all_param_types
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !mask.is_captured(*i))
+            .map(|(_, ty)| ty.clone())
+            .collect();
         let result_type = fun_env.get_result_type().instantiate(type_inst);
         let fun_type = Type::Fun(
-            Box::new(Type::tuple(param_types)),
+            Box::new(Type::tuple(provided_param_types)),
             Box::new(result_type.clone()),
             AbilitySet::EMPTY,
         );
         let node_id = self.new_node(fun_type, Some(type_inst.to_vec()));
         let exp = ExpData::Call(
             node_id,
-            Operation::Closure(module_id, fun_id, ClosureMask::empty()),
-            vec![],
+            Operation::Closure(module_id, fun_id, mask),
+            captured_args,
         )
         .into_exp();
         (exp, result_type)
@@ -782,7 +860,17 @@ pub trait ExpGenerator<'env> {
         let mid = signer_module.get_id();
         let fid = address_of_fun.get_id();
         let addr_ty = Type::Primitive(PrimitiveType::Address);
-        self.mk_call(&addr_ty, Operation::MoveFunction(mid, fid), vec![exp])
+        // Use SpecFunction if the spec function exists (prover context),
+        // fall back to MoveFunction otherwise.
+        if let Some((spec_fun_id, _)) = address_of_fun.find_spec_fun() {
+            self.mk_call(
+                &addr_ty,
+                Operation::SpecFunction(mid, spec_fun_id, MemoryRange::default()),
+                vec![exp],
+            )
+        } else {
+            self.mk_call(&addr_ty, Operation::MoveFunction(mid, fid), vec![exp])
+        }
     }
 
     // =================================================================================================

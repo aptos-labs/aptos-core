@@ -1044,7 +1044,10 @@ impl Generator<'_> {
             | Operation::ExtendEventStore
             | Operation::EventStoreIncludes
             | Operation::EventStoreIncludedIn
-            | Operation::Behavior(..) => self.internal_error(
+            | Operation::Behavior(..)
+            | Operation::SpecPublish(..)
+            | Operation::SpecRemove(..)
+            | Operation::SpecUpdate(..) => self.internal_error(
                 id,
                 format!("unsupported specification construct: `{:?}`", op),
             ),

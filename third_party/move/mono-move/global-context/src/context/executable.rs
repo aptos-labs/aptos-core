@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Placeholder types for executables (compiled modules / scripts).
+//! Types for executables (compiled modules / scripts).
 
 use crate::{
     context::types::{
@@ -13,33 +13,15 @@ use crate::{
 use anyhow::{anyhow, bail};
 use fxhash::FxBuildHasher;
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
-use mono_move_core::ExecutableId;
+use mono_move_core::{ExecutableId, FrameOffset, Function, FRAME_METADATA_SIZE};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex},
     CompiledModule,
 };
+use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 use parking_lot::Mutex;
 use std::collections::HashMap;
-
-/// Loaded function placeholder.
-pub struct Function {
-    #[allow(dead_code)]
-    name: GlobalArenaPtr<str>,
-}
-
-impl Function {
-    /// Returns the name of this function.
-    pub fn name(&self) -> &str {
-        // SAFETY: Function name is a pointer to data allocated in global
-        // arena. It must still be valid because:
-        //   - This function allocation is alive.
-        //   - Executable storing function pointer is not dropped.
-        //   - Global arena has not been reset and therefore the pointer is
-        //     valid since it was created.
-        unsafe { self.name.as_ref_unchecked() }
-    }
-}
 
 pub struct StructType {
     /// Struct type signature. Invariant: stored type is always
@@ -167,22 +149,74 @@ impl<'ctx> ExecutionGuard<'ctx> {
 impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
     /// Builds an executable from the provided compiled module.
     pub fn build(mut self) -> anyhow::Result<Box<Executable>> {
-        for function in &self.module.function_defs {
-            let handle = self.module.function_handle_at(function.function);
-            if !handle.type_parameters.is_empty() {
-                todo!("Generic functions are not yet implemented");
-            }
-
-            let identifier = self.module.identifier_at(handle.name);
-            let name = self.guard.intern_identifier_internal(identifier);
-            let function = Function { name };
-            let ptr = self.arena.alloc(function);
-            self.data.functions.insert(name, ptr);
-        }
-
+        // Process struct definitions first (type layout is needed by lowering
+        // functions).
         for struct_def in &self.module.struct_defs {
             self.resolve_struct_def(struct_def)?;
         }
+
+        // Specializer pipeline.
+        // TODO: Factor this out into specializer.
+
+        let struct_name_table: Vec<StructNameIndex> = (0..self.module.struct_handles.len())
+            .map(|i| StructNameIndex::new(i as u32))
+            .collect();
+        let module_ir = specializer::destack(self.module.clone(), &struct_name_table)?;
+        let func_id_map = specializer::lower::build_func_id_map(&module_ir.module);
+
+        // Indexed by definition index. Generic functions that are not
+        // lowered leave their slot as None.
+        let mut func_ptrs = vec![None; module_ir.functions.len()];
+        for (def_idx, func_ir) in module_ir.functions.iter().enumerate() {
+            let name = module_ir.module.identifier_at(func_ir.name_idx);
+            let name = self.guard.intern_identifier_internal(name);
+
+            // TODO: support generic functions.
+            if let Some(ctx) =
+                specializer::lower::try_build_context(&module_ir.module, func_ir, &func_id_map)?
+            {
+                let micro_ops = specializer::lower::lower_function(func_ir, &ctx)?;
+
+                // Compute frame layout.
+                let args_size = ctx.home_slots[..func_ir.num_params as usize]
+                    .iter()
+                    .map(|s| s.size as usize)
+                    .sum::<usize>();
+                let args_and_locals_size = ctx.frame_data_size as usize;
+                let extended_frame_size = ctx
+                    .call_sites
+                    .iter()
+                    .flat_map(|cs| cs.arg_write_slots.iter().chain(cs.ret_read_slots.iter()))
+                    .map(|s| (s.offset + s.size) as usize)
+                    .max()
+                    .unwrap_or(args_and_locals_size + FRAME_METADATA_SIZE);
+
+                // Allocate micro-ops and pointer_offsets in the executable arena.
+                let code = self.arena.alloc_slice_fill_iter(micro_ops);
+                let pointer_offsets = self
+                    .arena
+                    .alloc_slice_fill_iter(std::iter::empty::<FrameOffset>());
+
+                let func = Function {
+                    name,
+                    code,
+                    args_size,
+                    args_and_locals_size,
+                    extended_frame_size,
+                    // TODO: hardcoded for now.
+                    zero_frame: false,
+                    pointer_offsets,
+                };
+                let ptr = self.arena.alloc(func);
+                self.data.functions.insert(name, ptr);
+                func_ptrs[def_idx] = Some(ptr);
+            }
+        }
+
+        // Patch CallFunc to CallLocalFunc using definition-indexed func_ptrs.
+        // SAFETY: We have exclusive access — the executable is being built
+        // and no concurrent readers exist. The arena outlives the executable.
+        unsafe { Function::resolve_calls(&func_ptrs) };
 
         Ok(Box::new(Executable {
             data: self.data,

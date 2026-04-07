@@ -61,13 +61,13 @@ module 0x66::fv_enum_basic {
         let _v2 = signer::address_of(p0);
         let _v3 = borrow_global<Mapper<u64, u64>>(_v2);
         if (_v3 is Twice) {
-            let _v4 = &_v3._0;
+            let _v4 = &_v3.Twice._0;
             let _v5 = *&_v4.v1;
             let _v6 = _v5(10);
             let _v7 = *&_v4.v1;
             _v0 = _v7(_v6)
         } else if (_v3 is Id) {
-            let _v8 = *&_v3._0;
+            let _v8 = *&_v3.Id._0;
             _v0 = _v8(10)
         } else abort 14566554180833181697;
         assert!(_v0 == 16, 99);

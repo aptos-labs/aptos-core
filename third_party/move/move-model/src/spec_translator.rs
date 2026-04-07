@@ -13,7 +13,7 @@ use crate::{
         TraceKind,
     },
     exp_generator::ExpGenerator,
-    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, MemoryLabelFreshener, RewriteTarget},
     model::{
         FunctionEnv, GlobalEnv, GlobalId, Loc, NodeId, Parameter, QualifiedId, QualifiedInstId,
         SpecVarId, StructId,
@@ -76,6 +76,22 @@ pub enum ProofAction {
     /// an extra verification variant is created for `!guard`, and the base cases
     /// are conjuncted with `guard`.
     Split(Exp, Option<Exp>),
+}
+
+impl ProofAction {
+    /// Freshen memory labels in this proof action's expressions.
+    pub fn freshen_labels(&mut self, freshener: &mut MemoryLabelFreshener) {
+        match self {
+            ProofAction::Assert(exp, _) => *exp = freshener.rewrite_exp(exp.clone()),
+            ProofAction::Assume(exp) => *exp = freshener.rewrite_exp(exp.clone()),
+            ProofAction::Split(exp, opt_exp) => {
+                *exp = freshener.rewrite_exp(exp.clone());
+                if let Some(e) = opt_exp {
+                    *e = freshener.rewrite_exp(e.clone());
+                }
+            },
+        }
+    }
 }
 
 /// Represents a translated spec.
@@ -213,6 +229,73 @@ impl TranslatedSpec {
             let extend_exp = builder.mk_call(&es_ty, Operation::ExtendEventStore, args);
             Self::build_event_store(builder, extend_exp, &emits[1..])
         }
+    }
+
+    /// Freshen all memory labels in this translated spec by replacing them with
+    /// deterministic new labels starting from `counter`. The counter is advanced
+    /// past all allocated labels and returned so that subsequent freshenings can
+    /// continue from a non-colliding value.
+    pub fn freshen_labels(&mut self, counter: &mut usize) {
+        let mut freshener = MemoryLabelFreshener::new(*counter);
+        for (_, exp) in &mut self.post {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, exp, code_exp) in &mut self.aborts {
+            *exp = freshener.rewrite_exp(exp.clone());
+            if let Some(c) = code_exp {
+                *c = freshener.rewrite_exp(c.clone());
+            }
+        }
+        for (_, exp) in &mut self.modifies {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, exps) in &mut self.aborts_with {
+            for exp in exps {
+                *exp = freshener.rewrite_exp(exp.clone());
+            }
+        }
+        for (_, exp, exp2, opt_exp) in &mut self.emits {
+            *exp = freshener.rewrite_exp(exp.clone());
+            *exp2 = freshener.rewrite_exp(exp2.clone());
+            if let Some(e) = opt_exp {
+                *e = freshener.rewrite_exp(e.clone());
+            }
+        }
+        for (_, exp, exp2) in &mut self.updates {
+            *exp = freshener.rewrite_exp(exp.clone());
+            *exp2 = freshener.rewrite_exp(exp2.clone());
+        }
+        for (_, exp) in &mut self.pre {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, action) in &mut self.pre_proof {
+            action.freshen_labels(&mut freshener);
+        }
+        for (_, action) in &mut self.post_proof {
+            action.freshen_labels(&mut freshener);
+        }
+        for (_, _, _, exp) in &mut self.lets {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, _, exp) in &mut self.invariants {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, _, exp) in &mut self.debug_traces {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        // Freshen labels in saved_memory and saved_spec_vars
+        let map = freshener.label_map();
+        self.saved_memory = self
+            .saved_memory
+            .iter()
+            .map(|(k, v)| (k.clone(), map.get(v).copied().unwrap_or(*v)))
+            .collect();
+        self.saved_spec_vars = self
+            .saved_spec_vars
+            .iter()
+            .map(|(k, v)| (k.clone(), map.get(v).copied().unwrap_or(*v)))
+            .collect();
+        *counter = freshener.next_counter();
     }
 }
 
@@ -609,7 +692,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         if let Some(label) = self.shared_old_label {
             label
         } else {
-            let label = self.builder.global_env().new_global_id();
+            let label = MemoryLabel::new(self.builder.global_env().new_global_id().as_usize());
             self.shared_old_label = Some(label);
             label
         }

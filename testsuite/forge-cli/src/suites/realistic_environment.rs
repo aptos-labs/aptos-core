@@ -432,7 +432,7 @@ pub(crate) fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
+    let mempool_backlog = if ha_proxy { 14000 } else { 19000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_vfns)
@@ -593,7 +593,7 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
     let mut forge_config = ForgeConfig::default()
             .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
-            .add_network_test(MultiRegionNetworkEmulationTest::default_for_validator_count(VALIDATOR_COUNT))
+            .add_network_test(MultiRegionNetworkEmulationTest::mainnet_calibrated_for_validator_count(VALIDATOR_COUNT))
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: (TARGET_TPS as f64 * VFN_LATENCY_S) as usize,
             }))
@@ -719,7 +719,7 @@ pub fn wrap_with_realistic_env<T: NetworkTest + 'static>(
     test: T,
 ) -> CompositeNetworkTest {
     CompositeNetworkTest::new(
-        MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
+        MultiRegionNetworkEmulationTest::mainnet_calibrated_for_validator_count(num_validators),
         test,
     )
 }

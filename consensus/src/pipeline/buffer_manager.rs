@@ -395,6 +395,20 @@ impl BufferManager {
             self.buffer.len() + 1,
         );
 
+        // Record BlockOrdered stage. BlockProposed + register_block are done
+        // earlier in round_manager::process_proposal (before execution starts).
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.is_enabled() {
+                for block in &ordered_blocks {
+                    store.record_block_stage(
+                        &block.id(),
+                        aptos_transaction_tracing::types::TransactionStage::BlockOrdered,
+                    );
+                }
+            }
+        }
+
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: ordered_blocks.clone(),
         });
@@ -502,6 +516,16 @@ impl BufferManager {
                     .expect("executed_blocks should be not empty")
                     .block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
+                // Record Certified tracing stage — uses block_txns mapping (no payload iteration)
+                if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
+                    let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+                    for eb in &aggregated_item.executed_blocks {
+                        store.record_block_stage(
+                            &eb.id(),
+                            aptos_transaction_tracing::types::TransactionStage::Certified,
+                        );
+                    }
+                }
                 // As all the validators broadcast commit votes directly to all other validators,
                 // the proposer do not have to broadcast commit decision again.
                 let commit_proof = aggregated_item.commit_proof.clone();

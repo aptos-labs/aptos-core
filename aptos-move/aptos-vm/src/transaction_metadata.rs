@@ -131,7 +131,24 @@ impl TransactionMetadata {
                         _ => None,
                     },
                 }),
-                _ => None,
+                TransactionPayload::EncryptedPayload(ep) => match ep.extra_config() {
+                    TransactionExtraConfig::V1 {
+                        multisig_address: Some(multisig_address),
+                        ..
+                    } => Some(Multisig {
+                        multisig_address: *multisig_address,
+                        transaction_payload: match ep.executable_ref() {
+                            Ok(TransactionExecutableRef::EntryFunction(e)) => {
+                                Some(MultisigTransactionPayload::EntryFunction(e.clone()))
+                            },
+                            _ => None,
+                        },
+                    }),
+                    _ => None,
+                },
+                TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config: TransactionExtraConfig:: V1 { multisig_address: None, ..}, .. }) |
+                TransactionPayload::Script(_) |
+                TransactionPayload::ModuleBundle(_) | TransactionPayload::EntryFunction(_) => None,
             },
             transaction_index_kind: auxiliary_info.transaction_index_kind(),
         }

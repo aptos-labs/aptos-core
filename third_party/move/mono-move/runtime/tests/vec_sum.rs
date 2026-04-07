@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use mono_move_alloc::GlobalArenaPtr;
+use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp};
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 
@@ -11,7 +11,10 @@ use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 ///   [fp + 16] : i (loop counter / len)
 ///   [fp + 24] : tmp (scratch)
 ///   [fp + 32] : vec_ref (16-byte fat pointer referencing vec_ptr)
-fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
+fn make_vec_sum_program(
+    arena: &ExecutableArena,
+    n: u64,
+) -> (Vec<ExecutableArenaPtr<Function>>, Vec<ObjectDescriptor>) {
     use MicroOp::*;
 
     let slot_result: u32 = 0;
@@ -21,7 +24,7 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
     let slot_vec_ref: u32 = 32;
 
     #[rustfmt::skip]
-    let code = vec![
+    let code = arena.alloc_slice_fill_iter(vec![
         VecNew { dst: FO(slot_vec) },
         SlotBorrow { dst: FO(slot_vec_ref), local: FO(slot_vec) },
         StoreImm8 { dst: FO(slot_i), imm: 0 },
@@ -40,17 +43,18 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
         VecLen { dst: FO(slot_i), vec_ref: FO(slot_vec_ref) },
         JumpNotZeroU64 { target: CO(13), src: FO(slot_i) },
         Return,
-    ];
+    ]);
+    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(slot_vec), FO(slot_vec_ref)]);
 
-    let func = Function {
+    let func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets: vec![FO(slot_vec), FO(slot_vec_ref)],
-    };
+        pointer_offsets,
+    });
 
     let descriptors = vec![ObjectDescriptor::Trivial];
     (vec![func], descriptors)
@@ -59,8 +63,9 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, Vec<ObjectDescriptor>) {
 #[test]
 fn vec_sum_100() {
     let n: u64 = 100;
-    let (functions, descriptors) = make_vec_sum_program(n);
-    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+    let arena = ExecutableArena::new();
+    let (functions, descriptors) = make_vec_sum_program(&arena, n);
+    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
 }
@@ -68,8 +73,13 @@ fn vec_sum_100() {
 #[test]
 fn vec_sum_with_gc_pressure() {
     let n: u64 = 200;
-    let (functions, descriptors) = make_vec_sum_program(n);
-    let mut ctx = InterpreterContext::with_heap_size(&functions, &descriptors, 0, 4 * 1024);
+    let arena = ExecutableArena::new();
+    let (functions, descriptors) = make_vec_sum_program(&arena, n);
+    let mut ctx = InterpreterContext::with_heap_size(
+        &descriptors,
+        unsafe { functions[0].as_ref_unchecked() },
+        4 * 1024,
+    );
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
     assert!(ctx.gc_count() > 0, "GC should have run at least once");

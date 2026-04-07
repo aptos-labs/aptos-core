@@ -413,20 +413,19 @@ pub(crate) fn run_multisig_prologue(
             &MultisigTransactionPayload::EntryFunction(entry_function.clone()),
         )
         .map_err(|_| unreachable_error.clone())?,
-        TransactionExecutableRef::Empty => {
+        // Empty: no payload provided. Encrypted: decryption failed, pass empty payload
+        // so prologue validates ownership/approvals; execution phase handles the failure.
+        TransactionExecutableRef::Empty | TransactionExecutableRef::Encrypted => {
             if features.is_abort_if_multisig_payload_mismatch_enabled() {
                 vec![]
             } else {
                 bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error.clone())?
             }
         },
-        TransactionExecutableRef::Script(_) | TransactionExecutableRef::Encrypted => {
+        TransactionExecutableRef::Script(_) => {
             return Err(VMStatus::error(
                 StatusCode::FEATURE_UNDER_GATING,
-                Some(
-                    "Script or encrypted payload not supported for multisig transactions"
-                        .to_string(),
-                ),
+                Some("Script payload not supported for multisig transactions".to_string()),
             ));
         },
     };

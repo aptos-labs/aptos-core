@@ -3,7 +3,8 @@ name: prover
 description: Information how to develop and extend the Move Prover
 ---
 
-The Move Prover is a formal verification tool for Move smart contracts. It translates Move code and specifications to Boogie, which then uses SMT solvers (Z3 or CVC5) to verify correctness.
+The Move Prover is a formal verification tool for Move smart contracts. It translates Move code and specifications to
+Boogie, which then uses SMT solvers (Z3 or CVC5) to verify correctness.
 
 Code is at `third_party/move/move-prover`.
 
@@ -138,6 +139,7 @@ trait FunctionTargetProcessor {
 ## Prelude Templates
 
 Located in `boogie-backend/src/prelude/`:
+
 - `prelude.bpl` - Core Boogie definitions
 - `native.bpl` - Native function stubs
 - `vector-*-theory.bpl` - Vector encoding (5 variants)
@@ -145,14 +147,17 @@ Located in `boogie-backend/src/prelude/`:
 ## Move to Boogie Mapping
 
 **Types:**
+
 - Primitives (u8-u256, bool, address) → Boogie types
 - Structs → Boogie datatypes
 - References → dereferenced at function boundaries
 
 **Memory:**
+
 - Global state: `memory(ModuleAddress, ResourceType) → Value`
 
 **Specs:**
+
 - `requires` → Function preconditions
 - `ensures` → Function postconditions
 - `aborts_if` → Abort condition assertions
@@ -163,6 +168,7 @@ Located in `boogie-backend/src/prelude/`:
 ## Monomorphization
 
 The prover computes all type instantiations needed:
+
 ```rust
 pub struct MonoInfo {
     pub structs: BTreeMap<QualifiedId<StructId>, BTreeSet<Vec<Type>>>,
@@ -217,31 +223,51 @@ pub struct ProverOptions {
 
 - Do always look into move-model helper functions before creating new functions on common data types like expressions.
 
-# Execution Modes
+# Spec Inference Is a Separate Tool
 
-The Move Prover has two independent execution modes that are **never combined in one tool session**:
+**IMPORTANT: Spec inference is COMPLETELY ORTHOGONAL to specification and verification in the Move Prover. It is an
+independent tool that happens to share some infrastructure.**
 
-- **Inference mode** (`--inference`): Runs the spec inference pipeline to generate specifications. The output is enriched source files with inferred specs. Does NOT run Boogie verification.
-- **Verification mode** (default): Runs the Boogie backend to verify existing specifications. Does NOT infer new specs.
+Do NOT confuse, conflate, or mix up spec inference with the prover's specification language or verification pipeline.
+They are separate concerns:
 
-The inference test suite (in `tests/inference/`) first runs inference to produce `.exp.move` files, then runs the prover in verification mode on those files as a separate invocation. These are two independent pipeline runs with separate `GlobalEnv` instances — state from inference does not carry over to verification.
+These two tools are never combined in one session. The inference test suite (in `tests/inference/`) first runs inference
+to produce `.exp.move` files, then runs the prover in verification mode on those files as a completely separate
+invocation with a separate `GlobalEnv` instance — no state carries over.
 
 # Debugging
 
 - You can run the Move prover as
+
 ```
 cargo run -p move-prover -- \
     --language-version 2.4 \
-    -d <rooot>/third_party/move/move-stdlib/sources \
+    -d <root>/third_party/move/move-stdlib/sources \
     -a std=0x1 \
     <source-files>
 ```
+
+- To verify files from the Aptos framework that depend on multiple packages, provide each package's
+  sources directory as a separate `-d` flag. For example, to verify a file in `aptos-stdlib`:
+
+```
+cargo run -p move-prover -- \
+    --language-version 2.4 \
+    -d aptos-move/framework/move-stdlib/sources \
+    -d aptos-move/framework/aptos-stdlib/sources \
+    -a std=0x1 aptos_std=0x1 \
+    -- <source-files-or-directory>
+```
+
 - In order to inspect generated Boogie, use `--keep`. The following output will be generated:
-  - `output.bpl` with the Boogie narrowed to verify given function
-  - `output.bpl.log` the model as returned by Boogie to the Move Prover. The prover prints error messages derived from this to console
-- In order to inspect generated smtlib file and the z3 log for a *given function*, use `--generate-smt --z3-trace=<function>`. The following output will be produced, assuming that source contains a function `<addr>::<module>::<function>`:
-  - a file `_<addr>_<module>_<function>.smt` containing the smtlib input for Z3 as generated from the Boogie
-  - a file `<function>.z3log` containing Z3 log during verifying the function.
+    - `output.bpl` with the Boogie narrowed to verify given function
+    - `output.bpl.log` the model as returned by Boogie to the Move Prover. The prover prints error messages derived from
+      this to console
+- In order to inspect generated smtlib file and the z3 log for a *given function*, use
+  `--generate-smt --z3-trace=<function>`. The following output will be produced, assuming that source contains a
+  function `<addr>::<module>::<function>`:
+    - a file `_<addr>_<module>_<function>.smt` containing the smtlib input for Z3 as generated from the Boogie
+    - a file `<function>.z3log` containing Z3 log during verifying the function.
 
 # Important: Language Version
 
@@ -273,14 +299,26 @@ MVP_TEST_FLAGS="-T=20" cargo test           # Custom flags
 
 ## Important
 
-- Do MUST NOT automatically try to fix verification failures
-- You can fix Rust or Boogie compilation failures
+- **No tests fail on `main`.** The repo has strict CI branch protection. If tests fail on a feature branch, they were
+  broken by commits on that branch — never dismiss them as "pre-existing on main."
 - For verification failures consult me before proceeding
 - **Baseline tests (`UB=1`) passing (exit 0) does NOT mean the test succeeded.**
   The `UB=1` flag auto-updates `.exp` files, so tests always pass. You MUST
   compare the resulting `.exp` changes against the parent of the PR to judge
   correctness. Some `.exp` changes are expected (e.g. fewer errors after a fix),
   others represent regressions or bugs.
+
+# Inference Tests
+
+The inference test suite (`tests/inference/`) runs spec inference on Move source, produces enriched `.exp.move` files,
+then runs the prover on those files. The verification result is appended at the end of each `.exp.move` file.
+
+**The verification result is ALWAYS expected to be `Verification Succeeded` with no errors or warnings.** Inferred specs
+are expected to verify. If verification fails, there is a bug in either inference or the verification pipeline. Any
+errors, warnings, or Boogie compilation failures in the appended output indicate a problem that must be fixed.
+
+The duality of these tests (inference produces specs, verification checks them) makes them a strong benchmark for
+AI-generated code quality.
 
 # Documentation
 

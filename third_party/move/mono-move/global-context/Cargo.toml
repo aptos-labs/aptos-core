@@ -20,7 +20,9 @@ mono-move-alloc = { workspace = true }
 mono-move-core = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
 parking_lot = { workspace = true }
+specializer = { workspace = true }
 
 [dev-dependencies]
 move-asm = { workspace = true }

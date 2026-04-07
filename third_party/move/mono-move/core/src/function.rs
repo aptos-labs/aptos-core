@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::instruction::{FrameOffset, MicroOp, FRAME_METADATA_SIZE};
-use mono_move_alloc::GlobalArenaPtr;
+use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
 
 /// ---------------------------------------------------------------------------
 // Function representation
@@ -21,7 +21,7 @@ use mono_move_alloc::GlobalArenaPtr;
 /// functions (no callee region).
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
-    pub code: Vec<MicroOp>,
+    pub code: ExecutableArenaPtr<[MicroOp]>,
     /// Size of the argument region at the start of the frame.
     /// Arguments are placed by the caller before `CallFunc`; when
     /// `zero_frame` is true, the runtime zeroes everything beyond args
@@ -63,13 +63,13 @@ pub struct Function {
     ///   callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer_offset slot may only be
     ///   overwritten with another valid heap pointer (or null). The
-    ///   re-compiler must guarantee this.
+    ///   specializer must guarantee this.
     ///
     /// The callee arg region (`frame_size()..extended_frame_size`)
     /// overlaps with the callee's frame during GC traversal — both
     /// frames may scan the same memory. The forwarding markers in
     /// `gc_copy_object` handle double-scans correctly.
-    pub pointer_offsets: Vec<FrameOffset>,
+    pub pointer_offsets: ExecutableArenaPtr<[FrameOffset]>,
 }
 
 impl Function {
@@ -77,5 +77,36 @@ impl Function {
     /// This is the offset where callee arguments begin.
     pub fn frame_size(&self) -> usize {
         self.args_and_locals_size + FRAME_METADATA_SIZE
+    }
+
+    /// Replaces every [`MicroOp::CallFunc`] (index-based dispatch) with
+    /// [`MicroOp::CallLocalFunc`] (direct pointer dispatch).
+    ///
+    /// `func_ptrs` is indexed by definition index and may contain `None`
+    /// for functions that were not lowered (e.g. generic functions).
+    ///
+    /// # Safety
+    ///
+    /// The caller must have exclusive access to the functions and their
+    /// arena-allocated code. The arena must outlive all uses of the patched
+    /// code.
+    pub unsafe fn resolve_calls(func_ptrs: &[Option<ExecutableArenaPtr<Function>>]) {
+        for func_ptr in func_ptrs {
+            let Some(mut func_ptr) = *func_ptr else {
+                continue;
+            };
+            // SAFETY: We have exclusive access during build — no concurrent
+            // readers exist yet. The arena is alive because the caller owns it.
+            let func = unsafe { func_ptr.as_mut_unchecked() };
+            let code = unsafe { func.code.as_mut_unchecked() };
+            for op in code.iter_mut() {
+                if let MicroOp::CallFunc { func_id } = *op {
+                    *op = MicroOp::CallLocalFunc {
+                        ptr: func_ptrs[func_id as usize]
+                            .expect("CallFunc target must be a lowered function"),
+                    };
+                }
+            }
+        }
     }
 }

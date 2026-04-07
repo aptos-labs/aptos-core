@@ -108,8 +108,10 @@ use rand::{distributions::Standard, prelude::Distribution, rngs::OsRng, Rng};
 use serde::{de, ser, Deserialize, Serialize};
 use std::{
     self,
+    borrow::Cow,
     convert::{AsRef, TryFrom},
     fmt,
+    ops::Deref,
     str::FromStr,
     sync::Arc,
 };
@@ -568,6 +570,17 @@ where
 
     fn hash(&self) -> HashValue {
         self.as_ref().hash()
+    }
+}
+
+impl<T> CryptoHash for Cow<'_, T>
+where
+    T: CryptoHash + Clone,
+{
+    type Hasher = T::Hasher;
+
+    fn hash(&self) -> HashValue {
+        self.deref().hash()
     }
 }
 

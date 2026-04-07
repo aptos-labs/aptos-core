@@ -12892,6 +12892,7 @@ components:
       - rejected_by_filter
       - health_check_failed
       - mempool_is_full
+      - rate_limited
       - internal_error
       - web_framework_error
       - bcs_not_supported

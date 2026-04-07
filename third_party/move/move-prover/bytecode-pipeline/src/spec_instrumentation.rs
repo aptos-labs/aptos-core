@@ -7,11 +7,12 @@
 
 use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
-use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast,
     ast::{Exp, ExpData, MemoryLabel, QuantKind, TempIndex, Value},
     exp_generator::ExpGenerator,
+    exp_rewriter::ExpRewriterFunctions,
+    memory_labels::all_labels_in_exp,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
     spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
@@ -364,6 +365,9 @@ struct Instrumenter<'a> {
     /// AttrIds are stable across optimization passes, unlike bytecode offsets.
     /// The optional guard is a path condition from enclosing `if` in the proof block.
     split_points: Vec<(AttrId, Exp, Option<Exp>)>,
+    /// Counter for deterministic label freshening across opaque call sites.
+    /// Starts at 0 so that freshened labels are independent of the global counter.
+    freshen_counter: usize,
 }
 
 // =================================================================================================
@@ -464,6 +468,7 @@ impl<'a> Instrumenter<'a> {
             can_abort: false,
             mem_info: &mem_info,
             split_points: vec![],
+            freshen_counter: 0,
         };
         instrumenter.instrument(&spec, &inlined_props);
 
@@ -568,22 +573,12 @@ impl<'a> Instrumenter<'a> {
             }
         }
 
-        // Collect intermediate state labels from spec conditions.
-        // These are labels (e.g. @inter, @inter1) that need SaveMem
-        // emitted at the appropriate bytecode offset (not at function entry).
-        let intermediate_saves = if self.is_verified() {
-            self.collect_intermediate_saves(spec, &old_code)
-        } else {
-            BTreeMap::new()
-        };
-
         // Instrument and generate new code.
         // Peel leading TraceLocal instructions and emit them before pre_proof
         // so that pre-proof assertion errors can display model values in counter-examples.
-        let mut old_code = old_code.into_iter().enumerate();
+        let mut old_code = old_code.into_iter();
         let mut pre_proof_emitted = false;
-        for (offset, bc) in old_code.by_ref() {
-            self.emit_intermediate_saves(&intermediate_saves, offset as CodeOffset);
+        for bc in old_code.by_ref() {
             if matches!(&bc, Call(_, _, Operation::TraceLocal(_), _, _)) {
                 self.builder.emit(bc);
             } else {
@@ -598,8 +593,7 @@ impl<'a> Instrumenter<'a> {
             self.emit_proof_actions(&spec.pre_proof, spec);
         }
         // Continue with remaining old_code.
-        for (offset, bc) in old_code {
-            self.emit_intermediate_saves(&intermediate_saves, offset as CodeOffset);
+        for bc in old_code {
             self.instrument_bytecode(spec, inlined_props, bc);
         }
 
@@ -733,6 +727,10 @@ impl<'a> Instrumenter<'a> {
             Some(&srcs),
             &dests,
         );
+
+        // Freshen state labels to avoid collisions between different inlining sites.
+        // Uses a function-scoped counter for deterministic label IDs.
+        callee_spec.freshen_labels(&mut self.freshen_counter);
 
         self.builder.set_loc_from_attr(id);
 
@@ -966,275 +964,6 @@ impl<'a> Instrumenter<'a> {
                     .emit_with(|attr_id| Assign(attr_id, *saved_idx, *idx, AssignKind::Copy))
             }
         }
-    }
-
-    /// Emit SaveMem instructions for intermediate state labels at the given bytecode offset.
-    fn emit_intermediate_saves(
-        &mut self,
-        intermediate_saves: &BTreeMap<CodeOffset, Vec<(QualifiedInstId<StructId>, MemoryLabel)>>,
-        offset: CodeOffset,
-    ) {
-        use Bytecode::*;
-        if let Some(saves) = intermediate_saves.get(&offset) {
-            for (mem, label) in saves {
-                let mem = mem.clone();
-                let label = *label;
-                self.builder
-                    .emit_with(|attr_id| SaveMem(attr_id, label, mem));
-            }
-        }
-    }
-
-    /// Collect intermediate SaveMem instructions needed for state labels in the spec.
-    /// Uses structural matching: labels are ordered via the behavioral predicate chain,
-    /// then mapped to state-transition operations in the bytecode.
-    /// Returns a map from bytecode offset to the set of (memory, label) pairs to save at that offset.
-    fn collect_intermediate_saves(
-        &self,
-        spec: &TranslatedSpec,
-        code: &[Bytecode],
-    ) -> BTreeMap<CodeOffset, Vec<(QualifiedInstId<StructId>, MemoryLabel)>> {
-        let env = self.builder.global_env();
-
-        // Collect all expressions from spec conditions
-        let mut all_exps: Vec<&Exp> = Vec::new();
-        for (_, exp) in &spec.post {
-            all_exps.push(exp);
-        }
-        for (_, exp, code_exp) in &spec.aborts {
-            all_exps.push(exp);
-            if let Some(c) = code_exp {
-                all_exps.push(c);
-            }
-        }
-        for (_, exp) in &spec.modifies {
-            all_exps.push(exp);
-        }
-        for (_, exps) in &spec.aborts_with {
-            for exp in exps {
-                all_exps.push(exp);
-            }
-        }
-        for (_, exp, exp2, opt_exp) in &spec.emits {
-            all_exps.push(exp);
-            all_exps.push(exp2);
-            if let Some(e) = opt_exp {
-                all_exps.push(e);
-            }
-        }
-        for (_, exp, exp2) in &spec.updates {
-            all_exps.push(exp);
-            all_exps.push(exp2);
-        }
-
-        // Collect (label, memory) pairs from expressions that use intermediate state labels.
-        // These come from:
-        // - Behavior(kind, range) with non-default range: behavioral predicates with state labels
-        // - Exists(Some(label)): existence checks at intermediate states
-        // - Global(Some(label)): resource access at intermediate states
-        let mut label_memory_pairs: BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> =
-            BTreeSet::new();
-
-        for exp in &all_exps {
-            exp.visit_pre_order(&mut |e| {
-                if let ExpData::Call(node_id, op, args) = e {
-                    match op {
-                        ast::Operation::Behavior(_, range) if !range.is_default() => {
-                            // Resolve the closure target to get memory types
-                            let closure_info: Option<(
-                                Vec<Type>,
-                                move_model::model::ModuleId,
-                                FunId,
-                            )> = match args.first().map(|a| a.as_ref()) {
-                                Some(ExpData::Call(
-                                    closure_id,
-                                    ast::Operation::Closure(mid, fid, _),
-                                    _,
-                                )) => {
-                                    let inst = env.get_node_instantiation(*closure_id);
-                                    Some((inst, *mid, *fid))
-                                },
-                                Some(ExpData::Temporary(_, idx)) => {
-                                    code.iter().rev().find_map(|bc| {
-                                        if let Bytecode::Call(
-                                            _,
-                                            dests,
-                                            Operation::Closure(mid, fid, types, _),
-                                            _,
-                                            _,
-                                        ) = bc
-                                        {
-                                            if dests.first() == Some(idx) {
-                                                return Some((types.clone(), *mid, *fid));
-                                            }
-                                        }
-                                        None
-                                    })
-                                },
-                                _ => None,
-                            };
-                            if let Some((inst, mid, fid)) = closure_info {
-                                let closure_fun_env = env.get_function(mid.qualified(fid));
-                                let all_memory = closure_fun_env
-                                    .get_spec_used_memory()
-                                    .iter()
-                                    .chain(closure_fun_env.get_spec_old_memory().iter());
-                                for memory in all_memory {
-                                    let memory = memory.clone().instantiate(&inst);
-                                    for label in range.labels() {
-                                        label_memory_pairs.insert((label, memory.clone()));
-                                    }
-                                }
-                            }
-                        },
-                        ast::Operation::SpecFunction(mid, fid, range) if !range.is_default() => {
-                            // Two-state spec function with state labels
-                            let module = env.get_module(*mid);
-                            let sfun = module.get_spec_fun(*fid);
-                            let inst = env.get_node_instantiation(*node_id);
-                            let all_memory = sfun.used_memory.iter().chain(sfun.old_memory.iter());
-                            for memory in all_memory {
-                                let memory = memory.clone().instantiate(&inst);
-                                for label in range.labels() {
-                                    label_memory_pairs.insert((label, memory.clone()));
-                                }
-                            }
-                        },
-                        ast::Operation::Exists(Some(label))
-                        | ast::Operation::Global(Some(label)) => {
-                            // Extract memory type from node's type instantiation
-                            let mem_ty = &env.get_node_instantiation(*node_id)[0];
-                            let (mid, sid, inst) = mem_ty.require_struct();
-                            let memory = mid.qualified_inst(sid, inst.to_owned());
-                            label_memory_pairs.insert((*label, memory));
-                        },
-                        _ => {},
-                    }
-                }
-                true
-            });
-        }
-
-        // Build set of labels already saved at function entry (from saved_memory)
-        let already_saved: BTreeSet<MemoryLabel> = spec.saved_memory.values().copied().collect();
-
-        // Filter to labels that actually need intermediate SaveMem
-        let labels_needing_save: BTreeSet<MemoryLabel> = label_memory_pairs
-            .iter()
-            .map(|(label, _)| *label)
-            .filter(|label| !already_saved.contains(label))
-            .collect();
-
-        if labels_needing_save.is_empty() {
-            return BTreeMap::new();
-        }
-
-        // Build a total order of intermediate labels from the behavioral predicate chain.
-        // Behavioral predicates (Behavior/SpecFunction) with MemoryRange {pre, post}
-        // define edges pre→post in a DAG. Topologically sorting this DAG gives program
-        // order, which we then filter to labels that need saving.
-        let label_order = Self::build_label_order_from_spec(&all_exps, &labels_needing_save);
-
-        // Enumerate state-transition operations in bytecode order.
-        // These are the operations that change global memory state: function calls,
-        // MoveFrom, MoveTo, WriteBack to global root, and OpaqueCallBegin (which marks
-        // the start of an opaque call that may modify global state).
-        let state_transition_offsets: Vec<CodeOffset> = code
-            .iter()
-            .enumerate()
-            .filter(|(_, bc)| {
-                bc.is_global_state_transition()
-                    || matches!(
-                        bc,
-                        Bytecode::Call(_, _, Operation::OpaqueCallBegin(..), _, _)
-                    )
-            })
-            .map(|(i, _)| i as CodeOffset)
-            .collect();
-
-        // TODO: Support state labels on branching control flow by anchoring labels to
-        // specific transitions in the CFG rather than ordinal position.
-        if !label_order.is_empty() && code.iter().any(|bc| matches!(bc, Bytecode::Branch(..))) {
-            env.error(
-                &self.builder.fun_env.get_spec_loc(),
-                "intermediate state labels (`|~`) are currently only supported \
-                 for functions with linear control flow (no branches); \
-                 this restriction will be lifted in a future version",
-            );
-            return BTreeMap::new();
-        }
-
-        // Map the Nth intermediate label to the state after the Nth state-transition
-        // operation. SaveMem is emitted at (state_transition_offset + 1), i.e., right
-        // after the operation completes and before the next bytecode executes.
-        let mut result: BTreeMap<CodeOffset, Vec<(QualifiedInstId<StructId>, MemoryLabel)>> =
-            BTreeMap::new();
-        for (n, label) in label_order.iter().enumerate() {
-            if n >= state_transition_offsets.len() {
-                break;
-            }
-            let save_offset = state_transition_offsets[n] + 1;
-            for (l, memory) in &label_memory_pairs {
-                if l == label {
-                    result
-                        .entry(save_offset)
-                        .or_default()
-                        .push((memory.clone(), *label));
-                }
-            }
-        }
-        result
-    }
-
-    /// Build a total order of intermediate labels from behavioral predicate chains in spec
-    /// expressions. Returns labels from `labels_needing_save` sorted in program order.
-    fn build_label_order_from_spec(
-        all_exps: &[&Exp],
-        labels_needing_save: &BTreeSet<MemoryLabel>,
-    ) -> Vec<MemoryLabel> {
-        use petgraph::{algo::toposort, graph::DiGraph};
-
-        // Build a directed graph of label ordering edges from behavioral predicate ranges.
-        let mut graph = DiGraph::<MemoryLabel, ()>::new();
-        let mut node_map: BTreeMap<MemoryLabel, petgraph::graph::NodeIndex> = BTreeMap::new();
-        let mut get_or_insert =
-            |g: &mut DiGraph<MemoryLabel, ()>, label: MemoryLabel| -> petgraph::graph::NodeIndex {
-                *node_map.entry(label).or_insert_with(|| g.add_node(label))
-            };
-
-        for exp in all_exps {
-            exp.visit_pre_order(&mut |e| {
-                if let ExpData::Call(_, op, _) = e {
-                    match op {
-                        ast::Operation::Behavior(_, range)
-                        | ast::Operation::SpecFunction(_, _, range) => {
-                            for label in range.labels() {
-                                get_or_insert(&mut graph, label);
-                            }
-                            if let (Some(pre), Some(post)) = (range.pre, range.post) {
-                                let pre_node = get_or_insert(&mut graph, pre);
-                                let post_node = get_or_insert(&mut graph, post);
-                                graph.update_edge(pre_node, post_node, ());
-                            }
-                        },
-                        ast::Operation::Global(Some(label))
-                        | ast::Operation::Exists(Some(label)) => {
-                            get_or_insert(&mut graph, *label);
-                        },
-                        _ => {},
-                    }
-                }
-                true
-            });
-        }
-
-        // Topological sort to get program order, then filter to labels that need saving.
-        toposort(&graph, None)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|idx| graph[idx])
-            .filter(|label| labels_needing_save.contains(label))
-            .collect()
     }
 
     fn emit_updates(&mut self, spec: &TranslatedSpec, prop_rhs_opt: Option<Exp>) {
@@ -1512,6 +1241,15 @@ impl<'a> Instrumenter<'a> {
         use Bytecode::*;
         use PropKind::*;
 
+        // Emit state-label-defining assumes so labeled memory variables are
+        // constrained on the abort path (not only the normal return path).
+        // Without this, labeled variables like Resource_$memory#S are
+        // unconstrained when checking abort coverage, causing spurious failures
+        // when address aliasing makes the abort condition depend on labeled state.
+        // Use abort_path=true to assume only the defining fragment of each
+        // condition, not extra properties that only hold on successful returns.
+        self.emit_state_label_assumes(spec, true);
+
         let is_partial = self
             .builder
             .fun_env
@@ -1604,8 +1342,24 @@ impl<'a> Instrumenter<'a> {
             // Emit well-formedness checks for choice expressions in post-state let bindings.
             self.emit_choice_wellformedness(spec, true);
 
+            let defining_indices = self.emit_state_label_assumes(spec, false);
+
             // Emit the negation of all aborts conditions.
-            for (loc, abort_cond, _) in &spec.aborts {
+            // For defining conditions (already assumed), assert the non-defining
+            // residual so mixed conditions like `mutation(...) && property` still
+            // verify the property part.
+            let post_count = spec.post.len();
+            for (i, (loc, abort_cond, _)) in spec.aborts.iter().enumerate() {
+                if defining_indices.contains(&(post_count + i)) {
+                    if let Some(residual) = self.non_defining_residual(abort_cond) {
+                        self.emit_traces(spec, abort_cond);
+                        let exp = self.builder.mk_not(residual);
+                        self.builder
+                            .set_loc_and_vc_info(loc.clone(), ABORTS_IF_FAILS_MESSAGE);
+                        self.builder.emit_with(|id| Prop(id, Assert, exp));
+                    }
+                    continue;
+                }
                 self.emit_traces(spec, abort_cond);
                 let exp = self.builder.mk_not(abort_cond.clone());
                 self.builder
@@ -1616,8 +1370,20 @@ impl<'a> Instrumenter<'a> {
             // Emit return-point proof actions (`post`-prefixed proof statements).
             self.emit_proof_actions(&spec.post_proof, spec);
 
-            // Emit all post-conditions which must hold as we do not abort.
-            for (loc, cond) in &spec.post {
+            // Emit all post-conditions which must hold.
+            // For defining conditions (already assumed), assert the non-defining
+            // residual so mixed conditions like `mutation(...) && result == 0`
+            // still verify the `result == 0` part.
+            for (i, (loc, cond)) in spec.post.iter().enumerate() {
+                if defining_indices.contains(&i) {
+                    if let Some(residual) = self.non_defining_residual(cond) {
+                        self.emit_traces(spec, cond);
+                        self.builder
+                            .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
+                        self.builder.emit_with(move |id| Prop(id, Assert, residual));
+                    }
+                    continue;
+                }
                 self.emit_traces(spec, cond);
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
@@ -1655,6 +1421,215 @@ impl<'a> Instrumenter<'a> {
         // Emit return
         let ret_locals = self.ret_locals.clone();
         self.builder.emit_with(move |id| Ret(id, ret_locals))
+    }
+
+    /// Emit havoc+assume for intermediate state labels.
+    /// Collects all conditions (ensures + aborts), finds which ones define state labels,
+    /// and emits them as assumes in topological (dependency) order.
+    /// Returns the set of condition indices that were emitted as assumes (defining conditions).
+    /// If `abort_path` is true, assume only the defining fragment of each condition
+    /// (conjuncts that contain label-defining operations), not extra properties
+    /// that only hold on successful returns.
+    fn emit_state_label_assumes(
+        &mut self,
+        spec: &TranslatedSpec,
+        abort_path: bool,
+    ) -> BTreeSet<usize> {
+        use Bytecode::*;
+        use PropKind::*;
+
+        let saved_labels: BTreeSet<MemoryLabel> = spec.saved_memory.values().copied().collect();
+
+        // Build map: label -> defining condition (the condition with range.post == Some(label))
+        let mut label_definers: BTreeMap<MemoryLabel, Vec<usize>> = BTreeMap::new();
+        // Only ensures and aborts conditions can define state labels (via mutation
+        // builtins, behavioral predicates, or spec functions with range.post).
+        // Other spec fields (modifies, emits, updates) don't carry these operations.
+        let all_conditions: Vec<&Exp> = spec
+            .post
+            .iter()
+            .map(|(_, e)| e)
+            .chain(spec.aborts.iter().map(|(_, e, _)| e))
+            .collect();
+        for (idx, cond) in all_conditions.iter().enumerate() {
+            for label in Self::defined_labels(cond) {
+                if !saved_labels.contains(&label) {
+                    label_definers.entry(label).or_default().push(idx);
+                }
+            }
+        }
+
+        // Validate: multiple unconditional (strict) definitions of the same label
+        // are always wrong. Multiple conditional definitions are legitimate
+        // (path-conditional mutations from different CFG branches).
+        for (label, definers) in &label_definers {
+            if definers.len() > 1 {
+                let all_strict = definers.iter().all(|&idx| {
+                    all_conditions[idx]
+                        .as_ref()
+                        .strictly_defined_labels()
+                        .contains(label)
+                });
+                if all_strict {
+                    let env = self.builder.global_env();
+                    env.error(
+                        &self.builder.fun_env.get_spec_loc(),
+                        "state label has multiple unconditional defining conditions \
+                             (combine with &&)",
+                    );
+                }
+            }
+        }
+
+        // Topological sort: emit definitions in dependency order.
+        // Each label may have multiple defining conditions (conditional mutations).
+        let mut emitted_labels: BTreeSet<MemoryLabel> = BTreeSet::new();
+        let mut defining_indices: BTreeSet<usize> = BTreeSet::new();
+        let mut remaining: BTreeMap<MemoryLabel, Vec<usize>> = BTreeMap::new();
+        for (label, definers) in &label_definers {
+            remaining.insert(*label, definers.clone());
+        }
+        // Iterate until all definitions are emitted (or stuck = cycle).
+        while !remaining.is_empty() {
+            let mut progress = false;
+            let snapshot: Vec<_> = remaining
+                .iter()
+                .map(|(l, indices)| (*l, indices.clone()))
+                .collect();
+            for (label, indices) in snapshot {
+                // Check all labels USED by ALL defining conditions are already defined.
+                let all_deps_met = indices.iter().all(|&idx| {
+                    let deps = Self::all_labels(all_conditions[idx]);
+                    deps.iter().all(|dep| {
+                        *dep == label
+                            || saved_labels.contains(dep)
+                            || emitted_labels.contains(dep)
+                            || !label_definers.contains_key(dep)
+                    })
+                });
+                if all_deps_met {
+                    for &idx in &indices {
+                        self.emit_traces(spec, all_conditions[idx]);
+                        let cond = if abort_path {
+                            Self::defining_fragment(all_conditions[idx])
+                        } else {
+                            all_conditions[idx].clone()
+                        };
+                        self.builder.emit_with(move |id| Prop(id, Assume, cond));
+                        defining_indices.insert(idx);
+                    }
+                    emitted_labels.insert(label);
+                    remaining.remove(&label);
+                    progress = true;
+                }
+            }
+            if !progress {
+                let env = self.builder.global_env();
+                env.error(
+                    &self.builder.fun_env.get_spec_loc(),
+                    "cyclic dependency among state label definitions",
+                );
+                break;
+            }
+        }
+        defining_indices
+    }
+
+    /// Returns the set of labels DEFINED by a condition (all range.post labels).
+    fn defined_labels(exp: &Exp) -> BTreeSet<MemoryLabel> {
+        exp.as_ref().all_defined_labels()
+    }
+
+    /// Extract the defining fragment of a condition: only the conjuncts that
+    /// contain label-defining operations. Non-defining conjuncts (properties
+    /// that only hold on successful returns) are dropped. Used on the abort
+    /// path to avoid assuming postcondition properties.
+    fn defining_fragment(exp: &Exp) -> Exp {
+        use move_model::exp_simplifier::flatten_conjunction_owned;
+        let conjuncts = flatten_conjunction_owned(exp);
+        let defining: Vec<Exp> = conjuncts
+            .into_iter()
+            .filter(|c| !c.as_ref().all_defined_labels().is_empty())
+            .collect();
+        if defining.is_empty() {
+            // No defining conjuncts — return true (no constraint).
+            let id = exp.as_ref().node_id();
+            ExpData::Value(id, Value::Bool(true)).into_exp()
+        } else {
+            defining
+                .into_iter()
+                .reduce(|a, b| {
+                    let id = a.as_ref().node_id();
+                    ExpData::Call(id, ast::Operation::And, vec![a, b]).into_exp()
+                })
+                .unwrap()
+        }
+    }
+
+    /// Returns all labels referenced by a condition.
+    fn all_labels(exp: &Exp) -> BTreeSet<MemoryLabel> {
+        all_labels_in_exp(exp)
+    }
+
+    /// Compute the non-defining residual of a condition: the condition with all
+    /// label-defining operations neutralized. Mutation builtins are replaced by `true`
+    /// (boolean predicates about state transitions). For behavioral predicates and spec
+    /// functions with `range.post`, stripping the label would change the state context
+    /// (evaluating at exit instead of the labeled intermediate state), producing
+    /// semantically incorrect assertions. For those, no residual is returned.
+    /// Returns `None` if the residual is trivially `true` (pure definition) or if
+    /// the condition contains label-defining Behavior/SpecFunction operations.
+    fn non_defining_residual(&self, exp: &Exp) -> Option<Exp> {
+        // If the condition contains label-defining Behavior or SpecFunction operations,
+        // there is no meaningful residual: stripping the label changes the state context.
+        // The assume already covers the verification obligation.
+        let has_non_mutation_definers = {
+            let mut found = false;
+            exp.as_ref().visit_pre_order(&mut |e| {
+                if let ExpData::Call(_, op, _) = e {
+                    match op {
+                        ast::Operation::Behavior(_, range)
+                        | ast::Operation::SpecFunction(_, _, range)
+                            if range.post.is_some() =>
+                        {
+                            found = true;
+                            return false;
+                        },
+                        _ => {},
+                    }
+                }
+                !found
+            });
+            found
+        };
+        if has_non_mutation_definers {
+            return None;
+        }
+        struct MutationStripper;
+        impl ExpRewriterFunctions for MutationStripper {
+            fn rewrite_call(
+                &mut self,
+                id: move_model::model::NodeId,
+                oper: &ast::Operation,
+                _args: &[Exp],
+            ) -> Option<Exp> {
+                match oper {
+                    ast::Operation::SpecPublish(_)
+                    | ast::Operation::SpecRemove(_)
+                    | ast::Operation::SpecUpdate(_) => {
+                        Some(ExpData::Value(id, Value::Bool(true)).into_exp())
+                    },
+                    _ => None,
+                }
+            }
+        }
+        let mut stripper = MutationStripper;
+        let residual = stripper.rewrite_exp(exp.clone());
+        if matches!(residual.as_ref(), ExpData::Value(_, Value::Bool(true))) {
+            None // Pure definition, no residual to assert
+        } else {
+            Some(residual)
+        }
     }
 
     /// Generate a check whether the target can modify the given memory provided

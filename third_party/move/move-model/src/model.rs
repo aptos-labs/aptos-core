@@ -432,6 +432,12 @@ impl GlobalId {
     }
 }
 
+impl std::fmt::Display for GlobalId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@{}", self.0)
+    }
+}
+
 impl IntrinsicId {
     pub fn new(idx: usize) -> Self {
         Self(idx)
@@ -611,7 +617,10 @@ pub struct GlobalEnv {
     /// A set containing spec functions which are called/used in specs. Note that these
     /// are represented without type instantiation because we assume the backend can handle
     /// generics in the expression language.
-    pub(crate) used_spec_funs: BTreeSet<QualifiedId<SpecFunId>>,
+    /// Uses `RefCell` for interior mutability so spec inference (which holds `&GlobalEnv`)
+    /// can register new spec functions. Must not call `add_used_spec_fun` while a borrow
+    /// from `is_spec_fun_used` or iteration is held.
+    pub(crate) used_spec_funs: RefCell<BTreeSet<QualifiedId<SpecFunId>>>,
     /// An annotation of all intrinsic declarations
     pub(crate) intrinsics: IntrinsicsAnnotation,
     /// A type-indexed container for storing extension data in the environment.
@@ -687,7 +696,7 @@ impl GlobalEnv {
             global_id_counter: RefCell::new(0),
             global_invariants: Default::default(),
             global_invariants_for_memory: Default::default(),
-            used_spec_funs: BTreeSet::new(),
+            used_spec_funs: RefCell::new(BTreeSet::new()),
             intrinsics: Default::default(),
             extensions: Default::default(),
             stdlib_address: None,
@@ -1490,12 +1499,12 @@ impl GlobalEnv {
 
     /// Returns true if a spec fun is used in specs.
     pub fn is_spec_fun_used(&self, id: QualifiedId<SpecFunId>) -> bool {
-        self.used_spec_funs.contains(&id)
+        self.used_spec_funs.borrow().contains(&id)
     }
 
     /// Marks a spec fun to be used
-    pub fn add_used_spec_fun(&mut self, id: QualifiedId<SpecFunId>) {
-        self.used_spec_funs.insert(id);
+    pub fn add_used_spec_fun(&self, id: QualifiedId<SpecFunId>) {
+        self.used_spec_funs.borrow_mut().insert(id);
     }
 
     /// Determines whether the given spec fun is recursive.
@@ -3893,6 +3902,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn spec_fun_is_used(&self, spec_fun_id: SpecFunId) -> bool {
         self.env
             .used_spec_funs
+            .borrow()
             .contains(&self.get_id().qualified(spec_fun_id))
     }
 
@@ -4983,6 +4993,40 @@ impl<'env> FunctionEnv<'env> {
             m.identifier_at(m.function_handle_at(self.data.handle_idx?).name)
                 .to_owned(),
         )
+    }
+
+    /// Returns true if this function is pure: it does not access or modify global
+    /// memory and has no mutable reference parameters. Purity is determined via the
+    /// associated spec function's `used_memory` (computed by the spec rewriter).
+    /// Returns false if no spec function exists (conservative).
+    pub fn is_pure(&'env self) -> bool {
+        if self
+            .get_parameters()
+            .iter()
+            .any(|p| p.1.is_mutable_reference())
+        {
+            return false;
+        }
+        if let Some((_, decl)) = self.find_spec_fun() {
+            decl.used_memory.is_empty()
+        } else {
+            false
+        }
+    }
+
+    /// Finds the associated spec function for this Move function, if one exists.
+    /// The spec function is derived from the Move function during the spec rewriter
+    /// pass and is named `$<function_name>` by convention.
+    pub fn find_spec_fun(&'env self) -> Option<(SpecFunId, &'env SpecFunDecl)> {
+        let spec_fun_name = self
+            .module_env
+            .env
+            .symbol_pool()
+            .make(&format!("${}", self.get_name().display(self.symbol_pool())));
+        self.module_env
+            .get_spec_funs()
+            .find(|(_, decl)| decl.name == spec_fun_name && decl.is_move_fun)
+            .map(|(id, decl)| (*id, decl))
     }
 
     /// Gets the id of this function.

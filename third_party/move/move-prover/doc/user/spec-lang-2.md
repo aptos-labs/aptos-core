@@ -35,7 +35,10 @@ This document describes MSL-2 in more detail, by providing examples and discussi
     - [Access Validation](#access-validation)
 - [State Labels](#state-labels)
     - [Motivation](#motivation)
+    - [Abstract State](#abstract-state)
     - [The `|~` Operator](#the--operator)
+    - [Defining and Using State Labels](#defining-and-using-state-labels)
+    - [Mutation Primitives](#mutation-primitives)
     - [Examples](#examples)
     - [Predicate Restrictions](#predicate-restrictions)
     - [Validation Rules](#validation-rules)
@@ -568,6 +571,20 @@ spec wrapper {
 
 Behavioral predicates like `ensures_of<f>(x, result)` describe a relation between the pre-state and post-state of a function call. When a function makes a single call, there is one pre-state (the function's entry) and one post-state (the function's exit), and these are implicit. But when a function makes *multiple* state-modifying calls, intermediate states arise: the post-state of the first call becomes the pre-state of the second call. State labels make these intermediate states explicit.
 
+## Abstract State
+
+State labels in specifications represent *abstract* snapshots of the global memory at particular points in a function's execution. They are not tied to concrete program counters or bytecode offsets — instead, they name logical states that are connected by specification constraints.
+
+A specification with state labels defines a system of constraints over a sequence of abstract states. Each constraint says something about the relationship between two states (or observes a single state). The verifier treats these states as symbolic: it introduces unconstrained memory variables for each labeled state and then assumes only what the specification constraints assert about them (see [Mutation Primitives](#mutation-primitives) below for the primary mechanism that constrains how states relate to each other).
+
+For example, in a specification with label `S`:
+
+- The *entry state* is the function's pre-state (accessible via `old()`)
+- State `S` is an intermediate abstract state
+- The *exit state* is the function's post-state (the default)
+
+The constraints connect these states into a chain: entry → S → exit. Each link in the chain is established by a mutation primitive or a behavioral predicate that describes how global resources change between two states.
+
 ## The `|~` Operator
 
 | Syntax | Meaning |
@@ -577,9 +594,82 @@ Behavioral predicates like `ensures_of<f>(x, result)` describe a relation betwee
 | `S.. \|~ expr` | Evaluate `expr` with pre-state `S` and the function's exit as post-state |
 | `S \|~ expr` | Evaluate `expr` in state `S` (single state, no transition) |
 
+## Defining and Using State Labels
+
+State labels appear in two roles: *defining* a label establishes a new abstract state, while *using* a label references a previously defined state. The distinction determines how the verifier introduces and constrains memory variables.
+
+**Defining a label.** A label is defined when it appears as the post-state (after `..`) in one of these constructs:
+
+- **Mutation primitives**: `..S |~ publish<R>(addr, val)`, `..S |~ remove<R>(addr)`, `..S |~ update<R>(addr, val)`. These are the primary state-defining operations — they specify exactly how global memory changes from the pre-state to the newly defined state S. See [Mutation Primitives](#mutation-primitives) below.
+- **Behavioral predicates**: `..S |~ ensures_of<f>(x)`. This defines S as the post-state of calling `f`, constraining it by `f`'s specification.
+- **Two-state spec functions**: `..S |~ counter_increased(addr)`. This defines S as the post-state of a two-state spec function evaluation.
+
+**Using a label.** A label is used when it appears as the pre-state (before `..`) or as a single-state label:
+
+- `S.. |~ expr` — evaluate `expr` starting from state S
+- `S |~ expr` — observe `expr` in state S (single state, no transition)
+- `S |~ global<R>(addr)` or equivalently `S |~ R[addr]` — read resource R at addr in state S
+
+Every label that is defined must also be used (no orphaned labels), and every label that is used must have been defined (no dangling references). This ensures the chain of states is well-connected.
+
+## Mutation Primitives
+
+Mutation primitives are specification-only builtins that describe how a global resource changes between two states. They are the fundamental building blocks for constraining abstract state transitions.
+
+| Primitive | Meaning |
+|-----------|---------|
+| `publish<R>(addr, value)` | Resource R is created at `addr` with `value`. Requires R did not exist before. |
+| `remove<R>(addr)` | Resource R is removed from `addr`. Requires R existed before. |
+| `update<R>(addr, value)` | Resource R at `addr` is replaced with `value`. Requires R existed before. |
+
+Each primitive is a boolean-valued expression that constrains the relationship between a pre-state and a post-state. When used with a state label range, the primitive defines how memory transitions between those states:
+
+```move
+ensures ..S |~ publish<Counter>(addr, Counter{value: 0});
+```
+
+This says: transitioning from the entry state to state S, a `Counter` resource with value 0 is published at `addr`. The implicit assertion is that `Counter` did not exist at `addr` in the entry state.
+
+**Without state labels**, mutation primitives describe the transition from the function's entry to its exit:
+
+```move
+spec create_counter(account: &signer, init_value: u64) {
+    ensures publish<Counter>(signer::address_of(account), Counter{value: init_value});
+}
+```
+
+**With state labels**, mutation primitives chain together to describe sequences of state changes:
+
+```move
+spec double_update(addr: address, v1: u64, v2: u64) {
+    // First update: entry → S
+    ensures ..S |~ update<Counter>(addr, update_field(old(Counter[addr]), value, v1));
+    // Second update: S → exit
+    ensures S.. |~ update<Counter>(addr, update_field(S |~ Counter[addr], value, v2));
+}
+```
+
+Note how the second `update` reads `Counter[addr]` in state S (via `S |~ Counter[addr]`) to get the value after the first update, then modifies it further.
+
+**Conditional mutations** use implications to describe path-dependent state changes:
+
+```move
+spec conditional_remove(addr: address, cond: bool) {
+    ensures cond ==> remove<Counter>(addr);
+}
+```
+
+**Verification semantics.** Under the hood, the verifier implements mutation primitives using a *havoc-and-assume* pattern:
+
+1. The memory for each modified resource type is havoced (set to an unconstrained value).
+2. Frame conditions constrain that unmodified resource types and unmodified addresses are unchanged.
+3. The mutation primitive constraints are assumed, pinning the havoced memory to the specified values.
+
+This approach is sound and decoupled from the implementation — the verifier reasons about state transitions purely through the specification constraints, without tracking bytecode offsets or instruction ordering.
+
 ## Examples
 
-**Two sequential state-modifying calls.** Here `..S` defines state `S` as the post-state of the first call, and `S..` uses it as the pre-state of the second. The single-state form `S |~ expr` evaluates `expr` in state `S` (e.g. for abort checks):
+**Two sequential state-modifying calls.** Here `..S` *defines* state `S` as the post-state of the first call, and `S..` *uses* it as the pre-state of the second. The single-state form `S |~ expr` observes `expr` in state `S` (e.g. for abort checks):
 
 ```move
 fun double_remove(addr1: address, addr2: address): (Resource, Resource) acquires Resource {

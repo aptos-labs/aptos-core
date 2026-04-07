@@ -23,7 +23,7 @@ use crate::{
         field_bv_flag_global_state, TypeIdentToken,
     },
     options::BoogieOptions,
-    spec_translator::SpecTranslator,
+    spec_translator::{LabelInfo, SpecTranslator},
 };
 use codespan::LineIndex;
 use codespan_reporting::diagnostic::Severity;
@@ -1929,7 +1929,7 @@ impl<'env> BoogieTranslator<'env> {
             })
             .collect();
 
-        match kind {
+        let joined = match kind {
             BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf => {
                 if translated.len() == 1 {
                     format!("({})", translated[0])
@@ -1944,7 +1944,37 @@ impl<'env> BoogieTranslator<'env> {
                     format!("({})", translated.join(" || "))
                 }
             },
-            BehaviorKind::ResultOf => "true".to_string(),
+            BehaviorKind::ResultOf => return "true".to_string(),
+        };
+
+        // Collect intermediate labels from conditions that need existential wrapping.
+        // Behavioral predicate Boogie functions have exactly two memory parameters:
+        // `old_...` (pre-state) and `...` (post-state). Any explicitly labeled memory
+        // reference is an intermediate state that must be existentially bound.
+        // Entry/exit labels have already been normalized away by MemoryLabelInfo,
+        // so all remaining labels are genuine intermediates.
+        let temp_writer = CodeWriter::new(self.env.internal_loc());
+        let temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
+        let mut all_labels = BTreeSet::new();
+        for cond in &conditions {
+            all_labels.extend(temp_trans.collect_intermediate_labels_from_exp(&cond.exp));
+        }
+        if all_labels.is_empty() {
+            joined
+        } else {
+            let decls: Vec<String> = all_labels
+                .iter()
+                .map(|(label, mem)| {
+                    let name = boogie_resource_memory_name(self.env, mem, &Some(*label));
+                    let ty = boogie_struct_name(
+                        &self.env.get_struct_qid(mem.to_qualified_id()),
+                        &mem.inst,
+                        false,
+                    );
+                    format!("{}: $Memory {}", name, ty)
+                })
+                .collect();
+            format!("(exists {} :: {})", decls.join(", "), joined)
         }
     }
 
@@ -3358,7 +3388,17 @@ impl FunctionTranslator<'_> {
         // Generate var declarations for behavior state labels and collect frame info.
         // These are logical variables used in behavioral predicates (ensures_of, etc.)
         // with state labels connecting sequential calls.
-        self.declare_behavior_state_labels(fun_target, code, env, writer, &mut declared_mem_names);
+        let label_info = self.declare_behavior_state_labels(
+            fun_target,
+            code,
+            env,
+            writer,
+            &mut declared_mem_names,
+        );
+
+        // Pass label info to the spec translator so it can resolve memory references
+        // at labeled states back through the pre-state chain for non-modified types.
+        self.parent.spec_translator.set_label_info(label_info);
 
         // Initialize renamed parameters.
         for (idx, _) in proxied_parameters {
@@ -3381,42 +3421,19 @@ impl FunctionTranslator<'_> {
         emitln!(writer, "}");
     }
 
-    /// Declare Boogie variables for behavior state labels found in spec conditions
-    /// and Prop bytecodes. These are memory snapshots used by behavioral predicates
-    /// (ensures_of, etc.) with state labels connecting sequential calls.
-    /// Already-declared names (in `declared_names`) are skipped.
-    fn declare_behavior_state_labels(
+    /// Collect (label, memory_type) pairs from expressions that reference state labels.
+    /// Handles all operation types: Behavior (with closure resolution), Global(Some),
+    /// Exists(Some), and SpecFunction with non-default ranges.
+    fn collect_label_memory_pairs(
         &self,
-        fun_target: &FunctionTarget,
+        exps: &[Exp],
         code: &[Bytecode],
         env: &GlobalEnv,
-        writer: &CodeWriter,
-        declared_names: &mut BTreeSet<String>,
-    ) {
-        let mut behavior_labels: BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> =
-            BTreeSet::new();
-        let spec = fun_target.func_env.get_spec();
-        let mut all_exps: Vec<_> = spec
-            .conditions
-            .iter()
-            .flat_map(|c| std::iter::once(&c.exp).chain(c.additional_exps.iter()))
-            .cloned()
-            .collect();
-        drop(spec);
-        // Also collect expressions from Prop bytecodes (inlined spec conditions
-        // from opaque calls have behavioral predicates in the bytecode).
-        for bc in code.iter() {
-            if let Bytecode::Prop(_, _, exp) = bc {
-                all_exps.push(exp.clone());
-            }
-        }
-        // Collect all memory labels from Behavior/SpecFunction MemoryRange,
-        // and associate them with memory from enclosed Behavior closures.
-        for exp in &all_exps {
+    ) -> BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> {
+        let mut result: BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> = BTreeSet::new();
+        for exp in exps {
             exp.visit_pre_order(&mut |e| {
                 if let ExpData::Call(_, AstOperation::Behavior(_, range), args) = e {
-                    // Find closure info: either from Closure expression
-                    // or from Temporary that was assigned a closure.
                     let closure_info: Option<(Vec<Type>, move_model::model::ModuleId, FunId)> =
                         match args.first().map(|a| a.as_ref()) {
                             Some(ExpData::Call(
@@ -3440,13 +3457,13 @@ impl FunctionTranslator<'_> {
                         for memory in closure_fun_env.get_spec_used_memory() {
                             let memory = memory.clone().instantiate(&inst);
                             for label in range.labels() {
-                                behavior_labels.insert((label, memory.clone()));
+                                result.insert((label, memory.clone()));
                             }
                         }
                         for memory in closure_fun_env.get_spec_old_memory() {
                             let memory = memory.clone().instantiate(&inst);
                             for label in range.labels() {
-                                behavior_labels.insert((label, memory.clone()));
+                                result.insert((label, memory.clone()));
                             }
                         }
                     }
@@ -3454,10 +3471,7 @@ impl FunctionTranslator<'_> {
                 true
             });
         }
-        // Collect memory labels from Global(Some(label)) and Exists(Some(label))
-        // in spec conditions. These arise when enriched sources with state labels
-        // (e.g. `S |~ global<T>(addr)`) are re-compiled and verified.
-        for exp in &all_exps {
+        for exp in exps {
             exp.visit_pre_order(&mut |e| {
                 match e {
                     ExpData::Call(node_id, AstOperation::Global(Some(label)), _)
@@ -3467,17 +3481,14 @@ impl FunctionTranslator<'_> {
                         let mem_ty = &node_inst[0];
                         let (mid, sid, inst) = mem_ty.require_struct();
                         let mem = mid.qualified_inst(sid, inst.to_owned());
-                        behavior_labels.insert((*label, mem));
+                        result.insert((*label, mem));
                     },
                     _ => {},
                 }
                 true
             });
         }
-        // Collect memory labels from SpecFunction(mid, fid, range) where
-        // range carries state labels. The spec function's `used_memory` tells
-        // us which resource types need corresponding Boogie memory variables.
-        for exp in &all_exps {
+        for exp in exps {
             exp.visit_pre_order(&mut |e| {
                 if let ExpData::Call(node_id, AstOperation::SpecFunction(mid, fid, range), _) = e {
                     if !range.is_default() {
@@ -3488,7 +3499,7 @@ impl FunctionTranslator<'_> {
                         for mem in fun.used_memory.iter() {
                             let mem = mem.clone().instantiate(&inst);
                             for label in range.labels() {
-                                behavior_labels.insert((label, mem.clone()));
+                                result.insert((label, mem.clone()));
                             }
                         }
                     }
@@ -3496,7 +3507,166 @@ impl FunctionTranslator<'_> {
                 true
             });
         }
-        // Emit declarations for labels not already declared.
+        for exp in exps {
+            exp.visit_pre_order(&mut |e| {
+                if let ExpData::Call(
+                    node_id,
+                    AstOperation::SpecPublish(range)
+                    | AstOperation::SpecRemove(range)
+                    | AstOperation::SpecUpdate(range),
+                    _,
+                ) = e
+                {
+                    if !range.is_default() {
+                        let node_inst = env.get_node_instantiation(*node_id);
+                        let node_inst = Type::instantiate_slice(&node_inst, self.type_inst);
+                        let mem_ty = &node_inst[0];
+                        let (mid, sid, inst) = mem_ty.require_struct();
+                        let mem = mid.qualified_inst(sid, inst.to_owned());
+                        for label in range.labels() {
+                            result.insert((label, mem.clone()));
+                        }
+                    }
+                }
+                true
+            });
+        }
+        result
+    }
+
+    /// Compute label info (pre-state chain and modified types) for each state label
+    /// found in spec expressions. This is used to resolve which resource types are
+    /// actually modified at each label so that non-modified types can be resolved
+    /// back through the chain to the correct memory state.
+    fn compute_label_info(
+        &self,
+        all_exps: &[Exp],
+        code: &[Bytecode],
+        env: &GlobalEnv,
+    ) -> BTreeMap<MemoryLabel, LabelInfo> {
+        use move_model::ast::BehaviorKind;
+        let mut label_info: BTreeMap<MemoryLabel, LabelInfo> = BTreeMap::new();
+
+        for exp in all_exps {
+            exp.visit_pre_order(&mut |e| {
+                if let ExpData::Call(node_id, op, args) = e {
+                    match op {
+                        AstOperation::SpecPublish(range)
+                        | AstOperation::SpecRemove(range)
+                        | AstOperation::SpecUpdate(range) => {
+                            if let Some(post_label) = range.post {
+                                let node_inst = env.get_node_instantiation(*node_id);
+                                let node_inst = Type::instantiate_slice(&node_inst, self.type_inst);
+                                let (mid, sid, inst) = node_inst[0].require_struct();
+                                let mem = mid.qualified_inst(sid, inst.to_owned());
+                                let info = label_info.entry(post_label).or_default();
+                                info.modified_types.insert(mem);
+                                info.pre = info.pre.or(range.pre);
+                            }
+                        },
+                        AstOperation::Behavior(
+                            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf,
+                            range,
+                        ) => {
+                            if let Some(post_label) = range.post {
+                                // Resolve closure to get callee's modifies
+                                let closure_info: Option<(
+                                    Vec<Type>,
+                                    move_model::model::ModuleId,
+                                    FunId,
+                                )> = match args.first().map(|a| a.as_ref()) {
+                                    Some(ExpData::Call(
+                                        closure_id,
+                                        AstOperation::Closure(mid, fid, _),
+                                        _,
+                                    )) => {
+                                        let inst = env.get_node_instantiation(*closure_id);
+                                        let inst = Type::instantiate_slice(&inst, self.type_inst);
+                                        Some((inst, *mid, *fid))
+                                    },
+                                    Some(ExpData::Temporary(_, idx)) => find_closure_for_temp(
+                                        code, *idx,
+                                    )
+                                    .map(|(mid, fid, types, _)| {
+                                        let inst = Type::instantiate_slice(&types, self.type_inst);
+                                        (inst, mid, fid)
+                                    }),
+                                    // TODO: For formal function parameters, we cannot
+                                    // resolve the closure to determine modified types.
+                                    // Labels defined by ensures_of<f> where f is a formal
+                                    // parameter will have empty modified_types, causing
+                                    // later label resolution to treat reads as unmodified.
+                                    // This requires consulting modifies_of<f> at codegen time.
+                                    _ => None,
+                                };
+                                if let Some((inst, mid, fid)) = closure_info {
+                                    let callee = env.get_function(mid.qualified(fid));
+                                    let info = label_info.entry(post_label).or_default();
+                                    // Add callee's modifies targets as modified types
+                                    for mem in callee.get_modify_targets().keys() {
+                                        let mem_inst =
+                                            mem.module_id.qualified_inst(mem.id, inst.clone());
+                                        info.modified_types.insert(mem_inst);
+                                    }
+                                    info.pre = info.pre.or(range.pre);
+                                }
+                            }
+                        },
+                        AstOperation::SpecFunction(mid, fid, range) => {
+                            if let Some(post_label) = range.post {
+                                let inst = env.get_node_instantiation(*node_id);
+                                let inst = Type::instantiate_slice(&inst, self.type_inst);
+                                let module = env.get_module(*mid);
+                                let sfun = module.get_spec_fun(*fid);
+                                let info = label_info.entry(post_label).or_default();
+                                for mem in &sfun.old_memory {
+                                    info.modified_types.insert(mem.clone().instantiate(&inst));
+                                }
+                                info.pre = info.pre.or(range.pre);
+                            }
+                        },
+                        _ => {},
+                    }
+                }
+                true
+            });
+        }
+        label_info
+    }
+
+    /// Declare Boogie variables for behavior state labels found in spec conditions
+    /// and Prop bytecodes. These are memory snapshots used by behavioral predicates
+    /// (ensures_of, etc.) with state labels connecting sequential calls.
+    /// Already-declared names (in `declared_names`) are skipped.
+    fn declare_behavior_state_labels(
+        &self,
+        fun_target: &FunctionTarget,
+        code: &[Bytecode],
+        env: &GlobalEnv,
+        writer: &CodeWriter,
+        declared_names: &mut BTreeSet<String>,
+    ) -> BTreeMap<MemoryLabel, LabelInfo> {
+        let spec = fun_target.func_env.get_spec();
+        let mut all_exps: Vec<_> = spec
+            .conditions
+            .iter()
+            .flat_map(|c| std::iter::once(&c.exp).chain(c.additional_exps.iter()))
+            .cloned()
+            .collect();
+        drop(spec);
+        for bc in code.iter() {
+            if let Bytecode::Prop(_, _, exp) = bc {
+                all_exps.push(exp.clone());
+            }
+        }
+
+        let behavior_labels = self.collect_label_memory_pairs(&all_exps, code, env);
+        let label_info = self.compute_label_info(&all_exps, code, env);
+
+        // Emit declarations for all (label, type) pairs referenced by any
+        // expression. The label resolution chain (label_info) determines which
+        // memory state each reference resolves to at translation time; here we
+        // just ensure every potentially-referenced variable exists in Boogie.
         for (lab, mem) in &behavior_labels {
             let name = boogie_resource_memory_name(env, mem, &Some(*lab));
             if !declared_names.insert(name.clone()) {
@@ -3509,6 +3679,7 @@ impl FunctionTranslator<'_> {
                 boogie_struct_name(&env.get_struct_qid(mem.to_qualified_id()), &mem.inst, false)
             );
         }
+        label_info
     }
 
     fn get_mutable_parameters(&self) -> Vec<(TempIndex, Type)> {

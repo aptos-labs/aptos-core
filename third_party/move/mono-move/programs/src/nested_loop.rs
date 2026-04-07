@@ -59,11 +59,16 @@ pub fn native_nested_loop(n: u64) -> u64 {
 ///   [32] tmp
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
     use mono_move_core::{CodeOffset as CO, FrameOffset as FO, Function, MicroOp::*};
     use mono_move_runtime::ObjectDescriptor;
 
-    pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
+    pub fn program() -> (
+        Vec<ExecutableArenaPtr<Function>>,
+        Vec<ObjectDescriptor>,
+        ExecutableArena,
+    ) {
+        let arena = ExecutableArena::new();
         let n = 0u32;
         let sum = 8u32;
         let i = 16u32;
@@ -97,7 +102,10 @@ mod micro_op {
             Return,                                                 // 14
         ];
 
-        let func = Function {
+        let code = arena.alloc_slice_fill_iter(code);
+        let pointer_offsets = arena.alloc_slice_fill_iter(std::iter::empty());
+
+        let func = arena.alloc(Function {
             name: GlobalArenaPtr::from_static("nested_loop"),
             code,
             args_size: 8,
@@ -105,10 +113,10 @@ mod micro_op {
             extended_frame_size: args_and_locals_size as usize
                 + mono_move_core::FRAME_METADATA_SIZE,
             zero_frame: false,
-            pointer_offsets: vec![],
-        };
+            pointer_offsets,
+        });
 
-        (vec![func], vec![ObjectDescriptor::Trivial])
+        (vec![func], vec![ObjectDescriptor::Trivial], arena)
     }
 }
 

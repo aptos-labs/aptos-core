@@ -14,4 +14,4 @@ pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u32, write_u64, MemoryRegion,
 };
 pub use types::{ObjectDescriptor, StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
-pub use verifier::{verify_program, VerificationError};
+pub use verifier::{verify_function, VerificationError};

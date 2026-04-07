@@ -102,6 +102,8 @@ pub enum AptosErrorCode {
     HealthCheckFailed = 500,
     /// The mempool is full, no new transactions can be submitted.
     MempoolIsFull = 501,
+    /// The transaction was dropped because the inbound transaction rate limit was exceeded.
+    RateLimited = 502,
 
     /// Internal server error
     InternalError = 600,

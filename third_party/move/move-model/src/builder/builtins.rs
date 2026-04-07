@@ -6,7 +6,7 @@
 //! Defines builtin functions, adding them to the model builder.
 
 use crate::{
-    ast::{Operation, TraceKind, Value},
+    ast::{MemoryRange, Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
     metadata::{
         lang_feature_versions::{
@@ -980,6 +980,50 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 type_param_constraints: BTreeMap::default(),
                 params: vec![mk_param(trans, 1, param_t.clone())],
                 result_type: param_t.clone(),
+                visibility: Spec,
+            },
+        );
+
+        // Spec mutation builtins
+        trans.define_spec_or_builtin_fun(
+            trans.builtin_qualified_symbol("publish"),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::SpecPublish(MemoryRange::default()),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
+                params: vec![
+                    mk_param(trans, 1, address_t.clone()),
+                    mk_param(trans, 2, param_t.clone()),
+                ],
+                result_type: bool_t.clone(),
+                visibility: Spec,
+            },
+        );
+        trans.define_spec_or_builtin_fun(
+            trans.builtin_qualified_symbol("remove"),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::SpecRemove(MemoryRange::default()),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
+                params: vec![mk_param(trans, 1, address_t.clone())],
+                result_type: bool_t.clone(),
+                visibility: Spec,
+            },
+        );
+        trans.define_spec_or_builtin_fun(
+            trans.builtin_qualified_symbol("update"),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::SpecUpdate(MemoryRange::default()),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
+                params: vec![
+                    mk_param(trans, 1, address_t.clone()),
+                    mk_param(trans, 2, param_t.clone()),
+                ],
+                result_type: bool_t.clone(),
                 visibility: Spec,
             },
         );

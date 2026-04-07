@@ -23,11 +23,13 @@ fn bench_nested_loop(c: &mut Criterion) {
             b.iter(|| black_box(native_nested_loop(N)));
         });
 
-        let (functions, descriptors) = micro_op_nested_loop();
+        let (functions, descriptors, _arena) = micro_op_nested_loop();
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+                    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+                        functions[0].as_ref_unchecked()
+                    });
                     ctx.set_root_arg(0, &N.to_le_bytes());
                     ctx
                 },

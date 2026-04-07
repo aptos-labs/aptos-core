@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use bumpalo::Bump;
-use std::ptr::NonNull;
+use std::{fmt, ptr::NonNull};
 
 /// A pointer into an executable's private arena. The pointer is valid for the
 /// lifetime of the executable (arena is dropped together with the executable).
@@ -27,6 +27,25 @@ impl<T: ?Sized> ExecutableArenaPtr<T> {
         // SAFETY: The caller ensures the arena is still alive / not dropped.
         unsafe { self.0.as_ref() }
     }
+
+    /// Returns a mutable reference to the pointee with the specified lifetime.
+    ///
+    /// # Safety
+    ///
+    ///   1. The caller must ensure the executable's arena that owns the
+    ///      allocation is alive and has not been reset or dropped.
+    ///   2. The caller must ensure exclusive access to the pointee.
+    ///   3. The lifetime is the lifetime of the executable arena.
+    pub unsafe fn as_mut_unchecked<'arena>(&mut self) -> &'arena mut T {
+        // SAFETY: The caller ensures the arena is still alive / not dropped,
+        // and that no other references to the pointee exist.
+        unsafe { self.0.as_mut() }
+    }
+
+    /// Returns the underlying `NonNull` pointer.
+    pub fn as_non_null(&self) -> NonNull<T> {
+        self.0
+    }
 }
 
 // This type can be duplicated using bitwise copy.
@@ -35,6 +54,12 @@ impl<T: ?Sized> Copy for ExecutableArenaPtr<T> {}
 impl<T: ?Sized> Clone for ExecutableArenaPtr<T> {
     fn clone(&self) -> Self {
         *self
+    }
+}
+
+impl<T: ?Sized> fmt::Debug for ExecutableArenaPtr<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ExecutableArenaPtr({:p})", self.0)
     }
 }
 
@@ -90,6 +115,19 @@ impl ExecutableArena {
     /// Panics if reserving space for the slice fails.
     pub fn alloc_slice_copy<T: Copy>(&self, values: &[T]) -> ExecutableArenaPtr<[T]> {
         ExecutableArenaPtr(NonNull::from(self.bump.alloc_slice_copy(values)))
+    }
+
+    /// Allocates a slice in the arena from an exact-size iterator.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if reserving space for the slice fails.
+    pub fn alloc_slice_fill_iter<T, I>(&self, iter: I) -> ExecutableArenaPtr<[T]>
+    where
+        I: IntoIterator<Item = T>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        ExecutableArenaPtr(NonNull::from(self.bump.alloc_slice_fill_iter(iter)))
     }
 }
 
