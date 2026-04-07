@@ -16,11 +16,13 @@ use aptos_forge::{
         LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
         SuccessCriteria, SystemMetricsThreshold,
     },
-    EmitJobMode, EmitJobRequest, ForgeConfig, NetworkTest, NodeResourceOverride,
+    EmitJobMode, EmitJobRequest, EntryPoints, ForgeConfig, NetworkTest, NodeResourceOverride,
+    TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainConsensusConfig,
-    OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
+    BlockGasLimitType, ConsensusAlgorithmConfig, FeatureFlag, Features, OnChainChunkyDKGConfig,
+    OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
+    ValidatorTxnConfig,
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
@@ -53,6 +55,7 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "realistic_env_max_load_encrypted" => realistic_env_max_load_encrypted_test(duration),
+        "realistic_env_max_load_randomness" => realistic_env_max_load_randomness_test(duration),
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -561,6 +564,76 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(success_criteria)
+}
+
+pub(crate) fn realistic_env_max_load_randomness_test(duration: Duration) -> ForgeConfig {
+    let num_validators = 5;
+    let num_fullnodes = 1;
+    let mempool_backlog = 100;
+
+    let success_criteria = SuccessCriteria::new(15)
+        .add_wait_for_catchup_s((duration.as_secs() / 10).max(60))
+        .add_latency_threshold(5.0, LatencyType::P50)
+        .add_latency_threshold(7.0, LatencyType::P70)
+        .add_chain_progress(StateProgressThreshold {
+            max_non_epoch_no_progress_secs: 30.0,
+            max_epoch_no_progress_secs: 30.0,
+            max_non_epoch_round_gap: 10,
+            max_epoch_round_gap: 10,
+        });
+
+    // Consensus config with order votes disabled to increase the chance
+    // that randomness blocks get ordered via multi-block batches.
+    let consensus_config = OnChainConsensusConfig::V5 {
+        alg: ConsensusAlgorithmConfig::JolteonV2 {
+            main: Default::default(),
+            quorum_store_enabled: true,
+            order_vote_enabled: false,
+        },
+        vtxn: ValidatorTxnConfig::default_for_genesis(),
+        window_size: None,
+        rand_check_enabled: true,
+    };
+
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_fullnodes)
+        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
+            inner_traffic: EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad { mempool_backlog })
+                .init_gas_price_multiplier(20)
+                .transaction_type(TransactionType::CallCustomModules {
+                    entry_point: Box::new(EntryPoints::DiceRoll),
+                    num_modules: 1,
+                    use_account_pool: false,
+                }),
+            inner_success_criteria: SuccessCriteria::new(300),
+        }))
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(&consensus_config).expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["randomness_config_override"] =
+                serde_yaml::to_value(OnChainRandomnessConfig::default_enabled())
+                    .expect("must serialize");
+        }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.quorum_store.enable_batch_v2_tx = true;
+            config.consensus.quorum_store.enable_batch_v2_rx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
+            config.consensus_observer.enable_v2_message_sending = true;
         }))
         .with_emit_job(
             EmitJobRequest::default()

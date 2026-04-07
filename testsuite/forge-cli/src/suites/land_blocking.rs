@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::ungrouped::mixed_compatible_emit_job;
-use crate::{suites::realistic_environment::realistic_env_max_load_test, TestCommand};
+use crate::{suites::realistic_environment::{realistic_env_max_load_test, realistic_env_max_load_randomness_test}, TestCommand};
 use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade, framework_upgrade::FrameworkUpgrade,
@@ -17,7 +17,7 @@ pub(crate) fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 0, 3)
+            realistic_env_max_load_randomness_test(duration)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
