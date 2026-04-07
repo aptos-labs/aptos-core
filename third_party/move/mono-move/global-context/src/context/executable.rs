@@ -14,8 +14,10 @@ use anyhow::{anyhow, bail};
 use fxhash::FxBuildHasher;
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    ExecutableId, FrameLayoutInfo, Function, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    ExecutableId, FrameLayoutInfo, Function, MicroOpGasSchedule, SortedSafePointEntries,
+    FRAME_METADATA_SIZE,
 };
+use mono_move_gas::GasInstrumentor;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex},
@@ -178,6 +180,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 specializer::lower::try_build_context(&module_ir.module, func_ir, &func_id_map)?
             {
                 let micro_ops = specializer::lower::lower_function(func_ir, &ctx)?;
+                let micro_ops = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);
 
                 // Compute frame layout.
                 let args_size = ctx.home_slots[..func_ir.num_params as usize]

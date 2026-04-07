@@ -21,6 +21,7 @@ use mono_move_core::{
     DescriptorId, FrameOffset, Function, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
     OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
 };
+use mono_move_gas::GasMeter;
 use std::ptr::NonNull;
 
 const MAX_SINGLE_ALLOCATION_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
@@ -58,7 +59,7 @@ impl Heap {
 // Heap operations on InterpreterContext
 // ---------------------------------------------------------------------------
 
-impl InterpreterContext<'_> {
+impl<G: GasMeter> InterpreterContext<'_, G> {
     /// Allocate `size` bytes (8-byte aligned) on the heap.
     /// Triggers GC if the bump allocator is full; fails on OOM after GC.
     pub(crate) fn heap_alloc(&mut self, size: usize) -> Result<*mut u8> {

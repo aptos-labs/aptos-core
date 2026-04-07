@@ -34,13 +34,15 @@ pub mod instrument;
 
 pub use cfg::{compute_basic_blocks, BasicBlock, HasCfgInfo};
 pub use instrument::{GasInstrumentor, GasMeteredInstruction, RemapTargets};
+use thiserror::Error;
 
 // ---------------------------------------------------------------------------
 // Gas meter
 // ---------------------------------------------------------------------------
 
 /// Gas exhaustion: the transaction ran out of budget.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[error("out of gas")]
 pub struct GasExhaustedError;
 
 /// Gas metering interface called by the interpreter at charge points.

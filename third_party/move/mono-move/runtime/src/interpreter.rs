@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use mono_move_core::{DescriptorId, Function, MicroOp, FRAME_METADATA_SIZE};
+use mono_move_gas::GasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 
@@ -23,9 +24,11 @@ use std::ptr::{null, NonNull};
 // ---------------------------------------------------------------------------
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
-pub struct InterpreterContext<'a> {
+pub struct InterpreterContext<'a, G: GasMeter> {
     /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
+    /// Externally-provided gas meter (will be replaced by execution context).
+    pub(crate) gas_meter: G,
 
     pub(crate) pc: usize,
     /// Pointer to the currently executing function.
@@ -39,14 +42,15 @@ pub struct InterpreterContext<'a> {
     rng: StdRng,
 }
 
-impl<'a> InterpreterContext<'a> {
-    pub fn new(descriptors: &'a [ObjectDescriptor], entry: &Function) -> Self {
-        Self::with_heap_size(descriptors, entry, DEFAULT_HEAP_SIZE)
+impl<'a, G: GasMeter> InterpreterContext<'a, G> {
+    pub fn new(descriptors: &'a [ObjectDescriptor], gas_meter: G, entry: &Function) -> Self {
+        Self::with_heap_size(descriptors, gas_meter, entry, DEFAULT_HEAP_SIZE)
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(
         descriptors: &'a [ObjectDescriptor],
+        gas_meter: G,
         entry: &Function,
         heap_size: usize,
     ) -> Self {
@@ -73,6 +77,7 @@ impl<'a> InterpreterContext<'a> {
 
         Self {
             descriptors,
+            gas_meter,
             pc: 0,
             current_func: NonNull::from(entry),
             frame_ptr,
@@ -84,6 +89,11 @@ impl<'a> InterpreterContext<'a> {
 
     pub fn set_rng_seed(&mut self, seed: u64) {
         self.rng = StdRng::seed_from_u64(seed);
+    }
+
+    /// Returns the remaining gas balance.
+    pub fn gas_balance(&self) -> u64 {
+        self.gas_meter.balance()
     }
 
     pub fn gc_count(&self) -> usize {
@@ -168,7 +178,7 @@ impl<'a> InterpreterContext<'a> {
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl InterpreterContext<'_> {
+impl<G: GasMeter> InterpreterContext<'_, G> {
     #[inline(always)]
     pub fn step(&mut self) -> Result<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
@@ -614,8 +624,8 @@ impl InterpreterContext<'_> {
                     write_u64(fp, dst + 8, offset as u64);
                 },
 
-                MicroOp::Charge { .. } => {
-                    // TODO: wire up to a GasMeter once the runtime carries one.
+                MicroOp::Charge { cost } => {
+                    self.gas_meter.charge(cost)?;
                 },
             }
         }
