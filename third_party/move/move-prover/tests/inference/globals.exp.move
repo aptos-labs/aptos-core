@@ -37,7 +37,7 @@ module 0x42::globals {
         pragma opaque = true;
         modifies Counter[addr];
         ensures [inferred] result == old(Counter[addr]);
-        ensures [inferred] !exists<Counter>(addr);
+        ensures [inferred] remove<Counter>(addr);
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -47,11 +47,11 @@ module 0x42::globals {
         move_to(account, Counter { value: 0 });
     }
     spec create_counter(account: &signer) {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Counter[0x1::signer::address_of(account)];
-        ensures [inferred] exists<Counter>(0x1::signer::address_of(account));
-        ensures [inferred] Counter[0x1::signer::address_of(account)] == Counter{value: 0};
-        aborts_if [inferred] exists<Counter>(0x1::signer::address_of(account));
+        modifies Counter[signer::address_of(account)];
+        ensures [inferred] publish<Counter>(signer::address_of(account), Counter{value: 0});
+        aborts_if [inferred] exists<Counter>(signer::address_of(account));
     }
 
 
@@ -78,7 +78,7 @@ module 0x42::globals {
     spec update_counter(addr: address, new_value: u64) {
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, new_value);
+        ensures [inferred] update<Counter>(addr, update_field(old(Counter[addr]), value, new_value));
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -92,11 +92,11 @@ module 0x42::globals {
         move_to(account, Counter { value: init_value });
     }
     spec create_with_value(account: &signer, init_value: u64) {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Counter[0x1::signer::address_of(account)];
-        ensures [inferred] exists<Counter>(0x1::signer::address_of(account));
-        ensures [inferred] Counter[0x1::signer::address_of(account)] == Counter{value: init_value};
-        aborts_if [inferred] exists<Counter>(0x1::signer::address_of(account));
+        modifies Counter[signer::address_of(account)];
+        ensures [inferred] publish<Counter>(signer::address_of(account), Counter{value: init_value});
+        aborts_if [inferred] exists<Counter>(signer::address_of(account));
     }
 
 
@@ -110,7 +110,7 @@ module 0x42::globals {
         pragma opaque = true;
         modifies Counter[addr];
         ensures [inferred] result == old(Counter[addr]).value;
-        ensures [inferred] !exists<Counter>(addr);
+        ensures [inferred] remove<Counter>(addr);
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -129,7 +129,7 @@ module 0x42::globals {
         pragma opaque = true;
         modifies Counter[addr];
         ensures [inferred] cond ==> result == old(Counter[addr]).value;
-        ensures [inferred] cond ==> !exists<Counter>(addr);
+        ensures [inferred] cond ==> remove<Counter>(addr);
         ensures [inferred] !cond ==> result == 0;
         aborts_if [inferred] cond && !exists<Counter>(addr);
     }

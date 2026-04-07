@@ -13,7 +13,7 @@ use crate::{
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
     },
     symbol::Symbol,
@@ -634,6 +634,40 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
+    /// Looks up a field in a specific variant of an enum. Returns the variant-qualified
+    /// FieldId and instantiated field type if found.
+    pub fn lookup_variant_field_decl(
+        &self,
+        id: &QualifiedInstId<StructId>,
+        variant_name: Symbol,
+        field_name: Symbol,
+    ) -> Option<(FieldId, Type)> {
+        let entry = self.lookup_struct_entry(id.to_qualified_id());
+        if let StructLayout::Variants(variants) = &entry.layout {
+            if let Some(variant) = variants.iter().find(|v| v.name == variant_name) {
+                if let Some(field_data) = variant.fields.get(&field_name) {
+                    let pool = self.env.symbol_pool();
+                    let fid = FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                        pool.string(variant_name).as_str(),
+                        pool.string(field_name).as_str(),
+                    )));
+                    return Some((fid, field_data.ty.instantiate(&id.inst)));
+                }
+            }
+        }
+        None
+    }
+
+    /// Checks whether the given name is a variant of the struct.
+    pub fn is_variant_name(&self, id: &QualifiedId<StructId>, name: Symbol) -> bool {
+        let entry = self.lookup_struct_entry(*id);
+        if let StructLayout::Variants(variants) = &entry.layout {
+            variants.iter().any(|v| v.name == name)
+        } else {
+            false
+        }
+    }
+
     /// Looks up field declaration, returning a list of optional variant name and type of the field
     /// in the variant. The variant name is None and the list a singleton for proper struct types.
     pub fn lookup_struct_field_decl(
@@ -780,7 +814,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Adds a spec function to used_spec_funs set.
     pub fn add_used_spec_fun(&mut self, qid: QualifiedId<SpecFunId>) {
-        self.env.used_spec_funs.insert(qid);
+        self.env.used_spec_funs.borrow_mut().insert(qid);
     }
 
     /// Pass model-level information to the global env

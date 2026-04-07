@@ -223,12 +223,12 @@ impl InterpreterContext<'_> {
         let mut func_ptr = self.current_func;
 
         loop {
-            // SAFETY: func_ptr is always a valid, non-null pointer — set from
+            // SAFETY: func_ptr is a valid, non-null pointer — set from
             // `self.functions[]` or from `CallLocalFunc`, and saved/restored
-            // via frame metadata. `pointer_offsets` offsets are within the
-            // frame's data segment (verified by the micro-op verifier).
-            // `fp.sub` retrieves saved metadata written by the call protocol.
-            let pointer_offsets = unsafe { &func_ptr.as_ref().pointer_offsets };
+            // via frame metadata. pointer_offsets is an arena pointer valid
+            // for the lifetime of the executable. `fp.sub` retrieves saved
+            // metadata written by the call protocol.
+            let pointer_offsets = unsafe { func_ptr.as_ref().pointer_offsets.as_ref_unchecked() };
             unsafe {
                 for &offset in pointer_offsets {
                     let old_ptr = read_ptr(fp, offset);

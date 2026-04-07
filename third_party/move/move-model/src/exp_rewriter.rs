@@ -5,8 +5,8 @@
 
 use crate::{
     ast::{
-        Condition, Exp, ExpData, FrameSpec, LambdaCaptureKind, MatchArm, MemoryLabel, Operation,
-        Pattern, Proof, Spec, SpecBlockTarget, TempIndex, Value,
+        Condition, Exp, ExpData, FrameSpec, LambdaCaptureKind, MatchArm, MemoryLabel, MemoryRange,
+        Operation, Pattern, Proof, Spec, SpecBlockTarget, TempIndex, Value,
     },
     model::{GlobalEnv, Loc, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -916,5 +916,79 @@ pub trait ExpRewriterFunctions {
             .unzip();
         let change = changevec.into_iter().any(|x| x);
         (change, new_ranges)
+    }
+}
+
+// =================================================================================================
+// Memory Label Freshener
+
+/// Rewrites all `MemoryLabel` values in an expression tree to fresh labels.
+/// Used when inlining opaque function specs at call sites to avoid label collisions
+/// between different inlining instances.
+///
+/// Uses a local counter rather than `GlobalEnv::new_global_id()` to ensure
+/// deterministic label IDs regardless of prior global allocations — the global
+/// counter depends on compilation order which can vary across machines.
+pub struct MemoryLabelFreshener {
+    counter: usize,
+    label_map: BTreeMap<MemoryLabel, MemoryLabel>,
+}
+
+impl MemoryLabelFreshener {
+    pub fn new(start: usize) -> Self {
+        Self {
+            counter: start,
+            label_map: BTreeMap::new(),
+        }
+    }
+
+    fn freshen(&mut self, label: MemoryLabel) -> MemoryLabel {
+        *self.label_map.entry(label).or_insert_with(|| {
+            let id = MemoryLabel::new(self.counter);
+            self.counter += 1;
+            id
+        })
+    }
+
+    fn freshen_range(&mut self, range: &MemoryRange) -> MemoryRange {
+        MemoryRange {
+            pre: range.pre.map(|l| self.freshen(l)),
+            post: range.post.map(|l| self.freshen(l)),
+        }
+    }
+
+    pub fn label_map(&self) -> &BTreeMap<MemoryLabel, MemoryLabel> {
+        &self.label_map
+    }
+
+    /// Returns the next available counter value for chaining multiple freshenings.
+    pub fn next_counter(&self) -> usize {
+        self.counter
+    }
+}
+
+impl ExpRewriterFunctions for MemoryLabelFreshener {
+    fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
+        let new_oper = match oper {
+            Operation::Global(Some(l)) => Some(Operation::Global(Some(self.freshen(*l)))),
+            Operation::Exists(Some(l)) => Some(Operation::Exists(Some(self.freshen(*l)))),
+            Operation::Behavior(k, r) if !r.is_default() => {
+                Some(Operation::Behavior(*k, self.freshen_range(r)))
+            },
+            Operation::SpecFunction(m, f, r) if !r.is_default() => {
+                Some(Operation::SpecFunction(*m, *f, self.freshen_range(r)))
+            },
+            Operation::SpecPublish(r) if !r.is_default() => {
+                Some(Operation::SpecPublish(self.freshen_range(r)))
+            },
+            Operation::SpecRemove(r) if !r.is_default() => {
+                Some(Operation::SpecRemove(self.freshen_range(r)))
+            },
+            Operation::SpecUpdate(r) if !r.is_default() => {
+                Some(Operation::SpecUpdate(self.freshen_range(r)))
+            },
+            _ => None,
+        };
+        new_oper.map(|op| ExpData::Call(id, op, args.to_vec()).into_exp())
     }
 }

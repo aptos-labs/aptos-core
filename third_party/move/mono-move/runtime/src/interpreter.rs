@@ -24,8 +24,6 @@ use std::ptr::{null, NonNull};
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a> {
-    /// Externally-provided function table (will be replaced by execution context).
-    pub(crate) functions: &'a [Function],
     /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
 
@@ -42,29 +40,17 @@ pub struct InterpreterContext<'a> {
 }
 
 impl<'a> InterpreterContext<'a> {
-    pub fn new(
-        functions: &'a [Function],
-        descriptors: &'a [ObjectDescriptor],
-        func_id: usize,
-    ) -> Self {
-        Self::with_heap_size(functions, descriptors, func_id, DEFAULT_HEAP_SIZE)
+    pub fn new(descriptors: &'a [ObjectDescriptor], entry: &Function) -> Self {
+        Self::with_heap_size(descriptors, entry, DEFAULT_HEAP_SIZE)
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(
-        functions: &'a [Function],
         descriptors: &'a [ObjectDescriptor],
-        func_id: usize,
+        entry: &Function,
         heap_size: usize,
     ) -> Self {
-        assert!(
-            func_id < functions.len(),
-            "entry func_id {} is out of bounds (have {} functions)",
-            func_id,
-            functions.len()
-        );
-
-        let verification_errors = crate::verifier::verify_program(functions, descriptors);
+        let verification_errors = crate::verifier::verify_function(entry, descriptors);
         assert!(
             verification_errors.is_empty(),
             "verification failed:\n{}",
@@ -86,10 +72,9 @@ impl<'a> InterpreterContext<'a> {
         }
 
         Self {
-            functions,
             descriptors,
             pc: 0,
-            current_func: NonNull::from(&functions[func_id]),
+            current_func: NonNull::from(entry),
             frame_ptr,
             stack,
             heap: Heap::new(heap_size),
@@ -108,15 +93,7 @@ impl<'a> InterpreterContext<'a> {
     /// Reset the context to call a different function, preserving the heap.
     ///
     /// Use `set_root_arg` to place arguments before calling `run()`.
-    pub fn invoke(&mut self, func_id: usize) {
-        assert!(
-            func_id < self.functions.len(),
-            "func_id {} out of bounds (have {} functions)",
-            func_id,
-            self.functions.len()
-        );
-
-        let func = &self.functions[func_id];
+    pub fn invoke(&mut self, func: &Function) {
         let base = self.stack.as_ptr();
 
         // Reset execution state to root frame.
@@ -194,21 +171,24 @@ impl<'a> InterpreterContext<'a> {
 impl InterpreterContext<'_> {
     #[inline(always)]
     pub fn step(&mut self) -> Result<StepResult> {
-        // SAFETY: current_func is always a valid, non-null pointer either
-        // derived from `self.functions[]` or from a `CallLocalFunc` pointer
-        // (which is itself non-null and a valid reference).
+        // SAFETY: Current function is always a valid, non-null pointer because
+        // it is derived from function reference (e.g., entrypoint) or when
+        // executing a call instruction, which stores a valid pointer.
         let func = unsafe { self.current_func.as_ref() };
-        if self.pc >= func.code.len() {
+        // SAFETY: The function's code is allocated in an executable arena that
+        // is alive for the duration of execution.
+        let code = unsafe { func.code.as_ref_unchecked() };
+        if self.pc >= code.len() {
             bail!(
                 "pc out of bounds: pc={} but function {} has {} instructions",
                 self.pc,
                 unsafe { func.name.as_ref_unchecked() },
-                func.code.len()
+                code.len()
             );
         }
 
         let fp = self.frame_ptr;
-        let instr = &func.code[self.pc];
+        let instr = &code[self.pc];
 
         // SAFETY: fp points into the interpreter's linear stack; all byte
         // offsets are within the current frame (enforced by the bytecode
@@ -216,13 +196,12 @@ impl InterpreterContext<'_> {
         unsafe {
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
-                MicroOp::CallFunc { func_id } => {
-                    let func_id = func_id as usize;
-                    let callee = &self.functions[func_id];
-                    return self.call(func, fp, callee);
+                MicroOp::CallFunc { .. } => {
+                    // TODO: Support cross module calls here.
+                    bail!("CallFunc must be resolved to CallLocalFunc before execution");
                 },
                 MicroOp::CallLocalFunc { ptr } => {
-                    return self.call(func, fp, ptr.as_ref());
+                    return self.call(func, fp, ptr.as_ref_unchecked());
                 },
 
                 MicroOp::JumpNotZeroU64 { target, src } => {

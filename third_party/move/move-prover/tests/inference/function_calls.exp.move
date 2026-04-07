@@ -19,7 +19,7 @@ module 0x42::function_calls {
     }
     spec test_call(x: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == result_of<callee>(x);
+        ensures [inferred] result == callee(x);
         aborts_if [inferred] aborts_of<callee>(x);
     }
 
@@ -30,8 +30,8 @@ module 0x42::function_calls {
     }
     spec test_call_chain(x: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] S.. |~ result == result_of<callee>(..S |~ result_of<callee>(x));
-        aborts_if [inferred] S |~ aborts_of<callee>(..S |~ result_of<callee>(x));
+        ensures [inferred] result == callee(callee(x));
+        aborts_if [inferred] aborts_of<callee>(callee(x));
         aborts_if [inferred] aborts_of<callee>(x);
     }
 
@@ -43,7 +43,7 @@ module 0x42::function_calls {
     }
     spec test_call_assign(x: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == result_of<callee>(x);
+        ensures [inferred] result == callee(x);
         aborts_if [inferred] aborts_of<callee>(x);
     }
 
@@ -94,8 +94,8 @@ module 0x42::function_calls {
     spec factorial {
         pragma opaque;
         ensures [inferred] n == 0 ==> result == 1;
-        ensures [inferred] n != 0 ==> result == n * result_of<factorial>(n - 1);
-        aborts_if [inferred] n != 0 && n * result_of<factorial>(n - 1) > MAX_U64;
+        ensures [inferred] n != 0 ==> result == n * factorial(n - 1);
+        aborts_if [inferred] n != 0 && n * factorial(n - 1) > MAX_U64;
         aborts_if [inferred] n != 0 && aborts_of<factorial>(n - 1);
         aborts_if [inferred] n != 0 && n == 0;
     }
@@ -106,7 +106,7 @@ module 0x42::function_calls {
     }
     spec test_factorial_call(n: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == result_of<factorial>(n);
+        ensures [inferred] result == factorial(n);
         aborts_if [inferred] aborts_of<factorial>(n);
     }
 
@@ -122,7 +122,7 @@ module 0x42::function_calls {
     spec is_even {
         pragma opaque;
         ensures [inferred] n == 0 ==> result == true;
-        ensures [inferred] n != 0 ==> result == result_of<is_odd>(n - 1);
+        ensures [inferred] n != 0 ==> result == is_odd(n - 1);
         aborts_if [inferred] n != 0 && aborts_of<is_odd>(n - 1);
         aborts_if [inferred] n != 0 && n == 0;
     }
@@ -137,7 +137,7 @@ module 0x42::function_calls {
     spec is_odd {
         pragma opaque;
         ensures [inferred] n == 0 ==> result == false;
-        ensures [inferred] n != 0 ==> result == result_of<is_even>(n - 1);
+        ensures [inferred] n != 0 ==> result == is_even(n - 1);
         aborts_if [inferred] n != 0 && aborts_of<is_even>(n - 1);
         aborts_if [inferred] n != 0 && n == 0;
     }
@@ -152,9 +152,9 @@ module 0x42::function_calls {
     }
     spec test_parity(n: u64): bool {
         pragma opaque = true;
-        ensures [inferred] (..S |~ result_of<is_even>(n)) ==> (S.. |~ result == !result_of<is_odd>(n));
-        ensures [inferred] (..S |~ !result_of<is_even>(n)) ==> (S.. |~ result == result_of<is_odd>(n));
-        aborts_if [inferred] S |~ aborts_of<is_odd>(n);
+        ensures [inferred] is_even(n) ==> result == !is_odd(n);
+        ensures [inferred] !is_even(n) ==> result == is_odd(n);
+        aborts_if [inferred] aborts_of<is_odd>(n);
         aborts_if [inferred] aborts_of<is_even>(n);
     }
 

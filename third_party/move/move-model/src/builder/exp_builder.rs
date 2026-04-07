@@ -6,8 +6,9 @@
 use crate::{
     ast::{
         AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, BehaviorKind,
-        Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryRange, ModuleName, Operation, Pattern,
-        QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
+        Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryLabel, MemoryRange, ModuleName, Operation,
+        Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex,
+        Value,
     },
     builder::{
         model_builder::{
@@ -22,8 +23,8 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
-        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter,
+        QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
         TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
@@ -116,7 +117,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub loop_stack: Vec<Option<PA::Label>>,
     /// Map from state label names to their GlobalId, ensuring the same label name
     /// always resolves to the same MemoryLabel across behavior predicates.
-    pub state_label_map: BTreeMap<Symbol, GlobalId>,
+    pub state_label_map: BTreeMap<Symbol, MemoryLabel>,
 }
 
 #[derive(Debug)]
@@ -4405,6 +4406,64 @@ impl ExpTranslator<'_, '_, '_> {
             EA::ExpDotted_::Dot(e, n) => {
                 let loc = self.to_loc(&dotted.loc);
                 let field_name = self.symbol_pool().make(n.value.as_str());
+
+                // Check for variant-qualified field access: expr.Variant.field
+                // where `e` is `Dot(base, Variant)` and `Variant` is an enum variant name.
+                if let EA::ExpDotted_::Dot(base, variant_n) = &e.value {
+                    let variant_sym = self.symbol_pool().make(variant_n.value.as_str());
+                    // Translate base with unconstrained type to discover its type
+                    let base_ty = self.fresh_type_var();
+                    let base_exp = self.translate_dotted(
+                        base.as_ref(),
+                        &base_ty,
+                        index_mutate,
+                        &ErrorMessageContext::General,
+                    );
+                    let base_ty_spec = self.subs.specialize(&base_ty);
+                    let base_struct_ty = base_ty_spec.skip_reference();
+                    if let Type::Struct(mid, sid, inst) = base_struct_ty.clone() {
+                        let qid = mid.qualified_inst(sid, inst);
+                        if self
+                            .parent
+                            .parent
+                            .is_variant_name(&qid.to_qualified_id(), variant_sym)
+                        {
+                            // Name is a variant — look up the field in this variant
+                            if let Some((fid, field_ty)) = self
+                                .parent
+                                .parent
+                                .lookup_variant_field_decl(&qid, variant_sym, field_name)
+                            {
+                                let result_ty =
+                                    self.check_type(&loc, &field_ty, expected_type, context);
+                                let id = self.new_node_id_with_type_loc(&result_ty, &loc);
+                                self.set_node_instantiation(id, vec![base_ty_spec]);
+                                return ExpData::Call(
+                                    id,
+                                    Operation::SelectVariants(mid, sid, vec![fid]),
+                                    vec![base_exp.into_exp()],
+                                );
+                            }
+                            // Variant exists but field doesn't
+                            self.error(
+                                &loc,
+                                &format!(
+                                    "field `{}` not found in variant `{}` of `{}`",
+                                    field_name.display(self.symbol_pool()),
+                                    variant_sym.display(self.symbol_pool()),
+                                    base_ty_spec.display(&self.type_display_context()),
+                                ),
+                            );
+                            return self.new_error_exp();
+                        }
+                        // Not a variant name — fall through to normal field access
+                    }
+                    // Base type not resolved or not an enum with this variant —
+                    // fall through to normal processing (re-translates inner expression
+                    // with proper field constraints).
+                }
+
+                // Normal field access
                 let constraint = Constraint::SomeStruct(
                     [(field_name, expected_type.clone())].into_iter().collect(),
                 );
@@ -5877,7 +5936,7 @@ impl ExpTranslator<'_, '_, '_> {
     /// if the same name was already used. Uses the parent `ModuleBuilder`'s shared
     /// `spec_block_state_labels` map so that the same label name across different conditions
     /// in the same spec block resolves to the same MemoryLabel.
-    fn translate_state_label(&mut self, label: &PA::Label) -> GlobalId {
+    fn translate_state_label(&mut self, label: &PA::Label) -> MemoryLabel {
         let sym = self.symbol_pool().make(label.value().as_str());
         // Check the spec-block-level shared map first
         if let Some(&id) = self.parent.spec_block_state_labels.get(&sym) {
@@ -5888,7 +5947,7 @@ impl ExpTranslator<'_, '_, '_> {
             self.parent.spec_block_state_labels.insert(sym, id);
             id
         } else {
-            let id = self.env().new_global_id();
+            let id = MemoryLabel::new(self.env().new_global_id().as_usize());
             self.state_label_map.insert(sym, id);
             self.parent.spec_block_state_labels.insert(sym, id);
             self.env().set_memory_label_name(id, sym);
@@ -5915,7 +5974,34 @@ impl ExpTranslator<'_, '_, '_> {
                         pre: existing_range.pre.or(self.range.pre),
                         post: existing_range.post.or(self.range.post),
                     };
-                    Call(*id, Behavior(*kind, merged), args.clone()).into_exp()
+                    let rewritten_args: Vec<Exp> =
+                        args.iter().map(|a| self.rewrite_exp(a.clone())).collect();
+                    Call(*id, Behavior(*kind, merged), rewritten_args).into_exp()
+                } else if let Call(
+                    id,
+                    op @ (SpecPublish(existing_range)
+                    | SpecRemove(existing_range)
+                    | SpecUpdate(existing_range)),
+                    args,
+                ) = exp.as_ref()
+                {
+                    // Mutation builtins are two-state, handled like Behavior and
+                    // SpecFunction: inherit both pre and post from the enclosing
+                    // StateLabeled wrapper. Requires explicit two-state range
+                    // notation (..S |~, S.. |~, A..S |~), NOT single-state S |~.
+                    let merged = MemoryRange {
+                        pre: existing_range.pre.or(self.range.pre),
+                        post: existing_range.post.or(self.range.post),
+                    };
+                    let new_op = match op {
+                        SpecPublish(_) => SpecPublish(merged),
+                        SpecRemove(_) => SpecRemove(merged),
+                        SpecUpdate(_) => SpecUpdate(merged),
+                        _ => unreachable!(),
+                    };
+                    let rewritten_args: Vec<Exp> =
+                        args.iter().map(|a| self.rewrite_exp(a.clone())).collect();
+                    Call(*id, new_op, rewritten_args).into_exp()
                 } else if let Call(id, Old, args) = exp.as_ref() {
                     // Handle Old before descent so inside_old is set when children are visited.
                     // If this were in rewrite_call, children would be rewritten first and
@@ -5974,7 +6060,48 @@ impl ExpTranslator<'_, '_, '_> {
             range,
             inside_old: false,
         };
-        propagator.rewrite_exp(exp)
+        let result = propagator.rewrite_exp(exp);
+        // Check that two-state operations are not used with single-state `S |~`
+        // (where pre == post). Two-state operations include mutation builtins,
+        // ensures_of/result_of behavior predicates, and two-state spec functions.
+        let env = self.env();
+        result.visit_pre_order(&mut |e| {
+            let (id, range, desc) = match e {
+                ExpData::Call(id, SpecPublish(r) | SpecRemove(r) | SpecUpdate(r), _) => {
+                    (*id, r, "mutation builtins (publish/remove/update)")
+                },
+                ExpData::Call(
+                    id,
+                    Behavior(BehaviorKind::EnsuresOf | BehaviorKind::ResultOf, r),
+                    _,
+                ) => (*id, r, "ensures_of/result_of"),
+                ExpData::Call(id, SpecFunction(mid, fid, r), _) => {
+                    let is_two_state = env.get_module_opt(*mid).is_some_and(|m| {
+                        m.get_spec_funs()
+                            .any(|(sid, decl)| *sid == *fid && decl.uses_old)
+                    });
+                    if is_two_state {
+                        (*id, r, "two-state spec functions")
+                    } else {
+                        return true;
+                    }
+                },
+                _ => return true,
+            };
+            if range.pre.is_some() && range.post.is_some() && range.pre == range.post {
+                self.error(
+                    &env.get_node_loc(id),
+                    &format!(
+                        "{} require two-state range notation; \
+                         use `..S |~` (post-only), `S.. |~` (pre-only), \
+                         or `A..S |~` (full range) instead of `S |~`",
+                        desc
+                    ),
+                );
+            }
+            true
+        });
+        result
     }
 
     /// Resolves the target of a behavior predicate to either a local variable or a function.

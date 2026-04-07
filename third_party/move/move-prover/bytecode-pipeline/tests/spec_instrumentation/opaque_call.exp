@@ -167,10 +167,10 @@ fun Test::incr_twice() {
   7: trace_abort($t3)
   8: goto 36
   9: label L3
- 10: @6 := save_mem(Test::R)
+ 10: @0 := save_mem(Test::R)
  11: modifies global<0x42::Test::R>($t0)
  12: assume WellFormed($t1)
- 13: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@6]<0x42::Test::R>($t0)), 1))
+ 13: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>($t0)), 1))
  14: assume Eq<u64>($t1, select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)))
  15: $t1 := opaque end: Test::get_and_incr($t0)
  16: drop($t1)
@@ -184,10 +184,10 @@ fun Test::incr_twice() {
  24: trace_abort($t3)
  25: goto 36
  26: label L5
- 27: @7 := save_mem(Test::R)
+ 27: @1 := save_mem(Test::R)
  28: modifies global<0x42::Test::R>($t4)
  29: assume WellFormed($t5)
- 30: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@7]<0x42::Test::R>($t4)), 1))
+ 30: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@1]<0x42::Test::R>($t4)), 1))
  31: assume Eq<u64>($t5, select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)))
  32: $t5 := opaque end: Test::get_and_incr($t4)
  33: drop($t5)
@@ -219,10 +219,10 @@ fun Test::incr_twice() {
   8: trace_abort($t3)
   9: goto 39
  10: label L3
- 11: @3 := save_mem(Test::R)
+ 11: @0 := save_mem(Test::R)
  12: modifies global<0x42::Test::R>($t0)
  13: assume WellFormed($t1)
- 14: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@3]<0x42::Test::R>($t0)), 1))
+ 14: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>($t0)), 1))
  15: assume Eq<u64>($t1, select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)))
  16: $t1 := opaque end: Test::get_and_incr($t0)
  17: drop($t1)
@@ -237,10 +237,10 @@ fun Test::incr_twice() {
  25: trace_abort($t3)
  26: goto 39
  27: label L5
- 28: @4 := save_mem(Test::R)
+ 28: @1 := save_mem(Test::R)
  29: modifies global<0x42::Test::R>($t4)
  30: assume WellFormed($t5)
- 31: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@4]<0x42::Test::R>($t4)), 1))
+ 31: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@1]<0x42::Test::R>($t4)), 1))
  32: assume Eq<u64>($t5, select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)))
  33: $t5 := opaque end: Test::get_and_incr($t4)
  34: drop($t5)

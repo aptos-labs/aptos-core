@@ -16,9 +16,12 @@ mod micro_op {
     use mono_move_runtime::InterpreterContext;
 
     fn run(n: u64) -> u64 {
-        let (mut functions, descriptors) = micro_op_fib();
-        mono_move_programs::resolve_calls(&mut functions);
-        let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+        let (functions, descriptors, _arena) = micro_op_fib();
+        // SAFETY: Exclusive access during test setup; arena is alive.
+        unsafe { mono_move_core::Function::resolve_calls(&functions) };
+        let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+            functions[0].unwrap().as_ref_unchecked()
+        });
         ctx.set_root_arg(0, &n.to_le_bytes());
         ctx.run().unwrap();
         ctx.root_result()

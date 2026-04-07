@@ -343,6 +343,7 @@ module 0x42::mutations {
     spec pass_ref_to_fn(p: &mut Point, val: u64) {
         pragma opaque = true;
         ensures [inferred] p == update_field(old(p), x, result_of<write_to_ref>(old(p).x, val));
+        ensures [inferred] ensures_of<write_to_ref>(old(p).x, val, result_of<write_to_ref>(old(p).x, val));
         aborts_if [inferred] aborts_of<write_to_ref>(p.x, val);
     }
 
@@ -357,6 +358,7 @@ module 0x42::mutations {
     spec create_pass_continue(p: Point, val: u64): Point {
         pragma opaque = true;
         ensures [inferred] result == update_field(p, x, result_of<write_to_ref>(p.x, val));
+        ensures [inferred] ensures_of<write_to_ref>(p.x, val, result_of<write_to_ref>(p.x, val));
         aborts_if [inferred] aborts_of<write_to_ref>(p.x, val);
     }
 
@@ -425,7 +427,7 @@ module 0x42::mutations {
     spec set_circle_radius(s: &mut Shape, new_r: u64) {
         pragma opaque = true;
         ensures [inferred] s == update_field(old(s), radius, new_r);
-        aborts_if [inferred] !(s is Circle);
+        aborts_if [inferred] s is Rect;
     }
 
 
@@ -439,7 +441,7 @@ module 0x42::mutations {
         pragma opaque = true;
         ensures [inferred] result == old(s).radius;
         ensures [inferred] s == update_field(old(s), radius, old(s).radius + 1);
-        aborts_if [inferred] !(s is Circle);
+        aborts_if [inferred] s is Rect;
         aborts_if [inferred] s.radius == MAX_U64;
     }
 
@@ -459,7 +461,7 @@ module 0x42::mutations {
     spec set_token_value(t: &mut Token, v: u64) {
         pragma opaque = true;
         ensures [inferred] t == update_field(old(t), value, v);
-        aborts_if [inferred] !(t is Fungible | SemiFungible);
+        aborts_if [inferred] t is NonFungible;
     }
 
 
@@ -477,7 +479,7 @@ module 0x42::mutations {
     spec increment_global(addr: address) {
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
+        ensures [inferred] update<Counter>(addr, update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1));
         aborts_if [inferred] Counter[addr].value == MAX_U64;
         aborts_if [inferred] !exists<Counter>(addr);
     }
@@ -490,7 +492,7 @@ module 0x42::mutations {
     spec set_global_value(addr: address, v: u64) {
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, v);
+        ensures [inferred] update<Counter>(addr, update_field(old(Counter[addr]), value, v));
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -508,7 +510,7 @@ module 0x42::mutations {
         pragma opaque = true;
         modifies Counter[addr];
         ensures [inferred] result == new_addr;
-        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, v);
+        ensures [inferred] update<Counter>(addr, update_field(old(Counter[addr]), value, v));
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -523,7 +525,9 @@ module 0x42::mutations {
     spec double_global_write(addr: address, v1: u64, v2: u64) {
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, v2);
+        ensures [inferred] S1.. |~ update<Counter>(addr, update_field(S1 |~ global<Counter>(addr), value, v2));
+        ensures [inferred] ..S1 |~ update<Counter>(addr, update_field(old(Counter[addr]), value, v1));
+        aborts_if [inferred] S1 |~ !exists<Counter>(addr);
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -538,8 +542,11 @@ module 0x42::mutations {
     spec double_increment_global(addr: address) {
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] Counter[addr] == update_field(old(Counter[addr]), value, old(Counter[addr]).value + 2);
-        aborts_if [inferred] Counter[addr].value > MAX_U64 - 2;
+        ensures [inferred] S1.. |~ update<Counter>(addr, update_field(S1 |~ global<Counter>(addr), value, (S1 |~ global<Counter>(addr)).value + 1));
+        ensures [inferred] ..S1 |~ update<Counter>(addr, update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1));
+        aborts_if [inferred] (S1 |~ global<Counter>(addr)).value == MAX_U64;
+        aborts_if [inferred] S1 |~ !exists<Counter>(addr);
+        aborts_if [inferred] Counter[addr].value == MAX_U64;
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -553,10 +560,9 @@ module 0x42::mutations {
         pragma opaque = true;
         modifies Counter[a2];
         modifies Counter[a1];
-        ensures [inferred] Counter[a2] == update_field(S |~ global<Counter>(a2), value, v2);
-        ensures [inferred] (S |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, v1);
-        ensures [inferred = sathard] forall x: address: x != a1 ==> (S |~ global<Counter>(x)) == old(Counter[x]);
-        aborts_if [inferred] S |~ !exists<Counter>(a2);
+        ensures [inferred] S1.. |~ update<Counter>(a2, update_field(S1 |~ global<Counter>(a2), value, v2));
+        ensures [inferred] ..S1 |~ update<Counter>(a1, update_field(old(Counter[a1]), value, v1));
+        aborts_if [inferred] S1 |~ !exists<Counter>(a2);
         aborts_if [inferred] !exists<Counter>(a1);
     }
 
@@ -574,8 +580,8 @@ module 0x42::mutations {
         pragma opaque = true;
         modifies Counter[a1];
         modifies Counter[a2];
-        ensures [inferred] cond ==> Counter[a1] == update_field(old(Counter[a1]), value, v);
-        ensures [inferred] !cond ==> Counter[a2] == update_field(old(Counter[a2]), value, v);
+        ensures [inferred] cond ==> update<Counter>(a1, update_field(old(Counter[a1]), value, v));
+        ensures [inferred] !cond ==> update<Counter>(a2, update_field(old(Counter[a2]), value, v));
         aborts_if [inferred] cond && !exists<Counter>(a1);
         aborts_if [inferred] !cond && !exists<Counter>(a2);
     }
@@ -591,8 +597,8 @@ module 0x42::mutations {
         pragma opaque = true;
         modifies Counter[a1];
         modifies Counter[a2];
-        ensures [inferred] cond ==> Counter[a1] == update_field(old(Counter[a1]), value, old(Counter[a1]).value + 1);
-        ensures [inferred] !cond ==> Counter[a2] == update_field(old(Counter[a2]), value, old(Counter[a2]).value + 1);
+        ensures [inferred] cond ==> update<Counter>(a1, update_field(old(Counter[a1]), value, old(Counter[a1]).value + 1));
+        ensures [inferred] !cond ==> update<Counter>(a2, update_field(old(Counter[a2]), value, old(Counter[a2]).value + 1));
         aborts_if [inferred] cond && Counter[a1].value == MAX_U64;
         aborts_if [inferred] cond && !exists<Counter>(a1);
         aborts_if [inferred] !cond && Counter[a2].value == MAX_U64;
@@ -613,14 +619,12 @@ module 0x42::mutations {
         pragma opaque = true;
         modifies Counter[a2];
         modifies Counter[a1];
-        ensures [inferred] cond ==> Counter[a2] == update_field(S |~ global<Counter>(a2), value, v2);
-        ensures [inferred] !cond ==> Counter[a1] == update_field(S |~ global<Counter>(a1), value, v2);
-        ensures [inferred] cond ==> (forall x: address: x != a1 ==> (S |~ global<Counter>(x)) == old(Counter[x]));
-        ensures [inferred] cond ==> (S |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, v1);
-        ensures [inferred] !cond ==> (forall x: address: x != a2 ==> (S |~ global<Counter>(x)) == old(Counter[x]));
-        ensures [inferred] !cond ==> (S |~ global<Counter>(a2)) == update_field(old(Counter[a2]), value, v1);
-        aborts_if [inferred] S |~ cond && !exists<Counter>(a2);
-        aborts_if [inferred] S |~ !cond && !exists<Counter>(a1);
+        ensures [inferred] cond ==> (S1.. |~ update<Counter>(a2, update_field(S1 |~ global<Counter>(a2), value, v2)));
+        ensures [inferred] !cond ==> (S1.. |~ update<Counter>(a1, update_field(S1 |~ global<Counter>(a1), value, v2)));
+        ensures [inferred] cond ==> (..S1 |~ update<Counter>(a1, update_field(old(Counter[a1]), value, v1)));
+        ensures [inferred] !cond ==> (..S1 |~ update<Counter>(a2, update_field(old(Counter[a2]), value, v1)));
+        aborts_if [inferred] S1 |~ cond && !exists<Counter>(a2);
+        aborts_if [inferred] S1 |~ !cond && !exists<Counter>(a1);
         aborts_if [inferred] cond && !exists<Counter>(a1);
         aborts_if [inferred] !cond && !exists<Counter>(a2);
     }
@@ -639,16 +643,14 @@ module 0x42::mutations {
         pragma opaque = true;
         modifies Counter[a2];
         modifies Counter[a1];
-        ensures [inferred] cond ==> Counter[a2] == update_field(S |~ global<Counter>(a2), value, (S |~ global<Counter>(a2)).value + v2);
-        ensures [inferred] !cond ==> Counter[a1] == update_field(S |~ global<Counter>(a1), value, (S |~ global<Counter>(a1)).value + v2);
-        ensures [inferred] cond ==> (forall x: address: x != a1 ==> (S |~ global<Counter>(x)) == old(Counter[x]));
-        ensures [inferred] cond ==> (S |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, old(Counter[a1]).value + v1);
-        ensures [inferred] !cond ==> (forall x: address: x != a2 ==> (S |~ global<Counter>(x)) == old(Counter[x]));
-        ensures [inferred] !cond ==> (S |~ global<Counter>(a2)) == update_field(old(Counter[a2]), value, old(Counter[a2]).value + v1);
-        aborts_if [inferred] cond && (S |~ global<Counter>(a2)).value + v2 > MAX_U64;
-        aborts_if [inferred] S |~ cond && !exists<Counter>(a2);
-        aborts_if [inferred] !cond && (S |~ global<Counter>(a1)).value + v2 > MAX_U64;
-        aborts_if [inferred] S |~ !cond && !exists<Counter>(a1);
+        ensures [inferred] cond ==> (S1.. |~ update<Counter>(a2, update_field(S1 |~ global<Counter>(a2), value, (S1 |~ global<Counter>(a2)).value + v2)));
+        ensures [inferred] !cond ==> (S1.. |~ update<Counter>(a1, update_field(S1 |~ global<Counter>(a1), value, (S1 |~ global<Counter>(a1)).value + v2)));
+        ensures [inferred] cond ==> (..S1 |~ update<Counter>(a1, update_field(old(Counter[a1]), value, old(Counter[a1]).value + v1)));
+        ensures [inferred] !cond ==> (..S1 |~ update<Counter>(a2, update_field(old(Counter[a2]), value, old(Counter[a2]).value + v1)));
+        aborts_if [inferred] cond && (S1 |~ global<Counter>(a2)).value + v2 > MAX_U64;
+        aborts_if [inferred] S1 |~ cond && !exists<Counter>(a2);
+        aborts_if [inferred] !cond && (S1 |~ global<Counter>(a1)).value + v2 > MAX_U64;
+        aborts_if [inferred] S1 |~ !cond && !exists<Counter>(a1);
         aborts_if [inferred] cond && Counter[a1].value + v1 > MAX_U64;
         aborts_if [inferred] cond && !exists<Counter>(a1);
         aborts_if [inferred] !cond && Counter[a2].value + v1 > MAX_U64;
@@ -670,13 +672,11 @@ module 0x42::mutations {
         modifies Counter[a3];
         modifies Counter[a2];
         modifies Counter[a1];
-        ensures [inferred] Counter[a3] == update_field(S2 |~ global<Counter>(a3), value, v3);
-        ensures [inferred] (S2 |~ global<Counter>(a2)) == update_field(S1 |~ global<Counter>(a2), value, v2);
-        ensures [inferred] (S1 |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, v1);
-        ensures [inferred = sathard] forall x: address: x != a2 ==> (S2 |~ global<Counter>(x)) == (S1 |~ global<Counter>(x));
-        ensures [inferred = sathard] forall x: address: x != a1 ==> (S1 |~ global<Counter>(x)) == old(Counter[x]);
-        aborts_if [inferred] S1 |~ !exists<Counter>(a3);
-        aborts_if [inferred] !exists<Counter>(a2);
+        ensures [inferred] S2.. |~ update<Counter>(a3, update_field(S2 |~ global<Counter>(a3), value, v3));
+        ensures [inferred] S1..S2 |~ update<Counter>(a2, update_field(S1 |~ global<Counter>(a2), value, v2));
+        ensures [inferred] ..S1 |~ update<Counter>(a1, update_field(old(Counter[a1]), value, v1));
+        aborts_if [inferred] S2 |~ !exists<Counter>(a3);
+        aborts_if [inferred] S1 |~ !exists<Counter>(a2);
         aborts_if [inferred] !exists<Counter>(a1);
     }
 
@@ -690,11 +690,11 @@ module 0x42::mutations {
     }
     spec mutation_then_call(a1: address, a2: address, v: u64) {
         pragma opaque = true;
-        modifies Counter[a1];
         modifies Counter[a2];
-        ensures [inferred] S.. |~ ensures_of<increment_global>(a2);
-        ensures [inferred] (S |~ global<Counter>(a1)) == update_field(old(Counter[a1]), value, v);
-        aborts_if [inferred] S |~ aborts_of<increment_global>(a2);
+        modifies Counter[a1];
+        ensures [inferred] S1.. |~ ensures_of<increment_global>(a2);
+        ensures [inferred] ..S1 |~ update<Counter>(a1, update_field(old(Counter[a1]), value, v));
+        aborts_if [inferred] S1 |~ aborts_of<increment_global>(a2);
         aborts_if [inferred] !exists<Counter>(a1);
     }
 
@@ -708,9 +708,9 @@ module 0x42::mutations {
         pragma opaque = true;
         modifies Counter[a1];
         modifies Counter[a2];
-        ensures [inferred] Counter[a1] == update_field(S |~ global<Counter>(a1), value, v);
-        ensures [inferred] ..S |~ ensures_of<increment_global>(a2);
-        aborts_if [inferred] S |~ !exists<Counter>(a1);
+        ensures [inferred] S1.. |~ update<Counter>(a1, update_field(S1 |~ global<Counter>(a1), value, v));
+        ensures [inferred] ..S1 |~ ensures_of<increment_global>(a2);
+        aborts_if [inferred] S1 |~ !exists<Counter>(a1);
         aborts_if [inferred] aborts_of<increment_global>(a2);
     }
 
@@ -726,36 +726,13 @@ module 0x42::mutations {
         modifies Counter[a2];
         modifies Counter[a1];
         ensures [inferred] result == old(Counter[a1]).value;
-        ensures [inferred] Counter[a2] == update_field(S |~ global<Counter>(a2), value, v);
-        ensures [inferred] S |~ !exists<Counter>(a1);
-        aborts_if [inferred] S |~ !exists<Counter>(a2);
+        ensures [inferred] S1.. |~ update<Counter>(a2, update_field(S1 |~ global<Counter>(a2), value, v));
+        ensures [inferred] ..S1 |~ remove<Counter>(a1);
+        aborts_if [inferred] S1 |~ !exists<Counter>(a2);
         aborts_if [inferred] !exists<Counter>(a1);
     }
 
 }
 /*
-Verification: exiting with bytecode transformation errors
-error: intermediate state labels (`|~`) are currently only supported for functions with linear control flow (no branches); this restriction will be lifted in a future version
-    ┌─ mutations.enriched.move:612:5
-    │
-612 │ ╭     spec cond_addr_sequential(cond: bool, a1: address, a2: address, v1: u64, v2: u64) {
-613 │ │         pragma opaque = true;
-614 │ │         modifies Counter[a2];
-615 │ │         modifies Counter[a1];
-    · │
-625 │ │         aborts_if [inferred] !cond && !exists<Counter>(a2);
-626 │ │     }
-    │ ╰─────^
-
-error: intermediate state labels (`|~`) are currently only supported for functions with linear control flow (no branches); this restriction will be lifted in a future version
-    ┌─ mutations.enriched.move:638:5
-    │
-638 │ ╭     spec cond_addr_increment(cond: bool, a1: address, a2: address, v1: u64, v2: u64) {
-639 │ │         pragma opaque = true;
-640 │ │         modifies Counter[a2];
-641 │ │         modifies Counter[a1];
-    · │
-655 │ │         aborts_if [inferred] !cond && !exists<Counter>(a2);
-656 │ │     }
-    │ ╰─────^
+Verification: Succeeded.
 */

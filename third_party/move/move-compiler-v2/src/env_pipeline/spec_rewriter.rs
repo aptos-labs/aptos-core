@@ -99,6 +99,43 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         }
     }
 
+    // When running from the prover, also derive spec functions for all pure
+    // Move functions (no &mut params, no acquired resources). This allows the
+    // spec inference engine to reference them directly (via SpecFunction)
+    // instead of using result_of behavioral predicates.
+    if env.get_extension::<crate::Options>().is_some_and(|opts| {
+        opts.experiment_on(crate::experiments::Experiment::SPEC_REWRITE_PURE_FUNS)
+    }) {
+        for module in env.get_modules() {
+            for fun in module.get_functions() {
+                let qid = fun.get_qualified_id();
+                if called_funs.contains(&qid)
+                    || fun.is_inline()
+                    || fun.is_native()
+                    || fun.is_lemma()
+                    || fun.get_def().is_none()
+                {
+                    continue;
+                }
+                if fun
+                    .get_parameters()
+                    .iter()
+                    .any(|p| p.1.is_mutable_reference())
+                {
+                    continue;
+                }
+                if !matches!(fun.get_acquired_structs(), Some(s) if s.is_empty()) {
+                    continue;
+                }
+                called_funs.insert(qid);
+                // Include transitive used functions (not just called) so that
+                // lambda-lifted closure functions are also mapped.
+                let mut transitive = fun.get_transitive_closure_of_used_functions();
+                called_funs.append(&mut transitive);
+            }
+        }
+    }
+
     // For compatibility reasons with the v1 way how to compile spec
     // blocks of inline functions, we also need to add all 'lambda'
     // lifted functions.
@@ -466,6 +503,18 @@ pub fn compute_direct_old_usage(
             | ExpData::Call(id, Operation::Exists(_), _)
                 if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
             {
+                let inst = &env.get_node_instantiation(*id);
+                let (mid, sid, sinst) = inst[0].require_struct();
+                old_memory.insert(mid.qualified_inst(sid, sinst.to_owned()));
+            },
+            // Mutation builtins are inherently two-state: they transition from
+            // pre-state to post-state. Their resource type is in old_memory.
+            ExpData::Call(
+                id,
+                Operation::SpecPublish(_) | Operation::SpecRemove(_) | Operation::SpecUpdate(_),
+                _,
+            ) if matches!(pos, VisitorPosition::Pre) => {
+                uses_old = true;
                 let inst = &env.get_node_instantiation(*id);
                 let (mid, sid, sinst) = inst[0].require_struct();
                 old_memory.insert(mid.qualified_inst(sid, sinst.to_owned()));

@@ -25,7 +25,7 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr];
         ensures [inferred] result == old(Resource[addr]);
-        ensures [inferred] !exists<Resource>(addr);
+        ensures [inferred] remove<Resource>(addr);
         aborts_if [inferred] !exists<Resource>(addr);
     }
 
@@ -39,11 +39,11 @@ module 0x42::state_labels {
         move_to(account, Resource { value });
     }
     spec publish_resource(account: &signer, value: u64) {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Resource[0x1::signer::address_of(account)];
-        ensures [inferred] exists<Resource>(0x1::signer::address_of(account));
-        ensures [inferred] Resource[0x1::signer::address_of(account)] == Resource{value: value};
-        aborts_if [inferred] exists<Resource>(0x1::signer::address_of(account));
+        modifies Resource[signer::address_of(account)];
+        ensures [inferred] publish<Resource>(signer::address_of(account), Resource{value: value});
+        aborts_if [inferred] exists<Resource>(signer::address_of(account));
     }
 
 
@@ -89,8 +89,9 @@ module 0x42::state_labels {
         publish_resource(account, value)
     }
     spec call_publish(account: &signer, value: u64) {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Resource[0x1::signer::address_of(account)];
+        modifies Resource[signer::address_of(account)];
         ensures [inferred] ensures_of<publish_resource>(account, value);
         aborts_if [inferred] aborts_of<publish_resource>(account, value);
     }
@@ -113,14 +114,14 @@ module 0x42::state_labels {
         r
     }
     spec swap_resources(account: &signer, addr: address): Resource {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Container[0x1::signer::address_of(account)];
+        modifies Container[signer::address_of(account)];
         modifies Resource[addr];
         ensures [inferred] result == old(Resource[addr]);
-        ensures [inferred] exists<Container>(0x1::signer::address_of(account));
-        ensures [inferred] Container[0x1::signer::address_of(account)] == Container{inner: old(Resource[addr]).value};
-        ensures [inferred] S |~ !exists<Resource>(addr);
-        aborts_if [inferred] S |~ exists<Container>(0x1::signer::address_of(account));
+        ensures [inferred] S1.. |~ publish<Container>(signer::address_of(account), Container{inner: old(Resource[addr]).value});
+        ensures [inferred] ..S1 |~ remove<Resource>(addr);
+        aborts_if [inferred] S1 |~ exists<Container>(signer::address_of(account));
         aborts_if [inferred] !exists<Resource>(addr);
     }
 
@@ -146,7 +147,7 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr];
         ensures [inferred] cond ==> result == old(Resource[addr]);
-        ensures [inferred] cond ==> !exists<Resource>(addr);
+        ensures [inferred] cond ==> remove<Resource>(addr);
         ensures [inferred] !cond ==> result == Resource{value: 0};
         aborts_if [inferred] cond && !exists<Resource>(addr);
     }
@@ -160,11 +161,11 @@ module 0x42::state_labels {
         }
     }
     spec safe_publish(account: &signer, addr: address, value: u64) {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Resource[0x1::signer::address_of(account)];
-        ensures [inferred] !old(exists<Resource>(addr)) ==> exists<Resource>(0x1::signer::address_of(account));
-        ensures [inferred] !old(exists<Resource>(addr)) ==> Resource[0x1::signer::address_of(account)] == Resource{value: value};
-        aborts_if [inferred] !exists<Resource>(addr) && exists<Resource>(0x1::signer::address_of(account));
+        modifies Resource[signer::address_of(account)];
+        ensures [inferred] !old(exists<Resource>(addr)) ==> publish<Resource>(signer::address_of(account), Resource{value: value});
+        aborts_if [inferred] !exists<Resource>(addr) && exists<Resource>(signer::address_of(account));
     }
 
 
@@ -185,13 +186,13 @@ module 0x42::state_labels {
         move_to(account, Resource { value: new_value });
     }
     spec increment_resource(account: &signer, addr: address) {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Resource[0x1::signer::address_of(account)];
+        modifies Resource[signer::address_of(account)];
         modifies Resource[addr];
-        ensures [inferred] exists<Resource>(0x1::signer::address_of(account));
-        ensures [inferred] Resource[0x1::signer::address_of(account)] == Resource{value: old(Resource[addr]).value + 1};
-        ensures [inferred] S |~ !exists<Resource>(addr);
-        aborts_if [inferred] S |~ exists<Resource>(0x1::signer::address_of(account));
+        ensures [inferred] S1.. |~ publish<Resource>(signer::address_of(account), Resource{value: old(Resource[addr]).value + 1});
+        ensures [inferred] ..S1 |~ remove<Resource>(addr);
+        aborts_if [inferred] S1 |~ exists<Resource>(signer::address_of(account));
         aborts_if [inferred] Resource[addr].value == MAX_U64;
         aborts_if [inferred] !exists<Resource>(addr);
     }
@@ -213,8 +214,8 @@ module 0x42::state_labels {
     spec update_and_read(addr: address, new_value: u64): u64 {
         pragma opaque = true;
         modifies Resource[addr];
-        ensures [inferred] result == Resource[addr].value;
-        ensures [inferred] Resource[addr] == update_field(old(Resource[addr]), value, new_value);
+        ensures [inferred] result == new_value;
+        ensures [inferred] update<Resource>(addr, update_field(old(Resource[addr]), value, result));
         aborts_if [inferred] !exists<Resource>(addr);
     }
 
@@ -236,7 +237,7 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr];
         ensures [inferred] result == old(Resource[addr]).value;
-        ensures [inferred] !exists<Resource>(addr);
+        ensures [inferred] remove<Resource>(addr);
         aborts_if [inferred] !exists<Resource>(addr);
     }
 
@@ -256,7 +257,7 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr];
         ensures [inferred] result == old(exists<Resource>(addr));
-        ensures [inferred] old(exists<Resource>(addr)) ==> !exists<Resource>(addr);
+        ensures [inferred] old(exists<Resource>(addr)) ==> remove<Resource>(addr);
         aborts_if [inferred] false;
     }
 
@@ -280,13 +281,13 @@ module 0x42::state_labels {
         read_resource(addr)
     }
     spec create_then_read_same(account: &signer, addr: address): u64 {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Resource[0x1::signer::address_of(account)];
-        ensures [inferred] S.. |~ result == result_of<read_resource>(addr);
-        ensures [inferred] S |~ exists<Resource>(0x1::signer::address_of(account));
-        ensures [inferred] S |~ global<Resource>(0x1::signer::address_of(account)) == Resource{value: 42};
-        aborts_if [inferred] S |~ aborts_of<read_resource>(addr);
-        aborts_if [inferred] exists<Resource>(0x1::signer::address_of(account));
+        modifies Resource[signer::address_of(account)];
+        ensures [inferred] S1.. |~ result == result_of<read_resource>(addr);
+        ensures [inferred] ..S1 |~ publish<Resource>(signer::address_of(account), Resource{value: 42});
+        aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr);
+        aborts_if [inferred] exists<Resource>(signer::address_of(account));
     }
 
 
@@ -304,8 +305,9 @@ module 0x42::state_labels {
     spec remove_then_try_read(addr1: address, addr2: address): u64 {
         pragma opaque = true;
         modifies Resource[addr1];
-        ensures [inferred] S.. |~ result == result_of<read_resource>(addr2);
-        aborts_if [inferred] S |~ aborts_of<read_resource>(addr2);
+        ensures [inferred] S1.. |~ result == result_of<read_resource>(addr2);
+        ensures [inferred] ..S1 |~ ensures_of<remove_resource>(addr1, ..S1 |~ result_of<remove_resource>(addr1));
+        aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr2);
         aborts_if [inferred] aborts_of<remove_resource>(addr1);
     }
 
@@ -323,9 +325,9 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr2];
         modifies Resource[addr1];
-        ensures [inferred] ..S |~ result_1 == result_of<remove_resource>(addr1);
-        ensures [inferred] S.. |~ result_2 == result_of<remove_resource>(addr2);
-        aborts_if [inferred] S |~ aborts_of<remove_resource>(addr2);
+        ensures [inferred] ..S1 |~ result_1 == result_of<remove_resource>(addr1);
+        ensures [inferred] S1.. |~ result_2 == result_of<remove_resource>(addr2);
+        aborts_if [inferred] S1 |~ aborts_of<remove_resource>(addr2);
         aborts_if [inferred] aborts_of<remove_resource>(addr1);
     }
 
@@ -339,12 +341,13 @@ module 0x42::state_labels {
         publish_resource(account2, v2);
     }
     spec nested_publish(account1: &signer, account2: &signer, v1: u64, v2: u64) {
+        use 0x1::signer;
         pragma opaque = true;
-        modifies Resource[0x1::signer::address_of(account2)];
-        modifies Resource[0x1::signer::address_of(account1)];
-        ensures [inferred] S.. |~ ensures_of<publish_resource>(account2, v2);
-        ensures [inferred] ..S |~ ensures_of<publish_resource>(account1, v1);
-        aborts_if [inferred] S |~ aborts_of<publish_resource>(account2, v2);
+        modifies Resource[signer::address_of(account2)];
+        modifies Resource[signer::address_of(account1)];
+        ensures [inferred] S1.. |~ ensures_of<publish_resource>(account2, v2);
+        ensures [inferred] ..S1 |~ ensures_of<publish_resource>(account1, v1);
+        aborts_if [inferred] S1 |~ aborts_of<publish_resource>(account2, v2);
         aborts_if [inferred] aborts_of<publish_resource>(account1, v1);
     }
 

@@ -140,21 +140,17 @@ error: expected function type has argument of type `||u64 has copy + drop` but `
 153 │             _v0 = _v6(_v7)
     │                   ^^^^^^^^
 
-error: cannot select field `fv1` since it has different types in variants of enum `Wrapper<||u64 has drop + store>`
-    ┌─ TEMPFILE1:164:24
+error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
+    ┌─ TEMPFILE1:167:19
     │
-164 │             let _v3 = &_v2.fv1;
-    │                        ^^^
-    │
-    = field `fv1` has type `|||u64 has drop + store|u64 has copy + drop + store` in variant `V2` and type `|||u64 has drop + store|u64 has copy + store` in variant `V1`
+167 │             _v0 = _v5(_v4)
+    │                   ^^^^^^^^
 
-error: cannot select field `fv1` since it has different types in variants of enum `Wrapper<||u64 has drop + store>`
-    ┌─ TEMPFILE1:169:24
+error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
+    ┌─ TEMPFILE1:172:19
     │
-169 │             let _v6 = &_v2.fv1;
-    │                        ^^^
-    │
-    = field `fv1` has type `|||u64 has drop + store|u64 has copy + drop + store` in variant `V2` and type `|||u64 has drop + store|u64 has copy + store` in variant `V1`
+172 │             _v0 = _v8(_v7)
+    │                   ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
     ┌─ TEMPFILE1:190:19

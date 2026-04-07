@@ -1669,7 +1669,12 @@ impl ModelValue {
         let mut entries = vec![];
         for idx in values.values.keys().sorted() {
             let mut p = values.values.get(idx)?.pretty_or_raw(wrapper, model, param);
-            p = PrettyDoc::text(format!("Address({}): ", idx)).append(p);
+            let addr_prefix = if wrapper.options.stable_test_output {
+                "Address(<redacted>): ".to_string()
+            } else {
+                format!("Address({}): ", idx)
+            };
+            p = PrettyDoc::text(addr_prefix).append(p);
             entries.push(p);
         }
         let default = if values.default == ModelValue::error() {

@@ -1502,6 +1502,13 @@ impl ExpData {
                         result.insert(mem.to_owned().instantiate(inst));
                     }
                 },
+                Call(id, SpecPublish(_), _)
+                | Call(id, SpecRemove(_), _)
+                | Call(id, SpecUpdate(_), _) => {
+                    let inst = &env.get_node_instantiation(*id);
+                    let (mid, sid, sinst) = inst[0].require_struct();
+                    result.insert(mid.qualified_inst(sid, sinst.to_owned()));
+                },
                 _ => {},
             }
             true // keep going
@@ -2344,7 +2351,8 @@ impl ExpData {
                         | Cast | Negate | Exists(..) | BorrowGlobal(..) | Borrow(..) | Deref
                         | MoveTo | MoveFrom | Freeze(..) | Abort(..) | Vector | Len | TypeValue
                         | TypeDomain | ResourceDomain | Global(..) | CanModify | Old
-                        | Trace(..) | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
+                        | Trace(..) | SpecPublish(..) | SpecRemove(..) | SpecUpdate(..)
+                        | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
                         | ContainsVec | InRangeRange | InRangeVec | RangeVec | MaxU8 | MaxU16
                         | MaxU32 | MaxU64 | MaxU128 | MaxU256 | Bv2Int | Int2Bv | AbortFlag
                         | AbortCode | WellFormed | BoxValue | UnboxValue | EmptyEventStore
@@ -2588,6 +2596,15 @@ pub enum Operation {
     Old,
     Trace(TraceKind),
 
+    // Spec-level mutation builtins. Two-state predicates carrying MemoryRange.
+    // Type argument: the resource type. Args: (addr, value) or (addr).
+    // `publish<R>(addr, value)` — resource R is published at addr
+    SpecPublish(MemoryRange),
+    // `remove<R>(addr)` — resource R is removed from addr
+    SpecRemove(MemoryRange),
+    // `update<R>(addr, value)` — resource R at addr is updated to value
+    SpecUpdate(MemoryRange),
+
     EmptyVec,
     SingleVec,
     UpdateVec,
@@ -2622,7 +2639,21 @@ pub enum Operation {
 }
 
 /// A label used for referring to a specific memory in Global and Exists expressions.
-pub type MemoryLabel = GlobalId;
+/// This is a function-scoped identifier — labels are only meaningful within the
+/// context of a single function's spec. When inlining specs across functions,
+/// labels are freshened to avoid collisions.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub struct MemoryLabel(usize);
+
+impl MemoryLabel {
+    pub fn new(idx: usize) -> Self {
+        Self(idx)
+    }
+
+    pub fn as_usize(self) -> usize {
+        self.0
+    }
+}
 
 /// Describes the memory state range for an operation that accesses global state.
 /// - `pre`: which memory snapshot `old()` references resolve to
@@ -3489,14 +3520,17 @@ impl Operation {
             Vector => false,           // Move-related
 
             // Builtin functions (spec only)
-            Len => false,            // Spec
-            TypeValue => false,      // Spec
-            TypeDomain => false,     // Spec
-            ResourceDomain => false, // Spec
-            Global(..) => false,     // Spec
-            CanModify => false,      // Spec
-            Old => false,            // Spec
-            Trace(..) => false,      // Spec
+            Len => false,             // Spec
+            TypeValue => false,       // Spec
+            TypeDomain => false,      // Spec
+            ResourceDomain => false,  // Spec
+            Global(..) => false,      // Spec
+            CanModify => false,       // Spec
+            Old => false,             // Spec
+            Trace(..) => false,       // Spec
+            SpecPublish(..) => false, // Spec
+            SpecRemove(..) => false,  // Spec
+            SpecUpdate(..) => false,  // Spec
 
             EmptyVec => false,     // Spec
             SingleVec => false,    // Spec

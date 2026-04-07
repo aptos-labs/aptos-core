@@ -1,0 +1,66 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::test {
+    enum State {
+        Empty,
+        Value {
+            0: u64,
+        }
+        Continuation {
+            0: |u64|u64 has copy + drop,
+        }
+    }
+    enum Uniform {
+        A {
+            0: u64,
+        }
+        B {
+            0: u64,
+        }
+    }
+    private fun get_uniform(u: &Uniform): u64 {
+        select_variants test::Uniform.A.0|test::Uniform.B.0<&Uniform>(u)
+    }
+    private fun get_value(s: &State): u64 {
+        if test_variants test::State::Value(s) {
+          select_variants test::State.Value.0<&State>(s)
+        } else {
+          0
+        }
+    }
+    spec {
+      ensures Implies(test_variants test::State::Value($t0), Eq<u64>(result0(), select_variants test::State.Value.0<0x42::test::State>($t0)));
+    }
+
+} // end 0x42::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::test {
+    enum State has copy, drop {
+        Empty,
+        Value {
+            0: u64,
+        }
+        Continuation {
+            0: |u64|u64 has copy + drop,
+        }
+    }
+    enum Uniform has copy, drop {
+        A {
+            0: u64,
+        }
+        B {
+            0: u64,
+        }
+    }
+    fun get_uniform(u: &Uniform): u64 {
+        u.0
+    }
+    fun get_value(s: &State): u64 {
+        if (s is Value) s.Value.0 else 0
+    }
+
+    spec get_value(s: &State): u64 {
+        ensures (s is Value) ==> result == s.Value.0;
+    }
+
+}

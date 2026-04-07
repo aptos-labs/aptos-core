@@ -40,6 +40,12 @@ error: cyclic state label reference detected: a -> b -> a
 41 │ │     }
    │ ╰─────^
 
+error: ensures_of/result_of require two-state range notation; use `..S |~` (post-only), `S.. |~` (pre-only), or `A..S |~` (full range) instead of `S |~`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:49:25
+   │
+49 │         ensures a..a |~ ensures_of<f>(x, result);
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^
+
 error: cyclic state label reference detected: a -> a
    ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_state_label_err.move:48:5
    │

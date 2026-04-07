@@ -992,6 +992,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-transaction-filters",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-validator-transaction-pool",
  "aptos-vm",
@@ -1557,6 +1558,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-transaction-simulation",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -3077,10 +3079,13 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-time-service",
+ "aptos-token-bucket",
  "aptos-transaction-filters",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-vm-validator",
  "bcs 0.1.4",
+ "dashmap 7.0.0-rc2",
  "enum_dispatch",
  "fail",
  "futures",
@@ -3609,6 +3614,7 @@ dependencies = [
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-time-service",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-validator-transaction-pool",
  "aptos-vm",
@@ -4573,7 +4579,9 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-cached-packages",
  "aptos-config",
+ "aptos-crypto",
  "aptos-forge",
  "aptos-global-constants",
  "aptos-keygen",
@@ -4805,6 +4813,22 @@ dependencies = [
  "serde_json",
  "tempfile",
  "url",
+]
+
+[[package]]
+name = "aptos-transaction-tracing"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "arc-swap",
+ "dashmap 7.0.0-rc2",
+ "once_cell",
+ "serde",
+ "strum_macros 0.27.1",
 ]
 
 [[package]]
@@ -12668,7 +12692,9 @@ dependencies = [
  "move-asm",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "parking_lot 0.12.5",
+ "specializer",
 ]
 
 [[package]]
@@ -12698,6 +12724,25 @@ dependencies = [
  "mono-move-alloc",
  "mono-move-core",
  "rand 0.7.3",
+]
+
+[[package]]
+name = "mono-move-testsuite"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "legacy-move-compiler",
+ "libtest-mimic",
+ "mono-move-global-context",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "tempfile",
+ "walkdir",
 ]
 
 [[package]]
@@ -13220,7 +13265,6 @@ dependencies = [
  "move-stackless-bytecode",
  "move-stackless-bytecode-test-utils",
  "num 0.4.1",
- "petgraph 0.6.5",
  "serde",
  "shell-words",
  "tempfile",
@@ -18066,7 +18110,6 @@ dependencies = [
  "bcs 0.1.4",
  "blake2-rfc",
  "digest 0.9.0",
- "env_logger",
  "ethers",
  "futures",
  "hex",

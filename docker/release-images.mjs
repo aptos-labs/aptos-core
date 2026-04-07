@@ -61,12 +61,15 @@ const IMAGES_TO_RELEASE = {
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   faucet: {
+    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   tools: {
+    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   "indexer-grpc": {
+    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
 };

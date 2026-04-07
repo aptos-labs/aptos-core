@@ -506,6 +506,9 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::ExtendEventStore
             | Operation::EventStoreIncludes
             | Operation::EventStoreIncludedIn
+            | Operation::SpecPublish(..)
+            | Operation::SpecRemove(..)
+            | Operation::SpecUpdate(..)
             | Operation::NoOp => {},
         },
 

@@ -96,6 +96,7 @@
 use crate::options::ProverOptions;
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::CodeOffset;
+use move_core_types::function::ClosureMask;
 use move_model::{
     ast::{
         Condition, ConditionKind, Exp, ExpData, MemoryLabel, MemoryRange, Operation as AstOp,
@@ -104,8 +105,10 @@ use move_model::{
     exp_generator::{ExpGenerator, RangeCheckKind},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     exp_simplifier::{flatten_conjunction_owned, ExpSimplifier},
+    memory_labels::MemoryLabelInfo,
     model::{
-        FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, StructEnv, StructId,
+        FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, SpecFunId, StructEnv,
+        StructId,
     },
     pragmas::{
         CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD, CONDITION_INFERRED_VACUOUS,
@@ -128,7 +131,7 @@ use move_stackless_bytecode::{
 };
 use num::{bigint::Sign, BigInt, Zero};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
 };
@@ -168,6 +171,11 @@ pub struct WPState {
     /// back via `WriteBack(GlobalRoot)`. The BorrowGlobal handler (processed last in backward
     /// order) resolves the temp to `global<R>(addr)`.
     pub captured_globals: BTreeSet<TempIndex>,
+    /// Tracks globals modified via `update<R>` mutation builtins (from WriteBack(GlobalRoot)).
+    /// Unlike `captured_globals`, these temps use in-place substitution in WriteBack(Reference)
+    /// rather than the separate ensures path. Used by `has_global_mutations()` to create
+    /// intermediate labels for sequential writes.
+    pub update_globals: BTreeSet<TempIndex>,
     /// Tracks globals directly modified by MoveFrom/MoveTo (which bypass the borrow+writeback path).
     /// Each entry is a `global<R>(addr)` expression (no label) used to emit `modifies` clauses.
     pub direct_modifies: Vec<Exp>,
@@ -184,6 +192,7 @@ impl WPState {
             post,
             captured_mut_params: BTreeSet::new(),
             captured_globals: BTreeSet::new(),
+            update_globals: BTreeSet::new(),
             direct_modifies: vec![],
         }
     }
@@ -198,6 +207,7 @@ impl WPState {
             post,
             captured_mut_params: BTreeSet::new(),
             captured_globals: BTreeSet::new(),
+            update_globals: BTreeSet::new(),
             direct_modifies: vec![],
         }
     }
@@ -212,6 +222,7 @@ impl WPState {
             post: self.post,
             captured_mut_params: self.captured_mut_params.clone(),
             captured_globals: self.captured_globals.clone(),
+            update_globals: self.update_globals.clone(),
             direct_modifies: self.direct_modifies.iter().map(&mut f).collect(),
         }
     }
@@ -247,7 +258,7 @@ impl WPState {
     /// by a WriteBack, so operations that create abort conditions should not
     /// blindly use `state.post` as the existence-check label.
     fn has_global_mutations(&self) -> bool {
-        !self.captured_globals.is_empty()
+        !self.captured_globals.is_empty() || !self.update_globals.is_empty()
     }
 }
 
@@ -327,6 +338,12 @@ impl AbstractDomain for WPState {
             self.captured_globals.insert(*idx);
         }
 
+        // For update_globals: same union semantics.
+        let old_update_globals_len = self.update_globals.len();
+        for idx in &other.update_globals {
+            self.update_globals.insert(*idx);
+        }
+
         // For direct_modifies: union semantics (modification from ANY path counts)
         let old_direct_modifies_len = self.direct_modifies.len();
         for exp in &other.direct_modifies {
@@ -337,6 +354,7 @@ impl AbstractDomain for WPState {
             || self.aborts.len() != old_aborts_len
             || self.captured_mut_params.len() != old_captured_len
             || self.captured_globals.len() != old_captured_globals_len
+            || self.update_globals.len() != old_update_globals_len
             || self.direct_modifies.len() != old_direct_modifies_len
         {
             JoinResult::Changed
@@ -558,40 +576,8 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
             // If this invariant is violated, it indicates a bug in spec inference.
             let entry_state = wp_map.get(&0).or_else(|| wp_map.get(&1));
             if let Some(state) = entry_state {
-                // Strip the end-of-function label: it maps to implicit post-state
-                // (i.e., `Global(None)`). The entry pre-state label is handled later
-                // by `normalize_behavior_labels` (for behavioral predicates) and
-                // `rewrite_entry_pre_state_refs` (for direct memory observations).
                 let entry_post_label = state.post;
-                let at_end_label = analyzer.at_end_label;
-                let mutation_labels = analyzer.mutation_labels.borrow().clone();
-                let mut state = analyzer.substitute_labels_in_state(state, &|label| {
-                    if mutation_labels.contains(&label) {
-                        None // Keep intermediate mutation labels
-                    } else if label == at_end_label {
-                        Some(None) // Remove the label
-                    } else {
-                        None // Keep unchanged
-                    }
-                });
-
-                // Normalize behavioral predicate labels:
-                // - drop pre-labels whose producer post-label was optimized away
-                // - drop post-labels that are not consumed by a later predicate
-                state = analyzer.normalize_behavior_labels(
-                    state,
-                    &mutation_labels,
-                    Some(entry_post_label),
-                );
-                // Rewrite the function entry state label into `old(...)` for direct
-                // state observations. The entry state is implicit for behavioral
-                // predicates, but direct memory reads need to retain pre-state semantics.
-                if !mutation_labels.contains(&entry_post_label) {
-                    state = analyzer.rewrite_entry_pre_state_refs(state, entry_post_label);
-                }
-
-                // Rename internal `at_op_N` labels to user-friendly sequential names.
-                analyzer.rename_inferred_labels(&state);
+                let mut state = state.clone();
 
                 // Resolve is_parent temporaries: substitute them with their path conditions
                 // computed via dominator tree analysis.
@@ -617,7 +603,9 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
                 // On exit paths, the BorrowGlobal handler may not have been reached
                 // (it only appears on the loop body path), leaving unresolved
                 // Temporary(idx) or Freeze(Temporary(idx)) references to borrow temps.
-                // Substitute them with the corresponding global<R>(addr).
+                // Substitute them with the corresponding global<R>[@entry](addr),
+                // using the entry label so MemoryLabelInfo::normalize can later
+                // wrap it in old() for ensures context.
                 let captured_globals: Vec<TempIndex> =
                     state.captured_globals.iter().copied().collect();
                 for &temp in &captured_globals {
@@ -626,7 +614,12 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
                     {
                         let struct_env = analyzer.get_struct(mid, sid);
                         let addr_exp = analyzer.mk_temporary(addr_temp);
-                        let global_exp = analyzer.mk_global(&struct_env, &targs, addr_exp);
+                        let global_exp = analyzer.mk_global_with_label(
+                            &struct_env,
+                            &targs,
+                            addr_exp,
+                            Some(entry_post_label),
+                        );
                         // Replace patterns referencing the borrow temp with global<R>(addr):
                         // - Freeze(Temporary(temp)) → global<R>(addr)
                         // - bare Temporary(temp) → global<R>(addr)
@@ -664,10 +657,33 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
                 // including inside old(). Labels inside old() are semantically wrong
                 // (old() already refers to function entry state).
                 state = analyzer.strip_labels_inside_old(&state);
-                // Collect modifies targets from ensures that reference mutation labels,
-                // so emit_modifies can generate modifies clauses for them.
+
+                // Collect modifies targets before normalization (labels still present).
                 for ensures in &state.ensures {
                     collect_modifies_targets(ensures, &mut state.direct_modifies);
+                }
+
+                // Final label normalization: classify all labels and convert.
+                // - pre-labels in ensures → old(Global(None))
+                // - pre-labels in aborts → Global(None) (already pre-state context)
+                // - post-labels → stripped to None (implicit post-state)
+                // - intermediate labels preserved
+                {
+                    let all_conds: Vec<&Exp> =
+                        state.ensures.iter().chain(state.aborts.iter()).collect();
+                    let label_info =
+                        MemoryLabelInfo::from_conditions(&all_conds, Some(entry_post_label));
+                    let env = analyzer.global_env();
+                    state.ensures = state
+                        .ensures
+                        .iter()
+                        .map(|e| label_info.normalize(env, e, true))
+                        .collect();
+                    state.aborts = state
+                        .aborts
+                        .iter()
+                        .map(|e| label_info.normalize(env, e, false))
+                        .collect();
                 }
 
                 // Simplify conditions: constant folding, arithmetic/boolean
@@ -824,10 +840,104 @@ fn update_spec<'env>(
         }
     };
 
+    // Strip undefined state labels: any label not defined by a two-state operation
+    // (mutation builtin, behavioral predicate, or spec function with range.post)
+    // references the function's entry/pre-state and should be None.
+    // Collect defined labels: labels that appear as range.post in a defining operation
+    let mut defined_labels = BTreeSet::new();
+    for exp in state.ensures.iter().chain(state.aborts.iter()) {
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(_, op, _) = e {
+                let post = match op {
+                    AstOp::SpecPublish(r)
+                    | AstOp::SpecRemove(r)
+                    | AstOp::SpecUpdate(r)
+                    | AstOp::SpecFunction(_, _, r) => r.post,
+                    AstOp::Behavior(
+                        move_model::ast::BehaviorKind::EnsuresOf
+                        | move_model::ast::BehaviorKind::ResultOf,
+                        r,
+                    ) => r.post,
+                    _ => None,
+                };
+                if let Some(label) = post {
+                    defined_labels.insert(label);
+                }
+            }
+            true
+        });
+    }
+
+    // Rewrite: replace undefined labels with None
+    struct UndefinedLabelStripper<'a> {
+        defined: &'a BTreeSet<MemoryLabel>,
+    }
+    impl UndefinedLabelStripper<'_> {
+        fn strip_range(&self, range: &MemoryRange) -> Option<MemoryRange> {
+            let new_pre = match range.pre {
+                Some(l) if !self.defined.contains(&l) => None,
+                other => other,
+            };
+            let new_post = match range.post {
+                Some(l) if !self.defined.contains(&l) => None,
+                other => other,
+            };
+            if new_pre != range.pre || new_post != range.post {
+                Some(MemoryRange {
+                    pre: new_pre,
+                    post: new_post,
+                })
+            } else {
+                None
+            }
+        }
+    }
+    impl ExpRewriterFunctions for UndefinedLabelStripper<'_> {
+        fn rewrite_call(&mut self, id: NodeId, oper: &AstOp, args: &[Exp]) -> Option<Exp> {
+            match oper {
+                AstOp::Global(Some(l)) if !self.defined.contains(l) => {
+                    Some(ExpData::Call(id, AstOp::Global(None), args.to_vec()).into_exp())
+                },
+                AstOp::Exists(Some(l)) if !self.defined.contains(l) => {
+                    Some(ExpData::Call(id, AstOp::Exists(None), args.to_vec()).into_exp())
+                },
+                AstOp::SpecPublish(r) => self
+                    .strip_range(r)
+                    .map(|nr| ExpData::Call(id, AstOp::SpecPublish(nr), args.to_vec()).into_exp()),
+                AstOp::SpecRemove(r) => self
+                    .strip_range(r)
+                    .map(|nr| ExpData::Call(id, AstOp::SpecRemove(nr), args.to_vec()).into_exp()),
+                AstOp::SpecUpdate(r) => self
+                    .strip_range(r)
+                    .map(|nr| ExpData::Call(id, AstOp::SpecUpdate(nr), args.to_vec()).into_exp()),
+                AstOp::Behavior(kind, r) => self.strip_range(r).map(|nr| {
+                    ExpData::Call(id, AstOp::Behavior(*kind, nr), args.to_vec()).into_exp()
+                }),
+                AstOp::SpecFunction(mid, fid, r) => self.strip_range(r).map(|nr| {
+                    ExpData::Call(id, AstOp::SpecFunction(*mid, *fid, nr), args.to_vec()).into_exp()
+                }),
+                _ => None,
+            }
+        }
+    }
+
+    let mut stripper = UndefinedLabelStripper {
+        defined: &defined_labels,
+    };
+    let stripped_ensures: Vec<Exp> = state
+        .ensures
+        .iter()
+        .map(|e| stripper.rewrite_exp(e.clone()))
+        .collect();
+    let stripped_aborts: Vec<Exp> = state
+        .aborts
+        .iter()
+        .map(|e| stripper.rewrite_exp(e.clone()))
+        .collect();
+
     // Add each ensures condition separately, filtering out trivial `true` conditions.
     if infer_ensures {
-        let ensures_conds: Vec<_> = state
-            .ensures
+        let ensures_conds: Vec<_> = stripped_ensures
             .iter()
             .filter(|e| !is_trivial_true(e))
             .collect();
@@ -844,8 +954,7 @@ fn update_spec<'env>(
     // then re-simplify to catch tautologies introduced by stripping (e.g., `r == r`
     // from `Old(r) == Old(r)`).
     if infer_aborts {
-        let aborts_conds: Vec<_> = state
-            .aborts
+        let aborts_conds: Vec<_> = stripped_aborts
             .iter()
             .filter(|e| !is_trivial_true(e) && !is_trivial_false(e))
             .map(strip_old)
@@ -1029,6 +1138,22 @@ fn strip_labels_in_exp(exp: &Exp) -> Exp {
                         args.to_vec(),
                     )
                     .into_exp(),
+                ),
+                AstOp::SpecPublish(range) if !range.is_default() => Some(
+                    ExpData::Call(
+                        id,
+                        AstOp::SpecPublish(MemoryRange::default()),
+                        args.to_vec(),
+                    )
+                    .into_exp(),
+                ),
+                AstOp::SpecRemove(range) if !range.is_default() => Some(
+                    ExpData::Call(id, AstOp::SpecRemove(MemoryRange::default()), args.to_vec())
+                        .into_exp(),
+                ),
+                AstOp::SpecUpdate(range) if !range.is_default() => Some(
+                    ExpData::Call(id, AstOp::SpecUpdate(MemoryRange::default()), args.to_vec())
+                        .into_exp(),
                 ),
                 _ => None,
             }
@@ -1296,6 +1421,7 @@ fn simplify_state<'env>(generator: &mut impl ExpGenerator<'env>, state: &WPState
         post: state.post,
         captured_mut_params: state.captured_mut_params.clone(),
         captured_globals: state.captured_globals.clone(),
+        update_globals: state.update_globals.clone(),
         direct_modifies,
     }
 }
@@ -1460,8 +1586,11 @@ struct SpecInferenceAnalyzer<'env> {
     target: FunctionTarget<'env>,
     /// Current location for expression creation
     current_loc: Loc,
-    /// The "at_end" label representing the final state (post-return)
-    at_end_label: MemoryLabel,
+    /// Label for the function entry state (before any mutations).
+    at_entry_label: MemoryLabel,
+    /// Label for the function exit state (post-return). Created during
+    /// construction; never reassigned. Uses `Cell` for `.get()` from `&self`.
+    at_end_label: Cell<MemoryLabel>,
     /// Cache of labels per code offset (for fixpoint stability)
     offset_labels: RefCell<BTreeMap<CodeOffset, MemoryLabel>>,
     /// Pre-scanned mapping from `borrow_global_mut` dest temp to
@@ -1472,15 +1601,87 @@ struct SpecInferenceAnalyzer<'env> {
     /// Used to decide whether BorrowGlobal resolution should be deferred: only temps
     /// that will be havoc'd need deferral so the quantifier can bind them.
     havoc_targets: BTreeSet<TempIndex>,
-    /// Labels created at `WriteBack(GlobalRoot)` for same-resource-different-addr mutations.
-    /// These intermediate labels must be preserved during label stripping (they represent
-    /// intermediate memory states between two writes to the same resource type at different
-    /// addresses).
-    mutation_labels: RefCell<BTreeSet<MemoryLabel>>,
-    /// Map from label to its position in the bytecode, used for ordering labels.
-    /// The tuple `(CodeOffset, u8)` encodes: `(offset, 0)` = pre-state before operation
-    /// at `offset`, `(offset, 1)` = post-state after operation at `offset`.
-    label_offsets: RefCell<BTreeMap<MemoryLabel, (CodeOffset, u8)>>,
+    /// Pre-assigned labels from forward state boundary analysis.
+    /// Maps each code offset to (state_before, state_after).
+    /// For state-changing instructions: state_before ≠ state_after.
+    /// For non-state-changing: state_before == state_after.
+    forward_label_map: RefCell<BTreeMap<CodeOffset, (MemoryLabel, MemoryLabel)>>,
+    /// Counter for generating sequential label names (S1, S2, ...).
+    label_counter: Cell<usize>,
+}
+
+// =================================================================================================
+// Forward State Boundary Analysis
+
+/// State for the forward label pre-assignment analysis.
+/// Tracks the current memory label at each program point.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct StateBoundaryState(MemoryLabel);
+
+impl AbstractDomain for StateBoundaryState {
+    fn join(&mut self, other: &Self) -> JoinResult {
+        if self.0 == other.0 {
+            JoinResult::Unchanged
+        } else {
+            // At CFG merge points, pick the smaller label as canonical representative.
+            // This is safe because the backward WP's path_aware_join handles the
+            // semantic merge at branches — this forward pass only provides label hints.
+            // Invariant: the backward WP must use path_aware_join (not plain join)
+            // for correctness when multiple forward labels converge.
+            let merged = std::cmp::min(self.0, other.0);
+            if self.0 != merged {
+                self.0 = merged;
+                JoinResult::Changed
+            } else {
+                JoinResult::Unchanged
+            }
+        }
+    }
+}
+
+/// Forward analysis that pre-assigns memory labels at state-changing instructions.
+/// Runs before the backward WP to eliminate retroactive label rewriting.
+struct StateBoundaryAnalysis<'a, 'env> {
+    analyzer: &'a SpecInferenceAnalyzer<'env>,
+}
+
+impl TransferFunctions for StateBoundaryAnalysis<'_, '_> {
+    type State = StateBoundaryState;
+
+    const BACKWARD: bool = false;
+
+    fn execute(&self, state: &mut StateBoundaryState, instr: &Bytecode, offset: CodeOffset) {
+        if self.is_state_changing(instr) {
+            state.0 = self.analyzer.mk_label_at(offset);
+        }
+    }
+}
+
+impl DataflowAnalysis for StateBoundaryAnalysis<'_, '_> {}
+
+impl StateBoundaryAnalysis<'_, '_> {
+    /// Determine whether an instruction creates a state boundary (new memory label).
+    fn is_state_changing(&self, instr: &Bytecode) -> bool {
+        match instr {
+            Bytecode::Call(_, dests, op, _, _) => match op {
+                Operation::WriteBack(BorrowNode::GlobalRoot(_), _) => true,
+                Operation::MoveTo(_, _, _) | Operation::MoveFrom(_, _, _) => true,
+                Operation::Function(module_id, fun_id, type_inst) => {
+                    // Mirror the backward WP's logic: a function call is only
+                    // non-state-changing if it qualifies as a pure spec call
+                    // AND has exactly one dest (so it can be substituted).
+                    !(dests.len() == 1
+                        && self
+                            .analyzer
+                            .try_as_pure_spec_call(*module_id, *fun_id, type_inst)
+                            .is_some())
+                },
+                Operation::Invoke => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
 }
 
 // =================================================================================================
@@ -1527,7 +1728,7 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
             },
             Bytecode::Abort(_, _, _) => {
                 // Abort sets the aborts condition to true
-                *state = WPState::with_aborts(self.mk_bool_const(true), self.at_end_label);
+                *state = WPState::with_aborts(self.mk_bool_const(true), self.at_end_label.get());
             },
             Bytecode::Assign(_, dest, src, _) => {
                 // WP[x := e](Q) = Q[x ↦ e]
@@ -1585,32 +1786,82 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
 
                     // Direct function call
                     Operation::Function(module_id, fun_id, type_inst) => {
-                        // WP[dest := f(args)](Q) = Q[dest ↦ result_of<f>(args)]
-                        let (fun_exp, result_type) =
-                            self.mk_closure(*module_id, *fun_id, type_inst);
-                        let args = self.mk_behavioral_call_args(state, srcs);
-                        let mut_ref_srcs: Vec<(usize, TempIndex)> = srcs
-                            .iter()
-                            .enumerate()
-                            .filter(|&(_, &idx)| self.get_local_type(idx).is_mutable_reference())
-                            .map(|(i, &idx)| (i, idx))
-                            .collect();
-                        self.wp_function_call(
-                            state,
-                            offset,
-                            fun_exp,
-                            args,
-                            &result_type,
-                            dests,
-                            &mut_ref_srcs,
-                        );
-                        self.add_direct_call_modifies(state, *module_id, *fun_id, srcs);
+                        // Check if the callee has an associated pure spec function.
+                        // If so, substitute with a SpecFunction call for the result,
+                        // but still generate aborts_of for abort conditions.
+                        if dests.len() == 1
+                            && let Some((spec_fun_id, result_type)) =
+                                self.try_as_pure_spec_call(*module_id, *fun_id, type_inst)
+                        {
+                            // WP[dest := f(args)](Q) = Q[dest ↦ spec_f(args)]
+                            let args: Vec<Exp> =
+                                srcs.iter().map(|s| self.mk_temporary(*s)).collect();
+                            let spec_call = self.mk_call(
+                                &result_type,
+                                AstOp::SpecFunction(
+                                    *module_id,
+                                    spec_fun_id,
+                                    MemoryRange::default(),
+                                ),
+                                args.clone(),
+                            );
+                            *state = self.substitute_exp_state(state, dests[0], &spec_call);
+                            // Mark the spec function as used
+                            self.global_env()
+                                .add_used_spec_fun(module_id.qualified(spec_fun_id));
+                            // Still add aborts_of for the callee
+                            let (fun_exp, _) = self.mk_closure(
+                                *module_id,
+                                *fun_id,
+                                type_inst,
+                                ClosureMask::empty(),
+                                vec![],
+                            );
+                            let aborts = self.mk_aborts_of(fun_exp, args);
+                            state.add_aborts(aborts);
+                        } else {
+                            // WP[dest := f(args)](Q) = Q[dest ↦ result_of<f>(args)]
+                            let (fun_exp, result_type) = self.mk_closure(
+                                *module_id,
+                                *fun_id,
+                                type_inst,
+                                ClosureMask::empty(),
+                                vec![],
+                            );
+                            let args = self.mk_behavioral_call_args(state, srcs);
+                            let mut_ref_srcs: Vec<(usize, TempIndex)> = srcs
+                                .iter()
+                                .enumerate()
+                                .filter(|&(_, &idx)| {
+                                    self.get_local_type(idx).is_mutable_reference()
+                                })
+                                .map(|(i, &idx)| (i, idx))
+                                .collect();
+                            self.wp_function_call(
+                                state,
+                                offset,
+                                fun_exp,
+                                args,
+                                &result_type,
+                                dests,
+                                &mut_ref_srcs,
+                            );
+                            self.add_direct_call_modifies(state, *module_id, *fun_id, srcs);
+                        }
                     },
 
-                    // WP[dest := closure<f>](Q) = Q[dest ↦ f]
-                    Operation::Closure(module_id, fun_id, type_inst, _mask) => {
+                    // WP[dest := closure<f>(captured_args)](Q) = Q[dest ↦ |provided| f(captured, provided)]
+                    Operation::Closure(module_id, fun_id, type_inst, mask) => {
                         if dests.len() == 1 {
-                            let (closure_exp, _) = self.mk_closure(*module_id, *fun_id, type_inst);
+                            let captured_args: Vec<Exp> =
+                                srcs.iter().map(|&s| self.mk_temporary(s)).collect();
+                            let (closure_exp, _) = self.mk_closure(
+                                *module_id,
+                                *fun_id,
+                                type_inst,
+                                *mask,
+                                captured_args,
+                            );
                             *state = self.substitute_exp_state(state, dests[0], &closure_exp);
                         }
                     },
@@ -1933,20 +2184,9 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             );
                             *state = self.substitute_exp_state(state, dest, &global_exp);
                         }
-                        // Add abort condition: !exists<R>(@addr)
-                        // When the state has global mutations, state.post may have
-                        // been changed to an intermediate label by a WriteBack
-                        // (processed earlier in backward order). Use at_end_label
-                        // instead, which rewrite_old_globals_to_label will later
-                        // update to the correct intermediate label. Without global
-                        // mutations, state.post is the correct label for
-                        // deduplication with other abort conditions (e.g., from
-                        // MoveFrom at the same address).
-                        let abort_label = if state.has_global_mutations() {
-                            self.at_end_label
-                        } else {
-                            state.post
-                        };
+                        // Add abort condition: !exists<R>(@label)(addr)
+                        // Use the forward-analysis label at this offset.
+                        let abort_label = self.forward_label_at(offset);
                         let exists_exp = self.mk_exists_with_label(
                             &struct_env,
                             type_args,
@@ -1997,14 +2237,9 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             global_exp
                         };
                         *state = self.substitute_exp_state(state, dest, &global_exp);
-                        // Add abort condition: !exists<R>(@addr)
-                        // Same logic as BorrowGlobal: use at_end_label when
-                        // global mutations are present to allow later rewriting.
-                        let abort_label = if state.has_global_mutations() {
-                            self.at_end_label
-                        } else {
-                            state.post
-                        };
+                        // Add abort condition: !exists<R>(@label)(addr)
+                        // Use the forward-analysis label at this offset.
+                        let abort_label = self.forward_label_at(offset);
                         let exists_exp = self.mk_exists_with_label(
                             &struct_env,
                             type_args,
@@ -2019,25 +2254,8 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                     //   Q[dest ↦ R[addr]] ∧ exists<R>(addr) ∧ ensures(!exists<R>(addr))
                     Operation::MoveFrom(module_id, struct_id, type_args) => {
                         let dest = dests[0];
-                        // When global mutations are present (processed earlier in
-                        // backward order), create an intermediate label so the
-                        // mutations' abort/ensures reference the post-MoveFrom state.
-                        let post_label = if state.has_global_mutations() {
-                            let resource_type =
-                                Type::Struct(*module_id, *struct_id, type_args.clone());
-                            let mid_label = self.mk_fresh_label("mutation", offset);
-                            self.mutation_labels.borrow_mut().insert(mid_label);
-                            *state = self.rewrite_old_globals_to_label(
-                                state,
-                                Some(&resource_type),
-                                state.post,
-                                mid_label,
-                            );
-                            mid_label
-                        } else {
-                            state.post
-                        };
-                        let pre_label = self.mk_label_at(offset);
+                        let pre_label = self.forward_label_at(offset);
+                        let post_label = state.post;
                         let addr_exp = self.mk_temporary(srcs[0]);
                         let struct_env = self.get_struct(*module_id, *struct_id);
                         // Return value comes from global state
@@ -2057,13 +2275,21 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                         );
                         let not_exists = self.mk_not(exists_exp);
                         state.add_aborts(not_exists.clone());
-                        // Post-state: resource no longer exists after removal
-                        state.add_ensures(self.mk_not(self.mk_exists_with_label(
+                        // Post-state ensures: remove<R>(addr) defines the transition.
+                        let range = MemoryRange {
+                            pre: Some(pre_label),
+                            post: if post_label == self.at_end_label.get() {
+                                None
+                            } else {
+                                Some(post_label)
+                            },
+                        };
+                        state.add_ensures(self.mk_spec_remove(
                             &struct_env,
                             type_args,
                             addr_exp.clone(),
-                            Some(post_label),
-                        )));
+                            range,
+                        ));
                         // Track as direct modifies target
                         let modifies_target = self.mk_global(&struct_env, type_args, addr_exp);
                         state.add_direct_modifies(modifies_target);
@@ -2073,25 +2299,8 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                     // WP[move_to<R>(signer, val)](Q) =
                     //   Q ∧ !exists<R>(addr) ∧ ensures(exists<R>(addr) ∧ R[addr] == val)
                     Operation::MoveTo(module_id, struct_id, type_args) => {
-                        // When global mutations are present (processed earlier in
-                        // backward order), create an intermediate label so the
-                        // mutations' abort/ensures reference the post-MoveTo state.
-                        let post_label = if state.has_global_mutations() {
-                            let resource_type =
-                                Type::Struct(*module_id, *struct_id, type_args.clone());
-                            let mid_label = self.mk_fresh_label("mutation", offset);
-                            self.mutation_labels.borrow_mut().insert(mid_label);
-                            *state = self.rewrite_old_globals_to_label(
-                                state,
-                                Some(&resource_type),
-                                state.post,
-                                mid_label,
-                            );
-                            mid_label
-                        } else {
-                            state.post
-                        };
-                        let pre_label = self.mk_label_at(offset);
+                        let pre_label = self.forward_label_at(offset);
+                        let post_label = state.post;
                         // srcs[0] = signer/address, srcs[1] = resource value
                         let addr_exp = self.signer_to_address(self.mk_temporary(srcs[0]));
                         let val_exp = self.mk_temporary(srcs[1]);
@@ -2104,20 +2313,22 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             Some(pre_label),
                         );
                         state.add_aborts(exists_exp.clone());
-                        // Post-state ensures: resource now exists with the given value
-                        let global_post = self.mk_global_with_label(
+                        // Post-state ensures: publish<R>(addr, val) defines the transition.
+                        let range = MemoryRange {
+                            pre: Some(pre_label),
+                            post: if post_label == self.at_end_label.get() {
+                                None
+                            } else {
+                                Some(post_label)
+                            },
+                        };
+                        state.add_ensures(self.mk_spec_publish(
                             &struct_env,
                             type_args,
                             addr_exp.clone(),
-                            Some(post_label),
-                        );
-                        state.add_ensures(self.mk_exists_with_label(
-                            &struct_env,
-                            type_args,
-                            addr_exp.clone(),
-                            Some(post_label),
+                            val_exp,
+                            range,
                         ));
-                        state.add_ensures(self.mk_eq(global_post, val_exp));
                         // Track as direct modifies target
                         let modifies_target = self.mk_global(&struct_env, type_args, addr_exp);
                         state.add_direct_modifies(modifies_target);
@@ -2222,57 +2433,43 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                                         state.captured_mut_params.insert(ref_temp);
                                     }
                                 } else if let Some((mid, sid, targs, addr_temp)) =
-                                    self.find_same_resource_different_addr(state, ref_temp)
+                                    self.borrow_global_info.get(&ref_temp).cloned()
                                 {
-                                    // Same resource type but different address (N=2 case).
-                                    // Create intermediate label to chain the two writes.
-                                    // Use op_index+1 so SaveMem is emitted AFTER the
-                                    // WriteBack (before the next op), capturing the
-                                    // post-mutation state. Same pattern as function calls
-                                    // (line ~2613).
-                                    let mid_label = self.mk_fresh_label("mutation", offset);
-                                    self.mutation_labels.borrow_mut().insert(mid_label);
-
-                                    let struct_env = self.global_env().get_struct(QualifiedId {
-                                        module_id: mid,
-                                        id: sid,
-                                    });
-                                    let resource_type = Type::Struct(mid, sid, targs.clone());
+                                    // Emit update<R>(addr, ref_temp) with pre-label from
+                                    // forward analysis and post-label from backward state.
+                                    let struct_env = self.get_struct(mid, sid);
                                     let addr_exp = self.mk_temporary(addr_temp);
+                                    let val_exp = self.mk_temporary(ref_temp);
 
-                                    // Retroactive rewrite: old(global[@state.post]<R>(...))
-                                    //                    → global[@mid_label]<R>(...)
-                                    *state = self.rewrite_old_globals_to_label(
-                                        state,
-                                        Some(&resource_type),
-                                        state.post,
-                                        mid_label,
-                                    );
-
-                                    // Emit frame: forall a: a != addr ==>
-                                    //   global[@mid]<R>(a) == old(global<R>(a))
-                                    let frame = self.mk_intermediate_frame(
-                                        mid_label,
+                                    let pre_label = self.forward_label_at(offset);
+                                    let post_label = state.post;
+                                    let range = MemoryRange {
+                                        pre: Some(pre_label),
+                                        post: if post_label == self.at_end_label.get() {
+                                            None
+                                        } else {
+                                            Some(post_label)
+                                        },
+                                    };
+                                    state.add_ensures(self.mk_spec_update(
                                         &struct_env,
                                         &targs,
-                                        addr_exp,
-                                    );
-                                    state.add_ensures(frame);
+                                        addr_exp.clone(),
+                                        val_exp,
+                                        range,
+                                    ));
 
-                                    // Update state.post for predecessor instructions
-                                    state.post = mid_label;
+                                    // Track as direct modifies target
+                                    let modifies_target =
+                                        self.mk_global(&struct_env, &targs, addr_exp);
+                                    state.add_direct_modifies(modifies_target);
+                                    state.post = pre_label;
                                 }
-                                // When a function call precedes this WriteBack in backward
-                                // order (= follows in program order), state.post is the
-                                // call's pre_label. Preserve it so label stripping doesn't
-                                // remove it (it would otherwise match entry_post_label).
-                                if state.post != self.at_end_label {
-                                    self.mutation_labels.borrow_mut().insert(state.post);
-                                }
-                                // Mark the source temp as a captured global. The BorrowGlobal
-                                // handler (processed later in backward order) will resolve this
-                                // temp to `global<R>(addr)`.
-                                state.captured_globals.insert(ref_temp);
+                                // Track in update_globals (not captured_globals) so
+                                // has_global_mutations() returns true for sequential
+                                // writes, but is_global_or_mut_param() returns false
+                                // so WriteBack(Reference) substitutes in-place.
+                                state.update_globals.insert(ref_temp);
                             },
                             BorrowNode::ReturnPlaceholder(_) => {
                                 // This doesn't appear in bytecode instructions, skip
@@ -2282,6 +2479,12 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
 
                     // Havoc: wp(x := *, Q) = forall x. Q
                     // Wrap conditions referencing dest in a universal quantifier.
+                    // NOTE: For loop-modified variables, the existential quantification
+                    // of abort conditions may over-approximate. E.g., a loop that
+                    // increments a counter n times produces `aborts_if 0 < n` instead
+                    // of the precise `aborts_if counter + n > MAX_U64`, because the
+                    // quantifier abstracts away cumulative effects. This is sound
+                    // (over-approximates aborts) but imprecise.
                     Operation::Havoc(_) => {
                         let dest = dests[0];
                         let raw_ty = self.get_local_type(dest);
@@ -2599,8 +2802,13 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         let target = FunctionTarget::new(fun_env, data);
         let env = fun_env.module_env.env;
 
-        // Create the "at_end" label representing the final state
-        let at_end_label = env.new_global_id();
+        // Create the entry label representing the function's initial state.
+        let at_entry_label = MemoryLabel::new(env.new_global_id().as_usize());
+        let at_entry_sym = env.symbol_pool().make("at_entry");
+        env.set_memory_label_name(at_entry_label, at_entry_sym);
+
+        // Create the "at_end" label representing the final state (post-return).
+        let at_end_label = MemoryLabel::new(env.new_global_id().as_usize());
         let at_end_sym = env.symbol_pool().make("at_end");
         env.set_memory_label_name(at_end_label, at_end_sym);
 
@@ -2622,76 +2830,68 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             fun_env,
             target,
             current_loc: fun_env.get_loc(),
-            at_end_label,
+            at_entry_label,
+            at_end_label: Cell::new(at_end_label),
             offset_labels: RefCell::new(BTreeMap::new()),
             borrow_global_info,
             havoc_targets,
-            mutation_labels: RefCell::new(BTreeSet::new()),
-            label_offsets: RefCell::new(BTreeMap::new()),
+            forward_label_map: RefCell::new(BTreeMap::new()),
+            label_counter: Cell::new(0),
         }
     }
 
     /// Create or retrieve a memory label for a specific code offset.
     /// Returns the same label for the same offset (for fixpoint stability).
-    /// Compute the stable operation index for a bytecode offset: count of "original"
-    /// bytecodes at offsets <= `offset`. Original bytecodes exclude instrumentation
-    /// (SaveMem, Prop, TraceLocal, etc.), making the index stable across recompilation.
-    fn op_index_at(&self, offset: CodeOffset) -> usize {
-        self.target
-            .get_bytecode()
-            .iter()
-            .enumerate()
-            .filter(|(i, bc)| *i <= offset as usize && Self::is_original_bytecode(bc))
-            .count()
-    }
-
     fn mk_label_at(&self, offset: CodeOffset) -> MemoryLabel {
         let mut cache = self.offset_labels.borrow_mut();
         *cache.entry(offset).or_insert_with(|| {
             let env = self.global_env();
-            let label = env.new_global_id();
-            let op_index = self.op_index_at(offset);
-            let name = env.symbol_pool().make(&format!("at_op_{}", op_index));
-            env.set_memory_label_name(label, name);
-            self.label_offsets.borrow_mut().insert(label, (offset, 0));
+            let label = MemoryLabel::new(env.new_global_id().as_usize());
+            let seq = self.label_counter.get() + 1;
+            self.label_counter.set(seq);
+            let name = format!("{}{}", INFERRED_LABEL_PREFIX, seq);
+            let sym = env.symbol_pool().make(&name);
+            env.set_memory_label_name(label, sym);
             label
         })
     }
 
-    /// Determines if a bytecode is an "original" operation bytecode (from source compilation)
-    /// as opposed to an instrumentation-added bytecode. This classification must be stable
-    /// between instrumented and uninstrumented code for label offset mapping to work.
-    fn is_original_bytecode(bc: &Bytecode) -> bool {
-        match bc {
-            // Instrumentation-added bytecodes (not in original code)
-            Bytecode::SaveMem(..)
-            | Bytecode::SaveSpecVar(..)
-            | Bytecode::Prop(..)
-            | Bytecode::Nop(..) => false,
-            // Trace operations are added during compilation but also during instrumentation.
-            // They appear in both Stage 1 and Stage 2, so count them.
-            Bytecode::Call(_, _, op, _, _) => !matches!(
-                op,
-                Operation::OpaqueCallBegin(..) | Operation::OpaqueCallEnd(..)
-            ),
-            // All other bytecodes are original
-            _ => true,
-        }
+    /// Run forward state boundary analysis to pre-assign memory labels.
+    /// Must be called before the backward WP analysis.
+    ///
+    /// The forward analysis assigns a fresh label at each state-changing instruction.
+    /// The result maps each bytecode offset to (state_before, state_after).
+    /// `at_end_label` is NOT derived from the forward analysis (CFG joins can
+    /// lose branch-specific information); it's created in the constructor.
+    fn run_forward_label_analysis(&self, bytecode: &[Bytecode]) {
+        let fwd_cfg = StacklessControlFlowGraph::new_forward(bytecode);
+        let initial = StateBoundaryState(self.at_entry_label);
+        let analysis = StateBoundaryAnalysis { analyzer: self };
+        let state_map = analysis.analyze_function(initial, bytecode, &fwd_cfg);
+        let label_map =
+            analysis.state_per_instruction(state_map, bytecode, &fwd_cfg, |before, after| {
+                // Map the forward exit state to at_end_label at Ret/Abort.
+                // The forward analysis may produce different exit labels on
+                // different paths (due to CFG join imprecision), but the
+                // backward WP uses at_end_label uniformly for the exit state.
+                let after_label = if after.0 != before.0 {
+                    after.0 // state-changing: keep the forward-assigned label
+                } else {
+                    before.0 // non-state-changing: same as before
+                };
+                (before.0, after_label)
+            });
+        *self.forward_label_map.borrow_mut() = label_map;
     }
 
-    /// Create a fresh memory label with a given name (not cached by offset).
-    /// Use this when `mk_label_at` would clash with an existing label at the same offset.
-    /// `code_offset` is the bytecode offset of the operation this label is associated with;
-    /// the label represents the post-state after that operation.
-    fn mk_fresh_label(&self, name: &str, code_offset: CodeOffset) -> MemoryLabel {
-        let env = self.global_env();
-        let label = env.new_global_id();
-        let sym = env.symbol_pool().make(name);
-        env.set_memory_label_name(label, sym);
-        self.label_offsets
-            .borrow_mut()
-            .insert(label, (code_offset, 1));
-        label
+    /// Look up the forward-analysis memory label at a given code offset.
+    /// Returns the state BEFORE the instruction (the ambient state).
+    fn forward_label_at(&self, offset: CodeOffset) -> MemoryLabel {
+        self.forward_label_map
+            .borrow()
+            .get(&offset)
+            .map(|(pre, _)| *pre)
+            .unwrap_or(self.at_entry_label)
     }
 
     /// Shared WP logic for function calls (direct) and closure invocations.
@@ -2710,36 +2910,13 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         dests: &[TempIndex],
         mut_ref_srcs: &[(usize, TempIndex)],
     ) {
-        // Create a new pre-label for this call site
-        let pre_label = self.mk_label_at(offset);
-
-        // When global mutations are present (processed earlier in
-        // backward order = later in program order), the function call
-        // creates a state transition boundary. Insert an intermediate
-        // label so the mutations' old() references point to the post-call
-        // state rather than the function entry state.
-        let call_post = if state.has_global_mutations() {
-            let mid_label = self.mk_fresh_label("mutation", offset);
-            self.mutation_labels.borrow_mut().insert(mid_label);
-            // Rewrite existing old(global[@state.post]<R>(...)) and
-            // old(global[None]<R>(...)) → global[@mid_label]<R>(...)
-            // for all resource types (opaque call).
-            *state = self.rewrite_old_globals_to_label(
-                state, None, // all resource types
-                state.post, mid_label,
-            );
-            mid_label
-        } else {
-            state.post
-        };
+        // Pre-label from forward analysis; post from backward WP state.
+        let pre_label = self.forward_label_at(offset);
+        let call_post = state.post;
 
         // Create state labels for the behavioral predicates:
         // - result_of uses pre_label as pre-state and call_post as post-state
         // - aborts_of uses only pre_label (no post-state: aborts don't produce state)
-        // The post-processing step (substitute_labels_in_state) will strip
-        // labels that correspond to the function's entry/exit states, and
-        // a second pass strips orphaned pre-labels (those referencing
-        // a post-label that no behavioral predicate defines).
         let behavior_pre = Some(pre_label);
         let behavior_post = Some(call_post);
         let aborts_pre = Some(pre_label);
@@ -2797,6 +2974,24 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             all_subs.push((*idx, result_exp));
         }
 
+        // Check if any dest temp is referenced in the state before substitution.
+        // If not, result_of will vanish (return value discarded) and we'll need
+        // ensures_of as a fallback to preserve the post-label for state chaining.
+        let any_dest_referenced = dests.iter().any(|&d| {
+            state.ensures.iter().chain(state.aborts.iter()).any(|e| {
+                let mut found = false;
+                e.visit_pre_order(&mut |sub| {
+                    if let ExpData::Temporary(_, idx) = sub {
+                        if *idx == d {
+                            found = true;
+                        }
+                    }
+                    !found
+                });
+                found
+            })
+        });
+
         // Apply all substitutions simultaneously
         *state = self.substitute_multiple_temps_in_state(state, &all_subs);
 
@@ -2838,10 +3033,13 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             }
         }
 
-        // For void-returning calls with no &mut params, emit ensures_of
-        // to capture the callee's post-conditions and define the post-label
-        // for state chaining.
+        // Emit ensures_of for state chaining in two cases:
+        // 1. Void calls (no dests, no &mut): ensures_of is the only postcondition
+        // 2. Non-void calls where result_of vanished (return value discarded):
+        //    ensures_of<f>(args, result_of<f>(args)) preserves the post-label
+        //    so downstream behavioral predicates can reference the intermediate state.
         if dests.is_empty() && mut_ref_srcs.is_empty() {
+            // Void call: ensures_of<f>(args)
             let ensures_of = self.mk_ensures_of_with_state(
                 fun_exp.clone(),
                 args.clone(),
@@ -2849,6 +3047,29 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 behavior_post,
             );
             state.add_ensures(ensures_of);
+        } else if !any_dest_referenced {
+            {
+                // Result discarded: emit ensures_of<f>(args, result_of<f>(args)...)
+                let mut ensures_args = args.clone();
+                for i in 0..num_all_outputs {
+                    ensures_args.push(self.mk_result_of_at_with_state(
+                        fun_exp.clone(),
+                        args.clone(),
+                        &extended_result_type,
+                        i,
+                        num_all_outputs,
+                        behavior_pre,
+                        behavior_post,
+                    ));
+                }
+                let ensures_of = self.mk_ensures_of_with_state(
+                    fun_exp.clone(),
+                    ensures_args,
+                    behavior_pre,
+                    behavior_post,
+                );
+                state.add_ensures(ensures_of);
+            }
         }
 
         let aborts = self.mk_aborts_of_with_state(fun_exp, args, aborts_pre, aborts_post);
@@ -2989,8 +3210,41 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             .collect()
     }
 
-    /// Import direct `modifies` targets from a statically known callee so the
-    /// caller has permission to verify the callee's mutations.
+    /// Check if a callee has an associated pure spec function (created by the
+    /// spec rewriter) that can be called directly in spec expressions, returning
+    /// the spec function id and instantiated result type if so.
+    ///
+    /// A function qualifies if it has no `&mut` params, no function-type params,
+    /// and an associated spec function with a body and empty `used_memory`.
+    fn try_as_pure_spec_call(
+        &self,
+        module_id: ModuleId,
+        fun_id: FunId,
+        type_inst: &[Type],
+    ) -> Option<(SpecFunId, Type)> {
+        let callee = self.global_env().get_function(QualifiedId {
+            module_id,
+            id: fun_id,
+        });
+        // Must have no &mut params and no function-type params
+        if callee
+            .get_parameters()
+            .iter()
+            .any(|p| p.1.is_mutable_reference() || matches!(p.1.skip_reference(), Type::Fun(..)))
+        {
+            return None;
+        }
+        // Must have an associated pure spec function with a body and no memory use.
+        // Functions without a body (e.g., those with side effects like move_to that
+        // can't be expressed as spec expressions) are not pure.
+        let (spec_fun_id, decl) = callee.find_spec_fun()?;
+        if decl.body.is_none() || !decl.used_memory.is_empty() {
+            return None;
+        }
+        let result_type = callee.get_result_type().instantiate(type_inst);
+        Some((spec_fun_id, result_type))
+    }
+
     fn add_direct_call_modifies(
         &self,
         state: &mut WPState,
@@ -3035,32 +3289,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         })
     }
 
-    /// Check whether any already-captured global temp maps to the same resource
-    /// type (same `mid`, `sid`, `targs`) but a DIFFERENT `addr_temp` as `ref_temp`.
-    /// Returns Some((mid, sid, targs, addr_temp)) of ref_temp if found.
-    /// Handles N>=2 different-addr writes to the same resource type.
-    fn find_same_resource_different_addr(
-        &self,
-        state: &WPState,
-        ref_temp: TempIndex,
-    ) -> Option<(ModuleId, StructId, Vec<Type>, TempIndex)> {
-        let info = self.borrow_global_info.get(&ref_temp)?;
-        let has_match = state.captured_globals.iter().any(|&captured| {
-            captured != ref_temp
-                && self.borrow_global_info.get(&captured).is_some_and(|ci| {
-                    ci.0 == info.0 && ci.1 == info.1 && ci.2 == info.2 && ci.3 != info.3
-                    // Different addr_temp
-                })
-        });
-        if has_match {
-            Some((info.0, info.1, info.2.clone(), info.3))
-        } else {
-            None
-        }
-    }
-
-    /// Find whether any captured global in the state matches the given resource
-    /// (module_id, struct_id, type_args, addr_temp). Returns the borrow temp if found.
     fn find_captured_global_for_resource(
         &self,
         state: &WPState,
@@ -3086,171 +3314,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         })
     }
 
-    /// Retroactively rewrite `old(global[@old_label]<R>(...))` and
-    /// `old(global[None]<R>(...))` → `global[@new_label]<R>(...)` in a WPState.
-    /// This makes already-processed writes read from the intermediate state
-    /// instead of from the function entry state.
-    /// When `resource_type` is `Some`, only globals of that type are rewritten;
-    /// when `None`, all resource types are rewritten.
-    fn rewrite_old_globals_to_label(
-        &self,
-        state: &WPState,
-        resource_type: Option<&Type>,
-        old_label: MemoryLabel,
-        new_label: MemoryLabel,
-    ) -> WPState {
-        let env = self.global_env();
-        state.map(|e| {
-            struct OldGlobalRewriter<'a> {
-                env: &'a GlobalEnv,
-                resource_type: Option<&'a Type>,
-                old_label: MemoryLabel,
-                new_label: MemoryLabel,
-            }
-
-            impl OldGlobalRewriter<'_> {
-                fn matches_resource_type(&self, inner_id: NodeId) -> bool {
-                    match self.resource_type {
-                        Some(rt) => self.env.get_node_type(inner_id) == *rt,
-                        None => true,
-                    }
-                }
-
-                /// Like `matches_resource_type` but checks the type instantiation
-                /// instead of the node type. This is needed for `Exists` nodes whose
-                /// node type is `bool` with the resource type in the instantiation.
-                fn matches_resource_type_from_inst(&self, id: NodeId) -> bool {
-                    match self.resource_type {
-                        Some(rt) => {
-                            let inst = self.env.get_node_instantiation(id);
-                            inst.len() == 1 && inst[0] == *rt
-                        },
-                        None => true,
-                    }
-                }
-            }
-
-            impl ExpRewriterFunctions for OldGlobalRewriter<'_> {
-                fn rewrite_call(&mut self, _id: NodeId, oper: &AstOp, args: &[Exp]) -> Option<Exp> {
-                    if matches!(oper, AstOp::Old) && args.len() == 1 {
-                        match args[0].as_ref() {
-                            // Match: old(global[@old_label]<R>(...))
-                            ExpData::Call(inner_id, AstOp::Global(Some(label)), inner_args)
-                                if *label == self.old_label
-                                    && self.matches_resource_type(*inner_id) =>
-                            {
-                                let rewritten_args: Vec<Exp> = inner_args
-                                    .iter()
-                                    .map(|a| self.rewrite_exp(a.clone()))
-                                    .collect();
-                                return Some(
-                                    ExpData::Call(
-                                        *inner_id,
-                                        AstOp::Global(Some(self.new_label)),
-                                        rewritten_args,
-                                    )
-                                    .into_exp(),
-                                );
-                            },
-                            // Match: old(global[None]<R>(...)) — bare old(global<R>(x))
-                            ExpData::Call(inner_id, AstOp::Global(None), inner_args)
-                                if self.matches_resource_type(*inner_id) =>
-                            {
-                                let rewritten_args: Vec<Exp> = inner_args
-                                    .iter()
-                                    .map(|a| self.rewrite_exp(a.clone()))
-                                    .collect();
-                                return Some(
-                                    ExpData::Call(
-                                        *inner_id,
-                                        AstOp::Global(Some(self.new_label)),
-                                        rewritten_args,
-                                    )
-                                    .into_exp(),
-                                );
-                            },
-                            _ => {},
-                        }
-                    }
-                    // Also handle bare Exists[@old_label]<R>(addr) in abort conditions.
-                    // These are not wrapped in old() but still need label rewriting.
-                    if let AstOp::Exists(Some(label)) = oper {
-                        if *label == self.old_label && self.matches_resource_type_from_inst(_id) {
-                            let rewritten_args: Vec<Exp> =
-                                args.iter().map(|a| self.rewrite_exp(a.clone())).collect();
-                            return Some(
-                                ExpData::Call(
-                                    _id,
-                                    AstOp::Exists(Some(self.new_label)),
-                                    rewritten_args,
-                                )
-                                .into_exp(),
-                            );
-                        }
-                    }
-                    None
-                }
-            }
-
-            OldGlobalRewriter {
-                env,
-                resource_type,
-                old_label,
-                new_label,
-            }
-            .rewrite_exp(e.clone())
-        })
-    }
-
-    /// Build an intermediate frame condition:
-    /// `forall a: address: a != addr_exp ==> global[@mid]<R>(a) == old(global<R>(a))`
-    fn mk_intermediate_frame(
-        &self,
-        mid_label: MemoryLabel,
-        struct_env: &StructEnv,
-        type_args: &[Type],
-        addr_exp: Exp,
-    ) -> Exp {
-        // Build the quantifier: forall a: address
-        let sym = self.mk_symbol("$a");
-        let addr_type = Type::Primitive(PrimitiveType::Address);
-        let a_var = self.mk_local_by_sym(sym, addr_type.clone());
-
-        // a != addr_exp
-        let neq = self.mk_not(self.mk_eq(a_var.clone(), addr_exp));
-
-        // global[@mid]<R>(a)
-        let global_mid =
-            self.mk_global_with_label(struct_env, type_args, a_var.clone(), Some(mid_label));
-
-        // old(global<R>(a)) — Global(None) inside old() represents entry state
-        let global_old = self.mk_old(self.mk_global(struct_env, type_args, a_var.clone()));
-
-        // global[@mid]<R>(a) == old(global<R>(a))
-        let eq = self.mk_eq(global_mid, global_old);
-
-        // a != addr_exp ==> global[@mid]<R>(a) == old(global<R>(a))
-        let body = self.mk_implies(neq, eq);
-
-        // forall a: address: body
-        let range = self.mk_type_domain(addr_type.clone());
-        let pat = self.mk_decl(sym, addr_type);
-        let node_id = self.new_node(BOOL_TYPE.clone(), None);
-        ExpData::Quant(
-            node_id,
-            QuantKind::Forall,
-            vec![(pat, range)],
-            vec![],
-            None,
-            body,
-        )
-        .into_exp()
-    }
-
-    /// Strip memory labels inside `old()` wrappers in a WPState.
-    /// Transforms: `old(global[@label]<R>(a))` → `old(global<R>(a))`
-    /// This is needed because BorrowGlobal substitution inserts the state.post label
-    /// into all occurrences of the temp (including those inside old()), but labels
     /// inside old() are semantically wrong (old() already refers to function entry state).
     fn strip_labels_inside_old(&self, state: &WPState) -> WPState {
         state.map(|e| {
@@ -3384,298 +3447,11 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             post: new_post,
             captured_mut_params: state.captured_mut_params.clone(),
             captured_globals: state.captured_globals.clone(),
+            update_globals: state.update_globals.clone(),
             direct_modifies,
         }
     }
 
-    /// Collect all post-labels defined by `Behavior` and `SpecFunction` operations in a WPState.
-    fn collect_behavior_post_labels(&self, state: &WPState) -> BTreeSet<MemoryLabel> {
-        let mut labels = BTreeSet::new();
-        for e in state.ensures.iter().chain(state.aborts.iter()) {
-            e.as_ref().visit_pre_order(&mut |e| {
-                if let ExpData::Call(_, op, _) = e {
-                    match op {
-                        AstOp::Behavior(_, range) | AstOp::SpecFunction(_, _, range) => {
-                            if let Some(label) = range.post {
-                                labels.insert(label);
-                            }
-                        },
-                        _ => {},
-                    }
-                }
-                true
-            });
-        }
-        labels
-    }
-
-    /// Collect intermediate-state labels from direct memory observations (Global/Exists).
-    /// Only includes labels that are tracked in `offset_labels` or `mutation_labels`
-    /// (intermediate states at specific bytecode offsets); entry-state and other labels
-    /// are excluded.
-    fn collect_memory_observation_labels(&self, state: &WPState) -> BTreeSet<MemoryLabel> {
-        let offset_labels = self.offset_labels.borrow();
-        let mutation_labels = self.mutation_labels.borrow();
-        let mut labels = BTreeSet::new();
-        for e in state.ensures.iter().chain(state.aborts.iter()) {
-            e.as_ref().visit_pre_order(&mut |e| {
-                if let ExpData::Call(_, op, _) = e {
-                    match op {
-                        AstOp::Global(Some(label)) | AstOp::Exists(Some(label)) => {
-                            if offset_labels.values().any(|l| l == label)
-                                || mutation_labels.contains(label)
-                            {
-                                labels.insert(*label);
-                            }
-                        },
-                        _ => {},
-                    }
-                }
-                true
-            });
-        }
-        labels
-    }
-
-    /// Collect all pre-labels referenced by `Behavior` and `SpecFunction` operations.
-    fn collect_behavior_pre_labels(&self, state: &WPState) -> BTreeSet<MemoryLabel> {
-        let mut labels = BTreeSet::new();
-        for e in state.ensures.iter().chain(state.aborts.iter()) {
-            e.as_ref().visit_pre_order(&mut |e| {
-                if let ExpData::Call(_, op, _) = e {
-                    match op {
-                        AstOp::Behavior(_, range) | AstOp::SpecFunction(_, _, range) => {
-                            if let Some(label) = range.pre {
-                                labels.insert(label);
-                            }
-                        },
-                        _ => {},
-                    }
-                }
-                true
-            });
-        }
-        labels
-    }
-
-    /// Rename internal `at_op_N` / `mutation` labels to user-friendly sequential names.
-    /// Labels with a tracked position (in `label_offsets`) are collected from the state,
-    /// sorted by bytecode position, and renamed to `{INFERRED_LABEL_PREFIX}` (single label)
-    /// or `{INFERRED_LABEL_PREFIX}1`, `{INFERRED_LABEL_PREFIX}2`, ... (multiple labels).
-    fn rename_inferred_labels(&self, state: &WPState) {
-        let env = self.global_env();
-        let offsets = self.label_offsets.borrow();
-        // Collect all unique labels with a tracked position from the state expressions.
-        let mut labels_with_pos: BTreeMap<(CodeOffset, u8), MemoryLabel> = BTreeMap::new();
-        let mut visitor = |e: &ExpData| {
-            if let ExpData::Call(_, op, _) = e {
-                match op {
-                    AstOp::Global(Some(label)) | AstOp::Exists(Some(label)) => {
-                        if let Some(pos) = offsets.get(label) {
-                            labels_with_pos.insert(*pos, *label);
-                        }
-                    },
-                    AstOp::Behavior(_, range) | AstOp::SpecFunction(_, _, range) => {
-                        for label in [range.pre, range.post].into_iter().flatten() {
-                            if let Some(pos) = offsets.get(&label) {
-                                labels_with_pos.insert(*pos, label);
-                            }
-                        }
-                    },
-                    _ => {},
-                }
-            }
-            true
-        };
-        for e in state.ensures.iter().chain(state.aborts.iter()) {
-            e.as_ref().visit_pre_order(&mut visitor);
-        }
-        if labels_with_pos.is_empty() {
-            return;
-        }
-        // Rename labels sequentially (BTreeMap is sorted by key = program order).
-        let count = labels_with_pos.len();
-        for (seq, (_, label)) in labels_with_pos.iter().enumerate() {
-            let name = if count == 1 {
-                INFERRED_LABEL_PREFIX.to_string()
-            } else {
-                format!("{}{}", INFERRED_LABEL_PREFIX, seq + 1)
-            };
-            let sym = env.symbol_pool().make(&name);
-            env.set_memory_label_name(*label, sym);
-        }
-    }
-
-    /// Normalize `Behavior`/`SpecFunction` labels:
-    /// - strip pre-labels whose producer post-label is absent
-    /// - strip post-labels that are never consumed by a later predicate
-    fn normalize_behavior_labels(
-        &self,
-        state: WPState,
-        preserved_pre_labels: &BTreeSet<MemoryLabel>,
-        entry_pre_label: Option<MemoryLabel>,
-    ) -> WPState {
-        let mut defined = self.collect_behavior_post_labels(&state);
-        // Labels from direct memory observations (Global/Exists) also define
-        // observable intermediate states that behavioral predicates can reference.
-        defined.extend(self.collect_memory_observation_labels(&state));
-        // Call-site pre-labels represent real state boundaries between
-        // sequential operations. Include them as defined states so that
-        // behavioral predicates referencing them survive normalization
-        // even when the call that originally produced the post-label
-        // has its result simplified away.
-        defined.extend(self.offset_labels.borrow().values().copied());
-        // The entry pre-state is implicit for behavioral predicates —
-        // strip it so pre-labels referencing it are removed.
-        if let Some(label) = entry_pre_label {
-            defined.remove(&label);
-        }
-        let referenced = self.collect_behavior_pre_labels(&state);
-
-        struct NormalizeBehaviorLabels<'a> {
-            defined: &'a BTreeSet<MemoryLabel>,
-            preserved_pre_labels: &'a BTreeSet<MemoryLabel>,
-            referenced: &'a BTreeSet<MemoryLabel>,
-        }
-        impl ExpRewriterFunctions for NormalizeBehaviorLabels<'_> {
-            fn rewrite_call(&mut self, id: NodeId, oper: &AstOp, args: &[Exp]) -> Option<Exp> {
-                match oper {
-                    AstOp::Behavior(kind, range) => {
-                        let new_range = MemoryRange {
-                            pre: range.pre.filter(|label| {
-                                self.defined.contains(label)
-                                    || self.preserved_pre_labels.contains(label)
-                            }),
-                            // Keep post-label if referenced by another predicate's pre-label
-                            // OR if defined by a memory observation (Global/Exists with this label)
-                            post: range.post.filter(|label| {
-                                self.referenced.contains(label) || self.defined.contains(label)
-                            }),
-                        };
-                        if new_range != *range {
-                            return Some(
-                                ExpData::Call(id, AstOp::Behavior(*kind, new_range), args.to_vec())
-                                    .into_exp(),
-                            );
-                        }
-                    },
-                    AstOp::SpecFunction(mid, fid, range) => {
-                        let new_range = MemoryRange {
-                            pre: range.pre.filter(|label| {
-                                self.defined.contains(label)
-                                    || self.preserved_pre_labels.contains(label)
-                            }),
-                            post: range.post.filter(|label| self.referenced.contains(label)),
-                        };
-                        if new_range != *range {
-                            return Some(
-                                ExpData::Call(
-                                    id,
-                                    AstOp::SpecFunction(*mid, *fid, new_range),
-                                    args.to_vec(),
-                                )
-                                .into_exp(),
-                            );
-                        }
-                    },
-                    _ => {},
-                }
-                None
-            }
-        }
-
-        let mut rewriter = NormalizeBehaviorLabels {
-            defined: &defined,
-            preserved_pre_labels,
-            referenced: &referenced,
-        };
-        let ensures = state
-            .ensures
-            .iter()
-            .map(|e| rewriter.rewrite_exp(e.clone()))
-            .collect();
-        let aborts = state
-            .aborts
-            .iter()
-            .map(|e| rewriter.rewrite_exp(e.clone()))
-            .collect();
-        WPState {
-            ensures,
-            aborts,
-            direct_modifies: state.direct_modifies,
-            ..state
-        }
-    }
-
-    /// Rewrite entry-state references to direct memory observations into `old(...)`.
-    /// Behavioral predicates already encode their pre/post-state explicitly, so
-    /// only direct `global`/`exists` references need this rewrite.
-    fn rewrite_entry_pre_state_refs(
-        &self,
-        state: WPState,
-        entry_post_label: MemoryLabel,
-    ) -> WPState {
-        struct RewriteEntryPreState<'a> {
-            env: &'a GlobalEnv,
-            entry_post_label: MemoryLabel,
-        }
-
-        impl ExpRewriterFunctions for RewriteEntryPreState<'_> {
-            fn rewrite_call(&mut self, id: NodeId, oper: &AstOp, args: &[Exp]) -> Option<Exp> {
-                let rewritten = match oper {
-                    AstOp::Global(Some(label)) if *label == self.entry_post_label => {
-                        Some(ExpData::Call(id, AstOp::Global(None), args.to_vec()).into_exp())
-                    },
-                    AstOp::Exists(Some(label)) if *label == self.entry_post_label => {
-                        Some(ExpData::Call(id, AstOp::Exists(None), args.to_vec()).into_exp())
-                    },
-                    _ => None,
-                }?;
-                let old_id = self
-                    .env
-                    .new_node(self.env.get_node_loc(id), self.env.get_node_type(id));
-                if let Some(inst) = self.env.get_node_instantiation_opt(id) {
-                    self.env.set_node_instantiation(old_id, inst);
-                }
-                Some(ExpData::Call(old_id, AstOp::Old, vec![rewritten]).into_exp())
-            }
-        }
-
-        let mut rewriter = RewriteEntryPreState {
-            env: self.global_env(),
-            entry_post_label,
-        };
-        let ensures = state
-            .ensures
-            .iter()
-            .map(|e| rewriter.rewrite_exp(e.clone()))
-            .collect();
-        let aborts = state
-            .aborts
-            .iter()
-            .map(|e| rewriter.rewrite_exp(e.clone()))
-            .collect();
-        WPState {
-            ensures,
-            aborts,
-            ..state
-        }
-    }
-
-    /// Prepare bytecode for backward WP analysis by neutralizing abort handler blocks.
-    ///
-    /// Abort actions create edges from `Call` instructions to abort handler blocks.
-    /// These are redundant for spec inference because abort conditions are computed
-    /// analytically at each `Call` site (overflow checks, `!exists`, `aborts_of`, etc.).
-    ///
-    /// If left in the backward CFG, the `Abort` instruction's `aborts = [true]`
-    /// propagates backward through these edges and creates spurious conditions.
-    ///
-    /// This function:
-    /// 1. Collects abort handler labels (targets of `AbortAction` on `Call` instructions).
-    /// 2. Strips `AbortAction` from all `Call` instructions (removing CFG edges).
-    /// 3. Neutralizes handler blocks by replacing non-`Label` instructions with a
-    ///    self-loop `Jump`. This makes them non-exit blocks, so the backward CFG
     ///    won't process them. User-written abort blocks are preserved.
     fn prepare_bytecode_for_analysis(bytecode: &[Bytecode]) -> Vec<Bytecode> {
         // Phase 1: Collect abort handler labels
@@ -3734,13 +3510,18 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         let bytecode_for_analysis = Self::prepare_bytecode_for_analysis(bytecode);
         let bytecode = &bytecode_for_analysis;
 
+        // Run forward state boundary analysis to pre-assign memory labels
+        // at state-changing instructions. This determines the label chain
+        // and sets at_end_label.
+        self.run_forward_label_analysis(bytecode);
+
         // Build backward CFG for analysis (backward from exit to entry)
         // Use from_all_blocks=false so DUMMY_EXIT only connects to actual exit blocks (Ret/Abort),
         // not all blocks. This is needed for path-conditional join to work correctly.
         let cfg = StacklessControlFlowGraph::new_backward(bytecode, false);
 
         // Initial state: post points to the "at_end" label (the final state)
-        let initial_state = WPState::new(self.at_end_label);
+        let initial_state = WPState::new(self.at_end_label.get());
 
         // Run dataflow analysis
         let state_map = self.analyze_function(initial_state, bytecode, &cfg);
@@ -3802,9 +3583,10 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             aborts: vec![],
             is_normal_return: true,
             origin_block: None,
-            post: self.at_end_label,
+            post: self.at_end_label.get(),
             captured_mut_params: BTreeSet::new(),
             captured_globals: BTreeSet::new(),
+            update_globals: BTreeSet::new(),
             direct_modifies: vec![],
         }
     }
@@ -4698,13 +4480,14 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         let incoming_post = incoming.post;
         let current_post = current.post;
 
-        let unified_post = if incoming_post != current_post && current_post == self.at_end_label {
-            // Current has the default label; incoming modified state.
-            // Adopt incoming's intermediate label.
-            incoming_post
-        } else {
-            current_post
-        };
+        let unified_post =
+            if incoming_post != current_post && current_post == self.at_end_label.get() {
+                // Current has the default label; incoming modified state.
+                // Adopt incoming's intermediate label.
+                incoming_post
+            } else {
+                current_post
+            };
 
         // Rewrite current state's labels if we're adopting the incoming's post.
         if current_post != unified_post {

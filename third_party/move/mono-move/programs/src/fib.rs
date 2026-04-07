@@ -39,13 +39,18 @@ pub fn native_fib(n: u64) -> u64 {
 ///   [40] callee: n / callee_result
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
     use mono_move_core::{
         CodeOffset as CO, FrameOffset as FO, Function, MicroOp::*, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::ObjectDescriptor;
 
-    pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
+    pub fn program() -> (
+        Vec<Option<ExecutableArenaPtr<Function>>>,
+        Vec<ObjectDescriptor>,
+        ExecutableArena,
+    ) {
+        let arena = ExecutableArena::new();
         let n = 0u32;
         let result = n;
         let tmp = 8u32;
@@ -75,17 +80,20 @@ mod micro_op {
             Return,
         ];
 
-        let func = Function {
+        let code = arena.alloc_slice_fill_iter(code);
+        let pointer_offsets = arena.alloc_slice_fill_iter(std::iter::empty());
+
+        let func = arena.alloc(Function {
             name: GlobalArenaPtr::from_static("fib"),
             code,
             args_size: 8,
             args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (callee_n + 8) as usize,
             zero_frame: false,
-            pointer_offsets: vec![],
-        };
+            pointer_offsets,
+        });
 
-        (vec![func], vec![ObjectDescriptor::Trivial])
+        (vec![Some(func)], vec![ObjectDescriptor::Trivial], arena)
     }
 }
 
