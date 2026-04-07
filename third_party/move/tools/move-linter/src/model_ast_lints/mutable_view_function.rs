@@ -8,35 +8,66 @@
 //! View functions are expected to be read-only. A view that mutates state
 //! could lead to bugs.
 //!
-//! The checker lazily precomputes a set of all functions that transitively
-//! mutate global state using reverse call-graph propagation. Each
-//! `check_function` call then does a simple set lookup.
+//! The checker uses recursive memoized traversal starting from view functions,
+//! so only functions reachable from view functions are ever visited.
 
 use move_compiler_v2::external_checks::FunctionChecker;
 use move_model::{
     ast::{Attribute, ExpData, Operation},
-    model::{FunId, FunctionEnv, GlobalEnv, QualifiedId},
+    model::{FunId, FunctionEnv, QualifiedId},
     ty::ReferenceKind,
 };
-use std::{
-    cell::OnceCell,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::{cell::RefCell, collections::BTreeMap};
 
 const CHECKER_NAME: &str = "mutable_view_function";
 const VIEW_ATTRIBUTE: &str = "view";
 
 pub struct MutableViewFunction {
-    /// Lazily computed set of all functions that (directly or transitively)
-    /// call a state-mutating global operation.
-    mutating_funs: OnceCell<BTreeSet<QualifiedId<FunId>>>,
+    memo: RefCell<BTreeMap<QualifiedId<FunId>, bool>>,
 }
 
 impl MutableViewFunction {
     pub fn new() -> Self {
         Self {
-            mutating_funs: OnceCell::new(),
+            memo: RefCell::new(BTreeMap::new()),
         }
+    }
+
+    fn transitively_mutates(&self, func: &FunctionEnv) -> bool {
+        let fun_id = func.get_qualified_id();
+
+        if let Some(&result) = self.memo.borrow().get(&fun_id) {
+            return result;
+        }
+
+        if func.is_native() {
+            self.memo.borrow_mut().insert(fun_id, false);
+            return false;
+        }
+
+        if mutates_global_state_directly(func) {
+            self.memo.borrow_mut().insert(fun_id, true);
+            return true;
+        }
+
+        // Insert false before recursing to handle cycles.
+        self.memo.borrow_mut().insert(fun_id, false);
+
+        let mut result = false;
+        if let Some(callees) = func.get_called_functions() {
+            let env = &func.module_env.env;
+            for callee_id in callees {
+                if let Some(callee_func) = env.get_function_opt(*callee_id) {
+                    if self.transitively_mutates(&callee_func) {
+                        result = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        self.memo.borrow_mut().insert(fun_id, result);
+        result
     }
 }
 
@@ -46,13 +77,8 @@ impl FunctionChecker for MutableViewFunction {
     }
 
     fn check_function(&self, func: &FunctionEnv) {
-        let env = &func.module_env.env;
-
-        let mutating_funs = self
-            .mutating_funs
-            .get_or_init(|| compute_mutating_funs(env));
-
-        if has_view_attribute(func) && mutating_funs.contains(&func.get_qualified_id()) {
+        if has_view_attribute(func) && self.transitively_mutates(func) {
+            let env = &func.module_env.env;
             let name = func.get_name_str();
             let msg = format!(
                 "view function `{name}` should not modify state, but this function \
@@ -68,56 +94,6 @@ fn has_view_attribute(func: &FunctionEnv) -> bool {
     let env = &func.module_env.env;
     let view_sym = env.symbol_pool().make(VIEW_ATTRIBUTE);
     func.has_attribute(|attr| matches!(attr, Attribute::Apply(_, name, _) if *name == view_sym))
-}
-
-/// Compute the set of all functions that directly or transitively call a
-/// state-mutating global operation.
-///
-/// Algorithm:
-/// 1. Build a reverse call-graph (callee -> set of callers) using
-///    `get_called_functions()` which is available for all functions.
-/// 2. Seed the worklist with functions that directly mutate global state
-///    by scanning `ExpData` for `BorrowGlobal(Mutable)`, `MoveTo`, `MoveFrom`.
-/// 3. Propagate: any caller of a mutating function is also mutating.
-fn compute_mutating_funs(env: &GlobalEnv) -> BTreeSet<QualifiedId<FunId>> {
-    let mut reverse_callees: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>> =
-        BTreeMap::new();
-    let mut worklist: Vec<QualifiedId<FunId>> = Vec::new();
-
-    for module in env.get_modules() {
-        for func in module.get_functions() {
-            let fun_id = func.get_qualified_id();
-            if func.is_native() {
-                continue;
-            }
-
-            if mutates_global_state_directly(&func) {
-                worklist.push(fun_id);
-            }
-
-            if let Some(callees) = func.get_called_functions() {
-                for callee in callees {
-                    reverse_callees.entry(*callee).or_default().insert(fun_id);
-                }
-            }
-        }
-    }
-
-    let mut mutating_funs = BTreeSet::new();
-    while let Some(current) = worklist.pop() {
-        if !mutating_funs.insert(current) {
-            continue;
-        }
-        if let Some(callers) = reverse_callees.get(&current) {
-            for caller in callers {
-                if !mutating_funs.contains(caller) {
-                    worklist.push(*caller);
-                }
-            }
-        }
-    }
-
-    mutating_funs
 }
 
 /// Check if a function directly mutates global state by scanning its AST.
