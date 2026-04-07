@@ -63,28 +63,46 @@ warning: [lint] view function `unsafe_view_mutual_recursive` should not modify s
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
 
-warning: [lint] view function `unsafe_view_deep_chain` should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`).
-    ┌─ tests/model_ast_lints/mutable_view_function.move:148:16
+warning: [lint] view function `first_view_reaches_x` should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`).
+    ┌─ tests/model_ast_lints/mutable_view_function.move:130:16
     │
-148 │     public fun unsafe_view_deep_chain(): u64 acquires State {
+130 │     public fun first_view_reaches_x(): bool acquires State {
+    │                ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `second_view_reaches_y` should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`).
+    ┌─ tests/model_ast_lints/mutable_view_function.move:137:16
+    │
+137 │     public fun second_view_reaches_y(): bool acquires State {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_view_deep_chain` should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`).
+    ┌─ tests/model_ast_lints/mutable_view_function.move:175:16
+    │
+175 │     public fun unsafe_view_deep_chain(): u64 acquires State {
     │                ^^^^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
 
 warning: [lint] view function `unsafe_friend_view_mutates` should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`).
-    ┌─ tests/model_ast_lints/mutable_view_function.move:166:24
+    ┌─ tests/model_ast_lints/mutable_view_function.move:193:24
     │
-166 │     public(friend) fun unsafe_friend_view_mutates(): u64 acquires State {
+193 │     public(friend) fun unsafe_friend_view_mutates(): u64 acquires State {
     │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
 
 warning: [lint] view function `unsafe_package_view_mutates` should not modify state, but this function (or one of its callees) calls a state-mutating operation (`borrow_global_mut`, `move_to`, or `move_from`).
-    ┌─ tests/model_ast_lints/mutable_view_function.move:180:25
+    ┌─ tests/model_ast_lints/mutable_view_function.move:207:25
     │
-180 │     public(package) fun unsafe_package_view_mutates(): u64 acquires State {
+207 │     public(package) fun unsafe_package_view_mutates(): u64 acquires State {
     │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.

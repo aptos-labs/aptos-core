@@ -112,6 +112,33 @@ module 0x42::view_function_safety {
         1
     }
 
+    fun z_mutates() acquires State {
+        let state = borrow_global_mut<State>(@0x42);
+        state.val = state.val + 1;
+    }
+
+    fun cycle_x() acquires State {
+        cycle_y();
+        z_mutates();
+    }
+
+    fun cycle_y() acquires State {
+        cycle_x();
+    }
+
+    #[view]
+    public fun first_view_reaches_x(): bool acquires State {
+        cycle_x();
+        true
+    }
+
+    // Should warn: y transitively mutates via x -> z_mutates
+    #[view]
+    public fun second_view_reaches_y(): bool acquires State {
+        cycle_y();
+        true
+    }
+
     // Ok: mutually recursive functions that do NOT modify state, called by view
     fun mutual_pure_a(n: u64): u64 {
         if (n == 0) {
