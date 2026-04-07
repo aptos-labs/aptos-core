@@ -47,7 +47,7 @@ pub enum SrsBasis<C: CurveGroup> {
     },
 }
 
-impl<C: CurveGroup> SrsBasis<C>  {
+impl<C: CurveGroup> SrsBasis<C> {
     /// Size of basis
     pub fn size(&self) -> usize {
         match self {
@@ -55,7 +55,6 @@ impl<C: CurveGroup> SrsBasis<C>  {
             SrsBasis::PowersOfTau { tau_powers } => tau_powers.len(),
         }
     }
-
 }
 
 // Enums need to be (de)serialised manually

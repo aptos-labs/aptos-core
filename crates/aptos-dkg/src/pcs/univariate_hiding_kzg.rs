@@ -15,7 +15,10 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
     arkworks::{
-        GroupGenerators, msm::MsmInput, random::{sample_field_element, unsafe_random_point}, srs::{SrsBasis, SrsType, convert_to_lagrange_basis, lagrange_basis, powers_of_tau}
+        msm::MsmInput,
+        random::{sample_field_element, unsafe_random_point},
+        srs::{convert_to_lagrange_basis, lagrange_basis, powers_of_tau, SrsBasis, SrsType},
+        GroupGenerators,
     },
     utils,
 };
@@ -136,14 +139,12 @@ pub fn setup<E: Pairing>(
         g2: E::G2Affine::generator(),
     };
 
-
     let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(m)
         .expect("Could not construct evaluation domain");
 
     let msm_basis = SrsBasis::Lagrange {
-        lagr: convert_to_lagrange_basis::<E::G1>(powers_of_tau, eval_dom)
+        lagr: convert_to_lagrange_basis::<E::G1>(powers_of_tau, eval_dom),
     };
-
 
     let roots_of_unity_in_eval_dom = eval_dom.elements().collect();
     let m_inv = E::ScalarField::from(m as u64).inverse().unwrap();
@@ -513,7 +514,7 @@ impl<'a, E: Pairing> sigma_protocol::CurveGroupTrait for CommitmentHomomorphism<
 mod tests {
     use super::*;
     use aptos_crypto::arkworks::random::{sample_field_element, sample_field_elements};
-    use ark_ec::{PrimeGroup as _, pairing::Pairing};
+    use ark_ec::{pairing::Pairing, PrimeGroup as _};
     use ark_poly::{univariate::DensePolynomial, Polynomial};
     use rand::thread_rng;
 
@@ -528,7 +529,8 @@ mod tests {
         let m = 64;
         let xi = sample_field_element(&mut rng);
         let tau = sample_field_element(&mut rng);
-        let (vk, ck) = setup_with_trapdoor::<E>(m, SrsType::Lagrange, group_data, Trapdoor { xi, tau });
+        let (vk, ck) =
+            setup_with_trapdoor::<E>(m, SrsType::Lagrange, group_data, Trapdoor { xi, tau });
 
         let f_coeffs: Vec<Fr<E>> = sample_field_elements(m, &mut rng);
         let poly = DensePolynomial::<Fr<E>> { coeffs: f_coeffs };
@@ -600,15 +602,9 @@ mod tests {
                 g1: G1Affine::generator(),
                 g2: G2Affine::generator(),
             },
-            Trapdoor {
-                xi,
-                tau,
-            }
+            Trapdoor { xi, tau },
         );
 
         assert_eq!(s1, s2);
-
     }
-
-
 }

@@ -4,19 +4,25 @@
 #[cfg(test)]
 use crate::tests::smoke::run_smoke;
 use crate::{
-    group::{Fr, Pairing, G1Affine, G2Affine},
+    group::{Fr, G1Affine, G2Affine, Pairing},
     schemes::fptx_weighted::{
         FPTXWeighted, WeightedBIBEMasterSecretKeyShare, WeightedBIBEVerificationKey,
     },
     shared::{digest::DigestKey, encryption_key::EncryptionKey},
     traits::BatchThresholdEncryption,
 };
-use aptos_crypto::{TSecretSharingConfig as _, arkworks::{GroupGenerators, srs::SrsType}, weighted_config::WeightedConfigArkworks};
-use aptos_dkg::{pcs::univariate_hiding_kzg, pvss::{chunky::chunked_elgamal::num_chunks_per_scalar, traits::transcript::Aggregatable}};
+use aptos_crypto::{
+    arkworks::{srs::SrsType, GroupGenerators},
+    weighted_config::WeightedConfigArkworks,
+    TSecretSharingConfig as _,
+};
+use aptos_dkg::{
+    pcs::univariate_hiding_kzg,
+    pvss::{chunky::chunked_elgamal::num_chunks_per_scalar, traits::transcript::Aggregatable},
+};
 use ark_ec::AffineRepr as _;
-
 #[cfg(test)]
-use ark_std::rand::{Rng as _, thread_rng};
+use ark_std::rand::{thread_rng, Rng as _};
 
 pub fn run_pvss(
     dk: &DigestKey,
@@ -28,7 +34,8 @@ pub fn run_pvss(
 ) {
     let mut aptos_rng = rand::thread_rng();
 
-    let num_chunks = num_chunks_per_scalar::<Fr>(aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT);
+    let num_chunks =
+        num_chunks_per_scalar::<Fr>(aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT);
     let max_num_chunks_padded = (8 * num_chunks + 1).next_power_of_two() - 1;
 
     let trapdoor = univariate_hiding_kzg::Trapdoor::rand(&mut aptos_rng);
@@ -50,7 +57,7 @@ pub fn run_pvss_with_hkzg(
     hkzg_setup: (
         univariate_hiding_kzg::CommitmentKey<Pairing>,
         univariate_hiding_kzg::VerificationKey<Pairing>,
-    )
+    ),
 ) -> (
     WeightedConfigArkworks<Fr>,
     EncryptionKey,

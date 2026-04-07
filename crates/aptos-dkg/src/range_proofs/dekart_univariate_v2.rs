@@ -303,7 +303,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
         ck_S: univariate_hiding_kzg::CommitmentKey<E>,
     ) -> (ProverKey<E>, VerificationKey<E>) {
-
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
         let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell.into());
