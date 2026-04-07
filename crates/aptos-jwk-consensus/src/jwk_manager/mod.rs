@@ -192,7 +192,7 @@ impl JWKManager {
         let needs_update = match observed_nonce {
             Some(nonce) => {
                 // For blockchain events: compare nonce (version) only
-                let on_chain_version = state.convert_oracle_nonce();
+                let on_chain_version = state.convert_oracle_nonce()?;
                 let should_update = nonce > on_chain_version;
                 if should_update {
                     debug!(
@@ -558,19 +558,22 @@ impl PerProviderState {
             .map_or(0, |provider_jwks| provider_jwks.version)
     }
 
-    pub fn convert_oracle_nonce(&self) -> u128 {
-        self.on_chain.as_ref().map_or(0, |provider_jwks| {
-            provider_jwks
-                .jwks
-                .first()
-                .and_then(|jwk| {
-                    let data = jwk.variant.data.as_slice();
-                    data.try_into()
-                        .ok()
-                        .map(|bytes: [u8; 16]| u128::from_be_bytes(bytes))
-                })
-                .unwrap_or(0)
-        })
+    pub fn convert_oracle_nonce(&self) -> anyhow::Result<u128> {
+        let provider_jwks = match self.on_chain.as_ref() {
+            Some(jwks) => jwks,
+            None => return Ok(0),
+        };
+
+        let jwk = provider_jwks.jwks.first().ok_or_else(|| {
+            anyhow::anyhow!("No JWK entries to convert oracle nonce")
+        })?;
+
+        let data = jwk.variant.data.as_slice();
+        let bytes: [u8; 16] = data.try_into().map_err(|_| {
+            anyhow::anyhow!("Oracle nonce payload must be 16 bytes")
+        })?;
+
+        Ok(u128::from_be_bytes(bytes))
     }
 }
 
