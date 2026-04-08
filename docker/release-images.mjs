@@ -46,7 +46,7 @@ import {
 // When we release aptos-node, we also want to release related images for tooling, testing, etc. Similarly, other images have other related images
 // that we can release together, ie in a release group.
 const IMAGES_TO_RELEASE_BY_RELEASE_GROUP = {
-  "aptos-node": ["validator", "validator-testing", "faucet", "tools"],
+  "aptos-node": ["validator", "validator-testing", "faucet", "tools", "indexer-grpc"],
   "aptos-indexer-grpc": ["indexer-grpc"],
 };
 
@@ -77,7 +77,7 @@ const IMAGES_TO_RELEASE = {
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "IMAGE_TAG_PREFIX"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN"];
-  const BOOLEAN_ARGS = ["PROFILE_RELEASE"];
+  const BOOLEAN_ARGS = ["PROFILE_RELEASE", "GCP_ONLY"];
 
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
 
@@ -92,13 +92,16 @@ async function main() {
 
   const INTERNAL_TARGET_REGISTRIES = [GCP_ARTIFACT_REPO];
 
-  const ALL_TARGET_REGISTRIES = [...INTERNAL_TARGET_REGISTRIES, DOCKERHUB];
+  const ALL_TARGET_REGISTRIES = parsedArgs.GCP_ONLY
+    ? INTERNAL_TARGET_REGISTRIES
+    : [...INTERNAL_TARGET_REGISTRIES, DOCKERHUB];
 
   // default 10 seconds
   parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
   // dry run
   console.log(`INFO: dry run: ${parsedArgs.DRY_RUN}`);
+  console.log(`INFO: gcp only: ${parsedArgs.GCP_ONLY}`);
 
   // get the appropriate release group based on the image tag prefix
   const imageReleaseGroup = getImageReleaseGroupByImageTagPrefix(parsedArgs.IMAGE_TAG_PREFIX);
