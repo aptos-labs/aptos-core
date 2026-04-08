@@ -34,14 +34,11 @@
 ///
 /// # Notes
 ///
-/// * Make sure LargePackages is deployed to your network of choice, you can currently find it both on
-///   mainnet and testnet at `0xa29df848eebfe5d981f708c2a5b06d31af2be53bbd8ddc94c8523f4b903f7adb`, and
-///   in 0x7 (aptos-experimental) on devnet/localnet.
+/// * Make sure LargePackages is deployed to your network of choice.
 /// * Ensure that `code_indices` have no gaps. For example, if code_indices are
-///   provided as [0, 1, 3] (skipping index 2), the inline function `assemble_module_code` will abort
-///   since `StagingArea.last_module_idx` is set as the max value of the provided index
-///   from `code_indices`, and `assemble_module_code` will lookup the `StagingArea.code` SmartTable from
-///   0 to `StagingArea.last_module_idx` in turn.
+///   provided as [0, 1, 3] (skipping index 2), `assemble_module_code` aborts with
+///   `EINDEX_GAP` (invalid state) once it reaches the missing index, instead of an opaque table error.
+/// * Staging, publish, upgrade, and cleanup emit module events for indexers and monitoring.
 module aptos_experimental::large_packages {
     use std::error;
     use std::signer;
@@ -49,13 +46,50 @@ module aptos_experimental::large_packages {
     use aptos_std::smart_table::{Self, SmartTable};
 
     use aptos_framework::code::{Self, PackageRegistry};
-    use aptos_framework::object::{Object};
+    use aptos_framework::event;
+    use aptos_framework::object::{Self, Object};
     use aptos_framework::object_code_deployment;
 
     /// code_indices and code_chunks should be the same length.
     const ECODE_MISMATCH: u64 = 1;
     /// Object reference should be provided when upgrading object code.
     const EMISSING_OBJECT_REFERENCE: u64 = 2;
+    /// Assembly expected module index `i` in `0..=last_module_idx` but chunk `i` was never staged (gap in indices).
+    const EINDEX_GAP: u64 = 3;
+    /// Code chunk must be non-empty.
+    const EEMPTY_CODE: u64 = 4;
+
+    #[event]
+    /// Emitted after each successful staging call (including the final chunk before publish/upgrade).
+    struct ChunkStaged has drop, store {
+        owner: address,
+        module_indices: vector<u16>,
+        current_last_idx: u64,
+    }
+
+    #[event]
+    /// Emitted after a chunked package is published to an account or to a new object.
+    struct PackagePublished has drop, store {
+        publisher: address,
+        /// For account publish, the package address. For object publish, same as publisher (see `object_code_deployment::Publish` for the new object address).
+        target: address,
+        is_object: bool,
+        module_count: u64,
+    }
+
+    #[event]
+    /// Emitted after a chunked upgrade of object-hosted package code.
+    struct PackageUpgraded has drop, store {
+        publisher: address,
+        code_object_address: address,
+        module_count: u64,
+    }
+
+    #[event]
+    /// Emitted when a staging area is removed via `cleanup_staging_area`.
+    struct StagingCleanedUp has drop, store {
+        owner: address,
+    }
 
     struct StagingArea has key {
         metadata_serialized: vector<u8>,
@@ -78,8 +112,16 @@ module aptos_experimental::large_packages {
         code_indices: vector<u16>,
         code_chunks: vector<vector<u8>>,
     ) acquires StagingArea {
+        let owner_address = signer::address_of(owner);
         let staging_area = stage_code_chunk_internal(owner, metadata_chunk, code_indices, code_chunks);
+        let module_count = staging_area.last_module_idx + 1;
         publish_to_account(owner, staging_area);
+        event::emit(PackagePublished {
+            publisher: owner_address,
+            target: owner_address,
+            is_object: false,
+            module_count,
+        });
         cleanup_staging_area(owner);
     }
 
@@ -89,8 +131,16 @@ module aptos_experimental::large_packages {
         code_indices: vector<u16>,
         code_chunks: vector<vector<u8>>,
     ) acquires StagingArea {
+        let owner_address = signer::address_of(owner);
         let staging_area = stage_code_chunk_internal(owner, metadata_chunk, code_indices, code_chunks);
+        let module_count = staging_area.last_module_idx + 1;
         publish_to_object(owner, staging_area);
+        event::emit(PackagePublished {
+            publisher: owner_address,
+            target: owner_address,
+            is_object: true,
+            module_count,
+        });
         cleanup_staging_area(owner);
     }
 
@@ -101,8 +151,16 @@ module aptos_experimental::large_packages {
         code_chunks: vector<vector<u8>>,
         code_object: Object<PackageRegistry>,
     ) acquires StagingArea {
+        let owner_address = signer::address_of(owner);
+        let code_object_address = object::object_address(&code_object);
         let staging_area = stage_code_chunk_internal(owner, metadata_chunk, code_indices, code_chunks);
+        let module_count = staging_area.last_module_idx + 1;
         upgrade_object_code(owner, staging_area, code_object);
+        event::emit(PackageUpgraded {
+            publisher: owner_address,
+            code_object_address,
+            module_count,
+        });
         cleanup_staging_area(owner);
     }
 
@@ -136,6 +194,10 @@ module aptos_experimental::large_packages {
         let i = 0;
         while (i < vector::length(&code_chunks)) {
             let inner_code = *vector::borrow(&code_chunks, i);
+            assert!(
+                vector::length(&inner_code) > 0,
+                error::invalid_argument(EEMPTY_CODE),
+            );
             let idx = (*vector::borrow(&code_indices, i) as u64);
 
             if (smart_table::contains(&staging_area.code, idx)) {
@@ -148,6 +210,12 @@ module aptos_experimental::large_packages {
             };
             i = i + 1;
         };
+
+        event::emit(ChunkStaged {
+            owner: owner_address,
+            module_indices: code_indices,
+            current_last_idx: staging_area.last_module_idx,
+        });
 
         staging_area
     }
@@ -184,6 +252,10 @@ module aptos_experimental::large_packages {
         let code = vector[];
         let i = 0;
         while (i <= last_module_idx) {
+            assert!(
+                smart_table::contains(&staging_area.code, i),
+                error::invalid_state(EINDEX_GAP),
+            );
             vector::push_back(
                 &mut code,
                 *smart_table::borrow(&staging_area.code, i)
@@ -194,11 +266,15 @@ module aptos_experimental::large_packages {
     }
 
     public entry fun cleanup_staging_area(owner: &signer) acquires StagingArea {
-        let StagingArea {
-            metadata_serialized: _,
-            code,
-            last_module_idx: _,
-        } = move_from<StagingArea>(signer::address_of(owner));
-        smart_table::destroy(code);
+        let owner_address = signer::address_of(owner);
+        if (exists<StagingArea>(owner_address)) {
+            let StagingArea {
+                metadata_serialized: _,
+                code,
+                last_module_idx: _,
+            } = move_from<StagingArea>(owner_address);
+            smart_table::destroy(code);
+            event::emit(StagingCleanedUp { owner: owner_address });
+        };
     }
 }
