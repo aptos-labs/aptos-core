@@ -161,8 +161,10 @@ mod tests {
         block_queue::{BlockQueue, QueueItem},
         test_utils::create_ordered_blocks,
     };
+    use aptos_consensus_types::pipelined_block::PipelineInputTx;
     use aptos_types::randomness::Randomness;
     use std::collections::HashSet;
+    use tokio::sync::oneshot;
 
     #[test]
     fn test_queue_item() {
@@ -230,5 +232,53 @@ mod tests {
         assert_eq!(queue.dequeue_rand_ready_prefix().len(), 2);
 
         assert_eq!(queue.queue.len(), 1);
+    }
+
+    /// Test that set_randomness immediately sends rand_tx to unblock the pipeline.
+    /// Without this, multi-block batches deadlock: later blocks' has_rand_txns_fut
+    /// waits for earlier blocks' execute_fut, which waits for rand_rx, which is
+    /// normally only sent after the entire batch is dequeued.
+    #[test]
+    fn test_set_randomness_sends_rand_tx_immediately() {
+        let ordered_blocks = create_ordered_blocks(vec![1, 2]);
+        let mut rand_rxs = vec![];
+
+        // Wire up pipeline_tx with rand_tx/rand_rx for each block
+        for block in &ordered_blocks.ordered_blocks {
+            let (rand_tx, rand_rx) = oneshot::channel();
+            block.set_pipeline_tx(PipelineInputTx {
+                qc_tx: None,
+                rand_tx: Some(rand_tx),
+                order_vote_tx: None,
+                ordered_blocks_and_proof_fut: None,
+                commit_proof_tx: None,
+                secret_shared_key_tx: None,
+            });
+            rand_rxs.push(rand_rx);
+        }
+
+        let mut item = QueueItem::new(ordered_blocks, None);
+
+        // Set randomness on block 1 — rand_rx should fire immediately
+        assert!(item.set_randomness(1, Randomness::default()));
+        let result = rand_rxs[0].try_recv();
+        assert!(
+            result.is_ok(),
+            "rand_tx for block 1 should be sent immediately on set_randomness"
+        );
+
+        // Block 2 rand_rx should NOT have fired yet
+        assert!(
+            rand_rxs[1].try_recv().is_err(),
+            "rand_tx for block 2 should not be sent yet"
+        );
+
+        // Set randomness on block 2
+        assert!(item.set_randomness(2, Randomness::default()));
+        let result = rand_rxs[1].try_recv();
+        assert!(
+            result.is_ok(),
+            "rand_tx for block 2 should be sent immediately on set_randomness"
+        );
     }
 }

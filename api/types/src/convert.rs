@@ -405,6 +405,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 entry_function_payload,
                             ))
                         },
+                        aptos_types::transaction::MultisigTransactionPayload::Script(script) => {
+                            let script_payload = try_into_script_payload(script)?;
+                            Some(MultisigTransactionPayload::ScriptPayload(script_payload))
+                        },
                     }
                 } else {
                     None
@@ -434,11 +438,20 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                     ),
                                 ),
                             }),
-                            aptos_types::transaction::TransactionExecutable::Script(_)
-                            | aptos_types::transaction::TransactionExecutable::Encrypted => {
+                            aptos_types::transaction::TransactionExecutable::Encrypted => {
                                 bail!(
-                                    "Script/encrypted executable is not supported for multisig transactions"
+                                    "Encrypted executable is not supported for multisig transactions"
                                 )
+                            },
+                            aptos_types::transaction::TransactionExecutable::Script(script) => {
+                                TransactionPayload::MultisigPayload(MultisigPayload {
+                                    multisig_address: multisig_address.into(),
+                                    transaction_payload: Some(
+                                        MultisigTransactionPayload::ScriptPayload(
+                                            try_into_script_payload(script)?,
+                                        ),
+                                    ),
+                                })
                             },
                             aptos_types::transaction::TransactionExecutable::Empty => {
                                 TransactionPayload::MultisigPayload(MultisigPayload {
@@ -945,7 +958,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     Target::Script(try_into_script_payload(script)?)
                 }
             },
-
             TransactionPayload::MultisigPayload(multisig) => {
                 if let Some(nonce) = nonce {
                     let executable = if let Some(payload) = multisig.transaction_payload {
@@ -955,6 +967,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             ) => Executable::EntryFunction(try_into_entry_function(
                                 entry_func_payload,
                             )?),
+                            MultisigTransactionPayload::ScriptPayload(script) => {
+                                Executable::Script(try_into_script_payload(script)?)
+                            },
                         }
                     } else {
                         Executable::Empty
@@ -979,6 +994,14 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 Some(
                                     aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
                                         entry_function,
+                                    ),
+                                )
+                            },
+                            MultisigTransactionPayload::ScriptPayload(script) => {
+                                let script = try_into_script_payload(script)?;
+                                Some(
+                                    aptos_types::transaction::MultisigTransactionPayload::Script(
+                                        script,
                                     ),
                                 )
                             },

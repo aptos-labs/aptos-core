@@ -19314,15 +19314,20 @@
       },
       "MultisigTransactionPayload": {
         "type": "object",
+        "description": "Enum for multisig transaction payloads, supporting both entry functions and scripts.",
         "oneOf": [
           {
             "$ref": "#/components/schemas/MultisigTransactionPayload_EntryFunctionPayload"
+          },
+          {
+            "$ref": "#/components/schemas/MultisigTransactionPayload_ScriptPayload"
           }
         ],
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "entry_function_payload": "#/components/schemas/MultisigTransactionPayload_EntryFunctionPayload"
+            "entry_function_payload": "#/components/schemas/MultisigTransactionPayload_EntryFunctionPayload",
+            "script_payload": "#/components/schemas/MultisigTransactionPayload_ScriptPayload"
           }
         }
       },
@@ -19345,6 +19350,28 @@
           },
           {
             "$ref": "#/components/schemas/EntryFunctionPayload"
+          }
+        ]
+      },
+      "MultisigTransactionPayload_ScriptPayload": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "script_payload"
+                ],
+                "example": "script_payload"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/ScriptPayload"
           }
         ]
       },

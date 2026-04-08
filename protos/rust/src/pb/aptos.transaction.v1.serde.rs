@@ -6192,6 +6192,9 @@ impl serde::Serialize for MultisigTransactionPayload {
                 multisig_transaction_payload::Payload::EntryFunctionPayload(v) => {
                     struct_ser.serialize_field("entryFunctionPayload", v)?;
                 }
+                multisig_transaction_payload::Payload::ScriptPayload(v) => {
+                    struct_ser.serialize_field("scriptPayload", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -6207,12 +6210,15 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
             "type",
             "entry_function_payload",
             "entryFunctionPayload",
+            "script_payload",
+            "scriptPayload",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Type,
             EntryFunctionPayload,
+            ScriptPayload,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -6236,6 +6242,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                         match value {
                             "type" => Ok(GeneratedField::Type),
                             "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
+                            "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -6272,6 +6279,13 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                             payload__ = map.next_value::<::std::option::Option<_>>()?.map(multisig_transaction_payload::Payload::EntryFunctionPayload)
 ;
                         }
+                        GeneratedField::ScriptPayload => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("scriptPayload"));
+                            }
+                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(multisig_transaction_payload::Payload::ScriptPayload)
+;
+                        }
                     }
                 }
                 Ok(MultisigTransactionPayload {
@@ -6292,6 +6306,7 @@ impl serde::Serialize for multisig_transaction_payload::Type {
         let variant = match self {
             Self::Unspecified => "TYPE_UNSPECIFIED",
             Self::EntryFunctionPayload => "TYPE_ENTRY_FUNCTION_PAYLOAD",
+            Self::ScriptPayload => "TYPE_SCRIPT_PAYLOAD",
         };
         serializer.serialize_str(variant)
     }

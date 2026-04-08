@@ -23,7 +23,8 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp, STRUCT_DATA_OFFSET,
+    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries, STRUCT_DATA_OFFSET,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
@@ -124,9 +125,6 @@ fn make_gc_stress_program(
         // PC 6: return
         Return,
     ]);
-    let callee_pointer_offsets =
-        arena.alloc_slice_fill_iter(vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)]);
-
     let callee_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: make_entry_code,
@@ -134,7 +132,12 @@ fn make_gc_stress_program(
         args_and_locals_size: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        pointer_offsets: callee_pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(arena, vec![
+            FO(callee_vec),
+            FO(callee_entry),
+            FO(callee_vec_ref),
+        ]),
+        safe_point_layouts: SortedSafePointEntries::empty(arena),
     });
 
     // -- Function 0: main --
@@ -228,9 +231,6 @@ fn make_gc_stress_program(
         // ---- DONE (PC 30) ----
         Return,
     ]);
-    let main_pointer_offsets =
-        arena.alloc_slice_fill_iter(vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)]);
-
     let main_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -238,7 +238,12 @@ fn make_gc_stress_program(
         args_and_locals_size: 64,
         extended_frame_size: 128,
         zero_frame: true,
-        pointer_offsets: main_pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(arena, vec![
+            FO(outer_vec),
+            FO(outer_vec_ref),
+            FO(entry_ptr),
+        ]),
+        safe_point_layouts: SortedSafePointEntries::empty(arena),
     });
 
     let descriptors = vec![
