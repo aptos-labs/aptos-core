@@ -318,10 +318,7 @@ impl Transformer<'_> {
             },
             Branch(id, if_true, if_false, cond) => {
                 let new_cond = self.copy_arg_if_needed(code_offset, id, cond);
-                self.check_and_emit_bytecode(
-                    code_offset,
-                    Branch(id, if_true, if_false, new_cond),
-                )
+                self.check_and_emit_bytecode(code_offset, Branch(id, if_true, if_false, new_cond))
             },
             Abort(id, code, msg_opt) => {
                 let new_code = self.copy_arg_if_needed(code_offset, id, code);
@@ -330,10 +327,8 @@ impl Transformer<'_> {
             },
             // These variants either have no source temps or are handled by
             // check_and_emit_bytecode without needing copy insertion.
-            Ret(..) | Load(..) | Jump(..) | Label(..) | Nop(..)
-            | SpecBlock(..) | SaveMem(..) | SaveSpecVar(..) | Prop(..) => {
-                self.check_and_emit_bytecode(code_offset, bc.clone())
-            },
+            Ret(..) | Load(..) | Jump(..) | Label(..) | Nop(..) | SpecBlock(..) | SaveMem(..)
+            | SaveSpecVar(..) | Prop(..) => self.check_and_emit_bytecode(code_offset, bc.clone()),
         }
         // Insert/check any drops needed after this program point
         self.check_and_add_implicit_drops(code_offset, &bc, false)
