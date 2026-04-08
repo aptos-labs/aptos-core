@@ -87,6 +87,9 @@ module aptos_framework::confidential_asset {
     /// Pointlessly depositing zero into one's confidential balance would unncessarily increment the `transfers_received` counter.
     const E_POINTLESSLY_DEPOSITING_ZERO: u64 = 18;
 
+    /// Memo in confidential transfer must not exceed `MAX_MEMO_BYTES`.
+    const E_MEMO_TOO_LONG: u64 = 19;
+
     /// An internal error occurred: there is either a bug or a misconfiguration in the contract.
     const E_INTERNAL_ERROR: u64 = 999;
 
@@ -101,6 +104,9 @@ module aptos_framework::confidential_asset {
     /// The maximum number of transactions can be aggregated on the pending balance before rollover is required.
     /// i.e., `ConfidentialStore::transfers_received` will never exceed this value.
     const MAX_TRANSFERS_BEFORE_ROLLOVER: u64 = 65536;
+
+    /// Maximum number of bytes a confidential transfer's memo is allowed to be
+    const MAX_MEMO_BYTES: u64 = 256;
 
     /// The mainnet chain ID. If the chain ID is 1, the allow list is enabled.
     const MAINNET_CHAIN_ID: u8 = 1;
@@ -592,6 +598,10 @@ module aptos_framework::confidential_asset {
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(to, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
 
+        if(memo.length() > MAX_MEMO_BYTES) {
+            abort(error::invalid_argument(E_MEMO_TOO_LONG));
+        };
+
         let from = signer::address_of(sender);
         assert!(from != to, error::invalid_argument(E_SELF_TRANSFER));
         let effective_auditor = get_effective_auditor_config(asset_type);
@@ -1018,6 +1028,11 @@ module aptos_framework::confidential_asset {
     #[view]
     public fun get_max_transfers_before_rollover(): u64 {
         MAX_TRANSFERS_BEFORE_ROLLOVER
+    }
+
+    #[view]
+    public fun get_max_memo_bytes(): u64 {
+        MAX_MEMO_BYTES
     }
 
     // === Private, internal functions (10 out of 13) ===
