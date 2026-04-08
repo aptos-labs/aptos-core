@@ -8,6 +8,7 @@
 //! without passing it through arguments.
 
 use crate::{
+    error::{bail, ExecutionResult},
     interpreter::InterpreterContext,
     memory::{read_ptr, read_u32, read_u64, write_ptr, write_u32, write_u64, MemoryRegion},
     types::{
@@ -16,7 +17,6 @@ use crate::{
         VEC_LENGTH_OFFSET,
     },
 };
-use anyhow::{bail, Result};
 use mono_move_core::{
     DescriptorId, FrameOffset, Function, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
     OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
@@ -62,7 +62,7 @@ impl Heap {
 impl<G: GasMeter> InterpreterContext<'_, G> {
     /// Allocate `size` bytes (8-byte aligned) on the heap.
     /// Triggers GC if the bump allocator is full; fails on OOM after GC.
-    pub(crate) fn heap_alloc(&mut self, size: usize) -> Result<*mut u8> {
+    pub(crate) fn heap_alloc(&mut self, size: usize) -> ExecutionResult<*mut u8> {
         if size == 0 {
             bail!("heap_alloc: size must not be zero");
         }
@@ -97,7 +97,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
         descriptor_id: DescriptorId,
         elem_size: u32,
         capacity: u64,
-    ) -> Result<*mut u8> {
+    ) -> ExecutionResult<*mut u8> {
         let total_size = (capacity as usize)
             .checked_mul(elem_size as usize)
             .and_then(|v| v.checked_add(VEC_DATA_OFFSET))
@@ -114,7 +114,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
 
     /// Allocate a new zeroed heap object (struct or enum). Size comes from the
     /// descriptor at `descriptor_id`.
-    pub(crate) fn alloc_obj(&mut self, descriptor_id: DescriptorId) -> Result<*mut u8> {
+    pub(crate) fn alloc_obj(&mut self, descriptor_id: DescriptorId) -> ExecutionResult<*mut u8> {
         let payload_size = match &self.descriptors[descriptor_id.as_usize()] {
             ObjectDescriptor::Struct { size, .. } => *size as usize,
             ObjectDescriptor::Enum { size, .. } => *size as usize,
@@ -151,7 +151,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
         vec_ref_offset: usize,
         elem_size: u32,
         required_cap: u64,
-    ) -> Result<*mut u8> {
+    ) -> ExecutionResult<*mut u8> {
         unsafe {
             let base = read_ptr(fp, vec_ref_offset);
             let off = read_u64(fp, vec_ref_offset + 8) as usize;
@@ -215,7 +215,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
     ///   in every heap object header are set by the allocator and never
     ///   overwritten by user code. Corrupted headers → wrong copy size or
     ///   wrong reference tracing (UB).
-    pub(crate) fn gc_collect(&mut self) -> Result<()> {
+    pub(crate) fn gc_collect(&mut self) -> ExecutionResult<()> {
         self.heap.gc_count += 1;
 
         let to_space = MemoryRegion::new(self.heap.buffer.len());

@@ -12735,6 +12735,7 @@ dependencies = [
  "mono-move-core",
  "mono-move-gas",
  "rand 0.7.3",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -5,6 +5,7 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
+    error::{bail, ExecutionResult},
     heap::Heap,
     memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
     types::{
@@ -13,7 +14,6 @@ use crate::{
         VEC_LENGTH_OFFSET,
     },
 };
-use anyhow::{bail, Result};
 use mono_move_core::{DescriptorId, Function, MicroOp, FRAME_METADATA_SIZE};
 use mono_move_gas::GasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -160,7 +160,11 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
     /// Allocate a vector of `u64` values on the heap and return its address
     /// as a `u64` suitable for embedding in args. Useful for passing pre-built
     /// data into a program without generating initialization micro-ops.
-    pub fn alloc_u64_vec(&mut self, descriptor_id: DescriptorId, values: &[u64]) -> Result<u64> {
+    pub fn alloc_u64_vec(
+        &mut self,
+        descriptor_id: DescriptorId,
+        values: &[u64],
+    ) -> ExecutionResult<u64> {
         let n = values.len() as u64;
         let ptr = self.alloc_vec(descriptor_id, 8, n)?;
         unsafe {
@@ -180,7 +184,7 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
 
 impl<G: GasMeter> InterpreterContext<'_, G> {
     #[inline(always)]
-    pub fn step(&mut self) -> Result<StepResult> {
+    pub fn step(&mut self) -> ExecutionResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
         // it is derived from function reference (e.g., entrypoint) or when
         // executing a call instruction, which stores a valid pointer.
@@ -646,7 +650,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
         caller: &Function,
         fp: *mut u8,
         callee: &Function,
-    ) -> Result<StepResult> {
+    ) -> ExecutionResult<StepResult> {
         unsafe {
             let new_fp = fp.add(caller.args_and_locals_size + FRAME_METADATA_SIZE);
             let stack_end = self.stack.as_ptr().add(self.stack.len());
@@ -681,7 +685,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
     // iteration. LLVM can't keep them in registers because heap operations
     // (VecPushBack, etc.) take &mut self, which may alias these fields.
     // Write back only on CallFunc/Return.
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> ExecutionResult<()> {
         loop {
             match self.step()? {
                 StepResult::Continue => {},

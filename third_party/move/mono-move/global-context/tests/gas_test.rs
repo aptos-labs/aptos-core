@@ -3,9 +3,9 @@
 
 //! Integration tests for gas metering through the full pipeline.
 
-use mono_move_gas::{GasExhaustedError, SimpleGasMeter};
+use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_runtime::InterpreterContext;
+use mono_move_runtime::{ExecutionError, InterpreterContext};
 use move_core_types::{account_address::AccountAddress, ident_str};
 
 /// Compiles a Move module and adds it to the executable cache.
@@ -48,5 +48,5 @@ module 0x1::test {
     let mut interpreter = InterpreterContext::new(&[], gas_meter, fib);
     interpreter.set_root_arg(0, &10u64.to_le_bytes());
     let err = interpreter.run().unwrap_err();
-    assert!(err.is::<GasExhaustedError>());
+    assert!(matches!(err, ExecutionError::GasExhausted(_)));
 }
