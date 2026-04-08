@@ -111,6 +111,8 @@ impl UnverifiedEvent {
         self_message: bool,
         max_num_batches: usize,
         max_batch_expiry_gap_usecs: u64,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
     ) -> Result<VerifiedEvent, VerifyError> {
         let start_time = Instant::now();
         Ok(match self {
@@ -122,6 +124,8 @@ impl UnverifiedEvent {
                         proof_cache,
                         quorum_store_enabled,
                         opt_qs_v2_rx_enabled,
+                        max_batch_txns,
+                        max_batch_bytes,
                     )?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
@@ -137,6 +141,8 @@ impl UnverifiedEvent {
                         proof_cache,
                         quorum_store_enabled,
                         opt_qs_v2_rx_enabled,
+                        max_batch_txns,
+                        max_batch_bytes,
                     )?;
                     counters::VERIFY_MSG
                         .with_label_values(&["opt_proposal"])

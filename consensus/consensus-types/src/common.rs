@@ -124,6 +124,27 @@ pub struct RejectedTransactionSummary {
     pub reason: DiscardedVMStatus,
 }
 
+/// Validates that a single batch's num_txns and num_bytes are within receiver-side limits.
+pub fn verify_batch_info_limits<T: TBatchInfo>(
+    batch: &T,
+    max_batch_txns: u64,
+    max_batch_bytes: u64,
+) -> anyhow::Result<()> {
+    ensure!(
+        batch.num_txns() <= max_batch_txns,
+        "Batch txn count {} exceeds limit {}",
+        batch.num_txns(),
+        max_batch_txns,
+    );
+    ensure!(
+        batch.num_bytes() <= max_batch_bytes,
+        "Batch byte count {} exceeds limit {}",
+        batch.num_bytes(),
+        max_batch_bytes,
+    );
+    Ok(())
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
@@ -281,8 +302,11 @@ impl Payload {
 
     pub fn verify_inline_batches<'a, T: TBatchInfo + 'a>(
         inline_batches: impl Iterator<Item = (&'a T, &'a Vec<SignedTransaction>)>,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
     ) -> anyhow::Result<()> {
         for (batch, payload) in inline_batches {
+            verify_batch_info_limits(batch, max_batch_txns, max_batch_bytes)?;
             // TODO: Can cloning be avoided here?
             let computed_digest = BatchPayload::new(batch.author(), payload.clone()).hash();
             ensure!(
@@ -299,9 +323,12 @@ impl Payload {
     pub fn verify_opt_batches<T: TBatchInfo>(
         verifier: &ValidatorVerifier,
         opt_batches: &OptBatches<T>,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
     ) -> anyhow::Result<()> {
         let authors = verifier.address_to_validator_index();
         for batch in &opt_batches.batch_summary {
+            verify_batch_info_limits(batch, max_batch_txns, max_batch_bytes)?;
             ensure!(
                 authors.contains_key(&batch.author()),
                 "Invalid author {} for batch {}",
@@ -318,18 +345,30 @@ impl Payload {
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
         opt_qs_v2_rx_enabled: bool,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::OptQuorumStore(OptQuorumStorePayload::V1(p))) => {
                 let proof_with_data = p.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
+                for proof in &proof_with_data.batch_summary {
+                    verify_batch_info_limits(proof.info(), max_batch_txns, max_batch_bytes)?;
+                }
                 Self::verify_inline_batches(
                     p.inline_batches()
                         .iter()
                         .map(|batch| (batch.info(), batch.transactions())),
+                    max_batch_txns,
+                    max_batch_bytes,
                 )?;
-                Self::verify_opt_batches(verifier, p.opt_batches())?;
+                Self::verify_opt_batches(
+                    verifier,
+                    p.opt_batches(),
+                    max_batch_txns,
+                    max_batch_bytes,
+                )?;
                 Ok(())
             },
             (true, Payload::OptQuorumStore(OptQuorumStorePayload::V2(p))) => {
@@ -339,12 +378,22 @@ impl Payload {
                 );
                 let proof_with_data = p.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
+                for proof in &proof_with_data.batch_summary {
+                    verify_batch_info_limits(proof.info(), max_batch_txns, max_batch_bytes)?;
+                }
                 Self::verify_inline_batches(
                     p.inline_batches()
                         .iter()
                         .map(|batch| (batch.info(), batch.transactions())),
+                    max_batch_txns,
+                    max_batch_bytes,
                 )?;
-                Self::verify_opt_batches(verifier, p.opt_batches())?;
+                Self::verify_opt_batches(
+                    verifier,
+                    p.opt_batches(),
+                    max_batch_txns,
+                    max_batch_bytes,
+                )?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
@@ -538,5 +587,125 @@ impl fmt::Display for PayloadFilter {
                 write!(f, "Empty filter")
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        payload::{BatchPointer, OptBatches},
+        proof_of_store::BatchInfo,
+    };
+    use aptos_crypto::HashValue;
+    use aptos_types::validator_verifier::random_validator_verifier;
+
+    const MAX_BATCH_TXNS: u64 = 100;
+    const MAX_BATCH_BYTES: u64 = 1024 * 1024;
+
+    fn make_batch_info(author: PeerId, num_txns: u64, num_bytes: u64) -> BatchInfo {
+        BatchInfo::new(
+            author,
+            aptos_types::quorum_store::BatchId::new_for_test(1),
+            1, // epoch
+            1000,
+            HashValue::random(),
+            num_txns,
+            num_bytes,
+            0,
+        )
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_accepts_valid() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, 50, 500_000);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_ok());
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_rejects_excess_txns() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, MAX_BATCH_TXNS + 1, 100);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_err());
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_rejects_excess_bytes() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, 1, MAX_BATCH_BYTES + 1);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_err());
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_rejects_overflow_values() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, u64::MAX, u64::MAX);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_err());
+    }
+
+    #[test]
+    fn test_verify_opt_batches_rejects_oversized_batch() {
+        let (signers, validators) = random_validator_verifier(1, None, false);
+        let author = signers[0].author();
+
+        let bad_batch = make_batch_info(author, 1, u64::MAX);
+        let opt_batches: OptBatches<BatchInfo> = BatchPointer::new(vec![bad_batch]);
+
+        assert!(Payload::verify_opt_batches(
+            &validators,
+            &opt_batches,
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_verify_opt_batches_accepts_valid() {
+        let (signers, validators) = random_validator_verifier(1, None, false);
+        let author = signers[0].author();
+
+        let batch = make_batch_info(author, 50, 500_000);
+        let opt_batches: OptBatches<BatchInfo> = BatchPointer::new(vec![batch]);
+
+        assert!(Payload::verify_opt_batches(
+            &validators,
+            &opt_batches,
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_verify_opt_batches_rejects_before_checking_author() {
+        let (_signers, validators) = random_validator_verifier(1, None, false);
+        // Use a random author NOT in the validator set, but with oversized batch.
+        // The limit check should fire before the author check.
+        let bad_author = PeerId::random();
+        let bad_batch = make_batch_info(bad_author, MAX_BATCH_TXNS + 1, 100);
+        let opt_batches: OptBatches<BatchInfo> = BatchPointer::new(vec![bad_batch]);
+
+        let err =
+            Payload::verify_opt_batches(&validators, &opt_batches, MAX_BATCH_TXNS, MAX_BATCH_BYTES)
+                .unwrap_err();
+        // Should fail on batch limit, not author
+        assert!(err.to_string().contains("Batch txn count"));
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_oversized_batch() {
+        let author = PeerId::random();
+        let bad_batch = make_batch_info(author, u64::MAX / 2 + 1, u64::MAX / 2 + 1);
+        let empty_txns = vec![];
+        let inline_batches = vec![(&bad_batch, &empty_txns)];
+
+        assert!(Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .is_err());
     }
 }

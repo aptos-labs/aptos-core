@@ -86,6 +86,8 @@ impl ProposalMsg {
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
         opt_qs_v2_rx_enabled: bool,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
     ) -> Result<()> {
         if let Some(proposal_author) = self.proposal.author() {
             ensure!(
@@ -103,6 +105,8 @@ impl ProposalMsg {
                         proof_cache,
                         quorum_store_enabled,
                         opt_qs_v2_rx_enabled,
+                        max_batch_txns,
+                        max_batch_bytes,
                     )
                 })
             },
