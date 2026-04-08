@@ -4,15 +4,22 @@
 #[cfg(test)]
 use crate::tests::smoke::run_smoke;
 use crate::{
-    group::Fr,
+    group::{Fr, G1Affine, G2Affine, Pairing},
     schemes::fptx_weighted::{
         FPTXWeighted, WeightedBIBEMasterSecretKeyShare, WeightedBIBEVerificationKey,
     },
     shared::{digest::DigestKey, encryption_key::EncryptionKey},
     traits::BatchThresholdEncryption,
 };
-use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
-use aptos_dkg::pvss::traits::transcript::Aggregatable;
+use aptos_crypto::{
+    arkworks::{srs::SrsType, GroupGenerators},
+    weighted_config::WeightedConfigArkworks,
+    TSecretSharingConfig as _,
+};
+use aptos_dkg::{
+    pcs::univariate_hiding_kzg,
+    pvss::{chunky::chunked_elgamal::num_chunks_per_scalar, traits::transcript::Aggregatable},
+};
 use ark_ec::AffineRepr as _;
 #[cfg(test)]
 use ark_std::rand::{thread_rng, Rng as _};
@@ -25,14 +32,47 @@ pub fn run_pvss(
     Vec<WeightedBIBEVerificationKey>,
     Vec<WeightedBIBEMasterSecretKeyShare>,
 ) {
+    let mut aptos_rng = rand::thread_rng();
+
+    let num_chunks =
+        num_chunks_per_scalar::<Fr>(aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT);
+    let max_num_chunks_padded = (8 * num_chunks + 1).next_power_of_two() - 1;
+
+    let trapdoor = univariate_hiding_kzg::Trapdoor::rand(&mut aptos_rng);
+    let hkzg_setup = univariate_hiding_kzg::setup_with_trapdoor(
+        max_num_chunks_padded + 1,
+        SrsType::Lagrange,
+        GroupGenerators {
+            g1: G1Affine::generator(),
+            g2: G2Affine::generator(),
+        },
+        trapdoor,
+    );
+
+    run_pvss_with_hkzg(dk, (hkzg_setup.1, hkzg_setup.0))
+}
+
+pub fn run_pvss_with_hkzg(
+    dk: &DigestKey,
+    hkzg_setup: (
+        univariate_hiding_kzg::CommitmentKey<Pairing>,
+        univariate_hiding_kzg::VerificationKey<Pairing>,
+    ),
+) -> (
+    WeightedConfigArkworks<Fr>,
+    EncryptionKey,
+    Vec<WeightedBIBEVerificationKey>,
+    Vec<WeightedBIBEMasterSecretKeyShare>,
+) {
     let mut rng_aptos = rand::thread_rng();
 
     let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
-    let pp = <T as TranscriptCore>::PublicParameters::new_for_testing(
+    let pp = <T as TranscriptCore>::PublicParameters::new(
         tc.get_total_weight(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
         tc.get_total_num_players(),
         G2Affine::generator(),
+        hkzg_setup,
         &mut rng_aptos,
     );
 
@@ -107,7 +147,6 @@ fn weighted_smoke_with_setup_for_testing() {
 }
 
 type T = aptos_dkg::pvss::chunky::SignedWeightedTranscript<crate::group::Pairing>;
-use crate::group::G2Affine;
 use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,

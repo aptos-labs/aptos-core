@@ -47,6 +47,16 @@ pub enum SrsBasis<C: CurveGroup> {
     },
 }
 
+impl<C: CurveGroup> SrsBasis<C> {
+    /// Size of basis
+    pub fn size(&self) -> usize {
+        match self {
+            SrsBasis::Lagrange { lagr } => lagr.len(),
+            SrsBasis::PowersOfTau { tau_powers } => tau_powers.len(),
+        }
+    }
+}
+
 // Enums need to be (de)serialised manually
 impl<C: CurveGroup> CanonicalSerialize for SrsBasis<C> {
     fn serialize_with_mode<W: Write>(
