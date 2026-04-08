@@ -98,6 +98,9 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
     /// Reset the context to call a different function, preserving the heap.
     ///
     /// Use `set_root_arg` to place arguments before calling `run()`.
+    ///
+    // TODO: invoke() is test-only for now. When used with real gas budgets,
+    // decide whether to reset the gas meter here.
     pub fn invoke(&mut self, func: &Function) {
         let base = self.stack.as_ptr();
 
