@@ -3,7 +3,7 @@
 
 ### WP Tool
 
-Use `{{ tool(name="move_package_spec_infer") }}`, a weakest precondition (WP)
+Use `{{ tool(name="move_package_wp") }}`, a weakest precondition (WP)
 inference tool for deriving specs. Do not run this tool outside of this workflow.
 
 Parameters:
@@ -11,6 +11,14 @@ Parameters:
 - **`package_path`** (required) — path to the Move package directory.
 - **`filter`** (optional) — `module_name` or `module_name::function_name`.
   When omitted, all target modules are inferred.
+- **`spec_output`** (optional, default `"inline"`) — where to write inferred specs.
+  `"inline"` injects specs into the original source files.
+  `"file"` writes separate `.spec.move` files alongside the sources, leaving
+  originals untouched.
+
+**Important:** If the user asks for specs in a separate file, in a spec file, or
+to keep the source untouched, you **must** pass `spec_output: "file"`. Only use
+the default `"inline"` when the user wants specs added directly into their source.
 
 If the program contains loops, they are broken into exit and iteration points.
 Loop variables are havoced and the loop invariant is expected to fix them.

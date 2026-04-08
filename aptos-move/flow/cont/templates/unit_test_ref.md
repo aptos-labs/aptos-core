@@ -1,5 +1,5 @@
 {# Unit test generation workflow #}
-{% if once(name="unit_test_workflow") %}
+{% if once(name="unit_test_ref") %}
 
 {% include "templates/move_lang.md" %}
 {% include "templates/move_package.md" %}
@@ -8,14 +8,14 @@
 
 {% include "templates/unit_test_rules.md" %}
 
-## Unit Test Generation Workflow
+## Unit Test Generation — Detailed Instructions
 
-### Phase 1 — Check Package
+### Task: 1 — Check Package
 
 1. Call `{{ tool(name="move_package_manifest") }}` to build the package and discover sources. **Fix any compilation errors before proceeding.**
 2. Call `{{ tool(name="move_package_test") }}` with `establish_baseline` set to true. **Fix failing tests before proceeding.**
 
-### Phase 2 — Analyze Target Code
+### Task: 2 — Analyze Target Code
 
 **Specific function requested:**
 1. Call `{{ tool(name="move_package_coverage") }}` with `function` set to `"module_name::function_name"` — get uncovered lines in that function
@@ -31,7 +31,7 @@
 3. Identify testable functions: public, entry, public(friend) — skip `#[test_only]` and private
 4. For functions with uncovered lines, identify behaviors to test (same as above)
 
-### Phase 3 — Generate Test Module
+### Task: 3 — Generate Test Module
 
 Create `tests/move_flow/<module>_tests.move` (create directory if needed).
 
@@ -46,9 +46,9 @@ Create `tests/move_flow/<module>_tests.move` (create directory if needed).
 module <package_address>::<module>_tests {
     use <package_address>::<module>;
 
+    #[test(account = @0x1)]
     /// @ai-generated
     /// Verifies that <function> <behavior>.
-    #[test(account = @0x1)]
     fun test_<function>_<scenario>(account: &signer) { ... }
 }
 ```
@@ -57,7 +57,7 @@ module <package_address>::<module>_tests {
 
 **Suspected bugs:** Assert the *correct* expected behavior — the test should fail against the buggy code.
 
-### Phase 4 — Validate Tests
+### Task: 4 — Validate Tests
 
 Call `{{ tool(name="move_package_test") }}`. If `success` is false, classify each failure:
 
@@ -71,17 +71,17 @@ Call `{{ tool(name="move_package_test") }}`. If `success` is false, classify eac
 
 Iterate until all tests in `tests/move_flow/` pass.
 
-### Phase 5 — Check Coverage Improvement
+### Task: 5 — Check Coverage Improvement
 
-Check `newly_covered` from Phase 4 to confirm the generated tests added coverage. Use `{{ tool(name="move_package_coverage") }}` to check remaining gaps (pass `function` as `"module_name::function_name"` when targeting a specific function) — generate additional tests if needed and feasible.
+Check `newly_covered` from the validation step to confirm the generated tests added coverage. Use `{{ tool(name="move_package_coverage") }}` to check remaining gaps (pass `function` as `"module_name::function_name"` when targeting a specific function) — generate additional tests if needed and feasible.
 
-### Phase 6 — Minimize Tests (do not skip)
+### Task: 6 — Minimize Tests (do not skip)
 
 Delete tests that add no new coverage. Keep tests with distinct scenarios (different abort conditions, branches, edge cases). When duplicates exist, prefer simpler setup and clearer naming.
 
 Only modify tests in `tests/move_flow/` — do not touch `sources/` or `tests/` root.
 
-### Phase 7 — Report
+### Task: 7 — Report
 
 Summarize:
 - Tests generated and coverage achieved

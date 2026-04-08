@@ -1,0 +1,6 @@
+[package]
+name = "baby_swap"
+version = "0.0.0"
+
+[addresses]
+baby_swap = "0x42"

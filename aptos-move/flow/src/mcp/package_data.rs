@@ -7,7 +7,15 @@ use codespan_reporting::{
     term::{emit, termcolor::NoColor, Config},
 };
 use move_model::model::{FunId, GlobalEnv, ModuleId, QualifiedId};
-use std::path::Path;
+use std::{collections::BTreeMap, path::Path};
+
+/// Source stage that produced a set of diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum DiagnosticSource {
+    Compiler,
+    Verifier,
+    Inference,
+}
 
 /// What scope was last verified and whether it succeeded.
 #[derive(Clone, PartialEq, Eq)]
@@ -53,14 +61,11 @@ impl VerifiedScope {
 /// Compiled package data holding a `GlobalEnv` (the Move model).
 pub(crate) struct PackageData {
     env: GlobalEnv,
-    path: String,
-    args: McpArgs,
-    built_with_bytecode: bool,
     verified: Option<(VerifiedScope, bool, usize)>,
-    /// Pre-rendered diagnostic messages from the last stage that produced them.
-    diagnostics: Vec<String>,
-    /// Label of the stage that produced the diagnostics (e.g. "checking", "compiling", "verifying").
-    diagnostics_source: String,
+    /// Whether the initial compilation produced errors.
+    has_compilation_errors: bool,
+    /// Per-source diagnostic messages, keyed by the stage that produced them.
+    diagnostics: BTreeMap<DiagnosticSource, Vec<String>>,
 }
 
 // SAFETY: `GlobalEnv` is `!Send` because it uses `Rc` and `NonNull` internally for its
@@ -74,17 +79,12 @@ impl PackageData {
     ///
     /// Only fails on I/O errors or invalid package path. All compilation errors and
     /// warnings are stored in the returned `GlobalEnv`.
-    pub(crate) fn init(path: &Path, args: &McpArgs, with_bytecode: bool) -> anyhow::Result<Self> {
+    pub(crate) fn init(path: &Path, args: &McpArgs) -> anyhow::Result<Self> {
         let named_addresses = args
             .named_addresses
             .iter()
             .map(|(name, addr)| (name.clone(), addr.into_inner()))
             .collect();
-        let source = if with_bytecode {
-            "compiling"
-        } else {
-            "checking"
-        };
         let env = aptos_framework::build_model(
             args.dev_mode,
             // test_mode off: test code is handled separately by run_move_unit_tests.
@@ -100,18 +100,18 @@ impl PackageData {
             false,
             aptos_framework::extended_checks::get_all_attribute_names().clone(),
             args.experiments.clone(),
-            with_bytecode,
+            true, // always build with bytecode
         )?;
-        let diagnostics = render_diagnostics(&env);
-        log_diagnostics(&diagnostics, source);
+        let compilation_diagnostics = render_diagnostics(&env);
+        let has_compilation_errors = env.has_errors();
+        log_diagnostics(&compilation_diagnostics, DiagnosticSource::Compiler);
+        let mut diagnostics = BTreeMap::new();
+        diagnostics.insert(DiagnosticSource::Compiler, compilation_diagnostics);
         Ok(Self {
             env,
-            path: path.to_string_lossy().into_owned(),
-            args: args.clone(),
-            built_with_bytecode: with_bytecode,
             verified: None,
+            has_compilation_errors,
             diagnostics,
-            diagnostics_source: source.to_string(),
         })
     }
 
@@ -125,43 +125,6 @@ impl PackageData {
         &mut self.env
     }
 
-    /// Returns true if this model was built with bytecode generation enabled.
-    pub(crate) fn built_with_bytecode(&self) -> bool {
-        self.built_with_bytecode
-    }
-
-    /// Rebuild the model with bytecode generation enabled (required by the prover).
-    /// Resets the cached verification result.
-    pub(crate) fn rebuild_with_bytecode(&mut self) -> anyhow::Result<()> {
-        let named_addresses = self
-            .args
-            .named_addresses
-            .iter()
-            .map(|(name, addr)| (name.clone(), addr.into_inner()))
-            .collect();
-        self.env = aptos_framework::build_model(
-            self.args.dev_mode,
-            false, // test_mode
-            true,  // verify_mode
-            self.path.as_ref(),
-            named_addresses,
-            self.args.target_filter.clone(),
-            self.args.bytecode_version,
-            None,
-            Some(self.args.language_version),
-            false,
-            aptos_framework::extended_checks::get_all_attribute_names().clone(),
-            self.args.experiments.clone(),
-            true, // with bytecode for prover
-        )?;
-        self.built_with_bytecode = true;
-        self.verified = None;
-        self.diagnostics = render_diagnostics(&self.env);
-        log_diagnostics(&self.diagnostics, "compiling");
-        self.diagnostics_source = "compiling".to_string();
-        Ok(())
-    }
-
     /// Returns the cached verification result, if any.
     pub(crate) fn verified(&self) -> Option<(VerifiedScope, bool, usize)> {
         self.verified.clone()
@@ -172,26 +135,33 @@ impl PackageData {
         self.verified = Some((scope, success, timeout));
     }
 
-    /// Returns stored diagnostic messages and the source stage that produced them.
-    pub(crate) fn diagnostics(&self) -> (&[String], &str) {
-        (&self.diagnostics, &self.diagnostics_source)
+    /// Whether the initial compilation produced errors.
+    pub(crate) fn has_compilation_errors(&self) -> bool {
+        self.has_compilation_errors
     }
 
-    /// Override diagnostics with output from a later stage (e.g. verifying, inferring).
-    pub(crate) fn set_diagnostics(&mut self, diagnostics: Vec<String>, source: &str) {
+    /// Returns stored diagnostic messages for the given source.
+    pub(crate) fn diagnostics(&self, source: DiagnosticSource) -> &[String] {
+        self.diagnostics
+            .get(&source)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+    }
+
+    /// Store diagnostics for the given source.
+    pub(crate) fn set_diagnostics(&mut self, source: DiagnosticSource, diagnostics: Vec<String>) {
         log_diagnostics(&diagnostics, source);
-        self.diagnostics = diagnostics;
-        self.diagnostics_source = source.to_string();
+        self.diagnostics.insert(source, diagnostics);
     }
 }
 
 /// Log stored diagnostics at INFO level.
-fn log_diagnostics(diagnostics: &[String], source: &str) {
+fn log_diagnostics(diagnostics: &[String], source: DiagnosticSource) {
     if diagnostics.is_empty() {
-        log::info!("stored diagnostics ({}): none", source);
+        log::info!("stored diagnostics ({:?}): none", source);
     } else {
         log::info!(
-            "stored diagnostics ({}): {} message(s):\n{}",
+            "stored diagnostics ({:?}): {} message(s):\n{}",
             source,
             diagnostics.len(),
             diagnostics.join("\n")

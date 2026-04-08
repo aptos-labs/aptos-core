@@ -1,0 +1,32 @@
+inference succeeded, wrote spec files for 1 file(s) (read the files to see the changes):
+- <TEMPDIR>/mergetest.spec.move
+
+=== source (untouched) ===
+module 0xCAFE::mergetest {
+    fun add_one(x: u64): u64 {
+        x + 1
+    }
+
+    fun double(x: u64): u64 {
+        x * 2
+    }
+}
+=== spec file (merged) ===
+spec 0xCAFE::mergetest {
+    spec fun helper(x: u64): u64 {
+        x + 1
+    }
+
+    spec add_one(x: u64): u64 {
+        ensures result == helper(x);
+        pragma opaque = true;
+        ensures [inferred] result == x + 1;
+        aborts_if [inferred] x == MAX_U64;
+    }
+    spec double(x: u64): u64 {
+        pragma opaque = true;
+        ensures [inferred] result == x * 2;
+        aborts_if [inferred] x * 2 > MAX_U64;
+    }
+
+}
