@@ -95,7 +95,7 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
                 || {
                     let mut rng = StdRng::seed_from_u64(42); // TODO: hmm not ideal to put this here
                     let group_generators = GroupGenerators::default();
-                    let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
+                    let (pk, vk) = B::setup_for_testing(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
                     let proof_projective =
@@ -121,7 +121,7 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
     let proof_size = {
         let mut rng = StdRng::seed_from_u64(42);
         let group_generators = GroupGenerators::default();
-        let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
+        let (pk, _) = B::setup_for_testing(n, ell, group_generators, &mut rng);
         let (values, comm, r) =
             test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
         let proof_projective = B::prove(&pk, &values, ell, &comm.into(), &r, &mut rng);
@@ -140,7 +140,7 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
                 || {
                     let mut rng = StdRng::seed_from_u64(42);
                     let group_generators = GroupGenerators::default();
-                    let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
+                    let (pk, _) = B::setup_for_testing(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
                     (pk, values, comm, r, rng)
