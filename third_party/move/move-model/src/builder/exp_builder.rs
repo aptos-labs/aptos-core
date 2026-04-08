@@ -2404,7 +2404,11 @@ impl ExpTranslator<'_, '_, '_> {
         result_exp.visit_pre_order(&mut |e| {
             if let ExpData::Call(id, Operation::Borrow(ReferenceKind::Mutable), args) = &e {
                 debug_assert!(args.len() == 1);
-                if let ExpData::Call(_, Operation::Select(_, _, _), ref_targets) = args[0].as_ref()
+                if let ExpData::Call(
+                    _,
+                    Operation::Select(_, _, _) | Operation::SelectVariants(_, _, _),
+                    ref_targets,
+                ) = args[0].as_ref()
                 {
                     debug_assert!(ref_targets.len() == 1);
                     if self

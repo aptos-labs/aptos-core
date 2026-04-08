@@ -1138,7 +1138,10 @@ impl ExpData {
         use ExpData::*;
         matches!(
             self,
-            LocalVar(..) | Temporary(..) | Call(_, Operation::Select(..), _)
+            LocalVar(..)
+                | Temporary(..)
+                | Call(_, Operation::Select(..), _)
+                | Call(_, Operation::SelectVariants(..), _)
         )
     }
 
