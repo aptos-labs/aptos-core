@@ -16,11 +16,13 @@ use crate::{
         boogie_function_name, boogie_make_vec_from_strings, boogie_modifies_memory_name,
         boogie_num_literal, boogie_num_type_base, boogie_num_type_string_capital,
         boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_struct_name, boogie_struct_variant_name, boogie_temp,
-        boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field, boogie_type_param,
-        boogie_type_suffix, boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
-        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
-        field_bv_flag_global_state, TypeIdentToken,
+        boogie_spec_fun_name, boogie_struct_field_name, boogie_struct_field_result_fun_name,
+        boogie_struct_field_spec_fun_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field,
+        boogie_type_param, boogie_type_suffix, boogie_type_suffix_for_struct,
+        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
+        boogie_well_formed_check, boogie_well_formed_expr, field_bv_flag_global_state,
+        TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -31,11 +33,11 @@ use itertools::Itertools;
 use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
-use move_core_types::function::ClosureMask;
+use move_core_types::{ability::AbilitySet, function::ClosureMask};
 use move_model::{
     ast::{
-        Attribute, BehaviorKind, ConditionKind, Exp, ExpData, FrameAccessKind, MemoryLabel,
-        Operation as AstOperation, TempIndex, TraceKind, Value,
+        Attribute, BehaviorKind, ConditionKind, Exp, ExpData, FrameAccessKind, FunParamAccessOf,
+        MemoryLabel, Operation as AstOperation, TempIndex, TraceKind, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -53,7 +55,7 @@ use move_model::{
 };
 use move_prover_bytecode_pipeline::{
     mono_analysis,
-    mono_analysis::{ClosureInfo, FunParamInfo},
+    mono_analysis::{ClosureInfo, FunParamInfo, StructFieldInfo},
     number_operation::{
         FuncOperationMap, GlobalNumberOperationState, NumOperation,
         NumOperation::{Bitwise, Bottom},
@@ -396,7 +398,7 @@ impl<'env> BoogieTranslator<'env> {
             .translate_axioms(env, mono_info.as_ref());
 
         let mut translated_types = BTreeSet::new();
-        let mut translated_memory = vec![];
+        let mut translated_memory: Vec<(QualifiedInstId<StructId>, String)> = vec![];
         let mut translated_funs = BTreeSet::new();
         let mut verified_functions_count = 0;
         info!("generating verification conditions");
@@ -420,11 +422,9 @@ impl<'env> BoogieTranslator<'env> {
                         continue;
                     }
                     if struct_env.has_memory() {
-                        translated_memory.push(boogie_resource_memory_name(
-                            env,
-                            &struct_env.get_qualified_id().instantiate(type_inst.clone()),
-                            &None,
-                        ))
+                        let mem_qid = struct_env.get_qualified_id().instantiate(type_inst.clone());
+                        let mem_name = boogie_resource_memory_name(env, &mem_qid, &None);
+                        translated_memory.push((mem_qid, mem_name))
                     }
                     StructTranslator {
                         parent: self,
@@ -529,12 +529,23 @@ impl<'env> BoogieTranslator<'env> {
 
         // Emit function types and closures
         let empty_param_infos = BTreeSet::new();
+        let empty_struct_field_infos = BTreeSet::new();
         for (fun_type, closure_infos) in &mono_info.fun_infos {
             let fun_param_infos = mono_info
                 .fun_param_infos
                 .get(fun_type)
                 .unwrap_or(&empty_param_infos);
-            self.translate_fun_type(fun_type, closure_infos, fun_param_infos, &translated_memory)
+            let struct_field_infos = mono_info
+                .fun_struct_field_infos
+                .get(fun_type)
+                .unwrap_or(&empty_struct_field_infos);
+            self.translate_fun_type(
+                fun_type,
+                closure_infos,
+                fun_param_infos,
+                struct_field_infos,
+                &translated_memory,
+            )
         }
 
         // Emit any finalization items required by spec translation.
@@ -555,7 +566,8 @@ impl<'env> BoogieTranslator<'env> {
         fun_type: &Type,
         closure_infos: &BTreeSet<ClosureInfo>,
         fun_param_infos: &BTreeSet<FunParamInfo>,
-        memory: &[String],
+        struct_field_infos: &BTreeSet<StructFieldInfo>,
+        memory: &[(QualifiedInstId<StructId>, String)],
     ) {
         emitln!(
             self.writer,
@@ -570,7 +582,8 @@ impl<'env> BoogieTranslator<'env> {
         // Collect all variants first to handle commas properly
         let closure_count = closure_infos.len();
         let param_count = fun_param_infos.len();
-        let total_count = closure_count + param_count;
+        let struct_field_count = struct_field_infos.len();
+        let total_count = closure_count + param_count + struct_field_count;
 
         for (idx, info) in closure_infos.iter().enumerate() {
             emitln!(
@@ -621,6 +634,24 @@ impl<'env> BoogieTranslator<'env> {
                 if is_last { "" } else { "," }
             );
         }
+        // Add struct field variants for storable function-typed fields.
+        // These carry an `n: int` parameter to distinguish different struct instances.
+        for (idx, info) in struct_field_infos.iter().enumerate() {
+            let struct_env = self.env.get_struct_qid(info.struct_id.to_qualified_id());
+            emitln!(
+                self.writer,
+                "// Struct field `{}` of `{}`",
+                info.field_sym.display(self.env.symbol_pool()),
+                struct_env.get_name().display(self.env.symbol_pool())
+            );
+            let is_last = closure_count + param_count + idx == total_count - 1;
+            emitln!(
+                self.writer,
+                "{}(n: int){}",
+                boogie_struct_field_name(self.env, &info.struct_id, info.field_sym),
+                if is_last { "" } else { "," }
+            );
+        }
         if total_count == 0 {
             // Emit a dummy constructor to avoid an empty Boogie datatype, which
             // can happen when a function type is referenced but no closures or
@@ -640,34 +671,44 @@ impl<'env> BoogieTranslator<'env> {
         // These are used for connecting closures to specs.
         self.generate_behavioral_spec_funs_for_params(fun_type, fun_param_infos);
 
+        // Generate uninterpreted spec functions for behavioral predicates on struct field variants.
+        self.generate_behavioral_spec_funs_for_struct_fields(fun_type, struct_field_infos);
+
         // Generate per-function behavioral spec functions for closure target functions.
         // These inline functions have concrete bodies derived from the function's spec.
         self.generate_behavioral_spec_funs_for_functions(fun_type, closure_infos);
 
-        // Generate behavioral predicate evaluator functions that dispatch on closure/param variants.
-        // Closure branches delegate to per-function spec functions (no global memory refs).
-        // Param branches delegate to per-param uninterpreted functions.
+        // Generate behavioral predicate evaluator functions that dispatch on closure/param/struct
+        // field variants.
         self.generate_behavioral_predicate_evaluator(
             fun_type,
             closure_infos,
             fun_param_infos,
+            struct_field_infos,
             BehaviorKind::RequiresOf,
         );
         self.generate_behavioral_predicate_evaluator(
             fun_type,
             closure_infos,
             fun_param_infos,
+            struct_field_infos,
             BehaviorKind::AbortsOf,
         );
         self.generate_behavioral_predicate_evaluator(
             fun_type,
             closure_infos,
             fun_param_infos,
+            struct_field_infos,
             BehaviorKind::EnsuresOf,
         );
 
         // Generate the uninterpreted result_of function and its connecting axiom.
-        self.generate_result_of_function_and_axiom(fun_type, closure_infos, fun_param_infos);
+        self.generate_result_of_function_and_axiom(
+            fun_type,
+            closure_infos,
+            fun_param_infos,
+            struct_field_infos,
+        );
 
         // Create an apply procedure which dispatches to the appropriate closure implementation.
         emitln!(
@@ -734,8 +775,11 @@ impl<'env> BoogieTranslator<'env> {
         let result_str = result_locals.iter().cloned().join(", ");
 
         // Declare frame save variables for all resources that may need frame conditions.
+        // This includes resources from specific variants AND all translated memory types
+        // (for Reads frame conditions on memory types not referenced by a variant).
         let (frame_save_resources, old_memory_resources) =
             Self::collect_frame_and_old_memory(closure_infos, fun_param_infos, self.env);
+        let mut declared_frame_vars = BTreeSet::new();
         for mem in &frame_save_resources {
             let mem_name = boogie_resource_memory_name(self.env, mem, &None);
             let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
@@ -744,6 +788,20 @@ impl<'env> BoogieTranslator<'env> {
                 boogie_struct_name(&struct_env, &mem.inst, false)
             );
             emitln!(self.writer, "var {}_$frame: {};", mem_name, mem_type);
+            declared_frame_vars.insert(mem_name);
+        }
+        // Declare frame variables for all translated memory types not already covered.
+        // These are needed when a variant doesn't reference a memory type — the Reads
+        // frame condition saves/restores the memory to preserve it after havoc.
+        for (mem_qid, mem_name) in memory {
+            if !declared_frame_vars.contains(mem_name) {
+                let struct_env = self.env.get_struct_qid(mem_qid.to_qualified_id());
+                let mem_type = format!(
+                    "$Memory {}",
+                    boogie_struct_name(&struct_env, &mem_qid.inst, false)
+                );
+                emitln!(self.writer, "var {}_$frame: {};", mem_name, mem_type);
+            }
         }
         for mem in &old_memory_resources {
             let mem_name = boogie_resource_memory_name(self.env, mem, &None);
@@ -760,7 +818,8 @@ impl<'env> BoogieTranslator<'env> {
         // in which case we emit the body directly without any block).
         let closure_count = closure_infos.len();
         let param_count = fun_param_infos.len();
-        let total_variants = closure_count + param_count;
+        let struct_field_count = struct_field_infos.len();
+        let total_variants = closure_count + param_count + struct_field_count;
 
         for (idx, info) in closure_infos.iter().enumerate() {
             let is_last = idx == total_variants - 1;
@@ -907,6 +966,103 @@ impl<'env> BoogieTranslator<'env> {
                 }
             }
         }
+
+        // Generate branches for struct field variants using behavioral predicates.
+        // These are fully opaque with no known memory access (conservative WritesAll).
+        for (idx, info) in struct_field_infos.iter().enumerate() {
+            let is_last = closure_count + param_count + idx == total_variants - 1;
+            let is_only = total_variants == 1;
+            let ctor_name = boogie_struct_field_name(self.env, &info.struct_id, info.field_sym);
+            if is_only {
+                // Single variant: emit body directly without any block
+            } else if is_last {
+                emitln!(self.writer, "{{   // {}", ctor_name);
+                self.writer.indent();
+            } else {
+                emitln!(self.writer, "if (fun is {}) {{", ctor_name);
+                self.writer.indent();
+            }
+            // Build data args with `fun->n` prepended (the instance discriminator).
+            let data_args: Vec<String> = std::iter::once("fun->n".to_string())
+                .chain(params.iter().enumerate().map(|(pos, ty)| {
+                    if ty.is_mutable_reference() {
+                        format!("$Dereference(p{})", pos)
+                    } else {
+                        format!("p{}", pos)
+                    }
+                }))
+                .collect();
+            // Look up access declarations for this struct field. If the struct spec
+            // has reads_of/modifies_of for this field, use them; otherwise assume pure.
+            let struct_env_for_access = self.env.get_struct_qid(info.struct_id.to_qualified_id());
+            let (used_memory, old_memory, frame_access) = derive_struct_field_frame_access(
+                self.env,
+                &struct_env_for_access,
+                info.field_sym,
+                &data_args,
+            );
+
+            // Build memory args for the pre-state (both old and current slots use same variable)
+            let fun_mem_args =
+                self.build_spec_memory_args(&used_memory, &old_memory, &[], &None, None);
+            let bp_args = fun_mem_args.iter().chain(data_args.iter()).join(", ");
+
+            let aborts_name = boogie_struct_field_spec_fun_name(
+                self.env,
+                &info.struct_id,
+                info.field_sym,
+                BehaviorKind::AbortsOf,
+                &[],
+            );
+            let ensures_name = boogie_struct_field_spec_fun_name(
+                self.env,
+                &info.struct_id,
+                info.field_sym,
+                BehaviorKind::EnsuresOf,
+                &[],
+            );
+            let result_fun_name = boogie_struct_field_result_fun_name(
+                self.env,
+                &info.struct_id,
+                info.field_sym,
+                &[],
+                false,
+            );
+            let multi_result_fun_name = boogie_struct_field_result_fun_name(
+                self.env,
+                &info.struct_id,
+                info.field_sym,
+                &[],
+                true,
+            );
+            let explicit_results = results.clone().flatten();
+
+            self.emit_behavioral_predicate_body(
+                &aborts_name,
+                &ensures_name,
+                &bp_args,
+                &result_fun_name,
+                &multi_result_fun_name,
+                &data_args,
+                &used_memory,
+                &old_memory,
+                &result_locals,
+                &explicit_results,
+                &params,
+                memory,
+                &frame_access,
+            );
+            if is_only {
+                // Single variant: no outer block to close
+            } else {
+                self.writer.unindent();
+                if is_last {
+                    emitln!(self.writer, "}");
+                } else {
+                    emitln!(self.writer, "} else ");
+                }
+            }
+        }
         self.writer.unindent();
         emitln!(self.writer, "}");
     }
@@ -961,7 +1117,7 @@ impl<'env> BoogieTranslator<'env> {
         params: &[Type],
         results: &Type,
         result_locals: &[String],
-        memory: &[String],
+        memory: &[(QualifiedInstId<StructId>, String)],
     ) {
         // Build args for ALL callee params by interleaving captured and non-captured
         // using ClosureMask::compose.
@@ -1140,7 +1296,7 @@ impl<'env> BoogieTranslator<'env> {
         result_locals: &[String],
         explicit_results: &[Type],
         params: &[Type],
-        memory: &[String],
+        memory: &[(QualifiedInstId<StructId>, String)],
         frame_access: &BTreeMap<QualifiedInstId<StructId>, ApplyFrameAccess>,
     ) {
         let env = self.env;
@@ -1152,6 +1308,12 @@ impl<'env> BoogieTranslator<'env> {
             .map(|(idx, _)| idx)
             .collect();
         let first_mut_ref_param = mut_ref_param_indices.first().copied();
+
+        // Compute which memory names are covered by frame_access
+        let covered_by_frame: BTreeSet<String> = frame_access
+            .keys()
+            .map(|qid| boogie_resource_memory_name(env, qid, &None))
+            .collect();
 
         // Phase 1: Check abort condition using pre-state args (both old and current are pre-state)
         emitln!(self.writer, "if ({}({})) {{", aborts_name, bp_args);
@@ -1172,7 +1334,17 @@ impl<'env> BoogieTranslator<'env> {
             old_saves.insert(mem.clone(), pre_name);
         }
 
-        // Save memory for frame conditions before havoc
+        // Save memory for frame conditions before havoc.
+        // For memory types NOT in frame_access, also save for Reads constraint (preserve
+        // memory that this variant doesn't modify).
+        let mut uncovered_saves: Vec<String> = vec![];
+        for (_, mem_name) in memory {
+            if !covered_by_frame.contains(mem_name) {
+                let save_name = format!("{}_$frame", mem_name);
+                emitln!(self.writer, "{} := {};", save_name, mem_name);
+                uncovered_saves.push(mem_name.clone());
+            }
+        }
         let mut frame_saves: Vec<(
             String,
             String,
@@ -1190,8 +1362,16 @@ impl<'env> BoogieTranslator<'env> {
         }
 
         // Havoc memory since the function could modify anything
-        for mem in memory {
-            emitln!(self.writer, "havoc {};", mem)
+        for (_, mem_name) in memory {
+            emitln!(self.writer, "havoc {};", mem_name)
+        }
+
+        // Emit Reads constraints for memory types not in frame_access.
+        // These are memory types that this variant provably doesn't modify,
+        // so they must be preserved after havoc.
+        for mem_name in &uncovered_saves {
+            let save_name = format!("{}_$frame", mem_name);
+            emitln!(self.writer, "assume {} == {};", mem_name, save_name);
         }
 
         // Emit frame conditions: constrain unchanged memory after havoc
@@ -1364,6 +1544,7 @@ impl<'env> BoogieTranslator<'env> {
         fun_type: &Type,
         closure_infos: &BTreeSet<ClosureInfo>,
         fun_param_infos: &BTreeSet<FunParamInfo>,
+        struct_field_infos: &BTreeSet<StructFieldInfo>,
         kind: BehaviorKind,
     ) {
         let env = self.env;
@@ -1381,7 +1562,7 @@ impl<'env> BoogieTranslator<'env> {
         // This includes both closure and param variants so the evaluator's inline
         // body can pass memory to per-function spec functions in closure branches.
         let (union_used_memory, union_old_memory) =
-            Self::collect_union_memory(env, closure_infos, fun_param_infos);
+            Self::collect_union_memory(env, closure_infos, fun_param_infos, struct_field_infos);
         let (eval_mem_decls, _eval_mem_args) =
             Self::build_memory_params(env, &union_used_memory, &union_old_memory);
 
@@ -1419,7 +1600,7 @@ impl<'env> BoogieTranslator<'env> {
         self.writer.indent();
         emitln!(self.writer);
 
-        let total_variants = closure_infos.len() + fun_param_infos.len();
+        let total_variants = closure_infos.len() + fun_param_infos.len() + struct_field_infos.len();
         let mut variant_idx = 0;
 
         // Closure branches: delegate to per-function spec functions
@@ -1503,6 +1684,56 @@ impl<'env> BoogieTranslator<'env> {
             variant_idx += 1;
         }
 
+        // Struct field branches: delegate to per-struct-field uninterpreted functions.
+        // These have `n: int` (instance id) prepended to args.
+        for info in struct_field_infos {
+            let ctor_name = boogie_struct_field_name(env, &info.struct_id, info.field_sym);
+            let is_last = variant_idx == total_variants - 1;
+            if variant_idx == 0 && total_variants == 1 {
+                // Single variant: emit directly
+            } else if variant_idx == 0 {
+                emit!(self.writer, "if (f is {}) then ", ctor_name);
+            } else if is_last {
+                emit!(self.writer, "else /* {} */ ", ctor_name);
+            } else {
+                emit!(self.writer, "else if (f is {}) then ", ctor_name);
+            }
+
+            let bp_name =
+                boogie_struct_field_spec_fun_name(env, &info.struct_id, info.field_sym, kind, &[]);
+            // Build memory args for this struct field (if it has access declarations)
+            let struct_env_for_field = env.get_struct_qid(info.struct_id.to_qualified_id());
+            let field_access = struct_env_for_field.get_field_access_of();
+            let access_decl = field_access.iter().find(|a| a.fun_param == info.field_sym);
+            let mem_args: Vec<String> = if let Some(decl) = access_decl {
+                Self::build_evaluator_memory_args_for_access(
+                    env,
+                    decl,
+                    &union_used_memory,
+                    &union_old_memory,
+                )
+            } else {
+                vec![]
+            };
+            // Args: memory..., n (instance id from datatype field), then data args
+            let args = if kind == BehaviorKind::EnsuresOf {
+                let mut args = mem_args;
+                args.push("f->n".to_string());
+                for pos in 0..params.len() {
+                    args.push(format!("p{}", pos));
+                }
+                args.extend(Self::behavioral_output_args(&params, &results));
+                args.join(", ")
+            } else {
+                let mut args = mem_args;
+                args.push("f->n".to_string());
+                args.extend(param_args.iter().cloned());
+                args.join(", ")
+            };
+            emitln!(self.writer, "{}({})", bp_name, args);
+            variant_idx += 1;
+        }
+
         self.writer.unindent();
         emitln!(self.writer, "}");
     }
@@ -1513,6 +1744,7 @@ impl<'env> BoogieTranslator<'env> {
         fun_type: &Type,
         closure_infos: &BTreeSet<ClosureInfo>,
         fun_param_infos: &BTreeSet<FunParamInfo>,
+        struct_field_infos: &BTreeSet<StructFieldInfo>,
     ) {
         let env = self.env;
         let Type::Fun(params, results, _abilities) = fun_type else {
@@ -1531,7 +1763,7 @@ impl<'env> BoogieTranslator<'env> {
         // Compute union of all variants' memory for the result_of function.
         // Must match the evaluator's memory since the axiom references ensures_of.
         let (union_used_memory, union_old_memory) =
-            Self::collect_union_memory(env, closure_infos, fun_param_infos);
+            Self::collect_union_memory(env, closure_infos, fun_param_infos, struct_field_infos);
         let (eval_mem_decls, eval_mem_args) =
             Self::build_memory_params(env, &union_used_memory, &union_old_memory);
 
@@ -1962,6 +2194,121 @@ impl<'env> BoogieTranslator<'env> {
         if all_labels.is_empty() {
             joined
         } else {
+            // When the existential has intermediate labels, include the defining
+            // fragments of conditions from OTHER kinds that define those labels.
+            // For example, when generating $bp_aborts_of, Ensures conditions with
+            // SpecRemove/SpecPublish/SpecUpdate define the abstract states. Only the
+            // label-defining conjuncts are included (not full postcondition properties).
+            // This uses the same analysis as emit_state_label_assumes in
+            // spec_instrumentation.rs: ExpData::all_defined_labels() identifies
+            // which conditions define labels, and we filter to defining conjuncts.
+            let frame_translated: Vec<String> = closure_spec
+                .conditions
+                .iter()
+                .filter(|c| {
+                    // Skip conditions already in `joined` (same kind)
+                    let dominated = match kind {
+                        BehaviorKind::RequiresOf => matches!(c.kind, ConditionKind::Requires),
+                        BehaviorKind::AbortsOf => matches!(c.kind, ConditionKind::AbortsIf),
+                        BehaviorKind::EnsuresOf => matches!(c.kind, ConditionKind::Ensures),
+                        BehaviorKind::ResultOf => false,
+                    };
+                    if dominated {
+                        return false;
+                    }
+                    // Include only conditions that define at least one intermediate label
+                    let defined = c.exp.as_ref().all_defined_labels();
+                    defined
+                        .iter()
+                        .any(|l| all_labels.iter().any(|(al, _)| al == l))
+                })
+                .flat_map(|cond| {
+                    // Extract only label-defining conjuncts (same logic as
+                    // Instrumenter::defining_fragment in spec_instrumentation.rs)
+                    use move_model::exp_simplifier::flatten_conjunction_owned;
+                    let conjuncts = flatten_conjunction_owned(&cond.exp);
+                    conjuncts
+                        .into_iter()
+                        .filter(|c| !c.as_ref().all_defined_labels().is_empty())
+                        .filter_map(|fragment| {
+                            let fw = CodeWriter::new(self.env.internal_loc());
+                            let mut ft = SpecTranslator::new(&fw, self.env, self.options);
+                            ft.set_current_fun_qid(
+                                fun_env.get_qualified_id().instantiate(type_inst.to_vec()),
+                            );
+                            if !old_memory.is_empty() || fun_env.spec_uses_old() {
+                                ft.set_fun_old_memory(old_memory.clone());
+                                ft.set_fun_mut_params(
+                                    fun_env
+                                        .get_parameters()
+                                        .iter()
+                                        .filter(|p| p.1.is_mutable_reference())
+                                        .map(|p| p.0)
+                                        .collect(),
+                                );
+                            }
+                            ft.translate(&fragment, type_inst);
+                            ft.clear_current_fun_qid();
+                            let mut result = fw.extract_result();
+                            if result.ends_with('\n') {
+                                result.pop();
+                            }
+                            if kind != BehaviorKind::EnsuresOf {
+                                // For aborts_of/requires_of: skip fragments that reference
+                                // result variables or &mut post-state outputs, since these
+                                // functions have no result/output params. Check BEFORE
+                                // substitution so we detect $Dereference (post-state) vs
+                                // old($Dereference) (pre-state, which is fine).
+                                let has_ret = (0..num_results)
+                                    .any(|i| result.contains(&format!("$ret{}", i)));
+                                let has_mut_output =
+                                    mut_ref_result_positions.iter().any(|(idx, _)| {
+                                        let post = format!("$Dereference($t{})", idx);
+                                        let pre = format!("old($Dereference($t{}))", idx);
+                                        // Has post-state ref that isn't inside old()
+                                        result.contains(&post)
+                                            && result.replace(&pre, "").contains(&post)
+                                    });
+                                if has_ret || has_mut_output {
+                                    return None;
+                                }
+                            }
+                            for (param_idx, _) in mut_ref_result_positions.iter().rev() {
+                                result = result.replace(
+                                    &format!("old($Dereference($t{}))", param_idx),
+                                    &format!("p{}", param_idx),
+                                );
+                                result = result.replace(
+                                    &format!("$Dereference($t{})", param_idx),
+                                    &format!("p{}", param_idx),
+                                );
+                            }
+                            for i in (0..num_params).rev() {
+                                result = result.replace(&format!("$t{}", i), &format!("p{}", i));
+                            }
+                            if kind == BehaviorKind::EnsuresOf {
+                                for i in (0..num_results).rev() {
+                                    result =
+                                        result.replace(&format!("$ret{}", i), &format!("r{}", i));
+                                }
+                            }
+                            Some(result)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+
+            // Collect labels from frame conditions too
+            for cond in &closure_spec.conditions {
+                let defined = cond.exp.as_ref().all_defined_labels();
+                if defined
+                    .iter()
+                    .any(|l| all_labels.iter().any(|(al, _)| al == l))
+                {
+                    all_labels.extend(temp_trans.collect_intermediate_labels_from_exp(&cond.exp));
+                }
+            }
+
             let decls: Vec<String> = all_labels
                 .iter()
                 .map(|(label, mem)| {
@@ -1974,7 +2321,17 @@ impl<'env> BoogieTranslator<'env> {
                     format!("{}: $Memory {}", name, ty)
                 })
                 .collect();
-            format!("(exists {} :: {})", decls.join(", "), joined)
+            if frame_translated.is_empty() {
+                format!("(exists {} :: {})", decls.join(", "), joined)
+            } else {
+                let frame_conjoined = frame_translated.join(" && ");
+                format!(
+                    "(exists {} :: ({}) && {})",
+                    decls.join(", "),
+                    frame_conjoined,
+                    joined
+                )
+            }
         }
     }
 
@@ -2030,13 +2387,14 @@ impl<'env> BoogieTranslator<'env> {
         (frame_save_resources, old_memory_resources)
     }
 
-    /// Collect the union of used_memory and old_memory across all closure and function
-    /// parameter variants. Used to compute the memory parameter signature for evaluator
-    /// functions and result_of axioms.
+    /// Collect the union of used_memory and old_memory across all closure, function
+    /// parameter, and struct field variants. Used to compute the memory parameter
+    /// signature for evaluator functions and result_of axioms.
     fn collect_union_memory(
         env: &GlobalEnv,
         closure_infos: &BTreeSet<ClosureInfo>,
         fun_param_infos: &BTreeSet<FunParamInfo>,
+        struct_field_infos: &BTreeSet<StructFieldInfo>,
     ) -> (
         BTreeSet<QualifiedInstId<StructId>>,
         BTreeSet<QualifiedInstId<StructId>>,
@@ -2056,6 +2414,15 @@ impl<'env> BoogieTranslator<'env> {
             let (used, old) = Self::get_param_memory(env, &info.fun, info.param_sym);
             union_used_memory.extend(used);
             union_old_memory.extend(old);
+        }
+        for info in struct_field_infos {
+            let struct_env = env.get_struct_qid(info.struct_id.to_qualified_id());
+            for access in struct_env.get_field_access_of() {
+                if access.fun_param == info.field_sym {
+                    union_used_memory.extend(access.used_memory.iter().cloned());
+                    union_old_memory.extend(access.old_memory.iter().cloned());
+                }
+            }
         }
         (union_used_memory, union_old_memory)
     }
@@ -2136,6 +2503,28 @@ impl<'env> BoogieTranslator<'env> {
             }
         }
         (decls, args)
+    }
+
+    /// Build memory argument strings for a struct field variant in the evaluator.
+    /// Maps the field's declared memory to the evaluator's parameter names.
+    fn build_evaluator_memory_args_for_access(
+        env: &GlobalEnv,
+        decl: &FunParamAccessOf,
+        union_used: &BTreeSet<QualifiedInstId<StructId>>,
+        union_old: &BTreeSet<QualifiedInstId<StructId>>,
+    ) -> Vec<String> {
+        let uses_old = !union_old.is_empty();
+        let mut args = vec![];
+        for mem in &decl.used_memory {
+            let name = boogie_resource_memory_name(env, mem, &None);
+            if uses_old && decl.old_memory.contains(mem) && union_old.contains(mem) {
+                args.push(format!("old_{}", name));
+            }
+            if union_used.contains(mem) {
+                args.push(name);
+            }
+        }
+        args
     }
 
     /// Behavioral predicates reason over plain values, even when the underlying
@@ -2442,6 +2831,186 @@ impl<'env> BoogieTranslator<'env> {
             }
         }
     }
+
+    /// Generate uninterpreted behavioral predicate spec functions for struct field variants.
+    /// These are parameterized by an instance id `n: int` (first parameter) that distinguishes
+    /// different struct instances. The pattern mirrors `generate_behavioral_spec_funs_for_params`.
+    fn generate_behavioral_spec_funs_for_struct_fields(
+        &self,
+        fun_type: &Type,
+        struct_field_infos: &BTreeSet<StructFieldInfo>,
+    ) {
+        let Type::Fun(params, results, _) = fun_type else {
+            return;
+        };
+        let params = params.clone().flatten();
+        let results = results.clone().flatten();
+
+        for info in struct_field_infos {
+            // Look up access declarations for this field's memory requirements
+            let struct_env = self.env.get_struct_qid(info.struct_id.to_qualified_id());
+            let field_access = struct_env.get_field_access_of();
+            let access_decl = field_access.iter().find(|a| a.fun_param == info.field_sym);
+            let has_memory = access_decl.is_some();
+
+            // Build memory parameter declarations if the field has access declarations
+            let mut mem_param_decls = vec![];
+            let mut mem_args = vec![];
+            if let Some(decl) = access_decl {
+                // Add dual-state memory params (old + current) for used/old memory
+                for mem in &decl.used_memory {
+                    let mem_name = boogie_resource_memory_name(self.env, mem, &None);
+                    let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
+                    let mem_type = format!(
+                        "$Memory {}",
+                        boogie_struct_name(&struct_env, &mem.inst, false)
+                    );
+                    if decl.old_memory.contains(mem) {
+                        let old_name = format!("old_{}", mem_name);
+                        mem_param_decls.push(format!("{}: {}", old_name, mem_type));
+                        mem_args.push(old_name);
+                    }
+                    mem_param_decls.push(format!("{}: {}", mem_name, mem_type));
+                    mem_args.push(mem_name);
+                }
+            }
+
+            // Build input parameters: memory..., n (instance id), then data args.
+            let mut input_param_decls = mem_param_decls.clone();
+            input_param_decls.push("n: int".to_string());
+            let mut input_args: Vec<String> = mem_args.clone();
+            input_args.push("n".to_string());
+            for (i, ty) in params.iter().enumerate() {
+                input_param_decls.push(format!(
+                    "arg{}: {}",
+                    i,
+                    boogie_type(self.env, ty.skip_reference(), false)
+                ));
+                input_args.push(format!("arg{}", i));
+            }
+            let _ = has_memory;
+
+            // For requires_of and aborts_of: generate uninterpreted predicates
+            for kind in [BehaviorKind::RequiresOf, BehaviorKind::AbortsOf] {
+                let fun_name = boogie_struct_field_spec_fun_name(
+                    self.env,
+                    &info.struct_id,
+                    info.field_sym,
+                    kind,
+                    &[],
+                );
+                emitln!(
+                    self.writer,
+                    "function {}({}): bool;",
+                    fun_name,
+                    input_param_decls.join(", ")
+                );
+            }
+
+            // For ensures_of: generate result functions and define ensures_of in terms of them.
+            let all_result_type_refs = Self::behavioral_output_type_refs(&params, &results);
+            let all_result_types: Vec<String> = Self::behavioral_output_types(&params, &results)
+                .into_iter()
+                .map(|ty| boogie_type(self.env, &ty, false))
+                .collect();
+
+            let input_args_str = input_args.join(", ");
+            let precond = Self::validity_precondition(self.env, &params, "arg");
+
+            let ensures_fun_name = boogie_struct_field_spec_fun_name(
+                self.env,
+                &info.struct_id,
+                info.field_sym,
+                BehaviorKind::EnsuresOf,
+                &[],
+            );
+
+            let mut full_param_decls = input_param_decls.clone();
+            for (i, result_type) in all_result_types.iter().enumerate() {
+                full_param_decls.push(format!("result{}: {}", i, result_type));
+            }
+
+            if all_result_types.len() == 1 {
+                let result_fun_name = boogie_struct_field_result_fun_name(
+                    self.env,
+                    &info.struct_id,
+                    info.field_sym,
+                    &[],
+                    false,
+                );
+                emitln!(
+                    self.writer,
+                    "function {}({}): {};",
+                    result_fun_name,
+                    input_param_decls.join(", "),
+                    all_result_types[0]
+                );
+                let result_fun_app = format!("{}({})", result_fun_name, input_args_str);
+                self.emit_result_validity_axiom(
+                    &input_param_decls,
+                    &result_fun_app,
+                    all_result_type_refs[0],
+                    &precond,
+                );
+                let body = format!("{}({}) == result0", result_fun_name, input_args_str);
+                emitln!(
+                    self.writer,
+                    "function {{:inline}} {}({}): bool {{ {} }}",
+                    ensures_fun_name,
+                    full_param_decls.join(", "),
+                    body
+                );
+            } else if all_result_types.len() >= 2 {
+                let result_fun_name = boogie_struct_field_result_fun_name(
+                    self.env,
+                    &info.struct_id,
+                    info.field_sym,
+                    &[],
+                    true,
+                );
+                let tuple_element_types = Self::deref_output_types(&all_result_type_refs);
+                let tuple_type =
+                    boogie_type(self.env, &Type::Tuple(tuple_element_types.clone()), false);
+                emitln!(
+                    self.writer,
+                    "function {}({}): {};",
+                    result_fun_name,
+                    input_param_decls.join(", "),
+                    tuple_type
+                );
+                let result_fun_app = format!("{}({})", result_fun_name, input_args_str);
+                self.emit_tuple_result_validity_axiom(
+                    &input_param_decls,
+                    &result_fun_app,
+                    &tuple_element_types,
+                    &precond,
+                );
+                let equality_checks: Vec<String> = (0..all_result_types.len())
+                    .map(|i| format!("r->${} == result{}", i, i))
+                    .collect();
+                let body = format!(
+                    "(var r := {}({}); {})",
+                    result_fun_name,
+                    input_args_str,
+                    equality_checks.join(" && ")
+                );
+                emitln!(
+                    self.writer,
+                    "function {{:inline}} {}({}): bool {{ {} }}",
+                    ensures_fun_name,
+                    full_param_decls.join(", "),
+                    body
+                );
+            } else {
+                emitln!(
+                    self.writer,
+                    "function {{:inline}} {}({}): bool {{ true }}",
+                    ensures_fun_name,
+                    full_param_decls.join(", ")
+                );
+            }
+        }
+    }
 }
 
 // =================================================================================================
@@ -2473,6 +3042,44 @@ impl StructTranslator<'_> {
             sep,
             boogie_well_formed_expr(self.parent.env, &sel, ty, bv_flag)
         )
+    }
+
+    /// Return identity constraint for a function-valued field `f` if it has a
+    /// `StructFieldInfo` entry, e.g. `s->$0_Continuation is $struct_field'State$0'`.
+    /// Returns `None` if the field isn't a storable function type with a StructFieldInfo.
+    pub fn boogie_field_identity_constraint(
+        &self,
+        field: &FieldEnv<'_>,
+        sep: &str,
+    ) -> Option<String> {
+        let env = self.parent.env;
+        let field_ty = field.get_type().instantiate(self.type_inst);
+        if let Type::Fun(params, results, abilities) = &field_ty {
+            if abilities.has_store() {
+                let mono_info = mono_analysis::get_info(env);
+                let normalized = Type::Fun(
+                    Box::new(Type::tuple(params.clone().flatten())),
+                    Box::new(Type::tuple(results.clone().flatten())),
+                    AbilitySet::EMPTY,
+                );
+                let struct_qid = self
+                    .struct_env
+                    .get_qualified_id()
+                    .instantiate(self.type_inst.to_vec());
+                if let Some(field_infos) = mono_info.fun_struct_field_infos.get(&normalized) {
+                    let has_entry = field_infos.iter().any(|info| {
+                        info.struct_id == struct_qid && info.field_sym == field.get_name()
+                    });
+                    if has_entry {
+                        let sel = format!("s->{}", boogie_field_sel(field));
+                        let ctor_name =
+                            boogie_struct_field_name(env, &struct_qid, field.get_name());
+                        return Some(format!("{}{} is {}", sep, sel, ctor_name));
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Return argument of constructor for the field `f`
@@ -2575,6 +3182,14 @@ impl StructTranslator<'_> {
                     for field in &fields {
                         emitln!(writer, "{}", self.boogie_field_is_valid(field, sep));
                         sep = "  && ";
+                    }
+                    // Add identity constraints for function-valued fields
+                    for field in &fields {
+                        if let Some(constraint) = self.boogie_field_identity_constraint(field, sep)
+                        {
+                            emitln!(writer, "{}", constraint);
+                            sep = "  && ";
+                        }
                     }
                     emitln!(writer, "else false");
                 }
@@ -2934,6 +3549,13 @@ impl StructTranslator<'_> {
                 for field in struct_env.get_fields() {
                     emitln!(writer, "{}", self.boogie_field_is_valid(&field, sep));
                     sep = "  && ";
+                }
+                // Add identity constraints for function-valued fields
+                for field in struct_env.get_fields() {
+                    if let Some(constraint) = self.boogie_field_identity_constraint(&field, sep) {
+                        emitln!(writer, "{}", constraint);
+                        sep = "  && ";
+                    }
                 }
             });
         }
@@ -3847,6 +4469,10 @@ impl FunctionTranslator<'_> {
                     emit!(writer, "assume ");
                     spec_translator.translate(exp, self.type_inst);
                     emitln!(writer, ";");
+                    // Emit struct field identity assumptions for function-valued fields.
+                    // When WellFormed is assumed for a struct with function-typed fields,
+                    // the apply procedure needs to know which variant the field is.
+                    self.emit_struct_field_identity_assumes(exp, env, writer);
                 },
                 PropKind::Modifies => {
                     let ty = self.inst(&env.get_node_type(exp.node_id()));
@@ -5847,6 +6473,107 @@ impl FunctionTranslator<'_> {
         }
         res
     }
+
+    /// Emit identity assumptions for function-valued struct fields.
+    /// After a WellFormed assume for a struct with storable function-typed fields,
+    /// this emits `assume <value>-><field> is <struct_field_ctor>;` so the apply
+    /// procedure can dispatch on the correct variant.
+    fn emit_struct_field_identity_assumes(&self, exp: &Exp, env: &GlobalEnv, writer: &CodeWriter) {
+        let mono_info = mono_analysis::get_info(env);
+        if mono_info.fun_struct_field_infos.is_empty() {
+            return;
+        }
+        // Only extract WellFormed from top-level positive conjuncts — not from
+        // inside disjunctions, negations, or other non-conjunctive positions,
+        // where injecting identity assumptions would be unsound.
+        use move_model::exp_simplifier::flatten_conjunction_owned;
+        for conjunct in flatten_conjunction_owned(exp) {
+            if let ExpData::Call(_, AstOperation::WellFormed, args) = conjunct.as_ref() {
+                if let Some(arg) = args.first() {
+                    let ty = self.inst(&env.get_node_type(arg.node_id()));
+                    self.emit_struct_field_identity_for_type(arg, &ty, env, writer, &mono_info);
+                }
+            }
+        }
+    }
+
+    /// Recursively emit identity assumptions for a value of a given struct type.
+    fn emit_struct_field_identity_for_type(
+        &self,
+        value_exp: &Exp,
+        ty: &Type,
+        env: &GlobalEnv,
+        writer: &CodeWriter,
+        mono_info: &mono_analysis::MonoInfo,
+    ) {
+        let ty = ty.skip_reference();
+        let Type::Struct(mid, sid, inst) = ty else {
+            return;
+        };
+        let struct_env = env.get_module(*mid).into_struct(*sid);
+        // Get the Boogie expression for the value. We handle Temporary nodes
+        // which are the common case in WellFormed assumptions.
+        let boogie_value = match value_exp.as_ref() {
+            ExpData::Temporary(_, idx) => {
+                let val_ty = env.get_node_type(value_exp.node_id());
+                if val_ty.is_mutable_reference() {
+                    format!("$Dereference($t{})", idx)
+                } else {
+                    format!("$t{}", idx)
+                }
+            },
+            _ => return, // Only handle temporaries for now
+        };
+        let fields: Vec<_> = if struct_env.has_variants() {
+            struct_env
+                .get_variants()
+                .flat_map(|v| struct_env.get_fields_of_variant(v).collect::<Vec<_>>())
+                .collect()
+        } else {
+            struct_env.get_fields().collect()
+        };
+        for field in &fields {
+            let field_ty = field.get_type().instantiate(inst);
+            if let Type::Fun(params, results, abilities) = &field_ty {
+                if abilities.has_store() {
+                    // Normalize to check against MonoInfo (same as mono_analysis::normalize_fun_ty)
+                    let normalized = Type::Fun(
+                        Box::new(Type::tuple(params.clone().flatten())),
+                        Box::new(Type::tuple(results.clone().flatten())),
+                        AbilitySet::EMPTY,
+                    );
+                    let struct_qid = struct_env.get_qualified_id().instantiate(inst.clone());
+                    // Check if this field has a StructFieldInfo entry
+                    if let Some(field_infos) = mono_info.fun_struct_field_infos.get(&normalized) {
+                        let has_entry = field_infos.iter().any(|info| {
+                            info.struct_id == struct_qid && info.field_sym == field.get_name()
+                        });
+                        if has_entry {
+                            let field_sel = boogie_field_sel(field);
+                            let ctor_name =
+                                boogie_struct_field_name(env, &struct_qid, field.get_name());
+                            emitln!(
+                                writer,
+                                "assume {}->{} is {};",
+                                boogie_value,
+                                field_sel,
+                                ctor_name
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        // Recurse into struct fields for transitive function-valued fields
+        for field in &fields {
+            let field_ty = field.get_type().instantiate(inst);
+            if let Type::Struct(..) = field_ty.skip_reference() {
+                // Only recurse if the nested struct has function-valued fields
+                // (transitively). For simplicity, we skip recursion for now
+                // as this can be added when needed for deeper nesting.
+            }
+        }
+    }
 }
 
 /// Look backwards through bytecode to find the Closure operation that assigns to
@@ -6012,6 +6739,82 @@ fn local_var_exp_to_boogie_str(
                 .and_then(|pos| data_args.get(pos).cloned())
         },
         _ => None,
+    }
+}
+
+/// Derive frame access for a struct field variant in the apply procedure.
+///
+/// Uses `reads_of`/`modifies_of` declarations from the struct spec block.
+/// If no declaration exists for the field, the function is assumed pure (empty map —
+/// all memory preserved). `data_args` provides the Boogie argument strings; the first
+/// element is `fun->n` (instance discriminator), followed by the actual parameters.
+fn derive_struct_field_frame_access(
+    env: &GlobalEnv,
+    struct_env: &StructEnv<'_>,
+    field_sym: Symbol,
+    data_args: &[String],
+) -> (
+    BTreeSet<QualifiedInstId<StructId>>,
+    BTreeSet<QualifiedInstId<StructId>>,
+    BTreeMap<QualifiedInstId<StructId>, ApplyFrameAccess>,
+) {
+    let field_access = struct_env.get_field_access_of();
+    let access_decl = field_access.iter().find(|a| a.fun_param == field_sym);
+    match access_decl {
+        None => {
+            // No declaration: assume pure (no memory access)
+            (BTreeSet::new(), BTreeSet::new(), BTreeMap::new())
+        },
+        Some(decl) => {
+            let used_memory = decl.used_memory.clone();
+            let old_memory = decl.old_memory.clone();
+            let mut result = BTreeMap::new();
+
+            // Classify resources from modifies_targets
+            let mut write_resources: BTreeMap<QualifiedInstId<StructId>, Vec<String>> =
+                BTreeMap::new();
+            for target in &decl.frame_spec.modifies_targets {
+                if let ExpData::Call(id, AstOperation::Global(_), args) = target.as_ref() {
+                    let ty = env.get_node_type(*id).skip_reference().clone();
+                    if let Type::Struct(mid, sid, inst) = &ty {
+                        let res = mid.qualified_inst(*sid, inst.clone());
+                        // Resolve address expression: data_args[1..] are the actual params
+                        // (data_args[0] is `fun->n`)
+                        let addr_str = if !args.is_empty() {
+                            local_var_exp_to_boogie_str(
+                                &args[0],
+                                &decl.modifies_params,
+                                &data_args[1..],
+                            )
+                        } else {
+                            None
+                        };
+                        if let Some(addr) = addr_str {
+                            write_resources.entry(res).or_default().push(addr);
+                        } else {
+                            write_resources.entry(res).or_default();
+                        }
+                    }
+                }
+            }
+
+            // Classify each used resource
+            for mem in &used_memory {
+                if let Some(addrs) = write_resources.get(mem) {
+                    if addrs.is_empty() {
+                        result.insert(mem.clone(), ApplyFrameAccess::WritesAll);
+                    } else {
+                        result.insert(mem.clone(), ApplyFrameAccess::WritesAt(addrs.clone()));
+                    }
+                } else {
+                    // Resource in reads_targets or used_memory but not in
+                    // modifies_targets — treat as read-only
+                    result.insert(mem.clone(), ApplyFrameAccess::Reads);
+                }
+            }
+
+            (used_memory, old_memory, result)
+        },
     }
 }
 

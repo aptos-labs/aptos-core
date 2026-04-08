@@ -119,7 +119,10 @@ module 0x42::state_labels {
         modifies Container[signer::address_of(account)];
         modifies Resource[addr];
         ensures [inferred] result == old(Resource[addr]);
-        ensures [inferred] S1.. |~ publish<Container>(signer::address_of(account), Container{inner: old(Resource[addr]).value});
+        ensures [inferred] {
+            let a = Container{inner: old(Resource[addr]).value};
+            S1.. |~ publish<Container>(signer::address_of(account), a)
+        };
         ensures [inferred] ..S1 |~ remove<Resource>(addr);
         aborts_if [inferred] S1 |~ exists<Container>(signer::address_of(account));
         aborts_if [inferred] !exists<Resource>(addr);
@@ -190,7 +193,10 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[signer::address_of(account)];
         modifies Resource[addr];
-        ensures [inferred] S1.. |~ publish<Resource>(signer::address_of(account), Resource{value: old(Resource[addr]).value + 1});
+        ensures [inferred] {
+            let a = Resource{value: old(Resource[addr]).value + 1};
+            S1.. |~ publish<Resource>(signer::address_of(account), a)
+        };
         ensures [inferred] ..S1 |~ remove<Resource>(addr);
         aborts_if [inferred] S1 |~ exists<Resource>(signer::address_of(account));
         aborts_if [inferred] Resource[addr].value == MAX_U64;

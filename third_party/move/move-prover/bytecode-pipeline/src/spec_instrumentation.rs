@@ -810,6 +810,39 @@ impl<'a> Instrumenter<'a> {
             // to in aborts conditions, and must be initialized before evaluating those.
             self.emit_save_for_old(&callee_spec.saved_params);
 
+            // Emit memory and spec var saves BEFORE label defines. The label-defining
+            // ensures conditions reference these saved labels (e.g., global[@0] maps to
+            // a SaveMem'd memory). They must be initialized before the label defines
+            // and abort condition evaluation — on BOTH the abort and success paths.
+            for (mem, label) in std::mem::take(&mut callee_spec.saved_memory) {
+                self.builder.emit_with(|id| SaveMem(id, label, mem));
+            }
+            for (var, label) in std::mem::take(&mut callee_spec.saved_spec_vars) {
+                self.builder.emit_with(|id| SaveSpecVar(id, label, var));
+            }
+
+            // Emit state label defining conditions BEFORE the abort condition.
+            // This constrains abstract memory labels that may be referenced by
+            // aborts_if conditions. Uses abort_path=true to emit only the
+            // defining fragment (label-defining conjuncts), not full postcondition
+            // properties that reference post-havoc state.
+            let defining_indices = self.emit_state_label_assumes(&callee_spec, true);
+            // Remove defining conditions from post so they aren't double-emitted
+            // later when assumes for ensures are emitted on the non-abort path.
+            if !defining_indices.is_empty() {
+                let post_count = callee_spec.post.len();
+                callee_spec.post = callee_spec
+                    .post
+                    .drain(..)
+                    .enumerate()
+                    .filter(|(i, _)| !defining_indices.contains(i))
+                    .map(|(_, v)| v)
+                    .collect();
+                // Adjust aborts indices (they start after post in the combined list)
+                // No adjustment needed — aborts are separate from post in callee_spec
+                let _ = post_count; // suppress unused warning
+            }
+
             let callee_aborts_if_is_partial =
                 callee_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false);
 
@@ -837,13 +870,8 @@ impl<'a> Instrumenter<'a> {
                 self.can_abort = true;
             }
 
-            // Emit memory state saves
-            for (mem, label) in std::mem::take(&mut callee_spec.saved_memory) {
-                self.builder.emit_with(|id| SaveMem(id, label, mem));
-            }
-            for (var, label) in std::mem::take(&mut callee_spec.saved_spec_vars) {
-                self.builder.emit_with(|id| SaveSpecVar(id, label, var));
-            }
+            // Note: saved_memory and saved_spec_vars were already emitted above,
+            // before the label defines and abort condition evaluation.
 
             // Emit modifies properties which havoc memory at the modified location.
             for (_, exp) in std::mem::take(&mut callee_spec.modifies) {

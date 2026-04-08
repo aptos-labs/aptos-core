@@ -678,6 +678,29 @@ fn compute_behavioral_predicate_memory(env: &mut GlobalEnv) {
         }
         env.set_function_spec_memory(fun_id, spec_used, spec_old, spec_uses_old);
     }
+
+    // Process struct field access declarations
+    let struct_ids: Vec<QualifiedId<StructId>> = env
+        .get_modules()
+        .flat_map(|m| m.get_structs().map(|s| s.get_qualified_id()).collect_vec())
+        .collect_vec();
+    for struct_id in struct_ids {
+        let field_updates: Vec<_> = {
+            let struct_env = env.get_struct(struct_id);
+            struct_env
+                .get_field_access_of()
+                .iter()
+                .enumerate()
+                .map(|(i, access)| {
+                    let (used, old) = derive_memory_from_access_of(env, access);
+                    (i, used, old)
+                })
+                .collect()
+        };
+        for (i, used, old) in field_updates {
+            env.set_struct_field_access_of_memory(struct_id, i, used, old);
+        }
+    }
 }
 
 /// Validates that closures passed to functions with `modifies_of`/`reads_of` declarations
@@ -713,6 +736,97 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
         };
 
         body.visit_post_order(&mut |exp| {
+            // Check struct pack operations: when a closure is stored into a struct
+            // field with reads_of/modifies_of declarations, validate compliance.
+            if let ExpData::Call(call_id, Operation::Pack(mid, sid, _), args) = exp {
+                let struct_qid = mid.qualified(*sid);
+                let field_access = {
+                    let struct_env = env.get_struct(struct_qid);
+                    struct_env.get_field_access_of().to_vec()
+                };
+                if !field_access.is_empty() {
+                    let struct_env = env.get_struct(struct_qid);
+                    let fields: Vec<_> = struct_env.get_fields().collect();
+                    for (arg_idx, arg) in args.iter().enumerate() {
+                        if arg_idx >= fields.len() {
+                            continue;
+                        }
+                        let field = &fields[arg_idx];
+                        if !field.get_type().is_function() {
+                            continue;
+                        }
+                        let field_name = field.get_name();
+                        let empty_access;
+                        let access = match field_access.iter().find(|a| a.fun_param == field_name)
+                        {
+                            Some(a) => a,
+                            None => {
+                                // No declaration = pure: field function can't access memory
+                                empty_access = FunParamAccessOf {
+                                    loc: Loc::default(),
+                                    fun_param: field_name,
+                                    modifies_params: vec![],
+                                    frame_spec: FrameSpec::default(),
+                                    used_memory: BTreeSet::new(),
+                                    old_memory: BTreeSet::new(),
+                                };
+                                &empty_access
+                            },
+                        };
+                        let (arg_used, arg_old) = compute_arg_memory(
+                            env,
+                            arg,
+                            &caller_spec_used,
+                            &caller_spec_old,
+                            &caller_param_access,
+                            &caller_params,
+                        );
+                        for mem in &arg_used {
+                            if !access.used_memory.contains(mem) {
+                                let loc = env.get_node_loc(*call_id);
+                                env.error(
+                                    &loc,
+                                    &format!(
+                                        "stored function accesses resource `{}` \
+                                         which is not declared in `modifies_of`/`reads_of` \
+                                         for field `{}`",
+                                        env.display(mem),
+                                        field_name.display(env.symbol_pool())
+                                    ),
+                                );
+                            }
+                        }
+                        for mem in &arg_old {
+                            if !access.old_memory.contains(mem) {
+                                let loc = env.get_node_loc(*call_id);
+                                if access.used_memory.contains(mem) {
+                                    env.error(
+                                        &loc,
+                                        &format!(
+                                            "stored function writes resource `{}` \
+                                             but only `reads_of` (not `modifies_of`) is \
+                                             declared for field `{}`",
+                                            env.display(mem),
+                                            field_name.display(env.symbol_pool())
+                                        ),
+                                    );
+                                } else {
+                                    env.error(
+                                        &loc,
+                                        &format!(
+                                            "stored function accesses resource `{}` \
+                                             which is not declared in \
+                                             `modifies_of`/`reads_of` for field `{}`",
+                                            env.display(mem),
+                                            field_name.display(env.symbol_pool())
+                                        ),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             if let ExpData::Call(call_id, Operation::MoveFunction(mid, fid), args) = exp {
                 let callee_id = mid.qualified(*fid);
                 let (callee_param_access, callee_params) = {

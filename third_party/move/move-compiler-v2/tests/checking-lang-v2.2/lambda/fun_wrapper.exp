@@ -32,7 +32,7 @@ module 0x66::test {
         0: |u64|u64 has drop,
     }
     fun t1(): bool {
-        let work = Work(|arg0| lambda__1__t1(arg0));
+        let work = Work(|x| lambda__1__t1(x));
         work == <<wrongly typed closure expression>>
     }
     fun t2() {

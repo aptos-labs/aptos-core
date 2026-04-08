@@ -1,4 +1,3 @@
-// no_ci: TODO(#19277): Z3 trace non-determinism causes baseline mismatch on CI
 module 0x66::calculator {
     use 0x1::signer::address_of;
 
@@ -67,5 +66,3 @@ module 0x66::calculator {
         }
     }
 }
-
-// TODO(#19277): stored function value verification

@@ -28,7 +28,7 @@ module 0x66::delayed_work {
     }
     entry fun add(p0: &signer, p1: u64) {
         let _v0 = registry::remove<Work>(p0);
-        let _v1 = Work{_0: |arg0| more_work(_v0, p1, arg0)};
+        let _v1 = Work{_0: |x| more_work(_v0, p1, x)};
         registry::store<Work>(p0, _v1);
     }
     public fun more_work(p0: Work, p1: u64, p2: u64): u64 {
@@ -43,7 +43,7 @@ module 0x66::delayed_work {
         p0
     }
     entry fun initialize(p0: &signer) {
-        let _v0 = Work{_0: |arg0| id_fun(arg0)};
+        let _v0 = Work{_0: |x| id_fun(x)};
         registry::store<Work>(p0, _v0);
     }
 }

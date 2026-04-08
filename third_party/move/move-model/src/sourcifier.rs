@@ -59,6 +59,9 @@ fn is_simple_quant(
         })
 }
 
+// NOTE: has_any_state_label was removed — replaced by is_state_neutral which also
+// catches unlabeled Global(None)/Exists(None) references that would be corrupted by hoisting.
+
 /// Returns true if the expression has a single state label that can be hoisted
 /// out of an enclosing operation for readability. Looks through Not, binary
 /// ops (where the other side has no labels), and quantifiers.
@@ -71,10 +74,11 @@ fn has_hoistable_label(exp: &Exp) -> bool {
         },
         // Look through Not
         ExpData::Call(_, Operation::Not, args) if args.len() == 1 => has_hoistable_label(&args[0]),
-        // Look through hoistable binary ops
+        // Look through hoistable binary ops — but only if the other operand is
+        // state-neutral (no global/exists accesses that would be corrupted by hoisting).
         ExpData::Call(_, op, args) if args.len() == 2 && hoistable_bin_op_info(op).is_some() => {
-            (has_hoistable_label(&args[0]) && !has_any_state_label(&args[1]))
-                || (has_hoistable_label(&args[1]) && !has_any_state_label(&args[0]))
+            (has_hoistable_label(&args[0]) && is_state_neutral(&args[1]))
+                || (has_hoistable_label(&args[1]) && is_state_neutral(&args[0]))
         },
         // Look through simple quantifiers (type-domain ranges only, no triggers/where)
         ExpData::Quant(_, _, ranges, triggers, where_clause, body)
@@ -84,6 +88,35 @@ fn has_hoistable_label(exp: &Exp) -> bool {
         },
         _ => false,
     }
+}
+
+/// Returns true if the expression contains no state-sensitive operations — neither explicit
+/// labels nor unlabeled global/exists accesses. An expression is state-neutral when hoisting
+/// a label over it would not change its meaning after a sourcify → parse round-trip.
+///
+/// This subsumes and replaces `!has_any_state_label(exp)` for the hoisting check:
+/// - `Global(Some(_))` / `Exists(Some(_))` — explicit label, not neutral (same as before)
+/// - `Global(None)` / `Exists(None)` — unlabeled pre-state ref, would acquire hoisted label
+/// - `Old` — state-sensitive
+/// - `Behavior(_, range)` with non-default range — state-sensitive
+fn is_state_neutral(exp: &Exp) -> bool {
+    let mut neutral = true;
+    exp.as_ref().visit_pre_order(&mut |e: &ExpData| match e {
+        ExpData::Call(_, Operation::Global(_), _)
+        | ExpData::Call(_, Operation::Exists(_), _)
+        | ExpData::Call(_, Operation::Old, _) => {
+            neutral = false;
+            false
+        },
+        ExpData::Call(_, Operation::Behavior(_, range), _)
+            if range.pre.is_some() || range.post.is_some() =>
+        {
+            neutral = false;
+            false
+        },
+        _ => neutral,
+    });
+    neutral
 }
 
 /// Returns the priority and operator string for binary ops that support label hoisting.
@@ -103,29 +136,7 @@ fn hoistable_bin_op_info(op: &Operation) -> Option<(Priority, &'static str)> {
     }
 }
 
-/// Returns true if the expression (or any sub-expression) contains state labels
-/// or `old()` wrappers. Hoisting a state label past an `old()` would change
-/// semantics: `old(global<T>(a))` refers to function entry state, but
-/// `S |~ old(global<T>(a))` would apply label S inside old().
-fn has_any_state_label(exp: &Exp) -> bool {
-    let mut found = false;
-    exp.as_ref().visit_pre_order(&mut |e: &ExpData| match e {
-        ExpData::Call(_, Operation::Global(Some(_)), _)
-        | ExpData::Call(_, Operation::Exists(Some(_)), _)
-        | ExpData::Call(_, Operation::Old, _) => {
-            found = true;
-            false
-        },
-        ExpData::Call(_, Operation::Behavior(_, range), _)
-            if range.pre.is_some() || range.post.is_some() =>
-        {
-            found = true;
-            false
-        },
-        _ => !found,
-    });
-    found
-}
+// has_any_state_label removed — replaced by is_state_neutral (see above)
 
 impl<'a> Sourcifier<'a> {
     /// Creates a new sourcifier.
@@ -1489,6 +1500,8 @@ pub struct ExpSourcifier<'a> {
     // Whether we are printing spec expressions (affects number suffix printing)
     for_spec: bool,
     amend: bool,
+    // Shared counter for let-binding names, ensuring nested extractions don't clash.
+    let_counter: Cell<usize>,
 }
 
 /// Helper type to split blocks and sequences into vector of items
@@ -1525,6 +1538,11 @@ mod Prio {
 }
 
 impl<'a> ExpSourcifier<'a> {
+    /// Base names for let-bound variables.
+    const LET_BIND_NAMES: &'static [&'static str] = &["a", "b", "c", "d", "e", "f"];
+    /// Base names for lambda/closure parameters.
+    const PARAM_NAMES: &'static [&'static str] = &["x", "y", "z", "w", "v", "u"];
+
     /// Creates a sourcifier for the given expression in the context of the function
     pub fn for_fun(
         parent: &'a Sourcifier<'a>,
@@ -1558,6 +1576,7 @@ impl<'a> ExpSourcifier<'a> {
             result_count: 0,
             for_spec: true,
             amend,
+            let_counter: Cell::new(0),
         }
     }
 
@@ -1580,6 +1599,7 @@ impl<'a> ExpSourcifier<'a> {
             result_count: fun_env.get_return_count(),
             for_spec: true,
             amend,
+            let_counter: Cell::new(0),
         }
     }
 
@@ -1594,6 +1614,7 @@ impl<'a> ExpSourcifier<'a> {
             result_count: self.result_count,
             for_spec: true,
             amend: self.amend,
+            let_counter: Cell::new(0),
         }
     }
 
@@ -1638,6 +1659,7 @@ impl<'a> ExpSourcifier<'a> {
             result_count,
             for_spec,
             amend,
+            let_counter: Cell::new(0),
         }
     }
 
@@ -2078,11 +2100,7 @@ impl<'a> ExpSourcifier<'a> {
                             ) {
                                 arg.clone()
                             } else {
-                                let arg_ty = self.env().get_node_type(arg.node_id());
-                                let name = self.new_unique_name(args, "__cap");
-                                let local_id = self.env().new_node(loc.clone(), arg_ty);
-                                let pat = Pattern::Var(local_id, name);
-                                let var_exp = ExpData::LocalVar(local_id, name).into_exp();
+                                let (pat, var_exp) = self.let_bind_exp(arg, args);
                                 let_bindings.push((pat, arg.clone()));
                                 var_exp
                             }
@@ -2092,7 +2110,15 @@ impl<'a> ExpSourcifier<'a> {
                     let mut lambda_param_tys = vec![];
                     let mut lambda_param_exps = vec![];
                     for (i, ty) in arg_ty.flatten().into_iter().enumerate() {
-                        let name = self.new_unique_name(args, &format!("arg{}", i));
+                        let base = Self::PARAM_NAMES[i % Self::PARAM_NAMES.len()];
+                        // Include already-chosen lambda params in the scope to avoid
+                        // duplicate names when there are more params than PARAM_NAMES.
+                        let scope: Vec<Exp> = args
+                            .iter()
+                            .cloned()
+                            .chain(lambda_param_exps.iter().cloned())
+                            .collect();
+                        let name = self.new_unique_name(&scope, base);
                         let local_id = self.env().new_node(loc.clone(), ty.clone());
                         lambda_params.push(Pattern::Var(local_id, name));
                         lambda_param_exps.push(ExpData::LocalVar(local_id, name).into_exp());
@@ -2366,43 +2392,66 @@ impl<'a> ExpSourcifier<'a> {
             Operation::SpecPublish(range)
             | Operation::SpecRemove(range)
             | Operation::SpecUpdate(range) => {
-                // Use Postfix priority when there's no range prefix (bare call),
-                // General when there is one (the `|~` notation needs parentheses).
-                let prio = if range.pre.is_some() || range.post.is_some() {
-                    Prio::General
+                let has_range = range.pre.is_some() || range.post.is_some();
+                // When the operation has a state label range, check if any argument
+                // is state-dependent. If so, extract it into a let-binding so the
+                // label doesn't incorrectly scope over it after round-trip.
+                let needs_let = has_range && args.iter().any(|a| !is_state_neutral(a));
+                if needs_let {
+                    let mut let_bindings = vec![];
+                    let new_args: Vec<Exp> = args
+                        .iter()
+                        .map(|arg| {
+                            if is_state_neutral(arg) {
+                                arg.clone()
+                            } else {
+                                let (pat, var_exp) = self.let_bind_exp(arg, args);
+                                let_bindings.push((pat, arg.clone()));
+                                var_exp
+                            }
+                        })
+                        .collect();
+                    // Rebuild the operation with substituted args, wrap in lets
+                    let new_call = ExpData::Call(id, oper.clone(), new_args).into_exp();
+                    let wrapped = self.wrap_in_lets(let_bindings, new_call);
+                    self.print_exp(context_prio, true, &wrapped);
                 } else {
-                    Prio::Postfix
-                };
-                self.parenthesize(context_prio, prio, || {
-                    // Print two-state range prefix
-                    match (range.pre, range.post) {
-                        (None, Some(post)) => {
-                            emit!(self.wr(), "..");
-                            self.print_memory_label(&post);
-                            emit!(self.wr(), " |~ ");
-                        },
-                        (Some(pre), None) => {
-                            self.print_memory_label(&pre);
-                            emit!(self.wr(), ".. |~ ");
-                        },
-                        (Some(pre), Some(post)) => {
-                            self.print_memory_label(&pre);
-                            emit!(self.wr(), "..");
-                            self.print_memory_label(&post);
-                            emit!(self.wr(), " |~ ");
-                        },
-                        (None, None) => {},
-                    }
-                    let name = match oper {
-                        Operation::SpecPublish(_) => "publish",
-                        Operation::SpecRemove(_) => "remove",
-                        Operation::SpecUpdate(_) => "update",
-                        _ => unreachable!(),
+                    // No let-extraction needed — print normally
+                    let prio = if has_range {
+                        Prio::General
+                    } else {
+                        Prio::Postfix
                     };
-                    emit!(self.wr(), "{}", name);
-                    self.print_node_inst(id);
-                    self.print_exp_list("(", ")", args);
-                })
+                    self.parenthesize(context_prio, prio, || {
+                        match (range.pre, range.post) {
+                            (None, Some(post)) => {
+                                emit!(self.wr(), "..");
+                                self.print_memory_label(&post);
+                                emit!(self.wr(), " |~ ");
+                            },
+                            (Some(pre), None) => {
+                                self.print_memory_label(&pre);
+                                emit!(self.wr(), ".. |~ ");
+                            },
+                            (Some(pre), Some(post)) => {
+                                self.print_memory_label(&pre);
+                                emit!(self.wr(), "..");
+                                self.print_memory_label(&post);
+                                emit!(self.wr(), " |~ ");
+                            },
+                            (None, None) => {},
+                        }
+                        let name = match oper {
+                            Operation::SpecPublish(_) => "publish",
+                            Operation::SpecRemove(_) => "remove",
+                            Operation::SpecUpdate(_) => "update",
+                            _ => unreachable!(),
+                        };
+                        emit!(self.wr(), "{}", name);
+                        self.print_node_inst(id);
+                        self.print_exp_list("(", ")", args);
+                    })
+                }
             },
             Operation::BorrowGlobal(kind) => self.parenthesize(context_prio, Prio::Postfix, || {
                 if *kind == ReferenceKind::Mutable {
@@ -2710,6 +2759,30 @@ impl<'a> ExpSourcifier<'a> {
                     crate::ast::BehaviorKind::ResultOf => "result_of",
                 };
                 let has_labels = range.pre.is_some() || range.post.is_some();
+                // When the behavior has labels AND the target is non-simple AND
+                // the target is not state-neutral, extract the let-binding OUTSIDE
+                // the label scope to prevent the label from corrupting the target's
+                // state references after round-trip.
+                if has_labels
+                    && !self.is_simple_behavior_target(&args[0])
+                    && !is_state_neutral(&args[0])
+                {
+                    let (pat, var_exp) = self.let_bind_exp(&args[0], args);
+                    let mut new_args = vec![var_exp];
+                    new_args.extend(args[1..].iter().cloned());
+                    let pred_node = self
+                        .env()
+                        .new_node(self.env().get_node_loc(id), self.env().get_node_type(id));
+                    let pred_exp = ExpData::Call(
+                        pred_node,
+                        Operation::Behavior(*kind, range.clone()),
+                        new_args,
+                    )
+                    .into_exp();
+                    let wrapped = self.wrap_in_lets(vec![(pat, args[0].clone())], pred_exp);
+                    self.print_exp(context_prio, true, &wrapped);
+                    return;
+                }
                 let print_behavior = |this: &Self| {
                     if this.is_simple_behavior_target(&args[0]) {
                         this.parenthesize(context_prio, Prio::Postfix, || {
@@ -2720,12 +2793,22 @@ impl<'a> ExpSourcifier<'a> {
                             this.print_exp_list("(", ")", &args[1..]);
                         })
                     } else {
-                        emit!(this.wr(), "{{ let __f = ");
-                        this.print_exp(Prio::General, false, &args[0]);
-                        emit!(this.wr(), "; ");
-                        emit!(this.wr(), "{}<{}>", kind_str, "__f");
-                        this.print_exp_list("(", ")", &args[1..]);
-                        emit!(this.wr(), " }}");
+                        // Non-simple but state-neutral target (or no labels):
+                        // let-binding inside the label scope is safe
+                        let (pat, var_exp) = this.let_bind_exp(&args[0], args);
+                        let mut new_args = vec![var_exp];
+                        new_args.extend(args[1..].iter().cloned());
+                        let pred_node = this
+                            .env()
+                            .new_node(this.env().get_node_loc(id), this.env().get_node_type(id));
+                        let pred_exp = ExpData::Call(
+                            pred_node,
+                            Operation::Behavior(*kind, range.clone()),
+                            new_args,
+                        )
+                        .into_exp();
+                        let wrapped = this.wrap_in_lets(vec![(pat, args[0].clone())], pred_exp);
+                        this.print_exp(context_prio, true, &wrapped);
                     }
                 };
                 if has_labels {
@@ -2921,7 +3004,7 @@ impl<'a> ExpSourcifier<'a> {
         }
         let lhs_labeled = has_hoistable_label(&args[0]);
         let rhs_labeled = has_hoistable_label(&args[1]);
-        if lhs_labeled && !has_any_state_label(&args[1]) {
+        if lhs_labeled && is_state_neutral(&args[1]) {
             self.parenthesize(context_prio, Prio::General, || {
                 self.print_hoisted_label_prefix(&args[0]);
                 self.parenthesize(Prio::General, prio, || {
@@ -2931,7 +3014,7 @@ impl<'a> ExpSourcifier<'a> {
                 });
             });
             true
-        } else if rhs_labeled && !has_any_state_label(&args[0]) {
+        } else if rhs_labeled && is_state_neutral(&args[0]) {
             self.parenthesize(context_prio, Prio::General, || {
                 self.print_hoisted_label_prefix(&args[1]);
                 self.parenthesize(Prio::General, prio, || {
@@ -3017,7 +3100,7 @@ impl<'a> ExpSourcifier<'a> {
                     self.parent.enclosing_state_label.set(prev);
                 })
             },
-            ExpData::Call(_, Operation::Behavior(kind, _), args) => {
+            ExpData::Call(id, Operation::Behavior(kind, range), args) => {
                 let kind_str = match kind {
                     crate::ast::BehaviorKind::AbortsOf => "aborts_of",
                     crate::ast::BehaviorKind::EnsuresOf => "ensures_of",
@@ -3033,12 +3116,21 @@ impl<'a> ExpSourcifier<'a> {
                         self.print_exp_list("(", ")", &args[1..]);
                     })
                 } else {
-                    emit!(self.wr(), "{{ let __f = ");
-                    self.print_exp(Prio::General, false, &args[0]);
-                    emit!(self.wr(), "; ");
-                    emit!(self.wr(), "{}<{}>", kind_str, "__f");
-                    self.print_exp_list("(", ")", &args[1..]);
-                    emit!(self.wr(), " }}");
+                    // Non-simple target: extract into a let-binding
+                    let (pat, var_exp) = self.let_bind_exp(&args[0], args);
+                    let pred_node = self
+                        .env()
+                        .new_node(self.env().get_node_loc(*id), self.env().get_node_type(*id));
+                    let mut new_args = vec![var_exp];
+                    new_args.extend(args[1..].iter().cloned());
+                    let pred_exp = ExpData::Call(
+                        pred_node,
+                        Operation::Behavior(*kind, range.clone()),
+                        new_args,
+                    )
+                    .into_exp();
+                    let wrapped = self.wrap_in_lets(vec![(pat, args[0].clone())], pred_exp);
+                    self.print_exp(prio, true, &wrapped);
                 }
             },
             // Look through Not: print `!` then the inner without label
@@ -3053,13 +3145,13 @@ impl<'a> ExpSourcifier<'a> {
                 if args.len() == 2 && hoistable_bin_op_info(op).is_some() =>
             {
                 let (op_prio, op_str) = hoistable_bin_op_info(op).unwrap();
-                if has_hoistable_label(&args[0]) && !has_any_state_label(&args[1]) {
+                if has_hoistable_label(&args[0]) && is_state_neutral(&args[1]) {
                     self.parenthesize(prio, op_prio, || {
                         self.print_exp_without_label(op_prio, &args[0]);
                         emit!(self.wr(), " {} ", op_str);
                         self.print_exp(op_prio + 1, false, &args[1]);
                     })
-                } else if has_hoistable_label(&args[1]) && !has_any_state_label(&args[0]) {
+                } else if has_hoistable_label(&args[1]) && is_state_neutral(&args[0]) {
                     self.parenthesize(prio, op_prio, || {
                         self.print_exp(op_prio, false, &args[0]);
                         emit!(self.wr(), " {} ", op_str);
@@ -3243,6 +3335,24 @@ impl<'a> ExpSourcifier<'a> {
         let spool = self.env().symbol_pool();
         for e in for_scope {
             free_vars.append(&mut e.free_vars());
+            // Collect bound variables and Temporary display names so we don't
+            // shadow them when choosing fresh names.
+            e.as_ref().visit_pre_order(&mut |ed| {
+                match ed {
+                    ExpData::Block(_, pat, _, _) | ExpData::Lambda(_, pat, _, _, _) => {
+                        pat.vars().iter().for_each(|(_, sym)| {
+                            free_vars.insert(*sym);
+                        });
+                    },
+                    ExpData::Temporary(_, idx) => {
+                        if let Some(name) = self.temp_names.get(idx) {
+                            free_vars.insert(*name);
+                        }
+                    },
+                    _ => {},
+                }
+                true
+            });
         }
         for i in 0..256 {
             let name = if i > 0 {
@@ -3255,6 +3365,38 @@ impl<'a> ExpSourcifier<'a> {
             }
         }
         panic!("too many fruitless attempts to generate unique name")
+    }
+
+    /// Extract `exp` into a let-binding with a fresh variable name.
+    /// Returns `(pattern, var_exp)` — the caller accumulates let-bindings and wraps
+    /// in a flat Block for printing. Uses the shared `let_counter` to ensure nested
+    /// extractions produce distinct names.
+    fn let_bind_exp(&self, exp: &Exp, scope: &[Exp]) -> (Pattern, Exp) {
+        let count = self.let_counter.get();
+        let base = Self::LET_BIND_NAMES[count % Self::LET_BIND_NAMES.len()];
+        self.let_counter.set(count + 1);
+        let name = self.new_unique_name(scope, base);
+        let ty = self.env().get_node_type(exp.node_id());
+        let loc = self.env().get_node_loc(exp.node_id());
+        let local_id = self.env().new_node(loc, ty);
+        let pat = Pattern::Var(local_id, name);
+        let var_exp = ExpData::LocalVar(local_id, name).into_exp();
+        (pat, var_exp)
+    }
+
+    /// Wrap `body` in a flat block with the given let-bindings.
+    /// Produces `{ let x = e1; let y = e2; body }` as a single Block chain.
+    fn wrap_in_lets(&self, let_bindings: Vec<(Pattern, Exp)>, body: Exp) -> Exp {
+        let_bindings
+            .into_iter()
+            .rev()
+            .fold(body, |acc, (pat, binding)| {
+                let block_id = self.env().new_node(
+                    self.env().get_node_loc(acc.node_id()),
+                    self.env().get_node_type(acc.node_id()),
+                );
+                ExpData::Block(block_id, pat, Some(binding), acc).into_exp()
+            })
     }
 
     fn is_unspecified_abort_code(exp: &Exp) -> bool {

@@ -6119,10 +6119,14 @@ impl ExpTranslator<'_, '_, '_> {
                 // First try to resolve as a local variable/parameter
                 let sym = self.symbol_pool().make(name.value.as_str());
                 // Extract data from entry first to avoid borrow conflicts
-                let local_info = self
-                    .lookup_local(sym, false)
-                    .map(|entry| (entry.type_.clone(), entry.temp_index));
-                if let Some((entry_type, temp_index)) = local_info {
+                let local_info = self.lookup_local(sym, false).map(|entry| {
+                    (
+                        entry.type_.clone(),
+                        entry.temp_index,
+                        entry.operation.clone(),
+                    )
+                });
+                if let Some((entry_type, temp_index, operation)) = local_info {
                     // Check if it's a function type
                     let ty = self.subs.specialize(&entry_type);
                     if let Type::Fun(arg_ty, result_ty, _abilities) = &ty {
@@ -6140,7 +6144,11 @@ impl ExpTranslator<'_, '_, '_> {
                         let expected_types =
                             self.compute_behavior_arg_types(arg_ty, result_ty, kind);
                         let id = self.new_node_id_with_type_loc(&ty, loc);
-                        let fun_exp = if let Some(temp_idx) = temp_index {
+                        let fun_exp = if let Some(oper) = operation {
+                            // For struct field locals, use the associated Select operation
+                            // with empty args (will be rewritten by data invariant instrumenter)
+                            ExpData::Call(id, oper, vec![]).into_exp()
+                        } else if let Some(temp_idx) = temp_index {
                             // For function parameters with temp_index, use Temporary
                             ExpData::Temporary(id, temp_idx).into_exp()
                         } else {

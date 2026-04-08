@@ -108,9 +108,9 @@ module 0xc0ffee::m {
         while (i < 10) {
             i = i + 1;
             if (i == 5) {
-                brk2(|arg0| lambda__1__bar(arg0));
-                brk2(|arg0| lambda__2__bar(arg0));
-                brk2(|arg0| lambda__3__bar(arg0));
+                brk2(|x| lambda__1__bar(x));
+                brk2(|x| lambda__2__bar(x));
+                brk2(|x| lambda__3__bar(x));
             }
         };
         i

@@ -1532,9 +1532,10 @@ impl SpecTranslator<'_> {
                         );
                     },
                     _ => {
-                        self.env.error(
-                            &self.env.get_node_loc(fun_exp.node_id()),
-                            "bug: Operation::Behavior expects Temporary, LocalVar, or Closure",
+                        // Arbitrary expression evaluating to a function value (e.g., struct
+                        // field access after data invariant rewriting): use evaluator dispatch
+                        self.translate_behavior_via_evaluator(
+                            node_id, *kind, fun_exp, pred_args, range,
                         );
                     },
                 }
@@ -1697,7 +1698,8 @@ impl SpecTranslator<'_> {
         // Look up by boogie type name since Type::Ord includes abilities which may differ
         let boogie_name = boogie_type(self.env, fun_type, false);
 
-        // Compute the union of used/old memory across all variants (closure + param)
+        // Compute the union of used/old memory across all variants
+        // (closure + param + struct field).
         let mut union_used_memory = BTreeSet::new();
         let mut union_old_memory = BTreeSet::new();
 
@@ -1731,6 +1733,22 @@ impl SpecTranslator<'_> {
                             union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
                         }
                         break;
+                    }
+                }
+            }
+        }
+
+        // Include struct field variant memory from reads_of/modifies_of declarations
+        for (ty, field_infos) in &mono_info.fun_struct_field_infos {
+            if boogie_type(self.env, ty, false) != boogie_name {
+                continue;
+            }
+            for info in field_infos {
+                let struct_env = self.env.get_struct_qid(info.struct_id.to_qualified_id());
+                for access in struct_env.get_field_access_of() {
+                    if access.fun_param == info.field_sym {
+                        union_used_memory.extend(access.used_memory.iter().cloned());
+                        union_old_memory.extend(access.old_memory.iter().cloned());
                     }
                 }
             }

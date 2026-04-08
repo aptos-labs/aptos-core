@@ -1284,6 +1284,70 @@ pub fn boogie_behavioral_result_fun_name(
     )
 }
 
+/// Return name of the datatype constructor for a struct field variant.
+/// These variants represent storable function-typed fields in structs.
+/// Format: `$struct_field'StructName$field'`
+pub fn boogie_struct_field_name(
+    env: &GlobalEnv,
+    struct_id: &QualifiedInstId<StructId>,
+    field_sym: Symbol,
+) -> String {
+    let struct_env = env.get_struct_qid(struct_id.to_qualified_id());
+    let struct_name = boogie_struct_name(&struct_env, &struct_id.inst, false);
+    let field_name = field_sym.display(env.symbol_pool());
+    format!("$struct_field'{}${}'", struct_name, field_name)
+}
+
+/// Return name of a behavioral predicate spec function for a struct field variant.
+/// These are uninterpreted functions parameterized by instance id `n`.
+/// Format: `${module}_$sf_{kind}${struct}${field}${suffix}`
+pub fn boogie_struct_field_spec_fun_name(
+    env: &GlobalEnv,
+    struct_id: &QualifiedInstId<StructId>,
+    field_sym: Symbol,
+    kind: BehaviorKind,
+    inst: &[Type],
+) -> String {
+    let struct_env = env.get_struct_qid(struct_id.to_qualified_id());
+    let module_name = boogie_module_name(&struct_env.module_env);
+    let struct_name_sym = struct_env.get_name();
+    let struct_name = struct_name_sym.display(env.symbol_pool());
+    let field_name = field_sym.display(env.symbol_pool());
+    format!(
+        "${}_$sf_{}${}${}{}",
+        module_name,
+        kind,
+        struct_name,
+        field_name,
+        boogie_inst_suffix(env, inst, &[])
+    )
+}
+
+/// Return name of a behavioral predicate result function for a struct field variant.
+/// Format: `${module}_$sf_ensures_of_result(s?)${struct}${field}${suffix}`
+pub fn boogie_struct_field_result_fun_name(
+    env: &GlobalEnv,
+    struct_id: &QualifiedInstId<StructId>,
+    field_sym: Symbol,
+    inst: &[Type],
+    multi_result: bool,
+) -> String {
+    let struct_env = env.get_struct_qid(struct_id.to_qualified_id());
+    let module_name = boogie_module_name(&struct_env.module_env);
+    let struct_name_sym = struct_env.get_name();
+    let struct_name = struct_name_sym.display(env.symbol_pool());
+    let field_name = field_sym.display(env.symbol_pool());
+    let plural = if multi_result { "s" } else { "" };
+    format!(
+        "${}_$sf_ensures_of_result{}${}${}{}",
+        module_name,
+        plural,
+        struct_name,
+        field_name,
+        boogie_inst_suffix(env, inst, &[])
+    )
+}
+
 /// Return name of the behavioral predicate evaluation function for a function type.
 /// These inline functions dispatch on closure variants to evaluate behavioral predicates.
 /// Format: `${kind}'${type_suffix}'`

@@ -160,14 +160,14 @@ fun Test::incr_twice() {
   0: $t0 := 0x1
   1: assume Neq<address>($t0, 0x0)
   2: $t1 := opaque begin: Test::get_and_incr($t0)
-  3: assume Identical($t2, Or(Not(exists<0x42::Test::R>($t0)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615)))
-  4: if ($t2) goto 5 else goto 9
-  5: label L4
-  6: assume Or(And(Not(exists<0x42::Test::R>($t0)), Eq(33, $t3)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615))
-  7: trace_abort($t3)
-  8: goto 36
-  9: label L3
- 10: @0 := save_mem(Test::R)
+  3: @0 := save_mem(Test::R)
+  4: assume Identical($t2, Or(Not(exists<0x42::Test::R>($t0)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615)))
+  5: if ($t2) goto 6 else goto 10
+  6: label L4
+  7: assume Or(And(Not(exists<0x42::Test::R>($t0)), Eq(33, $t3)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615))
+  8: trace_abort($t3)
+  9: goto 36
+ 10: label L3
  11: modifies global<0x42::Test::R>($t0)
  12: assume WellFormed($t1)
  13: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>($t0)), 1))
@@ -177,14 +177,14 @@ fun Test::incr_twice() {
  17: $t4 := 0x1
  18: assume Neq<address>($t4, 0x0)
  19: $t5 := opaque begin: Test::get_and_incr($t4)
- 20: assume Identical($t6, Or(Not(exists<0x42::Test::R>($t4)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615)))
- 21: if ($t6) goto 22 else goto 26
- 22: label L6
- 23: assume Or(And(Not(exists<0x42::Test::R>($t4)), Eq(33, $t3)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615))
- 24: trace_abort($t3)
- 25: goto 36
- 26: label L5
- 27: @1 := save_mem(Test::R)
+ 20: @1 := save_mem(Test::R)
+ 21: assume Identical($t6, Or(Not(exists<0x42::Test::R>($t4)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615)))
+ 22: if ($t6) goto 23 else goto 27
+ 23: label L6
+ 24: assume Or(And(Not(exists<0x42::Test::R>($t4)), Eq(33, $t3)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615))
+ 25: trace_abort($t3)
+ 26: goto 36
+ 27: label L5
  28: modifies global<0x42::Test::R>($t4)
  29: assume WellFormed($t5)
  30: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@1]<0x42::Test::R>($t4)), 1))
@@ -212,14 +212,14 @@ fun Test::incr_twice() {
      # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:15:6+22
   2: assert Neq<address>($t0, 0x0)
   3: $t1 := opaque begin: Test::get_and_incr($t0)
-  4: assume Identical($t2, Or(Not(exists<0x42::Test::R>($t0)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615)))
-  5: if ($t2) goto 6 else goto 10
-  6: label L4
-  7: assume Or(And(Not(exists<0x42::Test::R>($t0)), Eq(33, $t3)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615))
-  8: trace_abort($t3)
-  9: goto 39
- 10: label L3
- 11: @0 := save_mem(Test::R)
+  4: @0 := save_mem(Test::R)
+  5: assume Identical($t2, Or(Not(exists<0x42::Test::R>($t0)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615)))
+  6: if ($t2) goto 7 else goto 11
+  7: label L4
+  8: assume Or(And(Not(exists<0x42::Test::R>($t0)), Eq(33, $t3)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615))
+  9: trace_abort($t3)
+ 10: goto 39
+ 11: label L3
  12: modifies global<0x42::Test::R>($t0)
  13: assume WellFormed($t1)
  14: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>($t0)), 1))
@@ -230,14 +230,14 @@ fun Test::incr_twice() {
      # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:15:6+22
  19: assert Neq<address>($t4, 0x0)
  20: $t5 := opaque begin: Test::get_and_incr($t4)
- 21: assume Identical($t6, Or(Not(exists<0x42::Test::R>($t4)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615)))
- 22: if ($t6) goto 23 else goto 27
- 23: label L6
- 24: assume Or(And(Not(exists<0x42::Test::R>($t4)), Eq(33, $t3)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615))
- 25: trace_abort($t3)
- 26: goto 39
- 27: label L5
- 28: @1 := save_mem(Test::R)
+ 21: @1 := save_mem(Test::R)
+ 22: assume Identical($t6, Or(Not(exists<0x42::Test::R>($t4)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615)))
+ 23: if ($t6) goto 24 else goto 28
+ 24: label L6
+ 25: assume Or(And(Not(exists<0x42::Test::R>($t4)), Eq(33, $t3)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615))
+ 26: trace_abort($t3)
+ 27: goto 39
+ 28: label L5
  29: modifies global<0x42::Test::R>($t4)
  30: assume WellFormed($t5)
  31: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@1]<0x42::Test::R>($t4)), 1))
