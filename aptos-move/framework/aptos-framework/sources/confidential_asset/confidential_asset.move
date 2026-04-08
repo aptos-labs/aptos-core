@@ -601,10 +601,7 @@ module aptos_framework::confidential_asset {
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(to, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
-
-        if(memo.length() > MAX_MEMO_BYTES) {
-            abort(error::invalid_argument(E_MEMO_TOO_LONG));
-        };
+        assert!(memo.length() <= MAX_MEMO_BYTES, error::invalid_argument(E_MEMO_TOO_LONG));
 
         let from = signer::address_of(sender);
         assert!(from != to, error::invalid_argument(E_SELF_TRANSFER));
