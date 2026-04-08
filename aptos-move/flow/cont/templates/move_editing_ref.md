@@ -1,5 +1,5 @@
 {# Shared spec writing/editing guidance #}
-{% if once(name="move_editing_workflow") %}
+{% if once(name="move_editing_ref") %}
 
 {% include "templates/move_lang.md" %}
 {% include "templates/move_package.md" %}
