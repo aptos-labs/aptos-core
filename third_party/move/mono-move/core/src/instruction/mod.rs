@@ -116,8 +116,7 @@
 //!   heap pointers.
 
 use crate::Function;
-use mono_move_alloc::ExecutableArenaPtr;
-use std::fmt;
+use std::{fmt, ptr::NonNull};
 
 // Submodules for instruction.
 mod gas;
@@ -286,7 +285,7 @@ pub enum MicroOp {
 
     /// Call a function via direct pointer. Same calling convention as
     /// `CallFunc`.
-    CallLocalFunc { ptr: ExecutableArenaPtr<Function> },
+    CallLocalFunc { ptr: NonNull<Function> },
 
     /// Return from the current function call. The compiler has already
     /// emitted micro-ops to write return values at the start of the
@@ -614,8 +613,8 @@ impl fmt::Display for MicroOp {
             MicroOp::CallFunc { func_id } => {
                 write!(f, "CallFunc #{}", func_id)
             },
-            MicroOp::CallLocalFunc { .. } => {
-                write!(f, "CallLocalFunc")
+            MicroOp::CallLocalFunc { ptr } => {
+                write!(f, "CallLocalFunc {:p}", ptr)
             },
             MicroOp::Return => {
                 write!(f, "Return")

@@ -17,7 +17,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct VerificationError {
-    pub func_name: String,
+    pub func_id: usize,
     pub pc: Option<usize>,
     pub message: String,
 }
@@ -25,8 +25,8 @@ pub struct VerificationError {
 impl fmt::Display for VerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.pc {
-            Some(pc) => write!(f, "'{}', pc {}: {}", self.func_name, pc, self.message),
-            None => write!(f, "'{}': {}", self.func_name, self.message),
+            Some(pc) => write!(f, "func {}, pc {}: {}", self.func_id, pc, self.message),
+            None => write!(f, "func {}: {}", self.func_id, self.message),
         }
     }
 }
@@ -35,19 +35,23 @@ impl fmt::Display for VerificationError {
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Validate a single function and its pointer slots against the descriptor table.
+/// Validate all functions and their pointer slots against the descriptor table.
 /// Returns an empty `Vec` on success.
-pub fn verify_function(
-    func: &Function,
+pub fn verify_program(
+    functions: &[Function],
     descriptors: &[ObjectDescriptor],
 ) -> Vec<VerificationError> {
     let mut errors = Vec::new();
-    let mut fv = FunctionVerifier {
-        func,
-        descriptors,
-        errors: &mut errors,
-    };
-    fv.verify();
+    for (fid, func) in functions.iter().enumerate() {
+        let mut fv = FunctionVerifier {
+            func_id: fid,
+            func,
+            all_functions: functions,
+            descriptors,
+            errors: &mut errors,
+        };
+        fv.verify();
+    }
     errors
 }
 
@@ -56,18 +60,16 @@ pub fn verify_function(
 // ---------------------------------------------------------------------------
 
 struct FunctionVerifier<'a> {
+    func_id: usize,
     func: &'a Function,
+    all_functions: &'a [Function],
     descriptors: &'a [ObjectDescriptor],
     errors: &'a mut Vec<VerificationError>,
 }
 
 impl FunctionVerifier<'_> {
     fn verify(&mut self) {
-        // SAFETY: The function's code is allocated in an executable arena that
-        // is alive for the duration of verification.
-        let code = unsafe { self.func.code.as_ref_unchecked() };
-        let pointer_offsets = unsafe { self.func.pointer_offsets.as_ref_unchecked() };
-        if code.is_empty() {
+        if self.func.code.is_empty() {
             self.err(None, "code must be non-empty");
         }
         if self.func.frame_size() > self.func.extended_frame_size {
@@ -92,11 +94,11 @@ impl FunctionVerifier<'_> {
             );
         }
 
-        for &off in pointer_offsets {
+        for &off in &self.func.pointer_offsets {
             self.check_frame_access(None, off, 8);
         }
 
-        for (pc, instr) in code.iter().enumerate() {
+        for (pc, instr) in self.func.code.iter().enumerate() {
             self.verify_instruction(pc, instr);
         }
     }
@@ -175,10 +177,10 @@ impl FunctionVerifier<'_> {
 
             MicroOp::Return | MicroOp::ForceGC => {},
 
-            MicroOp::CallFunc { .. } => {
-                // TODO: Verify that func_id is a valid function definition
-                // index. Requires passing the function table (or its length)
-                // into the verifier so we can bounds-check the callee index.
+            MicroOp::CallFunc { func_id } => {
+                if func_id as usize >= self.all_functions.len() {
+                    self.err(Some(pc), format!("func_id {} out of bounds", func_id));
+                }
             },
             MicroOp::CallLocalFunc { .. } => {},
 
@@ -338,10 +340,8 @@ impl FunctionVerifier<'_> {
     // -----------------------------------------------------------------------
 
     fn err(&mut self, pc: Option<usize>, msg: impl Into<String>) {
-        // SAFETY: The function name is allocated in an arena alive during verification.
-        let func_name = unsafe { self.func.name.as_ref_unchecked() }.to_string();
         self.errors.push(VerificationError {
-            func_name,
+            func_id: self.func_id,
             pc,
             message: msg.into(),
         });
@@ -396,15 +396,13 @@ impl FunctionVerifier<'_> {
     }
 
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
-        // SAFETY: code arena pointer is valid during verification.
-        let code = unsafe { self.func.code.as_ref_unchecked() };
-        if (target.0 as usize) >= code.len() {
+        if (target.0 as usize) >= self.func.code.len() {
             self.err(
                 Some(pc),
                 format!(
                     "jump target {} out of bounds (code length {})",
                     target.0,
-                    code.len()
+                    self.func.code.len()
                 ),
             );
         }

@@ -48,7 +48,7 @@ use identifiers::IdentifierInternerKey;
 mod executable_ids;
 use executable_ids::ExecutableIdInternerKey;
 mod executable;
-pub use executable::{Executable, ExecutableBuilder};
+pub use executable::{Executable, ExecutableBuilder, Function};
 mod executable_cache;
 use executable_cache::ExecutableCache;
 mod types;

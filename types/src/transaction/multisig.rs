@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{TransactionExecutable, TransactionExecutableRef};
-use crate::transaction::{user_transaction_context::MultisigPayload, EntryFunction, Script};
+use crate::transaction::{user_transaction_context::MultisigPayload, EntryFunction};
 use move_core_types::{account_address::AccountAddress, vm_status::VMStatus};
 use serde::{Deserialize, Serialize};
 
@@ -16,25 +16,22 @@ pub struct Multisig {
     pub transaction_payload: Option<MultisigTransactionPayload>,
 }
 
-/// Enum for multisig transaction payloads, supporting both entry functions and scripts.
+// We use an enum here for extensibility so we can add Script payload support
+// in the future for example.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MultisigTransactionPayload {
     EntryFunction(EntryFunction),
-    Script(Script),
 }
 
 impl Multisig {
     pub fn as_multisig_payload(&self) -> MultisigPayload {
         MultisigPayload {
             multisig_address: self.multisig_address,
-            entry_function_payload: self.transaction_payload.as_ref().and_then(|inner_payload| {
-                match inner_payload {
-                    MultisigTransactionPayload::EntryFunction(entry) => {
-                        Some(entry.as_entry_function_payload())
-                    },
-                    MultisigTransactionPayload::Script(_) => None,
-                }
-            }),
+            entry_function_payload: self.transaction_payload.as_ref().map(
+                |MultisigTransactionPayload::EntryFunction(entry)| {
+                    entry.as_entry_function_payload()
+                },
+            ),
         }
     }
 
@@ -42,9 +39,6 @@ impl Multisig {
         match &self.transaction_payload {
             Some(MultisigTransactionPayload::EntryFunction(entry)) => {
                 TransactionExecutable::EntryFunction(entry.clone())
-            },
-            Some(MultisigTransactionPayload::Script(script)) => {
-                TransactionExecutable::Script(script.clone())
             },
             None => TransactionExecutable::Empty,
         }
@@ -54,9 +48,6 @@ impl Multisig {
         match &self.transaction_payload {
             Some(MultisigTransactionPayload::EntryFunction(entry)) => {
                 TransactionExecutableRef::EntryFunction(entry)
-            },
-            Some(MultisigTransactionPayload::Script(script)) => {
-                TransactionExecutableRef::Script(script)
             },
             None => TransactionExecutableRef::Empty,
         }

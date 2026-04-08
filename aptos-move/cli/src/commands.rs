@@ -178,7 +178,7 @@ impl MoveTool {
     }
 }
 
-#[derive(Debug, Default, Parser)]
+#[derive(Default, Parser)]
 pub struct FrameworkPackageArgs {
     /// Git revision or branch for the Aptos framework
     ///

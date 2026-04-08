@@ -28,8 +28,6 @@ use aptos_mempool_notifications::CommittedTransaction;
 use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::state_store::state_view::db_state_view::LatestDbStateCheckpointView;
-use aptos_time_service::TimeService;
-use aptos_token_bucket::TokenBucket;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -38,7 +36,6 @@ use aptos_types::{
     vm_status::{DiscardedVMStatus, StatusCode},
 };
 use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
-use dashmap::DashMap;
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use std::{
     cmp,
@@ -151,7 +148,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
             &smp,
             vec![(transaction, None, Some(BroadcastPeerPriority::Primary))],
             timeline_state,
-            None,
+            true,
         )
         .await;
     log_txn_process_results(&statuses, None);
@@ -230,8 +227,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
-    let results =
-        process_incoming_transactions(&smp, transactions, timeline_state, Some(peer)).await;
+    let results = process_incoming_transactions(&smp, transactions, timeline_state, false).await;
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(message_id, results, &peer);
@@ -254,8 +250,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
     notify_subscribers(SharedMempoolNotification::ACK, &smp.subscribers);
 }
 
-/// If we encounter `MempoolIsFull` or `RateLimited` on any of the
-/// transactions, provide backpressure to the downstream peer.
+/// If `MempoolIsFull` on any of the transactions, provide backpressure to the downstream peer.
 fn gen_ack_response(
     message_id: MempoolMessageId,
     results: Vec<SubmissionStatusBundle>,
@@ -263,9 +258,7 @@ fn gen_ack_response(
 ) -> MempoolSyncMsg {
     let mut backoff_and_retry = false;
     for (_, (mempool_status, _)) in results.into_iter() {
-        if mempool_status.code == MempoolStatusCode::MempoolIsFull
-            || mempool_status.code == MempoolStatusCode::RateLimited
-        {
+        if mempool_status.code == MempoolStatusCode::MempoolIsFull {
             backoff_and_retry = true;
             break;
         }
@@ -316,7 +309,7 @@ pub(crate) async fn process_incoming_transactions<NetworkClient, TransactionVali
         Option<BroadcastPeerPriority>,
     )>,
     timeline_state: TimelineState,
-    peer_network_id: Option<PeerNetworkId>,
+    client_submitted: bool,
 ) -> Vec<SubmissionStatusBundle>
 where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
@@ -328,21 +321,6 @@ where
         filter_transactions(&smp.transaction_filter_config, transactions, &mut statuses);
 
     // If there are no transactions left after filtering, return early
-    if transactions.is_empty() {
-        return statuses;
-    }
-
-    // Drop transactions that exceed the per-peer inbound rate limit
-    let transactions = rate_limit_transactions(
-        smp.inbound_peer_rate_limiters.clone(),
-        smp.config.inbound_rate_limit_tps_per_peer,
-        &peer_network_id,
-        TimeService::real(),
-        transactions,
-        &mut statuses,
-    );
-
-    // If there are no transactions left after rate limiting, return early
     if transactions.is_empty() {
         return statuses;
     }
@@ -415,7 +393,6 @@ where
         })
         .collect();
 
-    let client_submitted = peer_network_id.is_none();
     validate_and_add_transactions(
         transactions,
         smp,
@@ -488,67 +465,6 @@ fn filter_transactions(
     transaction_filter_timer.stop_and_record();
 
     transactions
-}
-
-/// Applies the per-peer inbound rate limit to a batch of transactions. Any transactions
-/// that exceed the peer's rate are dropped and their statuses marked accordingly.
-///
-/// Note: this only applies if the rate limit is configured, and the peer is present.
-fn rate_limit_transactions(
-    inbound_peer_rate_limiters: Arc<DashMap<PeerNetworkId, TokenBucket>>,
-    inbound_rate_limit_tps_per_peer: Option<u64>,
-    peer_network_id: &Option<PeerNetworkId>,
-    time_service: TimeService,
-    transactions: Vec<(
-        SignedTransaction,
-        Option<u64>,
-        Option<BroadcastPeerPriority>,
-    )>,
-    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
-) -> Vec<(
-    SignedTransaction,
-    Option<u64>,
-    Option<BroadcastPeerPriority>,
-)> {
-    // Fetch the rate limit and the peer (return early if either is missing)
-    let (inbound_rate_limit_tps_per_peer, peer_network_id) =
-        match (inbound_rate_limit_tps_per_peer, peer_network_id) {
-            (Some(inbound_rate_limit), Some(peer)) => (inbound_rate_limit, peer),
-            _ => {
-                return transactions;
-            },
-        };
-
-    // Fetch (or create) the token bucket rate limiter for the peer
-    let mut inbound_peer_rate_limiter = inbound_peer_rate_limiters
-        .entry(*peer_network_id)
-        .or_insert_with(|| {
-            TokenBucket::new(
-                inbound_rate_limit_tps_per_peer,
-                inbound_rate_limit_tps_per_peer,
-                time_service,
-            )
-        });
-
-    // Rate limit and filter the transactions
-    transactions
-        .into_iter()
-        .filter_map(|(txn, ready_time, priority)| {
-            if inbound_peer_rate_limiter.try_acquire_all(1).is_ok() {
-                Some((txn, ready_time, priority))
-            } else {
-                // Update the rate limit metrics
-                counters::INBOUND_TRANSACTIONS_RATE_LIMITED.inc();
-
-                // Populate the transaction status
-                statuses.push((
-                    txn,
-                    (MempoolStatus::new(MempoolStatusCode::RateLimited), None),
-                ));
-                None
-            }
-        })
-        .collect()
 }
 
 /// Perfoms VM validation on the transactions and inserts those that passes
@@ -812,20 +728,7 @@ pub(crate) fn process_committed_transactions(
         history.compute_tracking_set()
     };
 
-    // Collect traced txn hashes while holding the lock, finalize after releasing.
-    let mut traced_commit_hashes = Vec::new();
-    let tracing_enabled =
-        aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled();
-
     for transaction in transactions {
-        if tracing_enabled {
-            if let Some(txn) = pool
-                .transactions
-                .get(&transaction.sender, transaction.replay_protector)
-            {
-                traced_commit_hashes.push(txn.committed_hash());
-            }
-        }
         pool.log_commit_transaction(
             &transaction.sender,
             transaction.replay_protector,
@@ -840,19 +743,6 @@ pub(crate) fn process_committed_transactions(
     if block_timestamp_usecs > 0 {
         pool.gc_by_expiration_time(block_timestamp);
     }
-
-    // Release mempool lock, then finalize traces (which may trigger GC).
-    drop(pool);
-    if !traced_commit_hashes.is_empty() {
-        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-        for hash in traced_commit_hashes {
-            store.record_stage(
-                &hash,
-                aptos_transaction_tracing::types::TransactionStage::MempoolCommit,
-            );
-            store.finalize_trace(&hash);
-        }
-    }
 }
 
 pub(crate) fn process_rejected_transactions(
@@ -861,10 +751,6 @@ pub(crate) fn process_rejected_transactions(
 ) {
     let mut pool = mempool.lock();
 
-    let tracing_enabled =
-        aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled();
-    let mut traced_reject_hashes = Vec::new();
-
     for transaction in transactions {
         pool.reject_transaction(
             &transaction.sender,
@@ -872,22 +758,6 @@ pub(crate) fn process_rejected_transactions(
             &transaction.hash,
             &transaction.reason,
         );
-        if tracing_enabled {
-            traced_reject_hashes.push(transaction.hash);
-        }
-    }
-
-    // Release mempool lock, then finalize traces (which may trigger GC).
-    drop(pool);
-    if !traced_reject_hashes.is_empty() {
-        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-        for hash in traced_reject_hashes {
-            store.record_stage(
-                &hash,
-                aptos_transaction_tracing::types::TransactionStage::MempoolReject,
-            );
-            store.finalize_trace(&hash);
-        }
     }
 }
 
@@ -930,7 +800,6 @@ pub(crate) async fn process_config_update<V, P>(
 mod test {
     use super::*;
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
-    use aptos_time_service::MockTimeService;
     use aptos_transaction_filters::transaction_filter::TransactionFilter;
     use aptos_types::{
         chain_id::ChainId,
@@ -940,7 +809,11 @@ mod test {
     #[test]
     fn test_filter_transactions() {
         // Create test transactions
-        let transactions = create_test_transactions(10);
+        let mut transactions = vec![];
+        for _ in 0..10 {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
 
         // Create a config with filtering enabled (the first and last transactions will be rejected)
         let transaction_filter = TransactionFilter::empty()
@@ -971,7 +844,11 @@ mod test {
     fn test_filter_transactions_disabled() {
         // Create test transactions
         let num_transactions = 10;
-        let transactions = create_test_transactions(num_transactions);
+        let mut transactions = vec![];
+        for _ in 0..num_transactions {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
 
         // Create a config with filtering disabled
         let transaction_filter = TransactionFilter::empty().add_all_filter(false); // Reject all transactions
@@ -997,7 +874,11 @@ mod test {
     fn test_filter_transactions_empty() {
         // Create test transactions
         let num_transactions = 10;
-        let transactions = create_test_transactions(num_transactions);
+        let mut transactions = vec![];
+        for _ in 0..num_transactions {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
 
         // Create a config with filtering enabled (the filter is empty, so no transactions will be rejected)
         let transaction_filter = TransactionFilter::empty(); // Allow all transactions
@@ -1017,250 +898,6 @@ mod test {
         for transaction in transactions {
             assert!(filtered_transactions.contains(&transaction));
         }
-    }
-
-    #[test]
-    fn test_rate_limit_transactions() {
-        // Create test transactions
-        let num_transactions = 10;
-        let transactions = create_test_transactions(num_transactions);
-
-        // Configure the rate limit to 5 TPS (so only the first 5 transactions are allowed)
-        let inbound_rate_limit_tps_per_peer = Some(5);
-        let inbound_peer_rate_limiters = Arc::new(DashMap::new());
-
-        // Rate limit the transactions
-        let mut statuses = vec![];
-        let allowed_transactions = rate_limit_transactions(
-            inbound_peer_rate_limiters,
-            inbound_rate_limit_tps_per_peer,
-            &Some(PeerNetworkId::random()),
-            TimeService::real(),
-            transactions.clone(),
-            &mut statuses,
-        );
-
-        // Verify that only the first 5 transactions are allowed
-        assert_eq!(allowed_transactions.len(), 5);
-        for transaction in &transactions[..5] {
-            assert!(allowed_transactions.contains(transaction));
-        }
-
-        // Verify that the last 5 transactions are rate limited
-        assert_eq!(statuses.len(), 5);
-        for (i, transaction) in transactions[5..].iter().enumerate() {
-            verify_rate_limited_status(statuses[i].clone(), transaction.0.clone());
-        }
-    }
-
-    #[test]
-    fn test_rate_limit_transactions_no_limit_configured() {
-        // Create test transactions
-        let num_transactions = 10;
-        let transactions = create_test_transactions(num_transactions);
-
-        // Don't configure any rate limits
-        let inbound_rate_limit_tps_per_peer = None;
-        let inbound_peer_rate_limiters = Arc::new(DashMap::new());
-
-        // Rate limit the transactions
-        let mut statuses = vec![];
-        let allowed_transactions = rate_limit_transactions(
-            inbound_peer_rate_limiters,
-            inbound_rate_limit_tps_per_peer,
-            &Some(PeerNetworkId::random()),
-            TimeService::real(),
-            transactions.clone(),
-            &mut statuses,
-        );
-
-        // Verify that all transactions are allowed
-        assert_eq!(allowed_transactions.len(), num_transactions);
-        assert!(statuses.is_empty());
-        for transaction in &transactions {
-            assert!(allowed_transactions.contains(transaction));
-        }
-    }
-
-    #[test]
-    fn test_rate_limit_transactions_no_peer() {
-        // Create test transactions
-        let num_transactions = 10;
-        let transactions = create_test_transactions(num_transactions);
-
-        // Configure a rate limit of 5 TPS
-        let inbound_rate_limit_tps_per_peer = Some(5);
-        let inbound_peer_rate_limiters = Arc::new(DashMap::new());
-
-        // Rate limit the transactions (but without a peer being specified)
-        let mut statuses = vec![];
-        let allowed_transactions = rate_limit_transactions(
-            inbound_peer_rate_limiters,
-            inbound_rate_limit_tps_per_peer,
-            &None,
-            TimeService::real(),
-            transactions.clone(),
-            &mut statuses,
-        );
-
-        // Verify that all transactions pass (no peer was specified)
-        assert_eq!(allowed_transactions.len(), num_transactions);
-        assert!(statuses.is_empty());
-        for transaction in &transactions {
-            assert!(allowed_transactions.contains(transaction));
-        }
-    }
-
-    #[test]
-    fn test_rate_limit_transactions_multiple_peers() {
-        // Create transactions for two different peers
-        let num_transactions = 7;
-        let transactions_peer_a = create_test_transactions(num_transactions);
-        let transactions_peer_b = create_test_transactions(num_transactions);
-
-        // Configure the rate limit to 5 TPS
-        let inbound_rate_limit_tps_per_peer = Some(5);
-        let inbound_peer_rate_limiters = Arc::new(DashMap::new());
-        let peer_network_id_a = Some(PeerNetworkId::random());
-        let peer_network_id_b = Some(PeerNetworkId::random());
-
-        // Rate limit peer A's transactions
-        let mut statuses_a = vec![];
-        let allowed_a = rate_limit_transactions(
-            inbound_peer_rate_limiters.clone(),
-            inbound_rate_limit_tps_per_peer,
-            &peer_network_id_a,
-            TimeService::real(),
-            transactions_peer_a.clone(),
-            &mut statuses_a,
-        );
-
-        // Rate limit peer B's transactions
-        let mut statuses_b = vec![];
-        let allowed_b = rate_limit_transactions(
-            inbound_peer_rate_limiters.clone(),
-            inbound_rate_limit_tps_per_peer,
-            &peer_network_id_b,
-            TimeService::real(),
-            transactions_peer_b.clone(),
-            &mut statuses_b,
-        );
-
-        // Verify that each peer is independently rate limited
-        assert_eq!(allowed_a.len(), 5);
-        assert_eq!(statuses_a.len(), 2);
-        assert_eq!(allowed_b.len(), 5);
-        assert_eq!(statuses_b.len(), 2);
-
-        // Verify that separate token buckets were created for each peer
-        assert_eq!(inbound_peer_rate_limiters.len(), 2);
-
-        // Verify the rate limited transaction statuses for each peer
-        for (i, transaction) in transactions_peer_a[5..].iter().enumerate() {
-            verify_rate_limited_status(statuses_a[i].clone(), transaction.0.clone());
-        }
-        for (i, transaction) in transactions_peer_b[5..].iter().enumerate() {
-            verify_rate_limited_status(statuses_b[i].clone(), transaction.0.clone());
-        }
-    }
-
-    #[test]
-    fn test_rate_limiter_cleanup_on_peer_disconnect() {
-        // Populate rate limiters for two peers
-        let inbound_rate_limit_tps_per_peer = Some(5);
-        let inbound_peer_rate_limiters = Arc::new(DashMap::new());
-        let peer_a = PeerNetworkId::random();
-        let peer_b = PeerNetworkId::random();
-
-        // Exhaust the rate limiters for both peers
-        for peer in [&peer_a, &peer_b] {
-            let allowed = rate_limit_transactions(
-                inbound_peer_rate_limiters.clone(),
-                inbound_rate_limit_tps_per_peer,
-                &Some(*peer),
-                TimeService::real(),
-                create_test_transactions(5),
-                &mut vec![],
-            );
-            assert_eq!(allowed.len(), 5);
-        }
-        assert_eq!(inbound_peer_rate_limiters.len(), 2);
-
-        // Simulate peer A disconnecting
-        inbound_peer_rate_limiters.remove(&peer_a);
-
-        // Verify the rate limiters
-        assert_eq!(inbound_peer_rate_limiters.len(), 1);
-        assert!(inbound_peer_rate_limiters.contains_key(&peer_b));
-
-        // After reconnecting, peer A should receive a new token bucket
-        let mut statuses = vec![];
-        let allowed = rate_limit_transactions(
-            inbound_peer_rate_limiters.clone(),
-            inbound_rate_limit_tps_per_peer,
-            &Some(peer_a),
-            TimeService::real(),
-            create_test_transactions(5),
-            &mut statuses,
-        );
-        assert_eq!(allowed.len(), 5);
-        assert!(statuses.is_empty());
-    }
-
-    #[test]
-    fn test_rate_limit_transactions_time_based_refill() {
-        // Set up a mock time service so we can advance time manually
-        let mock_time_service = MockTimeService::new();
-        let time_service = TimeService::from_mock(mock_time_service.clone());
-
-        // Configure the rate limit to 5 TPS
-        let inbound_rate_limit_tps_per_peer = Some(5);
-        let inbound_peer_rate_limiters = Arc::new(DashMap::new());
-        let peer_network_id = Some(PeerNetworkId::random());
-
-        // Process 5 transactions, and verify they are allowed
-        let transactions = create_test_transactions(5);
-        let mut statuses = vec![];
-        let allowed = rate_limit_transactions(
-            inbound_peer_rate_limiters.clone(),
-            inbound_rate_limit_tps_per_peer,
-            &peer_network_id,
-            time_service.clone(),
-            transactions.clone(),
-            &mut statuses,
-        );
-        assert_eq!(allowed.len(), 5);
-        assert!(statuses.is_empty());
-
-        // Process 5 more transactions, and verify they fail
-        let mut statuses = vec![];
-        let allowed = rate_limit_transactions(
-            inbound_peer_rate_limiters.clone(),
-            inbound_rate_limit_tps_per_peer,
-            &peer_network_id,
-            time_service.clone(),
-            transactions.clone(),
-            &mut statuses,
-        );
-        assert!(allowed.is_empty());
-        assert_eq!(statuses.len(), 5);
-
-        // Advance time by 1 second to allow the bucket to refill
-        mock_time_service.advance_secs(1);
-
-        // Process 8 transactions, and verify that 5 are allowed
-        let transactions = create_test_transactions(8);
-        let mut statuses = vec![];
-        let allowed = rate_limit_transactions(
-            inbound_peer_rate_limiters.clone(),
-            inbound_rate_limit_tps_per_peer,
-            &peer_network_id,
-            time_service.clone(),
-            transactions,
-            &mut statuses,
-        );
-        assert_eq!(allowed.len(), 5);
-        assert_eq!(statuses.len(), 3);
     }
 
     fn create_raw_transaction() -> RawTransaction {
@@ -1287,34 +924,11 @@ mod test {
         )
     }
 
-    fn create_test_transactions(
-        num_transactions: usize,
-    ) -> Vec<(
-        SignedTransaction,
-        Option<u64>,
-        Option<BroadcastPeerPriority>,
-    )> {
-        let mut transactions = vec![];
-        for _ in 0..num_transactions {
-            let transaction = create_signed_transaction();
-            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
-        }
-        transactions
-    }
-
     fn verify_rejected_status(
         status: (SignedTransaction, (MempoolStatus, Option<StatusCode>)),
         transaction: SignedTransaction,
     ) {
         let rejected_status = MempoolStatus::new(MempoolStatusCode::RejectedByFilter);
         assert_eq!(status, (transaction, (rejected_status, None)));
-    }
-
-    fn verify_rate_limited_status(
-        status: (SignedTransaction, (MempoolStatus, Option<StatusCode>)),
-        transaction: SignedTransaction,
-    ) {
-        let rate_limited_status = MempoolStatus::new(MempoolStatusCode::RateLimited);
-        assert_eq!(status, (transaction, (rate_limited_status, None)));
     }
 }

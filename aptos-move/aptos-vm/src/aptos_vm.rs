@@ -911,7 +911,7 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    fn validate_and_execute_script(
+    fn validate_and_execute_script<'a>(
         &self,
         session: &mut SessionExt<impl AptosMoveResolver>,
         serialized_signers: &SerializedSigners,
@@ -919,8 +919,8 @@ impl AptosVM {
         // Note: cannot use AptosGasMeter because it is not implemented for
         //       UnmeteredGasMeter.
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        serialized_script: &Script,
+        traversal_context: &mut TraversalContext<'a>,
+        serialized_script: &'a Script,
         trace_recorder: &mut impl TraceRecorder,
     ) -> Result<(), VMStatus> {
         if !self
@@ -1221,7 +1221,7 @@ impl AptosVM {
     fn execute_multisig_transaction<'r>(
         &self,
         resolver: &'r impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        module_storage: &impl AptosModuleStorage,
         mut session: UserSession<'r>,
         serialized_signers: &SerializedSigners,
         prologue_session_change_set: &SystemSessionChangeSet,
@@ -1275,16 +1275,15 @@ impl AptosVM {
                     bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error())?
                 }
             },
-            TransactionExecutableRef::Script(script) => {
-                if !self.features().is_multisig_script_enabled() {
-                    let s = VMStatus::error(
-                        StatusCode::FEATURE_UNDER_GATING,
-                        Some("Multisig script payload is not enabled".to_string()),
-                    );
-                    return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
-                }
-                bcs::to_bytes(&MultisigTransactionPayload::Script(script.clone()))
-                    .map_err(|_| invariant_violation_error())?
+            TransactionExecutableRef::Script(_) => {
+                let s = VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some(
+                        "Multisig transaction does not support script or encrypted payload"
+                            .to_string(),
+                    ),
+                );
+                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
             },
             TransactionExecutableRef::Encrypted => {
                 // Decryption failed. Return an error so the caller runs the failure epilogue,
@@ -1311,7 +1310,7 @@ impl AptosVM {
                     ]),
                     gas_meter,
                     traversal_context,
-                    code_storage,
+                    module_storage,
                 )
             })?
             .return_values
@@ -1345,17 +1344,20 @@ impl AptosVM {
         // failures, we'll discard the session and start a new one. This ensures that any data
         // changes are not persisted.
         // The multisig transaction would still be considered executed even if execution fails.
-        let execution_result = self.execute_multisig_payload(
-            resolver,
-            code_storage,
-            session,
-            gas_meter,
-            traversal_context,
-            multisig_address,
-            &payload,
-            change_set_configs,
-            trace_recorder,
-        );
+        let execution_result = match payload {
+            MultisigTransactionPayload::EntryFunction(entry_function) => self
+                .execute_multisig_entry_function(
+                    resolver,
+                    module_storage,
+                    session,
+                    gas_meter,
+                    traversal_context,
+                    multisig_address,
+                    &entry_function,
+                    change_set_configs,
+                    trace_recorder,
+                ),
+        };
 
         // Step 3: Call post transaction cleanup function in multisig account module with the result
         // from Step 2.
@@ -1370,7 +1372,7 @@ impl AptosVM {
         let epilogue_session = match execution_result {
             Err(execution_error) => self.failure_multisig_payload_cleanup(
                 resolver,
-                code_storage,
+                module_storage,
                 prologue_session_change_set,
                 execution_error,
                 txn_data,
@@ -1384,7 +1386,7 @@ impl AptosVM {
                 let mut epilogue_session = self.charge_change_set_and_respawn_session(
                     user_session_change_set,
                     resolver,
-                    code_storage,
+                    module_storage,
                     gas_meter,
                     txn_data,
                 )?;
@@ -1397,7 +1399,7 @@ impl AptosVM {
                             cleanup_args,
                             &mut UnmeteredGasMeter,
                             traversal_context,
-                            code_storage,
+                            module_storage,
                         )
                         .map_err(|e| e.into_vm_status())
                 })?;
@@ -1408,7 +1410,7 @@ impl AptosVM {
         // TODO(Gas): Charge for aggregator writes
         self.success_transaction_cleanup(
             epilogue_session,
-            code_storage,
+            module_storage,
             serialized_signers,
             gas_meter,
             txn_data,
@@ -1418,43 +1420,30 @@ impl AptosVM {
         )
     }
 
-    fn execute_multisig_payload(
+    fn execute_multisig_entry_function(
         &self,
         resolver: &impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        module_storage: &impl AptosModuleStorage,
         mut session: UserSession,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
-        payload: &MultisigTransactionPayload,
+        payload: &EntryFunction,
         change_set_configs: &ChangeSetConfigs,
         trace_recorder: &mut impl TraceRecorder,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        let serialized_signers =
-            SerializedSigners::new(vec![serialized_signer(&multisig_address)], None);
-
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
-        session.execute(|session| match payload {
-            MultisigTransactionPayload::EntryFunction(entry_function) => self
-                .validate_and_execute_entry_function(
-                    code_storage,
-                    session,
-                    &serialized_signers,
-                    gas_meter,
-                    traversal_context,
-                    entry_function,
-                    trace_recorder,
-                ),
-            MultisigTransactionPayload::Script(script) => self.validate_and_execute_script(
+        session.execute(|session| {
+            self.validate_and_execute_entry_function(
+                module_storage,
                 session,
-                &serialized_signers,
-                code_storage,
+                &SerializedSigners::new(vec![serialized_signer(&multisig_address)], None),
                 gas_meter,
                 traversal_context,
-                script,
+                payload,
                 trace_recorder,
-            ),
+            )
         })?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
@@ -1462,7 +1451,7 @@ impl AptosVM {
         self.resolve_pending_code_publish_and_finish_user_session(
             session,
             resolver,
-            code_storage,
+            module_storage,
             gas_meter,
             traversal_context,
             change_set_configs,
@@ -3038,10 +3027,7 @@ impl AptosVM {
             ));
         }
 
-        if executable.is_script()
-            && extra_config.is_multisig()
-            && !self.features().is_multisig_script_enabled()
-        {
+        if executable.is_script() && extra_config.is_multisig() {
             return Err(VMStatus::error(
                 StatusCode::FEATURE_UNDER_GATING,
                 Some("Script payload not yet supported for multisig transactions".to_string()),

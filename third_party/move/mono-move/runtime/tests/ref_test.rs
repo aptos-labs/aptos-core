@@ -4,7 +4,7 @@
 //! Tests for fat-pointer references (VecBorrow, SlotBorrow, ReadRef, WriteRef,
 //! HeapBorrow).
 
-use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
+use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     DescriptorId, FrameOffset as FO, Function, MicroOp, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
 };
@@ -28,10 +28,8 @@ fn ref_basic() {
     let val: u32 = 48;
     let vec_ref: u32 = 56;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -47,20 +45,19 @@ fn ref_basic() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(val), size: 8 },
         VecLoadElem { dst: FO(tmp), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         Return,
-    ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(r#ref), FO(vec_ref)]);
+    ];
 
-    let functions = [arena.alloc(Function {
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 72,
         extended_frame_size: 96,
         zero_frame: true,
-        pointer_offsets,
-    })];
+        pointer_offsets: vec![FO(vec), FO(r#ref), FO(vec_ref)],
+    }];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -89,10 +86,8 @@ fn ref_survives_gc() {
     let ref_base: u32 = 32;
     let vec_ref: u32 = 48;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
@@ -109,20 +104,19 @@ fn ref_survives_gc() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(tmp), size: 8 },
         VecLoadElem { dst: FO(tmp), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         Return,
-    ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(ref_base), FO(vec_ref)]);
+    ];
 
-    let functions = [arena.alloc(Function {
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_offsets,
-    })];
+        pointer_offsets: vec![FO(vec), FO(ref_base), FO(vec_ref)],
+    }];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -152,26 +146,23 @@ fn ref_cross_frame() {
     let c_ref_base: u32 = 0;
     let c_val: u32 = 16;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let callee_code = arena.alloc_slice_fill_iter(vec![
+    let callee_code = vec![
         ForceGC,
         StoreImm8 { dst: FO(c_val), imm: 77 },
         WriteRef { ref_ptr: FO(c_ref), src: FO(c_val), size: 8 },
         Return,
-    ]);
-    let callee_pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(c_ref_base)]);
+    ];
 
-    let callee_func = arena.alloc(Function {
+    let callee_func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: callee_code,
         args_size: 16,
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets: callee_pointer_offsets,
-    });
+        pointer_offsets: vec![FO(c_ref_base)],
+    };
 
     // -- Function 0: main --
     let m_result: u32 = 0;
@@ -183,7 +174,7 @@ fn ref_cross_frame() {
     let m_callee_ref: u32 = m_call_site + FRAME_METADATA_SIZE as u32; // 72
 
     #[rustfmt::skip]
-    let main_code = arena.alloc_slice_fill_iter(vec![
+    let main_code = vec![
         VecNew { dst: FO(m_vec) },
         SlotBorrow { dst: FO(m_vec_ref), local: FO(m_vec) },
         StoreImm8 { dst: FO(m_tmp), imm: 10 },
@@ -197,27 +188,21 @@ fn ref_cross_frame() {
         CallFunc { func_id: 1 },
         VecLoadElem { dst: FO(m_result), vec_ref: FO(m_vec_ref), idx: FO(m_idx), elem_size: 8 },
         Return,
-    ]);
-    let main_pointer_offsets =
-        arena.alloc_slice_fill_iter(vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)]);
+    ];
 
-    let main_func = arena.alloc(Function {
+    let main_func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: main_code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_offsets: main_pointer_offsets,
-    });
+        pointer_offsets: vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)],
+    };
 
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let functions = [Some(main_func), Some(callee_func)];
-    // SAFETY: Exclusive access during test setup; arena is alive.
-    unsafe { Function::resolve_calls(&functions) };
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
-        functions[0].unwrap().as_ref_unchecked()
-    });
+    let functions = [main_func, callee_func];
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -254,10 +239,8 @@ fn ref_multiple_borrows() {
     let val: u32 = 64;
     let vec_ref: u32 = 72;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -279,21 +262,19 @@ fn ref_multiple_borrows() {
         StoreImm8 { dst: FO(val), imm: 66 },
         WriteRef { ref_ptr: FO(ref_b), src: FO(val), size: 8 },
         Return,
-    ]);
-    let pointer_offsets =
-        arena.alloc_slice_fill_iter(vec![FO(vec), FO(ref_a_base), FO(ref_b_base), FO(vec_ref)]);
+    ];
 
-    let functions = [arena.alloc(Function {
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 88,
         extended_frame_size: 112,
         zero_frame: true,
-        pointer_offsets,
-    })];
+        pointer_offsets: vec![FO(vec), FO(ref_a_base), FO(ref_b_base), FO(vec_ref)],
+    }];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -329,10 +310,8 @@ fn ref_borrow_local() {
     let tmp: u32 = 40;
     let vec_ref: u32 = 48;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         StoreImm8 { dst: FO(local_val), imm: 42 },
         SlotBorrow { dst: FO(r#ref), local: FO(local_val) },
         VecNew { dst: FO(vec) },
@@ -343,10 +322,9 @@ fn ref_borrow_local() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(tmp), size: 8 },
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         Return,
-    ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(ref_base), FO(vec), FO(vec_ref)]);
+    ];
 
-    let functions = [arena.alloc(Function {
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
@@ -355,10 +333,10 @@ fn ref_borrow_local() {
         // ref_base holds a stack address → is_heap_ptr returns false, GC skips it.
         // vec is a genuine heap root.
         zero_frame: true,
-        pointer_offsets,
-    })];
+        pointer_offsets: vec![FO(ref_base), FO(vec), FO(vec_ref)],
+    }];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -388,10 +366,8 @@ fn ref_nested_vectors() {
     let outer_ref: u32 = 64;
     let inner_ref: u32 = 80;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         // -- Build inner0 = [100, 200] --
         VecNew { dst: FO(inner_ptr) },
         SlotBorrow { dst: FO(inner_ref), local: FO(inner_ptr) },
@@ -424,29 +400,28 @@ fn ref_nested_vectors() {
         StoreImm8 { dst: FO(val), imm: 999 },
         WriteRef { ref_ptr: FO(r#ref), src: FO(val), size: 8 },
         Return,
-    ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![
-        FO(outer),
-        FO(inner_ptr),
-        FO(ref_base),
-        FO(outer_ref),
-        FO(inner_ref),
-    ]);
+    ];
 
-    let functions = [arena.alloc(Function {
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 96,
         extended_frame_size: 120,
         zero_frame: true,
-        pointer_offsets,
-    })];
+        pointer_offsets: vec![
+            FO(outer),
+            FO(inner_ptr),
+            FO(ref_base),
+            FO(outer_ref),
+            FO(inner_ref),
+        ],
+    }];
     let descriptors = vec![ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
         elem_size: 8,
         elem_pointer_offsets: vec![0],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -496,10 +471,8 @@ fn ref_survives_double_gc() {
     let ref_base: u32 = 32;
     let vec_ref: u32 = 48;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -516,20 +489,19 @@ fn ref_survives_double_gc() {
         StoreImm8 { dst: FO(tmp), imm: 77 },
         WriteRef { ref_ptr: FO(r#ref), src: FO(tmp), size: 8 },
         Return,
-    ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(ref_base), FO(vec_ref)]);
+    ];
 
-    let functions = [arena.alloc(Function {
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_offsets,
-    })];
+        pointer_offsets: vec![FO(vec), FO(ref_base), FO(vec_ref)],
+    }];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -559,10 +531,8 @@ fn ref_struct_field_borrow() {
     let r#ref: u32 = 16;
     let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 42 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
@@ -575,23 +545,22 @@ fn ref_struct_field_borrow() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         MicroOp::struct_load8(FO(entry), 8, FO(result)),
         Return,
-    ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(entry), FO(r#ref), FO(entry_ref)]);
+    ];
 
-    let functions = [arena.alloc(Function {
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
-    })];
+        pointer_offsets: vec![FO(entry), FO(r#ref), FO(entry_ref)],
+    }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -618,10 +587,8 @@ fn ref_struct_field_survives_gc() {
     let ref_base: u32 = 16;
     let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 7 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
@@ -632,23 +599,22 @@ fn ref_struct_field_survives_gc() {
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         Return,
-    ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(entry), FO(ref_base), FO(entry_ref)]);
+    ];
 
-    let functions = [arena.alloc(Function {
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
-    })];
+        pointer_offsets: vec![FO(entry), FO(ref_base), FO(entry_ref)],
+    }];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 13, "entry.value should be 13 after GC");

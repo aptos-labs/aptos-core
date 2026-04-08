@@ -1248,7 +1248,12 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_floor">spec_floor</a>(self: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): u128 {
-   self.value &gt;&gt; 64
+   <b>let</b> fractional = self.value % (1 &lt;&lt; 64);
+   <b>if</b> (fractional == 0) {
+       self.value &gt;&gt; 64
+   } <b>else</b> {
+       (self.value - fractional) &gt;&gt; 64
+   }
 }
 </code></pre>
 
@@ -1265,7 +1270,8 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> verify_duration_estimate = 1000;
+<b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_ceil">spec_ceil</a>(self);
 </code></pre>
@@ -1277,8 +1283,13 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_ceil">spec_ceil</a>(self: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): u128 {
-   <b>if</b> (self.value % (1 &lt;&lt; 64) == 0) { self.value &gt;&gt; 64 }
-   <b>else</b> { (self.value &gt;&gt; 64) + 1 }
+   <b>let</b> fractional = self.value % (1 &lt;&lt; 64);
+   <b>let</b> one = 1 &lt;&lt; 64;
+   <b>if</b> (fractional == 0) {
+       self.value &gt;&gt; 64
+   } <b>else</b> {
+       (self.value - fractional + one) &gt;&gt; 64
+   }
 }
 </code></pre>
 
@@ -1307,8 +1318,14 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_round">spec_round</a>(self: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): u128 {
-   <b>if</b> (self.value % (1 &lt;&lt; 64) &lt; (1 &lt;&lt; 64) / 2) { self.value &gt;&gt; 64 }
-   <b>else</b> { (self.value &gt;&gt; 64) + 1 }
+   <b>let</b> fractional = self.value % (1 &lt;&lt; 64);
+   <b>let</b> boundary = (1 &lt;&lt; 64) / 2;
+   <b>let</b> one = 1 &lt;&lt; 64;
+   <b>if</b> (fractional &lt; boundary) {
+       (self.value - fractional) &gt;&gt; 64
+   } <b>else</b> {
+       (self.value - fractional + one) &gt;&gt; 64
+   }
 }
 </code></pre>
 

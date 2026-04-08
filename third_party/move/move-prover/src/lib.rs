@@ -12,7 +12,6 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use log::{log_enabled, Level};
-use move_compiler_v2::Experiment;
 use move_model::{
     code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
 };
@@ -44,12 +43,9 @@ pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> 
 pub fn run_move_prover_v2<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
-    mut experiments: Vec<String>,
+    experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    if options.inference.inference {
-        experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
-    }
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     if options.inference.inference {
         inference::run_spec_inference_with_model(&mut env, error_writer, options, now)
@@ -63,10 +59,9 @@ pub fn run_move_prover_v2<W: WriteColor>(
 pub fn run_inference_with_bytecode_dump<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
-    mut experiments: Vec<String>,
+    experiments: Vec<String>,
 ) -> anyhow::Result<String> {
     let now = Instant::now();
-    experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     inference::run_spec_inference_with_model_and_dump(&mut env, error_writer, options, now)
 }

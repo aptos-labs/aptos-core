@@ -23,15 +23,12 @@ fn bench_fib(c: &mut Criterion) {
             b.iter(|| black_box(native_fib(N)));
         });
 
-        let (functions, descriptors, _arena) = micro_op_fib();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions) };
+        let (mut functions, descriptors) = micro_op_fib();
+        mono_move_programs::resolve_calls(&mut functions);
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
-                        functions[0].unwrap().as_ref_unchecked()
-                    });
+                    let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
                     ctx.set_root_arg(0, &N.to_le_bytes());
                     ctx
                 },

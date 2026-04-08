@@ -18,7 +18,6 @@ use aptos_crypto::{
 use ark_ec::{pairing::Pairing as _, AffineRepr};
 use ark_ff::UniformRand as _;
 use ark_std::rand::{CryptoRng, RngCore};
-use num_traits::Zero as _;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -123,11 +122,8 @@ pub fn verify_shifted_bls(
 ) -> Result<()> {
     let hashed_offset: G1Affine = symmetric::hash_g2_element(offset)?;
 
-    if PairingSetting::multi_pairing(
-        [G1Affine::from(digest.as_g1() + hashed_offset), -signature],
-        [verification_key_g2, G2Affine::generator()],
-    )
-    .is_zero()
+    if PairingSetting::pairing(digest.as_g1() + hashed_offset, verification_key_g2)
+        == PairingSetting::pairing(signature, G2Affine::generator())
     {
         Ok(())
     } else {

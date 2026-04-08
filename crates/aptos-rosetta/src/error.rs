@@ -53,7 +53,6 @@ pub enum ApiError {
     VmError(Option<String>),
     MempoolIsFull(Option<String>),
     RejectedByFilter(Option<String>),
-    RateLimited(Option<String>),
 }
 
 impl std::fmt::Display for ApiError {
@@ -103,8 +102,6 @@ impl ApiError {
             SequenceNumberTooOld(None),
             VmError(None),
             MempoolIsFull(None),
-            RejectedByFilter(None),
-            RateLimited(None),
         ]
     }
 
@@ -147,7 +144,6 @@ impl ApiError {
             CoinTypeFailedToBeFetched(_) => 33,
             StateValueNotFound(_) => 34,
             RejectedByFilter(_) => 35,
-            RateLimited(_) => 36,
         }
     }
 
@@ -162,7 +158,6 @@ impl ApiError {
                 | MempoolIsFull(_)
                 | GasEstimationFailed(_)
                 | CoinTypeFailedToBeFetched(_)
-                | RateLimited(_)
         )
     }
 
@@ -209,7 +204,6 @@ impl ApiError {
             ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
             ApiError::GasEstimationFailed(_) => "Gas estimation failed",
             ApiError::RejectedByFilter(_) => "Transaction was rejected by the transaction filter",
-            ApiError::RateLimited(_) => "Rate limited",
         }
     }
 
@@ -316,7 +310,6 @@ impl From<RestError> for ApiError {
                     ApiError::InternalError(Some(err.error.message))
                 },
                 AptosErrorCode::MempoolIsFull => ApiError::MempoolIsFull(Some(err.error.message)),
-                AptosErrorCode::RateLimited => ApiError::RateLimited(Some(err.error.message)),
                 AptosErrorCode::WebFrameworkError => {
                     ApiError::InternalError(Some(err.error.message))
                 },

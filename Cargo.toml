@@ -214,7 +214,6 @@ members = [
     "third_party/move/mono-move/programs",
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
-    "third_party/move/mono-move/testsuite",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -476,7 +475,6 @@ aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
 aptos-transaction-simulation = { path = "aptos-move/aptos-transaction-simulation" }
-aptos-transaction-tracing = { path = "crates/aptos-transaction-tracing" }
 aptos-transaction-simulation-session = { path = "aptos-move/aptos-transaction-simulation-session" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
@@ -882,10 +880,8 @@ z3tracer = "0.8.0"
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-gas = { path = "third_party/move/mono-move/gas" }
-mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
 mono-move-programs = { path = "third_party/move/mono-move/programs" }
 mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
-mono-move-testsuite = { path = "third_party/move/mono-move/testsuite" }
 move-abigen = { path = "third_party/move/tools/move-abigen" }
 move-asm = { path = "third_party/move/tools/move-asm" }
 move-binary-format = { path = "third_party/move/move-binary-format" }

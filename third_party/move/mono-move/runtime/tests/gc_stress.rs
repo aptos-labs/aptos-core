@@ -21,7 +21,7 @@
 //! At the end, walks the VM's outer vector via heap pointers and compares
 //! element-by-element against a pure-Rust simulation using the same seed.
 
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp, STRUCT_DATA_OFFSET,
 };
@@ -92,13 +92,9 @@ fn simulate(n: u64, max_len: u64, seed: u64) -> Vec<(u64, Vec<u64>)> {
 ///   [fp + 16] : entry    (result: heap pointer to Entry struct)
 ///   [fp + 24] : vec_ref  (16-byte fat pointer to vec slot)
 fn make_gc_stress_program(
-    arena: &ExecutableArena,
     num_iterations: u64,
     max_len: u64,
-) -> (
-    Vec<Option<ExecutableArenaPtr<Function>>>,
-    Vec<ObjectDescriptor>,
-) {
+) -> (Vec<Function>, Vec<ObjectDescriptor>) {
     use MicroOp::*;
 
     // -- Function 1: make_entry(val) -> entry_ptr --
@@ -108,7 +104,7 @@ fn make_gc_stress_program(
     let callee_vec_ref: u32 = 24;
 
     #[rustfmt::skip]
-    let make_entry_code = arena.alloc_slice_fill_iter(vec![
+    let make_entry_code = vec![
         // PC 0: vec = VecNew(descriptor=0, elem_size=8)
         VecNew { dst: FO(callee_vec) },
         // PC 1: vec_ref = SlotBorrow(vec)
@@ -123,19 +119,17 @@ fn make_gc_stress_program(
         MicroOp::struct_store8(FO(callee_entry), 8, FO(callee_vec)),
         // PC 6: return
         Return,
-    ]);
-    let callee_pointer_offsets =
-        arena.alloc_slice_fill_iter(vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)]);
+    ];
 
-    let callee_func = arena.alloc(Function {
+    let callee_func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: make_entry_code,
         args_size: 8,
         args_and_locals_size: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        pointer_offsets: callee_pointer_offsets,
-    });
+        pointer_offsets: vec![FO(callee_vec), FO(callee_entry), FO(callee_vec_ref)],
+    };
 
     // -- Function 0: main --
     let outer_vec: u32 = 0;
@@ -149,7 +143,7 @@ fn make_gc_stress_program(
     let entry_ptr: u32 = 104; // callee result slot (callee fp + 16)
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = vec![
         // ---- Setup ----
         // PC 0: outer_vec = VecNew(descriptor=2, elem_size=8)
         VecNew { dst: FO(outer_vec) },
@@ -227,19 +221,17 @@ fn make_gc_stress_program(
 
         // ---- DONE (PC 30) ----
         Return,
-    ]);
-    let main_pointer_offsets =
-        arena.alloc_slice_fill_iter(vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)]);
+    ];
 
-    let main_func = arena.alloc(Function {
+    let main_func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
         args_size: 0,
         args_and_locals_size: 64,
         extended_frame_size: 128,
         zero_frame: true,
-        pointer_offsets: main_pointer_offsets,
-    });
+        pointer_offsets: vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)],
+    };
 
     let descriptors = vec![
         // Descriptor 0: trivial — inner vectors hold plain u64 values
@@ -256,7 +248,7 @@ fn make_gc_stress_program(
         },
     ];
 
-    (vec![Some(main_func), Some(callee_func)], descriptors)
+    (vec![main_func, callee_func], descriptors)
 }
 
 // ---------------------------------------------------------------------------
@@ -296,15 +288,8 @@ fn gc_stress() {
 
     let expected = simulate(n, max_len, seed);
 
-    let arena = ExecutableArena::new();
-    let (functions, descriptors) = make_gc_stress_program(&arena, n, max_len);
-    // SAFETY: Exclusive access during test setup; arena is alive.
-    unsafe { Function::resolve_calls(&functions) };
-    let mut ctx = InterpreterContext::with_heap_size(
-        &descriptors,
-        unsafe { functions[0].unwrap().as_ref_unchecked() },
-        8 * 1024,
-    );
+    let (functions, descriptors) = make_gc_stress_program(n, max_len);
+    let mut ctx = InterpreterContext::with_heap_size(&functions, &descriptors, 0, 8 * 1024);
     ctx.set_rng_seed(seed);
     ctx.run().unwrap();
 

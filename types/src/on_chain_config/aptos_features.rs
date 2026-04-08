@@ -169,8 +169,6 @@ pub enum FeatureFlag {
     ENCRYPTED_TRANSACTIONS = 108,
     /// Enables public struct and enum types as transaction arguments.
     PUBLIC_STRUCT_ENUM_ARGS = 109,
-    /// Whether multisig script payloads are enabled
-    MULTISIG_SCRIPT = 110,
 }
 
 impl FeatureFlag {
@@ -280,7 +278,6 @@ impl FeatureFlag {
             Self::VM_BINARY_FORMAT_V10,
             Self::SLH_DSA_SHA2_128S_SIGNATURE,
             Self::PUBLIC_STRUCT_ENUM_ARGS,
-            Self::MULTISIG_SCRIPT,
         ]
     }
 }
@@ -484,10 +481,6 @@ impl Features {
 
     pub fn is_encrypted_transactions_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENCRYPTED_TRANSACTIONS)
-    }
-
-    pub fn is_multisig_script_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::MULTISIG_SCRIPT)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

@@ -1265,19 +1265,6 @@ impl RoundManager {
             .await
             .context("[RoundManager] Failed to insert the block into BlockStore")?;
 
-        // Register block → traced txn hashes at proposal time (before execution).
-        if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
-            if let Some(payload) = proposal.payload() {
-                let batch_digests = extract_batch_digests(payload);
-                aptos_transaction_tracing::store::TransactionTraceStore::global()
-                    .process_proposed_block(
-                        proposal.id(),
-                        proposal.timestamp_usecs(),
-                        &batch_digests,
-                    );
-            }
-        }
-
         let block_store = self.block_store.clone();
         if block_store.check_payload(&proposal).is_err() {
             debug!("Payload not available locally for block: {}", proposal.id());
@@ -1440,9 +1427,19 @@ impl RoundManager {
 
         let parent = parent_vote.vote_data().proposed().clone();
         let opt_proposal_round = parent.round() + 1;
-        if self
-            .proposer_election
-            .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
+        // HACK: Skip opt proposal for faulty validator too.
+        let should_skip_opt = {
+            let author = self.proposal_generator.author();
+            let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
+            let n = ordered.len();
+            let idx = ordered.iter().position(|a| *a == author);
+            matches!(idx, Some(i) if i >= n - 1) && opt_proposal_round % 2 == 0
+        };
+
+        if !should_skip_opt
+            && self
+                .proposer_election
+                .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
         {
             let expected_grandparent_round = parent
                 .round()
@@ -2228,40 +2225,4 @@ impl RoundManager {
             Ok(())
         }
     }
-}
-
-/// Extract (batch_digest, inclusion_type) pairs from a block payload for tracing.
-fn extract_batch_digests(
-    payload: &aptos_consensus_types::common::Payload,
-) -> Vec<(
-    aptos_crypto::HashValue,
-    aptos_transaction_tracing::types::BatchInclusionType,
-)> {
-    use aptos_consensus_types::{payload::OptQuorumStorePayload, proof_of_store::TBatchInfo};
-    use aptos_transaction_tracing::types::BatchInclusionType;
-
-    let mut out = Vec::new();
-    macro_rules! collect {
-        ($p:expr) => {{
-            for b in $p.inline_batches().iter() {
-                out.push((*b.info().digest(), BatchInclusionType::Inline));
-            }
-            for b in $p.opt_batches().iter() {
-                out.push((*b.digest(), BatchInclusionType::Opt));
-            }
-            for b in $p.proof_with_data().iter() {
-                out.push((*b.info().digest(), BatchInclusionType::Proof));
-            }
-        }};
-    }
-    match payload {
-        aptos_consensus_types::common::Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
-            collect!(p);
-        },
-        aptos_consensus_types::common::Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
-            collect!(p);
-        },
-        _ => {},
-    }
-    out
 }

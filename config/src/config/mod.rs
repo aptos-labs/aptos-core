@@ -36,7 +36,6 @@ mod state_sync_config;
 mod storage_config;
 mod telemetry_service_config;
 mod transaction_filters_config;
-mod transaction_tracing_config;
 mod utils;
 
 // All public usage statements should be declared below
@@ -68,4 +67,3 @@ pub use state_sync_config::*;
 pub use storage_config::*;
 pub use telemetry_service_config::*;
 pub use transaction_filters_config::*;
-pub use transaction_tracing_config::*;

@@ -265,7 +265,7 @@ pub fn native_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
 /// in sequence on the same heap.
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+    use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp as Op, MicroOp::*,
         FRAME_METADATA_SIZE,
@@ -290,12 +290,7 @@ mod micro_op {
     pub const FN_GET: usize = 2;
     pub const FN_REMOVE: usize = 4;
 
-    pub fn program() -> (
-        Vec<Option<ExecutableArenaPtr<Function>>>,
-        Vec<ObjectDescriptor>,
-        ExecutableArena,
-    ) {
-        let arena = ExecutableArena::new();
+    pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
         let descriptors = vec![
             ObjectDescriptor::Trivial, // 0: node elements, free_list elements
             ObjectDescriptor::Struct {
@@ -306,16 +301,15 @@ mod micro_op {
         ];
         (
             vec![
-                Some(make_new(&arena)),         // 0
-                Some(make_insert(&arena, 3)),   // 1, calls alloc_node at 3
-                Some(make_get(&arena)),         // 2
-                Some(make_alloc_node(&arena)),  // 3
-                Some(make_remove(&arena, 5)),   // 4, calls remove_node at 5
-                Some(make_remove_node(&arena)), // 5
-                Some(make_run_ops(&arena)),     // 6
+                make_new(),         // 0
+                make_insert(3),     // 1, calls alloc_node at 3
+                make_get(),         // 2
+                make_alloc_node(),  // 3
+                make_remove(5),     // 4, calls remove_node at 5
+                make_remove_node(), // 5
+                make_run_ops(),     // 6
             ],
             descriptors,
-            arena,
         )
     }
 
@@ -328,7 +322,7 @@ mod micro_op {
     // Frame layout:
     //   [0] result: bst_ref   [8] nodes (temp)   [16] free_list (temp)
     // =================================================================
-    fn make_new(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_new() -> Function {
         let bst = 0u32;
         let nodes = 8u32;
         let free_list = 16u32;
@@ -345,17 +339,15 @@ mod micro_op {
             Return,                                                                // 6
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(bst), FO(nodes), FO(free_list)]);
-        arena.alloc(Function {
+        Function {
             name: GlobalArenaPtr::from_static("new"),
             code,
             args_size: 0,
             args_and_locals_size: 24,
             extended_frame_size: 24 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            pointer_offsets,
-        })
+            pointer_offsets: vec![FO(bst), FO(nodes), FO(free_list)],
+        }
     }
 
     // =================================================================
@@ -367,7 +359,7 @@ mod micro_op {
     //   [48] root   [56] idx
     //   [64] node (32B: key[64] val[72] left[80] right[88])
     // =================================================================
-    fn make_get(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_get() -> Function {
         let bst = 0u32;
         let key = 8u32;
         let bst_ref = 16u32;
@@ -410,18 +402,15 @@ mod micro_op {
             Return,                                                                // 17
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets =
-            arena.alloc_slice_fill_iter(vec![FO(bst), FO(bst_ref), FO(nodes_ref)]);
-        arena.alloc(Function {
+        Function {
             name: GlobalArenaPtr::from_static("get"),
             code,
             args_size: 16,
             args_and_locals_size: 96,
             extended_frame_size: 96 + FRAME_METADATA_SIZE,
             zero_frame: false,
-            pointer_offsets,
-        })
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
+        }
     }
 
     // =================================================================
@@ -438,7 +427,7 @@ mod micro_op {
     //   [104] metadata (24B)
     //   [128] callee: bst  [136] callee: key  [144] callee: value
     // =================================================================
-    fn make_insert(arena: &ExecutableArena, alloc_node_id: u32) -> ExecutableArenaPtr<Function> {
+    fn make_insert(alloc_node_id: u32) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let bst = 0u32;
         let key = 8u32;
@@ -521,18 +510,15 @@ mod micro_op {
             Return,                                                                // 36
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets =
-            arena.alloc_slice_fill_iter(vec![FO(bst), FO(bst_ref), FO(nodes_ref)]);
-        arena.alloc(Function {
+        Function {
             name: GlobalArenaPtr::from_static("insert"),
             code,
             args_size: 24,
             args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
-            pointer_offsets,
-        })
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
+        }
     }
 
     // =================================================================
@@ -550,7 +536,7 @@ mod micro_op {
     //   [72] idx   [80] fl_len
     //   [88] new_node (32B: key[88] val[96] left[104] right[112])
     // =================================================================
-    fn make_alloc_node(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_alloc_node() -> Function {
         let bst = 0u32;
         let key = 8u32;
         let value = 16u32;
@@ -595,22 +581,15 @@ mod micro_op {
             Return,                                                                // 15
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets = arena.alloc_slice_fill_iter(vec![
-            FO(bst),
-            FO(bst_ref),
-            FO(nodes_ref),
-            FO(free_list_ref),
-        ]);
-        arena.alloc(Function {
+        Function {
             name: GlobalArenaPtr::from_static("alloc_node"),
             code,
             args_size: 24,
             args_and_locals_size: 120,
             extended_frame_size: 120 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            pointer_offsets,
-        })
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)],
+        }
     }
 
     // =================================================================
@@ -627,7 +606,7 @@ mod micro_op {
     //   [104] metadata (24B)
     //   [128] callee: bst / result  [136] callee: idx
     // =================================================================
-    fn make_remove(arena: &ExecutableArena, remove_node_id: u32) -> ExecutableArenaPtr<Function> {
+    fn make_remove(remove_node_id: u32) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let bst = 0u32;
         let key = 8u32;
@@ -697,18 +676,15 @@ mod micro_op {
             Return,                                                                // 27
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets =
-            arena.alloc_slice_fill_iter(vec![FO(bst), FO(bst_ref), FO(nodes_ref)]);
-        arena.alloc(Function {
+        Function {
             name: GlobalArenaPtr::from_static("remove"),
             code,
             args_size: 16,
             args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c1 + 8) as usize,
             zero_frame: true,
-            pointer_offsets,
-        })
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref)],
+        }
     }
 
     // =================================================================
@@ -727,7 +703,7 @@ mod micro_op {
     //   [80] parent   [88] cur   [96] cur_right
     //   [104] scratch (32B: key[104] val[112] left[120] right[128])
     // =================================================================
-    fn make_remove_node(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_remove_node() -> Function {
         let bst = 0u32;
         let idx = 8u32;
         let bst_ref = 16u32;
@@ -805,22 +781,15 @@ mod micro_op {
             Return,                                                                // 34
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets = arena.alloc_slice_fill_iter(vec![
-            FO(bst),
-            FO(bst_ref),
-            FO(nodes_ref),
-            FO(free_list_ref),
-        ]);
-        arena.alloc(Function {
+        Function {
             name: GlobalArenaPtr::from_static("remove_node"),
             code,
             args_size: 16,
             args_and_locals_size: 136,
             extended_frame_size: 136 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            pointer_offsets,
-        })
+            pointer_offsets: vec![FO(bst), FO(bst_ref), FO(nodes_ref), FO(free_list_ref)],
+        }
     }
 
     // =================================================================
@@ -838,7 +807,7 @@ mod micro_op {
     //   [72] metadata (24 bytes)
     //   [96] c0   [104] c1   [112] c2
     // =================================================================
-    fn make_run_ops(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_run_ops() -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let ops = 0u32;
         let bst = 8u32;
@@ -902,17 +871,15 @@ mod micro_op {
             Return,                                                               // 28
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(ops), FO(bst), FO(ops_ref)]);
-        arena.alloc(Function {
+        Function {
             name: GlobalArenaPtr::from_static("run_ops"),
             code,
             args_size: 8,
             args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
-            pointer_offsets,
-        })
+            pointer_offsets: vec![FO(ops), FO(bst), FO(ops_ref)],
+        }
     }
 }
 

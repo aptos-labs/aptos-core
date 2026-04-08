@@ -61,19 +61,14 @@ pub fn native_merge_sort(v: &mut [u64]) {
 /// and pseudocode.
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+    use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp::*,
         FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::ObjectDescriptor;
 
-    pub fn program() -> (
-        Vec<Option<ExecutableArenaPtr<Function>>>,
-        Vec<ObjectDescriptor>,
-        ExecutableArena,
-    ) {
-        let arena = ExecutableArena::new();
+    pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
         let meta = FRAME_METADATA_SIZE as u32;
 
         // =================================================================
@@ -108,18 +103,15 @@ mod micro_op {
                 Return,
             ];
 
-            let code = arena.alloc_slice_fill_iter(code);
-            let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(vec_ref)]);
-
-            arena.alloc(Function {
+            Function {
                 name: GlobalArenaPtr::from_static("merge_sort"),
                 code,
                 args_size: 8,
                 args_and_locals_size: args_and_locals_size as usize,
                 extended_frame_size: (callee_hi + 8) as usize,
                 zero_frame: true,
-                pointer_offsets,
-            })
+                pointer_offsets: vec![FO(vec), FO(vec_ref)],
+            }
         };
 
         // =================================================================
@@ -177,18 +169,15 @@ mod micro_op {
                 Return,
             ];
 
-            let code = arena.alloc_slice_fill_iter(code);
-            let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec)]);
-
-            arena.alloc(Function {
+            Function {
                 name: GlobalArenaPtr::from_static("merge_sort_range"),
                 code,
                 args_size: 24,
                 args_and_locals_size: args_and_locals_size as usize,
                 extended_frame_size: (callee_3 + 8) as usize,
                 zero_frame: true,
-                pointer_offsets,
-            })
+                pointer_offsets: vec![FO(vec)],
+            }
         };
 
         // =================================================================
@@ -289,30 +278,21 @@ mod micro_op {
                 Jump { target: CO(33) },                                         // 39
             ];
 
-            let code = arena.alloc_slice_fill_iter(code);
-            let pointer_offsets =
-                arena.alloc_slice_fill_iter(vec![FO(vec), FO(tmp), FO(vec_ref), FO(tmp_ref)]);
-
-            arena.alloc(Function {
+            Function {
                 name: GlobalArenaPtr::from_static("merge"),
                 code,
                 args_size: 32,
                 args_and_locals_size: 120,
                 extended_frame_size: 144,
                 zero_frame: true,
-                pointer_offsets,
-            })
+                pointer_offsets: vec![FO(vec), FO(tmp), FO(vec_ref), FO(tmp_ref)],
+            }
         };
 
         let descriptors = vec![ObjectDescriptor::Trivial];
         (
-            vec![
-                Some(func_merge_sort),
-                Some(func_merge_sort_range),
-                Some(func_merge),
-            ],
+            vec![func_merge_sort, func_merge_sort_range, func_merge],
             descriptors,
-            arena,
         )
     }
 }
