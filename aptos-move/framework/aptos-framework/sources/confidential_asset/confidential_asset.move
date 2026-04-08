@@ -515,6 +515,9 @@ module aptos_framework::confidential_asset {
         );
 
         let ca_store = borrow_confidential_store_mut(sender_addr, asset_type);
+        if(amount == 0 && ca_store.normalized) {
+            abort(error::invalid_state(E_ALREADY_NORMALIZED));
+        };
         ca_store.normalized = true;
         ca_store.available_balance = compressed_new_balance;
         ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
@@ -718,7 +721,6 @@ module aptos_framework::confidential_asset {
         sigma_proto_resp: vector<vector<u8>>
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
         let user = signer::address_of(sender);
-        assert!(!is_normalized(user, asset_type), error::invalid_state(E_ALREADY_NORMALIZED));
 
         withdraw_to_raw(
             sender, asset_type, user, 0,
@@ -734,7 +736,6 @@ module aptos_framework::confidential_asset {
         proof: WithdrawalProof
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
         let user = signer::address_of(sender);
-        assert!(!is_normalized(user, asset_type), error::invalid_state(E_ALREADY_NORMALIZED));
 
         // Normalization is withdrawal with v = 0
         withdraw_to(sender, asset_type, user, 0, proof);
