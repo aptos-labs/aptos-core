@@ -55,6 +55,7 @@ struct ModuleSourceData {
 pub struct AptosSourceLocator {
     source_data: AHashMap<ModuleId, ModuleSourceData>,
     struct_field_names: AHashMap<ModuleId, AHashMap<String, Vec<String>>>,
+    enum_variants: AHashMap<ModuleId, AHashMap<String, Vec<(String, Vec<String>)>>>,
 }
 
 impl Default for AptosSourceLocator {
@@ -68,6 +69,7 @@ impl AptosSourceLocator {
         Self {
             source_data: AHashMap::new(),
             struct_field_names: AHashMap::new(),
+            enum_variants: AHashMap::new(),
         }
     }
 
@@ -108,30 +110,46 @@ impl AptosSourceLocator {
         Ok(())
     }
 
-    /// Extract struct field names from a compiled module and store them for
-    /// annotated struct display in the debugger.
+    /// Extract struct and enum type information from a compiled module and store
+    /// it for annotated local-variable display in the debugger.
     pub fn add_struct_field_names_from_module(&mut self, compiled_module: &CompiledModule) {
         let module_id = compiled_module.self_id();
-        let entry = self.struct_field_names.entry(module_id).or_default();
 
         for struct_def in compiled_module.struct_defs() {
             let handle = compiled_module.struct_handle_at(struct_def.struct_handle);
             let struct_name = compiled_module.identifier_at(handle.name).to_string();
 
-            let field_names: Vec<String> = match &struct_def.field_information {
-                StructFieldInformation::Native => vec![],
-                StructFieldInformation::Declared(fields) => fields
-                    .iter()
-                    .map(|f| compiled_module.identifier_at(f.name).to_string())
-                    .collect(),
-                StructFieldInformation::DeclaredVariants(_) => {
-                    // Enum types: field names depend on the active variant;
-                    // annotated display for enum locals is not yet implemented.
-                    vec![]
+            match &struct_def.field_information {
+                StructFieldInformation::Native => {},
+                StructFieldInformation::Declared(fields) => {
+                    let field_names = fields
+                        .iter()
+                        .map(|f| compiled_module.identifier_at(f.name).to_string())
+                        .collect();
+                    self.struct_field_names
+                        .entry(module_id.clone())
+                        .or_default()
+                        .insert(struct_name, field_names);
                 },
-            };
-
-            entry.insert(struct_name, field_names);
+                StructFieldInformation::DeclaredVariants(variants) => {
+                    let variant_info = variants
+                        .iter()
+                        .map(|v| {
+                            let name = compiled_module.identifier_at(v.name).to_string();
+                            let fields = v
+                                .fields
+                                .iter()
+                                .map(|f| compiled_module.identifier_at(f.name).to_string())
+                                .collect();
+                            (name, fields)
+                        })
+                        .collect();
+                    self.enum_variants
+                        .entry(module_id.clone())
+                        .or_default()
+                        .insert(struct_name, variant_info);
+                },
+            }
         }
     }
 }
@@ -139,7 +157,7 @@ impl AptosSourceLocator {
 // ── SourceLocator implementation ──────────────────────────────────────────────
 
 impl SourceLocator for AptosSourceLocator {
-    fn locate(
+    fn get_bytecode_source_location(
         &self,
         module_id: &ModuleId,
         func_def_idx: FunctionDefinitionIndex,
@@ -201,8 +219,12 @@ impl SourceLocator for AptosSourceLocator {
         let data = self.source_data.get(module_id)?;
         let func_map = data.source_map.get_function_source_map(func_def_idx).ok()?;
         let param_count = func_map.parameters.len();
-        let mut names: Vec<String> = func_map.parameters.iter().map(|sn| sn.0.clone()).collect();
-        names.extend(func_map.locals.iter().map(|sn| sn.0.clone()));
+        let names = func_map
+            .parameters
+            .iter()
+            .chain(func_map.locals.iter())
+            .map(|sn| sn.0.clone())
+            .collect();
         Some((param_count, names))
     }
 
@@ -215,6 +237,14 @@ impl SourceLocator for AptosSourceLocator {
             .get(module_id)?
             .get(struct_name)
             .cloned()
+    }
+
+    fn get_enum_variant_info(
+        &self,
+        module_id: &ModuleId,
+        enum_name: &str,
+    ) -> Option<Vec<(String, Vec<String>)>> {
+        self.enum_variants.get(module_id)?.get(enum_name).cloned()
     }
 }
 

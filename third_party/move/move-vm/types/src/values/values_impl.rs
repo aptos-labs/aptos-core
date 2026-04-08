@@ -4572,6 +4572,17 @@ impl Display for Locals {
     }
 }
 
+/// Type-level field information for annotated local-variable display in the
+/// debugger.  Passed per-local to [`debug::print_locals_with_info`].
+pub enum LocalTypeInfo {
+    /// Regular struct: field names in declaration order.
+    Struct(Vec<String>),
+    /// Enum: `(variant_name, field_names)` indexed by variant tag (0-based).
+    /// The runtime stores enum values as `[u16_tag, field0, field1, …]`, so
+    /// index 0 here corresponds to tag value `0`.
+    Enum(Vec<(String, Vec<String>)>),
+}
+
 #[allow(dead_code)]
 pub mod debug {
     use super::*;
@@ -4792,23 +4803,21 @@ pub mod debug {
     }
 
     /// Extended locals printer that shows separate Parameters / Locals sections
-    /// with optional variable names and optional per-local struct field names.
+    /// with optional variable names and optional per-local type information.
     ///
-    /// * `param_count`        – how many of the first locals are parameters.
-    /// * `names`              – combined parameter + local names (may be shorter
-    ///                          than the actual local count; missing entries fall
-    ///                          back to `_`).
-    /// * `struct_field_names` – for each local index, an optional ordered list
-    ///                          of field names to use when the value is a struct.
-    ///                          Pass `None` (or an empty/short slice) to skip
-    ///                          field-name annotation for all locals.
+    /// * `param_count` – how many of the first locals are parameters.
+    /// * `names`       – combined parameter + local names (may be shorter than
+    ///                   the actual local count; missing entries fall back to `_`).
+    /// * `type_info`   – for each local index, optional [`LocalTypeInfo`] that
+    ///                   annotates struct fields or enum variants in the output.
+    ///                   Pass `None` to skip annotation for all locals.
     pub fn print_locals_with_info<B: Write>(
         buf: &mut B,
         locals: &Locals,
         compact: bool,
         param_count: usize,
         names: Option<&[String]>,
-        struct_field_names: Option<&[Option<Vec<String>>]>,
+        type_info: Option<&[Option<LocalTypeInfo>]>,
     ) -> PartialVMResult<()> {
         let locals_ref = locals.0.borrow();
         let total = locals_ref.len();
@@ -4829,12 +4838,10 @@ pub mod debug {
                 .map(|s| s.as_str())
                 .unwrap_or("_");
             debug_write!(buf, "            [{}] {}: ", idx, name)?;
-            print_value_with_optional_field_names(
+            print_value_with_type_info(
                 buf,
                 val,
-                struct_field_names
-                    .and_then(|s| s.get(idx))
-                    .and_then(|o| o.as_deref()),
+                type_info.and_then(|t| t.get(idx)).and_then(|o| o.as_ref()),
             )?;
             debug_writeln!(buf)?;
         }
@@ -4855,12 +4862,10 @@ pub mod debug {
                 .map(|s| s.as_str())
                 .unwrap_or("_");
             debug_write!(buf, "            [{}] {}: ", idx, name)?;
-            print_value_with_optional_field_names(
+            print_value_with_type_info(
                 buf,
                 val,
-                struct_field_names
-                    .and_then(|s| s.get(idx))
-                    .and_then(|o| o.as_deref()),
+                type_info.and_then(|t| t.get(idx)).and_then(|o| o.as_ref()),
             )?;
             debug_writeln!(buf)?;
         }
@@ -4868,15 +4873,18 @@ pub mod debug {
         Ok(())
     }
 
-    /// Print `val`, using `field_names` to annotate `Container::Struct` fields
-    /// when provided.  Nested struct values are still printed positionally.
-    fn print_value_with_optional_field_names<B: Write>(
+    /// Print `val` with optional [`LocalTypeInfo`] for annotating struct fields
+    /// or enum variants.  Nested values are still printed positionally.
+    fn print_value_with_type_info<B: Write>(
         buf: &mut B,
         val: &Value,
-        field_names: Option<&[String]>,
+        info: Option<&LocalTypeInfo>,
     ) -> PartialVMResult<()> {
-        match (val, field_names) {
-            (Value::Container(Container::Struct(r)), Some(names)) if !names.is_empty() => {
+        match (val, info) {
+            // ── Struct with named fields ──────────────────────────────────────
+            (Value::Container(Container::Struct(r)), Some(LocalTypeInfo::Struct(names)))
+                if !names.is_empty() =>
+            {
                 debug_write!(buf, "{{ ")?;
                 let fields = r.borrow();
                 for (i, field_val) in fields.iter().enumerate() {
@@ -4888,6 +4896,36 @@ pub mod debug {
                     print_value_impl(buf, field_val)?;
                 }
                 debug_write!(buf, " }}")
+            },
+            // ── Enum variant: [u16_tag, field0, field1, …] ───────────────────
+            (Value::Container(Container::Struct(r)), Some(LocalTypeInfo::Enum(variants)))
+                if !variants.is_empty() =>
+            {
+                let fields = r.borrow();
+                let tag = match fields.first() {
+                    Some(Value::U16(t)) => *t as usize,
+                    _ => return print_value_impl(buf, val),
+                };
+                match variants.get(tag) {
+                    Some((variant_name, field_names)) => {
+                        debug_write!(buf, "{}", variant_name)?;
+                        let payload = &fields[1..];
+                        if !payload.is_empty() {
+                            debug_write!(buf, " {{ ")?;
+                            for (i, field_val) in payload.iter().enumerate() {
+                                if i > 0 {
+                                    debug_write!(buf, ", ")?;
+                                }
+                                let fname = field_names.get(i).map(|s| s.as_str()).unwrap_or("_");
+                                debug_write!(buf, "{}: ", fname)?;
+                                print_value_impl(buf, field_val)?;
+                            }
+                            debug_write!(buf, " }}")?;
+                        }
+                        Ok(())
+                    },
+                    None => print_value_impl(buf, val),
+                }
             },
             _ => print_value_impl(buf, val),
         }

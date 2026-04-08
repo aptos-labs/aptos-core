@@ -1710,7 +1710,9 @@ where
 
         // Print source location if available.
         if let Some(module_id) = function.module_id() {
-            if let Some(loc) = source_locator::get_location(module_id, function.index(), frame.pc) {
+            if let Some(loc) =
+                source_locator::get_bytecode_source_location(module_id, function.index(), frame.pc)
+            {
                 debug_writeln!(buf, "          at {}", loc)?;
             }
         }

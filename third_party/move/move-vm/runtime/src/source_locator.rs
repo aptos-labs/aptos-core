@@ -24,7 +24,7 @@ pub trait SourceLocator: Send + Sync {
     /// Return `"filename:line"` for the bytecode position `pc` inside the
     /// function identified by `func_def_idx` of `module_id`, or `None` when
     /// no source map is available for that function.
-    fn locate(
+    fn get_bytecode_source_location(
         &self,
         module_id: &ModuleId,
         func_def_idx: FunctionDefinitionIndex,
@@ -47,6 +47,15 @@ pub trait SourceLocator: Send + Sync {
         module_id: &ModuleId,
         struct_name: &str,
     ) -> Option<Vec<String>>;
+
+    /// Return `(variant_name, field_names)` pairs for each variant of enum
+    /// `enum_name` in `module_id`, indexed by variant tag (0-based), or
+    /// `None` when the type is not a known enum.
+    fn get_enum_variant_info(
+        &self,
+        module_id: &ModuleId,
+        enum_name: &str,
+    ) -> Option<Vec<(String, Vec<String>)>>;
 }
 
 // ── Thread-local storage ─────────────────────────────────────────────────────
@@ -70,7 +79,7 @@ pub fn clear_source_locator() {
 // ── Accessor helpers (called from interpreter / debug loop) ──────────────────
 
 /// Query the current thread's source locator for a `"file:line"` string.
-pub fn get_location(
+pub fn get_bytecode_source_location(
     module_id: &ModuleId,
     func_def_idx: FunctionDefinitionIndex,
     pc: u16,
@@ -78,7 +87,7 @@ pub fn get_location(
     LOCATOR.with(|l| {
         l.borrow()
             .as_ref()
-            .and_then(|loc| loc.locate(module_id, func_def_idx, pc))
+            .and_then(|loc| loc.get_bytecode_source_location(module_id, func_def_idx, pc))
     })
 }
 
@@ -103,6 +112,18 @@ pub fn get_struct_field_names(module_id: &ModuleId, struct_name: &str) -> Option
     })
 }
 
+/// Query the current thread's source locator for enum variant info.
+pub fn get_enum_variant_info(
+    module_id: &ModuleId,
+    enum_name: &str,
+) -> Option<Vec<(String, Vec<String>)>> {
+    LOCATOR.with(|l| {
+        l.borrow()
+            .as_ref()
+            .and_then(|loc| loc.get_enum_variant_info(module_id, enum_name))
+    })
+}
+
 /// Write enriched local-variable display (with source names and struct field
 /// names when a source locator is registered) into `buf`.
 ///
@@ -123,15 +144,18 @@ pub(crate) fn print_locals_enriched<B: fmt::Write>(
     let param_count = function.param_tys().len();
 
     if let Some((_, ref names)) = names_info {
-        let struct_fields: Vec<Option<Vec<String>>> = function
+        let type_info: Vec<Option<move_vm_types::values::LocalTypeInfo>> = function
             .local_tys()
             .iter()
             .map(|ty| {
-                runtime_environment
-                    .get_struct_name(ty)
-                    .ok()
-                    .flatten()
-                    .and_then(|(mid, sname)| get_struct_field_names(&mid, sname.as_str()))
+                let (mid, sname) = runtime_environment.get_struct_name(ty).ok().flatten()?;
+                let sname_str = sname.as_str();
+                if let Some(fields) = get_struct_field_names(&mid, sname_str) {
+                    Some(move_vm_types::values::LocalTypeInfo::Struct(fields))
+                } else {
+                    get_enum_variant_info(&mid, sname_str)
+                        .map(move_vm_types::values::LocalTypeInfo::Enum)
+                }
             })
             .collect();
         move_vm_types::values::debug::print_locals_with_info(
@@ -140,7 +164,7 @@ pub(crate) fn print_locals_enriched<B: fmt::Write>(
             compact,
             param_count,
             Some(names.as_slice()),
-            Some(struct_fields.as_slice()),
+            Some(type_info.as_slice()),
         )
     } else {
         move_vm_types::values::debug::print_locals_with_info(

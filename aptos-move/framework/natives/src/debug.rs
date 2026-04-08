@@ -26,19 +26,14 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 #[inline]
 fn native_print(
-    context: &mut SafeNativeContext,
+    _context: &mut SafeNativeContext,
     ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let should_print = cfg!(feature = "testing")
-        || context
-            .module_storage()
-            .runtime_environment()
-            .vm_config()
-            .enable_debugging;
+    let should_print = cfg!(feature = "testing");
 
     if should_print {
         let val = safely_pop_arg!(args, Struct);
@@ -68,12 +63,7 @@ fn native_stack_trace(
 
     let mut s = String::new();
 
-    let should_print = cfg!(feature = "testing")
-        || context
-            .module_storage()
-            .runtime_environment()
-            .vm_config()
-            .enable_debugging;
+    let should_print = cfg!(feature = "testing");
 
     if should_print {
         context.print_stack_trace(&mut s)?;
@@ -89,12 +79,7 @@ fn native_old_debug_print(
     ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let should_print = cfg!(feature = "testing")
-        || context
-            .module_storage()
-            .runtime_environment()
-            .vm_config()
-            .enable_debugging;
+    let should_print = cfg!(feature = "testing");
 
     if should_print {
         let x = safely_pop_arg!(args, Reference);
@@ -117,12 +102,7 @@ fn native_old_print_stacktrace(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.is_empty());
 
-    let should_print = cfg!(feature = "testing")
-        || context
-            .module_storage()
-            .runtime_environment()
-            .vm_config()
-            .enable_debugging;
+    let should_print = cfg!(feature = "testing");
 
     if should_print {
         let mut s = String::new();

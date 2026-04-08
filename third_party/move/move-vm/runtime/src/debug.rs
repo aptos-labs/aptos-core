@@ -233,7 +233,9 @@ impl DebugContext {
             // Print function + source location.
             print!("function >> {}", function_string);
             if let Some(module_id) = function.module_id() {
-                if let Some(loc) = source_locator::get_location(module_id, function.index(), pc) {
+                if let Some(loc) =
+                    source_locator::get_bytecode_source_location(module_id, function.index(), pc)
+                {
                     print!("  (at {})", loc);
                 }
             }
