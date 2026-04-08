@@ -994,22 +994,26 @@ module aptos_framework::confidential_asset {
     }
 
     #[view]
-    /// Returns the effective auditor: asset-specific if set, else global.
+    /// Returns the effective auditor: asset-specific if its EK is set, else global.
     /// Used by dapp developers to fetch the right auditor EK to create withdraw, normalize or transfer transactions.
     public fun get_effective_auditor_config(
         asset_type: Object<fungible_asset::Metadata>
     ): EffectiveAuditorConfig acquires AssetConfig, GlobalConfig {
         let config_addr = get_asset_config_address(asset_type); // first, check asset-specific auditor
         if (exists<AssetConfig>(config_addr)) {
-            return EffectiveAuditorConfig::V1 {
-                is_global: false,
-                config: borrow_global<AssetConfig>(config_addr).auditor
+            let auditor = borrow_global<AssetConfig>(config_addr).auditor;
+            // Only use asset-specific auditor if its EK is actually set; otherwise fall through to global.
+            if (auditor.ek.is_some()) {
+                return EffectiveAuditorConfig::V1 {
+                    is_global: false,
+                    config: auditor
+                };
             };
         };
 
         EffectiveAuditorConfig::V1 {      // otherwise, fall back to global auditor
             is_global: true,
-            config: borrow_global<GlobalConfig>( @aptos_framework).global_auditor
+            config: borrow_global<GlobalConfig>(@aptos_framework).global_auditor
         }
     }
 
