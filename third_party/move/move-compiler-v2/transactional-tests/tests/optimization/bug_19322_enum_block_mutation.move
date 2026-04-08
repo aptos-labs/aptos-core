@@ -17,7 +17,7 @@ module 0x42::m {
 
     fun test_enum_block_mutation(): u64 {
         let e = MyEnum::V { x: 10 };
-        *(&mut ({ e }).x) = 42;
+        *(&mut ({ e }).x) = 42; // modifies a temp value
         e.x
     }
 }
