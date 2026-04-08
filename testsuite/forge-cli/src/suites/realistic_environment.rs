@@ -16,7 +16,8 @@ use aptos_forge::{
         LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
         SuccessCriteria, SystemMetricsThreshold,
     },
-    EmitJobMode, EmitJobRequest, ForgeConfig, NetworkTest, NodeResourceOverride,
+    EmitJobMode, EmitJobRequest, EntryPoints, ForgeConfig, NetworkTest, NodeResourceOverride,
+    TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{
     BlockGasLimitType, FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainConsensusConfig,
@@ -55,6 +56,10 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_max_load_encrypted" => realistic_env_max_load_encrypted_test(duration),
         "realistic_env_max_load_encrypted_mix" => {
             realistic_env_max_load_encrypted_mix_test(duration)
+        },
+        "realistic_env_max_load_randomness" => realistic_env_max_load_randomness_test(duration),
+        "realistic_env_max_load_randomness_mixed" => {
+            realistic_env_max_load_randomness_mixed_test(duration)
         },
         _ => return None, // The test name does not match a realistic-env test
     };
@@ -644,6 +649,153 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)
+}
+
+/// Load test with 100% randomness-consuming transactions.
+pub(crate) fn realistic_env_max_load_randomness_test(duration: Duration) -> ForgeConfig {
+    realistic_env_max_load_randomness_inner(
+        duration,
+        EmitJobRequest::default()
+            .mode(EmitJobMode::MaxLoad {
+                mempool_backlog: 38000,
+            })
+            .init_gas_price_multiplier(20)
+            .transaction_type(TransactionType::CallCustomModules {
+                entry_point: Box::new(EntryPoints::DiceRoll),
+                num_modules: 1,
+                use_account_pool: false,
+            }),
+    )
+}
+
+/// Load test with 1:100 randomness-to-regular transaction ratio.
+/// Most blocks will have no randomness txns (has_rand_txns_fut = false),
+/// but occasional blocks will, exercising both the aggregation and skip paths.
+pub(crate) fn realistic_env_max_load_randomness_mixed_test(duration: Duration) -> ForgeConfig {
+    realistic_env_max_load_randomness_inner(
+        duration,
+        EmitJobRequest::default()
+            .mode(EmitJobMode::MaxLoad {
+                mempool_backlog: 38000,
+            })
+            .init_gas_price_multiplier(20)
+            .transaction_mix(vec![
+                (
+                    TransactionType::CallCustomModules {
+                        entry_point: Box::new(EntryPoints::DiceRoll),
+                        num_modules: 1,
+                        use_account_pool: false,
+                    },
+                    1,
+                ),
+                (TransactionType::default(), 100),
+            ]),
+    )
+}
+
+/// Shared implementation for randomness load tests. Matches realistic_env_max_load_test
+/// parameters exactly, except for randomness enablement and transaction type.
+fn realistic_env_max_load_randomness_inner(
+    duration: Duration,
+    inner_traffic: EmitJobRequest,
+) -> ForgeConfig {
+    let num_validators = 7;
+    let num_vfns = 0;
+    let num_pfns = 3;
+
+    let duration_secs = duration.as_secs();
+    let long_running = duration_secs >= 2400;
+
+    let resource_override = if long_running {
+        NodeResourceOverride {
+            storage_gib: Some(1000),
+            ..NodeResourceOverride::default()
+        }
+    } else {
+        NodeResourceOverride::default()
+    };
+
+    let mut success_criteria = SuccessCriteria::new(85)
+        .add_system_metrics_threshold(SystemMetricsThreshold::new(
+            MetricsThreshold::new(25.0, 15),
+            MetricsThreshold::new_gb(16.0 + 8.0 * (duration_secs as f64 / 3600.0), 20),
+        ))
+        .add_no_restarts()
+        .add_wait_for_catchup_s((duration.as_secs() / 10).max(60))
+        .add_latency_threshold(3.6, LatencyType::P50)
+        .add_latency_threshold(4.8, LatencyType::P70)
+        .add_chain_progress(StateProgressThreshold {
+            max_non_epoch_no_progress_secs: 15.0,
+            max_epoch_no_progress_secs: 16.0,
+            max_non_epoch_round_gap: 4,
+            max_epoch_round_gap: 4,
+        })
+        .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
+            vec![
+                (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 3.25),
+                (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                (LatencyBreakdownSlice::ConsensusOrderedToCommit, 1.0),
+            ],
+            5,
+        ));
+
+    if !long_running && ENABLE_FULLNODE_FAILURE_TEST {
+        success_criteria = success_criteria.add_no_fullnode_failures();
+    }
+
+    let inner_success_tps = if long_running { 11000 } else { 10000 };
+
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_vfns)
+        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
+            inner_traffic,
+            inner_success_criteria: SuccessCriteria::new(inner_success_tps),
+        }))
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] =
+                (if long_running { 600 } else { 300 }).into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["randomness_config_override"] =
+                serde_yaml::to_value(OnChainRandomnessConfig::default_enabled())
+                    .expect("must serialize");
+        }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000;
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000;
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.consensus_observer.observer_enabled = true;
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000;
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000;
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(success_criteria)
+        .with_validator_resource_override(resource_override)
+        .with_fullnode_resource_override(resource_override)
+        .with_num_pfns(num_pfns)
 }
 
 pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
