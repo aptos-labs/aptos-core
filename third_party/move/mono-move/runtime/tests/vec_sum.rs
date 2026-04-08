@@ -2,7 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
-use mono_move_core::{CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp};
+use mono_move_core::{
+    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries,
+};
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 
 /// Data segment (48 bytes):
@@ -44,8 +47,6 @@ fn make_vec_sum_program(
         JumpNotZeroU64 { target: CO(13), src: FO(slot_i) },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(slot_vec), FO(slot_vec_ref)]);
-
     let func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -53,7 +54,8 @@ fn make_vec_sum_program(
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(arena, vec![FO(slot_vec), FO(slot_vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(arena),
     });
 
     let descriptors = vec![ObjectDescriptor::Trivial];

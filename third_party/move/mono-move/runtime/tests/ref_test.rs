@@ -6,7 +6,8 @@
 
 use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
 use mono_move_core::{
-    DescriptorId, FrameOffset as FO, Function, MicroOp, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
+    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
+    FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET,
@@ -48,8 +49,6 @@ fn ref_basic() {
         VecLoadElem { dst: FO(tmp), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(r#ref), FO(vec_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -57,7 +56,8 @@ fn ref_basic() {
         args_and_locals_size: 72,
         extended_frame_size: 96,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(r#ref), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -110,8 +110,6 @@ fn ref_survives_gc() {
         VecLoadElem { dst: FO(tmp), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(ref_base), FO(vec_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -119,7 +117,8 @@ fn ref_survives_gc() {
         args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -161,8 +160,6 @@ fn ref_cross_frame() {
         WriteRef { ref_ptr: FO(c_ref), src: FO(c_val), size: 8 },
         Return,
     ]);
-    let callee_pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(c_ref_base)]);
-
     let callee_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: callee_code,
@@ -170,7 +167,8 @@ fn ref_cross_frame() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets: callee_pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(c_ref_base)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     });
 
     // -- Function 0: main --
@@ -198,9 +196,6 @@ fn ref_cross_frame() {
         VecLoadElem { dst: FO(m_result), vec_ref: FO(m_vec_ref), idx: FO(m_idx), elem_size: 8 },
         Return,
     ]);
-    let main_pointer_offsets =
-        arena.alloc_slice_fill_iter(vec![FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)]);
-
     let main_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: main_code,
@@ -208,7 +203,12 @@ fn ref_cross_frame() {
         args_and_locals_size: 48,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_offsets: main_pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![
+            FO(m_vec),
+            FO(m_vec_ref),
+            FO(m_callee_ref),
+        ]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     });
 
     let descriptors = vec![ObjectDescriptor::Trivial];
@@ -280,9 +280,6 @@ fn ref_multiple_borrows() {
         WriteRef { ref_ptr: FO(ref_b), src: FO(val), size: 8 },
         Return,
     ]);
-    let pointer_offsets =
-        arena.alloc_slice_fill_iter(vec![FO(vec), FO(ref_a_base), FO(ref_b_base), FO(vec_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -290,7 +287,13 @@ fn ref_multiple_borrows() {
         args_and_locals_size: 88,
         extended_frame_size: 112,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![
+            FO(vec),
+            FO(ref_a_base),
+            FO(ref_b_base),
+            FO(vec_ref),
+        ]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -344,8 +347,6 @@ fn ref_borrow_local() {
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(ref_base), FO(vec), FO(vec_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -355,7 +356,8 @@ fn ref_borrow_local() {
         // ref_base holds a stack address → is_heap_ptr returns false, GC skips it.
         // vec is a genuine heap root.
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(ref_base), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -425,14 +427,6 @@ fn ref_nested_vectors() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(val), size: 8 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![
-        FO(outer),
-        FO(inner_ptr),
-        FO(ref_base),
-        FO(outer_ref),
-        FO(inner_ref),
-    ]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -440,7 +434,14 @@ fn ref_nested_vectors() {
         args_and_locals_size: 96,
         extended_frame_size: 120,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![
+            FO(outer),
+            FO(inner_ptr),
+            FO(ref_base),
+            FO(outer_ref),
+            FO(inner_ref),
+        ]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
         elem_size: 8,
@@ -517,8 +518,6 @@ fn ref_survives_double_gc() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(tmp), size: 8 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(ref_base), FO(vec_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -526,7 +525,8 @@ fn ref_survives_double_gc() {
         args_and_locals_size: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
@@ -576,8 +576,6 @@ fn ref_struct_field_borrow() {
         MicroOp::struct_load8(FO(entry), 8, FO(result)),
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(entry), FO(r#ref), FO(entry_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -585,7 +583,8 @@ fn ref_struct_field_borrow() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -633,8 +632,6 @@ fn ref_struct_field_survives_gc() {
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(entry), FO(ref_base), FO(entry_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -642,7 +639,8 @@ fn ref_struct_field_survives_gc() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,

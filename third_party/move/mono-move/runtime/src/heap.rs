@@ -12,12 +12,13 @@ use crate::{
     memory::{read_ptr, read_u32, read_u64, write_ptr, write_u32, write_u64, MemoryRegion},
     types::{
         ObjectDescriptor, FORWARDED_MARKER, HEADER_DESCRIPTOR_OFFSET, HEADER_SIZE_OFFSET,
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
     },
 };
 use anyhow::{bail, Result};
 use mono_move_core::{
-    DescriptorId, Function, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
+    DescriptorId, FrameOffset, Function, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
     OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
 };
 use std::ptr::NonNull;
@@ -140,7 +141,7 @@ impl InterpreterContext<'_> {
     /// `fp` must point to a valid frame. `vec_ref_offset` must be the byte
     /// offset of a 16-byte fat pointer `(base, offset)` whose target holds
     /// the current vector heap pointer. `alloc_vec` may trigger GC which
-    /// relocates objects; the fat pointer's base in `pointer_offsets` and the
+    /// relocates objects; the fat pointer's base in `heap_ptr_offsets` and the
     /// vector pointer in the struct's `pointer_offsets` are updated by the GC.
     /// We re-read through the fat pointer after allocation.
     pub(crate) fn grow_vec_ref(
@@ -204,7 +205,8 @@ impl InterpreterContext<'_> {
     ///   and `pc` are written by `CallFunc`/`Return` and never modified by
     ///   user-visible micro-ops. A corrupted saved `fp` leads to
     ///   out-of-bounds stack reads (UB).
-    /// - **Pointer-slot accuracy**: `Function::pointer_offsets` lists every
+    /// - **Pointer-slot accuracy**: `Function::frame_layout` (and the
+    ///   matching `safe_point_layouts` entry, if any) together list every
     ///   frame offset that may hold a live heap pointer, and *only* those
     ///   offsets. Missing entries → dangling pointers after GC; extra
     ///   entries → non-pointer data reinterpreted as a pointer (UB).
@@ -219,23 +221,36 @@ impl InterpreterContext<'_> {
         let mut free_ptr = to_space.as_ptr();
 
         // Phase 1: scan roots from the call stack.
+        //
+        // For each frame we scan two sets of pointer offsets:
+        //   1. `frame_layout.heap_ptr_offsets` — always applies.
+        //   2. The matching `safe_point_layouts` entry for the frame's
+        //      current PC, if any — provides additional pointer offsets
+        //      that are only valid at that specific safe point.
+        //
+        // PC tracking: the topmost frame uses `self.pc`. For caller
+        // frames, the saved PC is read from the callee's frame metadata
+        // (the return address stored by `CallFunc`).
         let mut fp = self.frame_ptr;
         let mut func_ptr = self.current_func;
+        let mut pc = self.pc;
 
         loop {
             // SAFETY: func_ptr is a valid, non-null pointer — set from
             // `self.functions[]` or from `CallLocalFunc`, and saved/restored
-            // via frame metadata. pointer_offsets is an arena pointer valid
-            // for the lifetime of the executable. `fp.sub` retrieves saved
-            // metadata written by the call protocol.
-            let pointer_offsets = unsafe { func_ptr.as_ref().pointer_offsets.as_ref_unchecked() };
+            // via frame metadata. Arena pointers are valid for the lifetime
+            // of the executable. `fp.sub` retrieves saved metadata written
+            // by the call protocol.
+            let func = unsafe { func_ptr.as_ref() };
             unsafe {
-                for &offset in pointer_offsets {
-                    let old_ptr = read_ptr(fp, offset);
-                    if !old_ptr.is_null() && self.is_heap_ptr(old_ptr) {
-                        let new_ptr = self.gc_copy_object(old_ptr, &mut free_ptr);
-                        write_ptr(fp, offset, new_ptr);
-                    }
+                // Scan base pointer offsets (always active).
+                let base_offsets = func.frame_layout.heap_ptr_offsets.as_ref_unchecked();
+                self.gc_scan_frame_roots(fp, base_offsets, &mut free_ptr);
+
+                // Scan safe-point-specific pointer offsets, if any.
+                if let Some(sp_layout) = func.safe_point_layout_at(pc) {
+                    let sp_offsets = sp_layout.heap_ptr_offsets.as_ref_unchecked();
+                    self.gc_scan_frame_roots(fp, sp_offsets, &mut free_ptr);
                 }
 
                 let meta = fp.sub(FRAME_METADATA_SIZE);
@@ -243,6 +258,7 @@ impl InterpreterContext<'_> {
                 if saved_func_ptr.is_null() {
                     break;
                 }
+                pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
                 fp = read_ptr(meta, META_SAVED_FP_OFFSET);
                 // SAFETY: saved_func_ptr is non-null — we checked for the
                 // null sentinel above and would have broken out of the loop.
@@ -288,6 +304,32 @@ impl InterpreterContext<'_> {
         let end = start + self.heap.buffer.len();
         let p = ptr as usize;
         p >= start && p < end
+    }
+
+    /// Scan a set of pointer offsets in a frame, copying any heap objects
+    /// they reference into to-space and updating the frame slots.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` must point to a valid frame.
+    /// - Each entry in `offsets` must be a valid 8-byte-aligned offset within
+    ///   the frame's extended size.
+    /// - `free_ptr` must point into to-space with sufficient room.
+    unsafe fn gc_scan_frame_roots(
+        &mut self,
+        fp: *mut u8,
+        offsets: &[FrameOffset],
+        free_ptr: &mut *mut u8,
+    ) {
+        unsafe {
+            for &offset in offsets {
+                let old_ptr = read_ptr(fp, offset);
+                if !old_ptr.is_null() && self.is_heap_ptr(old_ptr) {
+                    let new_ptr = self.gc_copy_object(old_ptr, free_ptr);
+                    write_ptr(fp, offset, new_ptr);
+                }
+            }
+        }
     }
 
     /// Copy a single object from the old heap into to-space (at `*free_ptr`),

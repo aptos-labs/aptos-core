@@ -41,7 +41,8 @@ pub fn native_fib(n: u64) -> u64 {
 mod micro_op {
     use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
     use mono_move_core::{
-        CodeOffset as CO, FrameOffset as FO, Function, MicroOp::*, FRAME_METADATA_SIZE,
+        CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
+        SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::ObjectDescriptor;
 
@@ -81,7 +82,6 @@ mod micro_op {
         ];
 
         let code = arena.alloc_slice_fill_iter(code);
-        let pointer_offsets = arena.alloc_slice_fill_iter(std::iter::empty());
 
         let func = arena.alloc(Function {
             name: GlobalArenaPtr::from_static("fib"),
@@ -90,7 +90,8 @@ mod micro_op {
             args_and_locals_size: args_and_locals_size as usize,
             extended_frame_size: (callee_n + 8) as usize,
             zero_frame: false,
-            pointer_offsets,
+            frame_layout: FrameLayoutInfo::empty(&arena),
+            safe_point_layouts: SortedSafePointEntries::empty(&arena),
         });
 
         (vec![Some(func)], vec![ObjectDescriptor::Trivial], arena)
