@@ -177,7 +177,7 @@ module aptos_framework::sigma_protocol_proof_tests {
         let compressed_old_balance = old_balance.compress();
         let compressed_new_balance = new_balance.compress();
 
-        let (stmt, _) = new_withdrawal_statement(
+        let stmt = new_withdrawal_statement(
             compressed_ek, &compressed_old_balance, &compressed_new_balance, &compressed_ek_aud, v,
         );
         let witn = new_withdrawal_witness(dk, new_a, new_r);
@@ -202,7 +202,7 @@ module aptos_framework::sigma_protocol_proof_tests {
 
         let old_R_clone = points_clone(old_balance.get_R());
 
-        let (stmt, _) = new_withdrawal_statement(
+        let stmt = new_withdrawal_statement(
             compressed_ek, &old_balance.compress(), &new_balance.compress(), &compressed_ek_aud, v,
         );
         let witn = new_withdrawal_witness(dk, new_a, new_r);
@@ -335,7 +335,7 @@ module aptos_framework::sigma_protocol_proof_tests {
 
         let compressed_new_balance = new_balance.compress();
         let compressed_amount = confidential_amount::compress(&amount);
-        let (stmt, _, _) = new_transfer_statement(
+        let (stmt, _) = new_transfer_statement(
             *compressed_ek_sender, *compressed_ek_recip,
             compressed_old_balance, &compressed_new_balance,
             &compressed_amount,

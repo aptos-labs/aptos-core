@@ -885,7 +885,7 @@ module aptos_framework::confidential_asset_tests {
         let v = new_scalar_from_u64(v);
         let compressed_old_balance = confidential_asset::get_available_balance(sender_addr, asset_type);
         let compressed_new_balance = new_balance.compress();
-        let (stmt, _) = sigma_protocol_withdraw::new_withdrawal_statement(
+        let stmt = sigma_protocol_withdraw::new_withdrawal_statement(
             ek, &compressed_old_balance, &compressed_new_balance, &compressed_ek_aud, v
         );
         let witn = sigma_protocol_proof_tests::new_withdrawal_witness(*dk_sender, new_a, *new_r);

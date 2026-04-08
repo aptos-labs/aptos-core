@@ -1257,10 +1257,10 @@ module aptos_framework::confidential_asset {
 
         let v = new_scalar_from_u64(amount);
 
-        let (stmt, new_balance_P) = sigma_protocol_withdraw::new_withdrawal_statement(
+        let stmt = sigma_protocol_withdraw::new_withdrawal_statement(
             *ek, old_balance, &compressed_new_balance, compressed_ek_aud, v,
         );
-        confidential_range_proofs::assert_valid_range_proof(&new_balance_P, &zkrp_new_balance);
+        confidential_range_proofs::assert_valid_range_proof(compressed_new_balance.get_compressed_P(), &zkrp_new_balance);
 
         let session = sigma_protocol_withdraw::new_session(sender, asset_type, compressed_ek_aud.is_some());
         session.assert_verifies(&stmt, &sigma);
@@ -1294,15 +1294,15 @@ module aptos_framework::confidential_asset {
         let num_volun_auditors = compressed_ek_volun_auds.length();
 
         // Auditor count checks are performed inside new_transfer_statement
-        let (stmt, new_balance_P, amount) = sigma_protocol_transfer::new_transfer_statement(
+        let (stmt, amount) = sigma_protocol_transfer::new_transfer_statement(
             *compressed_ek_sender, *compressed_ek_recip,
             compressed_old_balance, &compressed_new_balance,
             &compressed_amount,
             compressed_ek_eff_aud, &compressed_ek_volun_auds,
         );
 
-        confidential_range_proofs::assert_valid_range_proof(amount.get_P(), &zkrp_amount);
-        confidential_range_proofs::assert_valid_range_proof(&new_balance_P, &zkrp_new_balance);
+        confidential_range_proofs::assert_valid_range_proof(compressed_amount.get_compressed_P(), &zkrp_amount);
+        confidential_range_proofs::assert_valid_range_proof(compressed_new_balance.get_compressed_P(), &zkrp_new_balance);
 
         let session = sigma_protocol_transfer::new_session(
             sender, recipient_addr, asset_type, has_effective_auditor, num_volun_auditors,
