@@ -331,6 +331,7 @@ fn test_db_indexer_data() {
         ident_str!("sigma_protocol_transfer"),
         ident_str!("sigma_protocol_withdraw"),
         ident_str!("storage_slots_allocator"),
+        ident_str!("chunky_dkg_config_seqnum"),
         ident_str!("randomness_api_v0_config"),
         ident_str!("randomness_config_seqnum"),
         ident_str!("reconfiguration_with_dkg"),
@@ -410,6 +411,10 @@ fn test_db_indexer_data() {
         (false, "0x1::aptos_governance::GovernanceResponsbility"),
         (false, "0x1::randomness_api_v0_config::RequiredGasDeposit"),
         (false, "0x1::transaction_validation::TransactionValidation"),
+        (
+            false,
+            "0x1::chunky_dkg_config_seqnum::ChunkyDKGConfigSeqNum",
+        ),
         (
             false,
             "0x1::randomness_api_v0_config::AllowCustomMaxGasFlag",

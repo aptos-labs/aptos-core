@@ -101,10 +101,11 @@ use aptos_types::{
     epoch_state::EpochState,
     jwks::SupportedOIDCProviders,
     on_chain_config::{
-        ChunkyDKGConfigMoveStruct, Features, LeaderReputationType, OnChainChunkyDKGConfig,
-        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
-        ProposerElectionType, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
+        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, Features, LeaderReputationType,
+        OnChainChunkyDKGConfig, OnChainConfigPayload, OnChainConfigProvider,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
+        RandomnessConfigSeqNum, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     secret_sharing::SecretShareConfig,
@@ -148,6 +149,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
     randomness_override_seq_num: u64,
+    chunky_dkg_override_seq_num: u64,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
@@ -230,6 +232,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             author,
             config,
             randomness_override_seq_num: node_config.randomness_override_seq_num,
+            chunky_dkg_override_seq_num: node_config.chunky_dkg_override_seq_num,
             time_service,
             self_sender,
             network_sender,
@@ -1242,6 +1245,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let chunky_dkg_state = payload.get::<ChunkyDKGState>();
         let chunky_dkg_config_move_struct: anyhow::Result<ChunkyDKGConfigMoveStruct> =
             payload.get();
+        let onchain_chunky_dkg_config_seq_num: anyhow::Result<ChunkyDKGConfigSeqNum> =
+            payload.get();
 
         if let Err(error) = &onchain_consensus_config {
             warn!("Failed to read on-chain consensus config {}", error);
@@ -1324,8 +1329,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         };
 
         info!("Generating secret share config");
-        let onchain_chunky_dkg_config =
-            OnChainChunkyDKGConfig::from_configs(chunky_dkg_config_move_struct.ok());
+        let onchain_chunky_dkg_config_seq_num = onchain_chunky_dkg_config_seq_num
+            .unwrap_or_else(|_| ChunkyDKGConfigSeqNum::default_if_missing());
+        info!(
+            epoch = epoch_state.epoch,
+            local = self.chunky_dkg_override_seq_num,
+            onchain = onchain_chunky_dkg_config_seq_num.seq_num,
+            "Checking chunky DKG config override."
+        );
+        if self.chunky_dkg_override_seq_num > onchain_chunky_dkg_config_seq_num.seq_num {
+            warn!("ChunkyDKG will be force-disabled by local config!");
+        }
+        let onchain_chunky_dkg_config = OnChainChunkyDKGConfig::from_configs(
+            self.chunky_dkg_override_seq_num,
+            onchain_chunky_dkg_config_seq_num.seq_num,
+            chunky_dkg_config_move_struct.ok(),
+        );
         let secret_share_verifier = match self.try_get_secret_share_config_for_epoch(
             loaded_consensus_key.clone(),
             &epoch_state,

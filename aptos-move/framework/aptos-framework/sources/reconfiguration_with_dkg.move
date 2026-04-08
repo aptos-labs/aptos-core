@@ -3,6 +3,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use std::features;
     use aptos_framework::chunky_dkg;
     use aptos_framework::chunky_dkg_config;
+    use aptos_framework::chunky_dkg_config_seqnum;
     use aptos_framework::consensus_config;
     use aptos_framework::decryption;
     use aptos_framework::dkg;
@@ -82,6 +83,7 @@ module aptos_framework::reconfiguration_with_dkg {
         randomness_config_seqnum::on_new_epoch(framework);
         randomness_config::on_new_epoch(framework);
         randomness_api_v0_config::on_new_epoch(framework);
+        chunky_dkg_config_seqnum::on_new_epoch(framework);
         chunky_dkg_config::on_new_epoch(framework);
         decryption::on_new_epoch(framework);
         reconfiguration::reconfigure();
