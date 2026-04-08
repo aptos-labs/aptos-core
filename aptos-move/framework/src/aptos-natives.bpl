@@ -148,7 +148,7 @@ procedure {:inline 1} $1_cmp_compare'{{S}}'(s1: {{T}}, s2: {{T}}) returns ($ret0
     }
 
     function $compare_vec'{{S}}'(v1: {{T}}, v2: {{T}}): $1_cmp_Ordering;
-    axiom {:ctor "Vec"} (forall v1: {{T}}, v2: {{T}}, res: $1_cmp_Ordering ::
+    axiom (forall v1: {{T}}, v2: {{T}} :: {$compare_vec'{{S}}'(v1, v2)}
         (var res := $compare_vec'{{S}}'(v1, v2);
         if v1 -> l == 0 && v2 -> l != 0 then
             res == $1_cmp_Ordering_Less()
