@@ -1385,7 +1385,10 @@ impl Generator<'_> {
                     self.get_node_type(id)
                 };
                 let temp = self.new_temp(ty);
-                self.generate(vec![temp], exp);
+                // Reference mode is only meaningful for direct field selections, so
+                // exit it here to prevent it from leaking into sub-expressions that
+                // manage their own reference contexts.
+                self.without_reference_mode(|s| s.generate(vec![temp], exp));
                 temp
             },
         }

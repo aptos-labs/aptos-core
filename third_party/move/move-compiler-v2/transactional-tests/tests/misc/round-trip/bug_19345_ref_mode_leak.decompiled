@@ -1,0 +1,42 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/bug_19345_ref_mode_leak.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct Inner has copy, drop {
+        x: u64,
+    }
+    struct Outer has copy, drop {
+        inner: Inner,
+    }
+    public fun main() {
+        let _v0 = Outer{inner: Inner{x: 10}};
+        let _v1 = Outer{inner: Inner{x: 20}};
+        assert!(test_if_else_select(true, _v0, _v1) == 10, 0);
+        assert!(test_if_else_select(false, _v0, _v1) == 20, 1);
+        assert!(test_block_select(_v0) == 10, 2);
+        assert!(test_block_with_side_effect(_v0) == 10, 3);
+        let _v2 = test_mutate_if_else(true, _v0, _v1);
+        assert!(*&(&(&_v2).inner).x == 42, 4);
+    }
+    fun test_if_else_select(p0: bool, p1: Outer, p2: Outer): u64 {
+        let _v0;
+        if (p0) _v0 = *&(&p1).inner else _v0 = *&(&p2).inner;
+        *&(&_v0).x
+    }
+    fun test_block_select(p0: Outer): u64 {
+        *&(&(&p0).inner).x
+    }
+    fun test_block_with_side_effect(p0: Outer): u64 {
+        *&(&(&p0).inner).x
+    }
+    fun test_mutate_if_else(p0: bool, p1: Outer, p2: Outer): Outer {
+        let _v0;
+        if (p0) _v0 = p1 else _v0 = p2;
+        let _v1 = &mut (&mut (&mut _v0).inner).x;
+        *_v1 = 42;
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::main
