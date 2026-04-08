@@ -31,7 +31,7 @@ ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
 # TODO: Fix compiler errors so we can use `workspace = true` here
-ed25519-dalek = { version = "2.1.1", features = ["serde"] }
+ed25519-dalek = { version = "=2.2.0", features = ["serde"] }
 generic-array = { workspace = true }
 hmac = { workspace = true }
 num-traits = { workspace = true }

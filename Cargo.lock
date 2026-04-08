@@ -674,7 +674,7 @@ dependencies = [
  "ark-std 0.5.0",
  "bcs 0.1.4",
  "criterion",
- "ed25519-dalek 2.1.1",
+ "ed25519-dalek 2.2.0",
  "generic-array",
  "hmac 0.12.1",
  "itertools 0.13.0",
@@ -8784,9 +8784,9 @@ dependencies = [
 
 [[package]]
 name = "ed25519-dalek"
-version = "2.1.1"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a3daa8e81a3963a60642bcc1f90a670680bd4a77535faa384e9d1c79d620871"
+checksum = "70e796c081cee67dc755e1a36a0a172b897fab85fc3f6bc48307991f64e4eca9"
 dependencies = [
  "curve25519-dalek 4.1.2",
  "ed25519 2.2.3",
@@ -21230,7 +21230,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ba5aa1827d6b1a35a29b3413ec69ce5f796e4d897e3e5b38f461bef41d225ea"
 dependencies = [
- "ed25519-dalek 2.1.1",
+ "ed25519-dalek 2.2.0",
  "thiserror 1.0.69",
 ]
 
