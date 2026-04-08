@@ -399,14 +399,14 @@ impl Transformer<'_> {
         id: AttrId,
         src: TempIndex,
     ) -> TempIndex {
-        use Bytecode::*;
         let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy drop");
         if copy_drop_at.needs_copy.contains(&src) {
             self.check_implicit_copy(code_offset, id, src);
             if self.lifetime.get_info_at(code_offset).is_borrowed(src) {
                 let ty = self.builder.get_local_type(src);
                 let temp = self.builder.new_temp(ty);
-                self.builder.emit(Assign(id, temp, src, AssignKind::Copy));
+                self.builder
+                    .emit(Bytecode::Assign(id, temp, src, AssignKind::Copy));
                 return temp;
             }
         }
