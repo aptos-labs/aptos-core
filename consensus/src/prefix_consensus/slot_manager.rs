@@ -48,9 +48,10 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
-use futures::{channel::oneshot, SinkExt, StreamExt};
+use futures::{FutureExt, channel::oneshot, SinkExt, StreamExt};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    panic::AssertUnwindSafe,
     pin::Pin,
     sync::Arc,
     time::{Duration, Instant},
@@ -230,7 +231,38 @@ where
             Some(output_tx),
         );
 
-        tokio::spawn(manager.run(spc_rx, priority_rx, close_rx));
+        // DIAGNOSTIC: Wrap with catch_unwind to log panics that would
+        // otherwise be silently swallowed (the JoinHandle is discarded).
+        // Note: the crash handler calls process::exit(12) on most panics,
+        // so this catch_unwind is effectively dead code for normal panics.
+        // It catches only bytecode-verifier-state panics where the crash
+        // handler returns without killing.
+        //
+        // To revert: replace this block with:
+        //   tokio::spawn(manager.run(spc_rx, priority_rx, close_rx));
+        let slot_for_log = slot;
+        let epoch_for_log = self.epoch;
+        tokio::spawn(async move {
+            let result =
+                AssertUnwindSafe(manager.run(spc_rx, priority_rx, close_rx))
+                    .catch_unwind()
+                    .await;
+            if let Err(panic_info) = result {
+                let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                error!(
+                    slot = slot_for_log,
+                    epoch = epoch_for_log,
+                    panic_message = %msg,
+                    "SPC task panicked! This causes the output channel to close."
+                );
+            }
+        });
 
         SPCHandles {
             msg_tx: spc_tx,
@@ -488,12 +520,29 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                             }
                         }
                         None => {
+                            // DIAGNOSTIC: The SPC task exited without producing
+                            // v_high. The one-time exit reason log (from
+                            // strong_manager.rs) would be drowned by an infinite
+                            // loop here if we don't clear the closed channel.
+                            //
+                            // Line 472 already restored the closed receiver to
+                            // self.spc_output_rx. Override it to None so the
+                            // next select iteration uses pending() instead of
+                            // polling the closed channel in a hot loop.
+                            //
+                            // To revert: remove the three .take() calls and the
+                            // self.spc_output_rx = None assignment below.
                             error!(
                                 epoch = self.epoch,
                                 current_slot = self.current_slot,
                                 "SPC output channel closed without producing v_high — \
-                                 SPC task may have exited prematurely"
+                                 SPC task may have exited prematurely. \
+                                 Clearing SPC handles to prevent infinite loop."
                             );
+                            self.spc_output_rx = None;
+                            self.spc_msg_tx.take();
+                            self.spc_priority_tx.take();
+                            self.spc_close_tx.take();
                         }
                     }
                 }
