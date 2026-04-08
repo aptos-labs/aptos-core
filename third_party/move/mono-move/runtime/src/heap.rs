@@ -8,7 +8,8 @@
 //! without passing it through arguments.
 
 use crate::{
-    error::{bail, ExecutionResult},
+    bail,
+    error::ExecutionResult,
     interpreter::InterpreterContext,
     memory::{read_ptr, read_u32, read_u64, write_ptr, write_u32, write_u64, MemoryRegion},
     types::{

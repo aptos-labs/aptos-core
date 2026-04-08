@@ -5,7 +5,8 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
-    error::{bail, ExecutionResult},
+    bail,
+    error::ExecutionResult,
     heap::Heap,
     memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
     types::{
