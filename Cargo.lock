@@ -12696,6 +12696,8 @@ dependencies = [
  "mono-move-alloc",
  "mono-move-core",
  "mono-move-gas",
+ "mono-move-runtime",
+ "mono-move-testsuite",
  "move-asm",
  "move-binary-format",
  "move-core-types",

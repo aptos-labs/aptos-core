@@ -26,4 +26,6 @@ parking_lot = { workspace = true }
 specializer = { workspace = true }
 
 [dev-dependencies]
+mono-move-runtime = { workspace = true }
+mono-move-testsuite = { workspace = true }
 move-asm = { workspace = true }
