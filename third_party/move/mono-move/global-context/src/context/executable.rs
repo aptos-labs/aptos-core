@@ -13,7 +13,9 @@ use crate::{
 use anyhow::{anyhow, bail};
 use fxhash::FxBuildHasher;
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
-use mono_move_core::{ExecutableId, FrameOffset, Function, FRAME_METADATA_SIZE};
+use mono_move_core::{
+    ExecutableId, FrameLayoutInfo, Function, SortedSafePointEntries, FRAME_METADATA_SIZE,
+};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex},
@@ -191,12 +193,8 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                     .max()
                     .unwrap_or(args_and_locals_size + FRAME_METADATA_SIZE);
 
-                // Allocate micro-ops and pointer_offsets in the executable arena.
+                // Allocate micro-ops and frame layout in the executable arena.
                 let code = self.arena.alloc_slice_fill_iter(micro_ops);
-                let pointer_offsets = self
-                    .arena
-                    .alloc_slice_fill_iter(std::iter::empty::<FrameOffset>());
-
                 let func = Function {
                     name,
                     code,
@@ -205,7 +203,8 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                     extended_frame_size,
                     // TODO: hardcoded for now.
                     zero_frame: false,
-                    pointer_offsets,
+                    frame_layout: FrameLayoutInfo::empty(&self.arena),
+                    safe_point_layouts: SortedSafePointEntries::empty(&self.arena),
                 };
                 let ptr = self.arena.alloc(func);
                 self.data.functions.insert(name, ptr);

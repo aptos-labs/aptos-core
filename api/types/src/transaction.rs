@@ -1120,13 +1120,13 @@ impl TryFrom<Script> for ScriptPayload {
     }
 }
 
-// We use an enum here for extensibility so we can add Script payload support
-// in the future for example.
+/// Enum for multisig transaction payloads, supporting both entry functions and scripts.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum MultisigTransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
+    ScriptPayload(ScriptPayload),
 }
 
 /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
@@ -1150,6 +1150,9 @@ impl VerifyInput for MultisigPayload {
                     for type_arg in entry_function.type_arguments.iter() {
                         type_arg.verify(0)?;
                     }
+                },
+                MultisigTransactionPayload::ScriptPayload(script_payload) => {
+                    script_payload.verify()?;
                 },
             }
         }

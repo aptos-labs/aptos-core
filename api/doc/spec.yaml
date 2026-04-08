@@ -14410,12 +14410,15 @@ components:
           $ref: '#/components/schemas/MultisigTransactionPayload'
     MultisigTransactionPayload:
       type: object
+      description: Enum for multisig transaction payloads, supporting both entry functions and scripts.
       oneOf:
       - $ref: '#/components/schemas/MultisigTransactionPayload_EntryFunctionPayload'
+      - $ref: '#/components/schemas/MultisigTransactionPayload_ScriptPayload'
       discriminator:
         propertyName: type
         mapping:
           entry_function_payload: '#/components/schemas/MultisigTransactionPayload_EntryFunctionPayload'
+          script_payload: '#/components/schemas/MultisigTransactionPayload_ScriptPayload'
     MultisigTransactionPayload_EntryFunctionPayload:
       allOf:
       - type: object
@@ -14428,6 +14431,18 @@ components:
             - entry_function_payload
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
+    MultisigTransactionPayload_ScriptPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - script_payload
+            example: script_payload
+      - $ref: '#/components/schemas/ScriptPayload'
     NoAccountSignature:
       type: object
       description: A placeholder to represent the absence of account signature

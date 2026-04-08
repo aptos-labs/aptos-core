@@ -5,8 +5,8 @@
 
 use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameOffset as FO, Function, MicroOp, ENUM_DATA_OFFSET,
-    ENUM_TAG_OFFSET,
+    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
@@ -41,8 +41,6 @@ fn enum_basic() {
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(shape)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -50,7 +48,8 @@ fn enum_basic() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(shape)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -96,8 +95,6 @@ fn enum_survives_gc() {
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(shape)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -105,7 +102,8 @@ fn enum_survives_gc() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(shape)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -158,8 +156,6 @@ fn enum_gc_traces_refs() {
         VecLoadElem { dst: FO(result), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(val), FO(vec), FO(vec_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -167,7 +163,8 @@ fn enum_gc_traces_refs() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(val), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![
         ObjectDescriptor::Enum {
@@ -227,8 +224,6 @@ fn enum_pattern_match() {
         StoreImm8 { dst: FO(result), imm: 0 },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(op)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -236,7 +231,8 @@ fn enum_pattern_match() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(op)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -277,8 +273,6 @@ fn enum_variant_switch() {
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(e)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -286,7 +280,8 @@ fn enum_variant_switch() {
         args_and_locals_size: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(e)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 16,
@@ -329,8 +324,6 @@ fn enum_borrow_field() {
         MicroOp::enum_load8(FO(e), 8, FO(result)),
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(e), FO(r#ref), FO(e_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -338,7 +331,8 @@ fn enum_borrow_field() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(e), FO(r#ref), FO(e_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -386,8 +380,6 @@ fn enum_gc_variant_switching() {
         MicroOp::enum_get_tag(FO(ctr), FO(result)),
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(ctr), FO(vec), FO(vec_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -395,7 +387,8 @@ fn enum_gc_variant_switching() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(ctr), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![
         ObjectDescriptor::Enum {
@@ -448,8 +441,6 @@ fn enum_in_struct() {
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(wrapper), FO(payload)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -457,7 +448,8 @@ fn enum_in_struct() {
         args_and_locals_size: 32,
         extended_frame_size: 56,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(wrapper), FO(payload)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![
         ObjectDescriptor::Struct {
@@ -524,8 +516,6 @@ fn enum_in_vector() {
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
     ]);
-    let pointer_offsets = arena.alloc_slice_fill_iter(vec![FO(vec), FO(e), FO(vec_ref)]);
-
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
@@ -533,7 +523,8 @@ fn enum_in_vector() {
         args_and_locals_size: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        pointer_offsets,
+        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(e), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![
         ObjectDescriptor::Enum {
