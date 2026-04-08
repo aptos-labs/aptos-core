@@ -91,11 +91,6 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
         self.rng = StdRng::seed_from_u64(seed);
     }
 
-    /// Returns the remaining gas balance.
-    pub fn gas_balance(&self) -> u64 {
-        self.gas_meter.balance()
-    }
-
     pub fn gc_count(&self) -> usize {
         self.heap.gc_count
     }
