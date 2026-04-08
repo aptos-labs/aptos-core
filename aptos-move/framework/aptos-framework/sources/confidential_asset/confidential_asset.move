@@ -72,8 +72,8 @@ module aptos_framework::confidential_asset {
     /// There are no pending transfers to roll over.
     const E_NOTHING_TO_ROLLOVER: u64 = 13;
 
-    /// The auditor encryption key must not be the identity (zero) point.
-    const E_AUDITOR_EK_IS_IDENTITY: u64 = 14;
+    /// The encryption key must not be the identity (zero) point.
+    const E_EK_IS_IDENTITY: u64 = 14;
 
     /// Self-transfers are not allowed: sender and recipient must be different.
     const E_SELF_TRANSFER: u64 = 15;
@@ -411,6 +411,7 @@ module aptos_framework::confidential_asset {
             !has_confidential_store(signer::address_of(sender), asset_type),
             error::already_exists(E_CONFIDENTIAL_STORE_ALREADY_REGISTERED)
         );
+        assert!(!ek.is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
 
         // Makes sure the user knows their decryption key.
         assert_valid_registration_proof(sender, asset_type, &ek, proof);
@@ -697,6 +698,7 @@ module aptos_framework::confidential_asset {
         );
 
         // Step 3: Install the new EK and the new re-encrypted available balance
+        assert!(!compressed_new_ek.is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
         ca_store.ek = compressed_new_ek;
         // We're just updating the available balance's EK-dependant R component & leaving the pending balance the same.
         confidential_balance::set_available_R(&mut ca_store.available_balance, compressed_new_R);
@@ -872,7 +874,7 @@ module aptos_framework::confidential_asset {
         let new_ek = new_ek_bytes.map(|ek| new_compressed_point_from_bytes(ek).extract());
 
         if (new_ek.is_some()) {
-            assert!(!new_ek.borrow().is_identity(), error::invalid_argument(E_AUDITOR_EK_IS_IDENTITY));
+            assert!(!new_ek.borrow().is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
         };
 
         // Increment epoch only when installing or changing the EK (not when removing):
@@ -1294,6 +1296,10 @@ module aptos_framework::confidential_asset {
             compressed_ek_volun_auds,
             zkrp_new_balance, zkrp_amount, sigma
         } = proof;
+
+        compressed_ek_volun_auds.for_each_ref(|ek| {
+            assert!(!ek.is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
+        });
 
         let has_effective_auditor = compressed_ek_eff_aud.is_some();
         let num_volun_auditors = compressed_ek_volun_auds.length();
