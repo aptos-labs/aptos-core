@@ -67,19 +67,15 @@ impl MutableViewFunction {
 
         self.memo.borrow_mut().insert(fun_id, None);
 
+        let env = &func.module_env.env;
         let mut result = false;
         let mut any_cycle = false;
-        if let Some(callees) = func.get_called_functions() {
-            let env = &func.module_env.env;
-            for callee_id in callees {
-                if let Some(callee_func) = env.get_function_opt(*callee_id) {
-                    let (r, c) = self.transitively_mutates_inner(&callee_func);
-                    any_cycle |= c;
-                    if r {
-                        result = true;
-                        break;
-                    }
-                }
+        for &callee_id in func.get_called_functions().into_iter().flatten() {
+            let (r, c) = self.transitively_mutates_inner(&env.get_function(callee_id));
+            any_cycle |= c;
+            if r {
+                result = true;
+                break;
             }
         }
 
@@ -103,9 +99,11 @@ impl FunctionChecker for MutableViewFunction {
             let env = &func.module_env.env;
             let name = func.get_name_str();
             let msg = format!(
-                "view function `{name}` should not modify state, but this function \
-                 (or one of its callees) calls a global-state mutating operation \
-                 (`borrow_global_mut`, `move_to`, or `move_from`).",
+                "view function `{name}` performs global state mutations (via `borrow_global_mut`, \
+                 `move_to`, or `move_from`), either directly or through a callee. \
+                 These mutations are silently discarded when called via the view API, \
+                 but applied when called from Move code. This inconsistency can lead to \
+                 unexpected behavior, reconsider the implementation.",
             );
             self.report(env, &func.get_id_loc(), &msg);
         }

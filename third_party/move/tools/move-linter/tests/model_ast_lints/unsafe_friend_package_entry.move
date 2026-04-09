@@ -1,15 +1,15 @@
 module 0x42::friend_caller {}
 
-// Test public(friend) entry functions
+// Test friend entry functions
 module 0x42::entry_points_friend {
     friend 0x42::friend_caller;
 
-    // Should warn: public(friend) entry is callable by anyone
-    public(friend) entry fun unsafe_friend_entry() {}
+    // Should warn: friend entry is callable by anyone
+    friend entry fun unsafe_friend_entry() {}
 
     // Ok: suppressed with lint::skip
     #[lint::skip(unsafe_friend_package_entry)]
-    public(friend) entry fun suppressed_friend_entry() {}
+    friend entry fun suppressed_friend_entry() {}
 
     // Ok: private entry function
     entry fun private_entry() {}
@@ -19,19 +19,19 @@ module 0x42::entry_points_friend {
 
     // Ok: non-entry friend function (restriction is real)
     #[lint::skip(unused_function)]
-    public(friend) fun friend_non_entry() {}
+    friend fun friend_non_entry() {}
 }
 
-// Test public(package) entry functions
+// Test package entry functions
 module 0x42::entry_points_package {
-    // Should warn: public(package) entry is callable by anyone
-    public(package) entry fun unsafe_package_entry() {}
+    // Should warn: package entry is callable by anyone
+    package entry fun unsafe_package_entry() {}
 
     // Ok: suppressed with lint::skip
     #[lint::skip(unsafe_friend_package_entry)]
-    public(package) entry fun suppressed_package_entry() {}
+    package entry fun suppressed_package_entry() {}
 
     // Ok: non-entry package function (restriction is real)
     #[lint::skip(unused_function)]
-    public(package) fun package_non_entry() {}
+    package fun package_non_entry() {}
 }
