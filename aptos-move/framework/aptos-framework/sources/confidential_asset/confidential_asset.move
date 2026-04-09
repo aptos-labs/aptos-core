@@ -1294,6 +1294,8 @@ module aptos_framework::confidential_asset {
             zkrp_new_balance, zkrp_amount, sigma
         } = proof;
 
+        // Note: `update_auditor` already guarantees that `compressed_ek_eff_aud` is not the identity, but the voluntary
+        // auditor EKs need to be manually checked.
         compressed_ek_volun_auds.for_each_ref(|ek| {
             assert!(!ek.is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
         });
