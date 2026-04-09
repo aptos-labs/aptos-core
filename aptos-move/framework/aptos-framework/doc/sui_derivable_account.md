@@ -410,22 +410,22 @@ Malformed data with trailing bytes.
 
 
 
-<a id="0x1_sui_derivable_account_EINVALID_PUBLIC_KEY"></a>
-
-Invalid public key.
-
-
-<pre><code><b>const</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>: u64 = 6;
-</code></pre>
-
-
-
 <a id="0x1_sui_derivable_account_EDEPRECATED"></a>
 
 Function is deprecated and should not be called.
 
 
 <pre><code><b>const</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_EDEPRECATED">EDEPRECATED</a>: u64 = 9;
+</code></pre>
+
+
+
+<a id="0x1_sui_derivable_account_EINVALID_PUBLIC_KEY"></a>
+
+Invalid public key.
+
+
+<pre><code><b>const</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>: u64 = 6;
 </code></pre>
 
 

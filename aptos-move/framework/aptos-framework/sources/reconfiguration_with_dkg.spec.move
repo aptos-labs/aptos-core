@@ -16,10 +16,14 @@ spec aptos_framework::reconfiguration_with_dkg {
             staking_config::StakingRewardsConfigEnabledRequirement;
         aborts_if false;
         pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved).
+        // Invariant: reconfig start always produces a precomputed validator set.
+        ensures exists<stake::PrecomputedValidatorSet>(@aptos_framework);
     }
 
     spec try_start_with_chunky_dkg() {
         pragma verify = false;
+        // Invariant: reconfig start always produces a precomputed validator set.
+        ensures exists<stake::PrecomputedValidatorSet>(@aptos_framework);
     }
 
     spec finish(framework: &signer) {

@@ -20,6 +20,7 @@ module aptos_framework::create_signer {
     friend aptos_framework::permissioned_signer;
     friend aptos_framework::reconfiguration_with_dkg;
     friend aptos_framework::transaction_validation;
+    friend aptos_framework::stake;
 
     public(friend) native fun create_signer(addr: address): signer;
 }

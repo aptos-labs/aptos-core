@@ -18,7 +18,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::randomness_config_seqnum;
     use aptos_framework::reconfiguration;
     use aptos_framework::reconfiguration_state;
-    use aptos_framework::stake;
+    use aptos_framework::stake::{Self, validator_consensus_infos_from_validator_set};
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     friend aptos_framework::block;
@@ -48,7 +48,7 @@ module aptos_framework::reconfiguration_with_dkg {
             cur_epoch,
             randomness_config::current(),
             stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos()
+            validator_consensus_infos_from_validator_set(&stake::next_validator_consensus_infos_v2())
         );
     }
 
@@ -60,17 +60,19 @@ module aptos_framework::reconfiguration_with_dkg {
         reconfiguration_state::on_reconfig_start();
 
         let cur_epoch = reconfiguration::current_epoch();
+        let dealer_validator_set = stake::cur_validator_consensus_infos();
+        let target_validator_set = validator_consensus_infos_from_validator_set(&stake::next_validator_consensus_infos_v2());
         dkg::start(
             cur_epoch,
             randomness_config::current(),
-            stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos()
+            dealer_validator_set,
+            target_validator_set,
         );
         chunky_dkg::start(
             cur_epoch,
             chunky_dkg_config::current(),
-            stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos()
+            dealer_validator_set,
+            target_validator_set,
         );
     }
 

@@ -950,6 +950,9 @@ pub enum EntryFunctionCall {
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
     StakeIncreaseLockup {},
 
+    /// Initialize validator set, validator performance, and precomputed validator set to the core resource account if they don't exist.
+    StakeInitialize {},
+
     /// Initialize the validator account and give ownership to the signing account
     /// except it leaves the ValidatorConfig to be set by another entity.
     /// Note: this triggers setting the operator and owner, set it to the account's address
@@ -1791,6 +1794,7 @@ impl EntryFunctionCall {
             ),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
+            StakeInitialize {} => stake_initialize(),
             StakeInitializeStakeOwner {
                 initial_stake_amount,
                 operator,
@@ -4486,6 +4490,22 @@ pub fn stake_increase_lockup() -> TransactionPayload {
     ))
 }
 
+/// Initialize validator set, validator performance, and precomputed validator set to the core resource account if they don't exist.
+pub fn stake_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("stake").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Initialize the validator account and give ownership to the signing account
 /// except it leaves the ValidatorConfig to be set by another entity.
 /// Note: this triggers setting the operator and owner, set it to the account's address
@@ -6910,6 +6930,14 @@ mod decoder {
         }
     }
 
+    pub fn stake_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::StakeInitialize {})
+        } else {
+            None
+        }
+    }
+
     pub fn stake_initialize_stake_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeInitializeStakeOwner {
@@ -7967,6 +7995,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "stake_increase_lockup".to_string(),
             Box::new(decoder::stake_increase_lockup),
+        );
+        map.insert(
+            "stake_initialize".to_string(),
+            Box::new(decoder::stake_initialize),
         );
         map.insert(
             "stake_initialize_stake_owner".to_string(),

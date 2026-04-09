@@ -176,13 +176,10 @@ spec aptos_framework::stake {
             };
     }
 
-    // `Validator` is initialized once.
     spec initialize(aptos_framework: &signer) {
         pragma disable_invariants_in_body;
         let aptos_addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
-        aborts_if exists<ValidatorSet>(aptos_addr);
-        aborts_if exists<ValidatorPerformance>(aptos_addr);
         ensures exists<ValidatorSet>(aptos_addr);
         ensures global<ValidatorSet>(aptos_addr).consensus_scheme == 0;
         ensures exists<ValidatorPerformance>(aptos_addr);
@@ -509,6 +506,12 @@ spec aptos_framework::stake {
         // This function should never abort.
         /// [high-level-req-4]
         aborts_if false;
+        // Invariant: the precomputed cache is consumed (resource destroyed) so the next epoch starts fresh.
+        ensures !exists<PrecomputedValidatorSet>(@aptos_framework);
+        // Invariant: if a precomputed validator set was present, it becomes the active set.
+        ensures old(exists<PrecomputedValidatorSet>(@aptos_framework)) ==>
+            global<ValidatorSet>(@aptos_framework).active_validators
+                == old(global<PrecomputedValidatorSet>(@aptos_framework)).validator_set.active_validators;
     }
 
     spec update_performance_statistics {
@@ -551,7 +554,7 @@ spec aptos_framework::stake {
         ensures result_2.voting_power == result_1;
     }
 
-    spec next_validator_consensus_infos {
+    spec next_validator_consensus_infos_v2 {
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 300;
         aborts_if false;

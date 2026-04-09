@@ -90,7 +90,7 @@ Do nothing if one is already in progress.
         cur_epoch,
         <a href="randomness_config.md#0x1_randomness_config_current">randomness_config::current</a>(),
         <a href="stake.md#0x1_stake_cur_validator_consensus_infos">stake::cur_validator_consensus_infos</a>(),
-        <a href="stake.md#0x1_stake_next_validator_consensus_infos">stake::next_validator_consensus_infos</a>()
+        validator_consensus_infos_from_validator_set(&<a href="stake.md#0x1_stake_next_validator_consensus_infos_v2">stake::next_validator_consensus_infos_v2</a>())
     );
 }
 </code></pre>
@@ -122,17 +122,19 @@ Do nothing if reconfiguration is already in progress; otherwise start both DKG a
     <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_start">reconfiguration_state::on_reconfig_start</a>();
 
     <b>let</b> cur_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
+    <b>let</b> dealer_validator_set = <a href="stake.md#0x1_stake_cur_validator_consensus_infos">stake::cur_validator_consensus_infos</a>();
+    <b>let</b> target_validator_set = validator_consensus_infos_from_validator_set(&<a href="stake.md#0x1_stake_next_validator_consensus_infos_v2">stake::next_validator_consensus_infos_v2</a>());
     <a href="dkg.md#0x1_dkg_start">dkg::start</a>(
         cur_epoch,
         <a href="randomness_config.md#0x1_randomness_config_current">randomness_config::current</a>(),
-        <a href="stake.md#0x1_stake_cur_validator_consensus_infos">stake::cur_validator_consensus_infos</a>(),
-        <a href="stake.md#0x1_stake_next_validator_consensus_infos">stake::next_validator_consensus_infos</a>()
+        dealer_validator_set,
+        target_validator_set,
     );
     <a href="chunky_dkg.md#0x1_chunky_dkg_start">chunky_dkg::start</a>(
         cur_epoch,
         <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_current">chunky_dkg_config::current</a>(),
-        <a href="stake.md#0x1_stake_cur_validator_consensus_infos">stake::cur_validator_consensus_infos</a>(),
-        <a href="stake.md#0x1_stake_next_validator_consensus_infos">stake::next_validator_consensus_infos</a>()
+        dealer_validator_set,
+        target_validator_set,
     );
 }
 </code></pre>
@@ -361,6 +363,7 @@ re-dealing DKG (dkg::start is idempotent per epoch).
     <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">staking_config::StakingRewardsConfigEnabledRequirement</a>;
 <b>aborts_if</b> <b>false</b>;
 <b>pragma</b> verify_duration_estimate = 600;
+<b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">stake::PrecomputedValidatorSet</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -377,6 +380,7 @@ re-dealing DKG (dkg::start is idempotent per epoch).
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">stake::PrecomputedValidatorSet</a>&gt;(@aptos_framework);
 </code></pre>
 
 
