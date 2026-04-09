@@ -1390,23 +1390,64 @@ module aptos_framework::stake {
     /// pending inactive validators so they no longer can vote.
     /// 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
     /// power.
-    public(friend) fun on_new_epoch() acquires AptosCoinCapabilities, PendingTransactionFee, StakePool, TransactionFeeConfig, ValidatorConfig, ValidatorPerformance, ValidatorSet {
-        let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
-        let config = staking_config::get();
+    public(friend) fun on_new_epoch() acquires AptosCoinCapabilities, PendingTransactionFee, StagedNextValidators, StakePool, TransactionFeeConfig, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        let validator_set  = borrow_global_mut<ValidatorSet>(@aptos_framework);
+        let config         = staking_config::get();
         let (minimum_stake, _) = staking_config::get_required_stake(&config);
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
+        let staged         = borrow_global_mut<StagedNextValidators>(@aptos_framework);
 
-        // Distribute rewards/fees and settle pending stakes using the extracted helper.
-        distribute_rewards_for_transition(validator_set, validator_perf, &config);
+        if (staged.pending.is_some()) {
+            // DKG path: start_epoch_transition() already ran.
+            // Discard any fees that accumulated during the DKG period, then apply the staged set.
+            let NextValidatorSetInner { validators: next_validators, total_voting_power } =
+                staged.pending.extract();
 
-        // Compute and apply the next validator set using the extracted helper.
-        let (next_epoch_validators, total_voting_power) =
-            compute_next_validators(validator_set, minimum_stake);
-        validator_set.active_validators = next_epoch_validators;
-        validator_set.pending_active     = vector::empty();
-        validator_set.pending_inactive   = vector::empty();
-        validator_set.total_voting_power = total_voting_power;
-        validator_set.total_joining_power = 0;
+            if (exists<PendingTransactionFee>(@aptos_framework)) {
+                // Drain DKG-period fees for each old active validator and discard them.
+                let pending_fee_by_validator =
+                    &mut borrow_global_mut<PendingTransactionFee>(@aptos_framework).pending_fee_by_validator;
+                validator_set.active_validators.for_each_ref(|v| {
+                    let v: &ValidatorInfo = v;
+                    let vi = v.config.validator_index;
+                    if (pending_fee_by_validator.contains(&vi)) {
+                        let _ = pending_fee_by_validator.remove(&vi).read();
+                    };
+                });
+            };
+
+            // Apply staged validator set: activate pending_active and deactivate
+            // pending_inactive implicitly (they are absent from the staged set).
+            validator_set.active_validators  = next_validators;
+            validator_set.pending_active     = vector::empty();
+            validator_set.pending_inactive   = vector::empty();
+            validator_set.total_voting_power = total_voting_power;
+            validator_set.total_joining_power = 0;
+        } else {
+            // Non-DKG path: do the work now using the same helpers.
+            distribute_rewards_for_transition(validator_set, validator_perf, &config);
+
+            let (next_epoch_validators, total_voting_power) =
+                compute_next_validators(validator_set, minimum_stake);
+            validator_set.active_validators  = next_epoch_validators;
+            validator_set.pending_active     = vector::empty();
+            validator_set.pending_inactive   = vector::empty();
+            validator_set.total_voting_power = total_voting_power;
+            validator_set.total_joining_power = 0;
+
+            if (exists<PendingTransactionFee>(@aptos_framework)) {
+                let pending_fee_by_validator =
+                    &mut borrow_global_mut<PendingTransactionFee>(@aptos_framework).pending_fee_by_validator;
+                assert!(
+                    pending_fee_by_validator.is_empty(),
+                    error::internal(ETRANSACTION_FEE_NOT_FULLY_DISTRIBUTED)
+                );
+            };
+            // Update rewards rate after reward distribution.
+            if (features::periodical_reward_rate_decrease_enabled()) {
+                staking_config::calculate_and_save_latest_epoch_rewards_rate();
+            };
+        };
 
         // Update validator indices, reset performance scores, and renew lockups.
         validator_perf.validators = vector::empty();
@@ -1466,21 +1507,16 @@ module aptos_framework::stake {
             validator_index += 1;
         };
 
+        // Re-initialize PendingTransactionFee for the new validator set.
+        // At this point the map is empty in both paths:
+        //   non-DKG: update_stake_pool consumed all entries (asserted above).
+        //   DKG: DKG-period entries were drained above.
         if (exists<PendingTransactionFee>(@aptos_framework)) {
             let pending_fee_by_validator =
                 &mut borrow_global_mut<PendingTransactionFee>(@aptos_framework).pending_fee_by_validator;
-            assert!(
-                pending_fee_by_validator.is_empty(),
-                error::internal(ETRANSACTION_FEE_NOT_FULLY_DISTRIBUTED)
-            );
             validator_set.active_validators.for_each_ref(|v| pending_fee_by_validator.add(
                 v.config.validator_index, aggregator_v2::create_unbounded_aggregator<u64>()
             ));
-        };
-
-        if (features::periodical_reward_rate_decrease_enabled()) {
-            // Update rewards rate after reward distribution.
-            staking_config::calculate_and_save_latest_epoch_rewards_rate();
         };
     }
 
