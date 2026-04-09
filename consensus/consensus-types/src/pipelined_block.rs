@@ -368,8 +368,19 @@ impl PipelinedBlock {
         }
     }
 
+    /// Stores the randomness on the block and eagerly sends it via the pipeline channel
+    /// to unblock the execution phase as early as possible. Without this, later blocks
+    /// in the same ordering batch deadlock: their has_rand_txns_fut waits for earlier
+    /// blocks' execute_fut, which waits for rand_rx. The execution_schedule_phase also
+    /// sends via this channel as a fallback (using take(), so only one send actually occurs).
     pub fn set_randomness(&self, randomness: Randomness) {
-        assert!(self.randomness.set(randomness.clone()).is_ok());
+        assert!(self.randomness.set(randomness).is_ok());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            let _ = tx
+                .rand_tx
+                .take()
+                .map(|tx| tx.send(self.randomness().cloned()));
+        }
     }
 
     /// Stores the decryption key on the block and eagerly sends it via the pipeline channel
