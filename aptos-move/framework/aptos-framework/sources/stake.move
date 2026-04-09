@@ -1342,6 +1342,44 @@ module aptos_framework::stake {
         };
     }
 
+    /// Phase A of epoch transition for the DKG path.
+    ///
+    /// Reuses distribute_rewards_for_transition() and compute_next_validators() to
+    /// finalize stake eagerly at DKG start, then stages the result in StagedNextValidators
+    /// so that on_new_epoch() can apply it directly without recomputing.
+    ///
+    /// Returns the ValidatorConsensusInfo vector DKG uses as its public input.
+    /// Any fees/rewards that accumulate during the DKG period are discarded at epoch change.
+    public(friend) fun start_epoch_transition(): vector<ValidatorConsensusInfo>
+        acquires AptosCoinCapabilities, PendingTransactionFee, StagedNextValidators,
+                 StakePool, TransactionFeeConfig, ValidatorConfig, ValidatorPerformance, ValidatorSet
+    {
+        let validator_set  = borrow_global<ValidatorSet>(@aptos_framework);
+        let config         = staking_config::get();
+        let (minimum_stake, _) = staking_config::get_required_stake(&config);
+        let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
+
+        // Reuse the same helpers on_new_epoch() uses for reward distribution and set computation.
+        distribute_rewards_for_transition(validator_set, validator_perf, &config);
+        let (next_validators, total_voting_power) =
+            compute_next_validators(validator_set, minimum_stake);
+
+        // Build ValidatorConsensusInfo for DKG public input.
+        let target_consensus_infos = vector[];
+        next_validators.for_each_ref(|v| {
+            let v: &ValidatorInfo = v;
+            target_consensus_infos.push_back(
+                validator_consensus_info::new(v.addr, v.config.consensus_pubkey, v.voting_power)
+            );
+        });
+
+        // Stage the computed validator set for on_new_epoch() to apply at epoch change.
+        let staged = borrow_global_mut<StagedNextValidators>(@aptos_framework);
+        staged.pending = option::some(NextValidatorSetInner { validators: next_validators, total_voting_power });
+
+        target_consensus_infos
+    }
+
     /// Triggered during a reconfiguration. This function shouldn't abort.
     ///
     /// 1. Distribute transaction fees and rewards to stake pools of active and pending inactive validators (requested
