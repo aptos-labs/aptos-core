@@ -408,7 +408,8 @@ impl Ord for MempoolMessageId {
                 return ordering;
             }
         }
-        Ordering::Equal
+        // If all compared elements are equal, compare by length for total ordering
+        self.0.len().cmp(&other.0.len())
     }
 }
 
@@ -454,6 +455,19 @@ mod test {
         let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 3), (2, 3)]);
         let right = MempoolMessageId(vec![(2 | sender, 5), (1 | sender, 4), (2, 3)]);
         assert!(right > left);
+
+        // Test different length vectors (total ordering requirement)
+        let left = MempoolMessageId(vec![(0, 0)]);
+        let right = MempoolMessageId(vec![(0, 0), (0, 0)]);
+        assert!(left < right);
+
+        let left = MempoolMessageId(vec![(1, 2), (3, 4)]);
+        let right = MempoolMessageId(vec![(3, 4)]);
+        assert!(left > right);
+
+        let left = MempoolMessageId(vec![]);
+        let right = MempoolMessageId(vec![(0, 0)]);
+        assert!(left < right);
     }
 }
 
