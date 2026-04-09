@@ -867,6 +867,8 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
         use TypeTag::*;
         let str_tag: Lazy<StructTag> =
             Lazy::new(|| StructTag::from_str("0x1::string::String").unwrap());
+        let option_tag: Lazy<StructTag> =
+            Lazy::new(|| StructTag::from_str("0x1::option::Option<u8>").unwrap());
         match type_tag {
             Bool => "bool".into(),
             U8 => "u8".into(),
@@ -879,9 +881,21 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             Vector(type_tag) => {
                 format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
             },
-            Struct(struct_tag) => match struct_tag {
-                tag if &**tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
-                _ => common::type_not_allowed(type_tag),
+            Struct(struct_tag) => {
+                if &**struct_tag == Lazy::force(&str_tag) {
+                    "Vec<u8>".into()
+                } else if struct_tag.address == Lazy::force(&option_tag).address
+                    && struct_tag.module == Lazy::force(&option_tag).module
+                    && struct_tag.name == Lazy::force(&option_tag).name
+                    && struct_tag.type_args.len() == 1
+                {
+                    format!(
+                        "Option<{}>",
+                        Self::quote_type(&struct_tag.type_args[0], local_types)
+                    )
+                } else {
+                    common::type_not_allowed(type_tag)
+                }
             },
             // TODO(#17645): signed integers
             Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {

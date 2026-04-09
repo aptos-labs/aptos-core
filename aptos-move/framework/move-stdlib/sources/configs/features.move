@@ -865,6 +865,17 @@ module std::features {
         is_enabled(STORAGE_SLOT_NATIVES)
     }
 
+    /// Whether the multisig timelock feature is enabled.
+    const MULTISIG_TIMELOCK: u64 = 114;
+
+    public fun get_multisig_timelock_feature(): u64 {
+        MULTISIG_TIMELOCK
+    }
+
+    public fun is_multisig_timelock_enabled(): bool {
+        is_enabled(MULTISIG_TIMELOCK)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
