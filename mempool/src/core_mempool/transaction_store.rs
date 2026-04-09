@@ -842,14 +842,10 @@ impl TransactionStore {
         sender_bucket: MempoolSenderBucket,
         start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>,
     ) -> Vec<(SignedTransaction, u64)> {
-        self.timeline_index
-            .get(&sender_bucket)
-            .unwrap_or_else(|| {
-                panic!(
-                    "Unable to get the timeline index for the sender bucket {}",
-                    sender_bucket
-                )
-            })
+        let Some(index) = self.timeline_index.get(&sender_bucket) else {
+            return Vec::new();
+        };
+        index
             .timeline_range(start_end_pairs)
             .iter()
             .filter_map(|(account, replay_protector)| {
