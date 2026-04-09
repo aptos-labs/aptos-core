@@ -192,7 +192,12 @@ def create_snapshot_with_gcloud(
             raise TimeoutError(
                 f"Snapshot '{snapshot_name}' did not become ready after {timeout} seconds"
             )
-        snapshot = snapshot_client.get(project=target_project, snapshot=snapshot_name)
+        try:
+            snapshot = snapshot_client.get(project=target_project, snapshot=snapshot_name)
+        except Exception as e:
+            logger.warning(f"Transient error polling snapshot status: {e}, retrying...")
+            time.sleep(60)
+            continue
         if snapshot.status == "READY":
             logger.info(f"Snapshot '{snapshot_name}' created successfully!")
             break
