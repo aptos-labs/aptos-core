@@ -158,7 +158,7 @@ def create_snapshot_with_gcloud(
             f"Snapshot {e} {target_project} {snapshot_name} does not exist. Creating a new one."
         )
 
-    # Construct the gcloud command to create the snapshot in the target project
+    # Create the snapshot asynchronously, then poll until complete
     source_disk_link = f"https://www.googleapis.com/compute/v1/projects/{source_project}/zones/{source_zone}/disks/{source_volume}"
     command = [
         "gcloud",
@@ -172,19 +172,28 @@ def create_snapshot_with_gcloud(
         target_project,
         "--storage-location",
         get_region_from_zone(source_zone),
+        "--async",
     ]
 
     try:
-        print(
+        logger.info(
             f"Creating snapshot '{snapshot_name}' in project '{target_project}' from disk '{source_disk_link}'..."
         )
         subprocess.run(command, check=True)
-        print(
-            f"Snapshot '{snapshot_name}' created successfully in project '{target_project}'!"
-        )
     except subprocess.CalledProcessError as e:
-        print(f"Error creating snapshot: {e}")
         raise Exception(f"Error creating snapshot: {e}")
+
+    # Poll until the snapshot is READY
+    logger.info(f"Waiting for snapshot '{snapshot_name}' to be ready...")
+    while True:
+        snapshot = snapshot_client.get(project=target_project, snapshot=snapshot_name)
+        if snapshot.status == compute_v1.Snapshot.Status.READY:
+            logger.info(f"Snapshot '{snapshot_name}' created successfully!")
+            break
+        elif snapshot.status == compute_v1.Snapshot.Status.FAILED:
+            raise Exception(f"Snapshot '{snapshot_name}' failed to create.")
+        logger.info(f"Snapshot status: {snapshot.status.name}, waiting...")
+        time.sleep(60)
 
 
 def delete_disk(
