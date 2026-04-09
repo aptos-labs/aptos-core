@@ -34,7 +34,6 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
-use rayon::prelude::*;
 use std::{
     cmp::min,
     sync::{atomic::Ordering, Arc},
@@ -51,7 +50,7 @@ pub(crate) struct LedgerPruner {
 
     ledger_metadata_pruner: Box<LedgerMetadataPruner>,
 
-    sub_pruners: Vec<Box<dyn DBSubPruner + Send + Sync>>,
+    sub_pruners: Arc<Vec<Box<dyn DBSubPruner + Send + Sync>>>,
 }
 
 impl DBPruner for LedgerPruner {
@@ -75,13 +74,25 @@ impl DBPruner for LedgerPruner {
             self.ledger_metadata_pruner
                 .prune(progress, current_batch_target_version)?;
 
-            THREAD_MANAGER.get_background_pool().install(|| {
-                self.sub_pruners.par_iter().try_for_each(|sub_pruner| {
-                    sub_pruner
-                        .prune(progress, current_batch_target_version)
-                        .map_err(|err| anyhow!("{} failed to prune: {err}", sub_pruner.name()))
-                })
-            })?;
+            {
+                let handle = THREAD_MANAGER.get_background_pool();
+                let sub_pruners = Arc::clone(&self.sub_pruners);
+                let join_handles: Vec<_> = (0..sub_pruners.len())
+                    .map(|i| {
+                        let sub_pruners = Arc::clone(&sub_pruners);
+                        handle.spawn_blocking(move || {
+                            sub_pruners[i]
+                                .prune(progress, current_batch_target_version)
+                                .map_err(|err| {
+                                    anyhow!("{} failed to prune: {err}", sub_pruners[i].name())
+                                })
+                        })
+                    })
+                    .collect();
+                for jh in join_handles {
+                    handle.block_on(jh).expect("background task panicked")?;
+                }
+            }
 
             progress = current_batch_target_version;
             self.record_progress(progress);
@@ -173,7 +184,7 @@ impl LedgerPruner {
             target_version: AtomicVersion::new(metadata_progress),
             progress: AtomicVersion::new(metadata_progress),
             ledger_metadata_pruner,
-            sub_pruners: vec![
+            sub_pruners: Arc::new(vec![
                 event_store_pruner,
                 persisted_auxiliary_info_pruner,
                 transaction_accumulator_pruner,
@@ -181,7 +192,7 @@ impl LedgerPruner {
                 transaction_info_pruner,
                 transaction_pruner,
                 write_set_pruner,
-            ],
+            ]),
         };
 
         info!(

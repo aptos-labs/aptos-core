@@ -89,16 +89,18 @@ impl DoGetExecutionOutput {
         };
 
         let ret = out.clone();
-        THREAD_MANAGER.get_background_pool().spawn(move || {
-            let _timer = OTHER_TIMERS.timer_with(&["async_update_counters__by_execution"]);
-            for x in [&out.to_commit, &out.to_retry, &out.to_discard] {
-                metrics::update_counters_for_processed_chunk(
-                    &x.transactions,
-                    &x.transaction_outputs,
-                    "execution",
-                )
-            }
-        });
+        let _ = THREAD_MANAGER
+            .get_background_pool()
+            .spawn_blocking(move || {
+                let _timer = OTHER_TIMERS.timer_with(&["async_update_counters__by_execution"]);
+                for x in [&out.to_commit, &out.to_retry, &out.to_discard] {
+                    metrics::update_counters_for_processed_chunk(
+                        &x.transactions,
+                        &x.transaction_outputs,
+                        "execution",
+                    )
+                }
+            });
 
         Ok(ret)
     }
@@ -241,14 +243,16 @@ impl DoGetExecutionOutput {
         )?;
 
         let ret = out.clone();
-        THREAD_MANAGER.get_background_pool().spawn(move || {
-            let _timer = OTHER_TIMERS.timer_with(&["async_update_counters__by_output"]);
-            metrics::update_counters_for_processed_chunk(
-                &out.to_commit.transactions,
-                &out.to_commit.transaction_outputs,
-                "output",
-            )
-        });
+        let _ = THREAD_MANAGER
+            .get_background_pool()
+            .spawn_blocking(move || {
+                let _timer = OTHER_TIMERS.timer_with(&["async_update_counters__by_output"]);
+                metrics::update_counters_for_processed_chunk(
+                    &out.to_commit.transactions,
+                    &out.to_commit.transaction_outputs,
+                    "output",
+                )
+            });
 
         Ok(ret)
     }

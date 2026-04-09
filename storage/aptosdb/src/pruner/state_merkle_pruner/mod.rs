@@ -29,7 +29,6 @@ use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{schema::KeyCodec, ReadOptions, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
-use rayon::prelude::*;
 use std::{
     marker::PhantomData,
     sync::{atomic::Ordering, Arc},
@@ -44,7 +43,7 @@ pub struct StateMerklePruner<S> {
 
     metadata_pruner: StateMerkleMetadataPruner<S>,
     // Non-empty iff sharding is enabled.
-    shard_pruners: Vec<StateMerkleShardPruner<S>>,
+    shard_pruners: Arc<Vec<StateMerkleShardPruner<S>>>,
 
     _phantom: PhantomData<S>,
 }
@@ -148,7 +147,7 @@ where
             target_version: AtomicVersion::new(metadata_progress),
             progress: AtomicVersion::new(metadata_progress),
             metadata_pruner,
-            shard_pruners,
+            shard_pruners: Arc::new(shard_pruners),
             _phantom: std::marker::PhantomData,
         };
 
@@ -167,21 +166,27 @@ where
         target_version: Version,
         batch_size: usize,
     ) -> Result<()> {
-        THREAD_MANAGER
-            .get_background_pool()
-            .install(|| {
-                self.shard_pruners.par_iter().try_for_each(|shard_pruner| {
-                    shard_pruner
+        let handle = THREAD_MANAGER.get_background_pool();
+        let shard_pruners = Arc::clone(&self.shard_pruners);
+        let join_handles: Vec<_> = (0..shard_pruners.len())
+            .map(|i| {
+                let shard_pruners = Arc::clone(&shard_pruners);
+                handle.spawn_blocking(move || {
+                    shard_pruners[i]
                         .prune(current_progress, target_version, batch_size)
                         .map_err(|err| {
                             anyhow!(
                                 "Failed to prune state merkle shard {}: {err}",
-                                shard_pruner.shard_id(),
+                                shard_pruners[i].shard_id(),
                             )
                         })
                 })
             })
-            .map_err(Into::into)
+            .collect();
+        for jh in join_handles {
+            handle.block_on(jh).expect("background task panicked")?;
+        }
+        Ok(())
     }
 
     pub(in crate::pruner::state_merkle_pruner) fn get_stale_node_indices(

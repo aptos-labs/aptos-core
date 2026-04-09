@@ -10,6 +10,7 @@ use crate::strategies::{
 use once_cell::sync::{Lazy, OnceCell};
 use rayon::ThreadPool;
 use std::cmp::max;
+use tokio::runtime::Handle;
 
 pub static MAX_THREAD_POOL_SIZE: usize = 32;
 
@@ -33,7 +34,7 @@ pub trait ThreadManager<'a>: Send + Sync {
     fn get_non_exe_cpu_pool(&'a self) -> &'a ThreadPool;
     fn get_high_pri_io_pool(&'a self) -> &'a ThreadPool;
     fn get_io_pool(&'a self) -> &'a ThreadPool;
-    fn get_background_pool(&'a self) -> &'a ThreadPool;
+    fn get_background_pool(&'a self) -> Handle;
 }
 
 pub struct ThreadManagerBuilder;
