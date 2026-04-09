@@ -84,7 +84,9 @@ module aptos_framework::sigma_protocol_withdraw {
     use std::signer;
     use std::option::Option;
     use std::vector;
-    use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto};
+    use aptos_std::ristretto255::{Self, Scalar, CompressedRistretto};
+    #[test_only]
+    use aptos_std::ristretto255::RistrettoPoint;
     use aptos_framework::chain_id;
     use aptos_framework::fungible_asset::Metadata;
     use aptos_framework::object::Object;
@@ -206,7 +208,7 @@ module aptos_framework::sigma_protocol_withdraw {
         compressed_new_balance: &CompressedBalance<Available>,
         compressed_ek_aud: &Option<CompressedRistretto>,
         v: Scalar,
-    ): (Statement<Withdrawal>, vector<RistrettoPoint>) {
+    ): Statement<Withdrawal> {
         assert!(
             compressed_new_balance.get_compressed_R_aud().length() == if (compressed_ek_aud.is_some()) { get_num_chunks() } else { 0 },
             error::invalid_argument(E_AUDITOR_COUNT_MISMATCH)
@@ -221,8 +223,7 @@ module aptos_framework::sigma_protocol_withdraw {
         assert!(b.add_point(compressed_ek) == IDX_EK, err);                                                           // ek
         assert!(b.add_points(compressed_old_balance.get_compressed_P()) == START_IDX_OLD_P, err);                  // old_P
         assert!(b.add_points(compressed_old_balance.get_compressed_R()) == START_IDX_OLD_P + ell, err);            // old_R
-        let (idx, new_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
-        assert!(idx == START_IDX_OLD_P + 2 * ell, err);
+        assert!(b.add_points(compressed_new_balance.get_compressed_P()) == START_IDX_OLD_P + 2 * ell, err); // new_P
         assert!(b.add_points(compressed_new_balance.get_compressed_R()) == START_IDX_OLD_P + 3 * ell, err);        // new_R
 
         if (compressed_ek_aud.is_some()) {
@@ -233,7 +234,7 @@ module aptos_framework::sigma_protocol_withdraw {
         assert!(b.add_scalar(v) == IDX_V, err);
         let stmt = b.build();
         assert_withdraw_statement_is_well_formed(&stmt, compressed_ek_aud.is_some());
-        (stmt, new_P)
+        stmt
     }
 
     /// The homomorphism $\psi$ for the withdrawal relation.
