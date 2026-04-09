@@ -193,10 +193,10 @@ def create_snapshot_with_gcloud(
                 f"Snapshot '{snapshot_name}' did not become ready after {timeout} seconds"
             )
         snapshot = snapshot_client.get(project=target_project, snapshot=snapshot_name)
-        if snapshot.status == compute_v1.Snapshot.Status.READY:
+        if snapshot.status == "READY":
             logger.info(f"Snapshot '{snapshot_name}' created successfully!")
             break
-        elif snapshot.status == compute_v1.Snapshot.Status.FAILED:
+        elif snapshot.status == "FAILED":
             raise Exception(f"Snapshot '{snapshot_name}' failed to create.")
         logger.info(f"Snapshot status: {snapshot.status}, waiting...")
         time.sleep(60)
