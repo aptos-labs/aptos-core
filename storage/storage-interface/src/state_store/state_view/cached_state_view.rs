@@ -6,7 +6,7 @@ use crate::{
     state_store::{
         state::State,
         state_delta::StateDelta,
-        state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
+        state_update_refs::StateUpdateRefs,
         state_view::{
             db_state_view::DbStateView,
             hot_state_view::{EmptyHotState, HotStateView},
@@ -29,7 +29,6 @@ use core::fmt;
 use dashmap::{mapref::entry::Entry, DashMap};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use rayon::prelude::*;
 use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
@@ -38,10 +37,11 @@ use std::{
 
 pub type StateCacheShard = DashMap<StateKey, StateSlot>;
 
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("kv_reader_{}", index))
+static IO_POOL: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_current_thread()
+        .max_blocking_threads(32)
+        .thread_name("kv_reader")
+        .enable_all()
         .build()
         .unwrap()
 });
@@ -102,7 +102,7 @@ pub struct CachedStateView {
     id: StateViewId,
 
     /// The in-memory state on top of known persisted state.
-    speculative: StateDelta,
+    speculative: Arc<StateDelta>,
 
     /// Persisted hot state. To be fetched if a key isn't in `speculative`.
     hot: Arc<dyn HotStateView>,
@@ -112,7 +112,7 @@ pub struct CachedStateView {
     cold: Arc<dyn DbReader>,
 
     /// State values (with update versions) read across the lifetime of the state view.
-    memorized: ShardedStateCache,
+    memorized: Arc<ShardedStateCache>,
 }
 
 impl Debug for CachedStateView {
@@ -122,6 +122,10 @@ impl Debug for CachedStateView {
 }
 
 impl CachedStateView {
+    /// Minimum number of keys per blocking task. Shards with more keys are split
+    /// into chunks of this size, similar to rayon's `with_min_len`.
+    const MIN_KEYS_PER_TASK: usize = 16;
+
     /// Constructs a [`CachedStateView`] with persistent state view in the DB and the in-memory
     /// speculative state represented by `speculative_state`. The persistent state view is the
     /// latest one preceding `next_version`
@@ -157,10 +161,10 @@ impl CachedStateView {
 
         Self {
             id,
-            speculative: state.into_delta(persisted_state),
+            speculative: Arc::new(state.into_delta(persisted_state)),
             hot: hot_state,
             cold: reader,
-            memorized: ShardedStateCache::new_empty(version),
+            memorized: Arc::new(ShardedStateCache::new_empty(version)),
         }
     }
 
@@ -177,55 +181,68 @@ impl CachedStateView {
         )
     }
 
+    /// Cheap clone via Arc reference counting, for sharing across blocking tasks.
+    fn cheap_clone(&self) -> Self {
+        Self {
+            id: self.id,
+            speculative: Arc::clone(&self.speculative),
+            hot: Arc::clone(&self.hot),
+            cold: Arc::clone(&self.cold),
+            memorized: Arc::clone(&self.memorized),
+        }
+    }
+
     pub fn prime_cache(&self, updates: &StateUpdateRefs, policy: PrimingPolicy) -> Result<()> {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
+        let handle = IO_POOL.handle();
+        let mut join_handles = Vec::new();
 
-        IO_POOL.install(|| {
-            if let Some(updates) = updates.for_last_checkpoint_batched() {
-                self.prime_cache_for_batched_updates(updates, policy)?;
+        for batch in [
+            updates.for_last_checkpoint_batched(),
+            updates.for_latest_batched(),
+        ] {
+            if let Some(batch) = batch {
+                for shard in &batch.shards {
+                    let keys: Arc<Vec<StateKey>> = Arc::new(
+                        shard
+                            .iter()
+                            .filter(|(_, u)| {
+                                !matches!(
+                                    policy,
+                                    PrimingPolicy::MakeHotOnly if u.state_op.is_value_write_op()
+                                )
+                            })
+                            .map(|(k, _)| (*k).clone())
+                            .collect(),
+                    );
+                    if keys.is_empty() {
+                        continue;
+                    }
+                    for chunk_start in (0..keys.len()).step_by(Self::MIN_KEYS_PER_TASK) {
+                        let chunk_end = (chunk_start + Self::MIN_KEYS_PER_TASK).min(keys.len());
+                        let keys = Arc::clone(&keys);
+                        let view = self.cheap_clone();
+                        join_handles.push(handle.spawn_blocking(move || {
+                            for key in &keys[chunk_start..chunk_end] {
+                                view.get_state_value(key).expect("Must succeed.");
+                            }
+                        }));
+                    }
+                }
             }
-            if let Some(updates) = updates.for_latest_batched() {
-                self.prime_cache_for_batched_updates(updates, policy)?;
-            }
-            Ok(())
-        })
-    }
+        }
 
-    fn prime_cache_for_batched_updates(
-        &self,
-        updates: &BatchedStateUpdateRefs,
-        policy: PrimingPolicy,
-    ) -> Result<()> {
-        updates.shards.par_iter().try_for_each(|shard| {
-            self.prime_cache_for_keys(
-                shard
-                    .iter()
-                    .filter_map(|(k, u)| match policy {
-                        PrimingPolicy::MakeHotOnly if u.state_op.is_value_write_op() => None,
-                        _ => Some(k),
-                    })
-                    .cloned(),
-            )
-        })
-    }
+        for jh in join_handles {
+            handle.block_on(jh).expect("kv_reader task panicked");
+        }
 
-    fn prime_cache_for_keys<'a, T: IntoIterator<Item = &'a StateKey> + Send>(
-        &self,
-        keys: T,
-    ) -> Result<()> {
-        rayon::scope(|s| {
-            keys.into_iter().for_each(|key| {
-                s.spawn(move |_| {
-                    self.get_state_value(key).expect("Must succeed.");
-                })
-            });
-        });
         Ok(())
     }
 
     /// Consumes `Self` and returns the state and all the memorized state reads.
     pub fn into_memorized_reads(self) -> ShardedStateCache {
-        self.memorized
+        Arc::into_inner(self.memorized)
+            .expect("CachedStateView should be the sole owner of memorized reads")
     }
 
     fn base_version(&self) -> Option<Version> {
