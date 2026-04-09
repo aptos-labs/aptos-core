@@ -923,7 +923,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )));
         let encrypted_txn_limit = secret_share_verifier
             .as_ref()
-            .map(|c| c.config().digest_key().max_batch_size() as u64);
+            .map(|_| self.config.quorum_store.sender_max_encrypted_batch_txns as u64);
         let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
             self.config.quorum_store.enable_opt_quorum_store,
             self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
