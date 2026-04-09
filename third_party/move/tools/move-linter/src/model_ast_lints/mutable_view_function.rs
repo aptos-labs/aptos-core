@@ -104,7 +104,7 @@ impl FunctionChecker for MutableViewFunction {
             let name = func.get_name_str();
             let msg = format!(
                 "view function `{name}` should not modify state, but this function \
-                 (or one of its callees) calls a state-mutating operation \
+                 (or one of its callees) calls a global-state mutating operation \
                  (`borrow_global_mut`, `move_to`, or `move_from`).",
             );
             self.report(env, &func.get_id_loc(), &msg);
