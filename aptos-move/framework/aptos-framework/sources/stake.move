@@ -225,6 +225,18 @@ module aptos_framework::stake {
         validators: vector<IndividualValidatorPerformance>
     }
 
+    /// Pre-computed next validator set staged at DKG start.
+    /// Present iff start_epoch_transition() has been called this epoch (DKG path).
+    /// Consumed and cleared by on_new_epoch().
+    struct StagedNextValidators has key {
+        pending: option::Option<NextValidatorSetInner>,
+    }
+
+    struct NextValidatorSetInner has store, drop {
+        validators: vector<ValidatorInfo>,
+        total_voting_power: u128,
+    }
+
     struct RegisterValidatorCandidateEvent has drop, store {
         pool_address: address
     }
@@ -556,6 +568,7 @@ module aptos_framework::stake {
         );
 
         move_to(aptos_framework, ValidatorPerformance { validators: vector::empty() });
+        move_to(aptos_framework, StagedNextValidators { pending: option::none() });
     }
 
     /// This is only called during Genesis, which is where MintCapability<AptosCoin> can be created.
