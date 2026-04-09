@@ -568,7 +568,9 @@ module aptos_framework::stake {
         );
 
         move_to(aptos_framework, ValidatorPerformance { validators: vector::empty() });
-        move_to(aptos_framework, StagedNextValidators { pending: option::none() });
+        if (!exists<StagedNextValidators>(@aptos_framework)) {
+            move_to(aptos_framework, StagedNextValidators { pending: option::none() });
+        };
     }
 
     /// This is only called during Genesis, which is where MintCapability<AptosCoin> can be created.
@@ -1395,9 +1397,15 @@ module aptos_framework::stake {
         let config         = staking_config::get();
         let (minimum_stake, _) = staking_config::get_required_stake(&config);
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
-        let staged         = borrow_global_mut<StagedNextValidators>(@aptos_framework);
 
-        if (staged.pending.is_some()) {
+        // StagedNextValidators may not exist on nodes that upgraded the framework code but
+        // haven't yet applied the governance-init transaction that creates the resource.
+        // Treat its absence as "no staged set" and fall through to the non-DKG path.
+        let has_staged_set = exists<StagedNextValidators>(@aptos_framework)
+            && borrow_global<StagedNextValidators>(@aptos_framework).pending.is_some();
+
+        if (has_staged_set) {
+            let staged = borrow_global_mut<StagedNextValidators>(@aptos_framework);
             // DKG path: start_epoch_transition() already ran.
             // Discard any fees that accumulated during the DKG period, then apply the staged set.
             let NextValidatorSetInner { validators: next_validators, total_voting_power } =
@@ -1527,7 +1535,7 @@ module aptos_framework::stake {
         validator_set: &ValidatorSet,
         validator_perf: &mut ValidatorPerformance,
         config: &StakingConfig,
-    ) acquires StakePool {
+    ) acquires AptosCoinCapabilities, PendingTransactionFee, StakePool, TransactionFeeConfig, ValidatorConfig {
         // Process pending stake and distribute transaction fees and rewards for each currently active validator.
         validator_set.active_validators.for_each_ref(|validator| {
             let validator: &ValidatorInfo = validator;
