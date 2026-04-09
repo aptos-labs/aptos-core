@@ -130,8 +130,10 @@ pub enum DigestKeySource {
 }
 
 /// Initialize the DigestKey source. Checks metadata only (no file read).
-/// On test chains without an explicit path, sets the test key override.
-pub fn initialize_digest_key(chain_id: ChainId) -> DigestKeySource {
+/// On test chains without an explicit path, sets the test key override
+/// for validator nodes only. Non-validator nodes (fullnodes) should not
+/// have a digest key since they don't participate in decryption.
+pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKeySource {
     if let Some(path) = DIGEST_KEY_PATH.get() {
         match std::fs::metadata(path) {
             Ok(meta) => DigestKeySource::WillLoadFromFile {
@@ -139,7 +141,7 @@ pub fn initialize_digest_key(chain_id: ChainId) -> DigestKeySource {
             },
             Err(_) => DigestKeySource::NotAvailable,
         }
-    } else if chain_id == ChainId::test() {
+    } else if chain_id == ChainId::test() && is_validator {
         let _ = DIGEST_KEY_OVERRIDE.set(Arc::clone(&TEST_DIGEST_KEY));
         DigestKeySource::TestKeyFallback
     } else {

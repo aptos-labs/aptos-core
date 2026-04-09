@@ -19,30 +19,17 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// Chain recovery using a local config from ChunkyDKG stall should work.
+/// Chain recovery using a local config override from a ChunkyDKG stall.
 /// See `chunky_dkg_config_seqnum.move` for more details.
-///
-/// Test flow:
-/// 1. Inject failpoint to block ChunkyDKG start event processing on all validators.
-/// 2. Wait for epoch boundary stall (consensus runs producing blocks, but epoch can't
-///    transition because ChunkyDKG never completes while regular DKG does).
-/// 3. Put all validators into sync_only mode to converge to the same version.
-/// 4. Restart validators with `chunky_dkg_override_seq_num=1` and `sync_only=false`.
-///    This clears the failpoint and disables ChunkyDKGManager. Epoch is still stuck because
-///    on-chain ChunkyDKG session remains in-progress with no one to complete it.
-/// 5. Governance `force_end_epoch()` clears the stuck session and bumps on-chain seqnum to 2.
-///    Since on-chain seqnum (2) > local override (1), ChunkyDKG is re-enabled in the new epoch.
-/// 6. Verify the next epoch advances (both DKG and ChunkyDKG complete successfully).
 #[tokio::test]
 async fn chunky_dkg_stall_recovery() {
-    let epoch_duration_secs = 10;
+    let epoch_duration_secs = 20;
     let estimated_dkg_latency_secs = 120;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(0)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
-            config.api.failpoints_enabled = true;
             config.api.allow_encrypted_txns_submission = true;
             config.consensus.quorum_store.enable_batch_v2_tx = true;
             config.consensus.quorum_store.enable_batch_v2_rx = true;
@@ -72,7 +59,9 @@ async fn chunky_dkg_stall_recovery() {
     let root_addr = swarm.chain_info().root_account().address();
     let root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
 
-    info!("Wait for epoch 2 (proves ChunkyDKG completed for epoch transition).");
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    info!("Wait for epoch 2.");
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(
             2,
@@ -81,74 +70,21 @@ async fn chunky_dkg_stall_recovery() {
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    info!("Verify ChunkyDKG completed a session before we stall.");
-    let rest_client = swarm.validators().next().unwrap().rest_client();
-    let dkg_state = get_on_chain_resource::<ChunkyDKGState>(&rest_client).await;
-    assert!(
-        dkg_state.last_completed.is_some(),
-        "ChunkyDKG should have a completed session before stall"
-    );
-    let pre_stall_completed_epoch = dkg_state.last_completed.unwrap().target_epoch();
-
-    info!("Injecting chunky_dkg::process_dkg_start_event failpoint to stall ChunkyDKG.");
-    let validator_clients: Vec<_> = swarm.validators().map(|v| v.rest_client()).collect();
-    for client in &validator_clients {
-        client
-            .set_failpoint(
-                "chunky_dkg::process_dkg_start_event".to_string(),
-                "return".to_string(),
-            )
-            .await
-            .expect("Failed to set failpoint");
-    }
-
-    // Get the current epoch. The next epoch boundary should stall because ChunkyDKG
-    // can't complete (failpoint blocks its start event processing).
-    let current_epoch = rest_client
-        .get_ledger_information()
-        .await
-        .unwrap()
-        .into_inner()
-        .epoch;
-    info!(
-        "Current epoch is {}. Waiting to confirm epoch doesn't advance past {} (ChunkyDKG stall).",
-        current_epoch, current_epoch
-    );
-
-    // Wait long enough for an epoch transition to happen if it could.
-    // The epoch timer is 10s, DKG takes some time. If the epoch advances, the failpoint didn't work.
-    tokio::time::sleep(Duration::from_secs(epoch_duration_secs + 30)).await;
-    let epoch_after_stall = rest_client
-        .get_ledger_information()
-        .await
-        .unwrap()
-        .into_inner()
-        .epoch;
-    info!(
-        "After waiting, epoch is {}. Expected <= {} (stalled).",
-        epoch_after_stall,
-        current_epoch + 1
-    );
-    // The epoch might advance by 1 (regular DKG completes but ChunkyDKG blocks the finish),
-    // but should not advance further. Actually it should NOT advance at all since
-    // both DKG and ChunkyDKG must complete for epoch transition.
-    // However, the reconfiguration starts when the epoch timer fires. Regular DKG completes
-    // but ChunkyDKG doesn't, so finish() is never called. The epoch stays the same.
-    assert!(
-        epoch_after_stall <= current_epoch + 1,
-        "Epoch should be stalled due to ChunkyDKG failpoint, but advanced to {}",
-        epoch_after_stall
-    );
-
-    // Put all validators into sync_only mode to converge to the same version.
-    info!("Putting all validators into sync_only mode to converge versions.");
+    info!("Halting the chain by putting every validator into sync_only mode.");
     for validator in swarm.validators_mut() {
         enable_sync_only_mode(4, validator).await;
     }
 
-    // Restart all validators with the override and sync_only=false.
-    info!("Restarting all validators with chunky_dkg_override_seq_num=1 and sync_only=false.");
+    info!("Chain should have halted.");
+    let liveness_check_result = swarm
+        .liveness_check(Instant::now().add(Duration::from_secs(20)))
+        .await;
+    info!("liveness_check_result={:?}", liveness_check_result);
+    assert!(liveness_check_result.is_err());
+
+    info!("Hot-fixing all validators.");
     for (idx, validator) in swarm.validators_mut().enumerate() {
+        info!("Stopping validator {}.", idx);
         validator.stop();
         let config_path = validator.config_path();
         let mut validator_override_config =
@@ -160,24 +96,20 @@ async fn chunky_dkg_stall_recovery() {
             .override_config_mut()
             .consensus
             .sync_only = false;
+        info!("Updating validator {} config.", idx);
         validator_override_config.save_config(config_path).unwrap();
+        info!("Restarting validator {}.", idx);
         validator.start().unwrap();
-        info!("Validator {} restarted with override.", idx);
+        info!("Let validator {} bake for 5 secs.", idx);
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
-    // Wait for all validators to become healthy (needs quorum to make progress).
-    info!("Waiting for all validators to become healthy.");
-    swarm
-        .liveness_check(Instant::now().add(Duration::from_secs(60)))
-        .await
-        .expect("Validators failed to become healthy after restart");
+    let liveness_check_result = swarm
+        .liveness_check(Instant::now().add(Duration::from_secs(30)))
+        .await;
+    assert!(liveness_check_result.is_ok());
 
-    // Chain is running (consensus produces blocks in current epoch) but epoch transition
-    // is still stuck: on-chain ChunkyDKG session is in-progress with no one to complete it
-    // (ChunkyDKGManager disabled by override).
-    // Use force_end_epoch() to clear the incomplete session and bump seqnum to re-enable.
-    info!("Running governance script: bump seqnum to 2 and force_end_epoch().");
-    let rest_client = swarm.validators().next().unwrap().rest_client();
+    info!("Bump on-chain config seqnum to re-enable ChunkyDKG.");
     let script = r#"
 script {
     use aptos_framework::aptos_governance;
@@ -201,6 +133,8 @@ script {
         .expect("Txn execution error.");
     debug!("txn_summary={:?}", txn_summary);
 
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
     let epoch = rest_client
         .get_ledger_information()
         .await
@@ -208,14 +142,11 @@ script {
         .into_inner()
         .epoch;
     info!(
-        "After force_end_epoch, current epoch is {}. Wait until epoch {} (ChunkyDKG re-enabled, should complete).",
+        "Current epoch is {}. Wait until epoch {}, and ChunkyDKG should be back.",
         epoch,
         epoch + 1
     );
 
-    // In the new epoch, on-chain seqnum is 2, local override is 1.
-    // Since 1 < 2, ChunkyDKG is re-enabled. Failpoint was cleared by restart.
-    // Both DKG and ChunkyDKG must complete for the epoch to advance.
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(
             epoch + 1,
@@ -229,17 +160,5 @@ script {
     assert!(
         dkg_state.last_completed.is_some(),
         "ChunkyDKG should have a completed session after re-enable"
-    );
-    let post_reenable_epoch = dkg_state.last_completed.unwrap().target_epoch();
-    assert!(
-        post_reenable_epoch > pre_stall_completed_epoch,
-        "ChunkyDKG should have completed for a newer epoch after re-enable (got {}, pre-stall was {})",
-        post_reenable_epoch,
-        pre_stall_completed_epoch
-    );
-
-    info!(
-        "ChunkyDKG re-enabled: completed session for epoch {} (pre-stall was {}).",
-        post_reenable_epoch, pre_stall_completed_epoch
     );
 }

@@ -37,7 +37,7 @@ impl ChunkyTestSetup {
     pub fn new(n: usize, voting_powers: Vec<u64>) -> Self {
         assert_eq!(n, voting_powers.len());
         // Ensure the test DigestKey is available for encryption key derivation.
-        let _ = initialize_digest_key(ChainId::test());
+        let _ = initialize_digest_key(ChainId::test(), true);
 
         let mut rng = thread_rng();
         let private_keys: Vec<Arc<PrivateKey>> = (0..n)

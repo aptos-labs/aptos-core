@@ -745,6 +745,7 @@ pub fn setup_environment_and_start_node(
     aptos_dkg_runtime::initialize_digest_key_with_counters(
         node_config.consensus.decryption_setup_blob_path.as_ref(),
         chain_id,
+        node_config.base.role.is_validator(),
     );
 
     // Start the telemetry service (as early as possible and before any blocking calls)
