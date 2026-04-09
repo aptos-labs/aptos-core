@@ -57,12 +57,11 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
                     storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
 
                     // V2 path.
-                    let id = guard.intern_address_name(module.self_addr(), module.self_name());
                     let executable = guard
                         .executable_builder_for_module(module)
                         .build()
                         .map_err(|err| anyhow!("Failed to build executable: {}", err))?;
-                    guard.insert_executable(id, executable);
+                    guard.insert_executable(executable);
                 }
             },
             Step::Execute {
@@ -242,7 +241,7 @@ fn execute_function_v2(
             if num_returns == 0 {
                 // TODO: Check frame contents?
                 Output {
-                    display: "results:".to_string(),
+                    display: "results: ".to_string(),
                     num_returns: 0,
                 }
             } else {

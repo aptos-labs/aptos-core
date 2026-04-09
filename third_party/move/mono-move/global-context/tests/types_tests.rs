@@ -19,9 +19,7 @@ fn add_executable<'guard>(guard: &'guard ExecutionGuard<'_>, source: &str) -> &'
         .executable_builder_for_module(&module)
         .build()
         .expect("Building an executable should always succeed");
-
-    let id = guard.intern_address_name(module.self_addr(), module.self_name());
-    guard.insert_executable(id, executable)
+    guard.insert_executable(executable)
 }
 
 #[test]

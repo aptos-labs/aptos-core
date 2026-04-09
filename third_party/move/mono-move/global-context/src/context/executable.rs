@@ -73,6 +73,19 @@ struct ExecutableData {
 }
 
 impl Executable {
+    /// Returns the ID corresponding to this executable.
+    pub fn id(&self) -> GlobalArenaPtr<ExecutableId> {
+        self.data.id
+    }
+
+    /// Returns the cost of this executable.
+    pub fn cost(&self) -> u64 {
+        // TODO:
+        //   1. placeholder, replace at construction time.
+        //   2. loader patches the cost to be right (e.g. package)
+        10
+    }
+
     /// Returns a non-generic function from this executable. Returns [`None`]
     /// if such function does not exist.
     pub fn get_function(&self, name: ArenaRef<'_, str>) -> Option<&Function> {

@@ -12,12 +12,11 @@ use move_core_types::{account_address::AccountAddress, ident_str};
 fn add_executable(guard: &ExecutionGuard<'_>, source: &str) {
     let modules = mono_move_testsuite::compile_move_modules(source);
     for module in &modules {
-        let id = guard.intern_address_name(module.self_addr(), module.self_name());
         let executable = guard
             .executable_builder_for_module(module)
             .build()
             .expect("Building an executable should always succeed");
-        guard.insert_executable(id, executable);
+        guard.insert_executable(executable);
     }
 }
 

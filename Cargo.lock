@@ -12710,6 +12710,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-linker"
+version = "0.1.0"
+
+[[package]]
+name = "mono-move-loader"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "fxhash",
+ "mono-move-core",
+ "mono-move-gas",
+ "mono-move-global-context",
+ "move-binary-format",
+ "move-core-types",
+]
+
+[[package]]
 name = "mono-move-programs"
 version = "0.1.0"
 dependencies = [
@@ -12759,6 +12777,19 @@ dependencies = [
  "move-vm-types",
  "tempfile",
  "walkdir",
+]
+
+[[package]]
+name = "mono-move-trasaction-context"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "mono-move-alloc",
+ "mono-move-core",
+ "mono-move-gas",
+ "mono-move-global-context",
+ "mono-move-linker",
+ "mono-move-loader",
 ]
 
 [[package]]

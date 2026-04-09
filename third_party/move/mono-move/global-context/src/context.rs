@@ -286,14 +286,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Inserts a loaded executable into the cache, keyed by its interned ID.
     pub fn insert_executable<'guard>(
         &'guard self,
-        key: ArenaRef<'guard, ExecutableId>,
         executable: Box<Executable>,
-    ) -> &'guard Executable {
-        // TODO: use ID stored inside executable instead.
+    ) -> &'guard Executable
+    where
+        'ctx: 'guard,
+    {
         let ptr = self
             .ctx
             .executable_cache
-            .insert(key.into_global_arena_ptr(), executable);
+            .insert(executable.id(), executable);
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
@@ -384,7 +385,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
 impl<'guard, T: ?Sized> ArenaRef<'guard, T> {
     /// Returns the underlying [`GlobalArenaPtr`] for this arena reference.
-    pub(crate) fn into_global_arena_ptr(self) -> GlobalArenaPtr<T> {
+    pub fn into_global_arena_ptr(self) -> GlobalArenaPtr<T> {
         self.ptr
     }
 
