@@ -34,11 +34,13 @@ module aptos_framework::reconfiguration_with_dkg {
         };
         reconfiguration_state::on_reconfig_start();
         let cur_epoch = reconfiguration::current_epoch();
+        let cur_validator_set = stake::cur_validator_consensus_infos();
+        let next_validator_set = stake::start_epoch_transition();
         dkg::start(
             cur_epoch,
             randomness_config::current(),
-            stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos()
+            cur_validator_set,
+            next_validator_set,
         );
     }
 
@@ -50,17 +52,19 @@ module aptos_framework::reconfiguration_with_dkg {
         reconfiguration_state::on_reconfig_start();
 
         let cur_epoch = reconfiguration::current_epoch();
+        let cur_validator_set = stake::cur_validator_consensus_infos();
+        let next_validator_set = stake::start_epoch_transition();
         dkg::start(
             cur_epoch,
             randomness_config::current(),
-            stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos()
+            cur_validator_set,
+            next_validator_set,
         );
         chunky_dkg::start(
             cur_epoch,
             chunky_dkg_config::current(),
-            stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos()
+            cur_validator_set,
+            next_validator_set,
         );
     }
 
