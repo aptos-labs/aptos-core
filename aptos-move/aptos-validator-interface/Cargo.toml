@@ -24,6 +24,7 @@ aptos-types = { workspace = true }
 async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }
 tokio = { workspace = true }

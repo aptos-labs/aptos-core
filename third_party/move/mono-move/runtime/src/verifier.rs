@@ -66,10 +66,17 @@ impl FunctionVerifier<'_> {
         // SAFETY: The function's code is allocated in an executable arena that
         // is alive for the duration of verification.
         let code = unsafe { self.func.code.as_ref_unchecked() };
-        let pointer_offsets = unsafe { self.func.pointer_offsets.as_ref_unchecked() };
+        let base_offsets = unsafe { self.func.frame_layout.heap_ptr_offsets.as_ref_unchecked() };
+        let safe_point_layouts = unsafe { self.func.safe_point_layouts.entries() };
+
+        // --- Function-level sanity ---
+        // Code must be non-empty (at minimum a Return).
         if code.is_empty() {
             self.err(None, "code must be non-empty");
         }
+
+        // --- Frame geometry ---
+        // extended_frame_size must be large enough to hold locals + metadata.
         if self.func.frame_size() > self.func.extended_frame_size {
             self.err(
                 None,
@@ -82,6 +89,7 @@ impl FunctionVerifier<'_> {
                 ),
             );
         }
+        // args_size must fit within the data region.
         if self.func.args_size > self.func.args_and_locals_size {
             self.err(
                 None,
@@ -92,12 +100,82 @@ impl FunctionVerifier<'_> {
             );
         }
 
-        for &off in pointer_offsets {
-            self.check_frame_access(None, off, 8);
+        // --- Base frame_layout: pointer offsets valid at every PC ---
+        // Each offset must be in-bounds, not overlap metadata, and sorted.
+        self.check_pointer_offsets(None, base_offsets);
+
+        // --- Safe-point layouts: per-PC pointer offsets ---
+
+        // Entries must be strictly sorted by code_offset.
+        for w in safe_point_layouts.windows(2) {
+            if w[0].code_offset.0 >= w[1].code_offset.0 {
+                self.err(
+                    None,
+                    format!(
+                        "safe_point_layouts: entries not strictly sorted (code_offset {} >= {})",
+                        w[0].code_offset.0, w[1].code_offset.0
+                    ),
+                );
+                break;
+            }
         }
 
+        // Per-entry: valid code_offset, pointer offsets in-bounds and
+        // sorted, disjoint from frame_layout.
+        for entry in safe_point_layouts {
+            let co = entry.code_offset.0;
+
+            if (co as usize) >= code.len() {
+                self.err(
+                    None,
+                    format!(
+                        "safe_point_layouts: code_offset {} out of bounds (code length {})",
+                        co,
+                        code.len()
+                    ),
+                );
+            }
+
+            let sp_offsets = unsafe { entry.layout.heap_ptr_offsets.as_ref_unchecked() };
+            self.check_pointer_offsets(Some(co as usize), sp_offsets);
+
+            for &off in sp_offsets {
+                if base_offsets.contains(&off) {
+                    self.err(
+                        Some(co as usize),
+                        format!(
+                            "safe_point_layouts: offset {} duplicates frame_layout",
+                            off.0
+                        ),
+                    );
+                }
+            }
+        }
+
+        // --- Per-instruction checks ---
+        // Frame access bounds, jump targets, descriptor validity, etc.
         for (pc, instr) in code.iter().enumerate() {
             self.verify_instruction(pc, instr);
+        }
+    }
+
+    /// Validate a set of pointer offsets: each must be within the extended
+    /// frame, not overlap the metadata segment, and be strictly sorted.
+    fn check_pointer_offsets(&mut self, pc: Option<usize>, offsets: &[FrameOffset]) {
+        for &off in offsets {
+            self.check_frame_access(pc, off, 8);
+        }
+        for w in offsets.windows(2) {
+            if w[0].0 >= w[1].0 {
+                self.err(
+                    pc,
+                    format!(
+                        "pointer_offsets not strictly sorted ({} >= {})",
+                        w[0].0, w[1].0
+                    ),
+                );
+                break;
+            }
         }
     }
 

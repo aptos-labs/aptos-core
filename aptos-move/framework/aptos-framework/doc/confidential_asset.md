@@ -68,6 +68,7 @@ Confidential Asset (CA) Standard: privacy-focused fungible asset transfers with 
 -  [Function `get_total_confidential_supply`](#0x1_confidential_asset_get_total_confidential_supply)
 -  [Function `get_num_transfers_received`](#0x1_confidential_asset_get_num_transfers_received)
 -  [Function `get_max_transfers_before_rollover`](#0x1_confidential_asset_get_max_transfers_before_rollover)
+-  [Function `get_max_memo_bytes`](#0x1_confidential_asset_get_max_memo_bytes)
 -  [Function `update_auditor_hint`](#0x1_confidential_asset_update_auditor_hint)
 -  [Function `get_asset_config_address`](#0x1_confidential_asset_get_asset_config_address)
 -  [Function `get_asset_config_address_or_create`](#0x1_confidential_asset_get_asset_config_address_or_create)
@@ -1356,16 +1357,6 @@ The asset type is currently not allowed for confidential transfers.
 
 
 
-<a id="0x1_confidential_asset_E_AUDITOR_EK_IS_IDENTITY"></a>
-
-The auditor encryption key must not be the identity (zero) point.
-
-
-<pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_E_AUDITOR_EK_IS_IDENTITY">E_AUDITOR_EK_IS_IDENTITY</a>: u64 = 14;
-</code></pre>
-
-
-
 <a id="0x1_confidential_asset_E_CONFIDENTIAL_STORE_ALREADY_REGISTERED"></a>
 
 The confidential store has already been published for the given user and asset-type pair: user need not call <code>register</code> again.
@@ -1382,6 +1373,16 @@ The confidential store has not been published for the given user and asset-type 
 
 
 <pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_E_CONFIDENTIAL_STORE_NOT_REGISTERED">E_CONFIDENTIAL_STORE_NOT_REGISTERED</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_confidential_asset_E_EK_IS_IDENTITY"></a>
+
+The encryption key must not be the identity (zero) point.
+
+
+<pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_E_EK_IS_IDENTITY">E_EK_IS_IDENTITY</a>: u64 = 14;
 </code></pre>
 
 
@@ -1426,6 +1427,16 @@ An internal error occurred: there is either a bug or a misconfiguration in the c
 
 
 <pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_E_INTERNAL_ERROR">E_INTERNAL_ERROR</a>: u64 = 999;
+</code></pre>
+
+
+
+<a id="0x1_confidential_asset_E_MEMO_TOO_LONG"></a>
+
+Memo in confidential transfer must not exceed <code><a href="confidential_asset.md#0x1_confidential_asset_MAX_MEMO_BYTES">MAX_MEMO_BYTES</a></code>.
+
+
+<pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_E_MEMO_TOO_LONG">E_MEMO_TOO_LONG</a>: u64 = 19;
 </code></pre>
 
 
@@ -1480,6 +1491,16 @@ The pending balance must be zero before rotating the encryption key.
 
 
 
+<a id="0x1_confidential_asset_E_POINTLESSLY_DEPOSITING_ZERO"></a>
+
+Pointlessly depositing zero into one's confidential balance would unncessarily increment the <code>transfers_received</code> counter.
+
+
+<pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_E_POINTLESSLY_DEPOSITING_ZERO">E_POINTLESSLY_DEPOSITING_ZERO</a>: u64 = 18;
+</code></pre>
+
+
+
 <a id="0x1_confidential_asset_E_RANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE"></a>
 
 The range proof system does not support sufficient range.
@@ -1516,6 +1537,16 @@ The mainnet chain ID. If the chain ID is 1, the allow list is enabled.
 
 
 <pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_MAINNET_CHAIN_ID">MAINNET_CHAIN_ID</a>: u8 = 1;
+</code></pre>
+
+
+
+<a id="0x1_confidential_asset_MAX_MEMO_BYTES"></a>
+
+Maximum number of bytes a confidential transfer's memo is allowed to be
+
+
+<pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_MAX_MEMO_BYTES">MAX_MEMO_BYTES</a>: u64 = 256;
 </code></pre>
 
 
@@ -1754,6 +1785,7 @@ Registers a confidential store for a specified asset type, encrypted under the g
         !<a href="confidential_asset.md#0x1_confidential_asset_has_confidential_store">has_confidential_store</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), asset_type),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_CONFIDENTIAL_STORE_ALREADY_REGISTERED">E_CONFIDENTIAL_STORE_ALREADY_REGISTERED</a>)
     );
+    <b>assert</b>!(!ek.is_identity(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EK_IS_IDENTITY">E_EK_IS_IDENTITY</a>));
 
     // Makes sure the user knows their <a href="decryption.md#0x1_decryption">decryption</a> key.
     <a href="confidential_asset.md#0x1_confidential_asset_assert_valid_registration_proof">assert_valid_registration_proof</a>(sender, asset_type, &ek, proof);
@@ -1803,6 +1835,7 @@ Deposits tokens from the sender's primary FA store into their pending balance.
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_safe_for_confidentiality">is_safe_for_confidentiality</a>(&asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_UNSAFE_DISPATCHABLE_FA">E_UNSAFE_DISPATCHABLE_FA</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_confidentiality_enabled_for_asset_type">is_confidentiality_enabled_for_asset_type</a>(asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_ASSET_TYPE_DISALLOWED">E_ASSET_TYPE_DISALLOWED</a>));
     <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_incoming_transfers_paused">incoming_transfers_paused</a>(addr, asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_INCOMING_TRANSFERS_PAUSED">E_INCOMING_TRANSFERS_PAUSED</a>));
+    <b>assert</b>!(amount != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_POINTLESSLY_DEPOSITING_ZERO">E_POINTLESSLY_DEPOSITING_ZERO</a>));
 
     // Note: Gets the "confidential asset pool" for this asset type, or sets it up <b>if</b> this asset type is veiled for the first time
     <b>let</b> pool_fa_store = <a href="confidential_asset.md#0x1_confidential_asset_ensure_pool_fa_store">ensure_pool_fa_store</a>(asset_type);
@@ -1829,7 +1862,7 @@ Deposits tokens from the sender's primary FA store into their pending balance.
 
     <a href="event.md#0x1_event_emit">event::emit</a>(Deposited::V1 { addr, amount, asset_type, new_pending_balance: ca_store.pending_balance });
 
-    // Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
+    // Abundantly-paranoid: Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
     <b>assert</b>!(amount == <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(pool_fa_store) - before, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_UNSAFE_DISPATCHABLE_FA">E_UNSAFE_DISPATCHABLE_FA</a>));
 }
 </code></pre>
@@ -1917,6 +1950,9 @@ Withdraws tokens from the sender's available balance to recipient's primary FA s
     );
 
     <b>let</b> ca_store = <a href="confidential_asset.md#0x1_confidential_asset_borrow_confidential_store_mut">borrow_confidential_store_mut</a>(sender_addr, asset_type);
+    <b>if</b>(amount == 0 && ca_store.normalized) {
+        <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_ALREADY_NORMALIZED">E_ALREADY_NORMALIZED</a>));
+    };
     ca_store.normalized = <b>true</b>;
     ca_store.available_balance = compressed_new_balance;
     ca_store.<a href="confidential_asset.md#0x1_confidential_asset_update_auditor_hint">update_auditor_hint</a>(&effective_auditor); // enables auditor <b>to</b> later tell whether their balance ciphertext is stale
@@ -2039,6 +2075,7 @@ Transfers a secret amount of tokens from sender's available balance to recipient
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_safe_for_confidentiality">is_safe_for_confidentiality</a>(&asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_UNSAFE_DISPATCHABLE_FA">E_UNSAFE_DISPATCHABLE_FA</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_confidentiality_enabled_for_asset_type">is_confidentiality_enabled_for_asset_type</a>(asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_ASSET_TYPE_DISALLOWED">E_ASSET_TYPE_DISALLOWED</a>));
     <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_incoming_transfers_paused">incoming_transfers_paused</a>(<b>to</b>, asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_INCOMING_TRANSFERS_PAUSED">E_INCOMING_TRANSFERS_PAUSED</a>));
+    <b>assert</b>!(memo.length() &lt;= <a href="confidential_asset.md#0x1_confidential_asset_MAX_MEMO_BYTES">MAX_MEMO_BYTES</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_MEMO_TOO_LONG">E_MEMO_TOO_LONG</a>));
 
     <b>let</b> from = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>assert</b>!(from != <b>to</b>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_SELF_TRANSFER">E_SELF_TRANSFER</a>));
@@ -2048,7 +2085,7 @@ Transfers a secret amount of tokens from sender's available balance to recipient
     <b>let</b> old_balance = <a href="confidential_asset.md#0x1_confidential_asset_get_available_balance">get_available_balance</a>(from, asset_type);
 
     // Note: Sender's amount in `TransferProof::compressed_amount::compressed_R_sender` is not used here; only included so it can be indexed for dapps that need it
-    <b>let</b> (compressed_new_balance, recipient_amount, amount, ek_volun_auds) =
+    <b>let</b> (compressed_new_balance, amount, compressed_amount, ek_volun_auds) =
         <a href="confidential_asset.md#0x1_confidential_asset_assert_valid_transfer_proof">assert_valid_transfer_proof</a>(
             sender, <b>to</b>, asset_type,
             &ek_sender, &ek_recip,
@@ -2058,7 +2095,7 @@ Transfers a secret amount of tokens from sender's available balance to recipient
 
     // Update recipient's confidential store
     <b>let</b> recip_ca_store = <a href="confidential_asset.md#0x1_confidential_asset_borrow_confidential_store_mut">borrow_confidential_store_mut</a>(<b>to</b>, asset_type);
-    <b>let</b> new_pending_balance = add_assign_pending(&<b>mut</b> recip_ca_store.pending_balance, &recipient_amount);
+    <b>let</b> new_pending_balance = add_assign_pending(&<b>mut</b> recip_ca_store.pending_balance, &amount);
     recip_ca_store.transfers_received += 1;
 
     <b>assert</b>!(
@@ -2073,7 +2110,7 @@ Transfers a secret amount of tokens from sender's available balance to recipient
     sender_ca_store.<a href="confidential_asset.md#0x1_confidential_asset_update_auditor_hint">update_auditor_hint</a>(&effective_auditor); // enables auditor <b>to</b> later tell whether their balance ciphertext is stale
 
     <a href="event.md#0x1_event_emit">event::emit</a>(Transferred::V1 {
-        from, <b>to</b>, asset_type, amount, ek_volun_auds,
+        from, <b>to</b>, asset_type, amount: compressed_amount, ek_volun_auds,
         sender_auditor_hint: sender_ca_store.auditor_hint,
         new_sender_available_balance: compressed_new_balance,
         new_recip_pending_balance: new_pending_balance,
@@ -2172,6 +2209,7 @@ Deserializes cryptographic data and forwards to <code>rotate_encryption_key</cod
     );
 
     // Step 3: Install the new EK and the new re-encrypted available balance
+    <b>assert</b>!(!compressed_new_ek.is_identity(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EK_IS_IDENTITY">E_EK_IS_IDENTITY</a>));
     ca_store.ek = compressed_new_ek;
     // We're just updating the available balance's EK-dependant R component & leaving the pending balance the same.
     <a href="confidential_balance.md#0x1_confidential_balance_set_available_R">confidential_balance::set_available_R</a>(&<b>mut</b> ca_store.available_balance, compressed_new_R);
@@ -2216,7 +2254,6 @@ Deserializes cryptographic data and ultimately forwards to <code>withdraw_to</co
     sigma_proto_resp: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
 ) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
     <b>let</b> user = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
-    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_normalized">is_normalized</a>(user, asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_ALREADY_NORMALIZED">E_ALREADY_NORMALIZED</a>));
 
     <a href="confidential_asset.md#0x1_confidential_asset_withdraw_to_raw">withdraw_to_raw</a>(
         sender, asset_type, user, 0,
@@ -2252,7 +2289,6 @@ Re-encrypts the available balance to ensure all chunks are within 16-bit bounds 
     proof: <a href="confidential_asset.md#0x1_confidential_asset_WithdrawalProof">WithdrawalProof</a>
 ) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
     <b>let</b> user = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
-    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_normalized">is_normalized</a>(user, asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_ALREADY_NORMALIZED">E_ALREADY_NORMALIZED</a>));
 
     // Normalization is withdrawal <b>with</b> v = 0
     <a href="confidential_asset.md#0x1_confidential_asset_withdraw_to">withdraw_to</a>(sender, asset_type, user, 0, proof);
@@ -2551,7 +2587,7 @@ Returns <code><b>true</b></code> if the auditor config actually changed.
     <b>let</b> new_ek = new_ek_bytes.map(|ek| new_compressed_point_from_bytes(ek).extract());
 
     <b>if</b> (new_ek.is_some()) {
-        <b>assert</b>!(!new_ek.borrow().is_identity(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_AUDITOR_EK_IS_IDENTITY">E_AUDITOR_EK_IS_IDENTITY</a>));
+        <b>assert</b>!(!new_ek.borrow().is_identity(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EK_IS_IDENTITY">E_EK_IS_IDENTITY</a>));
     };
 
     // Increment epoch only when installing or changing the EK (not when removing):
@@ -2895,7 +2931,7 @@ the auditor config even if the asset_type is no longer allow-listed.
 
 ## Function `get_effective_auditor_config`
 
-Returns the effective auditor: asset-specific if set, else global.
+Returns the effective auditor: asset-specific if its EK is set, else global.
 Used by dapp developers to fetch the right auditor EK to create withdraw, normalize or transfer transactions.
 
 
@@ -2914,15 +2950,19 @@ Used by dapp developers to fetch the right auditor EK to create withdraw, normal
 ): <a href="confidential_asset.md#0x1_confidential_asset_EffectiveAuditorConfig">EffectiveAuditorConfig</a> <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
     <b>let</b> config_addr = <a href="confidential_asset.md#0x1_confidential_asset_get_asset_config_address">get_asset_config_address</a>(asset_type); // first, check asset-specific auditor
     <b>if</b> (<b>exists</b>&lt;<a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a>&gt;(config_addr)) {
-        <b>return</b> EffectiveAuditorConfig::V1 {
-            is_global: <b>false</b>,
-            config: <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a>&gt;(config_addr).auditor
+        <b>let</b> auditor = <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a>&gt;(config_addr).auditor;
+        // Only <b>use</b> asset-specific auditor <b>if</b> its EK is actually set; otherwise fall through <b>to</b> <b>global</b>.
+        <b>if</b> (auditor.ek.is_some()) {
+            <b>return</b> EffectiveAuditorConfig::V1 {
+                is_global: <b>false</b>,
+                config: auditor
+            };
         };
     };
 
     EffectiveAuditorConfig::V1 {      // otherwise, fall back <b>to</b> <b>global</b> auditor
         is_global: <b>true</b>,
-        config: <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a>&gt;( @aptos_framework).global_auditor
+        config: <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a>&gt;(@aptos_framework).global_auditor
     }
 }
 </code></pre>
@@ -3002,6 +3042,31 @@ Returns the circulating supply of the confidential asset.
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_get_max_transfers_before_rollover">get_max_transfers_before_rollover</a>(): u64 {
     <a href="confidential_asset.md#0x1_confidential_asset_MAX_TRANSFERS_BEFORE_ROLLOVER">MAX_TRANSFERS_BEFORE_ROLLOVER</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_confidential_asset_get_max_memo_bytes"></a>
+
+## Function `get_max_memo_bytes`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_get_max_memo_bytes">get_max_memo_bytes</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_get_max_memo_bytes">get_max_memo_bytes</a>(): u64 {
+    <a href="confidential_asset.md#0x1_confidential_asset_MAX_MEMO_BYTES">MAX_MEMO_BYTES</a>
 }
 </code></pre>
 
@@ -3431,10 +3496,10 @@ Verifies range proof + $\Sigma$-protocol for withdrawal. Returns compressed new 
 
     <b>let</b> v = new_scalar_from_u64(amount);
 
-    <b>let</b> (stmt, new_balance_P) = <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_new_withdrawal_statement">sigma_protocol_withdraw::new_withdrawal_statement</a>(
+    <b>let</b> stmt = <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_new_withdrawal_statement">sigma_protocol_withdraw::new_withdrawal_statement</a>(
         *ek, old_balance, &compressed_new_balance, compressed_ek_aud, v,
     );
-    <a href="confidential_range_proofs.md#0x1_confidential_range_proofs_assert_valid_range_proof">confidential_range_proofs::assert_valid_range_proof</a>(&new_balance_P, &zkrp_new_balance);
+    <a href="confidential_range_proofs.md#0x1_confidential_range_proofs_assert_valid_range_proof">confidential_range_proofs::assert_valid_range_proof</a>(compressed_new_balance.get_compressed_P(), &zkrp_new_balance);
 
     <b>let</b> session = <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_new_session">sigma_protocol_withdraw::new_session</a>(sender, asset_type, compressed_ek_aud.is_some());
     session.assert_verifies(&stmt, &sigma);
@@ -3484,26 +3549,30 @@ Verifies range proofs + $\Sigma$-protocol for transfer. Returns (new_balance, re
         zkrp_new_balance, zkrp_amount, sigma
     } = proof;
 
+    compressed_ek_volun_auds.for_each_ref(|ek| {
+        <b>assert</b>!(!ek.is_identity(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EK_IS_IDENTITY">E_EK_IS_IDENTITY</a>));
+    });
+
     <b>let</b> has_effective_auditor = compressed_ek_eff_aud.is_some();
     <b>let</b> num_volun_auditors = compressed_ek_volun_auds.length();
 
     // Auditor count checks are performed inside new_transfer_statement
-    <b>let</b> (stmt, new_balance_P, recip_pending) = <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_new_transfer_statement">sigma_protocol_transfer::new_transfer_statement</a>(
+    <b>let</b> (stmt, amount) = <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_new_transfer_statement">sigma_protocol_transfer::new_transfer_statement</a>(
         *compressed_ek_sender, *compressed_ek_recip,
         compressed_old_balance, &compressed_new_balance,
         &compressed_amount,
         compressed_ek_eff_aud, &compressed_ek_volun_auds,
     );
 
-    <a href="confidential_range_proofs.md#0x1_confidential_range_proofs_assert_valid_range_proof">confidential_range_proofs::assert_valid_range_proof</a>(recip_pending.get_P(), &zkrp_amount);
-    <a href="confidential_range_proofs.md#0x1_confidential_range_proofs_assert_valid_range_proof">confidential_range_proofs::assert_valid_range_proof</a>(&new_balance_P, &zkrp_new_balance);
+    <a href="confidential_range_proofs.md#0x1_confidential_range_proofs_assert_valid_range_proof">confidential_range_proofs::assert_valid_range_proof</a>(compressed_amount.get_compressed_P(), &zkrp_amount);
+    <a href="confidential_range_proofs.md#0x1_confidential_range_proofs_assert_valid_range_proof">confidential_range_proofs::assert_valid_range_proof</a>(compressed_new_balance.get_compressed_P(), &zkrp_new_balance);
 
     <b>let</b> session = <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_new_session">sigma_protocol_transfer::new_session</a>(
         sender, recipient_addr, asset_type, has_effective_auditor, num_volun_auditors,
     );
     session.assert_verifies(&stmt, &sigma);
 
-    (compressed_new_balance, recip_pending, compressed_amount, compressed_ek_volun_auds)
+    (compressed_new_balance, amount, compressed_amount, compressed_ek_volun_auds)
 }
 </code></pre>
 

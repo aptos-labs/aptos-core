@@ -15,11 +15,12 @@ a governance proposal is needed to set <code><a href="randomness_config_seqnum.m
 
 
 -  [Resource `RandomnessConfigSeqNum`](#0x1_randomness_config_seqnum_RandomnessConfigSeqNum)
+-  [Constants](#@Constants_0)
 -  [Function `set_for_next_epoch`](#0x1_randomness_config_seqnum_set_for_next_epoch)
 -  [Function `initialize`](#0x1_randomness_config_seqnum_initialize)
 -  [Function `on_new_epoch`](#0x1_randomness_config_seqnum_on_new_epoch)
--  [Specification](#@Specification_0)
-    -  [Function `on_new_epoch`](#@Specification_0_on_new_epoch)
+-  [Specification](#@Specification_1)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
@@ -57,12 +58,28 @@ Useful in a chain recovery from randomness stall.
 
 </details>
 
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_randomness_config_seqnum_E_SEQ_NUM_MUST_INCREASE"></a>
+
+The new sequence number must be strictly greater than the current one.
+
+
+<pre><code><b>const</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_E_SEQ_NUM_MUST_INCREASE">E_SEQ_NUM_MUST_INCREASE</a>: u64 = 1;
+</code></pre>
+
+
+
 <a id="0x1_randomness_config_seqnum_set_for_next_epoch"></a>
 
 ## Function `set_for_next_epoch`
 
 Update <code><a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a></code>.
 Used when re-enable randomness after an emergency randomness disable via local override.
+The new <code>seq_num</code> must be strictly greater than the current on-chain value.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seq_num: u64)
@@ -74,8 +91,12 @@ Used when re-enable randomness after an emergency randomness disable via local o
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seq_num: u64) {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seq_num: u64) <b>acquires</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+    <b>if</b> (<b>exists</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework)) {
+        <b>let</b> current = <b>borrow_global</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework).seq_num;
+        <b>assert</b>!(seq_num &gt; current, <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_E_SEQ_NUM_MUST_INCREASE">E_SEQ_NUM_MUST_INCREASE</a>);
+    };
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> { seq_num });
 }
 </code></pre>
@@ -145,12 +166,12 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 
 </details>
 
-<a id="@Specification_0"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a id="@Specification_0_on_new_epoch"></a>
+<a id="@Specification_1_on_new_epoch"></a>
 
 ### Function `on_new_epoch`
 

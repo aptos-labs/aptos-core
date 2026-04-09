@@ -93,6 +93,12 @@ pub struct BuildConfig {
     #[clap(skip)]
     pub additional_named_addresses: BTreeMap<String, AccountAddress>,
 
+    /// Named addresses that unconditionally override any conflicting package-level
+    /// assignment.  Unlike `additional_named_addresses` (which errors on conflict),
+    /// entries here always win.  Populated by the `--named-address` replay flag.
+    #[clap(skip)]
+    pub forced_named_addresses: BTreeMap<String, AccountAddress>,
+
     /// Only fetch dependency repos to MOVE_HOME
     #[clap(long = "fetch-deps-only", global = true)]
     pub fetch_deps_only: bool,

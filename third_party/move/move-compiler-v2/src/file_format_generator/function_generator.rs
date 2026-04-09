@@ -23,7 +23,8 @@ use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
-        FunId, FunctionEnv, Loc, NodeId, Parameter, QualifiedId, StructEnv, StructId, TypeParameter,
+        FunId, FunctionEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId, StructEnv, StructId,
+        TypeParameter, Visibility,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -876,15 +877,7 @@ impl<'a> FunctionGenerator<'a> {
                 let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
                 let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
                 if mid != &fun_mid {
-                    if !struct_env
-                        .env()
-                        .language_version()
-                        .language_version_for_public_struct()
-                    {
-                        fun_ctx.internal_error(format!(
-                            "cross module struct access is not supported by language version {}",
-                            struct_env.env().language_version()
-                        ));
+                    if !fun_ctx.check_cross_module_struct_access(ctx, struct_env, fun_mid, "pack") {
                         return;
                     }
                     self.gen_pack_unpack_api_call::<true>(
@@ -906,15 +899,7 @@ impl<'a> FunctionGenerator<'a> {
                 let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
                 let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
                 if mid != &fun_mid {
-                    if !struct_env
-                        .env()
-                        .language_version()
-                        .language_version_for_public_struct()
-                    {
-                        fun_ctx.internal_error(format!(
-                            "cross module struct access is not supported by language version {}",
-                            struct_env.env().language_version()
-                        ));
+                    if !fun_ctx.check_cross_module_struct_access(ctx, struct_env, fun_mid, "pack") {
                         return;
                     }
                     self.gen_pack_unpack_api_call::<true>(
@@ -943,15 +928,8 @@ impl<'a> FunctionGenerator<'a> {
                 let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
                 let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
                 if mid != &fun_mid {
-                    if !struct_env
-                        .env()
-                        .language_version()
-                        .language_version_for_public_struct()
+                    if !fun_ctx.check_cross_module_struct_access(ctx, struct_env, fun_mid, "unpack")
                     {
-                        fun_ctx.internal_error(format!(
-                            "cross module struct access is not supported by language version {}",
-                            struct_env.env().language_version()
-                        ));
                         return;
                     }
                     self.gen_pack_unpack_api_call::<false>(
@@ -973,15 +951,8 @@ impl<'a> FunctionGenerator<'a> {
                 let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
                 let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
                 if mid != &fun_mid {
-                    if !struct_env
-                        .env()
-                        .language_version()
-                        .language_version_for_public_struct()
+                    if !fun_ctx.check_cross_module_struct_access(ctx, struct_env, fun_mid, "unpack")
                     {
-                        fun_ctx.internal_error(format!(
-                            "cross module struct access is not supported by language version {}",
-                            struct_env.env().language_version()
-                        ));
                         return;
                     }
                     self.gen_pack_unpack_api_call::<false>(
@@ -1011,15 +982,12 @@ impl<'a> FunctionGenerator<'a> {
                 let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
                 let is_mut_src = fun_ctx.fun.get_local_type(source[0]).is_mutable_reference();
                 if mid != &fun_mid {
-                    if !struct_env
-                        .env()
-                        .language_version()
-                        .language_version_for_public_struct()
-                    {
-                        fun_ctx.internal_error(format!(
-                            "cross module struct access is not supported by language version {}",
-                            struct_env.env().language_version()
-                        ));
+                    if !fun_ctx.check_cross_module_struct_access(
+                        ctx,
+                        struct_env,
+                        fun_mid,
+                        "variant test",
+                    ) {
                         return;
                     }
                     self.gen_test_variant_api_call(
@@ -1084,15 +1052,12 @@ impl<'a> FunctionGenerator<'a> {
                 let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
                 let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
                 if mid != &fun_mid {
-                    if !struct_env
-                        .env()
-                        .language_version()
-                        .language_version_for_public_struct()
-                    {
-                        fun_ctx.internal_error(format!(
-                            "cross module struct access is not supported by language version {}",
-                            struct_env.env().language_version()
-                        ));
+                    if !fun_ctx.check_cross_module_struct_access(
+                        ctx,
+                        struct_env,
+                        fun_mid,
+                        "field borrow",
+                    ) {
                         return;
                     }
                     self.gen_borrow_field_api_call(
@@ -1114,15 +1079,12 @@ impl<'a> FunctionGenerator<'a> {
                 let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
                 let fun_mid = ctx.fun_ctx.fun.func_env.module_env.get_id();
                 if mid != &fun_mid {
-                    if !struct_env
-                        .env()
-                        .language_version()
-                        .language_version_for_public_struct()
-                    {
-                        fun_ctx.internal_error(format!(
-                            "cross module struct access is not supported by language version {}",
-                            struct_env.env().language_version()
-                        ));
+                    if !fun_ctx.check_cross_module_struct_access(
+                        ctx,
+                        struct_env,
+                        fun_mid,
+                        "field borrow",
+                    ) {
                         return;
                     }
                     self.gen_borrow_field_api_call(
@@ -2212,6 +2174,57 @@ impl<'a> FunctionGenerator<'a> {
 }
 
 impl FunctionContext<'_> {
+    /// Checks whether a cross-module struct operation is allowed. Returns `false` (after emitting
+    /// a diagnostic) if the language version does not support public structs, the struct is
+    /// private, or it has package/friend visibility and `fun_mid` is not a declared friend.
+    fn check_cross_module_struct_access(
+        &self,
+        ctx: &BytecodeContext,
+        struct_env: &StructEnv,
+        fun_mid: ModuleId,
+        op: &str,
+    ) -> bool {
+        if !struct_env
+            .env()
+            .language_version()
+            .language_version_for_public_struct()
+        {
+            self.internal_error(format!(
+                "cross module struct access is not supported by language version {}",
+                struct_env.env().language_version()
+            ));
+            return false;
+        }
+        let op_loc = self.fun.get_bytecode_loc(ctx.attr_id);
+        let visibility = struct_env.get_visibility();
+        let struct_name = struct_env.get_full_name_str();
+        let module_name = struct_env.module_env.get_full_name_str();
+        if visibility == Visibility::Private {
+            self.module.error(
+                &op_loc,
+                format!(
+                    "Invalid operation: {op} on `{struct_name}` can only be done within module `{module_name}`"
+                ),
+            );
+            return false;
+        }
+        if visibility == Visibility::Friend && !struct_env.module_env.has_friend(&fun_mid) {
+            let scope = if struct_env.has_package_visibility() {
+                "package"
+            } else {
+                "friend"
+            };
+            self.module.error(
+                &op_loc,
+                format!(
+                    "Invalid operation: {op} on `{struct_name}` can only be done within module `{module_name}` or its {scope} modules"
+                ),
+            );
+            return false;
+        }
+        true
+    }
+
     /// Emits an internal error for this function.
     pub fn internal_error(&self, msg: impl AsRef<str>) {
         self.module.internal_error(

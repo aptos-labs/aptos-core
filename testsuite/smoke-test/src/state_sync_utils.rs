@@ -202,6 +202,9 @@ fn verify_first_ledger_info(node: &mut LocalNode) {
     let aptos_db = AptosDB::new_for_test_with_sharding(db_path_buf.as_path(), 1 << 13);
     aptos_db.get_epoch_ending_ledger_info(0).unwrap();
 
+    // Drop the DB handle before restarting the node to release the rocks DB lock file
+    drop(aptos_db);
+
     // Restart the node
     node.start().unwrap();
 }

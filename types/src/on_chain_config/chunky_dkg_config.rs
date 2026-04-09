@@ -71,11 +71,18 @@ impl OnChainChunkyDKGConfig {
     }
 
     /// Used by DKG and Consensus on a new epoch to determine the actual `OnChainChunkyDKGConfig` to be used.
-    pub fn from_configs(onchain_raw_config: Option<ChunkyDKGConfigMoveStruct>) -> Self {
-        // TODO(ibalajiarun): Implement manual disabling logic based on SeqNum
-        onchain_raw_config
-            .and_then(|onchain_raw| OnChainChunkyDKGConfig::try_from(onchain_raw).ok())
-            .unwrap_or_else(OnChainChunkyDKGConfig::default_if_missing)
+    pub fn from_configs(
+        local_seqnum: u64,
+        onchain_seqnum: u64,
+        onchain_raw_config: Option<ChunkyDKGConfigMoveStruct>,
+    ) -> Self {
+        if local_seqnum > onchain_seqnum {
+            Self::default_disabled()
+        } else {
+            onchain_raw_config
+                .and_then(|onchain_raw| OnChainChunkyDKGConfig::try_from(onchain_raw).ok())
+                .unwrap_or_else(OnChainChunkyDKGConfig::default_if_missing)
+        }
     }
 }
 
@@ -154,4 +161,20 @@ impl AsMoveValue for ChunkyDKGConfigMoveStruct {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::Struct(MoveStruct::Runtime(vec![self.variant.as_move_value()]))
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ChunkyDKGConfigSeqNum {
+    pub seq_num: u64,
+}
+
+impl ChunkyDKGConfigSeqNum {
+    pub fn default_if_missing() -> Self {
+        Self { seq_num: 0 }
+    }
+}
+
+impl OnChainConfig for ChunkyDKGConfigSeqNum {
+    const MODULE_IDENTIFIER: &'static str = "chunky_dkg_config_seqnum";
+    const TYPE_IDENTIFIER: &'static str = "ChunkyDKGConfigSeqNum";
 }

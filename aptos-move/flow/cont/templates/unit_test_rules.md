@@ -116,7 +116,7 @@ timestamp::update_global_time_for_test_secs(100); // seconds
 
 ## Test Design Rules
 
-**HARD RULES:**
+**Design rules:**
 - **One behavior per test.** Each test verifies exactly one scenario. Never combine success and failure cases.
 - **Minimal setup.** Only initialize what the specific test needs.
 - **Test the target function.** Every test must call the user-specified function.

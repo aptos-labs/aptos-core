@@ -29,9 +29,9 @@ use aptos_types::{
     },
     epoch_state::EpochState,
     on_chain_config::{
-        ChunkyDKGConfigMoveStruct, OnChainChunkyDKGConfig, OnChainConfigPayload,
-        OnChainConfigProvider, OnChainConsensusConfig, OnChainRandomnessConfig,
-        RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
+        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, OnChainChunkyDKGConfig,
+        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -73,6 +73,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // Randomness overriding.
     randomness_override_seq_num: u64,
 
+    // ChunkyDKG overriding.
+    chunky_dkg_override_seq_num: u64,
+
     key_storage: PersistentSafetyStorage,
 }
 
@@ -87,6 +90,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         vtxn_pool: VTxnPoolState,
         rb_config: ReliableBroadcastConfig,
         randomness_override_seq_num: u64,
+        chunky_dkg_override_seq_num: u64,
     ) -> Self {
         Self {
             my_addr,
@@ -104,6 +108,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chunky_dkg_start_event_tx: None,
             rb_config,
             randomness_override_seq_num,
+            chunky_dkg_override_seq_num,
             key_storage: storage(safety_rules_config),
         }
     }
@@ -255,9 +260,25 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
 
         let chunky_dkg_config_move_struct = payload.get::<ChunkyDKGConfigMoveStruct>();
+        let onchain_chunky_dkg_config_seq_num = payload
+            .get::<ChunkyDKGConfigSeqNum>()
+            .unwrap_or_else(|_| ChunkyDKGConfigSeqNum::default_if_missing());
 
-        let onchain_chunky_dkg_config =
-            OnChainChunkyDKGConfig::from_configs(chunky_dkg_config_move_struct.ok());
+        info!(
+            epoch = epoch_state.epoch,
+            local = self.chunky_dkg_override_seq_num,
+            onchain = onchain_chunky_dkg_config_seq_num.seq_num,
+            "Checking chunky DKG config override."
+        );
+        if self.chunky_dkg_override_seq_num > onchain_chunky_dkg_config_seq_num.seq_num {
+            warn!("ChunkyDKG will be force-disabled by local config!");
+        }
+
+        let onchain_chunky_dkg_config = OnChainChunkyDKGConfig::from_configs(
+            self.chunky_dkg_override_seq_num,
+            onchain_chunky_dkg_config_seq_num.seq_num,
+            chunky_dkg_config_move_struct.ok(),
+        );
 
         let onchain_consensus_config = payload
             .get::<OnChainConsensusConfig>()

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::fiat_shamir::SerializeForFiatShamirTranscript;
+use crate::{fiat_shamir::SerializeForFiatShamirTranscript, pcs::univariate_hiding_kzg};
 use aptos_crypto::arkworks::{random::UniformRand, GroupGenerators};
 use ark_ec::pairing::{Pairing, PairingOutput};
 use ark_ff::AdditiveGroup;
@@ -31,7 +31,15 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     fn commitment_key_from_prover_key(pk: &Self::ProverKey) -> Self::CommitmentKey;
 
     /// Setup generates the prover and verifier keys used in the batched range proof.
-    fn setup<R: RngCore + CryptoRng>(
+    #[allow(non_snake_case)]
+    fn setup(
+        max_ell: usize,
+        vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
+        ck_S: univariate_hiding_kzg::CommitmentKey<E>,
+    ) -> (Self::ProverKey, Self::VerificationKey);
+
+    /// Setup generates the prover and verifier keys used in the batched range proof.
+    fn setup_for_testing<R: RngCore + CryptoRng>(
         max_n: usize,
         max_ell: usize,
         group_generators: GroupGenerators<E>,

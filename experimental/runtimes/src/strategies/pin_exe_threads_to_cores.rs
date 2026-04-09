@@ -8,13 +8,14 @@ use crate::{
 use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;
 use libc::CPU_SET;
 use rayon::ThreadPool;
+use tokio::runtime::{Handle, Runtime};
 
 pub(crate) struct PinExeThreadsToCoresThreadManager {
     exe_threads: ThreadPool,
     non_exe_threads: ThreadPool,
     high_pri_io_threads: ThreadPool,
     io_threads: ThreadPool,
-    background_threads: ThreadPool,
+    background_runtime: Runtime,
 }
 
 impl PinExeThreadsToCoresThreadManager {
@@ -55,18 +56,20 @@ impl PinExeThreadsToCoresThreadManager {
             pin_cpu_set(non_exe_cpu_set),
         );
 
-        let background_threads = spawn_rayon_thread_pool_with_start_hook(
-            "background".into(),
-            Some(32),
-            pin_cpu_set(non_exe_cpu_set),
-        );
+        let background_runtime = tokio::runtime::Builder::new_current_thread()
+            .max_blocking_threads(32)
+            .thread_name("bg-pool")
+            .on_thread_start(pin_cpu_set(non_exe_cpu_set))
+            .enable_all()
+            .build()
+            .expect("Failed to create background tokio runtime");
 
         Self {
             exe_threads,
             non_exe_threads,
             high_pri_io_threads,
             io_threads,
-            background_threads,
+            background_runtime,
         }
     }
 }
@@ -88,7 +91,7 @@ impl<'a> ThreadManager<'a> for PinExeThreadsToCoresThreadManager {
         &self.high_pri_io_threads
     }
 
-    fn get_background_pool(&'a self) -> &'a ThreadPool {
-        &self.background_threads
+    fn get_background_pool(&'a self) -> Handle {
+        self.background_runtime.handle().clone()
     }
 }

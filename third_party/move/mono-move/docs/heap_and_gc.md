@@ -82,7 +82,7 @@ Each transaction gets its own memory manager for its subspace. The design has tw
 
 **Chosen approach: Bump allocation with Cheney's copying GC using direct pointers.**
 
-The runtime uses a bump allocator for fast allocation. When the heap is full, a copying garbage collector (Cheney's algorithm) runs: it walks the call stack using per-function `pointer_offsets` to find roots, then does a breadth-first copy of all reachable objects into a fresh to-space, fixing all pointers in place. This combines the speed of bump allocation with the ability to reclaim memory mid-transaction.
+The runtime uses a bump allocator for fast allocation. When the heap is full, a copying garbage collector (Cheney's algorithm) runs: it walks the call stack using per-function `frame_layout` (and per-safe-point `safe_point_layouts`) to find roots, then does a breadth-first copy of all reachable objects into a fresh to-space, fixing all pointers in place. This combines the speed of bump allocation with the ability to reclaim memory mid-transaction.
 
 ### Handling Global Values
 
@@ -137,7 +137,7 @@ Violations would indicate serious bugs in the interpreter.
 All pointers must be updated after memory moves during GC. Missing a pointer leads to dangling references. The runtime's safety model depends on three invariants (see also `runtime/AGENTS.md`):
 
 1. **Frame metadata integrity** — saved `fp`/`pc`/`func_ptr` are written only by call/return, never by user micro-ops.
-2. **Pointer-slot accuracy** — `Function::pointer_offsets` exactly matches slots that hold live heap pointers.
+2. **Pointer-slot accuracy** — `Function::frame_layout` (and, at safe points, the matching `safe_point_layouts` entry) together exactly match slots that hold live heap pointers.
 3. **Object header integrity** — `descriptor_id` and `size` are set by the allocator and never overwritten by user code.
 
 ### Type Safety
@@ -150,7 +150,7 @@ TBD: Anything the memory manager can do to help mitigate this risk?
 
 ## GC Design Space
 
-Four approaches were considered for the runtime's memory management. All assume a bump-allocated heap with copying collection (or equivalent). **Approach B was chosen and is implemented** — see its Status section and the Recommendation section at the end for the rationale.
+Four approaches were considered for the runtime's memory management. All assume a bump-allocated heap with copying collection (or equivalent). **The implemented design is a hybrid of Approach A and Approach B** — see their Status sections and the Recommendation section at the end for the rationale.
 
 ### Approach A: Direct Pointers + Stack Maps at Safe Points
 
@@ -167,7 +167,7 @@ Frame slots hold raw heap pointers. The re-compiler emits a stack map at every G
 - Fat pointer bases must be rewritten during GC
 - Natives holding raw pointers across GC-triggering calls get dangling pointers
 
-**Status:** Superseded by Approach B.
+**Status:** Partially implemented as part of the hybrid A+B design (see Approach B's Status).
 
 ### Approach B: Direct Pointers + Partitioned Frames
 
@@ -190,7 +190,14 @@ Stale pointers (logically dead but not yet overwritten) in the pointer region ca
 - Native GC safety still unsolved (same dangling pointer problem)
 - Still needs object descriptors for tracing internal heap refs
 
-**Status:** Implemented. Each `Function` declares `pointer_slots: Vec<u32>` (frame offsets that may hold heap pointers) and `args_size: usize`. The runtime zeroes the callee's local area (`args_size..data_size`) at `CallFunc` time so pointer slots start as null. GC scans `pointer_slots` for every live frame — no per-PC stack maps needed. If higher precision is needed in the future (e.g. to reduce over-retention), we can switch to Approach A by adding stack maps to the re-compiler — the core GC logic (Cheney's copying collector, object descriptors, pointer rewriting) stays the same.
+**Status:** Implemented as a hybrid of Approach A and B. Each `Function` declares two levels of pointer-slot information:
+
+1. `frame_layout: FrameLayoutInfo` — frame offsets that always hold heap pointers, scanned at every PC (Approach B).
+2. `safe_point_layouts: SortedSafePointEntries` — additional per-safe-point pointer offsets, scanned only when the frame's PC matches a safe-point entry (Approach A).
+
+At any given safe point, the GC scans the union of both. When `zero_frame` is true, the runtime zeroes the region beyond args (`args_size..extended_frame_size`) at `CallFunc` time so pointer slots start as null. Safe points are allocating instructions (at their own PC) and call return sites (`call_pc + 1`).
+
+This hybrid keeps the common case simple — stable pointer slots use `frame_layout` with no per-PC overhead — while supporting slots that change type across call boundaries (e.g., shared arg/return regions, different callee arg layouts). The specializer is free to use either mechanism: `frame_layout` for slots with a fixed pointer/scalar designation, `safe_point_layouts` for slots whose type varies by PC.
 
 ### Approach C: Handle Table + Partitioned Frames
 
@@ -287,9 +294,9 @@ For most blockchain transactions, the heap fits comfortably in the pre-allocated
 - **Per-mutation overhead is the dominant cost.** Every parent-pointer update in Approach D is paid on the hot path regardless of whether GC fires. For an operation that rarely benefits from the bookkeeping, this is pure overhead.
 - **Over-retention is a non-issue.** If the collector rarely runs, stale pointers in B/C just sit until the transaction ends — same as if they were collected.
 
-Under these assumptions, **Approach B** is the clear winner: zero hot-path overhead, simplest re-compiler, and its downsides (over-retention, pointer rewriting during GC) are either limited, or costs you rarely pay.
+Under these assumptions, the **A+B hybrid** is the clear winner: zero hot-path overhead, and the re-compiler burden is minimal — only slots whose pointer status changes across call boundaries need safe-point entries, while stable pointer slots use the simpler `frame_layout`. The downsides (over-retention, pointer rewriting during GC) are either limited, or costs you rarely pay.
 
-**Approach A** has the same runtime performance as B but burdens the re-compiler with stack map generation for no benefit. B strictly dominates A.
+Pure **Approach A** (stack maps everywhere) burdens the re-compiler with liveness analysis at every safe point for no benefit in the common case. Pure **Approach B** (no per-PC info) cannot correctly describe slots that change type across call boundaries. The hybrid gets the best of both.
 
 **Approach C** is worth considering only if native GC safety becomes a real obstacle. Otherwise it pays the handle indirection cost on every access for GC benefits that rarely materialize.
 

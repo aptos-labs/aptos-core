@@ -67,32 +67,28 @@ However, the benefits may not justify the complexity:
 - Small, simple functions benefit more from being inlined entirely.
 - Complex functions are unlikely to see meaningful gains from saving a few moves relative to the cost of the function body itself.
 
-## GC Root Discovery: `pointer_offsets` and Slot Typing
+## GC Root Discovery: `frame_layout` and `safe_point_layouts`
 
-The garbage collector needs to find all live heap pointers on the call stack. The current approach uses **`pointer_offsets`** — a per-function list of frame byte-offsets that may hold heap pointers. The GC scans these offsets in every live frame to find roots. This is simple and avoids stack maps: the same list applies at every point in the function's execution.
+The garbage collector needs to find all live heap pointers on the call stack. The runtime uses a two-level scheme:
 
-This works because each offset is designated as either a pointer slot or a scalar slot for the entire lifetime of the frame. When `zero_frame` is true, pointer slots are zeroed on entry so the GC always sees either a valid heap pointer or null — never stale data.
+1. **`frame_layout`** (`FrameLayoutInfo`) — a per-function list of frame byte-offsets that *always* hold heap pointers, regardless of the current PC. The GC scans these offsets in every live frame.
 
-### Tension with the calling convention
+2. **`safe_point_layouts`** (`[SafePointEntry]`) — per-safe-point lists of *additional* frame offsets that hold heap pointers at specific code offsets. The GC looks up the entry matching the frame's current PC (via binary search) and scans those offsets too.
 
-The current calling convention requires arguments and return values to share the same space at the beginning of the frame. This creates a conflict with slot typing:
+At any given safe point, the full set of GC roots on the frame is the union of `frame_layout.heap_ptr_offsets` and the matching safe-point entry's `heap_ptr_offsets` (if any).
 
-- A slot at the beginning of the frame might hold a heap pointer as an argument on entry, but later be overwritten with a scalar return value (or vice versa).
-- For `pointer_offsets` to be correct, a slot listed as a pointer must *only* ever contain a valid heap pointer or null. A slot not listed must *never* contain something that looks like a heap pointer. If the same slot changes roles between pointer and non-pointer across a call boundary, the static `pointer_offsets` list cannot accurately describe both states.
+**Safe points** are the only instructions where GC can trigger:
 
-This problem is more acute if we move toward **strongly-typed slots**, where each frame offset has a fixed type for the duration of the frame — something we are exploring for additional safety guarantees. Under strong slot typing, a slot that is a `u64` argument cannot later be reused as a pointer return value, because the slot's type is fixed.
+- **Allocating instructions** (`HeapNew`, `VecPushBack`, `ForceGC`): GC runs during the instruction, so the safe point is at that instruction's own PC.
+- **Call return sites**: when a callee triggers GC, the caller's saved PC is `call_pc + 1`. The safe point for a caller frame is the instruction *after* the call — at that point, the shared arg/return region holds return values, not arguments.
 
-### Possible future direction: stack maps
+When `zero_frame` is true, pointer slots are zeroed on entry so the GC always sees either a valid heap pointer or null — never stale data. `FrameLayoutInfo` is designed to be extended with additional per-slot type or layout information in the future (e.g., slot type tags for debugging or stronger runtime verification).
 
-If the `pointer_offsets` approach proves too restrictive — either because the calling convention forces slots to change type, or because strongly-typed slots are adopted — we may need to fall back to **stack maps**.
+The two-level scheme exists because the calling convention requires arguments and return values to share the same space at the beginning of the frame. A slot might hold a heap pointer as an argument on entry, but later be overwritten with a scalar return value (or vice versa). Similarly, callee argument slots may hold pointers for one callee but scalars for another. A single per-function list cannot describe both states. The `safe_point_layouts` mechanism handles this: slots that change type across call boundaries are listed in the appropriate safe-point entries rather than in `frame_layout`. The specializer emits safe-point entries only at PCs where the pointer set differs from the base `frame_layout` — functions with no type-changing slots leave `safe_point_layouts` empty.
 
-Stack maps record the type of every slot at GC safe points (allocation sites, call return sites). This gives the GC knowledge of the stack layout at different points of execution, but at a cost:
+If we move toward **strongly-typed slots** (where each frame offset has a fixed type for the duration of the frame), the safe-point mechanism provides the necessary per-PC type information to support this.
 
-- The specializer must compute liveness at safe points and emit stack maps (including handling the "maybe alive" problem at control-flow merge points).
-- Stack maps consume more memory than a single per-function list, though in practice they can likely be compressed significantly (e.g., sharing maps across safe points with identical layouts, delta-encoding, etc.).
-- GC root scanning must look up the correct map for the current safe point in each frame.
-
-See `docs/heap_and_gc.md` for further discussion of the stack map approach (Approach A) vs. the current `pointer_offsets` approach (Approach B).
+This approach was chosen because it is well understood, stable, and known to work. We may revisit this and explore alternatives in the future — for example, removing the per-function layout entirely in favor of per-PC-only layouts, or moving some of the work into the runtime (e.g., having the runtime reconstruct per-PC layout info rather than requiring the specializer to emit it). See `docs/heap_and_gc.md` for the full GC design space (Approaches A–D) and the rationale.
 
 ## Security Considerations
 

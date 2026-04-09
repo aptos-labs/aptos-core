@@ -11,7 +11,6 @@
 //! Verified with a single pairing equation.
 //!
 //! Largely following: <https://alinush.github.io/chunky#chunky-a-weighted-non-malleable-pvss>
-
 use crate::{
     delegate_transcript_core_to_subtrs,
     pcs::univariate_hiding_kzg,
@@ -45,7 +44,7 @@ use aptos_crypto::{
     arkworks::{
         self,
         msm::{self, MsmInput},
-        random::{sample_field_element_with_powers, unsafe_random_point},
+        random::{sample_field_element, sample_field_element_with_powers, unsafe_random_point},
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
         srs::SrsBasis,
@@ -319,13 +318,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
 
         // Step 2: Verify the range proof
-        let (g1_terms, g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
-            &pp.pk_range_proof.vk,
-            sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell),
-            pp.ell,
-            &self.sharing_proof.range_proof_commitment,
-            rng,
-        )?;
+        // Note(Rex): g1_terms and g2_terms are the hiding KZG verification pairing terms
+        let (dekart_verification_g1_terms, dekart_verification_g2_terms) =
+            self.sharing_proof.range_proof.pairing_for_verify(
+                &pp.pk_range_proof.vk,
+                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                pp.ell,
+                &self.sharing_proof.range_proof_commitment,
+                rng,
+            )?;
 
         // Step 3: Check that ciphertexts encrypt the committed shares
         let n = sc.get_total_weight();
@@ -408,14 +409,21 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 )
             })?;
 
+        let random_scalar_for_dekart: E::ScalarField = sample_field_element(rng);
+        let random_scalar_for_ciphertext_check: E::ScalarField = sample_field_element(rng);
+
         let res = E::multi_pairing(
-            g1_terms.iter().copied().chain([
-                combined_G1.into_affine(),
-                *pp.get_encryption_public_params().message_base(),
-            ]),
-            g2_terms
-                .iter()
-                .copied()
+            dekart_verification_g1_terms
+                .into_iter()
+                .map(|g| (g * random_scalar_for_dekart).into_affine())
+                .chain([
+                    (combined_G1 * random_scalar_for_ciphertext_check).into_affine(),
+                    (*pp.get_encryption_public_params().message_base()
+                        * random_scalar_for_ciphertext_check)
+                        .into_affine(),
+                ]),
+            dekart_verification_g2_terms
+                .into_iter()
                 .chain([pp.get_commitment_base(), (-combined_G2).into_affine()]),
         );
         if PairingOutput::<E>::ZERO != res {

@@ -207,10 +207,11 @@ impl DigestKey {
     }
 
     fn verify_pf(&self, digest: &Digest, id: Id, pf: G1Affine) -> Result<()> {
-        Ok((PairingSetting::pairing(
-            pf,
-            self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x()),
-        ) == PairingSetting::pairing(digest.as_g1(), G2Affine::generator()))
+        Ok(PairingSetting::multi_pairing([pf, -digest.as_g1()], [
+            G2Affine::from(self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x())),
+            G2Affine::generator(),
+        ])
+        .is_zero()
         .then_some(())
         .ok_or(BatchEncryptionError::EvalProofVerifyError)?)
     }

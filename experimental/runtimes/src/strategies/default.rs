@@ -5,12 +5,13 @@ use crate::thread_manager::{ThreadManager, MAX_THREAD_POOL_SIZE};
 use aptos_runtimes::spawn_rayon_thread_pool;
 use rayon::ThreadPool;
 use std::cmp::min;
+use tokio::runtime::{Handle, Runtime};
 
 pub struct DefaultThreadManager {
     exe_threads: ThreadPool,
     non_exe_threads: ThreadPool,
     io_threads: ThreadPool,
-    background_threads: ThreadPool,
+    background_runtime: Runtime,
 }
 
 impl DefaultThreadManager {
@@ -26,13 +27,17 @@ impl DefaultThreadManager {
             Some(min(num_cpus::get(), MAX_THREAD_POOL_SIZE)),
         );
         let io_threads = spawn_rayon_thread_pool("io".into(), Some(64));
-        let background_threads =
-            spawn_rayon_thread_pool("background".into(), Some(MAX_THREAD_POOL_SIZE));
+        let background_runtime = tokio::runtime::Builder::new_current_thread()
+            .max_blocking_threads(MAX_THREAD_POOL_SIZE)
+            .thread_name("bg-pool")
+            .enable_all()
+            .build()
+            .expect("Failed to create background tokio runtime");
         Self {
             exe_threads,
             non_exe_threads,
             io_threads,
-            background_threads,
+            background_runtime,
         }
     }
 }
@@ -54,7 +59,7 @@ impl<'a> ThreadManager<'a> for DefaultThreadManager {
         &self.io_threads
     }
 
-    fn get_background_pool(&'a self) -> &'a ThreadPool {
-        &self.background_threads
+    fn get_background_pool(&'a self) -> Handle {
+        self.background_runtime.handle().clone()
     }
 }

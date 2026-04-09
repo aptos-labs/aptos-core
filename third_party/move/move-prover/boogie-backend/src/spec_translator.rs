@@ -1629,8 +1629,18 @@ impl SpecTranslator<'_> {
                 self.translate_exp(&args[0]); // addr
                 emit!(self.writer, "))");
             },
-            Operation::MoveFunction(_, _)
-            | Operation::BorrowGlobal(_)
+            Operation::MoveFunction(mid, fid) => {
+                let fun_env = self.env.get_function(mid.qualified(*fid));
+                self.env.error(
+                    &self.env.get_node_loc(node_id),
+                    &format!(
+                        "Move function `{}` cannot be called in specifications; \
+                         use a spec function instead",
+                        fun_env.get_full_name_str()
+                    ),
+                );
+            },
+            Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
             | Operation::MoveTo
@@ -1638,7 +1648,7 @@ impl SpecTranslator<'_> {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
                     &format!(
-                        "bug: operation {} is not supported in the current context",
+                        "runtime operation `{}` cannot be used in specifications",
                         oper.display(self.env, node_id)
                     ),
                 );

@@ -512,11 +512,35 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::NoOp => {},
         },
 
-        // Match expression unpacks the discriminator
-        ExpData::Match(_, discriminator, _) => {
-            let id = discriminator.node_id();
-            if let Type::Struct(mid, sid, _) = env.get_node_type(id).drop_reference() {
-                push(mid.qualified(sid), StructOpKind::Unpack, id);
+        // Match expression unpacks the discriminator; arm patterns may unpack nested structs
+        ExpData::Match(_, discriminator, arms) => {
+            let disc_node = discriminator.node_id();
+            // The discriminator itself is unpacked when it is a struct/enum type
+            if let Type::Struct(mid, sid, _) = env.get_node_type(disc_node).drop_reference() {
+                push(mid.qualified(sid), StructOpKind::Unpack, disc_node);
+            }
+            // Traverse sub-patterns of each arm to catch nested struct unpacks not covered by
+            // the discriminator check above (e.g., `Inner { val }` inside `Outer::V { Inner { val } }`).
+            for arm in arms {
+                let sub_pats: Vec<&Pattern> = match &arm.pattern {
+                    // Handle nested struct unpacks in sub-patterns.
+                    Pattern::Struct(_, _, _, fields) => fields.iter().collect(),
+                    Pattern::Tuple(_, pats) => pats.iter().collect(),
+                    // No sub-patterns.
+                    Pattern::Var(_, _)
+                    | Pattern::Wildcard(_)
+                    | Pattern::LiteralValue(_, _)
+                    | Pattern::Error(_) => vec![],
+                };
+                for sub_pat in sub_pats {
+                    sub_pat.visit_pre_post(&mut |post, p| {
+                        if !post {
+                            if let Pattern::Struct(id, sid, _, _) = p {
+                                push(sid.to_qualified_id(), StructOpKind::Unpack, *id);
+                            }
+                        }
+                    });
+                }
             }
         },
 

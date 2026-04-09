@@ -13,6 +13,9 @@ module aptos_framework::randomness_config_seqnum {
 
     friend aptos_framework::reconfiguration_with_dkg;
 
+    /// The new sequence number must be strictly greater than the current one.
+    const E_SEQ_NUM_MUST_INCREASE: u64 = 1;
+
     /// If this seqnum is smaller than a validator local override, the on-chain `RandomnessConfig` will be ignored.
     /// Useful in a chain recovery from randomness stall.
     struct RandomnessConfigSeqNum has drop, key, store {
@@ -21,8 +24,13 @@ module aptos_framework::randomness_config_seqnum {
 
     /// Update `RandomnessConfigSeqNum`.
     /// Used when re-enable randomness after an emergency randomness disable via local override.
-    public fun set_for_next_epoch(framework: &signer, seq_num: u64) {
+    /// The new `seq_num` must be strictly greater than the current on-chain value.
+    public fun set_for_next_epoch(framework: &signer, seq_num: u64) acquires RandomnessConfigSeqNum {
         system_addresses::assert_aptos_framework(framework);
+        if (exists<RandomnessConfigSeqNum>(@aptos_framework)) {
+            let current = borrow_global<RandomnessConfigSeqNum>(@aptos_framework).seq_num;
+            assert!(seq_num > current, E_SEQ_NUM_MUST_INCREASE);
+        };
         config_buffer::upsert(RandomnessConfigSeqNum { seq_num });
     }
 

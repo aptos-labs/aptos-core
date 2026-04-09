@@ -298,7 +298,48 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 
     #[allow(non_snake_case)]
-    fn setup<R: RngCore + CryptoRng>(
+    fn setup(
+        max_ell: usize,
+        vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
+        ck_S: univariate_hiding_kzg::CommitmentKey<E>,
+    ) -> (ProverKey<E>, VerificationKey<E>) {
+        let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
+
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell.into());
+
+        let prover_precomputed = ProverPrecomputed {
+            powers_of_two: powers_of_two.clone(),
+            h_denom_eval,
+        };
+
+        let verifier_precomputed = VerifierPrecomputed {
+            powers_of_two,
+            roots_of_unity: ck_S.roots_of_unity_in_eval_dom.clone(),
+        };
+
+        let lagr_0: E::G1Affine = match &ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1[0],
+            SrsBasis::PowersOfTau { .. } => panic!("Wrong basis, this should not happen"),
+        };
+
+        let vk = VerificationKey {
+            xi_1: ck_S.xi_1,
+            lagr_0,
+            vk_hkzg,
+            verifier_precomputed,
+        };
+        let prk = ProverKey {
+            vk: vk.clone(),
+            max_n: ck_S.msm_basis.size() - 1,
+            ck_S,
+            prover_precomputed,
+        };
+
+        (prk, vk)
+    }
+
+    #[allow(non_snake_case)]
+    fn setup_for_testing<R: RngCore + CryptoRng>(
         max_n: usize,
         max_ell: usize,
         group_generators: GroupGenerators<E>,
@@ -332,7 +373,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
-        let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup(
+        let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup_with_trapdoor(
             max_n + 1,
             SrsType::Lagrange,
             group_generators.clone(),

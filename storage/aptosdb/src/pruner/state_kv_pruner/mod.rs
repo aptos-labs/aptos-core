@@ -22,7 +22,6 @@ use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
-use rayon::prelude::*;
 use std::{
     cmp::min,
     sync::{atomic::Ordering, Arc},
@@ -36,7 +35,7 @@ pub(crate) struct StateKvPruner {
     name: &'static str,
 
     metadata_pruner: StateKvMetadataPruner,
-    shard_pruners: Vec<StateKvShardPruner>,
+    shard_pruners: Arc<Vec<StateKvShardPruner>>,
 }
 
 impl DBPruner for StateKvPruner {
@@ -62,18 +61,28 @@ impl DBPruner for StateKvPruner {
             );
             self.metadata_pruner.prune(current_batch_target_version)?;
 
-            THREAD_MANAGER.get_background_pool().install(|| {
-                self.shard_pruners.par_iter().try_for_each(|shard_pruner| {
-                    shard_pruner
-                        .prune(progress, current_batch_target_version)
-                        .map_err(|err| {
-                            anyhow!(
-                                "Failed to prune state kv shard {}: {err}",
-                                shard_pruner.shard_id(),
-                            )
+            {
+                let handle = THREAD_MANAGER.get_background_pool();
+                let shard_pruners = Arc::clone(&self.shard_pruners);
+                let join_handles: Vec<_> = (0..shard_pruners.len())
+                    .map(|i| {
+                        let shard_pruners = Arc::clone(&shard_pruners);
+                        handle.spawn_blocking(move || {
+                            shard_pruners[i]
+                                .prune(progress, current_batch_target_version)
+                                .map_err(|err| {
+                                    anyhow!(
+                                        "Failed to prune state kv shard {}: {err}",
+                                        shard_pruners[i].shard_id(),
+                                    )
+                                })
                         })
-                })
-            })?;
+                    })
+                    .collect();
+                for jh in join_handles {
+                    handle.block_on(jh).expect("background task panicked")?;
+                }
+            }
 
             progress = current_batch_target_version;
             self.record_progress(progress);
@@ -145,7 +154,7 @@ impl StateKvPruner {
             progress: AtomicVersion::new(metadata_progress),
             name,
             metadata_pruner,
-            shard_pruners,
+            shard_pruners: Arc::new(shard_pruners),
         };
 
         info!(

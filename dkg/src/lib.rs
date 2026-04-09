@@ -40,6 +40,7 @@ pub fn start_dkg_runtime(
     vtxn_pool: VTxnPoolState,
     rb_config: ReliableBroadcastConfig,
     randomness_override_seq_num: u64,
+    chunky_dkg_override_seq_num: u64,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
@@ -55,6 +56,7 @@ pub fn start_dkg_runtime(
         vtxn_pool,
         rb_config,
         randomness_override_seq_num,
+        chunky_dkg_override_seq_num,
     );
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
     runtime.spawn(network_task.start());
@@ -64,11 +66,15 @@ pub fn start_dkg_runtime(
 
 /// Initialize the DigestKey and emit Prometheus counters for the source.
 /// Spawns a background thread to eagerly load the key from file and record load duration.
-pub fn initialize_digest_key_with_counters(blob_path: Option<&PathBuf>, chain_id: ChainId) {
+pub fn initialize_digest_key_with_counters(
+    blob_path: Option<&PathBuf>,
+    chain_id: ChainId,
+    is_validator: bool,
+) {
     if let Some(path) = blob_path {
         set_digest_key_path(path.clone());
     }
-    let source = initialize_digest_key(chain_id);
+    let source = initialize_digest_key(chain_id, is_validator);
     match &source {
         DigestKeySource::WillLoadFromFile { file_size } => {
             counters::DIGEST_KEY_FILE_SIZE_BYTES.set(*file_size as i64);

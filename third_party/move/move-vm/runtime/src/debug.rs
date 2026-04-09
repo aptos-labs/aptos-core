@@ -3,16 +3,34 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{interpreter::InterpreterDebugInterface, LoadedFunction, RuntimeEnvironment};
-use move_vm_types::{
-    instr::Instruction,
-    values::{self, Locals},
+use crate::{
+    interpreter::InterpreterDebugInterface, source_locator, LoadedFunction, RuntimeEnvironment,
 };
+use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
-    collections::BTreeSet,
-    io::{self, Write},
+    collections::{BTreeSet, VecDeque},
+    env,
+    io::{self, IsTerminal, Write},
     str::FromStr,
 };
+
+// ── Batch-command queue ───────────────────
+
+thread_local! {
+    /// Pre-loaded command queue populated from [`MOVE_VM_STEP_COMMANDS_ENV_VAR_NAME`].
+    /// Commands are comma-separated, e.g. `step,stack,step,continue`.
+    ///
+    /// When a command is available it is consumed without reading stdin,
+    /// making the debugger scriptable for non-interactive use.
+    static COMMAND_QUEUE: RefCell<VecDeque<String>> = {
+        let queue = env::var(crate::tracing::MOVE_VM_STEP_COMMANDS_ENV_VAR_NAME)
+            .map(|s| s.split(',').map(|c| c.trim().to_owned()).collect())
+            .unwrap_or_default();
+        RefCell::new(queue)
+    };
+}
+
+use std::cell::RefCell;
 
 #[derive(Debug)]
 #[allow(unused)]
@@ -211,89 +229,119 @@ impl DebugContext {
                     bp_match, instr_string
                 );
             }
-            println!(
-                "function >> {}\ninstruction >> {:?}\nprogram counter >> {}",
-                function_string, instr, pc
-            );
+
+            // Print function + source location.
+            print!("function >> {}", function_string);
+            if let Some(module_id) = function.module_id() {
+                if let Some(loc) =
+                    source_locator::get_bytecode_source_location(module_id, function.index(), pc)
+                {
+                    print!("  (at {})", loc);
+                }
+            }
+            println!();
+            println!("instruction >> {:?}\nprogram counter >> {}", instr, pc);
+
             loop {
-                print!("> ");
-                std::io::stdout().flush().unwrap();
-                let mut input = String::new();
-                match io::stdin().read_line(&mut input) {
-                    Ok(_) => match input.parse::<DebugCommand>() {
-                        Err(err) => println!("{}", err),
-                        Ok(command) => match command {
-                            DebugCommand::Step(n) => {
-                                self.input_checker = InputChecker::StepRemaining(n);
-                                break;
-                            },
-                            DebugCommand::StepOver(n) => {
-                                self.input_checker = InputChecker::StepOverRemaining {
-                                    stack_depth: interpreter
-                                        .get_stack_frames(usize::MAX)
-                                        .stack_trace()
-                                        .len(),
-                                    remaining: n,
+                // ── Try the pre-loaded command queue first ────────────────────
+                let queued = COMMAND_QUEUE.with(|q| q.borrow_mut().pop_front());
+                let input_str = if let Some(cmd) = queued {
+                    println!("> {}", cmd); // echo so output is parseable
+                    cmd
+                } else {
+                    // ── Fall back to stdin; auto-continue when not a TTY ──────
+                    if !io::stdin().is_terminal() {
+                        self.input_checker = InputChecker::Continue;
+                        break;
+                    }
+                    print!("> ");
+                    std::io::stdout().flush().unwrap();
+                    let mut line = String::new();
+                    match io::stdin().read_line(&mut line) {
+                        Ok(_) => line,
+                        Err(err) => {
+                            println!("Error reading input: {}", err);
+                            break;
+                        },
+                    }
+                };
+
+                match input_str.parse::<DebugCommand>() {
+                    Err(err) => println!("{}", err),
+                    Ok(command) => match command {
+                        DebugCommand::Step(n) => {
+                            self.input_checker = InputChecker::StepRemaining(n);
+                            break;
+                        },
+                        DebugCommand::StepOver(n) => {
+                            self.input_checker = InputChecker::StepOverRemaining {
+                                stack_depth: interpreter
+                                    .get_stack_frames(usize::MAX)
+                                    .stack_trace()
+                                    .len(),
+                                remaining: n,
+                            };
+                            break;
+                        },
+                        DebugCommand::Continue => {
+                            self.input_checker = InputChecker::Continue;
+                            break;
+                        },
+                        DebugCommand::Breakpoint(breakpoint) => {
+                            self.breakpoints.insert(breakpoint.to_string());
+                        },
+                        DebugCommand::DeleteBreakpoint(breakpoint) => {
+                            self.breakpoints.remove(&breakpoint);
+                        },
+                        DebugCommand::StepOut => {
+                            let stack_depth =
+                                interpreter.get_stack_frames(usize::MAX).stack_trace().len();
+                            if stack_depth == 0 {
+                                println!("No stack frames to step out of");
+                            } else {
+                                self.input_checker = InputChecker::StepOut {
+                                    target_stack_depth: stack_depth - 1,
                                 };
                                 break;
-                            },
-                            DebugCommand::Continue => {
-                                self.input_checker = InputChecker::Continue;
-                                break;
-                            },
-                            DebugCommand::Breakpoint(breakpoint) => {
-                                self.breakpoints.insert(breakpoint.to_string());
-                            },
-                            DebugCommand::DeleteBreakpoint(breakpoint) => {
-                                self.breakpoints.remove(&breakpoint);
-                            },
-                            DebugCommand::StepOut => {
-                                let stack_depth =
-                                    interpreter.get_stack_frames(usize::MAX).stack_trace().len();
-                                if stack_depth == 0 {
-                                    println!("No stack frames to step out of");
-                                } else {
-                                    self.input_checker = InputChecker::StepOut {
-                                        target_stack_depth: stack_depth - 1,
-                                    };
-                                    break;
-                                }
-                            },
-                            DebugCommand::PrintBreakpoints => self
-                                .breakpoints
-                                .iter()
-                                .enumerate()
-                                .for_each(|(i, bp)| println!("[{}] {}", i, bp)),
-                            DebugCommand::PrintStack => {
-                                let mut s = String::new();
-                                interpreter
-                                    .debug_print_stack_trace(&mut s, runtime_environment)
-                                    .unwrap();
-                                println!("{}", s);
-                                println!("Current frame: {}\n", function_string);
-                                let code = function.code();
-                                println!("        Code:");
-                                for (i, instr) in code.iter().enumerate() {
-                                    if i as u16 == pc {
-                                        println!("          > [{}] {:?}", pc, instr);
-                                    } else {
-                                        println!("            [{}] {:?}", i, instr);
-                                    }
-                                }
-                                println!("        Locals:");
-                                if !function.local_tys().is_empty() {
-                                    let mut s = String::new();
-                                    values::debug::print_locals(&mut s, locals, false).unwrap();
-                                    println!("{}", s);
-                                } else {
-                                    println!("            (none)");
-                                }
-                            },
+                            }
                         },
-                    },
-                    Err(err) => {
-                        println!("Error reading input: {}", err);
-                        break;
+                        DebugCommand::PrintBreakpoints => self
+                            .breakpoints
+                            .iter()
+                            .enumerate()
+                            .for_each(|(i, bp)| println!("[{}] {}", i, bp)),
+                        DebugCommand::PrintStack => {
+                            let mut s = String::new();
+                            interpreter
+                                .debug_print_stack_trace(&mut s, runtime_environment)
+                                .unwrap();
+                            println!("{}", s);
+                            println!("Current frame: {}\n", function_string);
+                            let code = function.code();
+                            println!("        Code:");
+                            for (i, instr) in code.iter().enumerate() {
+                                if i as u16 == pc {
+                                    println!("          > [{}] {:?}", pc, instr);
+                                } else {
+                                    println!("            [{}] {:?}", i, instr);
+                                }
+                            }
+                            if function.local_tys().is_empty() {
+                                println!("        Locals:");
+                                println!("            (none)");
+                            } else {
+                                let mut s = String::new();
+                                source_locator::print_locals_enriched(
+                                    &mut s,
+                                    function,
+                                    locals,
+                                    runtime_environment,
+                                    false,
+                                )
+                                .unwrap();
+                                println!("{}", s);
+                            }
+                        },
                     },
                 }
             }

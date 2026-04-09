@@ -475,6 +475,18 @@ impl MoveDebugger for AptosDebugger {
         DynStateView::new(Box::new(self.state_view_at_version(version)))
     }
 
+    fn state_view_at_version_with_overrides(
+        &self,
+        version: u64,
+        overrides: std::sync::Arc<aptos_validator_interface::LocalModuleOverrides>,
+    ) -> DynStateView {
+        DynStateView::new(Box::new(DebuggerStateView::new_with_overrides(
+            self.debugger.clone(),
+            version,
+            overrides,
+        )))
+    }
+
     fn execute_transaction_at_version_with_gas_profiler(
         &self,
         version: u64,

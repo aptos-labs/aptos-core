@@ -108,7 +108,7 @@ Both release paths call [`copy-images-to-dockerhub.yaml`](../.github/workflows/c
 
 | Prefix contains | Release group | Images |
 |---|---|---|
-| `aptos-node` (default) | `aptos-node` | `validator`, `validator-testing`, `faucet`, `tools` |
+| `aptos-node` (default) | `aptos-node` | `validator`, `validator-testing`, `faucet`, `tools`, `indexer-grpc` |
 | `aptos-indexer-grpc` | `aptos-indexer-grpc` | `indexer-grpc` |
 
 `validator-testing` is released to GCP only — never to Docker Hub (controlled by `IMAGE_NAMES_TO_RELEASE_ONLY_INTERNAL` in [`docker/release-images.mjs`](release-images.mjs)).
