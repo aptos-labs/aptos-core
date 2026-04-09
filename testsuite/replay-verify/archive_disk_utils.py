@@ -198,7 +198,7 @@ def create_snapshot_with_gcloud(
             break
         elif snapshot.status == compute_v1.Snapshot.Status.FAILED:
             raise Exception(f"Snapshot '{snapshot_name}' failed to create.")
-        logger.info(f"Snapshot status: {snapshot.status.name}, waiting...")
+        logger.info(f"Snapshot status: {snapshot.status}, waiting...")
         time.sleep(60)
 
 
