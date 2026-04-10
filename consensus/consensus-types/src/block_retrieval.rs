@@ -268,13 +268,13 @@ impl BlockRetrievalResponse {
             .iter()
             .try_fold(retrieval_request.block_id(), |expected_id, block| {
                 block.validate_signature(sig_verifier)?;
-                block.verify_well_formed()?;
                 ensure!(
                     block.id() == expected_id,
                     "blocks doesn't form a chain: expect {}, get {}",
                     expected_id,
                     block.id()
                 );
+                block.verify_well_formed()?;
                 Ok(block.parent_id())
             })
             .map(|_| ())
@@ -300,5 +300,30 @@ impl fmt::Display for BlockRetrievalResponse {
             },
             _ => write!(f, "[BlockRetrievalResponse: status: {:?}]", self.status()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus};
+    use crate::block::{block_test_utils::certificate_for_genesis, Block};
+    use aptos_crypto::hash::HashValue;
+    use aptos_types::validator_verifier::ValidatorVerifier;
+
+    #[test]
+    fn verify_rejects_chain_mismatch_before_block_validation() {
+        let malformed_nil_block = Block::new_nil(u64::MAX, certificate_for_genesis(), vec![]);
+        let retrieval_request = BlockRetrievalRequest::new_with_target_round(
+            HashValue::random(),
+            1,
+            malformed_nil_block.round(),
+        );
+        let response =
+            BlockRetrievalResponse::new(BlockRetrievalStatus::Succeeded, vec![malformed_nil_block]);
+        let verifier = ValidatorVerifier::new(vec![]);
+
+        let err = response.verify(retrieval_request, &verifier).unwrap_err();
+        let err_string = err.to_string();
+        assert!(!err_string.contains("Block round overflow"), "{err_string}");
     }
 }
