@@ -581,6 +581,137 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     }
 
     // ========================================================================
+    // Quorum check for proposal collection
+    // ========================================================================
+
+    /// Check if proposals for a slot have reached the 2f+1 (super-majority) quorum threshold.
+    fn has_quorum_proposals(&self, slot: u64) -> bool {
+        let slot_state = match self.slot_states.get(&slot) {
+            Some(s) => s,
+            None => return false,
+        };
+        let authors: Vec<&Author> = slot_state.proposal_buffer().proposal_authors().collect();
+        self.validator_verifier
+            .check_voting_power(authors.into_iter(), true)
+            .is_ok()
+    }
+
+    // ========================================================================
+    // Catch-up: ranking extraction
+    // ========================================================================
+
+    /// Find f+1 (minority-threshold) matching rankings from a set of proposals.
+    ///
+    /// Groups proposals by the hash of their `slot_ranking`, then checks if
+    /// any group's authors have enough combined stake to pass the minority
+    /// threshold (`check_voting_power(authors, false)`). If so, returns that
+    /// ranking (guaranteed to include at least one honest node's ranking).
+    fn find_agreed_ranking(
+        proposals: &HashMap<Author, SlotProposal>,
+        verifier: &ValidatorVerifier,
+    ) -> Option<Vec<Author>> {
+        // Group proposals by hash of their slot_ranking
+        let mut groups: HashMap<HashValue, Vec<&SlotProposal>> = HashMap::new();
+        for proposal in proposals.values() {
+            let ranking_bytes = bcs::to_bytes(&proposal.slot_ranking)
+                .expect("Vec<Author> BCS serialization should not fail");
+            let ranking_hash = HashValue::sha3_256_of(&ranking_bytes);
+            groups.entry(ranking_hash).or_default().push(proposal);
+        }
+
+        // Check each group for f+1 matching stake
+        for (_hash, group) in &groups {
+            let authors: Vec<&Author> = group.iter().map(|p| &p.author).collect();
+            // check_voting_power with check_super_majority=false → minority threshold (f+1)
+            if verifier.check_voting_power(authors.into_iter(), false).is_ok() {
+                // Return the ranking from this group (all proposals in the group have the same ranking)
+                return Some(group[0].slot_ranking.clone());
+            }
+        }
+
+        None
+    }
+
+    // ========================================================================
+    // Catch-up: skip to a future slot
+    // ========================================================================
+
+    /// Skip from the current slot to `target_slot` using a BFT-agreed ranking.
+    ///
+    /// Called when a lagging node detects 2f+1 proposals for a future slot with
+    /// f+1 matching rankings. Cleans up intermediate state and jumps ahead.
+    async fn catch_up_to_slot(&mut self, target_slot: u64, ranking: Vec<Author>) {
+        let skipped = target_slot - self.current_slot;
+        info!(
+            epoch = self.epoch,
+            current_slot = self.current_slot,
+            target_slot = target_slot,
+            slots_skipped = skipped,
+            "Catching up from slot {} to slot {}",
+            self.current_slot,
+            target_slot,
+        );
+
+        // 1. Close current SPC (if running) — dropping channels causes the SPC task to stop
+        self.spc_close_tx.take();
+        self.spc_msg_tx.take();
+        self.spc_priority_tx.take();
+        self.spc_output_rx.take();
+
+        // 2. Clean up intermediate state
+        // Remove slot states for current_slot..target_slot (keep target_slot's state with buffered proposals)
+        let slots_to_remove: Vec<u64> = self.slot_states.keys()
+            .filter(|&&s| s >= self.current_slot && s < target_slot)
+            .cloned()
+            .collect();
+        for s in &slots_to_remove {
+            self.slot_states.remove(s);
+            self.spc_msg_buffer.remove(s);
+            self.spc_priority_buffer.remove(s);
+        }
+
+        // Clear per-slot transient state
+        self.pending_wave = None;
+        self.buffered_v_high = None;
+        self.current_slot_commit_proof = None;
+        self.slot_timer = None;
+        self.v_low_committed_positions.clear();
+
+        // Clean up uncommitted own payloads for skipped slots
+        let remaining = self.uncommitted_own_payloads.split_off(&target_slot);
+        self.uncommitted_own_payloads = remaining;
+        UNCOMMITTED_PAYLOAD_COUNT.set(self.uncommitted_own_payloads.len() as i64);
+
+        // 3. Extract prev_commit_proof from any proposal for target_slot
+        if let Some(target_state) = self.slot_states.get(&target_slot) {
+            let mut found_proof = false;
+            for proposal in target_state.proposal_buffer().proposals().values() {
+                if let Some(ref proof) = proposal.prev_commit_proof {
+                    self.last_commit_proof = Some(proof.clone());
+                    found_proof = true;
+                    break;
+                }
+            }
+            if !found_proof {
+                warn!(
+                    epoch = self.epoch,
+                    target_slot = target_slot,
+                    "No prev_commit_proof found in proposals for target slot"
+                );
+            }
+        }
+
+        // 4. Reset ranking state for catch-up
+        self.last_spc_initial_ranking = None;
+
+        // 5. Adopt BFT-agreed ranking
+        self.ranking_manager.set_ranking(ranking);
+
+        // 6. Start the target slot (creates own proposal, broadcasts, checks quorum)
+        self.start_new_slot(target_slot).await;
+    }
+
+    // ========================================================================
     // Slot lifecycle
     // ========================================================================
 
@@ -640,6 +771,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             &self.validator_signer,
             now_usecs,
             self.last_commit_proof.clone(),
+            self.ranking_manager.current_ranking().to_vec(),
         ) {
             Ok(p) => p,
             Err(e) => {
@@ -667,13 +799,12 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
         self.proposal_wait_start = Some(Instant::now());
 
-        // Re-enabled: 2Δ timer for proposal collection. SPC starts when either
-        // all proposals arrive or this timer expires.
+        // 2Δ timer for proposal collection. SPC starts when either:
+        // (a) all n proposals arrive (immediate, cancel timer), or
+        // (b) timer expires with >= 2f+1 proposals (quorum fallback).
         self.slot_timer = Some((slot, Box::pin(tokio::time::sleep(self.proposal_timeout))));
-        // Previously disabled to guarantee full input vector (no View 2):
-        // self.slot_timer = Some((slot, Box::pin(tokio::time::sleep(self.proposal_timeout))));
 
-        // Check if all proposals already received (pre-buffered + own = all in single-validator case)
+        // Check if all n proposals already received (pre-buffered + own)
         let all_received = self
             .slot_states
             .get(&slot)
@@ -742,12 +873,13 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         let entry_data = ProposalData::from_proposal(&proposal);
         slot_state.insert_proposal(proposal);
 
-        // If all proposals received for current slot AND SPC not yet started.
-        // The spc_msg_tx check guards against starting SPC twice: on_timer_expired
-        // may have already started SPC for this slot before all proposals arrived.
+        // If all n proposals received for current slot AND SPC not yet started,
+        // start SPC immediately (don't wait for timer). The spc_msg_tx check
+        // guards against starting SPC twice.
+        let all_received = self.slot_states.get(&slot).map_or(false, |s| s.has_all_proposals());
         if slot == self.current_slot
-            && slot_state.has_all_proposals()
             && self.spc_msg_tx.is_none()
+            && all_received
         {
             if let Some(wait_start) = self.proposal_wait_start {
                 PROPOSAL_WAIT_DURATION
@@ -760,6 +892,39 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             info!(epoch = self.epoch, slot = slot, "All proposals received, starting SPC");
             self.slot_timer = None;
             self.run_spc(slot).await;
+        }
+
+        // Catch-up detection: if this proposal is for a future slot, check if we can skip ahead.
+        // Find the highest future slot with quorum proposals + f+1 matching ranking.
+        if slot > self.current_slot {
+            let mut best_catchup: Option<(u64, Vec<Author>)> = None;
+            let future_slots: Vec<u64> = self.slot_states.keys()
+                .filter(|&&s| s > self.current_slot)
+                .cloned()
+                .collect();
+            for future_slot in future_slots {
+                if !self.has_quorum_proposals(future_slot) {
+                    continue;
+                }
+                let proposals = self.slot_states.get(&future_slot)
+                    .expect("just filtered from slot_states")
+                    .proposal_buffer()
+                    .proposals();
+                if let Some(ranking) = Self::find_agreed_ranking(proposals, &self.validator_verifier) {
+                    match &best_catchup {
+                        None => best_catchup = Some((future_slot, ranking)),
+                        Some((best_slot, _)) if future_slot > *best_slot => {
+                            best_catchup = Some((future_slot, ranking));
+                        },
+                        _ => {},
+                    }
+                }
+            }
+
+            if let Some((target_slot, ranking)) = best_catchup {
+                self.catch_up_to_slot(target_slot, ranking).await;
+                return; // catch_up_to_slot calls start_new_slot which handles everything
+            }
         }
 
         // Check if this late proposal resolves a pending wave
@@ -780,15 +945,33 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         if self.spc_msg_tx.is_some() {
             return; // SPC already running
         }
-        SLOT_START_TRIGGER
-            .with_label_values(&["timer_expired"])
-            .inc();
-        info!(
-            epoch = self.epoch,
-            slot = slot,
-            "Timer expired, starting SPC with available proposals"
-        );
-        self.run_spc(slot).await;
+
+        // Timer is the quorum fallback: if all n proposals haven't arrived yet
+        // but we have >= 2f+1 (quorum), start SPC with what we have.
+        // If < 2f+1, keep waiting for more proposals.
+        if self.has_quorum_proposals(slot) {
+            SLOT_START_TRIGGER
+                .with_label_values(&["timer_expired_with_quorum"])
+                .inc();
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                "Timer expired with quorum met, starting SPC"
+            );
+            self.run_spc(slot).await;
+        } else {
+            let proposal_count = self.slot_states
+                .get(&slot)
+                .map_or(0, |s| s.proposal_buffer().proposal_count());
+            let n = self.ranking_manager.validator_count();
+            warn!(
+                epoch = self.epoch,
+                slot = slot,
+                proposals_received = proposal_count,
+                validators = n,
+                "Timer expired but quorum not met, waiting for more proposals"
+            );
+        }
     }
 
     // ========================================================================
@@ -1853,7 +2036,7 @@ mod tests {
         epoch: u64,
     ) {
         let proposal = create_signed_slot_proposal(
-            slot, epoch, signer.author(), Payload::DirectMempool(vec![]), signer, 0, None,
+            slot, epoch, signer.author(), Payload::DirectMempool(vec![]), signer, 0, None, vec![],
         )
         .unwrap();
         let n = manager.ranking_manager.validator_count();
@@ -1867,9 +2050,10 @@ mod tests {
         slot_state.insert_proposal(proposal);
 
         // Check if all proposals received for current slot and SPC not yet started
+        let all_received = slot_state.has_all_proposals();
         if slot == manager.current_slot
-            && slot_state.has_all_proposals()
             && manager.spc_msg_tx.is_none()
+            && all_received
         {
             manager.slot_timer = None;
             manager.run_spc(slot).await;
@@ -1940,7 +2124,7 @@ mod tests {
         manager.start_new_slot(1).await;
         assert_eq!(manager.current_slot, 1);
         assert!(manager.slot_states.contains_key(&1));
-        assert!(manager.slot_timer.is_none()); // Timer disabled while View > 1 logic is being fixed
+        assert!(manager.slot_timer.is_some()); // Timer set; SPC starts on all-n or timer with quorum
 
         // Feed proposals from other 3 validators
         for signer in &signers[1..] {
@@ -1952,18 +2136,19 @@ mod tests {
                 signer,
                 0, // test timestamp
                 None,
+                vec![],
             )
             .unwrap();
             manager.process_proposal(signer.author(), proposal).await;
         }
 
-        // All 4 proposals received → SPC should have been triggered
-        // StubSPCSpawner sends VLow then VHigh synchronously → available immediately
+        // All 4 proposals received → SPC starts immediately (all-n trigger).
+        // StubSPCSpawner sends VLow then VHigh synchronously → available immediately.
         if manager.spc_output_rx.is_some() {
             process_spc_output(&mut manager).await;
         }
 
-        // Wave 1: one OrderedBlocks with 4 per-entry blocks (v_low == v_high, all non-bot)
+        // Wave 1: one OrderedBlocks with 4 per-entry blocks (all validators present)
         let ordered = exec_rx.try_next().unwrap().expect("Wave 1 should be on execution channel");
         assert_eq!(ordered.ordered_blocks.len(), 4);
         assert_eq!(ordered.ordered_blocks[0].block().epoch(), 1);
@@ -2014,6 +2199,7 @@ mod tests {
             &signers[1],
             0,
             None,
+            vec![],
         )
         .unwrap();
 
@@ -2034,7 +2220,7 @@ mod tests {
         // Slot 1: only 2 proposals (from signers[0] and signers[1])
         manager.start_new_slot(1).await;
         let p1 = create_signed_slot_proposal(
-            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0, None,
+            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0, None, vec![],
         ).unwrap();
         manager.process_proposal(signers[1].author(), p1).await;
 
@@ -2062,7 +2248,7 @@ mod tests {
 
         // Send the other proposal
         let p = create_signed_slot_proposal(
-            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0, None,
+            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0, None, vec![],
         ).unwrap();
         manager.process_proposal(signers[1].author(), p).await;
 
@@ -2188,14 +2374,20 @@ mod tests {
         let (mut manager, exec_rx, ns) = build_test_manager(signers, verifier.clone());
         manager.start_new_slot(1).await;
 
-        // Submit proposals from all other validators
+        // Insert proposals from all other validators directly into the slot state
+        // (bypasses process_proposal's quorum trigger so we control when SPC starts)
+        let n = manager.ranking_manager.validator_count();
+        manager.slot_states.entry(1).or_insert_with(|| SlotState::new(1, n));
         for signer in &signers[1..] {
             let proposal = create_signed_slot_proposal(
-                1, 1, signer.author(), Payload::DirectMempool(vec![]), signer, 100, None,
+                1, 1, signer.author(), Payload::DirectMempool(vec![]), signer, 100, None, vec![],
             )
             .unwrap();
-            manager.process_proposal(signer.author(), proposal).await;
+            manager.slot_states.get_mut(&1).unwrap().insert_proposal(proposal);
         }
+
+        // Now start SPC manually with all proposals present
+        manager.run_spc(1).await;
 
         // Verify slot state has a frozen entry_data_map (SPC was started)
         let input_vector = manager

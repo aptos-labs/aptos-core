@@ -68,6 +68,11 @@ pub struct SlotProposal {
     pub prev_commit_proof_hash: Option<HashValue>,
     pub signature: BlsSignature,
     pub timestamp_usecs: u64,
+    /// Proposer's ranking for this slot (unsigned metadata for catch-up protocol).
+    /// NOT part of `SlotProposalSignData` or `entry_hash` — advisory only.
+    /// A catching-up node collects f+1 matching rankings from 2f+1 proposals
+    /// to adopt a BFT-agreed ranking when skipping ahead.
+    pub slot_ranking: Vec<Author>,
 }
 
 impl SlotProposal {
@@ -80,6 +85,7 @@ impl SlotProposal {
         prev_commit_proof: Option<StrongPCCommit>,
         signature: BlsSignature,
         timestamp_usecs: u64,
+        slot_ranking: Vec<Author>,
     ) -> Self {
         let payload_hash = Self::compute_payload_hash(&payload);
         let prev_commit_proof_hash = prev_commit_proof.as_ref().map(Self::compute_commit_proof_hash);
@@ -93,6 +99,7 @@ impl SlotProposal {
             prev_commit_proof_hash,
             signature,
             timestamp_usecs,
+            slot_ranking,
         }
     }
 
@@ -273,6 +280,7 @@ pub fn create_signed_slot_proposal(
     signer: &ValidatorSigner,
     timestamp_usecs: u64,
     prev_commit_proof: Option<StrongPCCommit>,
+    slot_ranking: Vec<Author>,
 ) -> Result<SlotProposal> {
     let payload_hash = SlotProposal::compute_payload_hash(&payload);
     let prev_commit_proof_hash = prev_commit_proof.as_ref().map(SlotProposal::compute_commit_proof_hash);
@@ -294,6 +302,7 @@ pub fn create_signed_slot_proposal(
         prev_commit_proof_hash,
         signature,
         timestamp_usecs,
+        slot_ranking,
     })
 }
 
@@ -490,7 +499,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None, vec![]).expect("signing failed");
 
         assert_eq!(proposal.slot, 1);
         assert_eq!(proposal.epoch, 1);
@@ -506,7 +515,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None, vec![]).expect("signing failed");
 
         // Verification with a different validator's verifier should fail
         assert!(proposal.verify(&wrong_verifier).is_err());
@@ -519,7 +528,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None, vec![]).expect("signing failed");
 
         let bytes = bcs::to_bytes(&proposal).expect("serialization failed");
         let deserialized: SlotProposal =
@@ -535,7 +544,7 @@ mod tests {
         let payload = create_test_payload();
 
         let mut proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None, vec![]).expect("signing failed");
 
         // Tamper with the payload after signing (substitute different transactions)
         proposal.payload = Payload::DirectMempool(vec![]);
@@ -559,7 +568,7 @@ mod tests {
         let author = signer.author();
         let payload = create_test_payload();
         let proposal =
-            create_signed_slot_proposal(5, 3, author, payload, &signer, 0, None).expect("signing failed");
+            create_signed_slot_proposal(5, 3, author, payload, &signer, 0, None, vec![]).expect("signing failed");
 
         // Test SlotProposal variant
         let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
@@ -597,7 +606,7 @@ mod tests {
         let author = signer.author();
         let payload = create_test_payload();
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None, vec![]).expect("signing failed");
 
         let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
         let bytes = bcs::to_bytes(&msg).expect("serialization failed");
@@ -670,7 +679,7 @@ mod tests {
         let author = signer.author();
         let payload = create_test_payload();
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None, vec![]).expect("signing failed");
 
         let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
         assert!(!msg.is_priority());
@@ -813,7 +822,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 12345, None)
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 12345, None, vec![])
                 .expect("signing failed");
 
         let data = ProposalData::from_proposal(&proposal);
@@ -892,7 +901,7 @@ mod tests {
 
         let proof = create_valid_commit_proof(&signers, 1, 1);
         let proposal = create_signed_slot_proposal(
-            2, 1, author, payload, signer, 0, Some(proof),
+            2, 1, author, payload, signer, 0, Some(proof), vec![],
         )
         .expect("signing failed");
 
@@ -911,7 +920,7 @@ mod tests {
 
         let proof = create_valid_commit_proof(&signers, 1, 1);
         let mut proposal = create_signed_slot_proposal(
-            2, 1, author, payload, signer, 0, Some(proof),
+            2, 1, author, payload, signer, 0, Some(proof), vec![],
         )
         .expect("signing failed");
 
@@ -951,7 +960,7 @@ mod tests {
         );
 
         let proposal = create_signed_slot_proposal(
-            2, 1, author, payload, signer, 0, Some(bad_proof),
+            2, 1, author, payload, signer, 0, Some(bad_proof), vec![],
         )
         .expect("signing failed");
 

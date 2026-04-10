@@ -97,6 +97,11 @@ impl MultiSlotRankingManager {
         self.current_ranking.iter().position(|a| a == author)
     }
 
+    /// Override the current ranking (used during catch-up to adopt a BFT-agreed ranking).
+    pub fn set_ranking(&mut self, ranking: Vec<Author>) {
+        self.current_ranking = ranking;
+    }
+
     /// Number of validators in the ranking.
     pub fn validator_count(&self) -> usize {
         self.current_ranking.len()
@@ -299,6 +304,22 @@ mod tests {
         // After demoting A: [B, C, D, A]
         // v_high exclusion: current_slot_ranking[1] = B → find B in [B, C, D, A] at pos 0, demote → [C, D, A, B]
         assert_eq!(mgr.current_ranking(), &[v[2], v[3], v[0], v[1]]);
+    }
+
+    #[test]
+    fn test_set_ranking_overrides_current() {
+        let v = authors(4); // [A, B, C, D]
+        let mut mgr = MultiSlotRankingManager::new(v.clone());
+        assert_eq!(mgr.current_ranking(), &v);
+
+        // Override with reversed ranking
+        let reversed: Vec<Author> = v.iter().rev().cloned().collect();
+        mgr.set_ranking(reversed.clone());
+        assert_eq!(mgr.current_ranking(), &reversed);
+
+        // Further updates work on the adopted ranking
+        mgr.update_with_proof(1, &reversed, &reversed, 2); // exclude reversed[2]=B
+        assert_eq!(mgr.current_ranking(), &[v[3], v[2], v[0], v[1]]);
     }
 
     #[test]

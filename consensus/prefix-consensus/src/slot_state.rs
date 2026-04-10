@@ -79,6 +79,16 @@ impl ProposalBuffer {
         self.proposals.get(author)
     }
 
+    /// Iterator over the authors who have submitted proposals.
+    pub fn proposal_authors(&self) -> impl Iterator<Item = &Author> {
+        self.proposals.keys()
+    }
+
+    /// Reference to the underlying proposals map (for ranking extraction during catch-up).
+    pub fn proposals(&self) -> &HashMap<Author, SlotProposal> {
+        &self.proposals
+    }
+
     /// Build the SPC input vector and entry data lookup map, ordered by `ranking`.
     ///
     /// Returns:
@@ -346,7 +356,7 @@ mod tests {
         signer: &ValidatorSigner,
         payload: Payload,
     ) -> SlotProposal {
-        crate::slot_types::create_signed_slot_proposal(slot, epoch, signer.author(), payload, signer, 0, None)
+        crate::slot_types::create_signed_slot_proposal(slot, epoch, signer.author(), payload, signer, 0, None, vec![])
             .expect("signing should not fail")
     }
 
@@ -369,6 +379,7 @@ mod tests {
             prev_commit_proof_hash: None,
             signature: BlsSignature::dummy_signature(),
             timestamp_usecs: 0,
+            slot_ranking: vec![],
         }
     }
 
