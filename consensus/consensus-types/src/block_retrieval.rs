@@ -267,13 +267,13 @@ impl BlockRetrievalResponse {
         self.blocks
             .iter()
             .try_fold(retrieval_request.block_id(), |expected_id, block| {
-                block.validate_signature(sig_verifier)?;
                 ensure!(
                     block.id() == expected_id,
                     "blocks doesn't form a chain: expect {}, get {}",
                     expected_id,
                     block.id()
                 );
+                block.validate_signature(sig_verifier)?;
                 block.verify_well_formed()?;
                 Ok(block.parent_id())
             })
