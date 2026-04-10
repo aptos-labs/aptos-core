@@ -53,6 +53,10 @@ where
         }
     }
 
+    fn from_dashmap(map: DashMap<K, V>) -> Self {
+        Self { inner: map }
+    }
+
     fn get(&self, key: &K) -> Option<Ref<'_, K, V>> {
         self.inner.get(key)
     }
@@ -93,6 +97,12 @@ where
     fn new_empty(max_items_per_shard: usize) -> Self {
         Self {
             shards: arr![Shard::new(max_items_per_shard); 16],
+        }
+    }
+
+    fn from_loaded(shards: [DashMap<K, V>; NUM_STATE_SHARDS]) -> Self {
+        Self {
+            shards: shards.map(Shard::from_dashmap),
         }
     }
 
@@ -161,6 +171,36 @@ pub struct HotState {
 impl HotState {
     pub fn new(state: State, config: HotStateConfig) -> Self {
         let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
+        let view = Arc::new(LayeredHotStateView {
+            delta: None,
+            base: Arc::clone(&base),
+        });
+        let committed = Arc::new(Mutex::new(CommittedSnapshot {
+            state: state.clone(),
+            view,
+        }));
+        let merged_version = Arc::new(AtomicU64::new(state.next_version()));
+        let commit_tx = Committer::spawn(
+            Arc::clone(&base),
+            Arc::clone(&committed),
+            state,
+            Arc::clone(&merged_version),
+        );
+
+        Self {
+            base,
+            committed,
+            commit_tx,
+            #[cfg(test)]
+            merged_version,
+        }
+    }
+
+    pub fn new_from_loaded(
+        state: State,
+        loaded_shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+    ) -> Self {
+        let base = Arc::new(HotStateBase::from_loaded(loaded_shards));
         let view = Arc::new(LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
