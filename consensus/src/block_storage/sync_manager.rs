@@ -8,7 +8,7 @@ use crate::{
         BlockReader, BlockStore,
     },
     counters::{
-        BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER,
+        self, BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER,
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC,
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
         SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
@@ -50,6 +50,27 @@ use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, fmt::Display, sync::Arc, time::Duration};
 use tokio::{time, time::timeout};
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+/// Why state sync was triggered in need_sync_for_ledger_info.
+pub enum StateSyncTriggerReason {
+    /// The committed block doesn't exist in the block tree
+    BlockNotExist,
+    /// The commit round gap exceeds the threshold
+    CommitGapTooLarge,
+    /// Both conditions are true
+    BlockNotExistAndCommitGap,
+}
+
+impl StateSyncTriggerReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StateSyncTriggerReason::BlockNotExist => "block_not_exist",
+            StateSyncTriggerReason::CommitGapTooLarge => "commit_gap",
+            StateSyncTriggerReason::BlockNotExistAndCommitGap => "block_not_exist_and_commit_gap",
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// Whether we need to do block retrieval if we want to insert a Quorum Cert.
 pub enum NeedFetchResult {
@@ -61,34 +82,54 @@ pub enum NeedFetchResult {
 
 impl BlockStore {
     /// Check if we're far away from this ledger info and need to sync.
-    /// This ensures that the block referred by the ledger info is not in buffer manager.
-    pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
+    /// Returns the trigger reason if sync is needed, or None if not.
+    pub fn need_sync_for_ledger_info(
+        &self,
+        li: &LedgerInfoWithSignatures,
+    ) -> Option<StateSyncTriggerReason> {
         const MAX_PRECOMMIT_GAP: u64 = 200;
-        let block_not_exist = self.ordered_root().round() < li.commit_info().round()
-            && !self.block_exists(li.commit_info().id());
+        let ordered_root_round = self.ordered_root().round();
+        let commit_round = li.commit_info().round();
+        let block_not_exist =
+            ordered_root_round < commit_round && !self.block_exists(li.commit_info().id());
         // TODO move min gap to fallback (30) to config, and if configurable make sure the value is
         // larger than buffer manager MAX_BACKLOG (20)
         let max_commit_gap = 30.max(2 * self.vote_back_pressure_limit);
-        let min_commit_round = li.commit_info().round().saturating_sub(max_commit_gap);
+        let min_commit_round = commit_round.saturating_sub(max_commit_gap);
         let current_commit_round = self.commit_root().round();
 
         if let Some(pre_commit_status) = self.pre_commit_status() {
             let mut status_guard = pre_commit_status.lock();
-            if block_not_exist || status_guard.round() < min_commit_round {
+            let commit_gap = status_guard.round() < min_commit_round;
+            if block_not_exist || commit_gap {
                 // pause the pre_commit so that pre_commit task doesn't over-commit
                 // it can still commit if it receives the LI previously forwarded,
                 // but it won't exceed the LI here
                 // it'll resume after state sync is done
                 status_guard.pause();
-                true
+                Some(Self::sync_trigger_reason(block_not_exist, commit_gap))
             } else {
                 if current_commit_round + MAX_PRECOMMIT_GAP < status_guard.round() {
                     status_guard.pause();
                 }
-                false
+                None
             }
         } else {
-            block_not_exist || current_commit_round < min_commit_round
+            let commit_gap = current_commit_round < min_commit_round;
+            if block_not_exist || commit_gap {
+                Some(Self::sync_trigger_reason(block_not_exist, commit_gap))
+            } else {
+                None
+            }
+        }
+    }
+
+    fn sync_trigger_reason(block_not_exist: bool, commit_gap: bool) -> StateSyncTriggerReason {
+        match (block_not_exist, commit_gap) {
+            (true, true) => StateSyncTriggerReason::BlockNotExistAndCommitGap,
+            (true, false) => StateSyncTriggerReason::BlockNotExist,
+            (false, true) => StateSyncTriggerReason::CommitGapTooLarge,
+            (false, false) => unreachable!("called only when block_not_exist || commit_gap"),
         }
     }
 
@@ -117,6 +158,7 @@ impl BlockStore {
         &self,
         sync_info: &SyncInfo,
         mut retriever: BlockRetriever,
+        source: &str,
     ) -> anyhow::Result<()> {
         // When the local ordered round is very old than the received sync_info, this function will
         // (1) resets the block store with highest commit cert = sync_info.highest_quorum_cert()
@@ -128,6 +170,7 @@ impl BlockStore {
             sync_info.highest_quorum_cert().clone(),
             sync_info.highest_commit_cert().clone(),
             &mut retriever,
+            source,
         )
         .await?;
 
@@ -281,10 +324,31 @@ impl BlockStore {
         highest_quorum_cert: QuorumCert,
         highest_commit_cert: WrappedLedgerInfo,
         retriever: &mut BlockRetriever,
+        source: &str,
     ) -> anyhow::Result<()> {
-        if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
-            return Ok(());
-        }
+        let reason = match self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
+            Some(reason) => reason,
+            None => return Ok(()),
+        };
+
+        let ordered_root_round = self.ordered_root().round();
+        let commit_round = highest_commit_cert.ledger_info().commit_info().round();
+        let gap = commit_round.saturating_sub(ordered_root_round);
+
+        counters::STATE_SYNC_TRIGGER
+            .with_label_values(&[reason.as_str(), source])
+            .inc();
+        counters::STATE_SYNC_TRIGGER_GAP.observe(gap as f64);
+        info!(
+            LogSchema::new(LogEvent::StateSyncTrigger),
+            reason = reason.as_str(),
+            source = source,
+            ordered_root_round = ordered_root_round,
+            commit_round = commit_round,
+            current_commit_round = self.commit_root().round(),
+            gap = gap,
+            commit_block_id = highest_commit_cert.ledger_info().commit_info().id(),
+        );
 
         if let Some(pre_commit_status) = self.pre_commit_status() {
             defer! {
@@ -306,9 +370,10 @@ impl BlockStore {
         .await?
         .take();
         info!(
-            LogSchema::new(LogEvent::CommitViaSync).round(self.ordered_root().round()),
+            LogSchema::new(LogEvent::CommitViaSync).round(ordered_root_round),
             committed_round = root.commit_root_block.round(),
             block_id = root.commit_root_block.id(),
+            source = source,
         );
         self.rebuild(root, root_metadata, blocks, quorum_certs)
             .await;
