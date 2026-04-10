@@ -76,6 +76,8 @@ pub fn run_pvss_with_hkzg(
         &mut rng_aptos,
     );
 
+    std::fs::write("pp.bin", &bcs::to_bytes(&pp).unwrap()).unwrap();
+
     let ssks = (0..tc.get_total_num_players())
         .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos))
         .collect::<Vec<<T as Transcript>::SigningSecretKey>>();

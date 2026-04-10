@@ -295,4 +295,51 @@ pub mod tests {
             BatchEncryptionError::CTVerifyError(CTVerifyError::SigVerificationFailed(_))
         ));
     }
+
+    #[test]
+    fn test_ct_verify_serialize() {
+        let mut rng = thread_rng();
+        let tc = ShamirThresholdConfig::new(1, 1);
+        let (ek, _, _, _) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
+
+        let plaintext = String::from("hi");
+        let associated_data = String::from("associated data");
+        let fake_associated_data = String::from("fake_associated data");
+        let mut ct: StandardCiphertext =
+            ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
+
+        use std::fs;
+
+        fs::write("test.ct", &bcs::to_bytes(&ct).unwrap()).unwrap();
+
+        // Verification with the correct associated data should succeed.
+        ct.verify(&associated_data).unwrap();
+
+        // The CT itself contains a byte encoding of the associated data. Verification with
+        // incorrect associated data returns an error indicating as such.
+        let e: BatchEncryptionError = ct
+            .verify(&fake_associated_data)
+            .unwrap_err()
+            .downcast()
+            .unwrap();
+        assert!(matches!(
+            e,
+            BatchEncryptionError::CTVerifyError(CTVerifyError::AssociatedDataDoesNotMatch)
+        ));
+
+        // Even if the CT itself is modified to contain a byte encoding of incorrect associated
+        // data, verification should fail, this time with an error message indicating that the
+        // signature verification failed.
+        ct.associated_data_bytes = bcs::to_bytes(&fake_associated_data).unwrap();
+        ct.bibe_ct.id = Id::from_verifying_key_and_ad(&ct.vk, &fake_associated_data);
+        let e: BatchEncryptionError = ct
+            .verify(&fake_associated_data)
+            .unwrap_err()
+            .downcast()
+            .unwrap();
+        assert!(matches!(
+            e,
+            BatchEncryptionError::CTVerifyError(CTVerifyError::SigVerificationFailed(_))
+        ));
+    }
 }
