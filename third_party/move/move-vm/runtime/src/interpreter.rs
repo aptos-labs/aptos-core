@@ -2991,7 +2991,7 @@ impl Frame {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_eq(&lhs, &rhs)?;
-                        let check_mask = interpreter.vm_config.check_closure_mask_in_eq;
+                        let check_mask = interpreter.vm_config.check_closure_mask_in_cmp;
                         interpreter
                             .operand_stack
                             .push(Value::bool(lhs.equals_with_depth(
@@ -3005,7 +3005,7 @@ impl Frame {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_neq(&lhs, &rhs)?;
-                        let check_mask = interpreter.vm_config.check_closure_mask_in_eq;
+                        let check_mask = interpreter.vm_config.check_closure_mask_in_cmp;
                         interpreter
                             .operand_stack
                             .push(Value::bool(!lhs.equals_with_depth(

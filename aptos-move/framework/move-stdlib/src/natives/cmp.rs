@@ -7,9 +7,8 @@
 
 //! Implementation of native functions for value comparison.
 
-use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_45,
-    gas_params::natives::move_stdlib::{CMP_COMPARE_BASE, CMP_COMPARE_PER_ABS_VAL_UNIT},
+use aptos_gas_schedule::gas_params::natives::move_stdlib::{
+    CMP_COMPARE_BASE, CMP_COMPARE_PER_ABS_VAL_UNIT,
 };
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
@@ -52,7 +51,11 @@ fn native_compare(
                 + context.abs_val_size_dereferenced(&args[1])?);
     context.charge(cost)?;
 
-    let check_mask = context.gas_feature_version() >= RELEASE_V1_45;
+    let check_mask = context
+        .module_storage()
+        .runtime_environment()
+        .vm_config()
+        .check_closure_mask_in_cmp;
     let ordering = args[0].compare_with_depth(
         &args[1],
         1,
