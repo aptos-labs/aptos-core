@@ -324,7 +324,10 @@ mod tests {
 
         let err = response.verify(retrieval_request, &verifier).unwrap_err();
         let err_string = err.to_string();
-        assert!(err_string.contains("blocks doesn't form a chain"), "{err_string}");
+        assert!(
+            err_string.contains("blocks doesn't form a chain"),
+            "{err_string}"
+        );
         assert!(!err_string.contains("Block round overflow"), "{err_string}");
     }
 }
