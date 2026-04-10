@@ -1172,6 +1172,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if !onchain_chunky_dkg_config.chunky_dkg_enabled() {
             return Err(NoSecretSharingReason::FeatureDisabled);
         }
+        if onchain_chunky_dkg_config.is_shadow_mode() {
+            return Err(NoSecretSharingReason::ShadowMode);
+        }
 
         let dkg_state =
             maybe_chunky_dkg_state.map_err(NoSecretSharingReason::ChunkyDKGStateResourceMissing)?;
@@ -2126,6 +2129,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 pub enum NoSecretSharingReason {
     VTxnDisabled,
     FeatureDisabled,
+    ShadowMode,
     ChunkyDKGStateResourceMissing(anyhow::Error),
     DKGCompletedSessionResourceMissing,
     CompletedSessionTooOld,

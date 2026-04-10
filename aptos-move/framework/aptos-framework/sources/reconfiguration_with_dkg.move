@@ -5,6 +5,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::chunky_dkg_config;
     use aptos_framework::chunky_dkg_config_seqnum;
     use aptos_framework::consensus_config;
+    use aptos_framework::create_signer;
     use aptos_framework::decryption;
     use aptos_framework::dkg;
     use aptos_framework::execution_config;
@@ -19,6 +20,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::reconfiguration_state;
     use aptos_framework::stake;
     use aptos_framework::system_addresses;
+    use aptos_framework::timestamp;
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
 
@@ -131,5 +133,31 @@ module aptos_framework::reconfiguration_with_dkg {
         let next_epoch = reconfiguration::current_epoch() + 1;
         decryption::set_for_next_epoch(next_epoch, encryption_key);
         maybe_finish_reconfig_with_chunky_dkg(account);
+    }
+
+    /// Safety net for shadow mode: if DKG is done but chunky DKG exceeds its grace period,
+    /// force epoch change. Called from block_prologue_ext_v2 every block after the epoch
+    /// interval has elapsed. No-op unless all conditions are met.
+    public(friend) fun try_complete_after_grace_period() {
+        if (!reconfiguration_state::is_in_progress()) { return };
+
+        // DKG must be done.
+        if (dkg::incomplete_session().is_some()) { return };
+
+        // Chunky DKG must still be in progress.
+        let chunky_session = chunky_dkg::incomplete_session();
+        if (chunky_session.is_none()) { return };
+
+        // Grace period must be configured (ConfigShadowV1).
+        let grace_period = chunky_dkg_config::grace_period_secs();
+        if (grace_period.is_none()) { return };
+
+        // Check if grace period has elapsed.
+        let start_time_us = chunky_dkg::session_start_time(chunky_session.borrow());
+        let grace_period_us = (*grace_period.borrow()) * 1_000_000;
+        if (timestamp::now_microseconds() - start_time_us >= grace_period_us) {
+            let framework = create_signer::create_signer(@aptos_framework);
+            finish(&framework);
+        };
     }
 }
