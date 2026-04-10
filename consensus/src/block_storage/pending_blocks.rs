@@ -119,6 +119,16 @@ impl PendingBlocks {
         }
     }
 
+    /// Check if an opt block (not yet converted to regular) exists at the given round.
+    pub fn has_opt_block_at_round(&self, round: Round) -> bool {
+        self.opt_blocks_by_round.contains_key(&round)
+    }
+
+    /// Check if a regular block exists at the given round.
+    pub fn has_regular_block_at_round(&self, round: Round) -> bool {
+        self.blocks_by_round.contains_key(&round)
+    }
+
     pub fn gc(&mut self, round: Round) {
         let mut to_remove = vec![];
         for (r, _) in self.blocks_by_round.range(..=round) {
