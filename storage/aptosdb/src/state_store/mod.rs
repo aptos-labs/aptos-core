@@ -4,7 +4,7 @@
 //! This file defines state store APIs that are related account state Merkle tree.
 
 use crate::{
-    ledger_db::LedgerDb,
+    ledger_db::{ledger_metadata_db::LedgerMetadataDb, LedgerDb},
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
     pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
@@ -447,90 +447,120 @@ impl StateStore {
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
-        if let Some(overall_commit_progress) = ledger_metadata_db
+        let Some(overall_commit_progress) = ledger_metadata_db
             .get_synced_version()
             .expect("DB read failed.")
-        {
-            info!(
-                overall_commit_progress = overall_commit_progress,
-                "Start syncing databases..."
-            );
-            let ledger_commit_progress = ledger_metadata_db
-                .get_ledger_commit_progress()
-                .expect("Failed to read ledger commit progress.");
-            assert_ge!(ledger_commit_progress, overall_commit_progress);
-
-            let state_kv_commit_progress = state_kv_db
-                .metadata_db()
-                .get::<DbMetadataSchema>(&DbMetadataKey::StateKvCommitProgress)
-                .expect("Failed to read state K/V commit progress.")
-                .expect("State K/V commit progress cannot be None.")
-                .expect_version();
-            assert_ge!(state_kv_commit_progress, overall_commit_progress);
-
-            // LedgerCommitProgress was not guaranteed to commit after all ledger changes finish,
-            // have to attempt truncating every column family.
-            info!(
-                ledger_commit_progress = ledger_commit_progress,
-                "Attempt ledger truncation...",
-            );
-            let difference = ledger_commit_progress - overall_commit_progress;
-            if crash_if_difference_is_too_large {
-                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-            }
-            truncate_ledger_db(ledger_db.clone(), overall_commit_progress)
-                .expect("Failed to truncate ledger db.");
-
-            // State K/V commit progress isn't (can't be) written atomically with the data,
-            // because there are shards, so we have to attempt truncation anyway.
-            info!(
-                state_kv_commit_progress = state_kv_commit_progress,
-                "Start state KV truncation..."
-            );
-            let difference = state_kv_commit_progress - overall_commit_progress;
-            if crash_if_difference_is_too_large {
-                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-            }
-            truncate_state_kv_db(
-                &state_kv_db,
-                state_kv_commit_progress,
-                overall_commit_progress,
-                std::cmp::max(difference as usize, 1), /* batch_size */
-            )
-            .expect("Failed to truncate state K/V db.");
-
-            let state_merkle_max_version = get_max_version_in_state_merkle_db(&state_merkle_db)
-                .expect("Failed to get state merkle max version.")
-                .expect("State merkle max version cannot be None.");
-            if state_merkle_max_version > overall_commit_progress {
-                let difference = state_merkle_max_version - overall_commit_progress;
-                if crash_if_difference_is_too_large {
-                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-                }
-            }
-            let state_merkle_target_version = find_tree_root_at_or_before(
-                ledger_metadata_db,
-                &state_merkle_db,
-                overall_commit_progress,
-            )
-            .expect("DB read failed.")
-            .unwrap_or_else(|| {
-                panic!(
-                    "Could not find a valid root before or at version {}, maybe it was pruned?",
-                    overall_commit_progress
-                )
-            });
-            if state_merkle_target_version < state_merkle_max_version {
-                info!(
-                    state_merkle_max_version = state_merkle_max_version,
-                    target_version = state_merkle_target_version,
-                    "Start state merkle truncation..."
-                );
-                truncate_state_merkle_db(&state_merkle_db, state_merkle_target_version)
-                    .expect("Failed to truncate state merkle db.");
-            }
-        } else {
+        else {
             info!("No overall commit progress was found!");
+            return;
+        };
+
+        info!(
+            overall_commit_progress = overall_commit_progress,
+            "Start syncing databases..."
+        );
+        let ledger_commit_progress = ledger_metadata_db
+            .get_ledger_commit_progress()
+            .expect("Failed to read ledger commit progress.");
+        assert_ge!(ledger_commit_progress, overall_commit_progress);
+
+        // LedgerCommitProgress was not guaranteed to commit after all ledger changes finish,
+        // have to attempt truncating every column family.
+        info!(
+            ledger_commit_progress = ledger_commit_progress,
+            "Attempt ledger truncation...",
+        );
+        let difference = ledger_commit_progress - overall_commit_progress;
+        if crash_if_difference_is_too_large {
+            assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+        }
+        truncate_ledger_db(ledger_db.clone(), overall_commit_progress)
+            .expect("Failed to truncate ledger db.");
+
+        Self::sync_state_kv_commit_progress(
+            &state_kv_db,
+            overall_commit_progress,
+            crash_if_difference_is_too_large,
+        );
+        Self::sync_state_merkle_commit_progress(
+            ledger_metadata_db,
+            &state_merkle_db,
+            overall_commit_progress,
+            crash_if_difference_is_too_large,
+        );
+    }
+
+    /// Reads the state KV commit progress and truncates the state KV DB back to
+    /// `overall_commit_progress`.
+    fn sync_state_kv_commit_progress(
+        state_kv_db: &StateKvDb,
+        overall_commit_progress: Version,
+        crash_if_difference_is_too_large: bool,
+    ) {
+        let state_kv_commit_progress = state_kv_db
+            .metadata_db()
+            .get::<DbMetadataSchema>(&DbMetadataKey::StateKvCommitProgress)
+            .expect("Failed to read state K/V commit progress.")
+            .expect("State K/V commit progress cannot be None.")
+            .expect_version();
+        assert_ge!(state_kv_commit_progress, overall_commit_progress);
+
+        // State K/V commit progress isn't (can't be) written atomically with the data,
+        // because there are shards, so we have to attempt truncation anyway.
+        info!(
+            state_kv_commit_progress = state_kv_commit_progress,
+            "Start state KV truncation..."
+        );
+        let difference = state_kv_commit_progress - overall_commit_progress;
+        if crash_if_difference_is_too_large {
+            assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+        }
+        truncate_state_kv_db(
+            state_kv_db,
+            state_kv_commit_progress,
+            overall_commit_progress,
+            std::cmp::max(difference as usize, 1), /* batch_size */
+        )
+        .expect("Failed to truncate state K/V db.");
+    }
+
+    /// Reads the state merkle max version and truncates the state merkle DB back to
+    /// the tree root at or before `overall_commit_progress`.
+    fn sync_state_merkle_commit_progress(
+        ledger_metadata_db: &LedgerMetadataDb,
+        state_merkle_db: &StateMerkleDb,
+        overall_commit_progress: Version,
+        crash_if_difference_is_too_large: bool,
+    ) {
+        let state_merkle_max_version = get_max_version_in_state_merkle_db(state_merkle_db)
+            .expect("Failed to get state merkle max version.")
+            .expect("State merkle max version cannot be None.");
+        if state_merkle_max_version > overall_commit_progress {
+            let difference = state_merkle_max_version - overall_commit_progress;
+            if crash_if_difference_is_too_large {
+                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+            }
+        }
+        let state_merkle_target_version = find_tree_root_at_or_before(
+            ledger_metadata_db,
+            state_merkle_db,
+            overall_commit_progress,
+        )
+        .expect("DB read failed.")
+        .unwrap_or_else(|| {
+            panic!(
+                "Could not find a valid root before or at version {}, maybe it was pruned?",
+                overall_commit_progress
+            )
+        });
+        if state_merkle_target_version < state_merkle_max_version {
+            info!(
+                state_merkle_max_version = state_merkle_max_version,
+                target_version = state_merkle_target_version,
+                "Start state merkle truncation..."
+            );
+            truncate_state_merkle_db(state_merkle_db, state_merkle_target_version)
+                .expect("Failed to truncate state merkle db.");
         }
     }
 
