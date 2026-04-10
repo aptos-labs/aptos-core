@@ -248,6 +248,7 @@ members = [
     "third_party/move/move-vm/test-utils",
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
+    "third_party/move/shared-dsa",
     "third_party/move/testing-infra/transactional-test-runner",
     "third_party/move/tools/move-abigen",
     "third_party/move/tools/move-asm",
@@ -783,6 +784,7 @@ rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 rstest = "0.15.0"
+rustc-hash = "2"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
 scopeguard = "1.2.0"
@@ -931,6 +933,7 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
     "table-extension",
 ] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
+shared-dsa = { path = "third_party/move/shared-dsa" }
 
 [profile.release]
 debug = true
