@@ -137,6 +137,28 @@ impl OnChainChunkyDKGConfig {
         OnChainChunkyDKGConfig::V1(ConfigV1::default())
     }
 
+    pub fn new_shadow_v1(
+        secrecy_threshold_in_percentage: u64,
+        reconstruct_threshold_in_percentage: u64,
+        grace_period_secs: u64,
+    ) -> Self {
+        let secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(secrecy_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        let reconstruction_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(reconstruct_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        Self::ShadowV1(ConfigShadowV1 {
+            secrecy_threshold,
+            reconstruction_threshold,
+            grace_period_secs,
+        })
+    }
+
+    pub fn default_shadow_enabled() -> Self {
+        Self::new_shadow_v1(50, 67, 30)
+    }
+
     pub fn default_disabled() -> Self {
         OnChainChunkyDKGConfig::Off
     }
