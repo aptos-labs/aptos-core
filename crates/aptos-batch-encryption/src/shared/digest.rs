@@ -305,4 +305,12 @@ pub(crate) mod tests {
         let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
         assert_eq!(dk.max_batch_size(), 8);
     }
+
+    #[test]
+    fn test_digest_key_serialization() {
+        let mut rng = thread_rng();
+        let dk = DigestKey::new(&mut rng, 256, 216000).unwrap();
+        std::fs::write("dk.bin", &bcs::to_bytes(&dk).unwrap()).unwrap();
+    }
+
 }

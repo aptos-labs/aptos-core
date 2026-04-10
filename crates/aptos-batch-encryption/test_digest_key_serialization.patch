@@ -1,0 +1,19 @@
+diff --git a/crates/aptos-batch-encryption/src/shared/digest.rs b/crates/aptos-batch-encryption/src/shared/digest.rs
+index 18fa2da157..e1ac9c0a5e 100644
+--- a/crates/aptos-batch-encryption/src/shared/digest.rs
++++ b/crates/aptos-batch-encryption/src/shared/digest.rs
+@@ -354,6 +354,14 @@ pub(crate) mod tests {
+         assert_eq!(dk.max_batch_size(), 8);
+     }
+ 
++    #[test]
++    fn test_digest_key_serialization() {
++        let mut rng = thread_rng();
++        let dk = DigestKey::new(&mut rng, 256, 216000).unwrap();
++        std::fs::write("dk.bin", &bcs::to_bytes(&dk).unwrap()).unwrap();
++    }
++
++
+     #[test]
+     fn test_with_randomized_powers_of_tau() {
+         let mut rng = thread_rng();
