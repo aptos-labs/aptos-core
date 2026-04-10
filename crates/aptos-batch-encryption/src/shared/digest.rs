@@ -309,7 +309,7 @@ pub(crate) mod tests {
     #[test]
     fn test_digest_key_serialization() {
         let mut rng = thread_rng();
-        let dk = DigestKey::new(&mut rng, 256, 216000).unwrap();
+        let dk = DigestKey::new(&mut rng, 128, 216000).unwrap();
         std::fs::write("dk.bin", &bitcode::serialize(&dk).unwrap()).unwrap();
     }
 
