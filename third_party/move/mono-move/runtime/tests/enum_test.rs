@@ -8,6 +8,7 @@ use mono_move_core::{
     CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
     SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
+use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
@@ -55,7 +56,10 @@ fn enum_basic() {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 7, "result should be 3 + 4 = 7");
@@ -109,7 +113,10 @@ fn enum_survives_gc() {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -173,7 +180,10 @@ fn enum_gc_traces_refs() {
         },
         ObjectDescriptor::Trivial,
     ];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 10, "vec[0] should be 10 after GC");
@@ -238,7 +248,10 @@ fn enum_pattern_match() {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 35, "result should be 10 + 25 = 35");
@@ -287,7 +300,10 @@ fn enum_variant_switch() {
         size: 16,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 223, "result should be 1 + 222 = 223");
@@ -338,7 +354,10 @@ fn enum_borrow_field() {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 99, "field_b should be 99 after WriteRef");
@@ -397,7 +416,10 @@ fn enum_gc_variant_switching() {
         },
         ObjectDescriptor::Trivial,
     ];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -461,7 +483,10 @@ fn enum_in_struct() {
             variant_pointer_offsets: vec![vec![], vec![]],
         },
     ];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -536,7 +561,10 @@ fn enum_in_vector() {
             elem_pointer_offsets: vec![0],
         },
     ];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(

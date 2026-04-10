@@ -6,6 +6,7 @@ use mono_move_core::{
     CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
     SortedSafePointEntries,
 };
+use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 
 /// Data segment (48 bytes):
@@ -67,7 +68,10 @@ fn vec_sum_100() {
     let n: u64 = 100;
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_vec_sum_program(&arena, n);
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
 }
@@ -77,8 +81,10 @@ fn vec_sum_with_gc_pressure() {
     let n: u64 = 200;
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_vec_sum_program(&arena, n);
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
     let mut ctx = InterpreterContext::with_heap_size(
         &descriptors,
+        gas_meter,
         unsafe { functions[0].as_ref_unchecked() },
         4 * 1024,
     );

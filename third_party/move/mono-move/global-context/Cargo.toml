@@ -18,6 +18,7 @@ dashmap = { workspace = true }
 fxhash = { workspace = true }
 mono-move-alloc = { workspace = true }
 mono-move-core = { workspace = true }
+mono-move-gas = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
@@ -25,4 +26,6 @@ parking_lot = { workspace = true }
 specializer = { workspace = true }
 
 [dev-dependencies]
+mono-move-runtime = { workspace = true }
+mono-move-testsuite = { workspace = true }
 move-asm = { workspace = true }

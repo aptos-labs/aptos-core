@@ -9,6 +9,7 @@ use mono_move_core::{
     DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
     FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
 };
+use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET,
 };
@@ -60,7 +61,10 @@ fn ref_basic() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -121,7 +125,10 @@ fn ref_survives_gc() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -215,7 +222,8 @@ fn ref_cross_frame() {
     let functions = [Some(main_func), Some(callee_func)];
     // SAFETY: Exclusive access during test setup; arena is alive.
     unsafe { Function::resolve_calls(&functions) };
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
         functions[0].unwrap().as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -296,7 +304,10 @@ fn ref_multiple_borrows() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -360,7 +371,10 @@ fn ref_borrow_local() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -447,7 +461,10 @@ fn ref_nested_vectors() {
         elem_size: 8,
         elem_pointer_offsets: vec![0],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -529,7 +546,10 @@ fn ref_survives_double_gc() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -590,7 +610,10 @@ fn ref_struct_field_borrow() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(
@@ -646,7 +669,10 @@ fn ref_struct_field_survives_gc() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let mut ctx = InterpreterContext::new(&descriptors, unsafe { functions[0].as_ref_unchecked() });
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        functions[0].as_ref_unchecked()
+    });
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 13, "entry.value should be 13 after GC");

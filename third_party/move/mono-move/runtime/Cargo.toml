@@ -16,4 +16,6 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 mono-move-alloc = { workspace = true }
 mono-move-core = { workspace = true }
+mono-move-gas = { workspace = true }
 rand = { workspace = true }
+thiserror = { workspace = true }

@@ -12,6 +12,7 @@ fn native() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use mono_move_gas::SimpleGasMeter;
     use mono_move_programs::fib::{micro_op_fib, FIB_CASES};
     use mono_move_runtime::InterpreterContext;
 
@@ -19,7 +20,8 @@ mod micro_op {
         let (functions, descriptors, _arena) = micro_op_fib();
         // SAFETY: Exclusive access during test setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions) };
-        let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+        let gas_meter = SimpleGasMeter::new(u64::MAX);
+        let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
             functions[0].unwrap().as_ref_unchecked()
         });
         ctx.set_root_arg(0, &n.to_le_bytes());

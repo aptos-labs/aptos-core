@@ -8,6 +8,7 @@ const KEY_RANGE: u64 = 2500;
 const SEED: u64 = 42;
 
 fn bench_bst(c: &mut Criterion) {
+    use mono_move_gas::SimpleGasMeter;
     use mono_move_programs::{
         bst::{generate_ops, micro_op_bst, move_bytecode_bst, move_stdlib_vector, native_run_ops},
         testing,
@@ -33,7 +34,8 @@ fn bench_bst(c: &mut Criterion) {
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&descriptors, unsafe {
+                    let gas_meter = SimpleGasMeter::new(u64::MAX);
+                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
                         functions[6].unwrap().as_ref_unchecked()
                     });
                     let vec_ptr = ctx

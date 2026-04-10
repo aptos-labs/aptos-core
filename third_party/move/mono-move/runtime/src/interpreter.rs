@@ -5,6 +5,8 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
+    bail,
+    error::ExecutionResult,
     heap::Heap,
     memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
     types::{
@@ -13,8 +15,8 @@ use crate::{
         VEC_LENGTH_OFFSET,
     },
 };
-use anyhow::{bail, Result};
 use mono_move_core::{DescriptorId, Function, MicroOp, FRAME_METADATA_SIZE};
+use mono_move_gas::GasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 
@@ -23,9 +25,11 @@ use std::ptr::{null, NonNull};
 // ---------------------------------------------------------------------------
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
-pub struct InterpreterContext<'a> {
+pub struct InterpreterContext<'a, G: GasMeter> {
     /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
+    /// Externally-provided gas meter (will be replaced by execution context).
+    pub(crate) gas_meter: G,
 
     pub(crate) pc: usize,
     /// Pointer to the currently executing function.
@@ -39,14 +43,15 @@ pub struct InterpreterContext<'a> {
     rng: StdRng,
 }
 
-impl<'a> InterpreterContext<'a> {
-    pub fn new(descriptors: &'a [ObjectDescriptor], entry: &Function) -> Self {
-        Self::with_heap_size(descriptors, entry, DEFAULT_HEAP_SIZE)
+impl<'a, G: GasMeter> InterpreterContext<'a, G> {
+    pub fn new(descriptors: &'a [ObjectDescriptor], gas_meter: G, entry: &Function) -> Self {
+        Self::with_heap_size(descriptors, gas_meter, entry, DEFAULT_HEAP_SIZE)
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(
         descriptors: &'a [ObjectDescriptor],
+        gas_meter: G,
         entry: &Function,
         heap_size: usize,
     ) -> Self {
@@ -73,6 +78,7 @@ impl<'a> InterpreterContext<'a> {
 
         Self {
             descriptors,
+            gas_meter,
             pc: 0,
             current_func: NonNull::from(entry),
             frame_ptr,
@@ -93,6 +99,9 @@ impl<'a> InterpreterContext<'a> {
     /// Reset the context to call a different function, preserving the heap.
     ///
     /// Use `set_root_arg` to place arguments before calling `run()`.
+    ///
+    // TODO: invoke() is test-only for now. When used with real gas budgets,
+    // decide whether to reset the gas meter here.
     pub fn invoke(&mut self, func: &Function) {
         let base = self.stack.as_ptr();
 
@@ -150,7 +159,11 @@ impl<'a> InterpreterContext<'a> {
     /// Allocate a vector of `u64` values on the heap and return its address
     /// as a `u64` suitable for embedding in args. Useful for passing pre-built
     /// data into a program without generating initialization micro-ops.
-    pub fn alloc_u64_vec(&mut self, descriptor_id: DescriptorId, values: &[u64]) -> Result<u64> {
+    pub fn alloc_u64_vec(
+        &mut self,
+        descriptor_id: DescriptorId,
+        values: &[u64],
+    ) -> ExecutionResult<u64> {
         let n = values.len() as u64;
         let ptr = self.alloc_vec(descriptor_id, 8, n)?;
         unsafe {
@@ -168,9 +181,9 @@ impl<'a> InterpreterContext<'a> {
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl InterpreterContext<'_> {
+impl<G: GasMeter> InterpreterContext<'_, G> {
     #[inline(always)]
-    pub fn step(&mut self) -> Result<StepResult> {
+    pub fn step(&mut self) -> ExecutionResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
         // it is derived from function reference (e.g., entrypoint) or when
         // executing a call instruction, which stores a valid pointer.
@@ -614,8 +627,8 @@ impl InterpreterContext<'_> {
                     write_u64(fp, dst + 8, offset as u64);
                 },
 
-                MicroOp::Charge { .. } => {
-                    // TODO: wire up to a GasMeter once the runtime carries one.
+                MicroOp::Charge { cost } => {
+                    self.gas_meter.charge(cost)?;
                 },
             }
         }
@@ -636,7 +649,7 @@ impl InterpreterContext<'_> {
         caller: &Function,
         fp: *mut u8,
         callee: &Function,
-    ) -> Result<StepResult> {
+    ) -> ExecutionResult<StepResult> {
         unsafe {
             let new_fp = fp.add(caller.args_and_locals_size + FRAME_METADATA_SIZE);
             let stack_end = self.stack.as_ptr().add(self.stack.len());
@@ -671,7 +684,7 @@ impl InterpreterContext<'_> {
     // iteration. LLVM can't keep them in registers because heap operations
     // (VecPushBack, etc.) take &mut self, which may alias these fields.
     // Write back only on CallFunc/Return.
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> ExecutionResult<()> {
         loop {
             match self.step()? {
                 StepResult::Continue => {},

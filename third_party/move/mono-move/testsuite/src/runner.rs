@@ -7,6 +7,7 @@
 use crate::{matcher::check_output, parser::Step};
 use anyhow::anyhow;
 use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes::KnownAttribute};
+use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::InterpreterContext;
 use move_binary_format::CompiledModule;
@@ -220,8 +221,9 @@ fn execute_function_v2(
         .and_then(|executable| executable.get_function(function_name))
         .unwrap_or_else(|| panic!("Failed to load function or find executable"));
 
+    let gas_meter = SimpleGasMeter::new(u64::MAX);
     // TODO: Set object descriptor table when supported.
-    let mut interpreter = InterpreterContext::new(&[], function);
+    let mut interpreter = InterpreterContext::new(&[], gas_meter, function);
 
     // TODO: Check function signature to decide how to parse arguments.
     for (i, arg) in args.iter().enumerate() {

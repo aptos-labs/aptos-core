@@ -258,6 +258,8 @@ impl AptosDB {
             Arc::clone(&ledger_db),
             Arc::clone(&state_kv_db),
             Arc::clone(&state_merkle_db),
+            None,
+            None,
             /*crash_if_difference_is_too_large=*/ false,
         );
 
