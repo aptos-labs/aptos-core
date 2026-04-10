@@ -62,6 +62,24 @@ pub struct MonoInfo {
     pub fun_struct_field_infos: BTreeMap<Type, BTreeSet<StructFieldInfo>>,
 }
 
+impl MonoInfo {
+    /// Returns the set of all resource (key-ability) struct instantiations.
+    /// This is the set of memory types that the Boogie backend will translate,
+    /// and the correct scope for wildcard `reads_of<f> *` / `modifies_of<f> *`.
+    pub fn all_memory_qids(&self, env: &GlobalEnv) -> BTreeSet<QualifiedInstId<StructId>> {
+        let mut result = BTreeSet::new();
+        for (sid, insts) in &self.structs {
+            let struct_env = env.get_struct(*sid);
+            if struct_env.has_memory() {
+                for inst in insts {
+                    result.insert(sid.instantiate(inst.clone()));
+                }
+            }
+        }
+        result
+    }
+}
+
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub struct ClosureInfo {
     /// The function used to construct the closure.

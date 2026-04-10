@@ -366,6 +366,18 @@ fn parse_identifier(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
     Ok(spanned(context.tokens.file_hash(), start_loc, end_loc, id))
 }
 
+// Parse an identifier, optionally resolving `self.N` to a positional field name.
+// Used by `modifies_of<self.0>`, `reads_of<self.0>`, and behavioral predicates.
+//     <Identifier> | "self" "." [0-9]+
+fn parse_identifier_or_self_field(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
+    let mut name = parse_identifier(context)?;
+    if name.value.as_str() == "self" && context.tokens.peek() == Tok::Period {
+        context.tokens.advance()?;
+        name = parse_identifier_or_positional_field(context)?;
+    }
+    Ok(name)
+}
+
 // Parse an identifier or an positional field
 //     <Identifier> | [0-9]+
 fn parse_identifier_or_positional_field(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
@@ -1184,7 +1196,7 @@ fn exp_ends_with_rbrace(exp: &Exp) -> bool {
         | Exp_::Vector(_, _, _)
         | Exp_::Lambda(_, _, _, _)
         | Exp_::Quant(_, _, _, _, _)
-        | Exp_::Behavior(_, _, _, _)
+        | Exp_::Behavior(_, _, _)
         | Exp_::StateLabeled(_, _, _)
         | Exp_::ExpList(_)
         | Exp_::Unit
@@ -2722,16 +2734,17 @@ fn parse_bare_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     })?;
     context.tokens.advance()?;
 
-    // Parse `<` fn_name [type_args] `>`
+    // Parse `<` target `>` where target is an expression (identifier, qualified name,
+    // field access chain, etc.). We use parse_dot_or_index_chain which handles names,
+    // dots, and indexing, and naturally stops at `>`.
     consume_token(context.tokens, Tok::Less)?;
-    let fn_name = parse_name_access_chain(context, false, || "a function name")?;
-    let type_args = parse_optional_type_args(context)?;
+    let target = parse_dot_or_index_chain(context)?;
     consume_token(context.tokens, Tok::Greater)?;
 
     // Parse `(` args `)`
     let args = parse_call_args(context)?;
 
-    Ok(Exp_::Behavior(kind, fn_name, type_args, args))
+    Ok(Exp_::Behavior(kind, Box::new(target), args))
 }
 
 // Parses a quantifier expressions, assuming is_quant(context) is true.
@@ -4618,16 +4631,43 @@ fn parse_reads_member(context: &mut Context) -> Result<SpecBlockMember, Box<Diag
     ))
 }
 
+/// Parses the common header of `reads_of` / `modifies_of`:
+///     keyword "<" (Identifier | self.N) ">"
+/// Then checks for the wildcard `*;` shorthand.
+/// Returns `(start_loc, fun_param, is_wildcard)`.
+fn parse_access_of_header(context: &mut Context) -> Result<(usize, Name, bool), Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::Identifier)?;
+    consume_token(context.tokens, Tok::Less)?;
+    let fun_param = parse_identifier_or_self_field(context)?;
+    consume_token(context.tokens, Tok::Greater)?;
+    let is_wildcard = if context.tokens.peek() == Tok::Star {
+        context.tokens.advance()?;
+        consume_token(context.tokens, Tok::Semicolon)?;
+        true
+    } else {
+        false
+    };
+    Ok((start_loc, fun_param, is_wildcard))
+}
+
 // Parse a modifies_of specification member:
 //     "modifies_of" "<" Identifier ">" "(" Comma<Parameter> ")" Exp { "," Exp }* ";"
 fn parse_modifies_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
-    let start_loc = context.tokens.start_loc();
-    // consume "modifies_of"
-    consume_token(context.tokens, Tok::Identifier)?;
-    // "<" Identifier ">"
-    consume_token(context.tokens, Tok::Less)?;
-    let fun_param = parse_identifier(context)?;
-    consume_token(context.tokens, Tok::Greater)?;
+    let (start_loc, fun_param, is_wildcard) = parse_access_of_header(context)?;
+    if is_wildcard {
+        return Ok(spanned(
+            context.tokens.file_hash(),
+            start_loc,
+            context.tokens.previous_end_loc(),
+            SpecBlockMember_::ModifiesOf {
+                fun_param,
+                params: vec![],
+                targets: vec![],
+                all: true,
+            },
+        ));
+    }
     // "(" Comma<Parameter> ")"
     let params = parse_comma_list(
         context,
@@ -4653,6 +4693,7 @@ fn parse_modifies_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagn
             fun_param,
             params,
             targets,
+            all: false,
         },
     ))
 }
@@ -4660,13 +4701,19 @@ fn parse_modifies_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagn
 // Parse a reads_of specification member:
 //     "reads_of" "<" Identifier ">" Type { "," Type }* ";"
 fn parse_reads_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
-    let start_loc = context.tokens.start_loc();
-    // consume "reads_of"
-    consume_token(context.tokens, Tok::Identifier)?;
-    // "<" Identifier ">"
-    consume_token(context.tokens, Tok::Less)?;
-    let fun_param = parse_identifier(context)?;
-    consume_token(context.tokens, Tok::Greater)?;
+    let (start_loc, fun_param, is_wildcard) = parse_access_of_header(context)?;
+    if is_wildcard {
+        return Ok(spanned(
+            context.tokens.file_hash(),
+            start_loc,
+            context.tokens.previous_end_loc(),
+            SpecBlockMember_::ReadsOf {
+                fun_param,
+                types: vec![],
+                all: true,
+            },
+        ));
+    }
     // comma-separated type names
     let types = parse_comma_list_after_start(
         context,
@@ -4680,7 +4727,11 @@ fn parse_reads_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnost
         context.tokens.file_hash(),
         start_loc,
         context.tokens.previous_end_loc(),
-        SpecBlockMember_::ReadsOf { fun_param, types },
+        SpecBlockMember_::ReadsOf {
+            fun_param,
+            types,
+            all: false,
+        },
     ))
 }
 

@@ -95,28 +95,9 @@ fn has_hoistable_label(exp: &Exp) -> bool {
 /// a label over it would not change its meaning after a sourcify → parse round-trip.
 ///
 /// This subsumes and replaces `!has_any_state_label(exp)` for the hoisting check:
-/// - `Global(Some(_))` / `Exists(Some(_))` — explicit label, not neutral (same as before)
-/// - `Global(None)` / `Exists(None)` — unlabeled pre-state ref, would acquire hoisted label
-/// - `Old` — state-sensitive
-/// - `Behavior(_, range)` with non-default range — state-sensitive
+/// Delegates to `ExpData::is_state_neutral`.
 fn is_state_neutral(exp: &Exp) -> bool {
-    let mut neutral = true;
-    exp.as_ref().visit_pre_order(&mut |e: &ExpData| match e {
-        ExpData::Call(_, Operation::Global(_), _)
-        | ExpData::Call(_, Operation::Exists(_), _)
-        | ExpData::Call(_, Operation::Old, _) => {
-            neutral = false;
-            false
-        },
-        ExpData::Call(_, Operation::Behavior(_, range), _)
-            if range.pre.is_some() || range.post.is_some() =>
-        {
-            neutral = false;
-            false
-        },
-        _ => neutral,
-    });
-    neutral
+    exp.as_ref().is_state_neutral()
 }
 
 /// Returns the priority and operator string for binary ops that support label hoisting.
@@ -922,6 +903,10 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a single spec condition using the given expression sourcifier.
     fn print_condition(&self, cond: &Condition, exp_sourcifier: &ExpSourcifier) {
+        // Each condition is a separate scope — reset the let-binding name counter
+        // so identical extractions across conditions get the same names (enabling
+        // structural equality comparison in the instrumentation pass).
+        exp_sourcifier.let_counter.set(0);
         use ConditionKind::*;
         match &cond.kind {
             LetPre(name, _) => {
@@ -1163,21 +1148,34 @@ impl<'a> Sourcifier<'a> {
     ) {
         use crate::ast::Operation;
         let current_mid = fun_env.module_env.get_id();
-        // Modules with module-level imports (members is empty)
-        let module_imports: BTreeSet<ModuleId> = fun_env
+        // Modules with module-level imports: `use m;`, `use m as n;`, or
+        // `use m::{Self, ...}` — all make the module qualifier available.
+        let pool = fun_env.module_env.env.symbol_pool();
+        let self_sym = pool.make("Self");
+        let env = self.env();
+        let imported_names: BTreeSet<Symbol> = fun_env
             .module_env
             .get_use_decls()
             .iter()
-            .filter(|u| u.members.is_empty())
-            .filter_map(|u| u.module_id)
+            .filter(|u| {
+                u.members.is_empty()
+                    || u.alias.is_some()
+                    || u.members.iter().any(|(_, sym, _)| *sym == self_sym)
+            })
+            .map(|u| u.module_name.name())
             .collect();
         let mut needed: BTreeSet<ModuleId> = BTreeSet::new();
+        let mut check_mid = |mid: &ModuleId| {
+            if *mid != current_mid
+                && !imported_names.contains(&env.get_module(*mid).get_name().name())
+            {
+                needed.insert(*mid);
+            }
+        };
         for cond in &spec.conditions {
             cond.exp.as_ref().visit_pre_order(&mut |e: &ExpData| {
                 if let ExpData::Call(_, Operation::SpecFunction(mid, _, _), _) = e {
-                    if *mid != current_mid && !module_imports.contains(mid) {
-                        needed.insert(*mid);
-                    }
+                    check_mid(mid);
                 }
                 true
             });
@@ -1186,9 +1184,7 @@ impl<'a> Sourcifier<'a> {
             for target in &frame.modifies_targets {
                 target.as_ref().visit_pre_order(&mut |e: &ExpData| {
                     if let ExpData::Call(_, Operation::SpecFunction(mid, _, _), _) = e {
-                        if *mid != current_mid && !module_imports.contains(mid) {
-                            needed.insert(*mid);
-                        }
+                        check_mid(mid);
                     }
                     true
                 });
@@ -2759,57 +2755,14 @@ impl<'a> ExpSourcifier<'a> {
                     crate::ast::BehaviorKind::ResultOf => "result_of",
                 };
                 let has_labels = range.pre.is_some() || range.post.is_some();
-                // When the behavior has labels AND the target is non-simple AND
-                // the target is not state-neutral, extract the let-binding OUTSIDE
-                // the label scope to prevent the label from corrupting the target's
-                // state references after round-trip.
-                if has_labels
-                    && !self.is_simple_behavior_target(&args[0])
-                    && !is_state_neutral(&args[0])
-                {
-                    let (pat, var_exp) = self.let_bind_exp(&args[0], args);
-                    let mut new_args = vec![var_exp];
-                    new_args.extend(args[1..].iter().cloned());
-                    let pred_node = self
-                        .env()
-                        .new_node(self.env().get_node_loc(id), self.env().get_node_type(id));
-                    let pred_exp = ExpData::Call(
-                        pred_node,
-                        Operation::Behavior(*kind, range.clone()),
-                        new_args,
-                    )
-                    .into_exp();
-                    let wrapped = self.wrap_in_lets(vec![(pat, args[0].clone())], pred_exp);
-                    self.print_exp(context_prio, true, &wrapped);
-                    return;
-                }
                 let print_behavior = |this: &Self| {
-                    if this.is_simple_behavior_target(&args[0]) {
-                        this.parenthesize(context_prio, Prio::Postfix, || {
-                            emit!(this.wr(), "{}", kind_str);
-                            emit!(this.wr(), "<");
-                            this.print_behavior_target(&args[0]);
-                            emit!(this.wr(), ">");
-                            this.print_exp_list("(", ")", &args[1..]);
-                        })
-                    } else {
-                        // Non-simple but state-neutral target (or no labels):
-                        // let-binding inside the label scope is safe
-                        let (pat, var_exp) = this.let_bind_exp(&args[0], args);
-                        let mut new_args = vec![var_exp];
-                        new_args.extend(args[1..].iter().cloned());
-                        let pred_node = this
-                            .env()
-                            .new_node(this.env().get_node_loc(id), this.env().get_node_type(id));
-                        let pred_exp = ExpData::Call(
-                            pred_node,
-                            Operation::Behavior(*kind, range.clone()),
-                            new_args,
-                        )
-                        .into_exp();
-                        let wrapped = this.wrap_in_lets(vec![(pat, args[0].clone())], pred_exp);
-                        this.print_exp(context_prio, true, &wrapped);
-                    }
+                    this.parenthesize(context_prio, Prio::Postfix, || {
+                        emit!(this.wr(), "{}", kind_str);
+                        emit!(this.wr(), "<");
+                        this.print_behavior_target(&args[0]);
+                        emit!(this.wr(), ">");
+                        this.print_exp_list("(", ")", &args[1..]);
+                    })
                 };
                 if has_labels {
                     // Check if all labels match enclosing state context — suppress if so
@@ -3100,38 +3053,20 @@ impl<'a> ExpSourcifier<'a> {
                     self.parent.enclosing_state_label.set(prev);
                 })
             },
-            ExpData::Call(id, Operation::Behavior(kind, range), args) => {
+            ExpData::Call(_id, Operation::Behavior(kind, _range), args) => {
                 let kind_str = match kind {
                     crate::ast::BehaviorKind::AbortsOf => "aborts_of",
                     crate::ast::BehaviorKind::EnsuresOf => "ensures_of",
                     crate::ast::BehaviorKind::RequiresOf => "requires_of",
                     crate::ast::BehaviorKind::ResultOf => "result_of",
                 };
-                if self.is_simple_behavior_target(&args[0]) {
-                    self.parenthesize(prio, Prio::Postfix, || {
-                        emit!(self.wr(), "{}", kind_str);
-                        emit!(self.wr(), "<");
-                        self.print_behavior_target(&args[0]);
-                        emit!(self.wr(), ">");
-                        self.print_exp_list("(", ")", &args[1..]);
-                    })
-                } else {
-                    // Non-simple target: extract into a let-binding
-                    let (pat, var_exp) = self.let_bind_exp(&args[0], args);
-                    let pred_node = self
-                        .env()
-                        .new_node(self.env().get_node_loc(*id), self.env().get_node_type(*id));
-                    let mut new_args = vec![var_exp];
-                    new_args.extend(args[1..].iter().cloned());
-                    let pred_exp = ExpData::Call(
-                        pred_node,
-                        Operation::Behavior(*kind, range.clone()),
-                        new_args,
-                    )
-                    .into_exp();
-                    let wrapped = self.wrap_in_lets(vec![(pat, args[0].clone())], pred_exp);
-                    self.print_exp(prio, true, &wrapped);
-                }
+                self.parenthesize(prio, Prio::Postfix, || {
+                    emit!(self.wr(), "{}", kind_str);
+                    emit!(self.wr(), "<");
+                    self.print_behavior_target(&args[0]);
+                    emit!(self.wr(), ">");
+                    self.print_exp_list("(", ")", &args[1..]);
+                })
             },
             // Look through Not: print `!` then the inner without label
             ExpData::Call(_, Operation::Not, args) if args.len() == 1 => {
@@ -3206,16 +3141,6 @@ impl<'a> ExpSourcifier<'a> {
     /// print the function name directly. Otherwise, print the expression as-is.
     /// Returns true if the expression can be printed directly inside `<...>` of
     /// a behavior predicate (i.e. it produces a simple name).
-    fn is_simple_behavior_target(&self, exp: &Exp) -> bool {
-        match exp.as_ref() {
-            ExpData::Call(_, Operation::Closure(_, _, mask), args) => {
-                args.is_empty() && mask.captured_count() == 0
-            },
-            ExpData::LocalVar(..) | ExpData::Temporary(..) => true,
-            _ => false,
-        }
-    }
-
     fn print_behavior_target(&self, exp: &Exp) {
         use ExpData::*;
 

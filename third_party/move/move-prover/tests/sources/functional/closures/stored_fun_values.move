@@ -422,4 +422,126 @@ module 0x42::stored_fun_values {
         ensures Counter[std::signer::address_of(s)]
             == old(Counter[std::signer::address_of(s)]); // error: post-condition does not hold
     }
+
+    // =========================================================================
+    // 11. reads_of<f> * — wildcard read access
+    // =========================================================================
+
+    struct AnyReader has key, drop {
+        f: |address|u64 has copy+store+drop,
+    }
+    spec AnyReader {
+        reads_of<f> *;
+        invariant forall a: address: !aborts_of<f>(a);
+    }
+
+    /// Pack with safe_read_counter (reads Counter): compliant with wildcard
+    fun create_any_reader(): AnyReader {
+        AnyReader { f: safe_read_counter }
+    }
+
+    // A function that reads both Counter and Config — tests wildcard accepts
+    // functions accessing multiple specific resources
+    #[persistent]
+    fun safe_read_both(addr: address): u64 {
+        if (exists<Config>(addr) && Config[addr].active && exists<Counter>(addr)) {
+            Counter[addr].value
+        } else {
+            0
+        }
+    }
+    spec safe_read_both {
+        pragma opaque;
+        aborts_if false;
+    }
+
+    /// Pack with safe_read_both (reads Counter AND Config): wildcard accepts it
+    fun create_any_reader_multi(): AnyReader {
+        AnyReader { f: safe_read_both }
+    }
+
+    /// Call through resource — reads_of * preserves all memory
+    fun use_any_reader(reader_addr: address, target: address): u64 {
+        let r = &AnyReader[reader_addr];
+        (r.f)(target)
+    }
+    spec use_any_reader {
+        requires exists<AnyReader>(reader_addr);
+        aborts_if !exists<AnyReader>(reader_addr);
+        // reads_of * preserves all memory
+        ensures Counter[target] == old(Counter[target]);
+        ensures Config[target] == old(Config[target]);
+    }
+
+    // =========================================================================
+    // 12. modifies_of<f> * — wildcard write access
+    // =========================================================================
+
+    struct AnyModifier has key, drop {
+        f: |&signer| has copy+store+drop,
+    }
+    spec AnyModifier {
+        modifies_of<f> *;
+        invariant forall s: signer: !aborts_of<f>(s);
+    }
+
+    /// Pack with safe_increment (modifies Counter): compliant with wildcard
+    fun create_any_modifier(): AnyModifier {
+        AnyModifier { f: safe_increment }
+    }
+
+    /// Pack with config_aware_increment (reads Config, modifies Counter):
+    /// wildcard accepts functions touching multiple resources
+    fun create_any_modifier_multi(): AnyModifier {
+        AnyModifier { f: config_aware_increment }
+    }
+
+    /// Call through resource — modifies_of * means nothing is preserved
+    fun use_any_modifier(modifier_addr: address, s: &signer) {
+        let m = &AnyModifier[modifier_addr];
+        (m.f)(s)
+    }
+    spec use_any_modifier {
+        requires exists<AnyModifier>(modifier_addr);
+        aborts_if !exists<AnyModifier>(modifier_addr);
+    }
+
+    /// Claiming Counter unchanged with modifies_of * should fail
+    fun use_any_modifier_wrong(modifier_addr: address, s: &signer) {
+        let m = &AnyModifier[modifier_addr];
+        (m.f)(s)
+    }
+    spec use_any_modifier_wrong {
+        requires exists<AnyModifier>(modifier_addr);
+        aborts_if !exists<AnyModifier>(modifier_addr);
+        ensures Counter[std::signer::address_of(s)]
+            == old(Counter[std::signer::address_of(s)]); // error: post-condition does not hold
+    }
+
+    // =========================================================================
+    // 13. Positional struct with reads_of<self.0>
+    // =========================================================================
+
+    struct Action(|address|u64 has copy+store+drop) has key, drop;
+    spec Action {
+        reads_of<self.0> Counter;
+        // Use self.0 in invariant via the field variable directly
+        invariant forall a: address: !aborts_of<self.0>(a);
+    }
+
+    /// Pack with safe_read_counter: should verify
+    fun create_action(): Action {
+        Action(safe_read_counter)
+    }
+
+    /// Call through positional field — Counter preserved by reads_of
+    fun use_action(action_addr: address, target: address): u64 {
+        let a = &Action[action_addr];
+        (a.0)(target)
+    }
+    spec use_action {
+        requires exists<Action>(action_addr);
+        aborts_if !exists<Action>(action_addr);
+        ensures Counter[target] == old(Counter[target]);
+    }
 }

@@ -592,9 +592,8 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             eopt.iter().for_each(|e| exp(context, e));
             exp(context, e)
         },
-        E::Behavior(_, fn_name, type_args, sp!(_, args)) => {
-            module_access(context, fn_name);
-            types_opt(context, type_args);
+        E::Behavior(_, target, sp!(_, args)) => {
+            exp(context, target);
             args.iter().for_each(|e| exp(context, e))
         },
         E::StateLabeled(_, inner, _) => exp(context, inner),

@@ -21,8 +21,8 @@ use crate::{
         boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field,
         boogie_type_param, boogie_type_suffix, boogie_type_suffix_for_struct,
         boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
-        boogie_well_formed_check, boogie_well_formed_expr, field_bv_flag_global_state,
-        TypeIdentToken,
+        boogie_well_formed_check, boogie_well_formed_expr, compute_evaluator_memory_union,
+        field_bv_flag_global_state, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -37,7 +37,7 @@ use move_core_types::{ability::AbilitySet, function::ClosureMask};
 use move_model::{
     ast::{
         Attribute, BehaviorKind, ConditionKind, Exp, ExpData, FrameAccessKind, FunParamAccessOf,
-        MemoryLabel, Operation as AstOperation, TempIndex, TraceKind, Value,
+        MemoryLabel, Operation as AstOperation, Pattern, TempIndex, TraceKind, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -811,6 +811,22 @@ impl<'env> BoogieTranslator<'env> {
                 boogie_struct_name(&struct_env, &mem.inst, false)
             );
             emitln!(self.writer, "var {}_$pre: {};", mem_name, mem_type);
+        }
+        // Also declare _$pre for any memory types needed by wildcard struct field variants
+        // that aren't already covered by old_memory_resources.
+        let declared_pre: BTreeSet<_> = old_memory_resources
+            .iter()
+            .map(|m| boogie_resource_memory_name(self.env, m, &None))
+            .collect();
+        for (mem_qid, mem_name) in memory {
+            if !declared_pre.contains(mem_name) {
+                let struct_env = self.env.get_struct_qid(mem_qid.to_qualified_id());
+                let mem_type = format!(
+                    "$Memory {}",
+                    boogie_struct_name(&struct_env, &mem_qid.inst, false)
+                );
+                emitln!(self.writer, "var {}_$pre: {};", mem_name, mem_type);
+            }
         }
 
         // Generate branches for all variants. Since the datatype is closed,
@@ -1851,7 +1867,11 @@ impl<'env> BoogieTranslator<'env> {
             }
             let fun_env = self.env.get_function(info.fun.to_qualified_id());
             let closure_spec = fun_env.get_spec();
-            let fun_param_tys = fun_env.get_parameter_types();
+            let fun_param_tys: Vec<Type> = fun_env
+                .get_parameter_types()
+                .into_iter()
+                .map(|ty| ty.instantiate(&info.fun.inst))
+                .collect();
 
             // Get function's spec memory
             let used_memory = fun_env.get_spec_used_memory();
@@ -2102,9 +2122,17 @@ impl<'env> BoogieTranslator<'env> {
             .map(|(mut_ref_idx, (param_idx, _))| (param_idx, num_results + mut_ref_idx))
             .collect::<Vec<_>>();
 
+        let is_two_state = !old_memory.is_empty() || fun_env.spec_uses_old();
+
         let translated: Vec<_> = conditions
             .iter()
             .map(|cond| {
+                let exp = self.wrap_behavioral_condition_with_lets(
+                    closure_spec,
+                    &cond.kind,
+                    is_two_state,
+                    &cond.exp,
+                );
                 // Translate with old-aware memory context
                 let temp_writer = CodeWriter::new(self.env.internal_loc());
                 let mut temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
@@ -2123,7 +2151,7 @@ impl<'env> BoogieTranslator<'env> {
                             .collect(),
                     );
                 }
-                temp_trans.translate(&cond.exp, type_inst);
+                temp_trans.translate(&exp, type_inst);
                 temp_trans.clear_current_fun_qid();
                 let mut result = temp_writer.extract_result();
                 if result.ends_with('\n') {
@@ -2231,6 +2259,12 @@ impl<'env> BoogieTranslator<'env> {
                         .into_iter()
                         .filter(|c| !c.as_ref().all_defined_labels().is_empty())
                         .filter_map(|fragment| {
+                            let fragment = self.wrap_behavioral_condition_with_lets(
+                                closure_spec,
+                                &cond.kind,
+                                is_two_state,
+                                &fragment,
+                            );
                             let fw = CodeWriter::new(self.env.internal_loc());
                             let mut ft = SpecTranslator::new(&fw, self.env, self.options);
                             ft.set_current_fun_qid(
@@ -2335,6 +2369,55 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
+    /// Wraps a condition expression with `(var sym := binding; body)` for each
+    /// `LetPre`/`LetPost` binding in the spec. For `LetPre` in two-state contexts,
+    /// Wraps a condition expression with `(var sym := binding; body)` for each
+    /// `LetPre`/`LetPost` binding in the spec. For `LetPre` in two-state contexts,
+    /// the binding is wrapped in `old()` to ensure pre-state evaluation.
+    fn wrap_behavioral_condition_with_lets(
+        &self,
+        closure_spec: &move_model::ast::Spec,
+        source_kind: &ConditionKind,
+        is_two_state: bool,
+        exp: &Exp,
+    ) -> Exp {
+        let include_post_lets = matches!(source_kind, ConditionKind::Ensures);
+        closure_spec
+            .conditions
+            .iter()
+            .rev()
+            .fold(exp.clone(), |scope, cond| match &cond.kind {
+                ConditionKind::LetPre(sym, _) => {
+                    // In two-state context, wrap binding in old() to ensure pre-state
+                    // evaluation. In one-state context, there's only pre-state so no
+                    // old() wrapping is needed.
+                    let binding = if is_two_state {
+                        let ty = self.env.get_node_type(cond.exp.node_id());
+                        let loc = self.env.get_node_loc(cond.exp.node_id());
+                        let node_id = self.env.new_node(loc, ty);
+                        ExpData::Call(node_id, AstOperation::Old, vec![cond.exp.clone()]).into_exp()
+                    } else {
+                        cond.exp.clone()
+                    };
+                    ExpData::Block(
+                        cond.exp.node_id(),
+                        Pattern::Var(cond.exp.node_id(), *sym),
+                        Some(binding),
+                        scope,
+                    )
+                    .into_exp()
+                },
+                ConditionKind::LetPost(sym, _) if include_post_lets => ExpData::Block(
+                    cond.exp.node_id(),
+                    Pattern::Var(cond.exp.node_id(), *sym),
+                    Some(cond.exp.clone()),
+                    scope,
+                )
+                .into_exp(),
+                _ => scope,
+            })
+    }
+
     /// Collect frame save resources and old memory resources across all closure and
     /// function parameter variants. Frame save resources are those that may need frame
     /// conditions (non-WritesAll access). Old memory resources are those needing pre-state
@@ -2419,8 +2502,19 @@ impl<'env> BoogieTranslator<'env> {
             let struct_env = env.get_struct_qid(info.struct_id.to_qualified_id());
             for access in struct_env.get_field_access_of() {
                 if access.fun_param == info.field_sym {
-                    union_used_memory.extend(access.used_memory.iter().cloned());
-                    union_old_memory.extend(access.old_memory.iter().cloned());
+                    if access.frame_spec.modifies_all || access.frame_spec.reads_all {
+                        // Wildcard: include all translated memory types
+                        let mono_info = mono_analysis::get_info(env);
+                        for qid in mono_info.all_memory_qids(env) {
+                            union_used_memory.insert(qid.clone());
+                            if access.frame_spec.modifies_all {
+                                union_old_memory.insert(qid);
+                            }
+                        }
+                    } else {
+                        union_used_memory.extend(access.used_memory.iter().cloned());
+                        union_old_memory.extend(access.old_memory.iter().cloned());
+                    }
                 }
             }
         }
@@ -2515,13 +2609,24 @@ impl<'env> BoogieTranslator<'env> {
     ) -> Vec<String> {
         let uses_old = !union_old.is_empty();
         let mut args = vec![];
-        for mem in &decl.used_memory {
-            let name = boogie_resource_memory_name(env, mem, &None);
-            if uses_old && decl.old_memory.contains(mem) && union_old.contains(mem) {
-                args.push(format!("old_{}", name));
-            }
-            if union_used.contains(mem) {
+        if decl.frame_spec.modifies_all || decl.frame_spec.reads_all {
+            // Wildcard: pass all union memory args
+            for mem in union_used {
+                let name = boogie_resource_memory_name(env, mem, &None);
+                if uses_old && (decl.frame_spec.modifies_all) && union_old.contains(mem) {
+                    args.push(format!("old_{}", name));
+                }
                 args.push(name);
+            }
+        } else {
+            for mem in &decl.used_memory {
+                let name = boogie_resource_memory_name(env, mem, &None);
+                if uses_old && decl.old_memory.contains(mem) && union_old.contains(mem) {
+                    args.push(format!("old_{}", name));
+                }
+                if union_used.contains(mem) {
+                    args.push(name);
+                }
             }
         }
         args
@@ -2857,21 +2962,39 @@ impl<'env> BoogieTranslator<'env> {
             let mut mem_param_decls = vec![];
             let mut mem_args = vec![];
             if let Some(decl) = access_decl {
-                // Add dual-state memory params (old + current) for used/old memory
-                for mem in &decl.used_memory {
-                    let mem_name = boogie_resource_memory_name(self.env, mem, &None);
-                    let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
-                    let mem_type = format!(
-                        "$Memory {}",
-                        boogie_struct_name(&struct_env, &mem.inst, false)
-                    );
-                    if decl.old_memory.contains(mem) {
-                        let old_name = format!("old_{}", mem_name);
-                        mem_param_decls.push(format!("{}: {}", old_name, mem_type));
-                        mem_args.push(old_name);
+                if decl.frame_spec.modifies_all || decl.frame_spec.reads_all {
+                    // Wildcard: include all translated memory types
+                    let mono_info = mono_analysis::get_info(self.env);
+                    for qid in mono_info.all_memory_qids(self.env) {
+                        let mem_name = boogie_resource_memory_name(self.env, &qid, &None);
+                        let se = self.env.get_struct_qid(qid.to_qualified_id());
+                        let mem_type =
+                            format!("$Memory {}", boogie_struct_name(&se, &qid.inst, false));
+                        if decl.frame_spec.modifies_all {
+                            let old_name = format!("old_{}", mem_name);
+                            mem_param_decls.push(format!("{}: {}", old_name, mem_type));
+                            mem_args.push(old_name);
+                        }
+                        mem_param_decls.push(format!("{}: {}", mem_name, mem_type));
+                        mem_args.push(mem_name);
                     }
-                    mem_param_decls.push(format!("{}: {}", mem_name, mem_type));
-                    mem_args.push(mem_name);
+                } else {
+                    // Specific access declarations
+                    for mem in &decl.used_memory {
+                        let mem_name = boogie_resource_memory_name(self.env, mem, &None);
+                        let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
+                        let mem_type = format!(
+                            "$Memory {}",
+                            boogie_struct_name(&struct_env, &mem.inst, false)
+                        );
+                        if decl.old_memory.contains(mem) {
+                            let old_name = format!("old_{}", mem_name);
+                            mem_param_decls.push(format!("{}: {}", old_name, mem_type));
+                            mem_args.push(old_name);
+                        }
+                        mem_param_decls.push(format!("{}: {}", mem_name, mem_type));
+                        mem_args.push(mem_name);
+                    }
                 }
             }
 
@@ -4088,6 +4211,17 @@ impl FunctionTranslator<'_> {
                                 result.insert((label, memory.clone()));
                             }
                         }
+                    } else if let Some(fun_arg) = args.first() {
+                        // Runtime function value (LocalVar, field access, etc.):
+                        // use the evaluator memory union from MonoInfo.
+                        let fun_type = env.get_node_type(fun_arg.node_id());
+                        let fun_type = fun_type.instantiate(self.type_inst);
+                        let (used, old) = compute_evaluator_memory_union(env, &fun_type);
+                        for memory in used.iter().chain(old.iter()) {
+                            for label in range.labels() {
+                                result.insert((label, memory.clone()));
+                            }
+                        }
                     }
                 }
                 true
@@ -4213,12 +4347,6 @@ impl FunctionTranslator<'_> {
                                         let inst = Type::instantiate_slice(&types, self.type_inst);
                                         (inst, mid, fid)
                                     }),
-                                    // TODO: For formal function parameters, we cannot
-                                    // resolve the closure to determine modified types.
-                                    // Labels defined by ensures_of<f> where f is a formal
-                                    // parameter will have empty modified_types, causing
-                                    // later label resolution to treat reads as unmodified.
-                                    // This requires consulting modifies_of<f> at codegen time.
                                     _ => None,
                                 };
                                 if let Some((inst, mid, fid)) = closure_info {
@@ -4231,6 +4359,23 @@ impl FunctionTranslator<'_> {
                                         info.modified_types.insert(mem_inst);
                                     }
                                     info.pre = info.pre.or(range.pre);
+                                } else if let Some(fun_arg) = args.first() {
+                                    // Runtime function value: use the evaluator
+                                    // memory union from MonoInfo to determine
+                                    // which memories could be modified.
+                                    let fun_type = env.get_node_type(fun_arg.node_id());
+                                    let fun_type = fun_type.instantiate(self.type_inst);
+                                    let (_, old) = compute_evaluator_memory_union(env, &fun_type);
+                                    // Only create an entry if there are actually
+                                    // modified memories. An empty entry would change
+                                    // label resolution from "preserve as-is" (SaveMem
+                                    // snapshot) to "walk back" mode, which is incorrect
+                                    // for pure functions that don't modify resources.
+                                    if !old.is_empty() {
+                                        let info = label_info.entry(post_label).or_default();
+                                        info.modified_types.extend(old);
+                                        info.pre = info.pre.or(range.pre);
+                                    }
                                 }
                             }
                         },
@@ -6663,6 +6808,20 @@ fn derive_param_frame_access(
             }
         },
         Some(decl) => {
+            // Wildcard: modifies_of<f> * → WritesAll for all memory
+            if decl.frame_spec.modifies_all {
+                for mem in used_memory {
+                    result.insert(mem, ApplyFrameAccess::WritesAll);
+                }
+                return result;
+            }
+            // Wildcard: reads_of<f> * → Reads for all memory
+            if decl.frame_spec.reads_all {
+                for mem in used_memory {
+                    result.insert(mem, ApplyFrameAccess::Reads);
+                }
+                return result;
+            }
             // Classify each resource based on modifies_targets and reads_types
             let mut write_resources: BTreeMap<QualifiedInstId<StructId>, Vec<String>> =
                 BTreeMap::new();
@@ -6766,9 +6925,34 @@ fn derive_struct_field_frame_access(
             (BTreeSet::new(), BTreeSet::new(), BTreeMap::new())
         },
         Some(decl) => {
-            let used_memory = decl.used_memory.clone();
-            let old_memory = decl.old_memory.clone();
+            let mut used_memory = decl.used_memory.clone();
+            let mut old_memory = decl.old_memory.clone();
+            // For wildcards, populate with all translated memory types
+            if decl.frame_spec.modifies_all || decl.frame_spec.reads_all {
+                let mono_info = mono_analysis::get_info(env);
+                for qid in mono_info.all_memory_qids(env) {
+                    used_memory.insert(qid.clone());
+                    if decl.frame_spec.modifies_all {
+                        old_memory.insert(qid);
+                    }
+                }
+            }
             let mut result = BTreeMap::new();
+
+            // Wildcard: modifies_of<f> * → WritesAll for all memory
+            if decl.frame_spec.modifies_all {
+                for mem in &used_memory {
+                    result.insert(mem.clone(), ApplyFrameAccess::WritesAll);
+                }
+                return (used_memory, old_memory, result);
+            }
+            // Wildcard: reads_of<f> * → Reads for all memory
+            if decl.frame_spec.reads_all {
+                for mem in &used_memory {
+                    result.insert(mem.clone(), ApplyFrameAccess::Reads);
+                }
+                return (used_memory, old_memory, result);
+            }
 
             // Classify resources from modifies_targets
             let mut write_resources: BTreeMap<QualifiedInstId<StructId>, Vec<String>> =

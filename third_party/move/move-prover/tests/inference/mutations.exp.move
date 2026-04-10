@@ -530,8 +530,8 @@ module 0x42::mutations {
             S1.. |~ update<Counter>(addr, a)
         };
         ensures [inferred] {
-            let b = update_field(old(Counter[addr]), value, v1);
-            ..S1 |~ update<Counter>(addr, b)
+            let a = update_field(old(Counter[addr]), value, v1);
+            ..S1 |~ update<Counter>(addr, a)
         };
         aborts_if [inferred] S1 |~ !exists<Counter>(addr);
         aborts_if [inferred] !exists<Counter>(addr);
@@ -553,8 +553,8 @@ module 0x42::mutations {
             S1.. |~ update<Counter>(addr, a)
         };
         ensures [inferred] {
-            let b = update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
-            ..S1 |~ update<Counter>(addr, b)
+            let a = update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
+            ..S1 |~ update<Counter>(addr, a)
         };
         aborts_if [inferred] (S1 |~ global<Counter>(addr)).value == MAX_U64;
         aborts_if [inferred] S1 |~ !exists<Counter>(addr);
@@ -577,8 +577,8 @@ module 0x42::mutations {
             S1.. |~ update<Counter>(a2, a)
         };
         ensures [inferred] {
-            let b = update_field(old(Counter[a1]), value, v1);
-            ..S1 |~ update<Counter>(a1, b)
+            let a = update_field(old(Counter[a1]), value, v1);
+            ..S1 |~ update<Counter>(a1, a)
         };
         aborts_if [inferred] S1 |~ !exists<Counter>(a2);
         aborts_if [inferred] !exists<Counter>(a1);
@@ -642,16 +642,16 @@ module 0x42::mutations {
             S1.. |~ update<Counter>(a2, a)
         };
         ensures [inferred] !cond ==> {
-            let b = update_field(S1 |~ global<Counter>(a1), value, v2);
-            S1.. |~ update<Counter>(a1, b)
+            let a = update_field(S1 |~ global<Counter>(a1), value, v2);
+            S1.. |~ update<Counter>(a1, a)
         };
         ensures [inferred] cond ==> {
-            let c = update_field(old(Counter[a1]), value, v1);
-            ..S1 |~ update<Counter>(a1, c)
+            let a = update_field(old(Counter[a1]), value, v1);
+            ..S1 |~ update<Counter>(a1, a)
         };
         ensures [inferred] !cond ==> {
-            let d = update_field(old(Counter[a2]), value, v1);
-            ..S1 |~ update<Counter>(a2, d)
+            let a = update_field(old(Counter[a2]), value, v1);
+            ..S1 |~ update<Counter>(a2, a)
         };
         aborts_if [inferred] S1 |~ cond && !exists<Counter>(a2);
         aborts_if [inferred] S1 |~ !cond && !exists<Counter>(a1);
@@ -678,16 +678,16 @@ module 0x42::mutations {
             S1.. |~ update<Counter>(a2, a)
         };
         ensures [inferred] !cond ==> {
-            let b = update_field(S1 |~ global<Counter>(a1), value, (S1 |~ global<Counter>(a1)).value + v2);
-            S1.. |~ update<Counter>(a1, b)
+            let a = update_field(S1 |~ global<Counter>(a1), value, (S1 |~ global<Counter>(a1)).value + v2);
+            S1.. |~ update<Counter>(a1, a)
         };
         ensures [inferred] cond ==> {
-            let c = update_field(old(Counter[a1]), value, old(Counter[a1]).value + v1);
-            ..S1 |~ update<Counter>(a1, c)
+            let a = update_field(old(Counter[a1]), value, old(Counter[a1]).value + v1);
+            ..S1 |~ update<Counter>(a1, a)
         };
         ensures [inferred] !cond ==> {
-            let d = update_field(old(Counter[a2]), value, old(Counter[a2]).value + v1);
-            ..S1 |~ update<Counter>(a2, d)
+            let a = update_field(old(Counter[a2]), value, old(Counter[a2]).value + v1);
+            ..S1 |~ update<Counter>(a2, a)
         };
         aborts_if [inferred] cond && (S1 |~ global<Counter>(a2)).value + v2 > MAX_U64;
         aborts_if [inferred] S1 |~ cond && !exists<Counter>(a2);
@@ -719,12 +719,12 @@ module 0x42::mutations {
             S2.. |~ update<Counter>(a3, a)
         };
         ensures [inferred] {
-            let b = update_field(S1 |~ global<Counter>(a2), value, v2);
-            S1..S2 |~ update<Counter>(a2, b)
+            let a = update_field(S1 |~ global<Counter>(a2), value, v2);
+            S1..S2 |~ update<Counter>(a2, a)
         };
         ensures [inferred] {
-            let c = update_field(old(Counter[a1]), value, v1);
-            ..S1 |~ update<Counter>(a1, c)
+            let a = update_field(old(Counter[a1]), value, v1);
+            ..S1 |~ update<Counter>(a1, a)
         };
         aborts_if [inferred] S2 |~ !exists<Counter>(a3);
         aborts_if [inferred] S1 |~ !exists<Counter>(a2);

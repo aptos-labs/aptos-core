@@ -106,7 +106,24 @@ module 0x42::stored_fun_access_errors {
     }
 
     // =========================================================================
-    // 4. Compliant packing should verify
+    // 4. reads_of<f> * wildcard must still reject writes
+    // =========================================================================
+
+    struct WildcardReader has key, drop {
+        f: |address| has copy+store+drop,
+    }
+    spec WildcardReader {
+        reads_of<f> *;
+    }
+
+    /// Pack with write_counter into reads_of * struct: should fail because
+    /// reads_of * does not grant write permission
+    fun create_wildcard_reader_writer(): WildcardReader {
+        WildcardReader { f: write_counter } // error: writes Counter but only reads_of
+    }
+
+    // =========================================================================
+    // 5. Compliant packing should verify
     // =========================================================================
 
     struct WideReader has key, drop {

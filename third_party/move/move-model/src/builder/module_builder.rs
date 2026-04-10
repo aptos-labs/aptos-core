@@ -1868,8 +1868,13 @@ impl ModuleBuilder<'_, '_> {
                 fun_param,
                 params,
                 targets,
-            } => self.def_ana_modifies_of(loc, context, fun_param, params, targets),
-            ReadsOf { fun_param, types } => self.def_ana_reads_of(loc, context, fun_param, types),
+                all,
+            } => self.def_ana_modifies_of(loc, context, fun_param, params, targets, *all),
+            ReadsOf {
+                fun_param,
+                types,
+                all,
+            } => self.def_ana_reads_of(loc, context, fun_param, types, *all),
             Modifies { targets } => self.def_ana_modifies(loc, context, targets),
             Reads { types } => self.def_ana_reads(loc, context, types),
             Let {
@@ -3435,6 +3440,7 @@ impl ModuleBuilder<'_, '_> {
         fun_param: &Spanned<move_symbol_pool::Symbol>,
         params: &[(PA::Var, EA::Type)],
         targets: &[EA::Exp],
+        all: bool,
     ) {
         let (owner_name, is_struct) = match context {
             SpecBlockContext::Function(name) => (name.clone(), false),
@@ -3501,6 +3507,7 @@ impl ModuleBuilder<'_, '_> {
         if let Some(entry) = entries.iter_mut().find(|e| e.fun_param == param_sym) {
             entry.modifies_params = translated_params;
             entry.frame_spec.modifies_targets = translated_targets;
+            entry.frame_spec.modifies_all = all;
         } else {
             entries.push(FunParamAccessOf {
                 loc: loc.clone(),
@@ -3509,6 +3516,8 @@ impl ModuleBuilder<'_, '_> {
                 frame_spec: FrameSpec {
                     modifies_targets: translated_targets,
                     reads_targets: BTreeSet::new(),
+                    modifies_all: all,
+                    ..Default::default()
                 },
                 used_memory: BTreeSet::new(),
                 old_memory: BTreeSet::new(),
@@ -3522,6 +3531,7 @@ impl ModuleBuilder<'_, '_> {
         context: &SpecBlockContext,
         fun_param: &Spanned<move_symbol_pool::Symbol>,
         types: &[EA::Type],
+        all: bool,
     ) {
         let (owner_name, is_struct) = match context {
             SpecBlockContext::Function(name) => (name.clone(), false),
@@ -3588,6 +3598,7 @@ impl ModuleBuilder<'_, '_> {
         };
         if let Some(entry) = entries.iter_mut().find(|e| e.fun_param == param_sym) {
             entry.frame_spec.reads_targets = reads_types;
+            entry.frame_spec.reads_all = all;
         } else {
             entries.push(FunParamAccessOf {
                 loc: loc.clone(),
@@ -3596,6 +3607,8 @@ impl ModuleBuilder<'_, '_> {
                 frame_spec: FrameSpec {
                     modifies_targets: vec![],
                     reads_targets: reads_types,
+                    reads_all: all,
+                    ..Default::default()
                 },
                 used_memory: BTreeSet::new(),
                 old_memory: BTreeSet::new(),

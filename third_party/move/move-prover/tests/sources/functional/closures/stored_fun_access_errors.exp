@@ -16,3 +16,9 @@ error: stored function accesses resource `stored_fun_access_errors::Counter` whi
     │
 105 │         NarrowWriter { f: write_counter } // error: accesses Counter not in modifies_of
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: stored function writes resource `stored_fun_access_errors::Counter` but only `reads_of` (not `modifies_of`) is declared for field `f`
+    ┌─ tests/sources/functional/closures/stored_fun_access_errors.move:122:9
+    │
+122 │         WildcardReader { f: write_counter } // error: writes Counter but only reads_of
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

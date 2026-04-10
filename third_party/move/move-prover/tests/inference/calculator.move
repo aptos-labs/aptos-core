@@ -1,3 +1,5 @@
+// TODO(#19422): Z3 seed sensitivity causes timeout without inline-spec-lets
+// flag: --inline-spec-lets
 module 0x66::calculator {
     use 0x1::signer::address_of;
 
