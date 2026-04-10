@@ -367,16 +367,6 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session, &module_storage, &mut traversal_context);
     }
-    let jwk_consensus_config = genesis_config
-        .jwk_consensus_config_override
-        .clone()
-        .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
-    initialize_jwk_consensus_config(
-        &mut session,
-        &module_storage,
-        &mut traversal_context,
-        &jwk_consensus_config,
-    );
     initialize_jwks_resources(&mut session, &module_storage, &mut traversal_context);
     initialize_keyless_accounts(
         &mut session,
