@@ -30,7 +30,7 @@ impl<K, V> UnorderedMap<K, V> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            inner: FxHashMap::with_capacity_and_hasher(capacity, FxBuildHasher::default()),
+            inner: FxHashMap::with_capacity_and_hasher(capacity, FxBuildHasher),
         }
     }
 

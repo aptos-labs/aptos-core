@@ -30,7 +30,7 @@ impl<K> UnorderedSet<K> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            inner: FxHashSet::with_capacity_and_hasher(capacity, FxBuildHasher::default()),
+            inner: FxHashSet::with_capacity_and_hasher(capacity, FxBuildHasher),
         }
     }
 
