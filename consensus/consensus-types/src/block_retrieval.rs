@@ -305,7 +305,10 @@ impl fmt::Display for BlockRetrievalResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus};
+    use super::{
+        BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse,
+        BlockRetrievalStatus,
+    };
     use crate::block::{block_test_utils::certificate_for_genesis, Block};
     use aptos_crypto::hash::HashValue;
     use aptos_types::validator_verifier::ValidatorVerifier;
@@ -313,17 +316,15 @@ mod tests {
     #[test]
     fn verify_rejects_chain_mismatch_before_block_validation() {
         let malformed_nil_block = Block::new_nil(u64::MAX, certificate_for_genesis(), vec![]);
-        let retrieval_request = BlockRetrievalRequest::new_with_target_round(
-            HashValue::random(),
-            1,
-            malformed_nil_block.round(),
-        );
+        let retrieval_request =
+            BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(HashValue::random(), 1));
         let response =
             BlockRetrievalResponse::new(BlockRetrievalStatus::Succeeded, vec![malformed_nil_block]);
         let verifier = ValidatorVerifier::new(vec![]);
 
         let err = response.verify(retrieval_request, &verifier).unwrap_err();
         let err_string = err.to_string();
+        assert!(err_string.contains("blocks doesn't form a chain"), "{err_string}");
         assert!(!err_string.contains("Block round overflow"), "{err_string}");
     }
 }
