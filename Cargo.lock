@@ -343,7 +343,7 @@ dependencies = [
  "diesel",
  "diesel-async",
  "dirs 5.0.1",
- "futures",
+ "futures 0.3.30",
  "hex",
  "itertools 0.13.0",
  "maplit",
@@ -464,9 +464,9 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "fail",
- "futures",
+ "futures 0.3.30",
  "hex",
  "itertools 0.13.0",
  "mime",
@@ -516,7 +516,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-validator",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "goldenfile",
  "hyper 0.14.28",
  "rand 0.7.3",
@@ -540,7 +540,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-types",
- "futures",
+ "futures 0.3.30",
  "move-core-types",
  "once_cell",
  "prometheus",
@@ -566,7 +566,7 @@ dependencies = [
  "aptos-vm",
  "async-trait",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "hex",
  "indoc",
  "move-binary-format",
@@ -606,10 +606,10 @@ dependencies = [
  "aptos-vm-environment",
  "async-trait",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "clap 4.5.60",
  "csv",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -645,7 +645,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "hyper 0.14.28",
  "once_cell",
  "reqwest 0.11.23",
@@ -675,6 +675,7 @@ dependencies = [
  "bcs 0.1.4",
  "criterion",
  "ed25519-dalek 2.1.1",
+ "fs",
  "generic-array",
  "hmac 0.12.1",
  "itertools 0.13.0",
@@ -728,7 +729,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "cfg-if",
  "claims",
  "concurrent-queue",
@@ -779,7 +780,7 @@ dependencies = [
 name = "aptos-bounded-executor"
 version = "0.1.0"
 dependencies = [
- "futures",
+ "futures 0.3.30",
  "rustversion",
  "tokio",
 ]
@@ -831,7 +832,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
  "aptos-types",
- "futures",
+ "futures 0.3.30",
  "tokio",
 ]
 
@@ -887,7 +888,7 @@ dependencies = [
  "aptos-vm",
  "bcs 0.1.4",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "legacy-move-compiler",
  "move-binary-format",
@@ -1000,14 +1001,14 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "byteorder",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
  "claims",
  "clap 4.5.60",
  "dashmap 7.0.0-rc2",
  "enum_dispatch",
  "fail",
- "futures",
+ "futures 0.3.30",
  "futures-channel",
  "hex",
  "itertools 0.13.0",
@@ -1049,7 +1050,7 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "claims",
- "futures",
+ "futures 0.3.30",
  "move-core-types",
  "serde",
  "thiserror 1.0.69",
@@ -1072,7 +1073,7 @@ dependencies = [
  "bcs 0.1.4",
  "derivative",
  "fail",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "mini-moka",
  "mirai-annotations",
@@ -1128,7 +1129,7 @@ dependencies = [
  "blstrs",
  "bulletproofs",
  "byteorder",
- "bytes",
+ "bytes 1.5.0",
  "criterion",
  "curve25519-dalek 3.2.0",
  "curve25519-dalek-ng",
@@ -1210,7 +1211,7 @@ dependencies = [
  "bcs 0.1.4",
  "claims",
  "dashmap 7.0.0-rc2",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "maplit",
  "mockall 0.11.4",
@@ -1240,7 +1241,7 @@ dependencies = [
  "async-trait",
  "claims",
  "enum_dispatch",
- "futures",
+ "futures 0.3.30",
  "once_cell",
  "rand 0.7.3",
  "serde",
@@ -1317,7 +1318,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "dashmap 7.0.0-rc2",
  "move-core-types",
  "once_cell",
@@ -1455,9 +1456,9 @@ dependencies = [
  "ark-std 0.5.0",
  "async-trait",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "fail",
- "futures",
+ "futures 0.3.30",
  "futures-channel",
  "futures-util",
  "move-core-types",
@@ -1526,7 +1527,7 @@ dependencies = [
  "aptos-vm-genesis",
  "bcs 0.1.4",
  "claims",
- "futures",
+ "futures 0.3.30",
  "move-binary-format",
  "move-core-types",
  "serde",
@@ -1564,7 +1565,7 @@ dependencies = [
  "aptos-vm-genesis",
  "arr_macro",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "criterion",
  "fail",
  "itertools 0.13.0",
@@ -1619,12 +1620,12 @@ dependencies = [
  "aptos-vm-types",
  "async-trait",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
  "clap 4.5.60",
  "dashmap 7.0.0-rc2",
  "derivative",
- "futures",
+ "futures 0.3.30",
  "indicatif 0.15.0",
  "itertools 0.13.0",
  "move-core-types",
@@ -1733,7 +1734,7 @@ dependencies = [
  "bcs 0.1.4",
  "chrono",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "rand 0.7.3",
  "reqwest 0.11.23",
  "serde",
@@ -1847,7 +1848,7 @@ dependencies = [
  "deadpool-redis",
  "enum_dispatch",
  "firebase-token",
- "futures",
+ "futures 0.3.30",
  "hex",
  "ipnet",
  "iprange",
@@ -1919,7 +1920,7 @@ dependencies = [
  "chrono",
  "clap 4.5.60",
  "either",
- "futures",
+ "futures 0.3.30",
  "hex",
  "hyper 0.14.28",
  "itertools 0.13.0",
@@ -1964,7 +1965,7 @@ dependencies = [
  "chrono",
  "clap 4.5.60",
  "env_logger",
- "futures",
+ "futures 0.3.30",
  "once_cell",
  "rand 0.7.3",
  "random_word",
@@ -2233,7 +2234,7 @@ dependencies = [
  "aptos-protos 1.3.1",
  "async-trait",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "futures-core",
  "once_cell",
  "prost 0.13.4",
@@ -2261,7 +2262,7 @@ dependencies = [
  "aptos-transaction-filter 0.1.0",
  "async-trait",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "once_cell",
  "prost 0.13.4",
  "redis",
@@ -2289,7 +2290,7 @@ dependencies = [
  "build_html",
  "clap 4.5.60",
  "dashmap 7.0.0-rc2",
- "futures",
+ "futures 0.3.30",
  "once_cell",
  "prost 0.13.4",
  "rand 0.7.3",
@@ -2334,7 +2335,7 @@ dependencies = [
  "aptos-moving-average",
  "async-trait",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "once_cell",
  "redis",
  "serde",
@@ -2353,7 +2354,7 @@ dependencies = [
  "aptos-protos 1.3.1",
  "async-trait",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "serde",
  "serde_json",
  "tikv-jemallocator",
@@ -2398,9 +2399,9 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-validator",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
- "futures",
+ "futures 0.3.30",
  "goldenfile",
  "hex",
  "hyper 0.14.28",
@@ -2428,7 +2429,7 @@ dependencies = [
  "async-trait",
  "axum 0.7.5",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "http-body-util",
  "hyper-util",
  "serde",
@@ -2446,7 +2447,7 @@ dependencies = [
  "anyhow",
  "aptos-indexer-grpc-utils",
  "aptos-protos 1.3.1",
- "futures",
+ "futures 0.3.30",
  "lazy_static",
  "once_cell",
  "redis",
@@ -2469,7 +2470,7 @@ dependencies = [
  "build_html",
  "clap 4.5.60",
  "dashmap 7.0.0-rc2",
- "futures",
+ "futures 0.3.30",
  "once_cell",
  "prost 0.13.4",
  "rand 0.7.3",
@@ -2526,7 +2527,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "flate2",
- "futures",
+ "futures 0.3.30",
  "google-cloud-storage",
  "hyper 0.14.28",
  "itertools 0.13.0",
@@ -2557,7 +2558,7 @@ dependencies = [
  "chrono",
  "cloud-storage",
  "dashmap 7.0.0-rc2",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "lz4",
  "once_cell",
@@ -2589,7 +2590,7 @@ dependencies = [
  "aptos-protos 1.3.1",
  "async-trait",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "serde",
  "serde_json",
  "tikv-jemallocator",
@@ -2624,7 +2625,7 @@ dependencies = [
  "diesel-async",
  "diesel_migrations",
  "field_count",
- "futures",
+ "futures 0.3.30",
  "futures-util",
  "hex",
  "indexmap 2.7.0",
@@ -2674,7 +2675,7 @@ dependencies = [
  "aptos-move-cli",
  "aptos-protos 1.3.1",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "rand 0.7.3",
  "serde",
@@ -2731,7 +2732,7 @@ dependencies = [
  "aptos-telemetry",
  "aptos-time-service",
  "assert_approx_eq",
- "futures",
+ "futures 0.3.30",
  "hyper 0.14.28",
  "once_cell",
  "prometheus",
@@ -2806,8 +2807,8 @@ dependencies = [
  "aptos-types",
  "aptos-validator-transaction-pool",
  "async-trait",
- "bytes",
- "futures",
+ "bytes 1.5.0",
+ "futures 0.3.30",
  "futures-channel",
  "futures-util",
  "move-core-types",
@@ -2953,7 +2954,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "goldenfile",
  "indoc",
  "move-asm",
@@ -2998,7 +2999,7 @@ dependencies = [
  "diesel",
  "diesel-async",
  "dirs 5.0.1",
- "futures",
+ "futures 0.3.30",
  "processor",
  "reqwest 0.11.23",
  "serde",
@@ -3029,7 +3030,7 @@ dependencies = [
  "chrono",
  "console-subscriber",
  "erased-serde",
- "futures",
+ "futures 0.3.30",
  "hostname",
  "once_cell",
  "pretty_assertions",
@@ -3088,7 +3089,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "enum_dispatch",
  "fail",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "maplit",
  "num_cpus",
@@ -3109,7 +3110,7 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "claims",
- "futures",
+ "futures 0.3.30",
  "serde",
  "thiserror 1.0.69",
  "tokio",
@@ -3120,8 +3121,8 @@ name = "aptos-memsocket"
 version = "0.1.0"
 dependencies = [
  "aptos-infallible",
- "bytes",
- "futures",
+ "bytes 1.5.0",
+ "futures 0.3.30",
  "once_cell",
 ]
 
@@ -3165,7 +3166,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.5.60",
  "colored",
- "futures",
+ "futures 0.3.30",
  "hex",
  "itertools 0.13.0",
  "legacy-move-compiler",
@@ -3369,7 +3370,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-types",
  "aptos-vm-types",
- "bytes",
+ "bytes 1.5.0",
  "claims",
  "concurrent-queue",
  "crossbeam",
@@ -3410,8 +3411,8 @@ dependencies = [
  "aptos-memsocket",
  "aptos-proxy",
  "aptos-types",
- "bytes",
- "futures",
+ "bytes 1.5.0",
+ "futures 0.3.30",
  "pin-project 1.1.3",
  "serde",
  "tokio",
@@ -3445,9 +3446,9 @@ dependencies = [
  "arc-swap",
  "async-trait",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "criterion",
- "futures",
+ "futures 0.3.30",
  "futures-util",
  "hex",
  "itertools 0.13.0",
@@ -3484,7 +3485,7 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "bcs 0.1.4",
- "futures",
+ "futures 0.3.30",
  "maplit",
  "rand 0.7.3",
  "serde",
@@ -3502,7 +3503,7 @@ dependencies = [
  "aptos-network",
  "aptos-types",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "serde",
  "tokio",
 ]
@@ -3526,7 +3527,7 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "bcs 0.1.4",
- "futures",
+ "futures 0.3.30",
  "once_cell",
  "rand 0.7.3",
  "serde_yaml 0.8.26",
@@ -3545,14 +3546,14 @@ dependencies = [
  "async-trait",
  "axum 0.7.5",
  "backoff",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
  "clap 4.5.60",
  "diesel",
  "diesel_migrations",
  "enum_dispatch",
  "field_count",
- "futures",
+ "futures 0.3.30",
  "google-cloud-storage",
  "image",
  "once_cell",
@@ -3626,7 +3627,7 @@ dependencies = [
  "clap 4.5.60",
  "either",
  "fail",
- "futures",
+ "futures 0.3.30",
  "hex",
  "num_cpus",
  "rand 0.7.3",
@@ -3731,9 +3732,9 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "enum_dispatch",
- "futures",
+ "futures 0.3.30",
  "maplit",
  "once_cell",
  "rand 0.7.3",
@@ -3763,9 +3764,9 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "claims",
- "futures",
+ "futures 0.3.30",
  "maplit",
  "mockall 0.11.4",
  "once_cell",
@@ -3884,7 +3885,7 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "git2 0.16.1",
  "handlebars",
  "hex",
@@ -3935,9 +3936,9 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "async-trait",
- "bytes",
+ "bytes 1.5.0",
  "claims",
- "futures",
+ "futures 0.3.30",
  "futures-channel",
  "tokio",
  "tokio-retry",
@@ -4002,7 +4003,7 @@ dependencies = [
  "aptos-logger",
  "aptos-types",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "clap 4.5.60",
  "hex",
  "move-core-types",
@@ -4048,7 +4049,7 @@ dependencies = [
  "aptos-warp-webserver",
  "bcs 0.1.4",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "hex",
  "itertools 0.13.0",
  "move-core-types",
@@ -4305,7 +4306,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "claims",
- "futures",
+ "futures 0.3.30",
  "mockall 0.11.4",
  "move-core-types",
  "ntest",
@@ -4332,7 +4333,7 @@ dependencies = [
  "aptos-types",
  "arr_macro",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "dashmap 7.0.0-rc2",
  "derive_more 0.99.17",
  "itertools 0.13.0",
@@ -4365,7 +4366,7 @@ dependencies = [
  "aptos-crypto",
  "async-trait",
  "claims",
- "futures",
+ "futures 0.3.30",
  "serde",
  "thiserror 1.0.69",
  "tokio",
@@ -4393,10 +4394,10 @@ dependencies = [
  "aptos-types",
  "arc-swap",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "claims",
  "dashmap 7.0.0-rc2",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "maplit",
  "mini-moka",
@@ -4473,7 +4474,7 @@ dependencies = [
  "aptos-native-interface",
  "aptos-types",
  "better_any",
- "bytes",
+ "bytes 1.5.0",
  "move-binary-format",
  "move-core-types",
  "move-table-extension",
@@ -4505,7 +4506,7 @@ dependencies = [
  "aptos-telemetry-service",
  "aptos-types",
  "flate2",
- "futures",
+ "futures 0.3.30",
  "httpmock",
  "once_cell",
  "prometheus",
@@ -4542,7 +4543,7 @@ dependencies = [
  "debug-ignore",
  "ed25519-dalek 1.0.1",
  "flate2",
- "futures",
+ "futures 0.3.30",
  "gcp-bigquery-client",
  "hex",
  "httpmock",
@@ -4599,7 +4600,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "csv",
- "futures",
+ "futures 0.3.30",
  "hex",
  "itertools 0.13.0",
  "log",
@@ -4614,7 +4615,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-infallible",
  "enum_dispatch",
- "futures",
+ "futures 0.3.30",
  "pin-project 1.1.3",
  "thiserror 1.0.69",
  "tokio",
@@ -4665,7 +4666,7 @@ dependencies = [
  "aptos-transaction-workloads-lib",
  "clap 4.5.60",
  "env_logger",
- "futures",
+ "futures 0.3.30",
  "rand 0.7.3",
  "tokio",
 ]
@@ -4690,7 +4691,7 @@ dependencies = [
  "base64 0.13.1",
  "bcs 0.1.4",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "hex",
  "itertools 0.13.0",
  "log",
@@ -4782,7 +4783,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm-genesis",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "move-binary-format",
  "move-core-types",
  "once_cell",
@@ -4913,7 +4914,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
  "chrono-tz 0.10.1",
  "ciborium",
@@ -4983,7 +4984,7 @@ dependencies = [
  "async-recursion",
  "async-trait",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "lru",
  "move-core-types",
  "tokio",
@@ -5051,12 +5052,12 @@ dependencies = [
  "ark-bn254",
  "ark-groth16",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "claims",
  "crossbeam-channel",
  "derive_more 0.99.17",
  "fail",
- "futures",
+ "futures 0.3.30",
  "hex",
  "itertools 0.13.0",
  "move-binary-format",
@@ -5130,7 +5131,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-types",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "claims",
  "move-binary-format",
  "move-core-types",
@@ -5197,7 +5198,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "claims",
  "derivative",
  "either",
@@ -5266,7 +5267,7 @@ dependencies = [
  "clap 4.5.60",
  "diesel",
  "diesel-async",
- "futures",
+ "futures 0.3.30",
  "maplit",
  "processor",
  "rand 0.7.3",
@@ -5954,7 +5955,7 @@ version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d7b9decdf35d8908a7e3ef02f64c5e9b1695e230154c0e8de3969142d9b94c"
 dependencies = [
- "futures",
+ "futures 0.3.30",
  "pharos",
  "rustc_version",
 ]
@@ -6072,7 +6073,7 @@ dependencies = [
  "async-trait",
  "axum-core 0.3.4",
  "bitflags 1.3.2",
- "bytes",
+ "bytes 1.5.0",
  "futures-util",
  "http 0.2.11",
  "http-body 0.4.6",
@@ -6099,7 +6100,7 @@ checksum = "3a6c9af12842a67734c9a2e355436e5d03b22383ed60cf13cd0c18fbfe3dcbcf"
 dependencies = [
  "async-trait",
  "axum-core 0.4.3",
- "bytes",
+ "bytes 1.5.0",
  "futures-util",
  "http 1.1.0",
  "http-body 1.0.0",
@@ -6132,7 +6133,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "759fa577a247914fd3f7f76d62972792636412fbfd634cd452f6a385a74d2d2c"
 dependencies = [
  "async-trait",
- "bytes",
+ "bytes 1.5.0",
  "futures-util",
  "http 0.2.11",
  "http-body 0.4.6",
@@ -6149,7 +6150,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a15c63fd72d41492dc4f497196f5da1fb04fb7529e631d73630d1b491e47a2e3"
 dependencies = [
  "async-trait",
- "bytes",
+ "bytes 1.5.0",
  "futures-util",
  "http 1.1.0",
  "http-body 1.0.0",
@@ -6585,7 +6586,7 @@ checksum = "f03db470b3c0213c47e978da93200259a1eb4dae2e5512cba9955e2b540a6fc6"
 dependencies = [
  "base64 0.21.7",
  "bollard-stubs",
- "bytes",
+ "bytes 1.5.0",
  "futures-core",
  "futures-util",
  "hex",
@@ -6752,6 +6753,16 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "206fdffcfa2df7cbe15601ef46c813fce0965eb3286db6b56c583b814b51c81c"
+dependencies = [
+ "byteorder",
+ "iovec",
+]
+
+[[package]]
+name = "bytes"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2bd12c1caf447e69cd4528f47f94d203fd2582878ecb9e9465484c4148a8223"
@@ -6798,7 +6809,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "move-binary-format",
  "move-core-types",
  "rayon",
@@ -7189,7 +7200,7 @@ checksum = "7602ac4363f68ac757d6b87dd5d850549a14d37489902ae639c06ecec06ad275"
 dependencies = [
  "async-trait",
  "base64 0.13.1",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
  "dotenv",
  "futures-util",
@@ -7318,7 +7329,7 @@ version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35ed6e9d84f0b51a7f52daf1c7d71dd136fd7a3f41a8462b8cdb8c78d920fad4"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "futures-core",
  "memchr",
  "pin-project-lite",
@@ -7332,7 +7343,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap 4.5.60",
- "futures",
+ "futures 0.3.30",
  "move-binary-format",
  "move-core-types",
  "rayon",
@@ -8891,7 +8902,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a3d8dc56e02f954cac8eb489772c552c473346fc34f67412bb6244fd647f7e4"
 dependencies = [
  "base64 0.21.7",
- "bytes",
+ "bytes 1.5.0",
  "hex",
  "k256",
  "log",
@@ -9145,7 +9156,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82d80cc6ad30b14a48ab786523af33b37f28a8623fc06afd55324816ef18fb1f"
 dependencies = [
  "arrayvec 0.7.4",
- "bytes",
+ "bytes 1.5.0",
  "cargo_metadata 0.18.1",
  "chrono",
  "const-hex",
@@ -9220,7 +9231,7 @@ dependencies = [
  "async-trait",
  "auto_impl",
  "base64 0.21.7",
- "bytes",
+ "bytes 1.5.0",
  "const-hex",
  "enr",
  "ethers-core",
@@ -9553,7 +9564,7 @@ dependencies = [
  "async-trait",
  "backoff",
  "chrono",
- "futures",
+ "futures 0.3.30",
  "gcloud-sdk",
  "hex",
  "hyper 1.4.1",
@@ -9717,6 +9728,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c2141d6d6c8512188a7891b4b01590a45f6dac67afb4f255c4124dbb86d4eaa"
 
 [[package]]
+name = "fs"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e94befb4c82414e638647f3f6fe8f908c39a7f2f40d556d318adb803ef263154"
+dependencies = [
+ "bytes 0.4.12",
+ "futures 0.1.31",
+ "futures-cpupool",
+]
+
+[[package]]
 name = "fs2"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9749,6 +9771,12 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "futures"
+version = "0.1.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a471a38ef8ed83cd6e40aa59c1ffe17db6855c18e3604d9c4ed8c08ebc28678"
+
+[[package]]
+name = "futures"
 version = "0.3.30"
 source = "git+https://github.com/aptos-labs/futures-rs?branch=backport#1845d7d36bc4bccbc0b57be68fbc05abd0b8bc68"
 dependencies = [
@@ -9774,6 +9802,16 @@ dependencies = [
 name = "futures-core"
 version = "0.3.30"
 source = "git+https://github.com/aptos-labs/futures-rs?branch=backport#1845d7d36bc4bccbc0b57be68fbc05abd0b8bc68"
+
+[[package]]
+name = "futures-cpupool"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab90cde24b3319636588d0c35fe03b1333857621051837ed769faefb4c2162e4"
+dependencies = [
+ "futures 0.1.31",
+ "num_cpus",
+]
 
 [[package]]
 name = "futures-executor"
@@ -9954,9 +9992,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "898e349fb0fabc16892de7858e5650b70a8044edeee13469cb2f7649040bf3c2"
 dependencies = [
  "async-trait",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
- "futures",
+ "futures 0.3.30",
  "hyper 1.4.1",
  "jsonwebtoken 9.3.0",
  "once_cell",
@@ -10320,7 +10358,7 @@ checksum = "22c57ca1d971d7c6f852c02eda4e87e88b1247b6ed8be9fa5b2768c68b0f2ca5"
 dependencies = [
  "async-stream",
  "base64 0.21.7",
- "bytes",
+ "bytes 1.5.0",
  "futures-util",
  "google-cloud-auth",
  "google-cloud-metadata",
@@ -10421,7 +10459,7 @@ version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81fe527a889e1532da5c525686d96d4c2e74cdd345badf8dfef9f6b39dd5f5e8"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "fnv",
  "futures-core",
  "futures-sink",
@@ -10441,7 +10479,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa82e28a107a8cc405f0839610bdc9b15f1e25ec7d696aa5cf173edbcb1486ab"
 dependencies = [
  "atomic-waker",
- "bytes",
+ "bytes 1.5.0",
  "fnv",
  "futures-core",
  "futures-sink",
@@ -10552,7 +10590,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06683b93020a07e3dbcf5f8c0f6d40080d725bea7936fc01ad345c01b97dc270"
 dependencies = [
  "base64 0.21.7",
- "bytes",
+ "bytes 1.5.0",
  "headers-core 0.2.0",
  "http 0.2.11",
  "httpdate",
@@ -10567,7 +10605,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "322106e6bd0cba2d5ead589ddb8150a13d7c4217cf80d7c4f682ca994ccc6aa9"
 dependencies = [
  "base64 0.21.7",
- "bytes",
+ "bytes 1.5.0",
  "headers-core 0.3.0",
  "http 1.1.0",
  "httpdate",
@@ -10762,7 +10800,7 @@ version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8947b1a6fad4393052c7ba1f4cd97bed3e953a95c79c92ad9b051a04611d9fbb"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "fnv",
  "itoa",
 ]
@@ -10773,7 +10811,7 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21b9ddb458710bc376481b842f5da65cdf31522de232c1ca8146abce2a358258"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "fnv",
  "itoa",
 ]
@@ -10784,7 +10822,7 @@ version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ceab25649e9960c0311ea418d17bee82c0dcec1bd053b5f9a66e265a693bed2"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "http 0.2.11",
  "pin-project-lite",
 ]
@@ -10795,7 +10833,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1cac85db508abc24a2e48553ba12a996e87244a0395ce011e62b37158745d643"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "http 1.1.0",
 ]
 
@@ -10805,7 +10843,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "793429d76616a256bcb62c2a2ec2bed781c8307e797e2598c50010f2bee2544f"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "futures-util",
  "http 1.1.0",
  "http-body 1.0.0",
@@ -10888,7 +10926,7 @@ version = "0.14.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf96e135eb83a2a8ddf766e426a841d8ddd7449d5f00d34ea02b41d2f19eef80"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "futures-channel",
  "futures-core",
  "futures-util",
@@ -10912,7 +10950,7 @@ version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50dfd22e0e76d0f662d429a5f80fcaf3855009297eab6a0a9f8543834744ba05"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "futures-channel",
  "futures-util",
  "h2 0.4.5",
@@ -11007,7 +11045,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "hyper 0.14.28",
  "native-tls",
  "tokio",
@@ -11020,7 +11058,7 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ab92f4f49ee4fb4f997c784b7a2e0fa70050211e0b6a287f898c3c9785ca956"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "futures-channel",
  "futures-util",
  "http 1.1.0",
@@ -11499,6 +11537,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "iovec"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2b3ea6ff95e175473f8ffe6a7eb7c00d054240321b84c57051175fe3c1e075e"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11753,7 +11800,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f8de9873b904e74b3533f77493731ee26742418077503683db44e1b3c54aa5c"
 dependencies = [
  "base64 0.13.1",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
  "serde",
  "serde-value",
@@ -11827,11 +11874,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95dddb1fcced906d79cdae530ff39079c2d3772b2d623088fdbebe610bfa8217"
 dependencies = [
  "base64 0.13.1",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
  "dirs-next",
  "either",
- "futures",
+ "futures 0.3.30",
  "http 0.2.11",
  "http-body 0.4.6",
  "hyper 0.14.28",
@@ -12973,7 +13020,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "bcs 0.1.4",
- "bytes",
+ "bytes 1.5.0",
  "dearbitrary",
  "ethnum",
  "hashbrown 0.14.3",
@@ -13161,7 +13208,7 @@ dependencies = [
  "aptos-framework",
  "aptos-rest-client",
  "fs2",
- "futures",
+ "futures 0.3.30",
  "git2 0.16.1",
  "hex",
  "move-core-types",
@@ -13244,7 +13291,7 @@ dependencies = [
  "clap 4.5.60",
  "codespan",
  "codespan-reporting",
- "futures",
+ "futures 0.3.30",
  "itertools 0.13.0",
  "legacy-move-compiler",
  "log",
@@ -13401,7 +13448,7 @@ name = "move-table-extension"
 version = "0.1.0"
 dependencies = [
  "better_any",
- "bytes",
+ "bytes 1.5.0",
  "move-binary-format",
  "move-core-types",
  "move-package",
@@ -13491,7 +13538,7 @@ name = "move-vm-integration-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytes",
+ "bytes 1.5.0",
  "claims",
  "codespan-reporting",
  "legacy-move-compiler",
@@ -13537,7 +13584,7 @@ dependencies = [
  "bcs 0.1.4",
  "better_any",
  "bitvec",
- "bytes",
+ "bytes 1.5.0",
  "cfg-if",
  "claims",
  "fail",
@@ -13566,7 +13613,7 @@ name = "move-vm-test-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytes",
+ "bytes 1.5.0",
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
@@ -13599,7 +13646,7 @@ dependencies = [
  "ambassador",
  "bcs 0.1.4",
  "better_any",
- "bytes",
+ "bytes 1.5.0",
  "claims",
  "crossbeam",
  "dashmap 7.0.0-rc2",
@@ -13626,7 +13673,7 @@ version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01acbdc23469fd8fe07ab135923371d5f5a422fbf9c522158677c8eb15bc51c2"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "encoding_rs",
  "futures-util",
  "http 0.2.11",
@@ -13644,7 +13691,7 @@ version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83e87776546dc87511aa5ee218730c92b666d7264ab6ed41f9d215af9cd5224b"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "encoding_rs",
  "futures-util",
  "http 1.1.0",
@@ -14181,7 +14228,7 @@ checksum = "786393f80485445794f6043fd3138854dd109cc6c4bd1a6383db304c9ce9b9ce"
 dependencies = [
  "arrayvec 0.7.4",
  "auto_impl",
- "bytes",
+ "bytes 1.5.0",
  "ethereum-types",
  "open-fastrlp-derive",
 ]
@@ -14192,7 +14239,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "003b2be5c6c53c1cfeb0a238b8a1c3915cd410feb684457a36c10038f764bb1c"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -14560,9 +14607,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f22ba0d95db56dde8685e3fadcb915cdaadda31ab8abbe3ff7f0ad1ef333267"
 dependencies = [
  "ahash 0.8.12",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
- "futures",
+ "futures 0.3.30",
  "half 2.2.1",
  "hashbrown 0.14.3",
  "lz4_flex",
@@ -14900,7 +14947,7 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9567389417feee6ce15dd6527a8a1ecac205ef62c2932bcf3d9f6fc5b78b414"
 dependencies = [
- "futures",
+ "futures 0.3.30",
  "rustc_version",
 ]
 
@@ -15167,7 +15214,7 @@ checksum = "fef0e102c6b811e0e01928eed4872b3ff63917f37dc2dab39a93db55f25d314d"
 dependencies = [
  "anyhow",
  "async-compression",
- "bytes",
+ "bytes 1.5.0",
  "chrono",
  "cookie 0.18.1",
  "futures-util",
@@ -15223,7 +15270,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c354a706a81a17657da8441869c6ce3d486ef5e72705919d6035fb038a6f7b5"
 dependencies = [
  "base64 0.22.1",
- "bytes",
+ "bytes 1.5.0",
  "derive_more 1.0.0",
  "futures-util",
  "indexmap 2.7.0",
@@ -15348,7 +15395,7 @@ checksum = "3ee9dd5fe15055d2b6806f4736aa0c9637217074e224bbec46d4041b91bb9491"
 dependencies = [
  "base64 0.22.1",
  "byteorder",
- "bytes",
+ "bytes 1.5.0",
  "fallible-iterator",
  "hmac 0.12.1",
  "md-5",
@@ -15364,7 +15411,7 @@ version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54b858f82211e84682fecd373f68e1ceae642d8d751a1ebd13f33de6257b3e20"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "fallible-iterator",
  "postgres-protocol",
 ]
@@ -15654,7 +15701,7 @@ dependencies = [
  "diesel_migrations",
  "enum_dispatch",
  "field_count",
- "futures",
+ "futures 0.3.30",
  "futures-util",
  "google-cloud-googleapis",
  "google-cloud-pubsub",
@@ -15798,7 +15845,7 @@ version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b82eaa1d779e9a4bc1c3217db8ffbeabaae1dca241bf70183242128d48681cd"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "prost-derive 0.11.9",
 ]
 
@@ -15808,7 +15855,7 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "146c289cda302b98a28d40c8b3b90498d6e526dd24ac2ecea73e4e491685b94a"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "prost-derive 0.12.3",
 ]
 
@@ -15818,7 +15865,7 @@ version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c0fef6c4230e4ccf618a35c59d7ede15dea37de8427500f50aff708806e42ec"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "prost-derive 0.13.4",
 ]
 
@@ -16047,7 +16094,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4ceeeeabace7857413798eb1ffa1e9c905a9946a57d81fb69b4b71c4d8eb3ad"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "pin-project-lite",
  "quinn-proto",
  "quinn-udp",
@@ -16064,7 +16111,7 @@ version = "0.11.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "getrandom 0.3.3",
  "lru-slab",
  "rand 0.9.1",
@@ -16348,9 +16395,9 @@ checksum = "aa8455fa3621f6b41c514946de66ea0531f57ca017b2e6c7cc368035ea5b46df"
 dependencies = [
  "arc-swap",
  "async-trait",
- "bytes",
+ "bytes 1.5.0",
  "combine",
- "futures",
+ "futures 0.3.30",
  "futures-util",
  "itoa",
  "percent-encoding",
@@ -16368,7 +16415,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e9ceb100979db7292de8a3d4ecdde659cccc85133303ea0741e1618a5bd73df"
 dependencies = [
- "futures",
+ "futures 0.3.30",
  "redis",
 ]
 
@@ -16481,7 +16528,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b1ae8d9ac08420c66222fb9096fc5de435c3c48542bc5336c51892cffafb41"
 dependencies = [
  "base64 0.21.7",
- "bytes",
+ "bytes 1.5.0",
  "cookie 0.16.2",
  "cookie_store",
  "encoding_rs",
@@ -16530,7 +16577,7 @@ checksum = "c7d6d2a27d57148378eb5e111173f4276ad26340ecc5c49a4a2152167a2d6a37"
 dependencies = [
  "async-compression",
  "base64 0.22.1",
- "bytes",
+ "bytes 1.5.0",
  "futures-core",
  "futures-util",
  "http 1.1.0",
@@ -16592,7 +16639,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "futures",
+ "futures 0.3.30",
  "getrandom 0.2.11",
  "http 0.2.11",
  "hyper 0.14.28",
@@ -16704,7 +16751,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb919243f34364b6bd2fc10ef797edbfa75f33c252e7998527479c6d6b47e1ec"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "rlp-derive",
  "rustc-hex",
 ]
@@ -16729,7 +16776,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
- "futures",
+ "futures 0.3.30",
  "pastey",
  "pin-project-lite",
  "rmcp-macros",
@@ -16851,7 +16898,7 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9c9dc66cc29792b663ffb5269be669f1613664e69ad56441fdb895c2347b930"
 dependencies = [
- "futures",
+ "futures 0.3.30",
  "futures-timer",
  "rstest_macros",
  "rustc_version",
@@ -17800,7 +17847,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18278f6a914fa3070aa316493f7d2ddfb9ac86ebc06fa3b83bffda487e9065b0"
 dependencies = [
  "async-trait",
- "bytes",
+ "bytes 1.5.0",
  "hex",
  "sha2 0.10.9",
  "tokio",
@@ -18125,7 +18172,7 @@ dependencies = [
  "blake2-rfc",
  "digest 0.9.0",
  "ethers",
- "futures",
+ "futures 0.3.30",
  "hex",
  "hyper 0.14.28",
  "itertools 0.13.0",
@@ -19087,7 +19134,7 @@ version = "1.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27ad5e34374e03cfffefc301becb44e9dc3c17584f414349ebe29ed26661822d"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "libc",
  "mio",
  "parking_lot 0.12.5",
@@ -19138,7 +19185,7 @@ checksum = "dcea47c8f71744367793f16c2db1f11cb859d28f436bdb4ca9193eb1f787ee42"
 dependencies = [
  "async-trait",
  "byteorder",
- "bytes",
+ "bytes 1.5.0",
  "fallible-iterator",
  "futures-channel",
  "futures-util",
@@ -19238,7 +19285,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e89b3cbabd3ae862100094ae433e1def582cf86451b4e9bf83aa7ac1d8a7d719"
 dependencies = [
  "async-stream",
- "bytes",
+ "bytes 1.5.0",
  "futures-core",
  "tokio",
  "tokio-stream",
@@ -19265,7 +19312,7 @@ version = "0.6.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36943ee01a6d67977dd3f84a5a1d2efeb4ada3a1ae771cadfaa535d9d9fc6507"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "futures-core",
  "futures-sink",
  "log",
@@ -19279,7 +19326,7 @@ version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5419f34732d9eb6ee4c3578b7989078579b7f039cbbb9ca2c4da015749371e15"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "futures-core",
  "futures-io",
  "futures-sink",
@@ -19409,7 +19456,7 @@ dependencies = [
  "async-trait",
  "axum 0.6.20",
  "base64 0.21.7",
- "bytes",
+ "bytes 1.5.0",
  "flate2",
  "futures-core",
  "futures-util",
@@ -19442,7 +19489,7 @@ dependencies = [
  "async-trait",
  "axum 0.6.20",
  "base64 0.21.7",
- "bytes",
+ "bytes 1.5.0",
  "h2 0.3.26",
  "http 0.2.11",
  "http-body 0.4.6",
@@ -19469,7 +19516,7 @@ dependencies = [
  "async-trait",
  "axum 0.7.5",
  "base64 0.22.1",
- "bytes",
+ "bytes 1.5.0",
  "flate2",
  "h2 0.4.5",
  "http 1.1.0",
@@ -19541,7 +19588,7 @@ checksum = "aba3f3efabf7fb41fae8534fc20a817013dd1c12cb45441efb6c82e6556b4cd8"
 dependencies = [
  "base64 0.13.1",
  "bitflags 1.3.2",
- "bytes",
+ "bytes 1.5.0",
  "futures-core",
  "futures-util",
  "http 0.2.11",
@@ -19767,7 +19814,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e3dac10fd62eaf6617d3a904ae222845979aec67c615d1c842b4002c7666fb9"
 dependencies = [
  "byteorder",
- "bytes",
+ "bytes 1.5.0",
  "data-encoding",
  "http 0.2.11",
  "httparse",
@@ -20296,7 +20343,7 @@ version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1e92e22e03ff1230c03a1a8ee37d2f89cd489e2e541b7550d6afad96faed169"
 dependencies = [
- "bytes",
+ "bytes 1.5.0",
  "futures-channel",
  "futures-util",
  "headers 0.3.9",
@@ -20475,7 +20522,7 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be0ecb0db480561e9a7642b5d3e4187c128914e58aa84330b9493e3eb68c5e7f"
 dependencies = [
- "futures",
+ "futures 0.3.30",
  "js-sys",
  "parking_lot 0.11.2",
  "pin-utils",
@@ -21006,7 +21053,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7999f5f4217fe3818726b66257a4475f71e74ffd190776ad053fa159e50737f5"
 dependencies = [
  "async_io_stream",
- "futures",
+ "futures 0.3.30",
  "js-sys",
  "log",
  "pharos",
@@ -21101,7 +21148,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.21.7",
- "futures",
+ "futures 0.3.30",
  "http 0.2.11",
  "hyper 0.14.28",
  "hyper-rustls 0.24.2",
