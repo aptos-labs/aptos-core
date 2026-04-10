@@ -52,6 +52,18 @@ impl HotStateMetadata {
             num_items: 0,
         }
     }
+
+    pub fn from_loaded(
+        latest: Option<HashValue>,
+        oldest: Option<HashValue>,
+        num_items: usize,
+    ) -> Self {
+        Self {
+            latest,
+            oldest,
+            num_items,
+        }
+    }
 }
 
 /// Represents the blockchain state at a given version.
@@ -97,6 +109,23 @@ impl State {
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
             arr![HotStateMetadata::new(); 16],
+            usage,
+            hot_state_config,
+        )
+    }
+
+    /// Like `new_at_version` but with pre-loaded hot state metadata (from hot state KV DB
+    /// recovery).
+    pub fn new_at_version_with_hot_metadata(
+        version: Option<Version>,
+        usage: StateStorageUsage,
+        hot_state_config: HotStateConfig,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
+    ) -> Self {
+        Self::new_with_updates(
+            version,
+            Arc::new(arr![MapLayer::new_family("state"); 16]),
+            hot_state_metadata,
             usage,
             hot_state_config,
         )

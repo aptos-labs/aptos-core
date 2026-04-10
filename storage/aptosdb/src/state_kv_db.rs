@@ -72,7 +72,7 @@ impl StateKvDb {
         self.is_hot
     }
 
-    fn db_tag(&self) -> &'static str {
+    pub(crate) fn db_tag(&self) -> &'static str {
         if self.is_hot {
             "hot"
         } else {
@@ -172,9 +172,7 @@ impl StateKvDb {
             is_hot,
         };
 
-        // TODO(HotState): Integrate hot state KV DB with pruner and add truncation support
-        // (stale index tracking, etc.) for the hot state DB.
-        if !readonly && !delete_on_restart && !is_hot {
+        if !readonly && !delete_on_restart {
             if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
                 truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
             }
@@ -426,7 +424,6 @@ impl StateKvDb {
     /// truncation is assumed to have already run). For each unique key hash, picks the most
     /// recent entry. Evicted entries are excluded. The returned shards have correctly assembled
     /// LRU doubly-linked list pointers, ordered by `hot_since_version`.
-    #[allow(dead_code)]
     pub(crate) fn load_hot_state_kvs(
         &self,
         committed_version: Version,
@@ -576,7 +573,6 @@ impl StateKvDb {
 }
 
 /// Per-shard data recovered from the hot state KV DB.
-#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct LoadedHotStateShard {
     /// All hot entries keyed by state key hash.
