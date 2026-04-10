@@ -13,9 +13,12 @@
 /aptos-move/aptos-vm/src/keyless_validation.rs @alinush
 /aptos-move/aptos-vm-profiling/ @vgao1996
 /aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
+/aptos-move/e2e-move-tests/src/confidential_asset.rs @alinush
+/aptos-move/e2e-move-tests/src/keyless_feature_gating.rs @alinush
 /aptos-move/framework/ @wrwg
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
 /aptos-move/framework/aptos-framework/sources/jwks.move @zjma
+/aptos-move/framework/aptos-framework/sources/confidential_asset/ @alinush
 /aptos-move/framework/aptos-framework/sources/keyless_account.move @alinush
 /aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma
 /aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
@@ -26,6 +29,9 @@
 /aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
 /aptos-move/sharded_block-executor/ @sitalkedia
 /aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
+/aptos-move/move-examples/drand/ @alinush
+/aptos-move/move-examples/groth16_example/ @alinush @zjma
+/aptos-move/vm-genesis/src/lib.rs @alinush @zjma
 
 # Owners for the gas subsystem.
 /aptos-move/aptos-abstract-gas-usage/ @vgao1996
@@ -61,17 +67,24 @@
 
 # Owners for quorum store.
 /consensus/src/quorum_store/ @bchocho @sasha8 @gelash
+/consensus/src/rand/rand_gen/ @zjma
 
 # Owners for the `/crates/aptos` directory and all its subdirectories.
 /crates/aptos @gregnazario @banool
 
+# Owners for the `aptos-batch-encryption` crate.
+/crates/aptos-batch-encryption/ @rex1fernando
+
 # Owners for the `/crates/aptos-crypto*` directories.
-/crates/aptos-crypto-derive/ @alinush @zjma @rex1fernando @waamm
-/crates/aptos-crypto/ @alinush @zjma @rex1fernando @waamm
+/crates/aptos-crypto-derive/ @alinush @zjma @rex1fernando
+/crates/aptos-crypto/ @alinush @zjma @rex1fernando
 
 # Owners for the `/crates/aptos-faucet` directory and all its subdirectories. And other faucet, genesis, and OpenAPI-related crates.
 /crates/aptos-faucet @banool @gregnazario
 /crates/aptos-genesis @gregnazario
+
+# Owners for the `aptos-jwk-consensus` crate.
+/crates/aptos-jwk-consensus/ @zjma
 
 # Owners for the aptos-logger crate
 /crates/aptos-logger @gregnazario @joshlind
@@ -100,18 +113,36 @@
 # Owners for the `/dashboards` directory and all its subdirectories.
 /dashboards/ @aptos-labs/prod-eng
 
+# Owners for the `/dkg` directory.
+/dkg/src/dkg_manager/ @zjma
+/dkg/src/transcript_aggregation/ @zjma
+/dkg/src/agg_trx_producer.rs @zjma
+/dkg/src/counters.rs @zjma
+/dkg/src/epoch_manager.rs @zjma
+/dkg/src/lib.rs @zjma
+/dkg/src/network_interface.rs @zjma
+/dkg/src/network.rs @zjma
+/dkg/src/types.rs @zjma
+
 # Owners for the `/docker` directory and all its subdirectories.
 /docker/ @aptos-labs/prod-eng
 /docker/builder/docker-bake-rust-all.hcl @aptos-labs/prod-eng @aptos-labs/security
 
 # Owners for execution and storage.
 /execution/ @lightmark @grao1991
+/execution/block-partitioner/ @zjma
+
+# Owners for the `/keyless` directory.
+/keyless/pepper/common/ @zjma
 
 # Owners for mempool.
 /mempool/ @bchocho
 
 # Owners for the network and all its subdirectories.
 /network/ @joshlind @zekun000
+
+# Owners for the `/protos` directory.
+/protos/proto/aptos/transaction/v1/transaction.proto @alinush
 
 # Owners for the scripts
 /scripts/ @aptos-labs/prod-eng
@@ -127,6 +158,10 @@
 # Owners for the `/terraform` directory and all its subdirectories.
 /terraform/ @aptos-labs/prod-eng
 
+# Owners for the testsuite.
+/testsuite/generate-format/ @alinush @zjma
+/testsuite/smoke-test/src/keyless.rs @alinush
+
 # Owners for the mono-move folder.
 /third_party/move/mono-move/ @calintat @georgemitenkov @vgao1996 @vineethk
 
@@ -139,9 +174,11 @@
 /third_party/move/tools/move-package-resolver/ @vgao1996
 
 # Owners for the `aptos-dkg` crate.
-/crates/aptos-dkg @alinush @rex1fernando @waamm
+/crates/aptos-dkg @alinush @rex1fernando
 
 # Owners for types.
+/types/src/dkg/ @zjma
+/types/src/jwks/ @zjma
 /types/src/keyless/ @alinush
 /types/src/on_chain_config/timed_features.rs @vgao1996
 /types/src/transaction/authenticator.rs @alinush
