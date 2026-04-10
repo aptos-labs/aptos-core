@@ -397,6 +397,7 @@ impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
             &self.toeplitz_domain.dimension(),
         )?;
         state.serialize_field("fft_domain_size", &self.fft_domain.size)?;
+        println!("prepared_toeplitz_inputs size: {} {}", self.prepared_toeplitz_inputs.len(), self.prepared_toeplitz_inputs[0].y.len());
         state.serialize_field("prepared_toeplitz_inputs", &self.prepared_toeplitz_inputs)?;
         state.end()
     }
