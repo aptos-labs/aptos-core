@@ -910,7 +910,7 @@ impl LifetimeAnalysisStep<'_, '_> {
             }
         }
 
-        // Create references for return values
+        // Create references for reference-typed return values
         for dest in dests {
             let ty = self.ty(*dest);
             if ty.is_mutable_reference() {
@@ -928,9 +928,21 @@ impl LifetimeAnalysisStep<'_, '_> {
             }
         }
 
-        // Release all input references
+        // Release all input references before checking non-reference destinations.
+        // This ensures that a local passed by reference as an argument
+        // is not incorrectly flagged as still borrowed when
+        // we write back to it — the borrow from the argument is consumed by the call.
         for id in all_references_to_borrow_from {
             self.state.release(id)
+        }
+
+        // Drop non-reference destinations. After the input references have been
+        // released above, any remaining borrow on a destination local is a genuine
+        // use-after-borrow (e.g. `r = &x; (x, _) = foo(); *r`).
+        for dest in dests {
+            if !self.ty(*dest).is_reference() {
+                self.replace(*dest, AbstractValue::NonReference)
+            }
         }
     }
 
