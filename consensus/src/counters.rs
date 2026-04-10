@@ -717,6 +717,15 @@ pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC: Lazy<IntCounter> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static NEED_SYNC_FOR_LEDGER_INFO: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_need_sync_for_ledger_info",
+        "Count of need_sync_for_ledger_info decisions",
+        &["result"]
+    )
+    .unwrap()
+});
+
 pub static SYNC_TO_HIGHEST_QC: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_sync_to_highest_qc",
@@ -806,6 +815,26 @@ pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC: Lazy<IntCounter>
         )
         .unwrap()
     });
+
+/// State sync trigger counter with reason and source labels
+pub static STATE_SYNC_TRIGGER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_state_sync_trigger",
+        "State sync trigger with reason (block_not_exist, commit_gap) and source (proposal, opt_proposal, vote, sync_info, round_timeout)",
+        &["reason", "source"]
+    )
+    .unwrap()
+});
+
+/// Gap between commit round and ordered root round when state sync triggers
+pub static STATE_SYNC_TRIGGER_GAP: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_state_sync_trigger_gap",
+        "Gap between commit round and ordered root round when state sync triggers",
+        vec![1.0, 2.0, 3.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
+    )
+    .unwrap()
+});
 
 //////////////////////
 // RECONFIGURATION COUNTERS

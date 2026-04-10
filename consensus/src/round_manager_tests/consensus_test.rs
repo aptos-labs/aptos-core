@@ -1243,6 +1243,7 @@ fn sync_on_partial_newer_sync_info() {
                 sync_info.highest_round() + 1,
                 &sync_info,
                 node.signer.author(),
+                "test",
             )
             .await
             .unwrap();

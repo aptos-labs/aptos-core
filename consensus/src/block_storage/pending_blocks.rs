@@ -119,6 +119,16 @@ impl PendingBlocks {
         }
     }
 
+    /// Check if a block with the given hash exists in the pending buffer.
+    pub fn block_exists_by_id(&self, block_id: &HashValue) -> bool {
+        self.blocks_by_hash.contains_key(block_id)
+    }
+
+    /// Check if any block (regular or opt) is pending at the given round.
+    pub fn has_block_at_round(&self, round: Round) -> bool {
+        self.blocks_by_round.contains_key(&round) || self.opt_blocks_by_round.contains_key(&round)
+    }
+
     pub fn gc(&mut self, round: Round) {
         let mut to_remove = vec![];
         for (r, _) in self.blocks_by_round.range(..=round) {
