@@ -134,18 +134,20 @@ impl StateMerkleDb {
             batches_for_shards.len() == NUM_STATE_SHARDS,
             "Shard count mismatch."
         );
-        THREAD_MANAGER.get_io_pool().install(|| {
-            batches_for_shards
-                .into_par_iter()
-                .enumerate()
-                .for_each(|(shard_id, batch)| {
-                    self.db_shard(shard_id)
-                        .write_schemas(batch)
-                        .unwrap_or_else(|err| {
-                            panic!("Failed to commit state merkle shard {shard_id}: {err}")
-                        });
-                })
-        });
+        aptos_experimental_runtimes::blocking_scope::scope_blocking(
+            &THREAD_MANAGER.get_io_pool(),
+            |s| {
+                for (shard_id, batch) in batches_for_shards.into_iter().enumerate() {
+                    s.spawn(move || {
+                        self.db_shard(shard_id)
+                            .write_schemas(batch)
+                            .unwrap_or_else(|err| {
+                                panic!("Failed to commit state merkle shard {shard_id}: {err}")
+                            });
+                    });
+                }
+            },
+        );
 
         self.commit_top_levels(version, top_levels_batch)
     }

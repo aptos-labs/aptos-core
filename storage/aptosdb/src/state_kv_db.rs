@@ -198,21 +198,24 @@ impl StateKvDb {
         {
             let _timer = OTHER_TIMERS_SECONDS
                 .timer_with(&[&format!("{}__state_kv_db__commit_shards", self.db_tag())]);
-            THREAD_MANAGER.get_io_pool().scope(|s| {
-                let mut batches = sharded_state_kv_batches.into_iter();
-                for shard_id in 0..NUM_STATE_SHARDS {
-                    let state_kv_batch = batches
-                        .next()
-                        .expect("Not sufficient number of sharded state kv batches");
-                    s.spawn(move |_| {
-                        // TODO(grao): Consider propagating the error instead of panic, if necessary.
-                        self.commit_single_shard(version, shard_id, state_kv_batch)
-                            .unwrap_or_else(|err| {
-                                panic!("Failed to commit shard {shard_id}: {err}.")
-                            });
-                    });
-                }
-            });
+            aptos_experimental_runtimes::blocking_scope::scope_blocking(
+                &THREAD_MANAGER.get_io_pool(),
+                |s| {
+                    let mut batches = sharded_state_kv_batches.into_iter();
+                    for shard_id in 0..NUM_STATE_SHARDS {
+                        let state_kv_batch = batches
+                            .next()
+                            .expect("Not sufficient number of sharded state kv batches");
+                        s.spawn(move || {
+                            // TODO(grao): Consider propagating the error instead of panic, if necessary.
+                            self.commit_single_shard(version, shard_id, state_kv_batch)
+                                .unwrap_or_else(|err| {
+                                    panic!("Failed to commit shard {shard_id}: {err}.")
+                                });
+                        });
+                    }
+                },
+            );
         }
         if let Some(batch) = state_kv_metadata_batch {
             let _timer = OTHER_TIMERS_SECONDS

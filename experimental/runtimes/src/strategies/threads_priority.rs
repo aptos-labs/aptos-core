@@ -4,12 +4,12 @@
 use crate::{common::set_thread_nice_value, thread_manager::ThreadManager};
 use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;
 use rayon::ThreadPool;
+use tokio::runtime::{Handle, Runtime};
 
 pub(crate) struct ThreadsPriorityThreadManager {
     exe_threads: ThreadPool,
     non_exe_threads: ThreadPool,
-    high_pri_io_threads: ThreadPool,
-    io_threads: ThreadPool,
+    io_threads: Runtime,
     background_threads: ThreadPool,
 }
 
@@ -28,17 +28,12 @@ impl ThreadsPriorityThreadManager {
             set_thread_nice_value(-10),
         );
 
-        let high_pri_io_threads = spawn_rayon_thread_pool_with_start_hook(
-            "io_high".into(),
-            Some(32),
-            set_thread_nice_value(-20),
-        );
-
-        let io_threads = spawn_rayon_thread_pool_with_start_hook(
-            "io_low".into(),
-            Some(64),
-            set_thread_nice_value(1),
-        );
+        let io_threads = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .max_blocking_threads(64)
+            .thread_name("io")
+            .build()
+            .expect("Failed to create io tokio runtime");
 
         let background_threads = spawn_rayon_thread_pool_with_start_hook(
             "background".into(),
@@ -49,7 +44,6 @@ impl ThreadsPriorityThreadManager {
         Self {
             exe_threads,
             non_exe_threads,
-            high_pri_io_threads,
             io_threads,
             background_threads,
         }
@@ -65,12 +59,12 @@ impl<'a> ThreadManager<'a> for ThreadsPriorityThreadManager {
         &self.non_exe_threads
     }
 
-    fn get_io_pool(&'a self) -> &'a ThreadPool {
-        &self.io_threads
+    fn get_io_pool(&'a self) -> Handle {
+        self.io_threads.handle().clone()
     }
 
-    fn get_high_pri_io_pool(&'a self) -> &'a ThreadPool {
-        &self.high_pri_io_threads
+    fn get_high_pri_io_pool(&'a self) -> Handle {
+        self.io_threads.handle().clone()
     }
 
     fn get_background_pool(&'a self) -> &'a ThreadPool {

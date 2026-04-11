@@ -381,7 +381,7 @@ where
 
         let mut shard_batch = TreeUpdateBatch::new();
         let shard_root_node_opt = if let Some(persisted_version) = persisted_version {
-            THREAD_MANAGER.get_io_pool().install(|| {
+            THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
                 self.batch_insert_at(
                     &NodeKey::new(persisted_version, shard_root_nibble_path),
                     version,
