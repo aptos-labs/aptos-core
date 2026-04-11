@@ -4,6 +4,7 @@ fun load_values(): u64 {
   slots: params(0), locals(0), temps(1)
     r0: u64
   code:
+  L0:
     0: r0 := ld_u64 42
     1: ret [r0]
 }
@@ -12,6 +13,7 @@ fun load_and_store() {
   slots: params(0), locals(1), temps(0)
     r0: u64
   code:
+  L0:
     0: r0 := ld_u64 10
     1: ret []
 }

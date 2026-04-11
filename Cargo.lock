@@ -18251,6 +18251,8 @@ dependencies = [
  "move-model",
  "move-prover-test-utils",
  "move-vm-types",
+ "shared-dsa",
+ "smallvec",
  "triomphe",
 ]
 

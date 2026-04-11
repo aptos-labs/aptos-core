@@ -62,20 +62,14 @@ pub fn translate_module(
                 // this will change to use more efficient cached type representations.
                 let local_types = convert_sig_tokens(&module, &all_sig_toks, struct_name_table);
 
-                // Pass: Bytecode -> Intra-Block SSA
+                // Pass: Bytecode -> Intra-Block SSA -> Fusion
                 let converter = SsaConverter::new(local_types, struct_name_table);
-                let mut ssa = converter.convert_function(&module, &code.code)?;
+                let ssa = converter
+                    .convert_function(&module, &code.code)?
+                    .with_fusion_passes();
 
-                // Pass: Pre-allocation instruction fusion
-                // [TODO]: right now, we have each different fusion operation to be a separate pass, each
-                // computing basic block boundaries again in a linear pass. This is easier to reason about
-                // but inefficient, and will be changed in to be more efficient in the future once we
-                // land on a reasonably minimal set of fusion patterns to implement.
-                ssa.fuse_field_access_instrs();
-                ssa.fuse_immediate_binops();
-
-                // Pass: Greedy Slot Allocation
-                let alloc = super::slot_alloc::allocate_slots(&ssa)?;
+                // Pass: Greedy Slot Allocation (consumes SSA, remaps in-place)
+                let alloc = super::slot_alloc::allocate_slots(ssa)?;
 
                 Ok(FunctionIR {
                     name_idx,
@@ -84,7 +78,7 @@ pub fn translate_module(
                     num_locals,
                     num_home_slots: alloc.num_home_slots,
                     num_xfer_slots: alloc.num_xfer_slots,
-                    instrs: alloc.instrs,
+                    blocks: alloc.blocks,
                     home_slot_types: alloc.home_slot_types,
                 })
             })

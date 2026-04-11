@@ -4,6 +4,7 @@ fun identity(r0): u64 {
   slots: params(1), locals(0), temps(0)
     r0: u64
   code:
+  L0:
     0: ret [r0]
 }
 
@@ -13,6 +14,7 @@ fun add_two(r0, r1): u64 {
     r1: u64
     r2: u64
   code:
+  L0:
     0: r2 := add r0, r1
     1: ret [r2]
 }
@@ -21,6 +23,7 @@ fun copy_to_call(r0): u64 {
   slots: params(1), locals(0), temps(0), xfer(1)
     r0: u64
   code:
+  L0:
     0: [x0] := call identity, [r0]
     1: ret [x0]
 }
@@ -29,6 +32,7 @@ fun move_to_call(r0): u64 {
   slots: params(1), locals(0), temps(0), xfer(1)
     r0: u64
   code:
+  L0:
     0: [x0] := call identity, [r0]
     1: ret [x0]
 }
@@ -38,6 +42,7 @@ fun multi_use_local_alias(r0): u64 {
     r0: u64
     r1: u64
   code:
+  L0:
     0: r1 := add r0, #1
     1: r1 := add r1, r0
     2: ret [r1]
@@ -48,6 +53,7 @@ fun copy_call_then_use(r0): u64 {
     r0: u64
     r1: u64
   code:
+  L0:
     0: [x0] := call identity, [r0]
     1: r1 := add x0, r0
     2: ret [r1]
@@ -58,6 +64,7 @@ fun two_copies_to_call(r0, r1): u64 {
     r0: u64
     r1: u64
   code:
+  L0:
     0: [x0] := call add_two, [r0, r1]
     1: ret [x0]
 }

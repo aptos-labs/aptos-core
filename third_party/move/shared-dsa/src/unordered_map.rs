@@ -114,6 +114,14 @@ impl<K: Hash + Eq, V> UnorderedMap<K, V> {
         self.inner.entry(key)
     }
 
+    /// Retains only the key-value pairs for which the predicate returns `true`.
+    /// The predicate is applied in an arbitrary order — callers must ensure
+    /// that `f` does not depend on the order in which key-value pairs are visited.
+    #[inline]
+    pub fn retain(&mut self, f: impl FnMut(&K, &mut V) -> bool) {
+        self.inner.retain(f);
+    }
+
     /// Reserves space for at least `additional` more elements. Pass the number
     /// of elements you expect to add, not an inflated value — the load factor
     /// is handled internally.

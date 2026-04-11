@@ -4,6 +4,7 @@ fun identity(r0): u64 {
   slots: params(1), locals(0), temps(0)
     r0: u64
   code:
+  L0:
     0: ret [r0]
 }
 
@@ -14,6 +15,7 @@ fun add_two_fields(r0): u64 {
     r2: u64
     r3: u64
   code:
+  L0:
     0: r1 := imm_borrow_loc r0
     1: r2 := read_field Pair::_1, r1
     2: r1 := imm_borrow_loc r0
@@ -27,6 +29,7 @@ fun field_to_call(r0): u64 {
     r0: Pair
     r1: &Pair
   code:
+  L0:
     0: r1 := imm_borrow_loc r0
     1: x0 := read_field Pair::_1, r1
     2: [x0] := call identity, [x0]
@@ -41,6 +44,7 @@ fun two_fields_to_call(r0, r1): u64 {
     r3: u64
     r4: u64
   code:
+  L0:
     0: r2 := imm_borrow_loc r0
     1: r3 := read_field Pair::_1, r2
     2: r2 := imm_borrow_loc r1
@@ -56,6 +60,7 @@ fun field_plus_constant(r0): u64 {
     r1: &Pair
     r2: u64
   code:
+  L0:
     0: r1 := imm_borrow_loc r0
     1: r2 := read_field Pair::_1, r1
     2: r2 := add r2, #42
@@ -67,6 +72,7 @@ fun increment_field(r0) {
     r0: &mut Pair
     r1: u64
   code:
+  L0:
     0: r1 := read_field Pair::_1, r0
     1: r1 := add r1, #1
     2: write_field Pair::_1, r0, r1

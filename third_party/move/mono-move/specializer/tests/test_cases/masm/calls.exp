@@ -4,12 +4,14 @@ fun identity(r0): u64 {
   slots: params(1), locals(0), temps(0)
     r0: u64
   code:
+  L0:
     0: ret [r0]
 }
 
 fun caller(): u64 {
   slots: params(0), locals(0), temps(0), xfer(1)
   code:
+  L0:
     0: x0 := ld_u64 10
     1: [x0] := call identity, [x0]
     2: ret [x0]
