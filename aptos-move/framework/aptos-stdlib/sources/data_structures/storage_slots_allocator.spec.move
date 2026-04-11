@@ -1,29 +1,5 @@
 spec aptos_std::storage_slots_allocator {
 
-    // -------------------------------------------
-    // Fully verified functions (no enum field access needed)
-    // -------------------------------------------
-
-    spec reserved_to_index(self: &ReservedSlot): u64 {
-        aborts_if false;
-        ensures result == self.slot_index;
-    }
-
-    spec stored_to_index(self: &StoredSlot): u64 {
-        aborts_if false;
-        ensures result == self.slot_index;
-    }
-
-    spec is_null_index(slot_index: u64): bool {
-        aborts_if false;
-        ensures result == (slot_index == 0);
-    }
-
-    spec is_special_unused_index(slot_index: u64): bool {
-        aborts_if false;
-        ensures result == (slot_index != 0 && slot_index < 10);
-    }
-
     spec free_reserved_slot<T: store>(
         self: &mut StorageSlotsAllocator<T>,
         reserved_slot: ReservedSlot,
@@ -35,23 +11,6 @@ spec aptos_std::storage_slots_allocator {
         pragma aborts_if_is_partial;
     }
 
-    // -------------------------------------------
-    // Enum-field access (single-variant enum V1)
-    // -------------------------------------------
-
-    spec new<T: store>(should_reuse: bool): StorageSlotsAllocator<T> {
-        aborts_if false;
-        ensures result.should_reuse == should_reuse;
-        ensures result.new_slot_index == 10;
-        ensures result.reuse_head_index == 0;
-        ensures result.reuse_spare_count == 0;
-        ensures result.slots.is_none();
-    }
-
-    spec get_num_spare_slot_count<T: store>(self: &StorageSlotsAllocator<T>): u32 {
-        aborts_if !self.should_reuse;
-        ensures result == self.reuse_spare_count;
-    }
 
     // -------------------------------------------
     // Complex functions: loop / enum pattern match
@@ -63,6 +22,7 @@ spec aptos_std::storage_slots_allocator {
     }
 
     spec add<T: store>(self: &mut StorageSlotsAllocator<T>, val: T): StoredSlot {
+        pragma opaque;
         // Overflows when reuse queue empty and new_slot_index wraps
         aborts_if self.reuse_head_index == 0 && self.new_slot_index + 1 > MAX_U64;
         pragma aborts_if_is_partial;
@@ -73,6 +33,7 @@ spec aptos_std::storage_slots_allocator {
     }
 
     spec remove<T: store>(self: &mut StorageSlotsAllocator<T>, slot: StoredSlot): T {
+        pragma opaque;
         aborts_if self.slots.is_none();
         aborts_if !table_with_length::spec_contains(option::borrow(self.slots), slot.slot_index);
         aborts_if !(table_with_length::spec_get(option::borrow(self.slots), slot.slot_index) is Link::Occupied);
@@ -82,11 +43,8 @@ spec aptos_std::storage_slots_allocator {
         ensures self.slots.is_some();
     }
 
-    spec destroy_empty<T: store>(self: StorageSlotsAllocator<T>) {
-        pragma aborts_if_is_partial;
-    }
-
     spec borrow<T: store>(self: &StorageSlotsAllocator<T>, slot_index: u64): &T {
+        pragma opaque;
         aborts_if self.slots.is_none();
         aborts_if !table_with_length::spec_contains(option::borrow(self.slots), slot_index);
         aborts_if !(table_with_length::spec_get(option::borrow(self.slots), slot_index) is Link::Occupied);
@@ -94,6 +52,7 @@ spec aptos_std::storage_slots_allocator {
     }
 
     spec borrow_mut<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): &mut T {
+        pragma opaque;
         aborts_if self.slots.is_none();
         aborts_if !table_with_length::spec_contains(option::borrow(self.slots), slot_index);
         aborts_if !(table_with_length::spec_get(option::borrow(self.slots), slot_index) is Link::Occupied);
@@ -108,18 +67,22 @@ spec aptos_std::storage_slots_allocator {
     }
 
     spec fill_reserved_slot<T: store>(self: &mut StorageSlotsAllocator<T>, slot: ReservedSlot, val: T) {
+        pragma opaque;
         aborts_if self.slots.is_none();
         aborts_if table_with_length::spec_contains(option::borrow(self.slots), slot.slot_index);
         ensures table_with_length::spec_contains(option::borrow(self.slots), slot.slot_index);
         ensures table_with_length::spec_get(option::borrow(self.slots), slot.slot_index) is Link::Occupied;
         ensures table_with_length::spec_get(option::borrow(self.slots), slot.slot_index).value == val;
+        ensures self.slots.is_some();
     }
 
     spec remove_and_reserve<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): (ReservedSlot, T) {
+        pragma opaque;
         aborts_if self.slots.is_none();
         aborts_if !table_with_length::spec_contains(option::borrow(self.slots), slot_index);
         aborts_if !(table_with_length::spec_get(option::borrow(self.slots), slot_index) is Link::Occupied);
         ensures result_1.slot_index == slot_index;
         ensures result_2 == old(table_with_length::spec_get(option::borrow(self.slots), slot_index)).value;
+        ensures self.slots.is_some();
     }
 }

@@ -89,6 +89,7 @@ impl FlowSession {
                 })?;
                 let mut options = move_prover::cli::Options::default();
                 options.prover.verify_scope = verification_scope;
+                aptos_framework::prover::configure_aptos_custom_natives(&mut options);
                 options.inference.inference = true;
                 options.inference.inference_output = match spec_output {
                     SpecOutput::Inline => InferenceOutput::Unified,

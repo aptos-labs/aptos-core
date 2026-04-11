@@ -61,7 +61,6 @@ has been deprecated in favor of <code>big_ordered_map.<b>move</b></code>.
     -  [Function `keys_paginated`](#@Specification_1_keys_paginated)
     -  [Function `split_one_bucket`](#@Specification_1_split_one_bucket)
     -  [Function `bucket_index`](#@Specification_1_bucket_index)
-    -  [Function `borrow_with_default`](#@Specification_1_borrow_with_default)
     -  [Function `load_factor`](#@Specification_1_load_factor)
     -  [Function `update_split_load_threshold`](#@Specification_1_update_split_load_threshold)
     -  [Function `update_target_bucket_size`](#@Specification_1_update_target_bucket_size)
@@ -1574,22 +1573,6 @@ map_spec_has_key = spec_contains;
 
 
 
-<a id="@Specification_1_borrow_with_default"></a>
-
-### Function `borrow_with_default`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, key: K, default: &V): &V
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_load_factor"></a>
 
 ### Function `load_factor`
@@ -1649,7 +1632,9 @@ map_spec_has_key = spec_contains;
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result_1 == self.key;
+<b>ensures</b> result_2 == self.value;
 </code></pre>
 
 
@@ -1665,7 +1650,9 @@ map_spec_has_key = spec_contains;
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result_1 == <b>old</b>(self.key);
+<b>ensures</b> result_2 == <b>old</b>(self.value);
 </code></pre>
 
 

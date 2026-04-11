@@ -300,7 +300,14 @@ Returns floor(log2(x))
     <b>assert</b>!(x != 0, std::error::invalid_argument(<a href="math128.md#0x1_math128_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>));
     // Effectively the position of the most significant set bit
     <b>let</b> n = 64;
-    <b>while</b> (n &gt; 0) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> n &lt;= 64;
+            <b>invariant</b> (res <b>as</b> u64) + 2 * (n <b>as</b> u64) &lt;= 128;
+            <b>invariant</b> n == 0 ==&gt; (res <b>as</b> u64) &lt;= 127;
+        };
+        n &gt; 0
+    }) {
         <b>if</b> (x &gt;= (1 &lt;&lt; n)) {
             x &gt;&gt;= n;
             res += n;
@@ -579,9 +586,10 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> [abstract] x == 0;
+<b>aborts_if</b> x == 0;
+<b>ensures</b> result &lt;= 127;
 <b>ensures</b> [abstract] <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(2, result) &lt;= x;
-<b>ensures</b> [abstract] x &lt; <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(2, result+1);
+<b>ensures</b> [abstract] x &lt; <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(2, result + 1);
 </code></pre>
 
 
@@ -599,6 +607,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> x == 0 ==&gt; result == 0;
 <b>ensures</b> [abstract] x &gt; 0 ==&gt; result * result &lt;= x;
 <b>ensures</b> [abstract] x &gt; 0 ==&gt; x &lt; (result+1) * (result+1);
 </code></pre>

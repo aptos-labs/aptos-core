@@ -798,12 +798,9 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_floor">spec_floor</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-   <b>let</b> fractional = self.value % (1 &lt;&lt; 32);
-   <b>if</b> (fractional == 0) {
-       self.value &gt;&gt; 32
-   } <b>else</b> {
-       (self.value - fractional) &gt;&gt; 32
-   }
+   // Right-shifting discards the lower 32 bits unconditionally;
+   // the original conditional was redundant since both branches equal self.value &gt;&gt; 32.
+   self.value &gt;&gt; 32
 }
 </code></pre>
 
@@ -820,8 +817,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>pragma</b> opaque;
+<pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(self);
 </code></pre>
@@ -833,12 +829,14 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-   <b>let</b> fractional = self.value % (1 &lt;&lt; 32);
-   <b>let</b> one = 1 &lt;&lt; 32;
-   <b>if</b> (fractional == 0) {
-       self.value &gt;&gt; 32
+   // Expressed in terms of floor_val <b>to</b> avoid modulo: the <b>else</b> branch
+   // (self.value - fractional + 2^32) &gt;&gt; 32 = floor_val + 1, and
+   // fractional == 0 iff self.value == floor_val &lt;&lt; 32.
+   <b>let</b> floor_val = self.value &gt;&gt; 32;
+   <b>if</b> (self.value == floor_val &lt;&lt; 32) {
+       floor_val
    } <b>else</b> {
-       (self.value - fractional + one) &gt;&gt; 32
+       floor_val + 1
    }
 }
 </code></pre>
@@ -856,8 +854,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>pragma</b> opaque;
+<pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(self);
 </code></pre>
@@ -869,13 +866,14 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-   <b>let</b> fractional = self.value % (1 &lt;&lt; 32);
-   <b>let</b> boundary = (1 &lt;&lt; 32) / 2;
-   <b>let</b> one = 1 &lt;&lt; 32;
-   <b>if</b> (fractional &lt; boundary) {
-       (self.value - fractional) &gt;&gt; 32
+   // Expressed in terms of floor_val <b>to</b> avoid modulo: both result branches
+   // equal floor_val or floor_val + 1, and the boundary condition
+   // fractional &lt; 2^31 is equivalent <b>to</b> self.value &lt; floor_val&lt;&lt;32 + 2^31.
+   <b>let</b> floor_val = self.value &gt;&gt; 32;
+   <b>if</b> (self.value &lt; (floor_val &lt;&lt; 32) + (1 &lt;&lt; 31)) {
+       floor_val
    } <b>else</b> {
-       (self.value - fractional + one) &gt;&gt; 32
+       floor_val + 1
    }
 }
 </code></pre>

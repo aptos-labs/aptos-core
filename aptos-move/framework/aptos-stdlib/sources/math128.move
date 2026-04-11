@@ -83,7 +83,14 @@ module aptos_std::math128 {
         assert!(x != 0, std::error::invalid_argument(EINVALID_ARG_FLOOR_LOG2));
         // Effectively the position of the most significant set bit
         let n = 64;
-        while (n > 0) {
+        while ({
+            spec {
+                invariant n <= 64;
+                invariant (res as u64) + 2 * (n as u64) <= 128;
+                invariant n == 0 ==> (res as u64) <= 127;
+            };
+            n > 0
+        }) {
             if (x >= (1 << n)) {
                 x >>= n;
                 res += n;

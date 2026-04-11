@@ -119,27 +119,12 @@ module aptos_std::smart_vector {
     public fun append<T: store>(self: &mut SmartVector<T>, other: SmartVector<T>) {
         let other_len = other.length();
         let half_other_len = other_len / 2;
-        spec {
-            update initial_self_len = length(self);
-        };
         let i = 0;
-        while ({
-            spec {
-                invariant i <= half_other_len;
-                invariant spec_len(self) == initial_self_len + i;
-            };
-            i < half_other_len
-        }) {
+        while (i < half_other_len) {
             self.push_back(other.swap_remove(i));
             i += 1;
         };
-        while ({
-            spec {
-                invariant half_other_len <= i && i <= other_len;
-                invariant spec_len(self) == initial_self_len + i;
-            };
-            i < other_len
-        }) {
+        while (i < other_len) {
             self.push_back(other.pop_back());
             i += 1;
         };

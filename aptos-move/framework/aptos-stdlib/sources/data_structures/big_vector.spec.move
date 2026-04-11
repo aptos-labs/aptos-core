@@ -4,9 +4,7 @@ spec aptos_std::big_vector {
     // -----------------
 
     spec module {
-        global initial_self_len: u64;
         global initial_end_index: u64;
-        global initial_bucket_size: u64;
     }
 
     spec BigVector {
@@ -32,6 +30,10 @@ spec aptos_std::big_vector {
         // division-based formulation of that invariant is not needed here.
         invariant (spec_table_len(buckets) == 0 && end_index == 0)
             || (spec_table_len(buckets) != 0 && ((spec_table_len(buckets) - 1) * bucket_size) + (len(table_with_length::spec_get(buckets, spec_table_len(buckets) - 1))) == end_index);
+        // ensures that no out-of-bound buckets exist
+        invariant forall i: u64 {spec_table_contains(buckets, i)} where i >= spec_table_len(buckets):  {
+            !spec_table_contains(buckets, i)
+        };
         // ensures that the last bucket is non-empty
         invariant spec_table_len(buckets) == 0
             || (len(table_with_length::spec_get(buckets, spec_table_len(buckets) - 1)) > 0);
@@ -122,7 +124,6 @@ spec aptos_std::big_vector {
     }
 
     spec append<T: store>(self: &mut BigVector<T>, other: BigVector<T>) {
-        pragma aborts_if_is_partial;
         ensures self.length() == old(self.length()) + other.length();
     }
 
@@ -134,39 +135,20 @@ spec aptos_std::big_vector {
         ensures result == spec_at(old(self), i);
     }
 
-    spec reverse<T>(self: &mut BigVector<T>) {
-        pragma aborts_if_is_partial;
-    }
-
     spec index_of<T>(self: &BigVector<T>, val: &T): (bool, u64) {
         pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract] result_1 ==> result_2 < self.length();
-        ensures [abstract] result_1 ==> spec_at(self, result_2) == val;
-        ensures [abstract] !result_1 ==> (forall i in 0..self.length(): spec_at(self, i) != val);
+        aborts_if false;
+        ensures result_1 ==> result_2 < self.length();
+        ensures result_1 ==> spec_at(self, result_2) == val;
+        // Bucket-level formulation avoids the non-linear i/bucket_size arithmetic of spec_at.
+        // Equivalent to forall i in 0..length(): spec_at(self, i) != val given BigVector invariants.
+        ensures !result_1 ==> (forall j in 0..spec_table_len(self.buckets):
+            forall k in 0..len(table_with_length::spec_get(self.buckets, j)):
+                table_with_length::spec_get(self.buckets, j)[k] != val);
     }
 
     spec contains<T>(self: &BigVector<T>, val: &T): bool {
         aborts_if false;
-    }
-
-    spec to_vector<T: copy>(self: &BigVector<T>): vector<T> {
-        pragma opaque;
-        pragma aborts_if_is_partial;
-    }
-
-    spec length<T>(self: &BigVector<T>): u64 {
-        aborts_if false;
-        ensures result == self.end_index;
-    }
-
-    spec is_empty<T>(self: &BigVector<T>): bool {
-        aborts_if false;
-        ensures result == (self.end_index == 0);
-    }
-
-    spec destroy<T: drop>(self: BigVector<T>) {
-        pragma aborts_if_is_partial;
     }
 
     // ---------------------

@@ -41,12 +41,6 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
-    spec borrow_with_default<K: copy + drop, V>(self: &SmartTable<K, V>, key: K, default: &V): &V {
-        aborts_if false;
-        ensures spec_contains(self, key) ==> result == spec_get(self, key);
-        ensures !spec_contains(self, key) ==> result == default;
-    }
-
     spec load_factor<K, V>(self: &SmartTable<K, V>): u64 {
         pragma verify = false;
     }

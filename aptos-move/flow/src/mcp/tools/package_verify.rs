@@ -120,6 +120,7 @@ impl FlowSession {
                 options.prover.verify_scope = verification_scope;
                 options.prover.verify_exclude = verify_exclude;
                 options.backend.vc_timeout = vc_timeout;
+                aptos_framework::prover::configure_aptos_custom_natives(&mut options);
                 #[cfg(test)]
                 {
                     options.prover.stable_test_output = true;

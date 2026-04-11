@@ -885,7 +885,6 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>pragma</b> verify_duration_estimate = 1000;
 <b>include</b> <a href="fixed_point64.md#0x1_fixed_point64_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a>;
 <b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_create_from_rational">spec_create_from_rational</a>(numerator, denominator);
 </code></pre>
@@ -915,7 +914,8 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_create_from_rational">spec_create_from_rational</a>(numerator: num, denominator: num): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a> {
-   <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>{value: (numerator &lt;&lt; 128) / (denominator &lt;&lt; 64)}
+   // Directly mirrors the body: (numerator <b>as</b> u256) &lt;&lt; 64 / (denominator <b>as</b> u256).
+   <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>{value: (numerator &lt;&lt; 64) / denominator}
 }
 </code></pre>
 

@@ -29,32 +29,8 @@ spec aptos_std::ed25519 {
         aborts_if len(bytes) != SIGNATURE_NUM_BYTES;
     }
 
-    spec public_key_to_unvalidated(pk: &ValidatedPublicKey): UnvalidatedPublicKey {
-        aborts_if false;
-        ensures result == UnvalidatedPublicKey { bytes: pk.bytes };
-    }
-
-    spec public_key_into_unvalidated(pk: ValidatedPublicKey): UnvalidatedPublicKey {
-        aborts_if false;
-        ensures result == UnvalidatedPublicKey { bytes: pk.bytes };
-    }
-
-    spec unvalidated_public_key_to_bytes(pk: &UnvalidatedPublicKey): vector<u8> {
-        aborts_if false;
-        ensures result == pk.bytes;
-    }
-
-    spec validated_public_key_to_bytes(pk: &ValidatedPublicKey): vector<u8> {
-        aborts_if false;
-        ensures result == pk.bytes;
-    }
-
-    spec signature_to_bytes(sig: &Signature): vector<u8> {
-        aborts_if false;
-        ensures result == sig.bytes;
-    }
-
     spec public_key_validate(pk: &UnvalidatedPublicKey): Option<ValidatedPublicKey> {
+        pragma opaque;
         aborts_if false;
         let cond = spec_public_key_validate_internal(pk.bytes);
         ensures cond ==> result == option::spec_some(ValidatedPublicKey { bytes: pk.bytes });
@@ -66,6 +42,7 @@ spec aptos_std::ed25519 {
         public_key: &UnvalidatedPublicKey,
         message: vector<u8>
     ): bool {
+        pragma opaque;
         aborts_if false;
         ensures result == spec_signature_verify_strict_internal(signature.bytes, public_key.bytes, message);
     }
@@ -75,21 +52,25 @@ spec aptos_std::ed25519 {
         public_key: &UnvalidatedPublicKey,
         data: T
     ): bool {
+        pragma opaque;
         aborts_if !type_info::spec_is_struct<T>();
         ensures result == spec_signature_verify_strict_t(signature, public_key, data);
     }
 
     spec new_signed_message<T: drop>(data: T): SignedMessage<T> {
+        pragma opaque;
         aborts_if !type_info::spec_is_struct<T>();
         ensures result == SignedMessage<T> { type_info: type_info::type_of<T>(), inner: data };
     }
 
     spec unvalidated_public_key_to_authentication_key(pk: &UnvalidatedPublicKey): vector<u8> {
+        pragma opaque;
         aborts_if false;
         ensures result == spec_public_key_bytes_to_authentication_key(pk.bytes);
     }
 
     spec validated_public_key_to_authentication_key(pk: &ValidatedPublicKey): vector<u8> {
+        pragma opaque;
         aborts_if false;
         ensures result == spec_public_key_bytes_to_authentication_key(pk.bytes);
     }

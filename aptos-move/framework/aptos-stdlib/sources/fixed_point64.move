@@ -155,7 +155,8 @@ module aptos_std::fixed_point64 {
         aborts_if quotient > MAX_U128 with ERATIO_OUT_OF_RANGE;
     }
     spec fun spec_create_from_rational(numerator: num, denominator: num): FixedPoint64 {
-        FixedPoint64{value: (numerator << 128) / (denominator << 64)}
+        // Directly mirrors the body: (numerator as u256) << 64 / (denominator as u256).
+        FixedPoint64{value: (numerator << 64) / denominator}
     }
 
     /// Create a fixedpoint value from a raw value.

@@ -87,12 +87,14 @@ spec aptos_std::math_fixed8 {
     /// remainder <= 10, so pow_raw never aborts.
     spec exp_raw(x: u8): u8 {
         pragma opaque;
+        pragma verify_duration_estimate = 60;
         aborts_if x / LN2 > 3;
     }
 
     /// exp aborts iff the input exceeds the representable range.
     spec exp(x: u8): u8 {
         pragma opaque;
+        pragma verify_duration_estimate = 60;
         aborts_if x / LN2 > 3;
     }
 }

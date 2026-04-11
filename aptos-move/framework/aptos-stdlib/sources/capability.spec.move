@@ -14,16 +14,6 @@ spec aptos_std::capability {
         exists<CapDelegateState<Feature>>(addr)
     }
 
-    spec root_addr<Feature>(self: Cap<Feature>, _feature_witness: &Feature): address {
-        aborts_if false;
-        ensures result == self.root;
-    }
-
-    spec linear_root_addr<Feature>(self: LinearCap<Feature>, _feature_witness: &Feature): address {
-        aborts_if false;
-        ensures result == self.root;
-    }
-
     spec create<Feature>(owner: &signer, _feature_witness: &Feature) {
         let addr = signer::address_of(owner);
         aborts_if spec_has_cap<Feature>(addr);

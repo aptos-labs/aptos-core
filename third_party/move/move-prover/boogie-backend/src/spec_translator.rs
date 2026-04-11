@@ -611,6 +611,9 @@ impl SpecTranslator<'_> {
             .chain(mem_params.into_iter().chain(params))
             .join(", ");
         let attrs = if fun.uninterpreted || recursive {
+            // Uninterpreted functions have no body; recursive functions cannot be inlined.
+            // Both use the default trigger (the function application pattern), which bounds
+            // e-matching instantiation depth via smt.qi.max_instances.
             ""
         } else {
             "{:inline}"
@@ -2038,7 +2041,14 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, &mem_name);
             }
         }
-        // Finally add argument expressions
+        // Finally add argument expressions.
+        // The global number-operation analysis (GlobalNumberOperationState) propagates bv-mode
+        // consistently through spec expressions, ensuring each argument's Boogie type already
+        // matches its parameter's declared type.  Inserting explicit $bv2int/$int2bv conversions
+        // here based on call-site bv_flag or node num_oper misfires on intermediate expressions
+        // (e.g. `e - int2bv(1)` inside a bv spec function has the right Boogie type but its
+        // node num_oper may not be Bitwise) and on calls whose result is bv but some parameters
+        // are int — in both cases the conversion creates a type error rather than fixing one.
         for exp in args {
             maybe_comma();
             self.translate_exp(exp);

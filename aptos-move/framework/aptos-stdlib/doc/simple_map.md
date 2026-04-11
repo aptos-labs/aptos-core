@@ -990,6 +990,7 @@ Remove a key/value pair from the map. The key must exist.
 
 <pre><code><b>pragma</b> intrinsic;
 <b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract]
     <b>forall</b> k: Key: <a href="../../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(result_1, k) &lt;==&gt;
         <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(self, k);

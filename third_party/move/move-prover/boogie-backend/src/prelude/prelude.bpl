@@ -378,6 +378,10 @@ function {:builtin "bv2nat"} $bv2int.{{impl.base}}(i: bv{{impl.base}}) returns (
 axiom (forall n: int :: {$int2bv.{{impl.base}}(n)}
     n >= 0 && n <= {{impl.max}} ==>
     $bv2int.{{impl.base}}($int2bv.{{impl.base}}(n)) == n);
+// Bitvector right-shift by 1 equals integer div 2 (unsigned right shift semantic).
+// This axiom bridges the bitvector-theory and integer-theory worlds for the prover.
+axiom (forall n: bv{{impl.base}} :: {$bv2int.{{impl.base}}($Shr'Bv{{impl.base}}'(n, 1bv{{impl.base}}))}
+    $bv2int.{{impl.base}}($Shr'Bv{{impl.base}}'(n, 1bv{{impl.base}})) == $bv2int.{{impl.base}}(n) div 2);
 
 {%- endfor %}
 
