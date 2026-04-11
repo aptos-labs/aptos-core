@@ -68,7 +68,7 @@ pub fn run_pvss_with_hkzg(
 ) {
     let mut rng_aptos = rand::thread_rng();
 
-    let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
+    let tc = WeightedConfigArkworks::new(256, vec![2; 128]).unwrap();
     let pp = <T as TranscriptCore>::PublicParameters::new(
         tc.get_total_weight(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
