@@ -34,12 +34,12 @@ impl PtxStateReader {
         scheduler: PtxSchedulerClient,
         state_view: &(impl StateView + Sync),
     ) {
-        THREAD_MANAGER
-            .get_high_pri_io_pool()
-            .scope(move |io_scope| loop {
+        aptos_experimental_runtimes::blocking_scope::scope_blocking(
+            &THREAD_MANAGER.get_high_pri_io_pool(),
+            move |s| loop {
                 let scheduler = scheduler.clone();
                 match work_rx.recv().expect("Channel closed.") {
-                    Command::Read { state_key } => io_scope.spawn(move |_io_scope| {
+                    Command::Read { state_key } => s.spawn(move || {
                         let value = state_view.get_state_value(&state_key).unwrap();
                         scheduler.inform_state_value((state_key, BASE_VERSION), value);
                     }),
@@ -48,7 +48,8 @@ impl PtxStateReader {
                         break;
                     },
                 }
-            });
+            },
+        );
         trace!("IO scope exit.");
     }
 }
