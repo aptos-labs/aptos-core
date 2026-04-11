@@ -1515,8 +1515,13 @@ where
         let last_input_output = shared_sync_params.last_input_output;
         let global_module_cache = shared_sync_params.global_module_cache;
 
+        // Track consecutive idle iterations to implement backoff: spin briefly,
+        // then yield CPU to other threads (commit, storage) that may be doing useful work.
+        let mut idle_spins: u32 = 0;
+
         loop {
             while scheduler.commit_hooks_try_lock() {
+                idle_spins = 0;
                 // Perform sequential commit hooks.
                 let blocked_by_validation = loop {
                     match scheduler.start_commit()? {
@@ -1551,6 +1556,7 @@ where
 
             match scheduler.next_task(worker_id)? {
                 TaskKind::Execute(txn_idx, incarnation) => {
+                    idle_spins = 0;
                     if incarnation > num_workers.pow(2) + num_txns + 30 {
                         // Something is wrong if we observe high incarnations (e.g. a bug
                         // might manifest as an execution-invalidation cycle). Break out
@@ -1583,6 +1589,7 @@ where
                     )?;
                 },
                 TaskKind::PostCommitProcessing(txn_idx) => {
+                    idle_spins = 0;
                     self.materialize_txn_commit(
                         txn_idx,
                         scheduler_wrapper,
@@ -1592,9 +1599,16 @@ where
                     self.record_finalized_output(txn_idx, txn_idx, shared_sync_params)?;
                 },
                 TaskKind::NextTask => {
-                    // TODO: Anything intelligent to do here?.
+                    idle_spins = idle_spins.saturating_add(1);
+                    if idle_spins > 128 {
+                        // After sustained spinning, yield CPU to commit/storage threads.
+                        std::thread::yield_now();
+                    } else {
+                        std::hint::spin_loop();
+                    }
                 },
                 TaskKind::ModuleValidation(txn_idx, incarnation, modules_to_validate) => {
+                    idle_spins = 0;
                     Self::module_validation_v2(
                         txn_idx,
                         incarnation,
