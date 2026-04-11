@@ -15,7 +15,7 @@ use fail::fail_point;
 use move_core_types::language_storage::ModuleId;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering},
 };
 
 /**
@@ -370,31 +370,56 @@ pub(crate) struct ExecutionQueueManager {
     /// `execution_queue`. This serves as an upper bound for transactions that have not
     /// been executed yet and provides an indication of scheduling progress.
     min_never_scheduled_idx: CachePadded<AtomicU32>,
-    /// Holds the indices of transactions currently scheduled for execution.
-    /// Using a `BTreeSet` ensures that transactions are generally processed in an
-    /// order (ascending by index by default when popping via `pop_first()`), which is
-    /// beneficial for reducing execution conflicts.
-    /// TODO(BlockSTMv2): Alternative implementations for performance (e.g. packed ints,
-    /// intervals w. locks, CachePadded<ConcurrentQueue<TxnIndex>>).
-    execution_queue: Mutex<BTreeSet<TxnIndex>>,
+    /// Lock-free bitmap representing the set of transaction indices scheduled for
+    /// execution. Bit `i` is set iff transaction `i` is in the queue. Scanning from
+    /// the lowest word with `trailing_zeros` preserves the ascending-index pop order
+    /// that reduces execution conflicts in BlockSTMv2.
+    execution_bitmap: Box<[AtomicU64]>,
 }
 
 impl ExecutionQueueManager {
     pub(crate) fn new(num_txns: TxnIndex) -> Self {
+        let num_words = ((num_txns as usize) + 63) / 64;
+        let mut words = Vec::with_capacity(num_words);
+        for i in 0..num_words {
+            let bit_start = i * 64;
+            let bit_count = std::cmp::min(64, num_txns as usize - bit_start);
+            let mask = if bit_count == 64 {
+                u64::MAX
+            } else {
+                (1u64 << bit_count) - 1
+            };
+            words.push(AtomicU64::new(mask));
+        }
         Self {
             executed_once_max_idx: CachePadded::new(AtomicU32::new(0)),
             min_never_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
-            execution_queue: Mutex::new((0..num_txns).collect()),
+            execution_bitmap: words.into_boxed_slice(),
         }
     }
 
     fn pop_next(&self) -> Option<TxnIndex> {
-        let ret = self.execution_queue.lock().pop_first();
-        if let Some(idx) = ret {
-            self.min_never_scheduled_idx
-                .fetch_max(idx + 1, Ordering::Relaxed);
+        for (word_idx, word) in self.execution_bitmap.iter().enumerate() {
+            loop {
+                let val = word.load(Ordering::Relaxed);
+                if val == 0 {
+                    break; // No bits set in this word, try the next one.
+                }
+                let bit = val.trailing_zeros(); // Lowest set bit.
+                let mask = 1u64 << bit;
+                // Atomically clear the bit. If we were the thread that actually
+                // flipped it from 1→0, we own this index.
+                let old = word.fetch_and(!mask, Ordering::AcqRel);
+                if old & mask != 0 {
+                    let idx = (word_idx as u32) * 64 + bit;
+                    self.min_never_scheduled_idx
+                        .fetch_max(idx + 1, Ordering::Relaxed);
+                    return Some(idx);
+                }
+                // Another thread cleared it first — re-read this word.
+            }
         }
-        ret
+        None
     }
 
     fn min_never_scheduled_idx(&self) -> TxnIndex {
@@ -409,33 +434,103 @@ impl ExecutionQueueManager {
         // writes and the information can be used for intelligent scheduling. Note that
         // for the same reason, incarnation 0 (first execution) is never terminated early.
         if !is_first_reexecution || self.executed_once_max_idx.load(Ordering::Relaxed) >= txn_idx {
-            self.execution_queue.lock().insert(txn_idx);
+            let word_idx = txn_idx as usize / 64;
+            let bit = txn_idx as usize % 64;
+            self.execution_bitmap[word_idx].fetch_or(1u64 << bit, Ordering::Release);
         }
     }
 
     pub(crate) fn remove_from_schedule(&self, txn_idx: TxnIndex) {
-        self.execution_queue.lock().remove(&txn_idx);
+        let word_idx = txn_idx as usize / 64;
+        let bit = txn_idx as usize % 64;
+        self.execution_bitmap[word_idx].fetch_and(!(1u64 << bit), Ordering::Release);
     }
 }
 
 // Testing interfaces for ExecutionQueueManager.
 impl ExecutionQueueManager {
+    /// Allocate a bitmap large enough for `capacity` indices, all initially unset.
     #[cfg(test)]
     pub(crate) fn new_for_test(executed_once_max_idx: u32) -> Self {
+        Self::new_for_test_with_capacity(executed_once_max_idx, 64)
+    }
+
+    #[cfg(test)]
+    fn new_for_test_with_capacity(executed_once_max_idx: u32, capacity: u32) -> Self {
+        let num_words = ((capacity as usize) + 63) / 64;
+        let words: Vec<AtomicU64> = (0..num_words).map(|_| AtomicU64::new(0)).collect();
         Self {
             executed_once_max_idx: CachePadded::new(AtomicU32::new(executed_once_max_idx)),
             min_never_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
-            execution_queue: Mutex::new(BTreeSet::new()),
+            execution_bitmap: words.into_boxed_slice(),
         }
     }
 
     #[cfg(test)]
     pub(crate) fn assert_execution_queue(&self, expected_indices: &Vec<TxnIndex>) {
-        let queue = self.execution_queue.lock();
-        assert_eq!(queue.len(), expected_indices.len());
-        for scheduled_idx in expected_indices {
-            assert!(queue.contains(scheduled_idx));
+        let actual = self.collect_set_indices();
+        assert_eq!(
+            actual.len(),
+            expected_indices.len(),
+            "bitmap contains {:?}, expected {:?}",
+            actual,
+            expected_indices
+        );
+        for idx in expected_indices {
+            assert!(
+                actual.contains(idx),
+                "expected index {} not found in bitmap {:?}",
+                idx,
+                actual
+            );
         }
+    }
+
+    /// Clear all bits and then set the bits for each index in `indices`.
+    #[cfg(test)]
+    pub(crate) fn reset_for_test(&self, indices: impl IntoIterator<Item = TxnIndex>) {
+        for word in self.execution_bitmap.iter() {
+            word.store(0, Ordering::Relaxed);
+        }
+        for idx in indices {
+            let word_idx = idx as usize / 64;
+            let bit = idx as usize % 64;
+            self.execution_bitmap[word_idx].fetch_or(1u64 << bit, Ordering::Relaxed);
+        }
+    }
+
+    /// Return the count of set bits.
+    #[cfg(test)]
+    pub(crate) fn queue_len_for_test(&self) -> usize {
+        self.execution_bitmap
+            .iter()
+            .map(|w| w.load(Ordering::Relaxed).count_ones() as usize)
+            .sum()
+    }
+
+    /// Check whether a specific index is set.
+    #[cfg(test)]
+    pub(crate) fn contains_for_test(&self, txn_idx: TxnIndex) -> bool {
+        let word_idx = txn_idx as usize / 64;
+        let bit = txn_idx as usize % 64;
+        if word_idx >= self.execution_bitmap.len() {
+            return false;
+        }
+        self.execution_bitmap[word_idx].load(Ordering::Relaxed) & (1u64 << bit) != 0
+    }
+
+    #[cfg(test)]
+    fn collect_set_indices(&self) -> Vec<TxnIndex> {
+        let mut result = Vec::new();
+        for (word_idx, word) in self.execution_bitmap.iter().enumerate() {
+            let mut val = word.load(Ordering::Relaxed);
+            while val != 0 {
+                let bit = val.trailing_zeros();
+                result.push((word_idx as u32) * 64 + bit);
+                val &= !(1u64 << bit);
+            }
+        }
+        result
     }
 }
 
@@ -1325,7 +1420,10 @@ impl SchedulerV2 {
 
                 // TODO(BlockSTMv2): Audit / should we keep ever_executed lock instead of re-acquiring.
                 if self.txn_statuses.pending_scheduling_and_not_stalled(idx) {
-                    execution_queue_manager.execution_queue.lock().insert(idx);
+                    let word_idx = idx as usize / 64;
+                    let bit = idx as usize % 64;
+                    execution_queue_manager.execution_bitmap[word_idx]
+                        .fetch_or(1u64 << bit, Ordering::Release);
                 }
 
                 idx += 1;
@@ -1443,15 +1541,14 @@ mod tests {
 
         // Successful stall when status requires execution must remove 2 from execution
         // queue, while different status or unsuccessful stall should not.
-        manager.execution_queue.lock().clear();
-        manager.execution_queue.lock().append(&mut (2..6).collect());
+        manager.reset_for_test(2..6);
         deps.not_stalled_deps.append(&mut (2..6).collect());
         assert_ok!(deps.add_stall(&statuses, &mut stall_propagation_queue));
 
         // Check the results: execution queue, propagation_queue, deps.stalled & not_stalled.
-        assert_eq!(manager.execution_queue.lock().len(), 3);
+        assert_eq!(manager.queue_len_for_test(), 3);
         for i in 3..6 {
-            assert!(manager.execution_queue.lock().contains(&i));
+            assert!(manager.contains_for_test(i));
         }
 
         // 5 is not in the propagation queue because it was already stalled.
@@ -1538,14 +1635,14 @@ mod tests {
         assert!(deps.not_stalled_deps.insert(0));
         assert!(deps.stalled_deps.remove(&0));
 
-        manager.execution_queue.lock().clear();
+        manager.reset_for_test(std::iter::empty());
         deps.stalled_deps.append(&mut (2..8).collect());
         assert_ok!(deps.remove_stall(&statuses, &mut stall_propagation_queue,));
 
         // Check the results: scheduling queue, propagation_queue, deps.stalled & not_stalled.
-        assert_eq!(manager.execution_queue.lock().len(), 2);
+        assert_eq!(manager.queue_len_for_test(), 2);
         for i in [4, 6].iter() {
-            assert!(manager.execution_queue.lock().contains(i));
+            assert!(manager.contains_for_test(*i));
         }
 
         assert_eq!(stall_propagation_queue.len(), 5);
