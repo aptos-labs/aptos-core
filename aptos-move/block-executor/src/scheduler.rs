@@ -36,6 +36,11 @@ impl ArmedLock {
 
     // try_lock succeeds when the lock is unlocked and armed (there is work to do).
     pub fn try_lock(&self) -> bool {
+        // TTAS: plain load gets the cache line in Shared state. Only escalate to
+        // CAS (which requires Exclusive ownership) when the lock looks acquirable.
+        if self.locked.load(Ordering::Relaxed) != 3 {
+            return false;
+        }
         self.locked
             .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()

@@ -1592,7 +1592,7 @@ where
                     self.record_finalized_output(txn_idx, txn_idx, shared_sync_params)?;
                 },
                 TaskKind::NextTask => {
-                    // TODO: Anything intelligent to do here?.
+                    std::hint::spin_loop();
                 },
                 TaskKind::ModuleValidation(txn_idx, incarnation, modules_to_validate) => {
                     Self::module_validation_v2(
