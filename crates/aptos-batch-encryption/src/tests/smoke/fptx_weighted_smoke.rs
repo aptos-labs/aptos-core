@@ -18,7 +18,7 @@ use aptos_crypto::{
 };
 use aptos_dkg::{
     pcs::univariate_hiding_kzg,
-    pvss::{chunky::chunked_elgamal::num_chunks_per_scalar, traits::transcript::Aggregatable},
+    pvss::{chunky::{self, chunked_elgamal::num_chunks_per_scalar}, traits::transcript::Aggregatable},
 };
 use ark_ec::AffineRepr as _;
 #[cfg(test)]
@@ -27,6 +27,7 @@ use ark_std::rand::{thread_rng, Rng as _};
 pub fn run_pvss(
     dk: &DigestKey,
 ) -> (
+    chunky::PublicParameters<Pairing>,
     WeightedConfigArkworks<Fr>,
     EncryptionKey,
     Vec<WeightedBIBEVerificationKey>,
@@ -59,6 +60,7 @@ pub fn run_pvss_with_hkzg(
         univariate_hiding_kzg::VerificationKey<Pairing>,
     ),
 ) -> (
+    chunky::PublicParameters<Pairing>,
     WeightedConfigArkworks<Fr>,
     EncryptionKey,
     Vec<WeightedBIBEVerificationKey>,
@@ -132,7 +134,7 @@ pub fn run_pvss_with_hkzg(
         })
         .collect();
 
-    (tc, ek, vks, msk_shares)
+    (pp, tc, ek, vks, msk_shares)
 }
 
 #[test]
@@ -159,7 +161,7 @@ use aptos_dkg::pvss::{
 #[test]
 fn weighted_smoke_with_pvss() {
     let dk = DigestKey::new(&mut thread_rng(), 8, 1).unwrap();
-    let (tc, ek, vks, msk_shares) = run_pvss(&dk);
+    let (_, tc, ek, vks, msk_shares) = run_pvss(&dk);
 
     run_smoke::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
 }
