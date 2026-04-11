@@ -7,9 +7,9 @@
 //! these caches is tied to the code cache, and is managed externally.
 
 use crate::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
+use dashmap::DashMap;
 use move_core_types::ability::AbilitySet;
-use parking_lot::RwLock;
-use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use triomphe::Arc;
 
 /// Compactly represents a loaded type.
@@ -56,108 +56,89 @@ enum TypeRepr {
     },
 }
 
-struct InternMap<T, I> {
-    interned: HashMap<T, I>,
-    data: Vec<T>,
-}
-
-impl<T, I> Default for InternMap<T, I> {
-    fn default() -> Self {
-        Self {
-            interned: HashMap::new(),
-            data: Vec::with_capacity(16),
-        }
-    }
-}
-
-impl<T, I> InternMap<T, I> {
-    fn clear(&mut self) {
-        self.interned.clear();
-        self.data.clear();
-    }
-}
-
-/// Interns single types.
+/// Interns single types. Uses DashMap (sharded concurrent map) to minimize lock contention
+/// across parallel executor workers.
 struct TypeInterner {
-    inner: RwLock<InternMap<TypeRepr, TypeId>>,
+    interned: DashMap<TypeRepr, TypeId>,
+    next_id: AtomicU32,
 }
 
 impl Default for TypeInterner {
     fn default() -> Self {
         Self {
-            inner: RwLock::new(InternMap::default()),
+            interned: DashMap::new(),
+            next_id: AtomicU32::new(0),
         }
     }
 }
 
 impl TypeInterner {
     fn intern(&self, repr: TypeRepr) -> TypeId {
-        if let Some(id) = self.inner.read().interned.get(&repr) {
+        if let Some(id) = self.interned.get(&repr) {
             return *id;
         }
+        *self
+            .interned
+            .entry(repr)
+            .or_insert_with(|| TypeId(self.next_id.fetch_add(1, Ordering::Relaxed)))
+    }
 
-        let mut inner = self.inner.write();
-        if let Some(id) = inner.interned.get(&repr) {
-            return *id;
-        }
+    fn clear(&self) {
+        self.interned.clear();
+        self.next_id.store(0, Ordering::Relaxed);
+    }
 
-        let id = TypeId(inner.data.len() as u32);
-        inner.data.push(repr);
-        inner.interned.insert(repr, id);
-        id
+    fn len(&self) -> usize {
+        self.next_id.load(Ordering::Relaxed) as usize
     }
 }
 
-/// Interns vector of types (e.g., list of type arguments).
+/// Interns vector of types (e.g., list of type arguments). Uses DashMap to minimize lock
+/// contention across parallel executor workers.
 struct TypeVecInterner {
-    inner: RwLock<InternMap<Arc<[TypeId]>, TypeVecId>>,
+    interned: DashMap<Arc<[TypeId]>, TypeVecId>,
+    next_id: AtomicU32,
 }
 
 impl Default for TypeVecInterner {
     fn default() -> Self {
         Self {
-            inner: RwLock::new(InternMap::default()),
+            interned: DashMap::new(),
+            next_id: AtomicU32::new(0),
         }
     }
 }
 
 impl TypeVecInterner {
     fn intern(&self, tys: &[TypeId]) -> TypeVecId {
-        if let Some(id) = self.inner.read().interned.get(tys) {
+        if let Some(id) = self.interned.get(tys) {
             return *id;
         }
-
         let tys_arced: Arc<[TypeId]> = Arc::from(tys);
-        let tys_arced_key = tys_arced.clone();
-
-        let mut inner = self.inner.write();
-        if let Some(id) = inner.interned.get(tys) {
-            return *id;
-        }
-
-        let id = TypeVecId(inner.data.len() as u32);
-        inner.data.push(tys_arced);
-        inner.interned.insert(tys_arced_key, id);
-        id
+        *self
+            .interned
+            .entry(tys_arced)
+            .or_insert_with(|| TypeVecId(self.next_id.fetch_add(1, Ordering::Relaxed)))
     }
 
     fn intern_vec(&self, tys: Vec<TypeId>) -> TypeVecId {
-        if let Some(id) = self.inner.read().interned.get(tys.as_slice()) {
+        if let Some(id) = self.interned.get(tys.as_slice()) {
             return *id;
         }
-
         let tys: Arc<[TypeId]> = tys.into();
-        let tys_key = tys.clone();
+        *self
+            .interned
+            .entry(tys)
+            .or_insert_with(|| TypeVecId(self.next_id.fetch_add(1, Ordering::Relaxed)))
+    }
 
-        let mut inner = self.inner.write();
-        if let Some(id) = inner.interned.get(&tys) {
-            return *id;
-        }
+    fn clear(&self) {
+        self.interned.clear();
+        self.next_id.store(0, Ordering::Relaxed);
+    }
 
-        let id = TypeVecId(inner.data.len() as u32);
-        inner.data.push(tys);
-        inner.interned.insert(tys_key, id);
-        id
+    fn len(&self) -> usize {
+        self.next_id.load(Ordering::Relaxed) as usize
     }
 }
 
@@ -186,12 +167,12 @@ impl InternedTypePool {
 
     /// Returns how many distinct types are instantiated.
     pub fn num_interned_tys(&self) -> usize {
-        self.ty_interner.inner.read().data.len()
+        self.ty_interner.len()
     }
 
     /// Returns how many distinct vectors of types are instantiated.
     pub fn num_interned_ty_vecs(&self) -> usize {
-        self.ty_vec_interner.inner.read().data.len()
+        self.ty_vec_interner.len()
     }
 
     /// Clears all interned data, and then warm-ups the cache for common types. Should be called if
@@ -203,13 +184,8 @@ impl InternedTypePool {
 
     /// Flushes all cached data without warming up the cache.
     fn flush_impl(&self) {
-        let mut ty_interner = self.ty_interner.inner.write();
-        ty_interner.clear();
-        drop(ty_interner);
-
-        let mut ty_vec_interner = self.ty_vec_interner.inner.write();
-        ty_vec_interner.clear();
-        drop(ty_vec_interner);
+        self.ty_interner.clear();
+        self.ty_vec_interner.clear();
     }
 
     /// Interns common type representations.
