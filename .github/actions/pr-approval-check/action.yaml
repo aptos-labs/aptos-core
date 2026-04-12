@@ -1,0 +1,60 @@
+name: PR Approval Check
+description: "Verifies that the pull request has satisfied all path-based approval rules."
+
+inputs:
+  GH_TOKEN:
+    description: "GitHub token with pull-request read access."
+    required: true
+  ORG_TOKEN:
+    description: "GitHub token with read:org scope used to fetch org team membership."
+    required: true
+  PR_NUMBER:
+    description: "Pull-request number"
+    required: true
+  REPO:
+    description: "Repository in owner/repo format (default: github.repository)"
+    required: false
+    default: ""
+  ORG:
+    description: >
+      GitHub organization name used to resolve @team-name references in the
+      approval rules. Defaults to the owner portion of REPO (e.g. 'aptos-labs'
+      from 'aptos-labs/aptos-core').
+    required: false
+    default: ""
+  RULES_FILE:
+    description: "Path to the approval rules YAML file"
+    required: false
+    default: ".github/actions/pr-approval-check/approval-rules.yaml"
+  BASE_BRANCH:
+    description: "Branch to diff against when computing changed files"
+    required: false
+    default: "origin/main"
+
+runs:
+  using: composite
+  steps:
+    - name: Install PyYAML
+      run: pip install --quiet PyYAML
+      shell: bash
+
+    - name: Run unit tests
+      run: python3 .github/actions/pr-approval-check/test_check_pr_approvals.py
+      shell: bash
+
+    - name: Run approval check
+      run: |
+        REPO="${{ inputs.REPO }}"
+        if [ -z "$REPO" ]; then
+          REPO="${GITHUB_REPOSITORY}"
+        fi
+        ORG="${{ inputs.ORG }}"
+        python3 .github/actions/pr-approval-check/check_pr_approvals.py \
+          --rules     "${{ inputs.RULES_FILE }}" \
+          --repo      "$REPO" \
+          --pr        "${{ inputs.PR_NUMBER }}" \
+          --token     "${{ inputs.GH_TOKEN }}" \
+          --org-token "${{ inputs.ORG_TOKEN }}" \
+          --base-branch "${{ inputs.BASE_BRANCH }}" \
+          ${ORG:+--org "$ORG"}
+      shell: bash

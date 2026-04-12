@@ -2,6 +2,8 @@ name: "Lint+Test"
 on:
   pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+  pull_request_review:
+    types: [submitted]
   push:
     branches:
       - main
@@ -21,7 +23,7 @@ env:
 # cancel redundant builds
 concurrency:
   # cancel redundant builds on PRs (only on PR, not on branches)
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  group: ${{ github.workflow }}-${{ ((github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && github.event.pull_request.number) || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -52,6 +54,31 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: echo "Skipping general lints! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+
+  # Verify that path-based PR approval rules are satisfied. This is a PR required job.
+  pr-approval-check:
+    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review'
+    runs-on: 2cpu-gh-ubuntu24-x64
+    environment: review-gatekeeper
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed to compute the merge-base for changed files
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Check PR approvals
+        uses: ./.github/actions/pr-approval-check
+        with:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
 
   # Run the crypto hasher domain separation checks
   rust-cryptohasher-domain-separation-check:

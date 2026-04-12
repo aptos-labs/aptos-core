@@ -1,0 +1,86 @@
+# PR Approval Rules
+#
+# This file defines approval requirements that are enforced by the
+# "pr-approval-check" CI job on every pull request.
+#
+# Structure:
+#   rules:    List of approval requirements.
+#             @team-name references in rules are resolved automatically from
+#             the GitHub org teams API (e.g., https://github.com/orgs/aptos-labs/teams).
+#
+# Rule fields:
+#   - name (required):
+#       Human-readable name shown in CI output.
+#   - description (required):
+#       Explanation of why this rule exists.
+#   - paths (required):
+#       Glob patterns relative to repo root. The rule fires when ANY changed
+#       file matches at least one pattern.
+#       Patterns follow fnmatch semantics: * matches anything including /,
+#       so "foo/**" matches all files under foo/.
+#   - required_approvers (required):
+#       List of approval clauses evaluated with AND semantics — every clause
+#       must independently be satisfied. Each clause is a dict with:
+#         - approvers (required): list of GitHub usernames or @group references.
+#           Any member's approval satisfies this clause (OR within a clause).
+#         - min_approvals (required): approvals needed from the pool.
+
+rules:
+  # ── Blockchain rules ──────────────────────────────────────
+  - name: "Blockchain Rules"
+    description: Core blockchain code. Requires a single approval from the blockchain team.
+    paths:
+      - "aptos-node/**"
+      - "consensus/**"
+      - "execution/**"
+      - "mempool/**"
+      - "network/**"
+      - "peer-monitoring-service/**"
+      - "secure/**"
+      - "state-sync/**"
+      - "storage/**"
+      - "vm-validator/**"
+    required_approvers:
+      - approvers: ["@blockchain"]
+        min_approvals: 1
+
+  # ── Cryptography rules ────────────────────────────────────────
+  - name: "Cryptography Rules"
+    description: Cryptography-sensitive code. Requires a single approval from the cryptography team.
+    paths:
+      - "aptos-move/aptos-vm/src/keyless_validation.rs"
+      - "aptos-move/framework/aptos-framework/sources/keyless_account.move"
+      - "aptos-move/framework/aptos-stdlib/sources/cryptography/**"
+      - "aptos-move/framework/aptos-stdlib/sources/hash.move"
+      - "aptos-move/framework/src/natives/cryptography/**"
+      - "crates/aptos-crypto/**"
+      - "crates/aptos-crypto-derive/**"
+      - "crates/aptos-dkg/**"
+      - "keyless/**"
+      - "types/src/keyless/**"
+    required_approvers:
+      - approvers: ["@cryptography"]
+        min_approvals: 1
+
+  # ── Move rules ───────────────────────────────────────────────
+  - name: "Move Rules"
+    description: Changes to Move code or tooling require a single approval from the Move team.
+    paths:
+      - "aptos-move/**"
+      - "third_party/move/**"
+    required_approvers:
+      - approvers: ["@move"]
+        min_approvals: 1
+
+  # ── Platform-Infra rules ──────────────────────────────────────
+  - name: "Platform-Infra Rules"
+    description: Infrastructure and platform code. Requires a single approval from the platform-infra team.
+    paths:
+      - ".github/**"
+      - "dashboards/**"
+      - "docker/**"
+      - "scripts/**"
+      - "terraform/**"
+    required_approvers:
+      - approvers: ["@platform-infra"]
+        min_approvals: 1
