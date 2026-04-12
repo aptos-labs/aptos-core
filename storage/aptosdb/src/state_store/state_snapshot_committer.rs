@@ -128,14 +128,7 @@ impl StateSnapshotCommitter {
                         })
                         .unzip();
 
-                    // TODO(HotState): for now we use `is_descendant_of` to determine if hot state
-                    // summary is computed at all. When it's not enabled everything is
-                    // `SparseMerkleTree::new_empty()`.
-                    let hot_state_merkle_batch_opt = if snapshot
-                        .summary()
-                        .hot_state_summary
-                        .is_descendant_of(&self.last_snapshot.summary().hot_state_summary)
-                    {
+                    let hot_state_merkle_batch_opt =
                         self.state_db.hot_state_merkle_db.as_ref().map(|db| {
                             Self::merklize(
                                 db,
@@ -148,11 +141,7 @@ impl StateSnapshotCommitter {
                             )
                             .expect("Failed to compute JMT commit batch for hot state.")
                             .0
-                        })
-                    } else {
-                        // TODO(HotState): this means that the relevant code path isn't enabled yet.
-                        None
-                    };
+                        });
                     let (state_merkle_batch, leaf_count) = Self::merklize(
                         &self.state_db.state_merkle_db,
                         base_version,
