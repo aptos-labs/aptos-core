@@ -332,14 +332,29 @@ impl Committer {
         initial_state: State,
         merged_version: Arc<AtomicU64>,
     ) -> Self {
+        // Compute initial byte totals from the base DashMaps. When the base is
+        // pre-populated (recovery from DB), these are non-zero; when starting
+        // empty they are 0. Without this, a later eviction of a loaded item
+        // would subtract from 0 and underflow.
+        let mut total_key_bytes = 0;
+        let mut total_value_bytes = 0;
+        for shard in base.shards.iter() {
+            for entry in shard.inner.iter() {
+                total_key_bytes += HashValue::LENGTH;
+                total_value_bytes += entry.value().size();
+            }
+        }
+        let heads = std::array::from_fn(|i| initial_state.latest_hot_key(i));
+        let tails = std::array::from_fn(|i| initial_state.oldest_hot_key(i));
+
         Self {
             base,
             committed,
             rx,
-            total_key_bytes: 0,
-            total_value_bytes: 0,
-            heads: arr![None; 16],
-            tails: arr![None; 16],
+            total_key_bytes,
+            total_value_bytes,
+            heads,
+            tails,
             merged_state: initial_state,
             old_views: Vec::new(),
             merged_version,
