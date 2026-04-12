@@ -22,8 +22,9 @@ use crate::{
     state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
     utils::{
         truncation_helper::{
-            find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
-            truncate_state_kv_db, truncate_state_merkle_db,
+            find_tree_root_at_or_before, get_max_version_in_state_merkle_db,
+            get_state_kv_commit_progress, truncate_ledger_db, truncate_state_kv_db,
+            truncate_state_merkle_db,
         },
         ShardedStateKvSchemaBatch,
     },
@@ -389,6 +390,8 @@ impl StateStore {
                 Arc::clone(&ledger_db),
                 Arc::clone(&state_kv_db),
                 Arc::clone(&state_merkle_db),
+                hot_state_kv_db.clone(),
+                hot_state_merkle_db.clone(),
                 /*crash_if_difference_is_too_large=*/ true,
             );
         }
@@ -444,6 +447,8 @@ impl StateStore {
         ledger_db: Arc<LedgerDb>,
         state_kv_db: Arc<StateKvDb>,
         state_merkle_db: Arc<StateMerkleDb>,
+        hot_state_kv_db: Option<Arc<StateKvDb>>,
+        hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
@@ -488,6 +493,31 @@ impl StateStore {
             overall_commit_progress,
             crash_if_difference_is_too_large,
         );
+
+        // Hot state DBs may be empty (e.g. delete_on_restart), skip if no progress.
+        if let Some(ref hot_kv_db) = hot_state_kv_db
+            && get_state_kv_commit_progress(hot_kv_db)
+                .expect("DB read failed.")
+                .is_some()
+        {
+            Self::sync_state_kv_commit_progress(
+                hot_kv_db,
+                overall_commit_progress,
+                crash_if_difference_is_too_large,
+            );
+        }
+        if let Some(ref hot_merkle_db) = hot_state_merkle_db
+            && get_max_version_in_state_merkle_db(hot_merkle_db)
+                .expect("DB read failed.")
+                .is_some()
+        {
+            Self::sync_state_merkle_commit_progress(
+                ledger_metadata_db,
+                hot_merkle_db,
+                overall_commit_progress,
+                crash_if_difference_is_too_large,
+            );
+        }
     }
 
     /// Reads the state KV commit progress and truncates the state KV DB back to
