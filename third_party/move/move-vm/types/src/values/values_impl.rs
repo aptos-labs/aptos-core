@@ -856,13 +856,18 @@ impl Value {
         self.compare_with_depth(other, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH), true)
     }
 
+    /// Returns true if two Move values are equal.
+    ///
+    /// Additional parameters:
+    ///   - Maximum allowed depth of the traversal of value trees.
+    ///   - Whether to include closure mask in closure comparison or not.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn equals_with_depth(
         &self,
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
-        check_closure_mask: bool,
+        include_closure_mask: bool,
     ) -> PartialVMResult<bool> {
         use Value::*;
 
@@ -883,14 +888,14 @@ impl Value {
             (Bool(l), Bool(r)) => l == r,
             (Address(l), Address(r)) => l == r,
 
-            (Container(l), Container(r)) => l.equals(r, depth, max_depth, check_closure_mask)?,
+            (Container(l), Container(r)) => l.equals(r, depth, max_depth, include_closure_mask)?,
 
             // We count references as +1 in nesting, hence increasing the depth.
             (ContainerRef(l), ContainerRef(r)) => {
-                l.equals(r, depth + 1, max_depth, check_closure_mask)?
+                l.equals(r, depth + 1, max_depth, include_closure_mask)?
             },
             (IndexedRef(l), IndexedRef(r)) => {
-                l.equals(r, depth + 1, max_depth, check_closure_mask)?
+                l.equals(r, depth + 1, max_depth, include_closure_mask)?
             },
 
             // Disallow equality for delayed values. The rationale behind this
@@ -905,11 +910,11 @@ impl Value {
 
             (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
                 if fun1.cmp_dyn(fun2.as_ref())? == Ordering::Equal
-                    && (!check_closure_mask || fun1.closure_mask() == fun2.closure_mask())
+                    && (!include_closure_mask || fun1.closure_mask() == fun2.closure_mask())
                     && captured1.len() == captured2.len()
                 {
                     for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        if !v1.equals_with_depth(v2, depth + 1, max_depth, check_closure_mask)? {
+                        if !v1.equals_with_depth(v2, depth + 1, max_depth, include_closure_mask)? {
                             return Ok(false);
                         }
                     }
@@ -951,12 +956,17 @@ impl Value {
         Ok(res)
     }
 
+    /// Compares two Move values.
+    ///
+    /// Additional parameters:
+    ///   - Maximum allowed depth of the traversal of value trees.
+    ///   - Whether to include closure mask in closure comparison or not.
     pub fn compare_with_depth(
         &self,
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
-        check_closure_mask: bool,
+        include_closure_mask: bool,
     ) -> PartialVMResult<Ordering> {
         use Value::*;
 
@@ -977,14 +987,14 @@ impl Value {
             (Bool(l), Bool(r)) => l.cmp(r),
             (Address(l), Address(r)) => l.cmp(r),
 
-            (Container(l), Container(r)) => l.compare(r, depth, max_depth, check_closure_mask)?,
+            (Container(l), Container(r)) => l.compare(r, depth, max_depth, include_closure_mask)?,
 
             // We count references as +1 in nesting, hence increasing the depth.
             (ContainerRef(l), ContainerRef(r)) => {
-                l.compare(r, depth + 1, max_depth, check_closure_mask)?
+                l.compare(r, depth + 1, max_depth, include_closure_mask)?
             },
             (IndexedRef(l), IndexedRef(r)) => {
-                l.compare(r, depth + 1, max_depth, check_closure_mask)?
+                l.compare(r, depth + 1, max_depth, include_closure_mask)?
             },
 
             // Disallow comparison for delayed values.
@@ -996,13 +1006,13 @@ impl Value {
 
             (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
                 let mut o = fun1.cmp_dyn(fun2.as_ref())?;
-                if check_closure_mask {
+                if include_closure_mask {
                     o = o.then_with(|| fun1.closure_mask().cmp(&fun2.closure_mask()));
                 }
                 if o == Ordering::Equal {
                     for (v1, v2) in captured1.iter().zip(captured2.iter()) {
                         let o =
-                            v1.compare_with_depth(v2, depth + 1, max_depth, check_closure_mask)?;
+                            v1.compare_with_depth(v2, depth + 1, max_depth, include_closure_mask)?;
                         if o != Ordering::Equal {
                             return Ok(o);
                         }
@@ -1072,7 +1082,7 @@ impl Container {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
-        check_closure_mask: bool,
+        include_closure_mask: bool,
     ) -> PartialVMResult<bool> {
         use Container::*;
 
@@ -1085,7 +1095,7 @@ impl Container {
                     return Ok(false);
                 }
                 for (v1, v2) in l.iter().zip(r.iter()) {
-                    if !v1.equals_with_depth(v2, depth + 1, max_depth, check_closure_mask)? {
+                    if !v1.equals_with_depth(v2, depth + 1, max_depth, include_closure_mask)? {
                         return Ok(false);
                     }
                 }
@@ -1140,7 +1150,7 @@ impl Container {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
-        check_closure_mask: bool,
+        include_closure_mask: bool,
     ) -> PartialVMResult<Ordering> {
         use Container::*;
 
@@ -1151,7 +1161,7 @@ impl Container {
 
                 for (v1, v2) in l.iter().zip(r.iter()) {
                     let value_cmp =
-                        v1.compare_with_depth(v2, depth + 1, max_depth, check_closure_mask)?;
+                        v1.compare_with_depth(v2, depth + 1, max_depth, include_closure_mask)?;
                     if value_cmp.is_ne() {
                         return Ok(value_cmp);
                     }
@@ -1211,12 +1221,12 @@ impl ContainerRef {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
-        check_closure_mask: bool,
+        include_closure_mask: bool,
     ) -> PartialVMResult<bool> {
         // Note: the depth passed in accounts for the container.
         check_depth(depth, max_depth)?;
         self.container()
-            .equals(other.container(), depth, max_depth, check_closure_mask)
+            .equals(other.container(), depth, max_depth, include_closure_mask)
     }
 
     fn compare(
@@ -1224,12 +1234,12 @@ impl ContainerRef {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
-        check_closure_mask: bool,
+        include_closure_mask: bool,
     ) -> PartialVMResult<Ordering> {
         // Note: the depth passed in accounts for the container.
         check_depth(depth, max_depth)?;
         self.container()
-            .compare(other.container(), depth, max_depth, check_closure_mask)
+            .compare(other.container(), depth, max_depth, include_closure_mask)
     }
 }
 
@@ -1240,7 +1250,7 @@ impl IndexedRef {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
-        check_closure_mask: bool,
+        include_closure_mask: bool,
     ) -> PartialVMResult<bool> {
         use Container::*;
 
@@ -1266,7 +1276,7 @@ impl IndexedRef {
                 &r2.borrow()[other_index],
                 depth + 1,
                 max_depth,
-                check_closure_mask,
+                include_closure_mask,
             )?,
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
@@ -1415,7 +1425,7 @@ impl IndexedRef {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
-        check_closure_mask: bool,
+        include_closure_mask: bool,
     ) -> PartialVMResult<Ordering> {
         use Container::*;
 
@@ -1441,7 +1451,7 @@ impl IndexedRef {
                 &r2.borrow()[other_index],
                 depth + 1,
                 max_depth,
-                check_closure_mask,
+                include_closure_mask,
             )?,
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),

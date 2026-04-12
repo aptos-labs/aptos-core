@@ -79,7 +79,7 @@ pub struct VMConfig {
     /// When enabled, closure equality and comparison include the closure mask.
     /// Without this, two closures over the same function with different masks but identical
     /// captured values are incorrectly treated as equal.
-    pub check_closure_mask_in_cmp: bool,
+    pub include_closure_mask_in_cmp: bool,
 }
 
 impl Default for VMConfig {
@@ -112,7 +112,7 @@ impl Default for VMConfig {
             enable_struct_layout_local_cache: true,
             check_depth_on_type_counts: true,
             enable_public_struct_args: true,
-            check_closure_mask_in_cmp: true,
+            include_closure_mask_in_cmp: true,
         }
     }
 }

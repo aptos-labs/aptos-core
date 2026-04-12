@@ -55,7 +55,7 @@ fn native_compare(
         .module_storage()
         .runtime_environment()
         .vm_config()
-        .check_closure_mask_in_cmp;
+        .include_closure_mask_in_cmp;
     let ordering = args[0].compare_with_depth(
         &args[1],
         1,
