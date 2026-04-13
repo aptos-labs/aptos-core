@@ -38,7 +38,8 @@ fn bench_digest_key_generate_serialize_deserialize() {
             // 2. Write to file
             let file_path = format!("/tmp/digest_key_b{}_r{}.bcs", batch_size, num_rounds);
             let start = Instant::now();
-            digest_key_file::write_digest_key(Path::new(&file_path), dk).expect("File write should succeed");
+            digest_key_file::write_digest_key(Path::new(&file_path), dk)
+                .expect("File write should succeed");
             let write_elapsed = start.elapsed();
 
             let file_size_mb =

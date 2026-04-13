@@ -18,7 +18,10 @@ use aptos_crypto::{
 };
 use aptos_dkg::{
     pcs::univariate_hiding_kzg,
-    pvss::{chunky::{self, chunked_elgamal::num_chunks_per_scalar}, traits::transcript::Aggregatable},
+    pvss::{
+        chunky::{self, chunked_elgamal::num_chunks_per_scalar},
+        traits::transcript::Aggregatable,
+    },
 };
 use ark_ec::AffineRepr as _;
 #[cfg(test)]
@@ -106,7 +109,7 @@ pub fn run_pvss_with_hkzg(
         .enumerate()
         .map(|(i, s)| {
             T::deal(
-                &tc,
+                tc,
                 &pp,
                 &ssks[i],
                 &spks[i],
@@ -121,17 +124,17 @@ pub fn run_pvss_with_hkzg(
         .collect();
 
     let subtranscript =
-        <T as HasAggregatableSubtranscript>::Subtranscript::aggregate(&tc, subtrx_paths).unwrap();
+        <T as HasAggregatableSubtranscript>::Subtranscript::aggregate(tc, subtrx_paths).unwrap();
 
     let (ek, vks, _) =
-        FPTXWeighted::setup(dk, &pp, &subtranscript, &tc, tc.get_player(0), &dks[0]).unwrap();
+        FPTXWeighted::setup(dk, &pp, &subtranscript, tc, tc.get_player(0), &dks[0]).unwrap();
 
     let msk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::MasterSecretKeyShare> = tc
         .get_players()
         .into_iter()
         .map(|p| {
             let (_, _, msk_share) =
-                FPTXWeighted::setup(dk, &pp, &subtranscript, &tc, p, &dks[p.get_id()]).unwrap();
+                FPTXWeighted::setup(dk, &pp, &subtranscript, tc, p, &dks[p.get_id()]).unwrap();
             msk_share
         })
         .collect();

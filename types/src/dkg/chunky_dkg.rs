@@ -77,10 +77,7 @@ pub static DIGEST_KEY: Lazy<Option<Arc<DigestKey>>> = Lazy::new(|| {
     let key: DigestKey = match digest_key_file::read_digest_key(path) {
         Ok(k) => k,
         Err(e) => {
-            tracing::error!(
-                "[DigestKey] failed to read file: {}",
-                e
-            );
+            tracing::error!("[DigestKey] failed to read file: {}", e);
             return None;
         },
     };

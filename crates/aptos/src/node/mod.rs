@@ -1516,8 +1516,8 @@ impl CliCommand<VerifyDigestKeyResult> for VerifyDigestKey {
     }
 
     async fn execute(self) -> CliTypedResult<VerifyDigestKeyResult> {
-        use aptos_types::secret_sharing::DigestKey;
         use aptos_batch_encryption::shared::digest_key_file;
+        use aptos_types::secret_sharing::DigestKey;
         use sha2::{Digest, Sha256};
         use std::time::Instant;
 
