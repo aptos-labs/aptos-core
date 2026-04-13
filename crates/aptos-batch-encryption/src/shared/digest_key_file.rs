@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use std::{fs::File, io::{Read, Seek, Write}};
+use std::{fs::File, io::{Read, Seek, Write}, path::Path};
 use anyhow::{Result, bail};
 
 use ark_ec::{AffineRepr, PrimeGroup};
@@ -108,7 +108,7 @@ impl From<DigestKey> for (HeaderV1, Vec<Round>) {
     }
 }
 
-pub fn write_digest_key(file: &str, dk: DigestKey) -> Result<()> {
+pub fn write_digest_key(file: &Path, dk: DigestKey) -> Result<()> {
     let mut file = File::create(file)?;
 
     let (header_v1, rounds) : (HeaderV1, Vec<Round>) = dk.into();
@@ -165,7 +165,7 @@ impl From<(HeaderV1, Vec<Round>)> for DigestKey {
     }
 }
 
-pub fn read_digest_key(file: &str) -> Result<DigestKey> {
+pub fn read_digest_key(file: &Path) -> Result<DigestKey> {
     let mut file = File::open(file)?;
 
     let mut buf: Vec<u8> = vec![0; Header::representation_size_bytes()];
@@ -180,7 +180,7 @@ pub fn read_digest_key(file: &str) -> Result<DigestKey> {
 }
 
 pub fn read_digest_key_range(
-    file: &str,
+    file: &Path,
     starting_round: usize,
     num_rounds_to_read: usize,
 ) -> Result<DigestKey> {
@@ -287,9 +287,9 @@ mod tests {
         let dk = DigestKey::new(&mut rng, 8, 5).unwrap();
 
         let file = NamedTempFile::new().unwrap();
-        write_digest_key(file.path().to_str().unwrap(), dk.clone()).unwrap();
+        write_digest_key(file.path(), dk.clone()).unwrap();
 
-        let dk_from_file = read_digest_key(file.path().to_str().unwrap()).unwrap();
+        let dk_from_file = read_digest_key(file.path()).unwrap();
 
         assert_eq!(dk, dk_from_file);
     }
@@ -300,10 +300,10 @@ mod tests {
         let dk = DigestKey::new(&mut rng, 8, 5).unwrap();
 
         let file = NamedTempFile::new().unwrap();
-        write_digest_key(file.path().to_str().unwrap(), dk.clone()).unwrap();
+        write_digest_key(file.path(), dk.clone()).unwrap();
 
-        let dk_from_file = read_digest_key(file.path().to_str().unwrap()).unwrap();
-        let dk_from_file_2 = read_digest_key_range(file.path().to_str().unwrap(), 0, 5).unwrap();
+        let dk_from_file = read_digest_key(file.path()).unwrap();
+        let dk_from_file_2 = read_digest_key_range(file.path(), 0, 5).unwrap();
 
         assert_eq!(dk_from_file, dk_from_file_2);
     }
@@ -315,9 +315,9 @@ mod tests {
         let dk = DigestKey::new(&mut rng, 8, 5).unwrap();
 
         let file = NamedTempFile::new().unwrap();
-        write_digest_key(file.path().to_str().unwrap(), dk.clone()).unwrap();
+        write_digest_key(file.path(), dk.clone()).unwrap();
 
-        let _ = read_digest_key_range(file.path().to_str().unwrap(), 0, 6).unwrap();
+        let _ = read_digest_key_range(file.path(), 0, 6).unwrap();
     }
 
     #[test]
@@ -327,9 +327,9 @@ mod tests {
         let dk = DigestKey::new(&mut rng, 8, 5).unwrap();
 
         let file = NamedTempFile::new().unwrap();
-        write_digest_key(file.path().to_str().unwrap(), dk.clone()).unwrap();
+        write_digest_key(file.path(), dk.clone()).unwrap();
 
-        let _ = read_digest_key_range(file.path().to_str().unwrap(), 1, 5).unwrap();
+        let _ = read_digest_key_range(file.path(), 1, 5).unwrap();
     }
 
     #[test]
@@ -338,9 +338,9 @@ mod tests {
         let mut dk = DigestKey::new(&mut rng, 8, 5).unwrap();
 
         let file = NamedTempFile::new().unwrap();
-        write_digest_key(file.path().to_str().unwrap(), dk.clone()).unwrap();
+        write_digest_key(file.path(), dk.clone()).unwrap();
 
-        let dk_from_file = read_digest_key_range(file.path().to_str().unwrap(), 2, 3).unwrap();
+        let dk_from_file = read_digest_key_range(file.path(), 2, 3).unwrap();
 
         dk.tau_powers_g1.remove(0);
         dk.tau_powers_g1.remove(0);

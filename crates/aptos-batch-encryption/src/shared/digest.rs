@@ -25,17 +25,9 @@ use std::{
 };
 
 /// The digest public parameters.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DigestKey {
-    #[serde(
-        serialize_with = "ark_se_uncompressed",
-        deserialize_with = "ark_de_uncompressed_no_validate"
-    )]
     pub tau_g2: G2Affine,
-    #[serde(
-        serialize_with = "ark_se_uncompressed",
-        deserialize_with = "ark_de_uncompressed_no_validate"
-    )]
     pub tau_powers_g1: Vec<Vec<G1Affine>>,
     pub fk_domain: FKDomain<Fr, G1Projective>,
 }

@@ -1,10 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::shared::digest::DigestKey;
+use crate::shared::{digest::DigestKey, digest_key_file};
 #[allow(unused_imports)]
 use ark_std::rand::thread_rng;
-use std::time::Instant;
+use hmac::digest;
+use std::{path::Path, time::Instant};
 
 const BATCH_SIZES: &[usize] = &[64, 96, 128];
 const NUM_ROUNDS: &[usize] = &[200_000, 300_000, 400_000];
@@ -38,12 +39,8 @@ fn bench_digest_key_generate_serialize_deserialize() {
 
             // 2. BCS serialize + write to file
             let start = Instant::now();
-            let bytes = bcs::to_bytes(&dk).expect("BCS serialization should succeed");
-            let serialize_elapsed = start.elapsed();
-
             let file_path = format!("/tmp/digest_key_b{}_r{}.bcs", batch_size, num_rounds);
-            let start = Instant::now();
-            std::fs::write(&file_path, &bytes).expect("File write should succeed");
+            digest_key_file::write_digest_key(&Path::new(file_path), dk).expect("File write should succeed");
             let write_elapsed = start.elapsed();
 
             let file_size_mb = bytes.len() as f64 / (1024.0 * 1024.0);
