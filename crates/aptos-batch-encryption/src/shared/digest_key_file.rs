@@ -115,7 +115,7 @@ pub fn write_digest_key(file: &Path, dk: DigestKey) -> Result<()> {
 
     let header = Header::V1(header_v1.clone());
 
-    file.write(&bcs::to_bytes(&header)?)?;
+    file.write_all(&bcs::to_bytes(&header)?)?;
 
     for round in rounds {
         write_round(&file, &round, &header_v1)?;
