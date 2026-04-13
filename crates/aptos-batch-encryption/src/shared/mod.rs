@@ -7,3 +7,4 @@ pub mod encryption_key;
 pub mod ids;
 pub mod key_derivation;
 pub mod symmetric;
+pub mod digest_key_file;

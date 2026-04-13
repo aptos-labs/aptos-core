@@ -25,7 +25,7 @@ use std::{
 };
 
 /// The digest public parameters.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct DigestKey {
     #[serde(
         serialize_with = "ark_se_uncompressed",
@@ -105,6 +105,9 @@ impl DigestKey {
             .iter()
             .map(|gs| gs.iter().map(|g| G1Projective::from(*g)).collect())
             .collect();
+
+        debug_assert_eq!(tau_powers_g1[0].len(), batch_size + 1);
+        debug_assert_eq!(tau_powers_g1_projective[0].len(), batch_size + 1);
 
         let tau_g2: G2Affine = (G2Affine::generator() * tau).into();
 
