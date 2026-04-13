@@ -74,12 +74,27 @@ impl ProofManager {
                 .info()
                 .expiration()
                 .saturating_sub(self.batch_expiry_gap_when_init_usecs);
+            let age = aptos_infallible::duration_since_epoch()
+                .checked_sub(std::time::Duration::from_micros(approx_created_ts_usecs));
             observe_batch(
                 approx_created_ts_usecs,
                 proof.info().author(),
                 BatchStage::PROOF_RECEIVED,
                 proof.info(),
             );
+            // Log on every node when a proof is slow to arrive (> 500ms from
+            // batch creation). Catches outliers that Prometheus histograms miss.
+            if let Some(age) = age {
+                if age.as_millis() > 500 {
+                    info!(
+                        "SlowProofReceipt author={} digest={} num_txns={} age_ms={}",
+                        proof.info().author(),
+                        proof.info().digest(),
+                        proof.info().num_txns(),
+                        age.as_millis(),
+                    );
+                }
+            }
             // Txn trace (per-txn log) — only fires on the batch author where the
             // batch digest is registered. Shows per-txn outliers.
             if tracing_enabled {
