@@ -1,0 +1,12 @@
+remote_endpoint: ~
+name: "v1.44-v-m-binary-format-v10"
+proposals:
+  - name: v_m_binary_format_v10
+    metadata:
+      title: "Proposal to enable bytecode format v10"
+      description: "Enable VM binary format v10, which introduces support for Move abort-with-message (AIP-138, https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-138-move-aborts-with-message.md) and public structs and enums (AIP-142, https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-142-public-structs-and-enums.md)."
+      execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - v_m_binary_format_v10
