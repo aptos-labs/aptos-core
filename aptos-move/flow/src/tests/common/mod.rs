@@ -175,6 +175,10 @@ pub fn sanitize_output(s: &str) -> String {
     let re_home = Regex::new(r#"/Users/[^\s/]+/"#).expect("regex");
     let s = re_home.replace_all(&s, "<HOME>/");
 
+    // Redact prover counterexample values (e.g., "x = 12345" → "x = <redacted>")
+    let re_cex = Regex::new(r"(=\s+\w+ = )\d+").expect("regex");
+    let s = re_cex.replace_all(&s, "${1}<redacted>");
+
     s.to_string()
 }
 
