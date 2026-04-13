@@ -9,7 +9,7 @@
 //! once within its block and never crosses a block boundary.
 
 use super::instr_utils::{extract_imm_value, is_commutative};
-use crate::stackless_exec_ir::{BasicBlock, Instr};
+use crate::stackless_exec_ir::{BasicBlock, BinaryOp, Instr};
 use move_vm_types::loaded_data::runtime_types::Type;
 
 /// Intermediate SSA representation of a single function, before slot allocation.
@@ -31,6 +31,9 @@ impl SSAFunction {
         for block in &mut self.blocks {
             fuse_pairs(&mut block.instrs, try_fuse_field_access);
             fuse_pairs(&mut block.instrs, try_fuse_immediate_binop);
+            // Must run after try_fuse_immediate_binop so that BinaryOpImm is
+            // available for the BrCmpImm variant.
+            fuse_pairs(&mut block.instrs, try_fuse_compare_branch);
         }
         self
     }
@@ -112,15 +115,48 @@ fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
     }
 }
 
+/// Try to fuse a comparison + conditional branch pair into a single `BrCmp`/`BrCmpImm`.
+///
+/// Handles both `BrTrue` (keeps the comparison operator) and `BrFalse` (negates it).
+fn try_fuse_compare_branch(first: &Instr, second: &Instr) -> Option<Instr> {
+    match (first, second) {
+        // BinaryOp(dst, Cmp(cmp), lhs, rhs) + BrTrue(label, dst)
+        (Instr::BinaryOp(dst, BinaryOp::Cmp(cmp), lhs, rhs), Instr::BrTrue(label, cond))
+            if *dst == *cond =>
+        {
+            Some(Instr::BrCmp(*label, *cmp, *lhs, *rhs))
+        },
+        // BinaryOp(dst, Cmp(cmp), lhs, rhs) + BrFalse(label, dst)
+        (Instr::BinaryOp(dst, BinaryOp::Cmp(cmp), lhs, rhs), Instr::BrFalse(label, cond))
+            if *dst == *cond =>
+        {
+            Some(Instr::BrCmp(*label, cmp.negate(), *lhs, *rhs))
+        },
+        // BinaryOpImm(dst, Cmp(cmp), src, imm) + BrTrue(label, dst)
+        (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrTrue(label, cond))
+            if *dst == *cond =>
+        {
+            Some(Instr::BrCmpImm(*label, *cmp, *src, *imm))
+        },
+        // BinaryOpImm(dst, Cmp(cmp), src, imm) + BrFalse(label, dst)
+        (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrFalse(label, cond))
+            if *dst == *cond =>
+        {
+            Some(Instr::BrCmpImm(*label, cmp.negate(), *src, *imm))
+        },
+        _ => None,
+    }
+}
+
 /// Try to fuse a `Ld*` + `BinaryOp` pair into a `BinaryOpImm` instruction.
 fn try_fuse_immediate_binop(first: &Instr, second: &Instr) -> Option<Instr> {
     let (tmp, imm) = extract_imm_value(first)?;
     match second {
         Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
-            Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm))
+            Some(Instr::BinaryOpImm(*dst, *op, *lhs, imm))
         },
         Instr::BinaryOp(dst, op, lhs, rhs) if *lhs == tmp && is_commutative(op) => {
-            Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm))
+            Some(Instr::BinaryOpImm(*dst, *op, *rhs, imm))
         },
         _ => None,
     }

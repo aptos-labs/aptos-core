@@ -4,7 +4,7 @@
 //! Lowers stackless exec IR to micro-ops.
 
 use super::context::{LoweringContext, SlotInfo};
-use crate::stackless_exec_ir::{BinaryOp, FunctionIR, ImmValue, Instr, Label, Slot};
+use crate::stackless_exec_ir::{BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot};
 use anyhow::{bail, Result};
 use mono_move_core::{CodeOffset, FrameOffset, MicroOp};
 use move_vm_types::loaded_data::runtime_types::Type;
@@ -13,15 +13,8 @@ pub fn lower_function(func_ir: &FunctionIR, ctx: &LoweringContext) -> Result<Vec
     let mut state = LoweringState::new(func_ir, ctx);
     for block in &func_ir.blocks {
         state.label_map[block.label.0 as usize] = Some(state.ops.len() as u32);
-        let body = &block.instrs;
-        let mut i = 0;
-        while i < body.len() {
-            let fused = state.lower_instr(func_ir, &body[i], body.get(i + 1))?;
-            if fused {
-                i += 2;
-            } else {
-                i += 1;
-            }
+        for instr in &block.instrs {
+            state.lower_instr(func_ir, instr)?;
         }
     }
     state.fixup_branches()?;
@@ -141,13 +134,8 @@ impl<'a> LoweringState<'a> {
         )
     }
 
-    /// Lower one IR instruction. Returns true if the next instruction was fused (skip it).
-    fn lower_instr(
-        &mut self,
-        func_ir: &FunctionIR,
-        instr: &Instr,
-        next: Option<&Instr>,
-    ) -> Result<bool> {
+    /// Lower one IR instruction.
+    fn lower_instr(&mut self, func_ir: &FunctionIR, instr: &Instr) -> Result<()> {
         match instr {
             // --- Loads ---
             Instr::LdU64(dst, v) => {
@@ -232,10 +220,6 @@ impl<'a> LoweringState<'a> {
             Instr::BinaryOp(dst, op, lhs, rhs) => {
                 let lhs_ty = self.slot_type(*lhs);
                 if Self::is_u64_type(lhs_ty) {
-                    // Try compare+branch fusion
-                    if let Some(fused) = self.try_fuse_compare_branch(op, dst, *lhs, *rhs, next) {
-                        return Ok(fused);
-                    }
                     let l = self.slot(*lhs);
                     let r = self.slot(*rhs);
                     let d = self.def_slot(*dst);
@@ -256,11 +240,6 @@ impl<'a> LoweringState<'a> {
             Instr::BinaryOpImm(dst, op, src, imm) => {
                 let src_ty = self.slot_type(*src);
                 if Self::is_u64_type(src_ty) {
-                    // Try compare+branch fusion
-                    if let Some(fused) = self.try_fuse_compare_branch_imm(op, dst, *src, imm, next)
-                    {
-                        return Ok(fused);
-                    }
                     let s = self.slot(*src);
                     let d = self.def_slot(*dst);
                     let v = imm_to_u64(imm);
@@ -300,7 +279,90 @@ impl<'a> LoweringState<'a> {
                 });
             },
             Instr::BrFalse(Label(_l), _cond) => {
-                bail!("standalone BrFalse not yet lowered (expected fusion)");
+                bail!("standalone BrFalse not yet lowered (expected compare+branch fusion)");
+            },
+
+            // --- Fused compare+branch ---
+            Instr::BrCmp(Label(l), op, lhs, rhs) => {
+                let lhs_ty = self.slot_type(*lhs);
+                if Self::is_u64_type(lhs_ty) {
+                    let l_slot = self.slot(*lhs);
+                    let r_slot = self.slot(*rhs);
+                    let idx = self.ops.len();
+                    self.branch_fixups.push(idx);
+                    match op {
+                        CmpOp::Lt => self.emit(MicroOp::JumpLessU64 {
+                            target: CodeOffset(encode_label(*l)),
+                            lhs: FrameOffset(l_slot.offset),
+                            rhs: FrameOffset(r_slot.offset),
+                        }),
+                        CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64 {
+                            target: CodeOffset(encode_label(*l)),
+                            lhs: FrameOffset(l_slot.offset),
+                            rhs: FrameOffset(r_slot.offset),
+                        }),
+                        // x > y ↔ y < x
+                        CmpOp::Gt => self.emit(MicroOp::JumpLessU64 {
+                            target: CodeOffset(encode_label(*l)),
+                            lhs: FrameOffset(r_slot.offset),
+                            rhs: FrameOffset(l_slot.offset),
+                        }),
+                        // x <= y ↔ y >= x
+                        CmpOp::Le => self.emit(MicroOp::JumpGreaterEqualU64 {
+                            target: CodeOffset(encode_label(*l)),
+                            lhs: FrameOffset(r_slot.offset),
+                            rhs: FrameOffset(l_slot.offset),
+                        }),
+                        CmpOp::Neq => self.emit(MicroOp::JumpNotEqualU64 {
+                            target: CodeOffset(encode_label(*l)),
+                            lhs: FrameOffset(l_slot.offset),
+                            rhs: FrameOffset(r_slot.offset),
+                        }),
+                        CmpOp::Eq => {
+                            bail!("BrCmp Eq for u64-sized type not yet lowered")
+                        },
+                    }
+                } else {
+                    bail!("BrCmp for non-u64 type not yet lowered");
+                }
+            },
+            Instr::BrCmpImm(Label(l), op, src, imm) => {
+                let src_ty = self.slot_type(*src);
+                if Self::is_u64_type(src_ty) {
+                    let s = self.slot(*src);
+                    let v = imm_to_u64(imm);
+                    let idx = self.ops.len();
+                    self.branch_fixups.push(idx);
+                    match op {
+                        CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64Imm {
+                            target: CodeOffset(encode_label(*l)),
+                            src: FrameOffset(s.offset),
+                            imm: v,
+                        }),
+                        CmpOp::Lt => self.emit(MicroOp::JumpLessU64Imm {
+                            target: CodeOffset(encode_label(*l)),
+                            src: FrameOffset(s.offset),
+                            imm: v,
+                        }),
+                        // x > c ↔ x >= c+1
+                        CmpOp::Gt => self.emit(MicroOp::JumpGreaterEqualU64Imm {
+                            target: CodeOffset(encode_label(*l)),
+                            src: FrameOffset(s.offset),
+                            imm: v + 1,
+                        }),
+                        // x <= c ↔ x < c+1
+                        CmpOp::Le => self.emit(MicroOp::JumpLessU64Imm {
+                            target: CodeOffset(encode_label(*l)),
+                            src: FrameOffset(s.offset),
+                            imm: v + 1,
+                        }),
+                        CmpOp::Eq | CmpOp::Neq => {
+                            bail!("BrCmpImm {:?} for u64-sized type not yet lowered", op)
+                        },
+                    }
+                } else {
+                    bail!("BrCmpImm for non-u64 type not yet lowered");
+                }
             },
 
             // --- Calls ---
@@ -323,7 +385,7 @@ impl<'a> LoweringState<'a> {
 
             _ => bail!("instruction {:?} not yet lowered", instr),
         }
-        Ok(false)
+        Ok(())
     }
 
     fn lower_call(&mut self, _func_ir: &FunctionIR, args: &[Slot], rets: &[Slot]) {
@@ -376,82 +438,17 @@ impl<'a> LoweringState<'a> {
         }
     }
 
-    /// Try to fuse a comparison (slot-slot) + branch into a single micro-op.
-    fn try_fuse_compare_branch(
-        &mut self,
-        op: &BinaryOp,
-        dst: &Slot,
-        lhs: Slot,
-        rhs: Slot,
-        next: Option<&Instr>,
-    ) -> Option<bool> {
-        let next = next?;
-        match (op, next) {
-            (BinaryOp::Lt, Instr::BrTrue(Label(l), cond)) if cond == dst => {
-                let l_slot = self.slot(lhs);
-                let r_slot = self.slot(rhs);
-                let idx = self.ops.len();
-                self.branch_fixups.push(idx);
-                self.emit(MicroOp::JumpLessU64 {
-                    target: CodeOffset(encode_label(*l)),
-                    lhs: FrameOffset(l_slot.offset),
-                    rhs: FrameOffset(r_slot.offset),
-                });
-                Some(true)
-            },
-            _ => None,
-        }
-    }
-
-    /// Try to fuse a comparison (slot-imm) + branch into a single micro-op.
-    fn try_fuse_compare_branch_imm(
-        &mut self,
-        op: &BinaryOp,
-        dst: &Slot,
-        src: Slot,
-        imm: &ImmValue,
-        next: Option<&Instr>,
-    ) -> Option<bool> {
-        let next = next?;
-        match (op, next) {
-            (BinaryOp::Le, Instr::BrFalse(Label(l), cond)) if cond == dst => {
-                // le src, #c + br_false L => jump if src >= c+1
-                let s = self.slot(src);
-                let v = imm_to_u64(imm);
-                let idx = self.ops.len();
-                self.branch_fixups.push(idx);
-                self.emit(MicroOp::JumpGreaterEqualU64Imm {
-                    target: CodeOffset(encode_label(*l)),
-                    src: FrameOffset(s.offset),
-                    imm: v + 1,
-                });
-                Some(true)
-            },
-            (BinaryOp::Lt, Instr::BrFalse(Label(l), cond)) if cond == dst => {
-                // lt src, #c + br_false L => jump if src >= c
-                let s = self.slot(src);
-                let v = imm_to_u64(imm);
-                let idx = self.ops.len();
-                self.branch_fixups.push(idx);
-                self.emit(MicroOp::JumpGreaterEqualU64Imm {
-                    target: CodeOffset(encode_label(*l)),
-                    src: FrameOffset(s.offset),
-                    imm: v,
-                });
-                Some(true)
-            },
-            _ => None,
-        }
-    }
-
     fn fixup_branches(&mut self) -> Result<()> {
         for &idx in &self.branch_fixups {
             // Extract the encoded label from the op, resolve it, then patch.
             let encoded = match &self.ops[idx] {
-                MicroOp::Jump { target } => target.0,
-                MicroOp::JumpNotZeroU64 { target, .. } => target.0,
-                MicroOp::JumpGreaterEqualU64Imm { target, .. } => target.0,
-                MicroOp::JumpLessU64 { target, .. } => target.0,
+                MicroOp::Jump { target }
+                | MicroOp::JumpNotZeroU64 { target, .. }
+                | MicroOp::JumpGreaterEqualU64Imm { target, .. }
+                | MicroOp::JumpLessU64Imm { target, .. }
+                | MicroOp::JumpLessU64 { target, .. }
+                | MicroOp::JumpGreaterEqualU64 { target, .. }
+                | MicroOp::JumpNotEqualU64 { target, .. } => target.0,
                 other => bail!(
                     "unexpected non-branch op at fixup index {}: {:?}",
                     idx,
@@ -461,10 +458,13 @@ impl<'a> LoweringState<'a> {
             let label = decode_label(encoded);
             let resolved = self.resolve_label(label)?;
             match &mut self.ops[idx] {
-                MicroOp::Jump { target } => target.0 = resolved,
-                MicroOp::JumpNotZeroU64 { target, .. } => target.0 = resolved,
-                MicroOp::JumpGreaterEqualU64Imm { target, .. } => target.0 = resolved,
-                MicroOp::JumpLessU64 { target, .. } => target.0 = resolved,
+                MicroOp::Jump { target }
+                | MicroOp::JumpNotZeroU64 { target, .. }
+                | MicroOp::JumpGreaterEqualU64Imm { target, .. }
+                | MicroOp::JumpLessU64Imm { target, .. }
+                | MicroOp::JumpLessU64 { target, .. }
+                | MicroOp::JumpGreaterEqualU64 { target, .. }
+                | MicroOp::JumpNotEqualU64 { target, .. } => target.0 = resolved,
                 _ => unreachable!(),
             }
         }

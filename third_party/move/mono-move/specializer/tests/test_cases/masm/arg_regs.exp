@@ -165,23 +165,21 @@ fun width_from_max(): u64 {
 }
 
 fun call_in_loop(r0): u64 {
-  slots: params(1), locals(1), temps(1), xfer(1)
+  slots: params(1), locals(1), temps(0), xfer(1)
     r0: u64
     r1: u64
-    r2: bool
   code:
   L3:
     0: r1 := ld_u64 0
   L2:
-    1: r2 := gt r0, #0
-    2: br_false L0, r2
+    1: br_le L0, r0, #0
   L1:
-    3: [x0] := call identity, [r0]
-    4: r1 := add x0, r1
-    5: r0 := sub r0, #1
-    6: branch L2
+    2: [x0] := call identity, [r0]
+    3: r1 := add x0, r1
+    4: r0 := sub r0, #1
+    5: branch L2
   L0:
-    7: ret [r1]
+    6: ret [r1]
 }
 
 fun mixed_at_callsite(r0): u64 {
@@ -373,7 +371,19 @@ fun width_from_max() {
     8: Return
 }
 
-fun call_in_loop(): skipped (lowering: BinaryOpImm Gt for u64-sized type not yet lowered)
+fun call_in_loop() {
+  frame_data_size: 16
+  code:
+    0: StoreImm8 [8] <- #0
+    1: JumpLessU64Imm @7 [0] < #1
+    2: Move8 [40] <- [0]
+    3: CallFunc #0
+    4: AddU64 [8] <- [40] + [8]
+    5: SubU64Imm [0] <- [0] - #1
+    6: Jump @1
+    7: Move8 [0] <- [8]
+    8: Return
+}
 
 fun mixed_at_callsite() {
   frame_data_size: 8

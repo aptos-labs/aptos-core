@@ -63,7 +63,7 @@ impl Slot {
 pub struct Label(pub u16);
 
 /// Unary operations.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOp {
     CastU8,
     CastU16,
@@ -82,8 +82,33 @@ pub enum UnaryOp {
     FreezeRef,
 }
 
+/// Comparison operations that produce a boolean result.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CmpOp {
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    Eq,
+    Neq,
+}
+
+impl CmpOp {
+    /// Return the logically negated comparison.
+    pub fn negate(self) -> Self {
+        match self {
+            CmpOp::Lt => CmpOp::Ge,
+            CmpOp::Ge => CmpOp::Lt,
+            CmpOp::Gt => CmpOp::Le,
+            CmpOp::Le => CmpOp::Gt,
+            CmpOp::Eq => CmpOp::Neq,
+            CmpOp::Neq => CmpOp::Eq,
+        }
+    }
+}
+
 /// Binary operations.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -95,18 +120,13 @@ pub enum BinaryOp {
     Xor,
     Shl,
     Shr,
-    Lt,
-    Gt,
-    Le,
-    Ge,
-    Eq,
-    Neq,
+    Cmp(CmpOp),
     Or,
     And,
 }
 
 /// Immediate values for `BinaryOpImm`. Restricted to small types.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImmValue {
     Bool(bool),
     U8(u8),
@@ -230,6 +250,10 @@ pub enum Instr {
     Branch(Label),
     BrTrue(Label, Slot),
     BrFalse(Label, Slot),
+    /// `BrCmp(target, op, lhs, rhs)` — branch to `target` if `op(lhs, rhs)` is true.
+    BrCmp(Label, CmpOp, Slot, Slot),
+    /// `BrCmpImm(target, op, src, imm)` — branch to `target` if `op(src, imm)` is true.
+    BrCmpImm(Label, CmpOp, Slot, ImmValue),
     Ret(Vec<Slot>),
     Abort(Slot),
     AbortMsg(Slot, Slot),

@@ -11,7 +11,7 @@ use super::{
     ssa_function::SSAFunction,
     type_conversion::{convert_sig_token, convert_sig_tokens},
 };
-use crate::stackless_exec_ir::{BasicBlock, BinaryOp, Instr, Label, Slot, UnaryOp};
+use crate::stackless_exec_ir::{BasicBlock, BinaryOp, CmpOp, Instr, Label, Slot, UnaryOp};
 use anyhow::{bail, ensure, Context, Result};
 use move_binary_format::{
     access::ModuleAccess,
@@ -441,12 +441,12 @@ impl<'a> SsaConverter<'a> {
             B::Shl => self.convert_binop(BinaryOp::Shl, false)?,
             B::Shr => self.convert_binop(BinaryOp::Shr, false)?,
             // --- Comparisons / logical (result type = bool) ---
-            B::Lt => self.convert_binop(BinaryOp::Lt, true)?,
-            B::Gt => self.convert_binop(BinaryOp::Gt, true)?,
-            B::Le => self.convert_binop(BinaryOp::Le, true)?,
-            B::Ge => self.convert_binop(BinaryOp::Ge, true)?,
-            B::Eq => self.convert_binop(BinaryOp::Eq, true)?,
-            B::Neq => self.convert_binop(BinaryOp::Neq, true)?,
+            B::Lt => self.convert_binop(BinaryOp::Cmp(CmpOp::Lt), true)?,
+            B::Gt => self.convert_binop(BinaryOp::Cmp(CmpOp::Gt), true)?,
+            B::Le => self.convert_binop(BinaryOp::Cmp(CmpOp::Le), true)?,
+            B::Ge => self.convert_binop(BinaryOp::Cmp(CmpOp::Ge), true)?,
+            B::Eq => self.convert_binop(BinaryOp::Cmp(CmpOp::Eq), true)?,
+            B::Neq => self.convert_binop(BinaryOp::Cmp(CmpOp::Neq), true)?,
             B::Or => self.convert_binop(BinaryOp::Or, true)?,
             B::And => self.convert_binop(BinaryOp::And, true)?,
 

@@ -75,18 +75,16 @@ fun make_point(r0, r1): Point {
 }
 
 fun max(r0, r1): u64 {
-  slots: params(2), locals(0), temps(1)
+  slots: params(2), locals(0), temps(0)
     r0: u64
     r1: u64
-    r2: bool
   code:
   L2:
-    0: r2 := gt r0, r1
-    1: br_false L0, r2
+    0: br_le L0, r0, r1
   L1:
-    2: ret [r0]
+    1: ret [r0]
   L0:
-    3: ret [r1]
+    2: ret [r1]
 }
 
 === micro-ops ===
@@ -104,4 +102,11 @@ fun get_x(): skipped (lowering: instruction ReadField(Home(1), FieldHandleIndex(
 
 fun make_point(): skipped (not all types are concrete)
 
-fun max(): skipped (lowering: BinaryOp Gt for u64-sized type not yet lowered)
+fun max() {
+  frame_data_size: 16
+  code:
+    0: JumpGreaterEqualU64 @2 [8] >= [0]
+    1: Return
+    2: Move8 [0] <- [8]
+    3: Return
+}

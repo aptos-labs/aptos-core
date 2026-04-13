@@ -4,7 +4,7 @@
 //! Human-readable display for the stackless execution IR.
 //! Resolves pool indices using the CompiledModule for readable output.
 
-use super::{BinaryOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
+use super::{BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -769,6 +769,22 @@ fn display_instr(
         Instr::Branch(l) => write!(f, "branch L{}", l.0),
         Instr::BrTrue(l, c) => write!(f, "br_true L{}, {}", l.0, slot_name(*c)),
         Instr::BrFalse(l, c) => write!(f, "br_false L{}, {}", l.0, slot_name(*c)),
+        Instr::BrCmp(l, op, lhs, rhs) => write!(
+            f,
+            "br_{} L{}, {}, {}",
+            cmp_op_name(op),
+            l.0,
+            slot_name(*lhs),
+            slot_name(*rhs)
+        ),
+        Instr::BrCmpImm(l, op, src, imm) => write!(
+            f,
+            "br_{} L{}, {}, {}",
+            cmp_op_name(op),
+            l.0,
+            slot_name(*src),
+            imm_value(imm)
+        ),
         Instr::Ret(rs) => write!(f, "ret {}", slot_names(rs)),
         Instr::Abort(c) => write!(f, "abort {}", slot_name(*c)),
         Instr::AbortMsg(c, m) => write!(f, "abort_msg {}, {}", slot_name(*c), slot_name(*m)),
@@ -807,14 +823,20 @@ fn binary_op_name(op: &BinaryOp) -> &'static str {
         BinaryOp::Xor => "xor",
         BinaryOp::Shl => "shl",
         BinaryOp::Shr => "shr",
-        BinaryOp::Lt => "lt",
-        BinaryOp::Gt => "gt",
-        BinaryOp::Le => "le",
-        BinaryOp::Ge => "ge",
-        BinaryOp::Eq => "eq",
-        BinaryOp::Neq => "neq",
+        BinaryOp::Cmp(cmp) => cmp_op_name(cmp),
         BinaryOp::Or => "or",
         BinaryOp::And => "and",
+    }
+}
+
+fn cmp_op_name(op: &CmpOp) -> &'static str {
+    match op {
+        CmpOp::Lt => "lt",
+        CmpOp::Gt => "gt",
+        CmpOp::Le => "le",
+        CmpOp::Ge => "ge",
+        CmpOp::Eq => "eq",
+        CmpOp::Neq => "neq",
     }
 }
 

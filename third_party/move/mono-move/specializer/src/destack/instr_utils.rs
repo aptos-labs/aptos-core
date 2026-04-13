@@ -179,6 +179,8 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::Branch(_)
         | Instr::BrTrue(_, _)
         | Instr::BrFalse(_, _)
+        | Instr::BrCmp(_, _, _, _)
+        | Instr::BrCmpImm(_, _, _, _)
         | Instr::Ret(_)
         | Instr::Abort(_)
         | Instr::AbortMsg(_, _) => None,
@@ -189,6 +191,7 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
 /// without changing the result).
 #[inline]
 pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
+    use crate::stackless_exec_ir::CmpOp;
     matches!(
         op,
         BinaryOp::Add
@@ -196,8 +199,8 @@ pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
             | BinaryOp::BitOr
             | BinaryOp::BitAnd
             | BinaryOp::Xor
-            | BinaryOp::Eq
-            | BinaryOp::Neq
+            | BinaryOp::Cmp(CmpOp::Eq)
+            | BinaryOp::Cmp(CmpOp::Neq)
             | BinaryOp::Or
             | BinaryOp::And
     )
@@ -391,6 +394,11 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
 
         Instr::Branch(_) => {},
         Instr::BrTrue(_, cond) | Instr::BrFalse(_, cond) => used::<USES>(*cond, &mut f),
+        Instr::BrCmp(_, _, lhs, rhs) => {
+            used::<USES>(*lhs, &mut f);
+            used::<USES>(*rhs, &mut f);
+        },
+        Instr::BrCmpImm(_, _, src, _) => used::<USES>(*src, &mut f),
         Instr::Ret(rets) => uses::<USES>(rets, &mut f),
         Instr::Abort(code) => used::<USES>(*code, &mut f),
         Instr::AbortMsg(code, msg) => {
@@ -660,6 +668,17 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC
         Instr::BrTrue(_, cond) | Instr::BrFalse(_, cond) => {
             if USES {
                 rewrite_slot(cond, &mut f);
+            }
+        },
+        Instr::BrCmp(_, _, lhs, rhs) => {
+            if USES {
+                rewrite_slot(lhs, &mut f);
+                rewrite_slot(rhs, &mut f);
+            }
+        },
+        Instr::BrCmpImm(_, _, src, _) => {
+            if USES {
+                rewrite_slot(src, &mut f);
             }
         },
         Instr::Ret(rets) => {
