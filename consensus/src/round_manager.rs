@@ -482,25 +482,28 @@ impl RoundManager {
                 .expect("Sending to a self loopback unbounded channel cannot fail");
         }
 
-        // HACK: Simulate proposer failures. The last 2 validators (by ordered index)
-        // skip their proposal 10% of the time (round % 10 == 0).
-        let should_skip_proposal = {
+        // HACK: Simulate slow proposers. The last 2 validators (by ordered index)
+        // delay their proposal by 500ms 10% of the time (round % 10 == 0).
+        let proposal_delay = {
             let author = self.proposal_generator.author();
             let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
             let n = ordered.len();
             let idx = ordered.iter().position(|a| *a == author);
-            matches!(idx, Some(i) if i >= n - 2) && new_round_event.round % 10 == 0
+            if matches!(idx, Some(i) if i >= n - 2) && new_round_event.round % 10 == 0 {
+                Some(std::time::Duration::from_millis(500))
+            } else {
+                None
+            }
         };
-        if should_skip_proposal {
+        if let Some(delay) = proposal_delay {
             warn!(
                 self.new_log(LogEvent::NewRound),
-                "HACK: skipping proposal for round {}", new_round_event.round
+                "HACK: delaying proposal for round {} by {:?}", new_round_event.round, delay
             );
         }
 
         // If the current proposer is the leading, try to propose a regular block if not opt proposed already
         if is_current_proposer
-            && !should_skip_proposal
             && self
                 .proposal_generator
                 .can_propose_in_round(new_round_event.round)
@@ -512,6 +515,9 @@ impl RoundManager {
             let safety_rules = self.safety_rules.clone();
             let proposer_election = self.proposer_election.clone();
             tokio::spawn(async move {
+                if let Some(delay) = proposal_delay {
+                    tokio::time::sleep(delay).await;
+                }
                 if let Err(e) = monitor!(
                     "generate_and_send_proposal",
                     Self::generate_and_send_proposal(
@@ -1444,19 +1450,22 @@ impl RoundManager {
 
         let parent = parent_vote.vote_data().proposed().clone();
         let opt_proposal_round = parent.round() + 1;
-        // HACK: Skip opt proposal for faulty validators too.
-        let should_skip_opt = {
+        // HACK: Simulate slow opt proposers too.
+        let opt_proposal_delay = {
             let author = self.proposal_generator.author();
             let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
             let n = ordered.len();
             let idx = ordered.iter().position(|a| *a == author);
-            matches!(idx, Some(i) if i >= n - 2) && opt_proposal_round % 10 == 0
+            if matches!(idx, Some(i) if i >= n - 2) && opt_proposal_round % 10 == 0 {
+                Some(std::time::Duration::from_millis(500))
+            } else {
+                None
+            }
         };
 
-        if !should_skip_opt
-            && self
-                .proposer_election
-                .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
+        if self
+            .proposer_election
+            .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
         {
             let expected_grandparent_round = parent
                 .round()
@@ -1475,6 +1484,9 @@ impl RoundManager {
             let proposal_generator = self.proposal_generator.clone();
             let proposer_election = self.proposer_election.clone();
             tokio::spawn(async move {
+                if let Some(delay) = opt_proposal_delay {
+                    tokio::time::sleep(delay).await;
+                }
                 if let Err(e) = monitor!(
                     "generate_and_send_opt_proposal",
                     Self::generate_and_send_opt_proposal(
