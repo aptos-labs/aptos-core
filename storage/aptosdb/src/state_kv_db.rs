@@ -424,7 +424,6 @@ impl StateKvDb {
     /// truncation is assumed to have already run). For each unique key hash, picks the most
     /// recent entry. Evicted entries are excluded. The returned shards have correctly assembled
     /// LRU doubly-linked list pointers, ordered by `hot_since_version`.
-    #[allow(dead_code)]
     pub(crate) fn load_hot_state_kvs(
         &self,
         committed_version: Version,
@@ -574,7 +573,6 @@ impl StateKvDb {
 }
 
 /// Per-shard data recovered from the hot state KV DB.
-#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct LoadedHotStateShard {
     /// All hot entries keyed by state key hash.
