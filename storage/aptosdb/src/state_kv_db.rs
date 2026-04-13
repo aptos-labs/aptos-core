@@ -172,12 +172,11 @@ impl StateKvDb {
             is_hot,
         };
 
-        // TODO(HotState): Integrate hot state KV DB with pruner and add truncation support
-        // (stale index tracking, etc.) for the hot state DB.
-        if !readonly && !delete_on_restart && !is_hot {
-            if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
-                truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
-            }
+        if !readonly
+            && !delete_on_restart
+            && let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)?
+        {
+            truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
         }
 
         Ok(state_kv_db)

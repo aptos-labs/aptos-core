@@ -9,6 +9,7 @@ use crate::{
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
+        hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema,
         stale_node_index::StaleNodeIndexSchema,
@@ -131,6 +132,7 @@ pub(crate) fn truncate_state_kv_db_single_shard(
         state_kv_db.db_shard(shard_id),
         target_version + 1,
         &mut batch,
+        state_kv_db.is_hot(),
     )?;
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
@@ -549,6 +551,7 @@ fn delete_state_value_and_index(
     state_kv_db_shard: &DB,
     start_version: Version,
     batch: &mut SchemaBatch,
+    is_hot: bool,
 ) -> Result<()> {
     let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexByKeyHashSchema>()?;
     iter.seek(&start_version)?;
@@ -556,10 +559,12 @@ fn delete_state_value_and_index(
     for item in iter {
         let (index, _) = item?;
         batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
-        batch.delete::<StateValueByKeyHashSchema>(&(
-            index.state_key_hash,
-            index.stale_since_version,
-        ))?;
+        let db_key = (index.state_key_hash, index.stale_since_version);
+        if is_hot {
+            batch.delete::<HotStateValueByKeyHashSchema>(&db_key)?;
+        } else {
+            batch.delete::<StateValueByKeyHashSchema>(&db_key)?;
+        }
     }
 
     Ok(())

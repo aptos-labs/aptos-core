@@ -389,7 +389,10 @@ impl StateStore {
                 Arc::clone(&ledger_db),
                 Arc::clone(&state_kv_db),
                 Arc::clone(&state_merkle_db),
+                hot_state_kv_db.clone(),
+                hot_state_merkle_db.clone(),
                 /*crash_if_difference_is_too_large=*/ true,
+                hot_state_config.delete_on_restart,
             );
         }
         let state_db = Arc::new(StateDb {
@@ -444,13 +447,19 @@ impl StateStore {
         ledger_db: Arc<LedgerDb>,
         state_kv_db: Arc<StateKvDb>,
         state_merkle_db: Arc<StateMerkleDb>,
+        hot_state_kv_db: Option<Arc<StateKvDb>>,
+        hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         crash_if_difference_is_too_large: bool,
+        delete_hot_state_on_restart: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
         let Some(overall_commit_progress) = ledger_metadata_db
             .get_synced_version()
             .expect("DB read failed.")
         else {
+            // Theoretically someone could bring up a new node and it could crash after saving the
+            // genesis transaction and before writing overall commit progress. Probably not worth
+            // fixing right now.
             info!("No overall commit progress was found!");
             return;
         };
@@ -488,6 +497,26 @@ impl StateStore {
             overall_commit_progress,
             crash_if_difference_is_too_large,
         );
+
+        // When `delete_on_restart` in config is flipped from true to false, the node will have been
+        // running for a while, so its hot_state_kv_db is extremely unlikely to not have a progress
+        // marker and `sync_state_kv_commit_progress` should work. Same for hot_state_merkle_db
+        // below.
+        if !delete_hot_state_on_restart && let Some(db) = &hot_state_kv_db {
+            Self::sync_state_kv_commit_progress(
+                db,
+                overall_commit_progress,
+                crash_if_difference_is_too_large,
+            );
+        }
+        if !delete_hot_state_on_restart && let Some(db) = &hot_state_merkle_db {
+            Self::sync_state_merkle_commit_progress(
+                ledger_metadata_db,
+                db,
+                overall_commit_progress,
+                crash_if_difference_is_too_large,
+            );
+        }
     }
 
     /// Reads the state KV commit progress and truncates the state KV DB back to
