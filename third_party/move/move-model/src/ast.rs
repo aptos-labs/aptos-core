@@ -86,6 +86,10 @@ pub struct FrameSpec {
     pub modifies_targets: Vec<Exp>,
     /// Resource types that are read (resolved struct IDs).
     pub reads_targets: BTreeSet<QualifiedInstId<StructId>>,
+    /// Wildcard: `modifies_of<f> *` — function can modify any memory.
+    pub modifies_all: bool,
+    /// Wildcard: `reads_of<f> *` — function can read any memory.
+    pub reads_all: bool,
 }
 
 /// Combined reads/writes access for a function-typed parameter.
@@ -1262,6 +1266,36 @@ impl ExpData {
             (SpecBlock(_, spec1), SpecBlock(_, spec2)) => spec1.structural_eq(spec2),
             _ => false,
         }
+    }
+
+    /// Returns true if this expression is state-neutral: its value does not depend on
+    /// global state and is the same regardless of which program state it's evaluated in.
+    /// Such expressions can safely be extracted into spec-level `let` bindings.
+    pub fn is_state_neutral(&self) -> bool {
+        let mut neutral = true;
+        self.visit_pre_order(&mut |e: &ExpData| match e {
+            ExpData::Call(_, Operation::Global(_), _)
+            | ExpData::Call(_, Operation::Exists(_), _)
+            | ExpData::Call(_, Operation::Old, _)
+            | ExpData::Call(_, Operation::Result(..), _) => {
+                neutral = false;
+                false
+            },
+            ExpData::Call(
+                _,
+                Operation::Behavior(_, range)
+                | Operation::SpecFunction(_, _, range)
+                | Operation::SpecPublish(range)
+                | Operation::SpecRemove(range)
+                | Operation::SpecUpdate(range),
+                _,
+            ) if range.pre.is_some() || range.post.is_some() => {
+                neutral = false;
+                false
+            },
+            _ => neutral,
+        });
+        neutral
     }
 
     pub fn node_id(&self) -> NodeId {

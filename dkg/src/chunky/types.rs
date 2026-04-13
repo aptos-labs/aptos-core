@@ -3,17 +3,42 @@
 
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::CryptoHasher;
-use aptos_dkg::pvss::Player;
+use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     dkg::{
-        chunky_dkg::{AggregatedSubtranscript, ChunkyDKGTranscript},
+        chunky_dkg::{
+            AggregatedSubtranscript, ChunkyDKGTranscript, ChunkySubtranscript, ChunkyTranscript,
+        },
         DKGTranscriptMetadata,
     },
 };
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+/// Wrapper around `ChunkyTranscript` with a precomputed transcript hash.
+pub struct ChunkyTranscriptWithHash {
+    pub transcript: Arc<ChunkyTranscript>,
+    hash: HashValue,
+}
+
+impl ChunkyTranscriptWithHash {
+    pub fn new(transcript: ChunkyTranscript, hash: HashValue) -> Self {
+        Self {
+            transcript: Arc::new(transcript),
+            hash,
+        }
+    }
+
+    pub fn hash(&self) -> HashValue {
+        self.hash
+    }
+
+    pub fn get_subtranscript(&self) -> ChunkySubtranscript {
+        self.transcript.get_subtranscript()
+    }
+}
 
 /// Once Chunky DKG starts, a validator should send this message to peers in order to collect Chunky DKG transcripts from peers.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

@@ -269,6 +269,12 @@ cargo run -p move-prover -- \
     - a file `_<addr>_<module>_<function>.smt` containing the smtlib input for Z3 as generated from the Boogie
     - a file `<function>.z3log` containing Z3 log during verifying the function.
 
+# Efficiency: Avoid Repeated Prover Runs
+
+Do NOT run the prover many times just to grep a single detail from its output — prover runs can take
+a long time. Instead, save the output to a file on the first run, then analyze that saved output for
+whatever you need.
+
 # Important: Language Version
 
 When testing the prover on standalone Move files, pass `--language-version 2.4`
@@ -311,7 +317,12 @@ MVP_TEST_FLAGS="-T=20" cargo test           # Custom flags
 # Inference Tests
 
 The inference test suite (`tests/inference/`) runs spec inference on Move source, produces enriched `.exp.move` files,
-then runs the prover on those files. The verification result is appended at the end of each `.exp.move` file.
+then runs the prover on those files. The verification result is appended as a comment at the end of each `.exp.move`
+file.
+
+The `.exp.move` files ARE the enriched source — they are ordinary Move source files (with inferred specs inserted) that
+could have been written by a user. There is no separate "enriched" format; the `.exp.move` file is directly compiled and
+verified by the prover as regular Move code.
 
 **The verification result is ALWAYS expected to be `Verification Succeeded` with no errors or warnings.** Inferred specs
 are expected to verify. If verification fails, there is a bug in either inference or the verification pipeline. Any

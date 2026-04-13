@@ -65,8 +65,8 @@ module 0x42::function_calls {
     }
     spec test_higher_order(x: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == result_of<apply>(|arg0| callee(arg0), x);
-        aborts_if [inferred] aborts_of<apply>(|arg0| callee(arg0), x);
+        ensures [inferred] result == result_of<apply>(|x| callee(x), x);
+        aborts_if [inferred] aborts_of<apply>(|x| callee(x), x);
     }
 
 

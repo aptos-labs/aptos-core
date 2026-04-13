@@ -260,7 +260,7 @@ module 0xc0ffee::m {
         f()(true) || a
     }
     public fun test_bug16195_OR_mix6(a: bool): bool {
-        let f = Bug16195_variant8(|arg0| lambda__2__test_bug16195_OR_mix6(arg0));
+        let f = Bug16195_variant8(|x| lambda__2__test_bug16195_OR_mix6(x));
         f(true)() || a
     }
     public fun test_bug16195_variant1(): u64 {
@@ -273,12 +273,12 @@ module 0xc0ffee::m {
     }
     public fun test_bug16195_variant3(): u64 {
         let _arg = || lambda__1__test_bug16195_variant3();
-        let f = Bug16195_variant3(|arg0| lambda__3__test_bug16195_variant3(arg0));
+        let f = Bug16195_variant3(|x| lambda__3__test_bug16195_variant3(x));
         f(_arg)()
     }
     public fun test_bug16195_variant4(): u64 {
         let _arg = || lambda__1__test_bug16195_variant4();
-        let f = Bug16195_variant4(|arg0| lambda__3__test_bug16195_variant4(arg0));
+        let f = Bug16195_variant4(|x| lambda__3__test_bug16195_variant4(x));
         f(_arg)()
     }
     public fun test_regular_OR_case1(a: u64, b: u64): bool {
@@ -339,7 +339,7 @@ module 0xc0ffee::m {
         x || a
     }
     fun lambda__2__test_bug16195_OR_mix5(a: bool): |bool|bool {
-        |arg0| lambda__1__test_bug16195_OR_mix5(a, arg0)
+        |x| lambda__1__test_bug16195_OR_mix5(a, x)
     }
     fun lambda__1__test_bug16195_OR_mix6(x: bool): bool {
         x || true

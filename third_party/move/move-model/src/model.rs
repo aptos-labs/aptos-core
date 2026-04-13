@@ -2093,6 +2093,7 @@ impl GlobalEnv {
             field_data,
             variants: None,
             spec: RefCell::new(Spec::default()),
+            field_access_of: vec![],
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
@@ -2553,6 +2554,23 @@ impl GlobalEnv {
             .expect("function data exists");
         data.fun_param_access_of[param_idx].used_memory = used_memory;
         data.fun_param_access_of[param_idx].old_memory = old_memory;
+    }
+
+    /// Sets derived memory on a struct field's access_of entry.
+    pub fn set_struct_field_access_of_memory(
+        &mut self,
+        qid: QualifiedId<StructId>,
+        field_idx: usize,
+        used_memory: BTreeSet<QualifiedInstId<StructId>>,
+        old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    ) {
+        let data = self
+            .get_module_data_mut(qid.module_id)
+            .struct_data
+            .get_mut(&qid.id)
+            .expect("struct data exists");
+        data.field_access_of[field_idx].used_memory = used_memory;
+        data.field_access_of[field_idx].old_memory = old_memory;
     }
 
     /// Returns an iterator for all modules in the environment.
@@ -4029,6 +4047,10 @@ pub struct StructData {
     /// Associated specification.
     pub(crate) spec: RefCell<Spec>,
 
+    /// Access declarations for function-typed fields (`reads_of<f>`, `modifies_of<f>`).
+    /// Reuses `FunParamAccessOf` where `fun_param` is the field name symbol.
+    pub(crate) field_access_of: Vec<FunParamAccessOf>,
+
     /// Whether this struct is native
     pub is_native: bool,
 
@@ -4059,6 +4081,7 @@ impl StructData {
             field_data: Default::default(),
             variants: None,
             spec: RefCell::new(Default::default()),
+            field_access_of: vec![],
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
@@ -4390,6 +4413,11 @@ impl<'env> StructEnv<'env> {
     /// Returns the data invariants associated with this struct.
     pub fn get_spec(&self) -> Ref<'_, Spec> {
         self.data.spec.borrow()
+    }
+
+    /// Returns access declarations for function-typed fields in this struct.
+    pub fn get_field_access_of(&self) -> &[FunParamAccessOf] {
+        &self.data.field_access_of
     }
 
     /// Returns the value of a boolean pragma for this struct. This first looks up a

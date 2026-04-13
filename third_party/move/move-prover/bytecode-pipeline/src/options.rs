@@ -78,9 +78,9 @@ pub struct ProverOptions {
     /// Whether to run spec inference instead of verification.
     #[arg(skip)]
     pub inference: bool,
-    /// Whether to add `pragma opaque` to inferred specs.
-    #[arg(skip)]
-    pub inference_opaque: bool,
+    /// Do not add `pragma opaque` to inferred specs.
+    #[arg(long)]
+    pub no_inference_opaque: bool,
     /// Optional names of native methods (qualified with module name, e.g., m::foo) implementing
     /// mutable borrow semantics
     #[arg(skip)]
@@ -89,6 +89,10 @@ pub struct ProverOptions {
     /// `VerificationScope::Only(name)` or `VerificationScope::OnlyModule(name)`.
     #[arg(skip)]
     pub verify_exclude: Vec<VerificationScope>,
+    /// Inline spec let bindings by substituting the expression directly into conditions,
+    /// instead of creating Identical temps.
+    #[arg(long, default_value_t = false)]
+    pub inline_spec_lets: bool,
 }
 
 // add custom struct for mutation options
@@ -110,9 +114,10 @@ impl Default for ProverOptions {
             for_interpretation: false,
             skip_loop_analysis: false,
             inference: false,
-            inference_opaque: true,
+            no_inference_opaque: false,
             borrow_natives: vec![],
             verify_exclude: vec![],
+            inline_spec_lets: false,
         }
     }
 }

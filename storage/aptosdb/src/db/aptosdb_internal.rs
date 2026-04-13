@@ -226,6 +226,7 @@ impl AptosDB {
         db_dir: &StorageDirPaths,
         target_version: Version,
     ) -> Result<()> {
+        let delete_hot_state_on_restart = true;
         let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
             Self::open_dbs(
                 db_dir,
@@ -235,7 +236,7 @@ impl AptosDB {
                 false, // readonly
                 0,     // max_num_nodes_per_lru_cache_shard
                 HotStateConfig {
-                    delete_on_restart: true,
+                    delete_on_restart: delete_hot_state_on_restart,
                     persist_hotness_in_write_set: false,
                     ..HotStateConfig::default()
                 },
@@ -258,7 +259,10 @@ impl AptosDB {
             Arc::clone(&ledger_db),
             Arc::clone(&state_kv_db),
             Arc::clone(&state_merkle_db),
+            hot_state_kv_db.clone(),
+            hot_state_merkle_db.clone(),
             /*crash_if_difference_is_too_large=*/ false,
+            delete_hot_state_on_restart,
         );
 
         if let Some(state_merkle_db_version) =

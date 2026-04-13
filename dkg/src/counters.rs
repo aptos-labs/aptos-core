@@ -3,8 +3,9 @@
 
 use aptos_infallible::duration_since_epoch;
 use aptos_metrics_core::{
-    register_histogram, register_histogram_vec, register_int_gauge, register_int_gauge_vec,
-    Histogram, HistogramVec, IntGauge, IntGaugeVec,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, register_int_gauge_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use move_core_types::account_address::AccountAddress;
@@ -98,6 +99,23 @@ pub static CHUNKY_DKG_OBJECT_SIZE_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
             64.0, 256.0, 1024.0, 4096.0, 16384.0, 65536.0, 262144.0, 1048576.0, 4194304.0,
             10485760.0,
         ]
+    )
+    .unwrap()
+});
+
+pub static CHUNKY_DKG_TRANSCRIPT_FETCH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_chunky_dkg_transcript_fetch_total",
+        "Fetch outcomes for missing transcript fetcher",
+        &["status"]
+    )
+    .unwrap()
+});
+
+pub static CHUNKY_DKG_SIGNATURE_REQUEST_SKIPPED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_chunky_dkg_signature_request_skipped",
+        "Signature requests skipped because a handler is already in-flight for the same sender"
     )
     .unwrap()
 });

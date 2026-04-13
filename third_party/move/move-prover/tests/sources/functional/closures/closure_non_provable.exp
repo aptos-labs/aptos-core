@@ -1,19 +1,4 @@
 Move prover returns: exiting with verification errors
-error: post-condition does not hold
-   ┌─ tests/sources/functional/closures/closure_non_provable.move:13:9
-   │
-13 │         ensures old(S[@0x2]) == S[@0x2];
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/closures/closure_non_provable.move:5: exec
-   =         f = <redacted>
-   =         x = <redacted>
-   =     at tests/sources/functional/closures/closure_non_provable.move:6: exec
-   =         result = <redacted>
-   =     at tests/sources/functional/closures/closure_non_provable.move:7: exec
-   =     at tests/sources/functional/closures/closure_non_provable.move:10: exec (spec)
-   =     at tests/sources/functional/closures/closure_non_provable.move:13: exec (spec)
-
 error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/closures/closure_non_provable.move:8:5
    │

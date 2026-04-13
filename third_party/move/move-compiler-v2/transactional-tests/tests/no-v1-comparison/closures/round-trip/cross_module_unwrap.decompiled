@@ -10,7 +10,7 @@ module 0xc0ffee::m {
         p0(_v0)
     }
     public fun unwrap_maker(): |Wrapper|(u64) {
-        |arg0| lambda__1__unwrap_maker(arg0)
+        |x| lambda__1__unwrap_maker(x)
     }
     fun lambda__1__unwrap_maker(p0: Wrapper): u64 {
         let Wrapper{_0: _v0} = p0;

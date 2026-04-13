@@ -1760,6 +1760,7 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
             fun_param,
             params,
             targets,
+            all,
         } => EM::ModifiesOf {
             fun_param,
             params: params
@@ -1767,10 +1768,16 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
                 .map(|(v, t)| (v, type_(context, t)))
                 .collect(),
             targets: targets.into_iter().map(|e| exp_(context, e)).collect(),
+            all,
         },
-        PM::ReadsOf { fun_param, types } => EM::ReadsOf {
+        PM::ReadsOf {
+            fun_param,
+            types,
+            all,
+        } => EM::ReadsOf {
             fun_param,
             types: types.into_iter().map(|t| type_(context, t)).collect(),
+            all,
         },
         PM::Modifies { targets } => EM::Modifies {
             targets: targets.into_iter().map(|e| exp_(context, e)).collect(),
@@ -2604,7 +2611,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             } = unbound_names;
             EE::Spec(spec_id, unbound_vars, unbound_func_ptrs)
         },
-        PE::Behavior(kind, fn_name, type_args, sp!(args_loc, args)) => {
+        PE::Behavior(kind, target, sp!(args_loc, args)) => {
             if !context.in_spec_context {
                 context.env.add_diag(diag!(
                     Syntax::SpecContextRestricted,
@@ -2615,14 +2622,9 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 ));
                 EE::UnresolvedError
             } else {
-                let e_fn_name = name_access_chain(context, Access::Term, fn_name);
-                let e_type_args = optional_types(context, type_args);
+                let e_target = exp_(context, *target);
                 let e_args = sp(args_loc, exps(context, args));
-                if let Some(fn_access) = e_fn_name {
-                    EE::Behavior(kind, fn_access, e_type_args, e_args)
-                } else {
-                    EE::UnresolvedError
-                }
+                EE::Behavior(kind, Box::new(e_target), e_args)
             }
         },
         PE::StateLabeled(pre_label, inner, post_label) => {
@@ -3301,13 +3303,8 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
             unbound.vars.extend(unbound_vars);
             unbound.func_ptrs.extend(unbound_func_ptrs);
         },
-        EE::Behavior(_, fn_name, _type_args, sp!(_, args)) => {
-            match &fn_name.value {
-                E::ModuleAccess_::Name(n) => {
-                    unbound.func_ptrs.insert(*n);
-                },
-                E::ModuleAccess_::ModuleAccess(..) => (),
-            }
+        EE::Behavior(_, target, sp!(_, args)) => {
+            unbound_names_exp(unbound, target);
             unbound_names_exps(unbound, args);
         },
         EE::StateLabeled(_, inner, _) => {

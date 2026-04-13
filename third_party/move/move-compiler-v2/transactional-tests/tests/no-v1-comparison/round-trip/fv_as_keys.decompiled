@@ -7,7 +7,7 @@ module 0x99::test_struct {
         fv: |T0|(u64) has copy + drop + store,
     }
     public fun init(p0: &signer) {
-        let _v0 = Wrapper<||(u64) has drop + store>{fv: |arg0: ||(u64) has drop + store| test(arg0)};
+        let _v0 = Wrapper<||(u64) has drop + store>{fv: |x: ||(u64) has drop + store| test(x)};
         move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]
@@ -110,7 +110,7 @@ module 0x99::test_enum {
         }
     }
     public fun init(p0: &signer) {
-        let _v0 = Wrapper::V1<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};
+        let _v0 = Wrapper::V1<||(u64) has drop + store>{fv1: |x: ||(u64) has drop + store| test(x)};
         move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]
@@ -119,7 +119,7 @@ module 0x99::test_enum {
         2
     }
     public fun bad_init(p0: &signer) {
-        let _v0 = Wrapper::V2<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};
+        let _v0 = Wrapper::V2<||(u64) has drop + store>{fv1: |x: ||(u64) has drop + store| test(x)};
         move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]

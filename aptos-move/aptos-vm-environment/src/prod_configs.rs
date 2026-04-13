@@ -5,6 +5,7 @@ pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
     gas_feature_versions::{
         RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
+        RELEASE_V1_45,
     },
     AptosGasParameters,
 };
@@ -296,6 +297,7 @@ pub fn aptos_prod_vm_config(
         enable_struct_layout_local_cache: gas_feature_version >= RELEASE_V1_41,
         check_depth_on_type_counts: gas_feature_version >= RELEASE_V1_41,
         enable_public_struct_args: features.is_enabled(FeatureFlag::PUBLIC_STRUCT_ENUM_ARGS),
+        include_closure_mask_in_cmp: gas_feature_version >= RELEASE_V1_45,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

@@ -12,8 +12,8 @@ use move_model::{
     ast,
     ast::{Condition, ConditionKind, ExpData},
     model::{
-        FunId, GlobalEnv, ModuleId, Parameter, QualifiedId, QualifiedInstId, SpecFunId, SpecVarId,
-        StructEnv, StructId,
+        FieldEnv, FunId, GlobalEnv, ModuleId, Parameter, QualifiedId, QualifiedInstId, SpecFunId,
+        SpecVarId, StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
@@ -56,6 +56,28 @@ pub struct MonoInfo {
     /// A map from function types to function-typed parameters of verification target functions.
     /// This enables the Boogie backend to generate parameter variants in the function type datatype.
     pub fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
+    /// A map from function types to struct fields containing storable function values.
+    /// This enables the Boogie backend to generate struct field variants in the function type
+    /// datatype with uninterpreted behavioral predicates.
+    pub fun_struct_field_infos: BTreeMap<Type, BTreeSet<StructFieldInfo>>,
+}
+
+impl MonoInfo {
+    /// Returns the set of all resource (key-ability) struct instantiations.
+    /// This is the set of memory types that the Boogie backend will translate,
+    /// and the correct scope for wildcard `reads_of<f> *` / `modifies_of<f> *`.
+    pub fn all_memory_qids(&self, env: &GlobalEnv) -> BTreeSet<QualifiedInstId<StructId>> {
+        let mut result = BTreeSet::new();
+        for (sid, insts) in &self.structs {
+            let struct_env = env.get_struct(*sid);
+            if struct_env.has_memory() {
+                for inst in insts {
+                    result.insert(sid.instantiate(inst.clone()));
+                }
+            }
+        }
+        result
+    }
 }
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -75,6 +97,17 @@ pub struct FunParamInfo {
     pub fun: QualifiedInstId<FunId>,
     /// The parameter name/symbol.
     pub param_sym: Symbol,
+}
+
+/// Information about a struct field that has a storable function type.
+/// This is used to track function-valued fields in structs so the Boogie backend
+/// can generate appropriate datatype variants with uninterpreted behavioral predicates.
+#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub struct StructFieldInfo {
+    /// The instantiated struct containing this function-typed field.
+    pub struct_id: QualifiedInstId<StructId>,
+    /// The field name.
+    pub field_sym: Symbol,
 }
 
 /// Get the information computed by this analysis.
@@ -717,13 +750,44 @@ impl Analyzer<'_> {
             if struct_.has_variants() {
                 for variant in struct_.get_variants() {
                     for field in struct_.get_fields_of_variant(variant) {
-                        self.add_type(&field.get_type().instantiate(targs));
+                        let field_ty = field.get_type().instantiate(targs);
+                        self.add_type(&field_ty);
+                        self.check_struct_fun_field(&struct_, &field, &field_ty, targs);
                     }
                 }
             } else {
                 for field in struct_.get_fields() {
-                    self.add_type(&field.get_type().instantiate(targs));
+                    let field_ty = field.get_type().instantiate(targs);
+                    self.add_type(&field_ty);
+                    self.check_struct_fun_field(&struct_, &field, &field_ty, targs);
                 }
+            }
+        }
+    }
+
+    /// Check if a struct field has a storable function type and register it in
+    /// `fun_struct_field_infos` if so.
+    fn check_struct_fun_field(
+        &mut self,
+        struct_env: &StructEnv<'_>,
+        field: &FieldEnv<'_>,
+        field_ty: &Type,
+        targs: &[Type],
+    ) {
+        if let Type::Fun(_, _, abilities) = field_ty {
+            if abilities.has_store() {
+                let normalized = self.normalize_fun_ty(field_ty.clone());
+                let info = StructFieldInfo {
+                    struct_id: struct_env.get_qualified_id().instantiate(targs.to_vec()),
+                    field_sym: field.get_name(),
+                };
+                self.info
+                    .fun_struct_field_infos
+                    .entry(normalized.clone())
+                    .or_default()
+                    .insert(info);
+                // Ensure the function type is also registered in fun_infos
+                self.info.fun_infos.entry(normalized).or_default();
             }
         }
     }

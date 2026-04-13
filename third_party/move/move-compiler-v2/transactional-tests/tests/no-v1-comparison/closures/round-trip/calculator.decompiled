@@ -46,13 +46,13 @@ module 0x66::calculator {
                     };
                     let State::Value{_0: _v7} = _v2;
                     let Input::Sub{} = p1;
-                    let _v8 = State::Continuation{_0: |arg0| storable_sub(_v7, arg0)};
+                    let _v8 = State::Continuation{_0: |x| storable_sub(_v7, x)};
                     move_to<State>(p0, _v8);
                     return ()
                 };
                 let State::Value{_0: _v9} = _v2;
                 let Input::Add{} = p1;
-                let _v10 = State::Continuation{_0: |arg0| storable_add(_v9, arg0)};
+                let _v10 = State::Continuation{_0: |x| storable_add(_v9, x)};
                 move_to<State>(p0, _v10);
                 return ()
             };

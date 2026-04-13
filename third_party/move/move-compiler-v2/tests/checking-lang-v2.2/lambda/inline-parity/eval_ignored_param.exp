@@ -69,7 +69,7 @@ module 0x42::Test {
         r1 + r2 + 3 * x + 5 * y + 7 * z
     }
     public fun test() {
-        let r = foo(|arg0,arg1,arg2| lambda__1__test(arg0, arg1, arg2), |arg0,arg1,arg2| lambda__2__test(arg0, arg1, arg2), 1, 10, 100, 1000);
+        let r = foo(|x,y,z| lambda__1__test(x, y, z), |x,y,z| lambda__2__test(x, y, z), 1, 10, 100, 1000);
         if (r == 9637) () else abort r;
     }
     fun lambda__1__test(x: u64, param_1: u64, z: u64): u64 {

@@ -678,6 +678,115 @@ fn compute_behavioral_predicate_memory(env: &mut GlobalEnv) {
         }
         env.set_function_spec_memory(fun_id, spec_used, spec_old, spec_uses_old);
     }
+
+    // Process struct field access declarations
+    let struct_ids: Vec<QualifiedId<StructId>> = env
+        .get_modules()
+        .flat_map(|m| m.get_structs().map(|s| s.get_qualified_id()).collect_vec())
+        .collect_vec();
+    for struct_id in struct_ids {
+        let field_updates: Vec<_> = {
+            let struct_env = env.get_struct(struct_id);
+            struct_env
+                .get_field_access_of()
+                .iter()
+                .enumerate()
+                .map(|(i, access)| {
+                    let (used, old) = derive_memory_from_access_of(env, access);
+                    (i, used, old)
+                })
+                .collect()
+        };
+        for (i, used, old) in field_updates {
+            env.set_struct_field_access_of_memory(struct_id, i, used, old);
+        }
+    }
+}
+
+/// Validates that a single function-typed expression complies with a field's access declaration.
+fn validate_field_access(
+    env: &GlobalEnv,
+    loc: &Loc,
+    field_name: Symbol,
+    field_access: &[FunParamAccessOf],
+    arg: &Exp,
+    caller_spec_used: &BTreeSet<QualifiedInstId<StructId>>,
+    caller_spec_old: &BTreeSet<QualifiedInstId<StructId>>,
+    caller_param_access: &[FunParamAccessOf],
+    caller_params: &[Parameter],
+) {
+    let empty_access;
+    let access = match field_access.iter().find(|a| a.fun_param == field_name) {
+        Some(a) => a,
+        None => {
+            // No declaration = pure: field function can't access memory
+            empty_access = FunParamAccessOf {
+                loc: Loc::default(),
+                fun_param: field_name,
+                modifies_params: vec![],
+                frame_spec: FrameSpec::default(),
+                used_memory: BTreeSet::new(),
+                old_memory: BTreeSet::new(),
+            };
+            &empty_access
+        },
+    };
+    // modifies_all subsumes everything (read + write)
+    if access.frame_spec.modifies_all {
+        return;
+    }
+    let (arg_used, arg_old) = compute_arg_memory(
+        env,
+        arg,
+        caller_spec_used,
+        caller_spec_old,
+        caller_param_access,
+        caller_params,
+    );
+    // reads_all subsumes only read checks
+    if !access.frame_spec.reads_all {
+        for mem in &arg_used {
+            if !access.used_memory.contains(mem) {
+                env.error(
+                    loc,
+                    &format!(
+                        "stored function accesses resource `{}` \
+                         which is not declared in `modifies_of`/`reads_of` \
+                         for field `{}`",
+                        env.display(mem),
+                        field_name.display(env.symbol_pool())
+                    ),
+                );
+            }
+        }
+    }
+    for mem in &arg_old {
+        if !access.old_memory.contains(mem) {
+            if access.used_memory.contains(mem) || access.frame_spec.reads_all {
+                env.error(
+                    loc,
+                    &format!(
+                        "stored function writes resource `{}` \
+                         but only `reads_of` (not `modifies_of`) is \
+                         declared for field `{}`",
+                        env.display(mem),
+                        field_name.display(env.symbol_pool())
+                    ),
+                );
+            } else {
+                env.error(
+                    loc,
+                    &format!(
+                        "stored function accesses resource `{}` \
+                         which is not declared in \
+                         `modifies_of`/`reads_of` for field `{}`",
+                        env.display(mem),
+                        field_name.display(env.symbol_pool())
+                    ),
+                );
+            }
+        }
+    }
 }
 
 /// Validates that closures passed to functions with `modifies_of`/`reads_of` declarations
@@ -713,6 +822,72 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
         };
 
         body.visit_post_order(&mut |exp| {
+            // Check struct pack operations: when a closure is stored into a struct
+            // field with reads_of/modifies_of declarations, validate compliance.
+            if let ExpData::Call(call_id, Operation::Pack(mid, sid, variant), args) = exp {
+                let struct_qid = mid.qualified(*sid);
+                let field_access = {
+                    let struct_env = env.get_struct(struct_qid);
+                    struct_env.get_field_access_of().to_vec()
+                };
+                if !field_access.is_empty() {
+                    let struct_env = env.get_struct(struct_qid);
+                    let fields: Vec<_> =
+                        struct_env.get_fields_optional_variant(*variant).collect();
+                    let loc = env.get_node_loc(*call_id);
+                    for (arg_idx, arg) in args.iter().enumerate() {
+                        if arg_idx >= fields.len() {
+                            continue;
+                        }
+                        let field = &fields[arg_idx];
+                        if !field.get_type().is_function() {
+                            continue;
+                        }
+                        validate_field_access(
+                            env,
+                            &loc,
+                            field.get_name(),
+                            &field_access,
+                            arg,
+                            &caller_spec_used,
+                            &caller_spec_old,
+                            &caller_param_access,
+                            &caller_params,
+                        );
+                    }
+                }
+            }
+            // Check field mutation: when a function-valued field is overwritten,
+            // validate that the new value complies with the field's access declarations.
+            if let ExpData::Mutate(mutate_id, lhs, rhs) = exp {
+                let (mid, sid, fid) = match lhs.as_ref() {
+                    ExpData::Call(_, Operation::Select(mid, sid, fid), _) => {
+                        (mid, sid, fid)
+                    },
+                    _ => return true,
+                };
+                let struct_qid = mid.qualified(*sid);
+                let (field_access, field_name, is_fn) = {
+                    let struct_env = env.get_struct(struct_qid);
+                    let access = struct_env.get_field_access_of().to_vec();
+                    let field = struct_env.get_field(*fid);
+                    (access, field.get_name(), field.get_type().is_function())
+                };
+                if is_fn {
+                    let loc = env.get_node_loc(*mutate_id);
+                    validate_field_access(
+                        env,
+                        &loc,
+                        field_name,
+                        &field_access,
+                        rhs,
+                        &caller_spec_used,
+                        &caller_spec_old,
+                        &caller_param_access,
+                        &caller_params,
+                    );
+                }
+            }
             if let ExpData::Call(call_id, Operation::MoveFunction(mid, fid), args) = exp {
                 let callee_id = mid.qualified(*fid);
                 let (callee_param_access, callee_params) = {
@@ -759,6 +934,11 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
                         },
                     };
 
+                    // modifies_all subsumes everything (read + write)
+                    if access.frame_spec.modifies_all {
+                        continue;
+                    }
+
                     // Compute the argument's memory footprint
                     let (arg_used, arg_old) = compute_arg_memory(
                         env,
@@ -769,19 +949,21 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
                         &caller_params,
                     );
 
-                    // Check arg_used ⊆ access.used_memory
-                    for mem in &arg_used {
-                        if !access.used_memory.contains(mem) {
-                            let call_loc = env.get_node_loc(*call_id);
-                            env.error(
-                                &call_loc,
-                                &format!(
-                                    "function argument accesses resource `{}` \
-                                     which is not declared in `modifies_of`/`reads_of` for `{}`",
-                                    env.display(mem),
-                                    param_name.display(env.symbol_pool())
-                                ),
-                            );
+                    // Check arg_used ⊆ access.used_memory (reads_all subsumes this)
+                    if !access.frame_spec.reads_all {
+                        for mem in &arg_used {
+                            if !access.used_memory.contains(mem) {
+                                let call_loc = env.get_node_loc(*call_id);
+                                env.error(
+                                    &call_loc,
+                                    &format!(
+                                        "function argument accesses resource `{}` \
+                                         which is not declared in `modifies_of`/`reads_of` for `{}`",
+                                        env.display(mem),
+                                        param_name.display(env.symbol_pool())
+                                    ),
+                                );
+                            }
                         }
                     }
 
@@ -789,7 +971,9 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
                     for mem in &arg_old {
                         if !access.old_memory.contains(mem) {
                             let call_loc = env.get_node_loc(*call_id);
-                            if access.used_memory.contains(mem) {
+                            if access.used_memory.contains(mem)
+                                || access.frame_spec.reads_all
+                            {
                                 env.error(
                                     &call_loc,
                                     &format!(

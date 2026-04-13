@@ -3,7 +3,9 @@
 
 use crate::{
     chunky::{
-        types::{AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest},
+        types::{
+            AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest, ChunkyTranscriptWithHash,
+        },
         validation::validate_chunky_transcript,
     },
     counters,
@@ -14,7 +16,7 @@ use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_crypto::HashValue;
 use aptos_dkg::pvss::{
-    traits::transcript::{Aggregatable, Aggregated, HasAggregatableSubtranscript},
+    traits::transcript::{Aggregatable, Aggregated},
     Player,
 };
 use aptos_infallible::RwLock;
@@ -24,7 +26,7 @@ use aptos_types::{
     dkg::{
         chunky_dkg::{
             AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGTranscript, ChunkySubtranscript,
-            ChunkyTranscript, DealerPublicKey,
+            DealerPublicKey,
         },
         DKGTranscriptMetadata,
     },
@@ -52,7 +54,7 @@ pub fn start_subtranscript_aggregation(
     spks: Vec<DealerPublicKey>,
     start_time: Duration,
     agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
-    received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
 ) -> AbortHandle {
     let epoch = dkg_config.session_metadata.dealer_epoch;
     let req = ChunkyDKGTranscriptRequest::new(epoch);
@@ -112,7 +114,7 @@ pub struct ChunkyTranscriptAggregationState {
     dkg_config: Arc<ChunkyDKGSession>,
     signing_pubkeys: Vec<DealerPublicKey>,
     start_time: Duration,
-    received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
     inner_state: RwLock<InnerState>,
 }
 
@@ -124,7 +126,7 @@ impl ChunkyTranscriptAggregationState {
         signing_pubkeys: Vec<DealerPublicKey>,
         start_time: Duration,
         agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
-        received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
+        received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
     ) -> Self {
         Self {
             epoch_state,
@@ -143,7 +145,7 @@ impl ChunkyTranscriptAggregationState {
         sender: Author,
         metadata: &DKGTranscriptMetadata,
         transcript_bytes: &[u8],
-    ) -> anyhow::Result<(ChunkyTranscript, u64)> {
+    ) -> anyhow::Result<(ChunkyTranscriptWithHash, u64)> {
         // Validate metadata (epoch, author, voting power) — specific to the aggregation context.
         ensure!(
             metadata.epoch == self.dkg_config.session_metadata.dealer_epoch,
@@ -221,11 +223,14 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             );
         }
 
-        // Store the transcript (Arc-wrapped for cheap clone-out by RPC handlers)
-        let transcript = Arc::new(transcript);
+        // Store the transcript before aggregation so that `received_transcripts` and
+        // `contributors` stay consistent even if `aggregate_with` fails via `?`.
+        // The quorum path below reads `received_transcripts` and expects every contributor
+        // to have a stored transcript.
+        let subtranscript = transcript.get_subtranscript();
         {
             let mut received_transcripts = self.received_transcripts.write();
-            received_transcripts.insert(metadata.author, Arc::clone(&transcript));
+            received_transcripts.insert(metadata.author, transcript);
         }
 
         // Aggregate the transcript (projective accumulator; normalize when quorum is met)
@@ -233,13 +238,10 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
         inner_state.contributors.insert(metadata.author);
         if let Some(agg_subtrx) = inner_state.subtrx.as_mut() {
             agg_subtrx
-                .aggregate_with(
-                    &self.dkg_config.threshold_config,
-                    &transcript.get_subtranscript(),
-                )
+                .aggregate_with(&self.dkg_config.threshold_config, &subtranscript)
                 .context("chunky transcript aggregation failed")?;
         } else {
-            inner_state.subtrx = Some(transcript.get_subtranscript().to_aggregated());
+            inner_state.subtrx = Some(subtranscript.to_aggregated());
         }
 
         // Check quorum and send if needed
@@ -284,12 +286,10 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                     contributors
                         .iter()
                         .map(|addr| {
-                            let transcript = received
+                            let twh = received
                                 .get(addr)
                                 .expect("contributor must have a stored transcript");
-                            let bytes = bcs::to_bytes(transcript.as_ref())
-                                .expect("transcript re-serialization should not fail");
-                            HashValue::sha3_256_of(&bytes)
+                            twh.hash()
                         })
                         .collect()
                 };
@@ -369,9 +369,10 @@ mod tests {
             setup.spks(),
             duration_since_epoch(),
             Some(tx),
-            Arc::new(RwLock::new(
-                HashMap::<AccountAddress, Arc<ChunkyTranscript>>::new(),
-            )),
+            Arc::new(RwLock::new(HashMap::<
+                AccountAddress,
+                ChunkyTranscriptWithHash,
+            >::new())),
         ));
         (state, rx)
     }

@@ -29,7 +29,7 @@ module 0xcafe::m {
         f(s, x)
     }
     fun pattern(s: S<u64>, x: u64): u64 {
-        consume<u64>(s, x, |arg0,arg1| lambda__1__pattern(arg0, arg1))
+        consume<u64>(s, x, |x,y| lambda__1__pattern(x, y))
     }
     fun lambda__1__pattern(param_0: S<u64>, _y: u64): u64 {
         let S<u64>{x: x} = param_0;

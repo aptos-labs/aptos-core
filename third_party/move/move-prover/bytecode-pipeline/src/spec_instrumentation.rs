@@ -9,9 +9,9 @@ use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
 use move_model::{
     ast,
-    ast::{Exp, ExpData, MemoryLabel, QuantKind, TempIndex, Value},
+    ast::{Exp, ExpData, MemoryLabel, QuantKind, RewriteResult, TempIndex, Value},
     exp_generator::ExpGenerator,
-    exp_rewriter::ExpRewriterFunctions,
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     memory_labels::all_labels_in_exp,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
@@ -470,7 +470,13 @@ impl<'a> Instrumenter<'a> {
             split_points: vec![],
             freshen_counter: 0,
         };
-        instrumenter.instrument(&spec, &inlined_props);
+        if ProverOptions::get(instrumenter.builder.global_env()).inline_spec_lets {
+            let mut spec = spec;
+            instrumenter.inline_lets(&mut spec, false);
+            instrumenter.instrument(&spec, &inlined_props);
+        } else {
+            instrumenter.instrument(&spec, &inlined_props);
+        }
 
         // Extract split points before consuming the instrumenter.
         let split_points = std::mem::take(&mut instrumenter.split_points);
@@ -734,6 +740,10 @@ impl<'a> Instrumenter<'a> {
 
         self.builder.set_loc_from_attr(id);
 
+        if ProverOptions::get(self.builder.global_env()).inline_spec_lets {
+            self.inline_lets(&mut callee_spec, true);
+        }
+
         // Emit `let` assignments.
         self.emit_lets(&callee_spec, false);
         self.builder.set_loc_from_attr(id);
@@ -810,6 +820,39 @@ impl<'a> Instrumenter<'a> {
             // to in aborts conditions, and must be initialized before evaluating those.
             self.emit_save_for_old(&callee_spec.saved_params);
 
+            // Emit memory and spec var saves BEFORE label defines. The label-defining
+            // ensures conditions reference these saved labels (e.g., global[@0] maps to
+            // a SaveMem'd memory). They must be initialized before the label defines
+            // and abort condition evaluation — on BOTH the abort and success paths.
+            for (mem, label) in std::mem::take(&mut callee_spec.saved_memory) {
+                self.builder.emit_with(|id| SaveMem(id, label, mem));
+            }
+            for (var, label) in std::mem::take(&mut callee_spec.saved_spec_vars) {
+                self.builder.emit_with(|id| SaveSpecVar(id, label, var));
+            }
+
+            // Emit state label defining conditions BEFORE the abort condition.
+            // This constrains abstract memory labels that may be referenced by
+            // aborts_if conditions. Uses abort_path=true to emit only the
+            // defining fragment (label-defining conjuncts), not full postcondition
+            // properties that reference post-havoc state.
+            let defining_indices = self.emit_state_label_assumes(&callee_spec, true);
+            // Remove defining conditions from post so they aren't double-emitted
+            // later when assumes for ensures are emitted on the non-abort path.
+            if !defining_indices.is_empty() {
+                let post_count = callee_spec.post.len();
+                callee_spec.post = callee_spec
+                    .post
+                    .drain(..)
+                    .enumerate()
+                    .filter(|(i, _)| !defining_indices.contains(i))
+                    .map(|(_, v)| v)
+                    .collect();
+                // Adjust aborts indices (they start after post in the combined list)
+                // No adjustment needed — aborts are separate from post in callee_spec
+                let _ = post_count; // suppress unused warning
+            }
+
             let callee_aborts_if_is_partial =
                 callee_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false);
 
@@ -837,13 +880,8 @@ impl<'a> Instrumenter<'a> {
                 self.can_abort = true;
             }
 
-            // Emit memory state saves
-            for (mem, label) in std::mem::take(&mut callee_spec.saved_memory) {
-                self.builder.emit_with(|id| SaveMem(id, label, mem));
-            }
-            for (var, label) in std::mem::take(&mut callee_spec.saved_spec_vars) {
-                self.builder.emit_with(|id| SaveSpecVar(id, label, var));
-            }
+            // Note: saved_memory and saved_spec_vars were already emitted above,
+            // before the label defines and abort condition evaluation.
 
             // Emit modifies properties which havoc memory at the modified location.
             for (_, exp) in std::mem::take(&mut callee_spec.modifies) {
@@ -1059,6 +1097,202 @@ impl<'a> Instrumenter<'a> {
             self.builder
                 .emit_with(|id| Prop(id, PropKind::Assume, assign));
         }
+    }
+
+    /// Inline let bindings by substituting the expression directly into conditions.
+    /// For `LetPre` expressions in post-state conditions, annotates memory references
+    /// with pre-state labels to preserve pre-state evaluation semantics.
+    /// Clears `spec.lets` so subsequent `emit_lets` calls are no-ops.
+    fn inline_lets(&mut self, spec: &mut TranslatedSpec, for_call: bool) {
+        let env = self.builder.global_env();
+        let mut lets = std::mem::take(&mut spec.lets);
+
+        let substitute_exp =
+            |env: &GlobalEnv, cond: &mut Exp, temp: TempIndex, replacement: &Exp| {
+                let replacement = replacement.clone();
+                let mut replacer =
+                    |_id: move_model::model::NodeId, target: RewriteTarget| -> Option<Exp> {
+                        if let RewriteTarget::Temporary(idx) = target {
+                            if idx == temp {
+                                return Some(replacement.clone());
+                            }
+                        }
+                        None
+                    };
+                *cond = ExpRewriter::new(env, &mut replacer).rewrite_exp(cond.clone());
+            };
+
+        for i in 0..lets.len() {
+            let (_, is_post, temp, ref exp) = lets[i];
+            let exp = exp.clone();
+
+            // Skip choice expressions — they need the Identical temp for
+            // the witness wellformedness assertion.
+            if matches!(exp.as_ref(), ExpData::Quant(_, kind, ..) if kind.is_choice()) {
+                spec.lets.push(lets[i].clone());
+                continue;
+            }
+
+            // For LetPre substituted into post-state conditions:
+            // 1. Annotate memory references with pre-state labels
+            // 2. Remap param temporaries to saved (pre-state) versions
+            let post_state_replacement = if !is_post {
+                let annotated =
+                    Self::annotate_pre_state_memory(env, exp.clone(), &mut spec.saved_memory);
+                self.remap_params_to_saved(annotated, &mut spec.saved_params)
+            } else {
+                exp.clone()
+            };
+            let pre_state_replacement = exp;
+
+            // Substitute into subsequent let expressions (for chained lets like
+            // `let x = a + 1; let y = x + b;`). When a LetPre is referenced by
+            // a subsequent LetPost, use post_state_replacement (with saved params)
+            // since the LetPost will be used in post-state context.
+            for subsequent_let in lets.iter_mut().skip(i + 1) {
+                let subsequent_is_post = subsequent_let.1;
+                let replacement = if subsequent_is_post && !is_post {
+                    &post_state_replacement
+                } else {
+                    &pre_state_replacement
+                };
+                substitute_exp(env, &mut subsequent_let.3, temp, replacement);
+            }
+
+            // Pre-state conditions: requires (always pre-state)
+            for (_, cond) in &mut spec.pre {
+                substitute_exp(env, cond, temp, &pre_state_replacement);
+            }
+            // Aborts_if: pre-state when translated for a call, post-state for a definition
+            let aborts_replacement = if for_call {
+                &pre_state_replacement
+            } else {
+                &post_state_replacement
+            };
+            for (_, cond, code_opt) in &mut spec.aborts {
+                substitute_exp(env, cond, temp, aborts_replacement);
+                if let Some(code) = code_opt {
+                    substitute_exp(env, code, temp, aborts_replacement);
+                }
+            }
+
+            // Post-state conditions: ensures
+            for (_, cond) in &mut spec.post {
+                substitute_exp(env, cond, temp, &post_state_replacement);
+            }
+
+            // Other conditions
+            for (_, cond) in &mut spec.modifies {
+                substitute_exp(env, cond, temp, &pre_state_replacement);
+            }
+            for (_, lhs, rhs) in &mut spec.updates {
+                substitute_exp(env, lhs, temp, &post_state_replacement);
+                substitute_exp(env, rhs, temp, &post_state_replacement);
+            }
+            for (_, cond, msg, flag_opt) in &mut spec.emits {
+                substitute_exp(env, cond, temp, &post_state_replacement);
+                substitute_exp(env, msg, temp, &post_state_replacement);
+                if let Some(flag) = flag_opt {
+                    substitute_exp(env, flag, temp, &post_state_replacement);
+                }
+            }
+
+            // Proof block actions
+            let substitute_proof_action =
+                |env: &GlobalEnv, action: &mut ProofAction, temp, replacement: &Exp| match action {
+                    ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => {
+                        substitute_exp(env, exp, temp, replacement);
+                    },
+                    ProofAction::Split(exp, guard) => {
+                        substitute_exp(env, exp, temp, replacement);
+                        if let Some(g) = guard {
+                            substitute_exp(env, g, temp, replacement);
+                        }
+                    },
+                };
+            for (_, action) in &mut spec.pre_proof {
+                substitute_proof_action(env, action, temp, &pre_state_replacement);
+            }
+            for (_, action) in &mut spec.post_proof {
+                substitute_proof_action(env, action, temp, &post_state_replacement);
+            }
+        }
+    }
+
+    /// Annotate an expression's unlabeled memory references (`Global(None)`, `Exists(None)`)
+    /// with a pre-state memory label. This is used when a LetPre expression (translated in
+    /// pre-state context) is substituted into a post-state condition (ensures), so that
+    /// memory accesses still evaluate against entry-state. For pure expressions without
+    /// memory references, this is a no-op.
+    fn annotate_pre_state_memory(
+        env: &GlobalEnv,
+        exp: Exp,
+        saved_memory: &mut BTreeMap<QualifiedInstId<StructId>, MemoryLabel>,
+    ) -> Exp {
+        use ast::Operation as AstOp;
+        ExpData::rewrite(exp, &mut |e| match e.as_ref() {
+            ExpData::Call(id, AstOp::Global(None), args) => {
+                let mem = env.get_node_instantiation(*id);
+                if let Some(rty) = mem.first() {
+                    let (mid, sid, inst) = rty.require_struct();
+                    let l = *saved_memory
+                        .entry(mid.qualified_inst(sid, inst.to_owned()))
+                        .or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()));
+                    RewriteResult::Rewritten(
+                        ExpData::Call(*id, AstOp::Global(Some(l)), args.clone()).into_exp(),
+                    )
+                } else {
+                    RewriteResult::Unchanged(e)
+                }
+            },
+            ExpData::Call(id, AstOp::Exists(None), args) => {
+                let mem = env.get_node_instantiation(*id);
+                if let Some(rty) = mem.first() {
+                    let (mid, sid, inst) = rty.require_struct();
+                    let l = *saved_memory
+                        .entry(mid.qualified_inst(sid, inst.to_owned()))
+                        .or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()));
+                    RewriteResult::Rewritten(
+                        ExpData::Call(*id, AstOp::Exists(Some(l)), args.clone()).into_exp(),
+                    )
+                } else {
+                    RewriteResult::Unchanged(e)
+                }
+            },
+            _ => RewriteResult::Unchanged(e),
+        })
+    }
+
+    /// Remap function parameter temporaries in an expression to their saved (pre-state)
+    /// versions. This is needed when a LetPre expression (translated in pre-state context
+    /// where params have their original values) is substituted into post-state conditions
+    /// (ensures), where the original param temps may have been modified by the function body.
+    /// Creates new saved_params entries for any params not yet saved.
+    fn remap_params_to_saved(
+        &mut self,
+        exp: Exp,
+        saved_params: &mut BTreeMap<TempIndex, TempIndex>,
+    ) -> Exp {
+        let param_count = self.builder.fun_env.get_parameter_count();
+        let env = self.builder.global_env();
+        ExpData::rewrite(exp, &mut |e| {
+            if let ExpData::Temporary(id, idx) = e.as_ref() {
+                if *idx < param_count {
+                    let saved = *saved_params.entry(*idx).or_insert_with(|| {
+                        self.builder
+                            .new_temp(self.builder.get_local_type(*idx).skip_reference().clone())
+                    });
+                    if saved != *idx {
+                        let new_id =
+                            env.new_node(env.get_node_loc(*id), self.builder.get_local_type(saved));
+                        return RewriteResult::Rewritten(
+                            ExpData::Temporary(new_id, saved).into_exp(),
+                        );
+                    }
+                }
+            }
+            RewriteResult::Unchanged(e)
+        })
     }
 
     /// Emit well-formedness assertions for choice expressions in let bindings.
@@ -1459,27 +1693,10 @@ impl<'a> Instrumenter<'a> {
             }
         }
 
-        // Validate: multiple unconditional (strict) definitions of the same label
-        // are always wrong. Multiple conditional definitions are legitimate
-        // (path-conditional mutations from different CFG branches).
-        for (label, definers) in &label_definers {
-            if definers.len() > 1 {
-                let all_strict = definers.iter().all(|&idx| {
-                    all_conditions[idx]
-                        .as_ref()
-                        .strictly_defined_labels()
-                        .contains(label)
-                });
-                if all_strict {
-                    let env = self.builder.global_env();
-                    env.error(
-                        &self.builder.fun_env.get_spec_loc(),
-                        "state label has multiple unconditional defining conditions \
-                             (combine with &&)",
-                    );
-                }
-            }
-        }
+        // Multiple conditions may define the same label (e.g., the same
+        // result_of chain appearing in both ensures and aborts_if).
+        // The topological sort handles this by emitting only the first
+        // definer and tracking it via defining_indices.
 
         // Topological sort: emit definitions in dependency order.
         // Each label may have multiple defining conditions (conditional mutations).
@@ -1498,13 +1715,18 @@ impl<'a> Instrumenter<'a> {
                 .collect();
             for (label, indices) in snapshot {
                 // Check all labels USED by ALL defining conditions are already defined.
+                // Labels co-defined by the same condition (nested chain like
+                // result_of<f>(result_of<g>(...))) are inherently ordered within
+                // the expression tree, so they don't block each other.
                 let all_deps_met = indices.iter().all(|&idx| {
                     let deps = Self::all_labels(all_conditions[idx]);
+                    let co_defined = Self::defined_labels(all_conditions[idx]);
                     deps.iter().all(|dep| {
                         *dep == label
                             || saved_labels.contains(dep)
                             || emitted_labels.contains(dep)
                             || !label_definers.contains_key(dep)
+                            || co_defined.contains(dep)
                     })
                 });
                 if all_deps_met {
