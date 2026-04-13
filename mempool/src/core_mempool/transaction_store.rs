@@ -151,6 +151,16 @@ impl TransactionStore {
             .and_then(|txns| txns.get(&replay_protector))
     }
 
+    /// Fetch committed hash without cloning the full transaction.
+    pub(crate) fn get_committed_hash(
+        &self,
+        address: &AccountAddress,
+        replay_protector: ReplayProtector,
+    ) -> Option<HashValue> {
+        self.get_mempool_txn(address, replay_protector)
+            .map(|txn| txn.txn.committed_hash())
+    }
+
     /// Fetch transaction by account address + replay_protector.
     pub(crate) fn get(
         &self,
