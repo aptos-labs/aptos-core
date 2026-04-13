@@ -9,9 +9,7 @@ use crate::{
     shared::{algebra::fk_algorithm::FKDomain, ids::UncomputedCoeffs},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::arkworks::serialization::{
-    ark_de, ark_de_uncompressed_no_validate, ark_se, ark_se_uncompressed,
-};
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ark_std::{
     rand::{CryptoRng, RngCore},

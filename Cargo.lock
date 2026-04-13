@@ -300,6 +300,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-backup-cli",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-build-info",
  "aptos-cached-packages",

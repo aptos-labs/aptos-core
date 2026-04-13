@@ -35,9 +35,11 @@ pub fn run_pvss(
 ) {
     let mut aptos_rng = rand::thread_rng();
 
+    let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
+
     let num_chunks =
         num_chunks_per_scalar::<Fr>(aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT);
-    let max_num_chunks_padded = (8 * num_chunks + 1).next_power_of_two() - 1;
+    let max_num_chunks_padded = (tc.get_total_weight() * num_chunks + 1).next_power_of_two() - 1;
 
     let trapdoor = univariate_hiding_kzg::Trapdoor::rand(&mut aptos_rng);
     let hkzg_setup = univariate_hiding_kzg::setup_with_trapdoor(
@@ -50,7 +52,7 @@ pub fn run_pvss(
         trapdoor,
     );
 
-    run_pvss_with_hkzg(dk, (hkzg_setup.1, hkzg_setup.0))
+    run_pvss_with_hkzg(dk, (hkzg_setup.1, hkzg_setup.0), &tc)
 }
 
 pub fn run_pvss_with_hkzg(
@@ -59,6 +61,7 @@ pub fn run_pvss_with_hkzg(
         univariate_hiding_kzg::CommitmentKey<Pairing>,
         univariate_hiding_kzg::VerificationKey<Pairing>,
     ),
+    tc: &WeightedConfigArkworks<Fr>,
 ) -> (
     chunky::PublicParameters<Pairing>,
     WeightedConfigArkworks<Fr>,
@@ -68,7 +71,6 @@ pub fn run_pvss_with_hkzg(
 ) {
     let mut rng_aptos = rand::thread_rng();
 
-    let tc = WeightedConfigArkworks::new(256, vec![2; 128]).unwrap();
     let pp = <T as TranscriptCore>::PublicParameters::new(
         tc.get_total_weight(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
@@ -134,7 +136,7 @@ pub fn run_pvss_with_hkzg(
         })
         .collect();
 
-    (pp, tc, ek, vks, msk_shares)
+    (pp, tc.clone(), ek, vks, msk_shares)
 }
 
 #[test]
