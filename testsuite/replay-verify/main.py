@@ -591,19 +591,33 @@ class ReplayScheduler:
         return any(w is not None for w in self.current_workers)
 
     def schedule(self, from_scratch: bool = False) -> tuple[list[str], list[str]]:
+        """Dispatch all tasks to worker pods and wait for them to complete.
+
+        The loop has two phases that blend together:
+        1. DISPATCHING: Tasks remain in self.tasks. Each iteration scans worker
+           slots — when a slot is free (None or completed), it gets the next task.
+           This continues until the task queue is empty.
+        2. WAITING: No tasks left, but some workers are still running. The loop
+           keeps polling until every worker reaches Succeeded/Failed, or the
+           timeout fires.
+
+        Returns (failed_workpod_logs, txn_mismatch_logs).
+        """
         if from_scratch:
             self.kill_all_pods()
         self.create_tasks()
 
         schedule_start = time.time()
         last_summary_time = schedule_start
-        # Track when all tasks have been dispatched so we can apply a
-        # timeout for the remaining workers to finish.
-        all_dispatched_time = None
-        collect_timeout = 20 * 60  # 20 minutes
+        all_dispatched_time = None  # Set once when task queue empties
+        collect_timeout = 20 * 60  # 20 minutes — max wait after all tasks dispatched
 
+        # Keep running while there are tasks to dispatch OR workers still active.
         while len(self.tasks) > 0 or self._has_active_workers():
-            # Check timeout after all tasks have been dispatched
+
+            # --- Timeout check (waiting phase only) ---
+            # Once all tasks have been dispatched, start a countdown. If workers
+            # don't finish within collect_timeout, log diagnostics and bail out.
             if len(self.tasks) == 0 and all_dispatched_time is not None:
                 elapsed = time.time() - all_dispatched_time
                 if elapsed > collect_timeout:
@@ -617,6 +631,10 @@ class ReplayScheduler:
                             self.current_workers[idx] = None
                     break
 
+            # --- Scan worker slots and dispatch tasks ---
+            # For each slot: if the slot is free and there's a task, launch a pod.
+            # The PVC bound check ensures we don't create pods on unbound PVCs
+            # (except for the initial pod per PVC which triggers binding).
             pvc_bound_status = self.get_pvc_bound_status()
             for i in range(len(self.current_workers)):
                 if (
@@ -624,12 +642,14 @@ class ReplayScheduler:
                     or self.current_workers[i].is_completed()
                 ) and (
                     pvc_bound_status[i % len(self.pvcs)] or i < len(self.pvcs)
-                ):  # we only create a new pod to intialize the pvc before the PVC is bound
+                ):
+                    # Slot is available — process the completed pod first if any
                     if (
                         self.current_workers[i] is not None
                         and self.current_workers[i].is_completed()
                     ):
                         self.process_completed_pod(self.current_workers[i], i)
+                    # Dispatch next task into this slot
                     if len(self.tasks) == 0:
                         break
                     task = self.tasks.pop(0)
@@ -646,9 +666,11 @@ class ReplayScheduler:
                     )
                     self.current_workers[i] = worker_pod
                     worker_pod.start()
-                    # collecting stats
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
+                # Probe pod phase to detect failures that need rescheduling
+                # (e.g. pod evictions). If the API call itself fails, reschedule
+                # the pod to be safe.
                 if self.current_workers[i] is not None:
                     try:
                         self.current_workers[i].get_phase()
@@ -656,23 +678,28 @@ class ReplayScheduler:
                         logger.error(f"Failed to get pod status: {e}")
                         self.reschedule_pod(self.current_workers[i], i)
 
-            # Track when we transition from dispatching to waiting
+            # --- Transition: dispatching → waiting ---
             if len(self.tasks) == 0 and all_dispatched_time is None:
                 all_dispatched_time = time.time()
                 logger.info("All tasks have been dispatched, waiting for remaining workers")
 
-            # Process completed workers even when no tasks remain
+            # --- Drain completed workers (waiting phase) ---
+            # During dispatching, completed pods are processed when their slot is
+            # reused above. But once there are no more tasks, slots won't be
+            # revisited by the dispatch loop, so we sweep explicitly.
             if len(self.tasks) == 0:
                 for i in range(len(self.current_workers)):
                     if self.current_workers[i] is not None and self.current_workers[i].is_completed():
                         self.process_completed_pod(self.current_workers[i], i)
 
+            # --- Periodic status summary ---
+            # Every 10 min while dispatching, every 60s while waiting.
             now = time.time()
-            # Log more frequently once we're just waiting for remaining workers
             summary_interval = 60 if len(self.tasks) == 0 else 600
             if now - last_summary_time >= summary_interval:
                 self._log_worker_summary(schedule_start, tasks_remaining=len(self.tasks))
                 last_summary_time = now
+
             time.sleep(QUERY_DELAY)
 
         logger.info("All tasks completed")
