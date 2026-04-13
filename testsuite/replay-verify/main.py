@@ -631,27 +631,21 @@ class ReplayScheduler:
                             self.current_workers[idx] = None
                     break
 
-            # --- Scan worker slots and dispatch tasks ---
-            # For each slot: if the slot is free and there's a task, launch a pod.
-            # The PVC bound check ensures we don't create pods on unbound PVCs
-            # (except for the initial pod per PVC which triggers binding).
+            # --- Scan worker slots ---
             pvc_bound_status = self.get_pvc_bound_status()
             for i in range(len(self.current_workers)):
-                if (
-                    self.current_workers[i] is None
-                    or self.current_workers[i].is_completed()
-                ) and (
-                    pvc_bound_status[i % len(self.pvcs)] or i < len(self.pvcs)
-                ):
-                    # Slot is available — process the completed pod first if any
-                    if (
-                        self.current_workers[i] is not None
-                        and self.current_workers[i].is_completed()
-                    ):
-                        self.process_completed_pod(self.current_workers[i], i)
-                    # Dispatch next task into this slot (if any remain)
-                    if len(self.tasks) == 0:
-                        continue
+                worker = self.current_workers[i]
+
+                # Step 1: Process completed pods to free up the slot
+                if worker is not None and worker.is_completed():
+                    self.process_completed_pod(worker, i)
+                    worker = self.current_workers[i]  # slot may now be None
+
+                # Step 2: If slot is free and there are tasks, dispatch one.
+                # PVC must be bound first, unless this is the initial pod
+                # that triggers binding (i < number of PVCs).
+                pvc_ready = pvc_bound_status[i % len(self.pvcs)] or i < len(self.pvcs)
+                if worker is None and pvc_ready and len(self.tasks) > 0:
                     task = self.tasks.pop(0)
                     worker_pod = WorkerPod(
                         i,
@@ -668,9 +662,9 @@ class ReplayScheduler:
                     worker_pod.start()
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
-                # Probe pod phase to detect failures that need rescheduling
-                # (e.g. pod evictions). If the API call itself fails, reschedule
-                # the pod to be safe.
+                # Step 3: Probe active pods to detect failures that need
+                # rescheduling (e.g. evictions). If the API call itself
+                # fails, reschedule the pod to be safe.
                 if self.current_workers[i] is not None:
                     try:
                         self.current_workers[i].get_phase()
