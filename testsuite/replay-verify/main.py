@@ -593,13 +593,10 @@ class ReplayScheduler:
     def schedule(self, from_scratch: bool = False) -> tuple[list[str], list[str]]:
         """Dispatch all tasks to worker pods and wait for them to complete.
 
-        The loop has two phases that blend together:
-        1. DISPATCHING: Tasks remain in self.tasks. Each iteration scans worker
-           slots — when a slot is free (None or completed), it gets the next task.
-           This continues until the task queue is empty.
-        2. WAITING: No tasks left, but some workers are still running. The loop
-           keeps polling until every worker reaches Succeeded/Failed, or the
-           timeout fires.
+        The loop scans worker slots each iteration:
+        - Completed or timed-out pods are processed and their slots freed.
+        - Free slots get the next task from the queue (if any).
+        - The loop exits when no tasks remain and all slots are empty.
 
         Returns (failed_workpod_logs, txn_mismatch_logs).
         """
@@ -609,39 +606,47 @@ class ReplayScheduler:
 
         schedule_start = time.time()
         last_summary_time = schedule_start
-        all_dispatched_time = None  # Set once when task queue empties
-        collect_timeout = 20 * 60  # 20 minutes — max wait after all tasks dispatched
+        pod_timeout = 20 * 60  # 20 minutes — max age before a pod is considered stuck
 
         # Keep running while there are tasks to dispatch OR workers still active.
         while len(self.tasks) > 0 or self._has_active_workers():
-
-            # --- Timeout check (waiting phase only) ---
-            # Once all tasks have been dispatched, start a countdown. If workers
-            # don't finish within collect_timeout, log diagnostics and bail out.
-            if len(self.tasks) == 0 and all_dispatched_time is not None:
-                elapsed = time.time() - all_dispatched_time
-                if elapsed > collect_timeout:
-                    logger.error(
-                        f"Timed out waiting for remaining workers after {int(elapsed)}s"
-                    )
-                    self._log_worker_summary(schedule_start, log_level=logging.ERROR)
-                    for idx, w in enumerate(self.current_workers):
-                        if w is not None:
-                            self.failed_workpod_logs.append(w.get_humio_log_link())
-                            self.current_workers[idx] = None
-                    break
 
             # --- Scan worker slots ---
             pvc_bound_status = self.get_pvc_bound_status()
             for i in range(len(self.current_workers)):
                 worker = self.current_workers[i]
 
-                # Step 1: Process completed pods to free up the slot
-                if worker is not None and worker.is_completed():
-                    self.process_completed_pod(worker, i)
-                    worker = self.current_workers[i]  # slot may now be None
+                if worker is not None:
+                    if worker.is_completed():
+                        # Pod finished (Succeeded or Failed) — process and free slot
+                        self.process_completed_pod(worker, i)
+                        worker = self.current_workers[i]
+                    elif worker.get_age_secs() > pod_timeout:
+                        # Pod has been running too long — reschedule if under
+                        # retry limit, otherwise treat as permanent failure.
+                        retries = self.task_stats[worker.name].retry_count
+                        logger.error(
+                            f"Worker {i} timed out: {worker.name}, "
+                            f"phase={worker.get_phase()}, "
+                            f"container={worker.get_container_status_summary()}, "
+                            f"age={int(worker.get_age_secs())}s, "
+                            f"retries={retries}/{MAX_RETRIES}"
+                        )
+                        if retries < MAX_RETRIES:
+                            self.reschedule_pod(worker, i)
+                        else:
+                            logger.error(
+                                f"Worker {i} exceeded max retries, giving up: {worker.name}"
+                            )
+                            self.failed_workpod_logs.append(worker.get_humio_log_link())
+                            self.current_workers[i] = None
+                        # Sync local var with the slot (now None in both branches:
+                        # reschedule_pod clears it, and the else branch above clears
+                        # it explicitly). This allows the dispatch check below to
+                        # immediately fill this slot with a new task.
+                        worker = None
 
-                # Step 2: If slot is free and there are tasks, dispatch one.
+                # If slot is free and there are tasks, dispatch one.
                 # PVC must be bound first, unless this is the initial pod
                 # that triggers binding (i < number of PVCs).
                 pvc_ready = pvc_bound_status[i % len(self.pvcs)] or i < len(self.pvcs)
@@ -661,21 +666,6 @@ class ReplayScheduler:
                     self.current_workers[i] = worker_pod
                     worker_pod.start()
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
-
-                # Step 3: Probe active pods to detect failures that need
-                # rescheduling (e.g. evictions). If the API call itself
-                # fails, reschedule the pod to be safe.
-                if self.current_workers[i] is not None:
-                    try:
-                        self.current_workers[i].get_phase()
-                    except Exception as e:
-                        logger.error(f"Failed to get pod status: {e}")
-                        self.reschedule_pod(self.current_workers[i], i)
-
-            # --- Transition: dispatching → waiting ---
-            if len(self.tasks) == 0 and all_dispatched_time is None:
-                all_dispatched_time = time.time()
-                logger.info("All tasks have been dispatched, waiting for remaining workers")
 
             # --- Periodic status summary ---
             # Every 10 min while dispatching, every 60s while waiting.
@@ -766,20 +756,21 @@ class ReplayScheduler:
             header += f", tasks remaining={tasks_remaining}"
         header += ") ==="
         log(header)
+        empty_count = 0
         for idx, worker in enumerate(self.current_workers):
             if worker is None:
-                phase_counts["(empty)"] += 1
-            else:
-                phase = worker.get_phase() or "Unknown"
-                phase_counts[phase] += 1
-                detail = ""
-                if phase not in ("Succeeded", "Failed", "Running"):
-                    detail = f", container={worker.get_container_status_summary()}"
-                log(
-                    f"  Worker {idx}: {worker.name}, phase={phase}, age={int(worker.get_age_secs())}s{detail}"
-                )
+                empty_count += 1
+                continue
+            phase = worker.get_phase() or "Unknown"
+            phase_counts[phase] += 1
+            detail = ""
+            if phase not in ("Succeeded", "Failed", "Running"):
+                detail = f", container={worker.get_container_status_summary()}"
+            log(
+                f"  Worker {idx}: {worker.name}, phase={phase}, age={int(worker.get_age_secs())}s{detail}"
+            )
         summary = ", ".join(f"{phase}={count}" for phase, count in sorted(phase_counts.items()))
-        log(f"  Summary: {summary}")
+        log(f"  Summary: {summary}, empty={empty_count}")
 
     # read skip ranges from gcp bucket
 
