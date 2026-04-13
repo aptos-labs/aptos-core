@@ -97,20 +97,18 @@ impl BlockStore {
         li: &LedgerInfoWithSignatures,
     ) -> Option<StateSyncTriggerReason> {
         const MAX_PRECOMMIT_GAP: u64 = 200;
+
         let ordered_root_round = self.ordered_root().round();
         let commit_round = li.commit_info().round();
-        let block_not_exist =
-            ordered_root_round < commit_round && !self.block_exists(li.commit_info().id());
-        // TODO move min gap to fallback (30) to config, and if configurable make sure the value is
-        // larger than buffer manager MAX_BACKLOG (20)
-        let max_commit_gap = 30.max(2 * self.vote_back_pressure_limit);
-        let min_commit_round = commit_round.saturating_sub(max_commit_gap);
-        let current_commit_round = self.commit_root().round();
+        let commit_block_id = li.commit_info().id();
 
-        // Determine the block status by checking the pending_blocks buffer to
-        // distinguish: not received at all vs received as opt block but not yet
-        // converted vs received as regular but not inserted.
-        let block_status = if block_not_exist {
+        let block_not_in_tree =
+            ordered_root_round < commit_round && !self.block_exists(commit_block_id);
+
+        // If block is not in the tree, check the pending_blocks buffer to determine
+        // the block status and whether to skip sync. The block may have been received
+        // (via opt proposal) but not yet inserted into the block tree.
+        let block_status = if block_not_in_tree {
             let pending = self.pending_blocks.lock();
             if pending.has_regular_block_at_round(commit_round) {
                 BlockStatus::RegularBlockPending
@@ -122,6 +120,16 @@ impl BlockStore {
         } else {
             BlockStatus::InTree
         };
+
+        // Skip sync if the block is in the pending buffer — it will be inserted
+        // into the tree normally via insert_quorum_cert.
+        let block_not_exist = matches!(block_status, BlockStatus::NotReceived);
+
+        // TODO move min gap to fallback (30) to config, and if configurable make sure the value is
+        // larger than buffer manager MAX_BACKLOG (20)
+        let max_commit_gap = 30.max(2 * self.vote_back_pressure_limit);
+        let min_commit_round = commit_round.saturating_sub(max_commit_gap);
+        let current_commit_round = self.commit_root().round();
 
         if let Some(pre_commit_status) = self.pre_commit_status() {
             let mut status_guard = pre_commit_status.lock();
@@ -137,6 +145,9 @@ impl BlockStore {
                     commit_gap,
                 })
             } else {
+                if block_not_in_tree && !block_not_exist {
+                    counters::STATE_SYNC_SKIPPED_BY_PENDING_BLOCKS.inc();
+                }
                 if current_commit_round + MAX_PRECOMMIT_GAP < status_guard.round() {
                     status_guard.pause();
                 }
@@ -150,6 +161,9 @@ impl BlockStore {
                     commit_gap,
                 })
             } else {
+                if block_not_in_tree && !block_not_exist {
+                    counters::STATE_SYNC_SKIPPED_BY_PENDING_BLOCKS.inc();
+                }
                 None
             }
         }
