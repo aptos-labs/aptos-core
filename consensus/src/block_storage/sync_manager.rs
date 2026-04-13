@@ -125,9 +125,9 @@ impl BlockStore {
         // into the tree normally via insert_quorum_cert.
         let block_not_exist = matches!(block_status, BlockStatus::NotReceived);
 
-        // TODO move min gap to fallback (30) to config, and if configurable make sure the value is
+        // TODO move min gap to fallback (60) to config, and if configurable make sure the value is
         // larger than buffer manager MAX_BACKLOG (20)
-        let max_commit_gap = 30.max(2 * self.vote_back_pressure_limit);
+        let max_commit_gap = 60.max(2 * self.vote_back_pressure_limit);
         let min_commit_round = commit_round.saturating_sub(max_commit_gap);
         let current_commit_round = self.commit_root().round();
 
