@@ -11,7 +11,7 @@ This section describes the core challenges.
 
 ### Non-deterministic cache across validators
 
-The module cache differs across validator nodes.
+The module cache differs across validator nodes because Block-STM executes transaction in non-deterministic way.
 When accessing module `A`, it may be cached on one node but not another.
 Because a cache miss is expensive (storage I/O, deserialization, verification), gas must be charged for module loading to ensure deterministic execution costs.
 
@@ -19,7 +19,7 @@ Because a cache miss is expensive (storage I/O, deserialization, verification), 
 
 Move supports module upgrades.
 When a module is upgraded, its size changes, its code changes, and any cached data derived from it (linked function pointers, struct layouts) becomes stale.
-Caches that depends on upgraded module must be invalidated.
+All loaded data (caches included) that depends on upgraded module must be invalidated.
 Readers of the upgraded module or caches depending on the upgraded module must be invalidated.
 
 ### "Charge once" semantics
@@ -149,7 +149,7 @@ It takes loaded modules and resolves cross-module references: function pointers,
 Linking is:
 
 - **Consensus-invisible**: not tracked by Block-STM.
-  Different validators may produce differently-optimized linked forms.
+  Different validators may produce differently-optimized linked forms after loading depending on what is available in the cache (recall that the cache state may be different between nodes).
 - **Unmetered**: no gas charged.
   Linking quality is an implementation detail.
 - **A total function**: given a set of loaded modules, linking *always* produces a correct result.
