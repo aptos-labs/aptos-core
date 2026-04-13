@@ -43,11 +43,11 @@ serde_json = { workspace = true }
 # TODO: Fix compiler errors so we can use `workspace = true` here
 sha2 = { version = "0.10.6" }
 thiserror = { workspace = true }
-tempfile = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
 itertools = { workspace = true }
+tempfile = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["ark-bn254", "ark-ff-asm", "ark-ff-macros", "serde_bytes"]
