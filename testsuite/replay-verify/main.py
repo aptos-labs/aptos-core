@@ -649,9 +649,9 @@ class ReplayScheduler:
                         and self.current_workers[i].is_completed()
                     ):
                         self.process_completed_pod(self.current_workers[i], i)
-                    # Dispatch next task into this slot
+                    # Dispatch next task into this slot (if any remain)
                     if len(self.tasks) == 0:
-                        break
+                        continue
                     task = self.tasks.pop(0)
                     worker_pod = WorkerPod(
                         i,
@@ -682,15 +682,6 @@ class ReplayScheduler:
             if len(self.tasks) == 0 and all_dispatched_time is None:
                 all_dispatched_time = time.time()
                 logger.info("All tasks have been dispatched, waiting for remaining workers")
-
-            # --- Drain completed workers (waiting phase) ---
-            # During dispatching, completed pods are processed when their slot is
-            # reused above. But once there are no more tasks, slots won't be
-            # revisited by the dispatch loop, so we sweep explicitly.
-            if len(self.tasks) == 0:
-                for i in range(len(self.current_workers)):
-                    if self.current_workers[i] is not None and self.current_workers[i].is_completed():
-                        self.process_completed_pod(self.current_workers[i], i)
 
             # --- Periodic status summary ---
             # Every 10 min while dispatching, every 60s while waiting.
