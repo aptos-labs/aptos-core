@@ -910,11 +910,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
+            self.config.max_commit_gap,
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
             Some(pipeline_builder),
+            self.config.skip_sync_small_gap_rounds,
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(

@@ -74,6 +74,13 @@ pub struct ConsensusConfig {
     pub intra_consensus_channel_buffer_size: usize,
     pub quorum_store: QuorumStoreConfig,
     pub vote_back_pressure_limit: u64,
+    /// Maximum gap between commit round and current commit root before triggering state sync.
+    /// Must be larger than buffer manager MAX_BACKLOG (20). Defaults to 60.
+    pub max_commit_gap: u64,
+    /// If set, skip state sync when the block is not in the tree but the round gap
+    /// is within this threshold. The block is likely in-flight from an optimistic proposal.
+    /// Defaults to Some(20). Set to None to disable.
+    pub skip_sync_small_gap_rounds: Option<u64>,
     /// If backpressure target block size is below it, update `max_txns_to_execute` instead.
     /// Applied to execution, pipeline and chain health backpressure.
     /// Needed as we cannot subsplit QS batches.
@@ -266,6 +273,8 @@ impl Default for ConsensusConfig {
             // Considering block gas limit and pipeline backpressure should keep number of blocks
             // in the pipline very low, we can keep this limit pretty low, too.
             vote_back_pressure_limit: 12,
+            max_commit_gap: 60,
+            skip_sync_small_gap_rounds: Some(20),
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
                 txn_limit: Some(ExecutionBackpressureTxnLimitConfig::default()),

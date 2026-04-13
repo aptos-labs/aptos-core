@@ -121,20 +121,26 @@ impl BlockStore {
             BlockStatus::InTree
         };
 
-        // Skip sync if the block is in the pending buffer — it will be inserted
-        // into the tree normally via insert_quorum_cert.
+        let max_commit_gap = self.max_commit_gap.max(2 * self.vote_back_pressure_limit);
+
         let block_not_exist = matches!(block_status, BlockStatus::NotReceived);
 
-        // TODO move min gap to fallback (60) to config, and if configurable make sure the value is
-        // larger than buffer manager MAX_BACKLOG (20)
-        let max_commit_gap = 60.max(2 * self.vote_back_pressure_limit);
+        // Skip sync if the block is in the pending buffer, or if the gap is small
+        // enough that the block is likely in-flight from an optimistic proposal.
+        let gap = commit_round.saturating_sub(ordered_root_round);
+        let skip_small_gap = block_not_exist
+            && self
+                .skip_sync_small_gap_rounds
+                .is_some_and(|threshold| gap <= threshold);
         let min_commit_round = commit_round.saturating_sub(max_commit_gap);
         let current_commit_round = self.commit_root().round();
+
+        let need_sync = block_not_exist && !skip_small_gap;
 
         if let Some(pre_commit_status) = self.pre_commit_status() {
             let mut status_guard = pre_commit_status.lock();
             let commit_gap = status_guard.round() < min_commit_round;
-            if block_not_exist || commit_gap {
+            if need_sync || commit_gap {
                 // pause the pre_commit so that pre_commit task doesn't over-commit
                 // it can still commit if it receives the LI previously forwarded,
                 // but it won't exceed the LI here
@@ -146,7 +152,13 @@ impl BlockStore {
                 })
             } else {
                 if block_not_in_tree && !block_not_exist {
-                    counters::STATE_SYNC_SKIPPED_BY_PENDING_BLOCKS.inc();
+                    counters::STATE_SYNC_SKIPPED
+                        .with_label_values(&["pending_blocks"])
+                        .inc();
+                } else if skip_small_gap {
+                    counters::STATE_SYNC_SKIPPED
+                        .with_label_values(&["small_gap"])
+                        .inc();
                 }
                 if current_commit_round + MAX_PRECOMMIT_GAP < status_guard.round() {
                     status_guard.pause();
@@ -155,14 +167,20 @@ impl BlockStore {
             }
         } else {
             let commit_gap = current_commit_round < min_commit_round;
-            if block_not_exist || commit_gap {
+            if need_sync || commit_gap {
                 Some(StateSyncTriggerReason {
                     block_status,
                     commit_gap,
                 })
             } else {
                 if block_not_in_tree && !block_not_exist {
-                    counters::STATE_SYNC_SKIPPED_BY_PENDING_BLOCKS.inc();
+                    counters::STATE_SYNC_SKIPPED
+                        .with_label_values(&["pending_blocks"])
+                        .inc();
+                } else if skip_small_gap {
+                    counters::STATE_SYNC_SKIPPED
+                        .with_label_values(&["small_gap"])
+                        .inc();
                 }
                 None
             }
