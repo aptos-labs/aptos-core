@@ -134,9 +134,12 @@ impl<K, V> Default for UnorderedMap<K, V> {
     }
 }
 
-impl<K: fmt::Debug, V: fmt::Debug> fmt::Debug for UnorderedMap<K, V> {
+impl<K, V> fmt::Debug for UnorderedMap<K, V> {
+    /// Only shows the length to avoid exposing arbitrary iteration order.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
+        f.debug_struct("UnorderedMap")
+            .field("len", &self.inner.len())
+            .finish()
     }
 }
 
@@ -252,7 +255,6 @@ mod tests {
         let mut map = UnorderedMap::new();
         map.insert(1, 2);
         let s = format!("{:?}", map);
-        assert!(s.contains("1"));
-        assert!(s.contains("2"));
+        assert!(s.contains("len: 1"));
     }
 }

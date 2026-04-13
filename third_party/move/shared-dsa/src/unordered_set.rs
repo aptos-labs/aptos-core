@@ -139,9 +139,12 @@ impl<K> Default for UnorderedSet<K> {
     }
 }
 
-impl<K: fmt::Debug> fmt::Debug for UnorderedSet<K> {
+impl<K> fmt::Debug for UnorderedSet<K> {
+    /// Only shows the length to avoid exposing arbitrary iteration order.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
+        f.debug_struct("UnorderedSet")
+            .field("len", &self.inner.len())
+            .finish()
     }
 }
 
@@ -262,6 +265,6 @@ mod tests {
         let mut set = UnorderedSet::new();
         set.insert(42);
         let s = format!("{:?}", set);
-        assert!(s.contains("42"));
+        assert!(s.contains("len: 1"));
     }
 }
