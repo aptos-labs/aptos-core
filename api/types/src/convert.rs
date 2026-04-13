@@ -422,28 +422,35 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 executable,
                 extra_config,
             }) => {
-                let multisig_address = extra_config.multisig_address();
+                let multisig_address = extra_config.multisig_address().map(Address::from);
                 if let Some(multisig_address) = multisig_address {
                     match executable {
                         aptos_types::transaction::TransactionExecutable::EntryFunction(
                             entry_function,
                         ) => TransactionPayload::MultisigPayload(MultisigPayload {
-                            multisig_address: multisig_address.into(),
+                            multisig_address,
                             transaction_payload: Some(
                                 MultisigTransactionPayload::EntryFunctionPayload(
                                     try_into_entry_function_payload(entry_function)?,
                                 ),
                             ),
                         }),
-                        aptos_types::transaction::TransactionExecutable::Script(_)
-                        | aptos_types::transaction::TransactionExecutable::Encrypted => {
-                            bail!(
-                                "Script/encrypted executable is not supported for multisig transactions"
-                            )
+                        aptos_types::transaction::TransactionExecutable::Encrypted => {
+                            bail!("Encrypted executable is not supported for multisig transactions")
+                        },
+                        aptos_types::transaction::TransactionExecutable::Script(script) => {
+                            TransactionPayload::MultisigPayload(MultisigPayload {
+                                multisig_address,
+                                transaction_payload: Some(
+                                    MultisigTransactionPayload::ScriptPayload(
+                                        try_into_script_payload(script)?,
+                                    ),
+                                ),
+                            })
                         },
                         aptos_types::transaction::TransactionExecutable::Empty => {
                             TransactionPayload::MultisigPayload(MultisigPayload {
-                                multisig_address: multisig_address.into(),
+                                multisig_address,
                                 transaction_payload: None,
                             })
                         },

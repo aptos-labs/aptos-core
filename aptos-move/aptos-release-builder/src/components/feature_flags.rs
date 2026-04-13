@@ -162,7 +162,7 @@ pub enum FeatureFlag {
     EncryptedTransactions,
     PublicStructEnumArgs,
     MultisigScript,
-    HighExecutionLimitTransactions,
+    TransactionLimits,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -424,9 +424,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EncryptedTransactions => AptosFeatureFlag::ENCRYPTED_TRANSACTIONS,
             FeatureFlag::PublicStructEnumArgs => AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS,
             FeatureFlag::MultisigScript => AptosFeatureFlag::MULTISIG_SCRIPT,
-            FeatureFlag::HighExecutionLimitTransactions => {
-                AptosFeatureFlag::HIGH_EXECUTION_LIMIT_TRANSACTIONS
-            },
+            FeatureFlag::TransactionLimits => AptosFeatureFlag::TRANSACTION_LIMITS,
         }
     }
 }
@@ -615,9 +613,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENCRYPTED_TRANSACTIONS => FeatureFlag::EncryptedTransactions,
             AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS => FeatureFlag::PublicStructEnumArgs,
             AptosFeatureFlag::MULTISIG_SCRIPT => FeatureFlag::MultisigScript,
-            AptosFeatureFlag::HIGH_EXECUTION_LIMIT_TRANSACTIONS => {
-                FeatureFlag::HighExecutionLimitTransactions
-            },
+            AptosFeatureFlag::TRANSACTION_LIMITS => FeatureFlag::TransactionLimits,
         }
     }
 }

@@ -663,14 +663,28 @@ pub enum StatusCode {
     EMPTY_PAYLOAD_PROVIDED = 43,
     TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE = 44,
     INVALID_NUMBER_OF_AUTHENTICATION_PROOFS = 45,
-    // All epoch slots for high-execution-limit transactions have been consumed.
-    HIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED = 46,
+    // Sender is not the owner of the specified stake pool.
+    NOT_STAKE_POOL_OWNER = 46,
+    // Sender is not the delegated voter of the specified stake pool.
+    NOT_DELEGATED_VOTER = 47,
+    // Sender's committed stake is insufficient for the requested multiplier tier.
+    INSUFFICIENT_STAKE = 48,
+    // Multiplier must be > 100 bps (> 1x).
+    INVALID_HIGH_TXN_LIMITS_MULTIPLIER = 49,
+    // No stake pool exists at the specified address.
+    STAKE_POOL_NOT_FOUND = 50,
+    // No delegation pool exists at the specified address.
+    DELEGATION_POOL_NOT_FOUND = 51,
+    // Requested multiplier is not available in any configured tier.
+    MULTIPLIER_NOT_AVAILABLE = 52,
 
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_12 = 47,
-    RESERVED_VALIDATION_ERROR_13 = 48,
-    RESERVED_VALIDATION_ERROR_14 = 49,
-    RESERVED_VALIDATION_ERROR_15 = 50,
+    RESERVED_VALIDATION_ERROR_1 = 53,
+    RESERVED_VALIDATION_ERROR_2 = 54,
+    RESERVED_VALIDATION_ERROR_3 = 55,
+    RESERVED_VALIDATION_ERROR_4 = 56,
+    RESERVED_VALIDATION_ERROR_5 = 57,
+
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.

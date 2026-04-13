@@ -36,8 +36,6 @@ to synchronize configuration changes for the validators.
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="high_execution_limit.md#0x1_high_execution_limit">0x1::high_execution_limit</a>;
 <b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
@@ -401,9 +399,6 @@ Signal validators to start using new configuration. Must be called from friend c
     // Call <a href="stake.md#0x1_stake">stake</a> <b>to</b> compute the new validator set and distribute rewards and transaction fees.
     <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
     <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_high_execution_limit_transactions_enabled">features::is_high_execution_limit_transactions_enabled</a>()) {
-        <a href="high_execution_limit.md#0x1_high_execution_limit_on_new_epoch">high_execution_limit::on_new_epoch</a>();
-    };
 
     <b>assert</b>!(
         current_time &gt; config_ref.last_reconfiguration_time,

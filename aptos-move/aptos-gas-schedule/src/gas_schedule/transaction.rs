@@ -8,7 +8,7 @@ use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_10, RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
-        RELEASE_V1_41, RELEASE_V1_44,
+        RELEASE_V1_41,
     },
 };
 use aptos_gas_algebra::{
@@ -216,11 +216,6 @@ crate::gas_schedule::macros::define_gas_parameters!(
             40_000_000_000,
         ],
         [
-            max_execution_gas_high: InternalGas,
-            { RELEASE_V1_44.. => "max_execution_gas.high" },
-            40_000_000_000,
-        ],
-        [
             max_io_gas: InternalGas,
             { 7.. => "max_io_gas" },
             10_000_000_000, // 100ms of IO at 100k gas per ms
@@ -231,16 +226,6 @@ crate::gas_schedule::macros::define_gas_parameters!(
             20_000_000_000,
         ],
         [
-            max_io_gas_high: InternalGas,
-            { RELEASE_V1_44.. => "max_io_gas.high" },
-            20_000_000_000,
-        ],
-        [
-            high_execution_limit_fee: Fee,
-            { RELEASE_V1_44.. => "high_execution_limit.fee" },
-            100_0000_0000, // 100 APT in octas
-        ],
-        [
             max_storage_fee: Fee,
             { 7.. => "max_storage_fee" },
             20_0000_0000, // 20 APT
@@ -248,11 +233,6 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_storage_fee_gov: Fee,
             { RELEASE_V1_13.. => "max_storage_fee.gov" },
-            20_0000_0000,
-        ],
-        [
-            max_storage_fee_high: Fee,
-            { RELEASE_V1_44.. => "max_storage_fee.high" },
             20_0000_0000,
         ],
         [

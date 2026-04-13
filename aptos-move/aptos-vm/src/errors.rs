@@ -40,8 +40,6 @@ pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
 pub const ENONCE_ALREADY_USED: u64 = 1012;
 // Transaction expiration time is too far in the future.
 pub const ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
-// Execution high limit is not available for this transaction.
-pub const EHIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED: u64 = 1014;
 
 // Specified account is not a multisig account.
 const EACCOUNT_NOT_MULTISIG: u64 = 2002;
@@ -56,12 +54,28 @@ const EMULTISIG_NOT_ENOUGH_APPROVALS: u64 = 2009;
 // Provided target function does not match the payload stored in the on-chain transaction.
 const EPAYLOAD_DOES_NOT_MATCH: u64 = 2010;
 
+// Module error codes for transaction_limits.move (must match Move constants).
+
+// No stake pool exists at the specified address.
+const ESTAKE_POOL_NOT_FOUND: u64 = 1;
+// Sender is not the owner of the specified stake pool.
+const ENOT_STAKE_POOL_OWNER: u64 = 2;
+// Sender is not the delegated voter of the specified stake pool.
+const ENOT_DELEGATED_VOTER: u64 = 3;
+// No delegation pool exists at the specified address.
+const EDELEGATION_POOL_NOT_FOUND: u64 = 4;
+// Sender's committed stake is insufficient for the requested multiplier tier.
+const EINSUFFICIENT_STAKE: u64 = 5;
+// Multiplier must be > 100 bps (> 1x).
+const EINVALID_MULTIPLIER: u64 = 7;
+// Requested multiplier is not available in any configured tier.
+const EMULTIPLIER_NOT_AVAILABLE: u64 = 8;
+
 const INVALID_ARGUMENT: u8 = 0x1;
 const LIMIT_EXCEEDED: u8 = 0x2;
 const INVALID_STATE: u8 = 0x3;
 const PERMISSION_DENIED: u8 = 0x5;
 const NOT_FOUND: u8 = 0x6;
-const RESOURCE_EXHAUSTED: u8 = 0x9;
 
 fn error_split(code: u64) -> (u8, u64) {
     let reason = code & 0xFFFF;
@@ -79,6 +93,41 @@ pub fn convert_prologue_error(
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
+        VMStatus::MoveAbort {
+            location,
+            code,
+            message,
+        } if APTOS_TRANSACTION_VALIDATION.is_transaction_limits_module_abort(&location) => {
+            let new_major_status = match error_split(code) {
+                (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
+                (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
+                (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
+                (NOT_FOUND, ESTAKE_POOL_NOT_FOUND) => StatusCode::STAKE_POOL_NOT_FOUND,
+                (NOT_FOUND, EDELEGATION_POOL_NOT_FOUND) => StatusCode::DELEGATION_POOL_NOT_FOUND,
+                (INVALID_ARGUMENT, EINVALID_MULTIPLIER) => {
+                    StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER
+                },
+                (INVALID_ARGUMENT, EMULTIPLIER_NOT_AVAILABLE) => {
+                    StatusCode::MULTIPLIER_NOT_AVAILABLE
+                },
+                (category, reason) => {
+                    let mut err_msg = format!(
+                        "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+                        location, code, category, reason
+                    );
+                    if let Some(abort_msg) = message {
+                        err_msg.push_str(" Message: ");
+                        err_msg.push_str(&abort_msg);
+                    }
+                    speculative_error!(log_context, err_msg.clone());
+                    return Err(VMStatus::error(
+                        StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                        Some(err_msg),
+                    ));
+                },
+            };
+            VMStatus::error(new_major_status, None)
+        },
         VMStatus::MoveAbort {
             location,
             code,
@@ -156,9 +205,6 @@ pub fn convert_prologue_error(
                     StatusCode::TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE
                 },
                 (INVALID_ARGUMENT, ENONCE_ALREADY_USED) => StatusCode::NONCE_ALREADY_USED,
-                (RESOURCE_EXHAUSTED, EHIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED) => {
-                    StatusCode::HIGH_EXECUTION_LIMIT_COUNTER_EXHAUSTED
-                },
                 (category, reason) => {
                     let mut err_msg = format!(
                         "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",

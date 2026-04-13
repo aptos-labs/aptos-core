@@ -846,17 +846,16 @@ module std::features {
         is_enabled(ENCRYPTED_TRANSACTIONS)
     }
 
-    /// Whether the high-execution limit transactions feature is enabled. Allows
-    /// transactions to opt in for higher transaction limits by paying a flat
-    /// fee.
-    const HIGH_EXECUTION_LIMIT_TRANSACTIONS: u64 = 110;
+    /// Whether the transaction limits feature is enabled. Allows transactions
+    /// to request higher execution/IO gas limits backed by staking voting power.
+    const TRANSACTION_LIMITS: u64 = 111;
 
-    public fun get_high_execution_limit_transactions_feature(): u64 {
-        HIGH_EXECUTION_LIMIT_TRANSACTIONS
+    public fun get_transaction_limits_feature(): u64 {
+        TRANSACTION_LIMITS
     }
 
-    public fun is_high_execution_limit_transactions_enabled(): bool {
-        is_enabled(HIGH_EXECUTION_LIMIT_TRANSACTIONS)
+    public fun is_transaction_limits_enabled(): bool {
+        is_enabled(TRANSACTION_LIMITS)
     }
 
     // ============================================================================================

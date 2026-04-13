@@ -90,7 +90,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
         is_simulation: bool,
-        high_execution_limit_fee: Option<u64>,
+        txn_limits_request: Option<UserTxnLimitsRequest>,
     ) {
         // TODO(fa_migration)
         pragma verify = false;
@@ -454,7 +454,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
         is_simulation: bool,
-        high_execution_limit_fee: Option<u64>,
+        txn_limits_request: Option<UserTxnLimitsRequest>,
     ) {
         // TODO: temporary mockup
         pragma verify = false;
@@ -473,22 +473,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
         is_simulation: bool,
-        high_execution_limit_fee: Option<u64>,
-    ) {
-        // TODO: temporary mockup
-        pragma verify = false;
-    }
-
-    spec unified_epilogue_v3(
-        account: signer,
-        gas_payer: signer,
-        storage_fee_refunded: u64,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        gas_units_remaining: u64,
-        is_simulation: bool,
-        is_orderless_txn: bool,
-        high_execution_limit_fee: Option<u64>,
+        txn_limits_request: Option<UserTxnLimitsRequest>,
     ) {
         // TODO: temporary mockup
         pragma verify = false;

@@ -81,16 +81,16 @@ impl AptosVM {
         use aptos_types::transaction::AuxiliaryInfo;
         use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 
+        let resolver = state_view.as_move_resolver();
+        let txn_data = TransactionMetadata::new(self, &resolver, txn, &AuxiliaryInfo::default())
+            .expect("metadata construction should not fail in tests");
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
         let vm_gas_params = self
             .gas_params_for_test()
             .expect("should be able to get gas params")
             .vm
             .clone();
-
-        let txn_data =
-            TransactionMetadata::new(self, &vm_gas_params, txn, &AuxiliaryInfo::default());
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-
         let storage_gas_params = self
             .storage_gas_params(&log_context)
             .expect("should be able to get storage gas params")
@@ -100,8 +100,7 @@ impl AptosVM {
             self.gas_feature_version(),
             vm_gas_params,
             storage_gas_params,
-            false,
-            false,
+            None,
             gas_meter_balance.into(),
             &NoopBlockSynchronizationKillSwitch {},
         );
@@ -111,7 +110,6 @@ impl AptosVM {
             .expect("Storage gas parameters should exist for tests")
             .change_set_configs;
 
-        let resolver = state_view.as_move_resolver();
         let module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
 
         let traversal_storage = TraversalStorage::new();

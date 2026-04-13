@@ -1141,6 +1141,13 @@ RawTransaction:
     - expiration_timestamp_secs: U64
     - chain_id:
         TYPENAME: ChainId
+RequestedMultipliers:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - execution_bps: U64
+          - io_bps: U64
 RoundTimeout:
   STRUCT:
     - timeout:
@@ -1455,7 +1462,9 @@ TransactionExtraConfig:
                 TYPENAME: AccountAddress
           - replay_protection_nonce:
               OPTION: U64
-          - high_execution_limit_request: BOOL
+          - txn_limits_request:
+              OPTION:
+                TYPENAME: UserTxnLimitsRequest
 TransactionPayload:
   ENUM:
     0:
@@ -1553,6 +1562,27 @@ TypeTag:
       i128: UNIT
     17:
       i256: UNIT
+UserTxnLimitsRequest:
+  ENUM:
+    0:
+      StakePoolOwner:
+        STRUCT:
+          - multipliers:
+              TYPENAME: RequestedMultipliers
+    1:
+      DelegatedVoter:
+        STRUCT:
+          - pool_address:
+              TYPENAME: AccountAddress
+          - multipliers:
+              TYPENAME: RequestedMultipliers
+    2:
+      DelegationPoolDelegator:
+        STRUCT:
+          - pool_address:
+              TYPENAME: AccountAddress
+          - multipliers:
+              TYPENAME: RequestedMultipliers
 ValidatorConsensusInfo:
   STRUCT:
     - address:

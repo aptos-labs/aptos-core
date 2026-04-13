@@ -163,8 +163,8 @@ return true.
 -  [Function `slh_dsa_sha2_128s_signature_enabled`](#0x1_features_slh_dsa_sha2_128s_signature_enabled)
 -  [Function `get_encrypted_transactions_feature`](#0x1_features_get_encrypted_transactions_feature)
 -  [Function `is_encrypted_transactions_enabled`](#0x1_features_is_encrypted_transactions_enabled)
--  [Function `get_high_execution_limit_transactions_feature`](#0x1_features_get_high_execution_limit_transactions_feature)
--  [Function `is_high_execution_limit_transactions_enabled`](#0x1_features_is_high_execution_limit_transactions_enabled)
+-  [Function `get_transaction_limits_feature`](#0x1_features_get_transaction_limits_feature)
+-  [Function `is_transaction_limits_enabled`](#0x1_features_is_transaction_limits_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -632,18 +632,6 @@ Whether function reflection is enabled.
 
 
 
-<a id="0x1_features_HIGH_EXECUTION_LIMIT_TRANSACTIONS"></a>
-
-Whether the high-execution limit transactions feature is enabled. Allows
-transactions to opt in for higher transaction limits by paying a flat
-fee.
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_HIGH_EXECUTION_LIMIT_TRANSACTIONS">HIGH_EXECUTION_LIMIT_TRANSACTIONS</a>: u64 = 110;
-</code></pre>
-
-
-
 <a id="0x1_features_JWK_CONSENSUS"></a>
 
 Deprecated by <code>aptos_framework::jwk_consensus_config::JWKConsensusConfig</code>.
@@ -945,6 +933,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TRANSACTION_CONTEXT_EXTENSION">TRANSACTION_CONTEXT_EXTENSION</a>: u64 = 59;
+</code></pre>
+
+
+
+<a id="0x1_features_TRANSACTION_LIMITS"></a>
+
+Whether the transaction limits feature is enabled. Allows transactions
+to request higher execution/IO gas limits backed by staking voting power.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_TRANSACTION_LIMITS">TRANSACTION_LIMITS</a>: u64 = 111;
 </code></pre>
 
 
@@ -4167,13 +4166,13 @@ Deprecated feature
 
 </details>
 
-<a id="0x1_features_get_high_execution_limit_transactions_feature"></a>
+<a id="0x1_features_get_transaction_limits_feature"></a>
 
-## Function `get_high_execution_limit_transactions_feature`
+## Function `get_transaction_limits_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_high_execution_limit_transactions_feature">get_high_execution_limit_transactions_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_transaction_limits_feature">get_transaction_limits_feature</a>(): u64
 </code></pre>
 
 
@@ -4182,8 +4181,8 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_high_execution_limit_transactions_feature">get_high_execution_limit_transactions_feature</a>(): u64 {
-    <a href="features.md#0x1_features_HIGH_EXECUTION_LIMIT_TRANSACTIONS">HIGH_EXECUTION_LIMIT_TRANSACTIONS</a>
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_transaction_limits_feature">get_transaction_limits_feature</a>(): u64 {
+    <a href="features.md#0x1_features_TRANSACTION_LIMITS">TRANSACTION_LIMITS</a>
 }
 </code></pre>
 
@@ -4191,13 +4190,13 @@ Deprecated feature
 
 </details>
 
-<a id="0x1_features_is_high_execution_limit_transactions_enabled"></a>
+<a id="0x1_features_is_transaction_limits_enabled"></a>
 
-## Function `is_high_execution_limit_transactions_enabled`
+## Function `is_transaction_limits_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_high_execution_limit_transactions_enabled">is_high_execution_limit_transactions_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_transaction_limits_enabled">is_transaction_limits_enabled</a>(): bool
 </code></pre>
 
 
@@ -4206,8 +4205,8 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_high_execution_limit_transactions_enabled">is_high_execution_limit_transactions_enabled</a>(): bool {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_HIGH_EXECUTION_LIMIT_TRANSACTIONS">HIGH_EXECUTION_LIMIT_TRANSACTIONS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_transaction_limits_enabled">is_transaction_limits_enabled</a>(): bool {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_TRANSACTION_LIMITS">TRANSACTION_LIMITS</a>)
 }
 </code></pre>
 

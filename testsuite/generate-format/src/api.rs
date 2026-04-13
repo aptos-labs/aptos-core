@@ -123,6 +123,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::encrypted_payload::DecryptionFailureReason>(&samples)?;
     tracer.trace_type::<transaction::TransactionExecutable>(&samples)?;
     tracer.trace_type::<transaction::TransactionExtraConfig>(&samples)?;
+    tracer.trace_type::<transaction::UserTxnLimitsRequest>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;

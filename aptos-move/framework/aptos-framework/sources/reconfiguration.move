@@ -2,12 +2,10 @@
 /// to synchronize configuration changes for the validators.
 module aptos_framework::reconfiguration {
     use std::error;
-    use std::features;
     use std::signer;
 
     use aptos_framework::account;
     use aptos_framework::event;
-    use aptos_framework::high_execution_limit;
     use aptos_framework::stake;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -137,9 +135,6 @@ module aptos_framework::reconfiguration {
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
         stake::on_new_epoch();
         storage_gas::on_reconfig();
-        if (features::is_high_execution_limit_transactions_enabled()) {
-            high_execution_limit::on_new_epoch();
-        };
 
         assert!(
             current_time > config_ref.last_reconfiguration_time,

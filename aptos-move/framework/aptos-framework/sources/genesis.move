@@ -18,7 +18,7 @@ module aptos_framework::genesis {
     use aptos_framework::execution_config;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
-    use aptos_framework::high_execution_limit;
+    use aptos_framework::transaction_limits;
     use aptos_framework::nonce_validation;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
@@ -133,7 +133,28 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         nonce_validation::initialize(&aptos_framework_account);
-        high_execution_limit::initialize(&aptos_framework_account, 10);
+
+        transaction_limits::initialize(
+            &aptos_framework_account,
+            // Execution tiers:
+            //   2x: 1M APT
+            //   4x: 10M APT
+            //   8x: 50M APT
+            vector[
+                transaction_limits::new_tier(1_000_000_0000_0000, 200),
+                transaction_limits::new_tier(10_000_000_0000_0000, 400),
+                transaction_limits::new_tier(50_000_000_0000_0000, 800),
+            ],
+            // IO tiers:
+            //   2x: 5M APT
+            //   4x: 20M APT
+            //   8x: 100M APT
+            vector[
+                transaction_limits::new_tier(5_000_000_0000_0000, 200),
+                transaction_limits::new_tier(20_000_000_0000_0000, 400),
+                transaction_limits::new_tier(100_000_000_0000_0000, 800),
+            ],
+        );
     }
 
     /// Genesis step 2: Initialize Aptos coin.
