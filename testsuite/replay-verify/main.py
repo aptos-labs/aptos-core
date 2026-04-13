@@ -587,14 +587,36 @@ class ReplayScheduler:
                 statuses.append(False)
         return statuses
 
-    def schedule(self, from_scratch: bool = False) -> None:
+    def _has_active_workers(self) -> bool:
+        return any(w is not None for w in self.current_workers)
+
+    def schedule(self, from_scratch: bool = False) -> tuple[list[str], list[str]]:
         if from_scratch:
             self.kill_all_pods()
         self.create_tasks()
 
         schedule_start = time.time()
         last_summary_time = schedule_start
-        while len(self.tasks) > 0:
+        # Track when all tasks have been dispatched so we can apply a
+        # timeout for the remaining workers to finish.
+        all_dispatched_time = None
+        collect_timeout = 20 * 60  # 20 minutes
+
+        while len(self.tasks) > 0 or self._has_active_workers():
+            # Check timeout after all tasks have been dispatched
+            if len(self.tasks) == 0 and all_dispatched_time is not None:
+                elapsed = time.time() - all_dispatched_time
+                if elapsed > collect_timeout:
+                    logger.error(
+                        f"Timed out waiting for remaining workers after {int(elapsed)}s"
+                    )
+                    self._log_worker_summary(schedule_start, log_level=logging.ERROR)
+                    for idx, w in enumerate(self.current_workers):
+                        if w is not None:
+                            self.failed_workpod_logs.append(w.get_humio_log_link())
+                            self.current_workers[idx] = None
+                    break
+
             pvc_bound_status = self.get_pvc_bound_status()
             for i in range(len(self.current_workers)):
                 if (
@@ -633,12 +655,28 @@ class ReplayScheduler:
                     except Exception as e:
                         logger.error(f"Failed to get pod status: {e}")
                         self.reschedule_pod(self.current_workers[i], i)
+
+            # Track when we transition from dispatching to waiting
+            if len(self.tasks) == 0 and all_dispatched_time is None:
+                all_dispatched_time = time.time()
+                logger.info("All tasks have been dispatched, waiting for remaining workers")
+
+            # Process completed workers even when no tasks remain
+            if len(self.tasks) == 0:
+                for i in range(len(self.current_workers)):
+                    if self.current_workers[i] is not None and self.current_workers[i].is_completed():
+                        self.process_completed_pod(self.current_workers[i], i)
+
             now = time.time()
-            if now - last_summary_time >= 600:  # Every 10 minutes
+            # Log more frequently once we're just waiting for remaining workers
+            summary_interval = 60 if len(self.tasks) == 0 else 600
+            if now - last_summary_time >= summary_interval:
                 self._log_worker_summary(schedule_start, tasks_remaining=len(self.tasks))
                 last_summary_time = now
             time.sleep(QUERY_DELAY)
-        logger.info("All tasks have been scheduled")
+
+        logger.info("All tasks completed")
+        return (self.failed_workpod_logs, self.txn_mismatch_logs)
 
     def reschedule_pod(self, worker_pod: WorkerPod, worker_idx: int):
         # clean up the existing pod
@@ -696,44 +734,6 @@ class ReplayScheduler:
             namespace=self.namespace,
             label_selector=f"run={self.get_label()}",
         )
-
-    def collect_all_failed_logs(self) -> tuple[list[str], list[str]]:
-        remaining = sum(1 for w in self.current_workers if w is not None)
-        logger.info(f"Collecting logs from {remaining} remaining pods")
-
-        collect_timeout = 20 * 60  # 20 minutes
-        collect_start = time.time()
-        last_summary_time = collect_start
-
-        all_completed = False
-        while not all_completed:
-            elapsed = time.time() - collect_start
-            if elapsed > collect_timeout:
-                logger.error(
-                    f"collect_all_failed_logs timed out after {int(elapsed)}s"
-                )
-                self._log_worker_summary(collect_start, log_level=logging.ERROR)
-                for idx, w in enumerate(self.current_workers):
-                    if w is not None:
-                        self.failed_workpod_logs.append(w.get_humio_log_link())
-                        self.current_workers[idx] = None
-                break
-
-            all_completed = True
-            for idx, worker in enumerate(self.current_workers):
-                if worker is not None:
-                    if not worker.is_completed():
-                        all_completed = False
-                    else:
-                        self.process_completed_pod(worker, idx)
-
-            now = time.time()
-            if now - last_summary_time >= 60:  # Every 60 seconds
-                self._log_worker_summary(collect_start)
-                last_summary_time = now
-            time.sleep(QUERY_DELAY)
-
-        return (self.failed_workpod_logs, self.txn_mismatch_logs)
 
     def print_stats(self):
         for key, value in self.task_stats.items():
@@ -963,8 +963,7 @@ if __name__ == "__main__":
         scheduler.create_all_required_pvcs()
         try:
             start_time = time.time()
-            scheduler.schedule(from_scratch=True)
-            (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
+            (failed_logs, txn_mismatch_logs) = scheduler.schedule(from_scratch=True)
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
             if txn_mismatch_logs:
