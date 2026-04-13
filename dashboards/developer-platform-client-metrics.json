@@ -80,7 +80,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "sum(increase(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client=~\"^unknown.*\"}[$__range]))",
+          "expr": "sum(increase(aptos_api_request_source_client{environment=~\"$environment\", request_source_client=~\"^unknown.*\"}[$__range]))",
           "hide": true,
           "instant": false,
           "range": true,
@@ -89,7 +89,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "sum(increase(aptos_api_request_source_client{chain_name=\"$chain_name\"}[$__range]))",
+          "expr": "sum(increase(aptos_api_request_source_client{environment=~\"$environment\"}[$__range]))",
           "hide": true,
           "instant": false,
           "range": true,
@@ -130,7 +130,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "editorMode": "code",
-          "expr": "sum by(request_source_client) (increase(label_replace(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client != \"unknown\"}, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\")[$__range])) != 0",
+          "expr": "sum by(request_source_client) (increase(label_replace(aptos_api_request_source_client{environment=~\"$environment\", request_source_client != \"unknown\"}, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\")[$__range])) != 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -162,7 +162,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "editorMode": "code",
-          "expr": "sum by(request_source_client) (increase(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client!~\"^unknown.*\"}[$__range])) != 0",
+          "expr": "sum by(request_source_client) (increase(aptos_api_request_source_client{environment=~\"$environment\", request_source_client!~\"^unknown.*\"}[$__range])) != 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -268,7 +268,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "topk(5, sum by(operation_id) (increase(aptos_api_request_source_client{request_source_client=\"$source_client\", chain_name=\"$chain_name\"}[$__range])))",
+              "expr": "topk(5, sum by(operation_id) (increase(aptos_api_request_source_client{environment=~\"$environment\", request_source_client=\"$source_client\"}[$__range])))",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -310,11 +310,27 @@
         "type": "query"
       },
       {
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": false,
+        "multiFormat": "",
+        "name": "environment",
+        "options": [],
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "VictoriaMetrics Global (Non-mainnet)", "value": "VictoriaMetrics Global (Non-mainnet)" },
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -328,23 +344,26 @@
         "type": "datasource"
       },
       {
-        "current": { "selected": false, "text": "testnet", "value": "testnet" },
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(aptos_api_request_source_client,chain_name)",
-        "description": "When looking at non-mainnet, use this to select the network.",
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
-        "includeAll": false,
-        "multi": false,
-        "name": "chain_name",
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(aptos_api_request_source_client,chain_name)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
+          "refId": "StandardVariableQuery"
         },
         "refresh": 1,
-        "regex": "testnet|devnet|mainnet",
+        "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 1,
         "type": "query"
       }
     ]
@@ -353,7 +372,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Developer Platform Client Metrics",
-  "uid": "be847ea3-c7cc-4048-b783-eb2fdb4f1abd",
+  "uid": "movement-developer-platform-client-metrics",
   "version": 62,
   "weekStart": ""
 }

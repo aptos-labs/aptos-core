@@ -81,9 +81,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_coordinator_heartbeat_timestamp_s{cluster=~\"$cluster\", chain_name=\"$chain_name\"}[7d]) * 1000",
+          "expr": "last_over_time(aptos_db_backup_coordinator_heartbeat_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\"}[7d]) * 1000",
           "interval": "",
-          "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
+          "legendFormat": " {{cluster}} {{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -121,7 +121,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_next_block_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
           "hide": false,
           "legendFormat": "latest",
           "range": true,
@@ -130,9 +130,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_coordinator_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[7d])",
+          "expr": "last_over_time(aptos_db_backup_coordinator_epoch_ending_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[7d])",
           "interval": "",
-          "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
+          "legendFormat": " {{cluster}} {{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -195,27 +195,27 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_backup_handler_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "aptos_backup_handler_epoch_ending_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}",
           "hide": true,
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "legendFormat": "{{cluster}} {{pod}} backed up",
           "range": true,
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_epoch_ending_epoch",
+          "expr": "aptos_storage_next_block_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and aptos_backup_handler_epoch_ending_epoch",
           "hide": true,
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} latest",
+          "legendFormat": "{{cluster}} {{pod}} latest",
           "range": true,
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_next_block_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
           "hide": false,
           "legendFormat": "latest",
           "range": true,
@@ -224,9 +224,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_db_backup_coordinator_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_db_backup_coordinator_epoch_ending_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}",
           "hide": false,
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "legendFormat": "{{cluster}} {{pod}} backed up",
           "range": true,
           "refId": "D"
         }
@@ -264,7 +264,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_latest_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
           "hide": false,
           "legendFormat": "latest",
           "range": true,
@@ -273,9 +273,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_coordinator_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[7d])",
+          "expr": "last_over_time(aptos_db_backup_coordinator_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[7d])",
           "interval": "",
-          "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
+          "legendFormat": " {{cluster}} {{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -334,27 +334,27 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_backup_handler_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "aptos_backup_handler_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}",
           "hide": true,
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "legendFormat": "{{cluster}} {{pod}} backed up",
           "range": true,
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_transaction_version",
+          "expr": "aptos_storage_latest_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and aptos_backup_handler_transaction_version",
           "hide": true,
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} latest",
+          "legendFormat": "{{cluster}} {{pod}} latest",
           "range": true,
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_latest_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
           "hide": false,
           "legendFormat": "latest",
           "range": true,
@@ -363,10 +363,10 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_db_backup_coordinator_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_db_backup_coordinator_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "legendFormat": "{{cluster}} {{pod}} backed up",
           "range": true,
           "refId": "C"
         }
@@ -415,9 +415,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_backup_handler_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[5m])",
+          "expr": "rate(aptos_backup_handler_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[5m])",
           "hide": false,
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "legendFormat": "{{cluster}} {{pod}}",
           "range": true,
           "refId": "B"
         }
@@ -464,7 +464,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_next_block_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
           "hide": false,
           "legendFormat": "latest",
           "range": true,
@@ -473,9 +473,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_coordinator_state_snapshot_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[7d])",
+          "expr": "last_over_time(aptos_db_backup_coordinator_state_snapshot_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[7d])",
           "interval": "",
-          "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
+          "legendFormat": " {{cluster}} {{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -534,27 +534,27 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_backup_handler_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "aptos_backup_handler_state_snapshot_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}",
           "hide": true,
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "legendFormat": "{{cluster}} {{pod}} backed up",
           "range": true,
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_state_snapshot_version",
+          "expr": "aptos_storage_latest_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and aptos_backup_handler_state_snapshot_version",
           "hide": true,
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} latest",
+          "legendFormat": "{{cluster}} {{pod}} latest",
           "range": true,
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_latest_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
           "hide": true,
           "legendFormat": "latest",
           "range": true,
@@ -563,7 +563,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_next_block_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
           "hide": false,
           "legendFormat": "latest",
           "range": true,
@@ -572,10 +572,10 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_db_backup_coordinator_state_snapshot_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_db_backup_coordinator_state_snapshot_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "legendFormat": "{{cluster}} {{pod}} backed up",
           "range": true,
           "refId": "D"
         }
@@ -624,9 +624,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_backup_handler_state_snapshot_leaf_index{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[5m])",
+          "expr": "rate(aptos_backup_handler_state_snapshot_leaf_index{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[5m])",
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "legendFormat": "{{cluster}} {{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -700,18 +700,18 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_backup_handler_state_snapshot_leaf_index{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} + 1 ",
+          "expr": "aptos_backup_handler_state_snapshot_leaf_index{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} + 1 ",
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}-progress",
+          "legendFormat": "{{cluster}} {{pod}}-progress",
           "range": true,
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.8, aptos_jellyfish_leaf_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "quantile(0.8, aptos_jellyfish_leaf_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
           "interval": "",
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} total",
+          "legendFormat": "{{cluster}} {{pod}} total",
           "range": true,
           "refId": "B"
         }
@@ -755,7 +755,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "max(aptos_storage_next_block_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
               "hide": false,
               "legendFormat": "latest",
               "range": true,
@@ -764,9 +764,9 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "last_over_time(aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1d])",
+              "expr": "last_over_time(aptos_db_backup_verify_epoch_ending_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1d])",
               "interval": "",
-              "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
+              "legendFormat": " {{cluster}} {{pod}}",
               "range": true,
               "refId": "A"
             }
@@ -812,9 +812,9 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
+              "expr": "aptos_db_backup_verify_epoch_ending_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_backup_verify_epoch_ending_epoch{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{cluster}} {{pod}}",
               "range": true,
               "refId": "A"
             }
@@ -869,9 +869,9 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_db_backup_verify_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
+              "expr": "aptos_db_backup_verify_epoch_ending_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_backup_verify_epoch_ending_version{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{cluster}} {{pod}}",
               "range": true,
               "refId": "A"
             }
@@ -918,7 +918,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "max(aptos_storage_latest_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
               "hide": false,
               "legendFormat": "latest",
               "range": true,
@@ -927,9 +927,9 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "last_over_time(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1d])",
+              "expr": "last_over_time(aptos_db_backup_verify_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1d])",
               "interval": "",
-              "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
+              "legendFormat": " {{cluster}} {{pod}}",
               "range": true,
               "refId": "A"
             }
@@ -975,9 +975,9 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
+              "expr": "aptos_db_backup_verify_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_backup_verify_transaction_version{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{cluster}} {{pod}}",
               "range": true,
               "refId": "A"
             }
@@ -1032,9 +1032,9 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "irate(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) > 0",
+              "expr": "irate(aptos_db_backup_verify_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m]) > 0",
               "interval": "",
-              "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{cluster}} {{pod}}",
               "range": true,
               "refId": "A"
             }
@@ -1081,7 +1081,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+              "expr": "max(aptos_storage_latest_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"})",
               "hide": false,
               "legendFormat": "latest",
               "range": true,
@@ -1090,9 +1090,9 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "last_over_time(aptos_db_backup_verify_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1d])",
+              "expr": "last_over_time(aptos_db_backup_verify_state_snapshot_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1d])",
               "interval": "",
-              "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
+              "legendFormat": " {{cluster}} {{pod}}",
               "range": true,
               "refId": "A"
             }
@@ -1138,9 +1138,9 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_db_backup_verify_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) != 0",
+              "expr": "aptos_db_backup_verify_state_snapshot_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{cluster}} {{pod}}",
               "range": true,
               "refId": "A"
             }
@@ -1212,27 +1212,27 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]))",
+              "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]))",
               "hide": false,
-              "legendFormat": "{{cluster}} {{kubernetes_pod_name}} running since",
+              "legendFormat": "{{cluster}} {{pod}} running since",
               "range": true,
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]))",
+              "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]))",
               "hide": false,
-              "legendFormat": "{{cluster}} {{kubernetes_pod_name}} succeeded since",
+              "legendFormat": "{{cluster}} {{pod}} succeeded since",
               "range": true,
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]))",
+              "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]))",
               "hide": false,
-              "legendFormat": "{{cluster}} {{kubernetes_pod_name}} failed since",
+              "legendFormat": "{{cluster}} {{pod}} failed since",
               "range": true,
               "refId": "C"
             }
@@ -1288,9 +1288,9 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum(irate(aptos_backup_service_sent_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", endpoint=~\"$backup_service_api_name\"}[1m])) by(kubernetes_pod_name, kubernetes_pod_name) > 0",
+              "expr": "sum(irate(aptos_backup_service_sent_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\", endpoint=~\"$backup_service_api_name\"}[1m])) by(pod, pod) > 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{pod}} {{pod}}",
               "refId": "A"
             }
           ],
@@ -1347,9 +1347,9 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "irate(aptos_backup_service_sent_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", endpoint=\"$backup_service_api_name\"}[1m]) and irate(aptos_backup_service_sent_bytes[1m]) > 0",
+              "expr": "irate(aptos_backup_service_sent_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", endpoint=\"$backup_service_api_name\"}[1m]) and irate(aptos_backup_service_sent_bytes[1m]) > 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}}",
+              "legendFormat": "{{pod}} {{pod}}",
               "refId": "A"
             }
           ],
@@ -1421,24 +1421,24 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
+              "expr": "aptos_db_restore_coordinator_start_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} running since",
+              "legendFormat": "{{pod}} running since",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} succeeded since",
+              "legendFormat": "{{pod}} succeeded since",
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
               "hide": false,
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} failed since",
+              "legendFormat": "{{pod}} failed since",
               "refId": "C"
             }
           ],
@@ -1491,9 +1491,9 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_restore_epoch_ending_epoch[1m]) != 0",
+              "expr": "aptos_db_restore_epoch_ending_epoch{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_restore_epoch_ending_epoch[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{pod}}",
               "refId": "A"
             }
           ],
@@ -1546,9 +1546,9 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_restore_epoch_ending_version[1m]) != 0",
+              "expr": "aptos_db_restore_epoch_ending_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_restore_epoch_ending_version[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{pod}}",
               "refId": "A"
             }
           ],
@@ -1601,9 +1601,9 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_restore_state_snapshot_target_leaf_index[1m]) != 0",
+              "expr": "aptos_db_restore_state_snapshot_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_restore_state_snapshot_target_leaf_index[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{pod}}",
               "refId": "A"
             }
           ],
@@ -1657,23 +1657,23 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_transaction_save_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_restore_transaction_save_version[1m]) != 0",
+              "expr": "aptos_db_restore_transaction_save_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_restore_transaction_save_version[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} saved",
+              "legendFormat": "{{pod}} saved",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_transaction_replay_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_restore_transaction_replay_version[1m]) != 0",
+              "expr": "aptos_db_restore_transaction_replay_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_restore_transaction_replay_version[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}  replayed",
+              "legendFormat": "{{pod}}  replayed",
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_target_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and (irate(aptos_db_restore_transaction_save_version[1m]) != 0 or irate(aptos_db_restore_transaction_replay_version[1m]) != 0)",
+              "expr": "aptos_db_restore_coordinator_target_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and (irate(aptos_db_restore_transaction_save_version[1m]) != 0 or irate(aptos_db_restore_transaction_replay_version[1m]) != 0)",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} target",
+              "legendFormat": "{{pod}} target",
               "refId": "C"
             }
           ],
@@ -1727,16 +1727,16 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "(aptos_db_restore_transaction_save_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_restore_transaction_save_version[1m]) != 0) / aptos_db_restore_coordinator_target_version",
+              "expr": "(aptos_db_restore_transaction_save_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_restore_transaction_save_version[1m]) != 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} saved",
+              "legendFormat": "{{pod}} saved",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "(aptos_db_restore_transaction_replay_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_restore_transaction_replay_version[1m]) != 0) / aptos_db_restore_coordinator_target_version",
+              "expr": "(aptos_db_restore_transaction_replay_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} and irate(aptos_db_restore_transaction_replay_version[1m]) != 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} replayed",
+              "legendFormat": "{{pod}} replayed",
               "refId": "B"
             }
           ],
@@ -1789,9 +1789,9 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "irate(aptos_db_restore_transaction_save_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
+              "expr": "irate(aptos_db_restore_transaction_save_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{pod}}",
               "refId": "A"
             }
           ],
@@ -1844,9 +1844,9 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "irate(aptos_db_restore_transaction_replay_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
+              "expr": "irate(aptos_db_restore_transaction_replay_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m]) != 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}",
+              "legendFormat": "{{pod}}",
               "refId": "A"
             }
           ],
@@ -1910,24 +1910,24 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
+              "expr": "aptos_db_restore_coordinator_start_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} running since",
+              "legendFormat": "{{pod}} running since",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} succeeded since",
+              "legendFormat": "{{pod}} succeeded since",
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
               "hide": false,
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} failed since",
+              "legendFormat": "{{pod}} failed since",
               "refId": "C"
             }
           ],
@@ -1982,21 +1982,21 @@
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} saved",
+              "legendFormat": "{{pod}} saved",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}  replayed",
+              "legendFormat": "{{pod}}  replayed",
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "aptos_db_restore_coordinator_target_version and (irate(aptos_db_restore_transaction_save_version[1m]) > 0 or irate(aptos_db_restore_transaction_replay_version[1m]) > 0)",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} target",
+              "legendFormat": "{{pod}} target",
               "refId": "C"
             }
           ],
@@ -2051,14 +2051,14 @@
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "(aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} saved",
+              "legendFormat": "{{pod}} saved",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "expr": "(aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} replayed",
+              "legendFormat": "{{pod}} replayed",
               "refId": "B"
             }
           ],
@@ -2114,7 +2114,7 @@
               "editorMode": "code",
               "expr": "aptos_db_restore_state_snapshot_leaf_index and irate(aptos_db_restore_state_snapshot_leaf_index[1m])",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} saved",
+              "legendFormat": "{{pod}} saved",
               "range": true,
               "refId": "A"
             },
@@ -2123,7 +2123,7 @@
               "editorMode": "code",
               "expr": "aptos_db_restore_state_snapshot_target_leaf_index and irate(aptos_db_restore_state_snapshot_leaf_index[1m])",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}}  target",
+              "legendFormat": "{{pod}}  target",
               "range": true,
               "refId": "B"
             }
@@ -2178,16 +2178,16 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
+              "expr": "aptos_storage_latest_transaction_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} synced",
+              "legendFormat": "{{pod}} {{pod}} synced",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "aptos_storage_ledger_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"validator|fullnode\"}",
+              "expr": "aptos_storage_ledger_version{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}",
               "interval": "",
-              "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} committed",
+              "legendFormat": "{{pod}} {{pod}} committed",
               "refId": "B"
             }
           ],
@@ -2263,7 +2263,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "rate(container_cpu_usage_seconds_total{pod=~\".*backup-0.*\", job=\"kubernetes-cadvisor\",container=\"backup\",  chain_name=\"$chain_name\"})",
+          "expr": "rate(container_cpu_usage_seconds_total{environment=~\"$environment\", pod=~\".*backup-0.*\", job=\"kubernetes-cadvisor\",container=\"backup\"})",
           "instant": false,
           "legendFormat": "{{cluster}}-{{pod}}",
           "range": true,
@@ -2320,7 +2320,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "container_memory_working_set_bytes{pod=~\".*backup-0.*\", job=\"kubernetes-cadvisor\",container=\"backup\",  chain_name=\"$chain_name\"}",
+          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", pod=~\".*backup-0.*\", job=\"kubernetes-cadvisor\",container=\"backup\"}",
           "instant": false,
           "legendFormat": "{{cluster}}-{{pod}}",
           "range": true,
@@ -2377,7 +2377,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "container_memory_working_set_bytes{pod=~\".*backup-verify.*\", job=\"kubernetes-cadvisor\",  chain_name=\"$chain_name\"}",
+          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", pod=~\".*backup-verify.*\", job=\"kubernetes-cadvisor\"}",
           "instant": false,
           "legendFormat": "{{cluster}}-{{pod}}",
           "range": true,
@@ -2397,11 +2397,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -2412,7 +2408,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -2420,43 +2416,17 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "selected": false, "text": "vmagent", "value": "vmagent" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(node_process_start_time{}, metrics_source)",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "metrics_source",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "selected": true, "text": "testnet", "value": "testnet" },
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "chain_name",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -2477,7 +2447,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -2500,7 +2470,7 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -2520,10 +2490,10 @@
         "label": "",
         "multi": true,
         "multiFormat": "",
-        "name": "kubernetes_pod_name",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -2533,20 +2503,27 @@
         "type": "query"
       },
       {
+        "allFormat": "",
+        "allValue": ".*",
         "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
+        "label": "",
         "multi": true,
-        "name": "role",
-        "options": [
-          { "selected": false, "text": "All", "value": "$__all" },
-          { "selected": false, "text": "fullnode", "value": "fullnode" },
-          { "selected": false, "text": "validator_fullnode", "value": "validator_fullnode" }
-        ],
-        "query": "fullnode, validator_fullnode",
-        "queryValue": "",
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
         "skipUrlSync": false,
-        "type": "custom"
+        "sort": 1,
+        "type": "query"
       },
       {
         "current": { "selected": false, "text": ["All"], "value": ["$__all"] },
@@ -2557,10 +2534,7 @@
         "multi": true,
         "name": "backup_service_api_name",
         "options": [],
-        "query": {
-          "query": "aptos_backup_service_latency_s_count",
-          "refId": "Prometheus-backup_service_api_name-Variable-Query"
-        },
+        "query": { "query": "aptos_backup_service_latency_s_count", "refId": "Prometheus-backup_service_api_name-Variable-Query" },
         "refresh": 1,
         "regex": "/endpoint=\"(\\w+)\"/",
         "skipUrlSync": false,
@@ -2576,7 +2550,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "storage-backup-and-restore",
-  "uid": "9oXpx4n4z",
+  "uid": "movement-storage-backup-and-restore",
   "version": 39,
   "weekStart": ""
 }

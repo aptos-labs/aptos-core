@@ -107,7 +107,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\"})",
+          "expr": "sum by(role_type, network_id) (aptos_connections{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"_type\", direction=\"inbound\"})",
           "legendFormat": "{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -170,7 +170,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\" }[$AggInterval]))",
+          "expr": "sum by(role_type, network_id) (rate(aptos_network_pending_connection_upgrades{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"_type\", direction=\"inbound\" }[$AggInterval]))",
           "legendFormat": "{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -233,7 +233,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_connections_rejected{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\"}[1m])",
+          "expr": "rate(aptos_connections_rejected{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"_type\", direction=\"inbound\"}[1m])",
           "legendFormat": "{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -296,7 +296,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by(role_type, network_id)(rate(aptos_network_rpc_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"_type\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{role_type}}-{{network_id}}",
@@ -361,7 +361,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", type=\"request\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by(role_type, network_id)(rate(aptos_network_rpc_messages{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"_type\", type=\"request\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{role_type}}-{{network_id}}",
@@ -426,7 +426,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by(role_type, network_id)(rate(aptos_network_direct_send_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"_type\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{role_type}}-{{network_id}}",
@@ -491,7 +491,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by(role_type, network_id)(rate(aptos_network_direct_send_messages{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"_type\", state=\"received\"}[$AggInterval]))",
           "legendFormat": "{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -554,7 +554,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\"}[$AggInterval])",
           "refId": "A"
         }
       ],
@@ -616,7 +616,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\"}[$AggInterval])",
           "refId": "A"
         }
       ],
@@ -692,7 +692,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{container=~\"$container\"}[$AggInterval]))",
+          "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{environment=~\"$environment\", container=~\"$container\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container}}",
@@ -700,7 +700,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (container_name) (rate(container_cpu_usage_seconds_total{container_name=~\"$container\"}[$AggInterval]))",
+          "expr": "sum by (container_name) (rate(container_cpu_usage_seconds_total{environment=~\"$environment\", container_name=~\"$container\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container_name}}",
@@ -765,7 +765,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(container_fs_reads_total{container=~\"$container\"}[$AggInterval])",
+          "expr": "rate(container_fs_reads_total{environment=~\"$environment\", container=~\"$container\"}[$AggInterval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container}}-reads",
@@ -773,7 +773,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(container_fs_writes_total{container=~\"$container\"}[$AggInterval])",
+          "expr": "rate(container_fs_writes_total{environment=~\"$environment\", container=~\"$container\"}[$AggInterval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container}}-writes",
@@ -781,7 +781,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(container_fs_reads_total{container_name=~\"$container\"}[$AggInterval]) ",
+          "expr": "rate(container_fs_reads_total{environment=~\"$environment\", container_name=~\"$container\"}[$AggInterval]) ",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container_name}}-reads",
@@ -789,7 +789,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(container_fs_writes_total{container_name=~\"$container\"}[$AggInterval])",
+          "expr": "rate(container_fs_writes_total{environment=~\"$environment\", container_name=~\"$container\"}[$AggInterval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container_name}}-writes",
@@ -873,7 +873,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "container_memory_working_set_bytes{container=~\"$container\"} / container_spec_memory_limit_bytes{container=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", container=~\"$container\"} / container_spec_memory_limit_bytes{container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container}}",
@@ -881,7 +881,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "container_memory_working_set_bytes{container_name=~\"$container\"} / container_spec_memory_limit_bytes{container_name=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", container_name=~\"$container\"} / container_spec_memory_limit_bytes{container_name=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container_name}}",
@@ -962,7 +962,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
+          "expr": "kubelet_volume_stats_used_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{persistentvolumeclaim}}",
@@ -988,11 +988,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -1003,7 +999,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -1011,42 +1007,20 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": null,
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "metrics_source",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -1063,7 +1037,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1084,11 +1058,34 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -1102,10 +1099,10 @@
         "label": "",
         "multi": true,
         "multiFormat": "",
-        "name": "kubernetes_pod_name",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "query": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1126,10 +1123,7 @@
         "multiFormat": "",
         "name": "network_id",
         "options": [],
-        "query": {
-          "query": "label_values(network_id)",
-          "refId": "VictoriaMetrics Mainnet US-network_id-Variable-Query"
-        },
+        "query": { "query": "label_values(network_id)", "refId": "VictoriaMetrics Mainnet US-network_id-Variable-Query" },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -1169,10 +1163,7 @@
         "multiFormat": "",
         "name": "rpc_protocol",
         "options": [],
-        "query": {
-          "query": "label_values(protocol_id)",
-          "refId": "VictoriaMetrics Mainnet US-rpc_protocol-Variable-Query"
-        },
+        "query": { "query": "label_values(protocol_id)", "refId": "VictoriaMetrics Mainnet US-rpc_protocol-Variable-Query" },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -1239,7 +1230,7 @@
   },
   "timezone": "",
   "title": "ddos",
-  "uid": "ddos",
+  "uid": "movement-ddos",
   "version": 2,
   "weekStart": ""
 }

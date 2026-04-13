@@ -106,14 +106,14 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "rate(aptos_struct_log_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Logging Rate ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Logging Rate ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -169,14 +169,14 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "rate(aptos_struct_log_processed_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Log Send Process Rate ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Log Send Process Rate ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -232,14 +232,14 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "rate(aptos_struct_log_tcp_submit_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Log Written to Logging Pod Rate ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Log Written to Logging Pod Rate ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -295,14 +295,14 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "rate(aptos_struct_log_processed_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])/rate(aptos_struct_log_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Processed Logs / Logs Written ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Processed Logs / Logs Written ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -358,14 +358,14 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "rate(aptos_struct_log_tcp_submit_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])/rate(aptos_struct_log_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Logs Sent / Logs Written ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Logs Sent / Logs Written ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -435,14 +435,14 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "rate(aptos_struct_log_tcp_connect_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Connect To Logstash Rate ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Connect To Logstash Rate ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -498,14 +498,14 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "(rate(aptos_struct_log_connect_error_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Connect Error Rate  ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Connect Error Rate  ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -601,12 +601,12 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])/rate(aptos_struct_log_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]))",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
-      "title": "Logging Total Failure Rate ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Logging Total Failure Rate ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "show": true },
@@ -680,12 +680,12 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or\n      rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0) + (rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0 or rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "(rate(aptos_struct_log_send_error_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]) or\n      rate(aptos_struct_log_queue_error_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]) * 0) + (rate(aptos_struct_log_send_error_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]) * 0 or rate(aptos_struct_log_queue_error_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]))",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
-      "title": "Total Dropped Logs Rate ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Total Dropped Logs Rate ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "show": true },
@@ -759,12 +759,12 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "(rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "(rate(aptos_struct_log_queue_error_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]))/rate(aptos_struct_log_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
-      "title": "Log Queue Error Rate ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Log Queue Error Rate ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "show": true },
@@ -838,12 +838,12 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "expr": "(rate(aptos_struct_log_send_error_count{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval]))/rate(aptos_struct_log_processed_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$AggInterval])",
+          "legendFormat": "{{pod}}-{{role}}",
           "refId": "A"
         }
       ],
-      "title": "Send To Logstash Error Rate  ($AggInterval) [$kubernetes_pod_name-$role]",
+      "title": "Send To Logstash Error Rate  ($AggInterval) [$pod]",
       "tooltip": { "shared": true, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "show": true },
@@ -861,11 +861,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -876,7 +872,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -884,42 +880,20 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": null,
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "metrics_source",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -936,7 +910,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -957,11 +931,34 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -975,35 +972,15 @@
         "label": "",
         "multi": true,
         "multiFormat": "",
-        "name": "kubernetes_pod_name",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "query": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
         "sort": 1,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["validator"], "value": ["validator"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": true,
-        "label": "",
-        "multi": true,
-        "multiFormat": "",
-        "name": "role",
-        "options": [],
-        "query": { "query": "label_values(role)", "refId": "Devinfra Remote Prometheus-role-Variable-Query" },
-        "refresh": 1,
-        "regex": "^fullnode$|^validator$",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
@@ -1043,7 +1020,7 @@
   "timepicker": { "refresh_intervals": ["1m", "5m", "15m"] },
   "timezone": "",
   "title": "logging",
-  "uid": "logging",
+  "uid": "movement-logging",
   "version": 2,
   "weekStart": ""
 }

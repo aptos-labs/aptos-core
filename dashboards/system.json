@@ -95,7 +95,7 @@
       "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
+          "expr": "rate(container_cpu_usage_seconds_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
@@ -148,7 +148,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
@@ -212,7 +212,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "MJnqIFmVk" },
           "editorMode": "code",
-          "expr": "container_memory_rss{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}",
+          "expr": "container_memory_rss{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
@@ -277,7 +277,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
+          "expr": "kubelet_volume_stats_used_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
@@ -342,9 +342,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
+          "expr": "kubelet_volume_stats_used_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "hide": false,
-          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "legendFormat": "{{cluster}} {{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -404,7 +404,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"} / container_spec_memory_limit_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"} / container_spec_memory_limit_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
@@ -466,7 +466,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(container_fs_reads_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}[$interval]) + rate(container_fs_writes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
+          "expr": "rate(container_fs_reads_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}[$interval]) + rate(container_fs_writes_total{cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{pod}}:{{container}}:{{device}}",
@@ -530,7 +530,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "P968F4F8972F6D74D" },
           "editorMode": "code",
-          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])",
+          "expr": "rate(container_network_receive_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]) + rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{pod}}",
@@ -607,7 +607,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "sum by (kubernetes_pod_name) (node_system_cpu_usage{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"})",
+          "expr": "sum by (pod) (node_system_cpu_usage{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "__auto",
@@ -628,11 +628,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -643,7 +639,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -651,7 +647,7 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
@@ -659,35 +655,9 @@
         "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "metrics_source",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -708,7 +678,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -731,7 +701,30 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -775,7 +768,7 @@
         "options": [],
         "query": { "query": "up{namespace=~\"$namespace\"}", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
         "refresh": 1,
-        "regex": ".*kubernetes_pod_name=\"(.*?)\".*",
+        "regex": ".*pod=~\"(.*?)\".*",
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
@@ -823,7 +816,7 @@
   },
   "timezone": "",
   "title": "system",
-  "uid": "system",
+  "uid": "movement-system",
   "version": 5,
   "weekStart": ""
 }

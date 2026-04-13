@@ -113,7 +113,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_consensus_messages\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_consensus_messages\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "epoch_manager_process_consensus_messages",
@@ -123,7 +123,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_quorum_store_messages\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_quorum_store_messages\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -134,7 +134,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_rpc\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_rpc\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -145,7 +145,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_round_timeout\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_round_timeout\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -206,7 +206,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_consensus_messages\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_consensus_messages\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "epoch_manager_process_consensus_messages",
@@ -216,7 +216,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_quorum_store_messages\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_quorum_store_messages\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -227,7 +227,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_rpc\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_rpc\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -238,7 +238,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_round_timeout\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_round_timeout\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -299,7 +299,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_consensus_messages\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_consensus_messages\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "epoch_manager_process_consensus_messages",
@@ -309,7 +309,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_quorum_store_messages\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_quorum_store_messages\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -320,7 +320,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_rpc\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_rpc\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -331,7 +331,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"epoch_manager_process_round_timeout\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"epoch_manager_process_round_timeout\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -400,7 +400,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_proposal\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_proposal\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "process_proposal",
@@ -410,7 +410,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_verified_proposal\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_verified_proposal\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -421,7 +421,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_vote\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_vote\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -432,7 +432,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_sync_info\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_sync_info\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -443,7 +443,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_local_timeout\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_local_timeout\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -454,7 +454,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_delayed_qc\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "avg(rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_delayed_qc\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -515,7 +515,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_proposal\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_proposal\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "process_proposal",
@@ -525,7 +525,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_verified_proposal\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_verified_proposal\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -536,7 +536,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_vote\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_vote\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -547,7 +547,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_sync_info\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_sync_info\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -558,7 +558,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_local_timeout\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_local_timeout\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -619,7 +619,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_proposal\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_proposal\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "process_proposal",
@@ -629,7 +629,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_verified_proposal\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_verified_proposal\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -640,7 +640,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_vote\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_vote\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -651,7 +651,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_sync_info\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_sync_info\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -662,7 +662,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"process_local_timeout\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"process_local_timeout\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -731,7 +731,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"batch_generator_handle_tick\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"batch_generator_handle_tick\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "batch_generator_handle_tick",
@@ -741,7 +741,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"batch_generator_handle_proof\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"batch_generator_handle_proof\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -752,7 +752,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"batch_generator_handle_command\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"batch_generator_handle_command\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -813,7 +813,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"batch_generator_handle_tick\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"batch_generator_handle_tick\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "batch_generator_handle_tick",
@@ -823,7 +823,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"batch_generator_handle_proof\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"batch_generator_handle_proof\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -834,7 +834,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5,rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"batch_generator_handle_command\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5,rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"batch_generator_handle_command\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -895,7 +895,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"proof_coordinator_handle_tick\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"proof_coordinator_handle_tick\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "proof_coordinator_handle_tick",
@@ -905,7 +905,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"proof_coordinator_handle_command\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"proof_coordinator_handle_command\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -958,7 +958,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"proof_coordinator_handle_tick\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"proof_coordinator_handle_tick\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "proof_coordinator_handle_tick",
@@ -968,7 +968,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"proof_coordinator_handle_command\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"proof_coordinator_handle_command\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1029,7 +1029,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"proof_manager_handle_proposal\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"proof_manager_handle_proposal\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "proof_manager_handle_proposal",
@@ -1039,7 +1039,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"proof_manager_handle_command\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"proof_manager_handle_command\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1092,7 +1092,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"proof_manager_handle_proposal\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"proof_manager_handle_proposal\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "proof_manager_handle_proposal",
@@ -1102,7 +1102,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"proof_manager_handle_command\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"proof_manager_handle_command\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1155,7 +1155,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"qs_network_listener_main_loop\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.9, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"qs_network_listener_main_loop\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "qs_network_listener_main_loop",
@@ -1207,7 +1207,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op=\"qs_network_listener_main_loop\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(consensus_duration_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", op=\"qs_network_listener_main_loop\", pod=~\"$pod\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "qs_network_listener_main_loop",
@@ -1227,11 +1227,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -1242,7 +1238,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -1250,43 +1246,17 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(node_process_start_time{}, metrics_source)",
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "metrics_source",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "selected": false, "text": "multi-region-bench", "value": "multi-region-bench" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -1307,7 +1277,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1330,7 +1300,30 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1350,36 +1343,16 @@
         "label": "",
         "multi": true,
         "multiFormat": "",
-        "name": "kubernetes_pod_name",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "query": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "selected": false, "text": ["validator"], "value": ["validator"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": true,
-        "label": "",
-        "multi": true,
-        "multiFormat": "",
-        "name": "role",
-        "options": [],
-        "query": { "query": "label_values(role)", "refId": "VictoriaMetrics Global-role-Variable-Query" },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
@@ -1426,7 +1399,7 @@
   },
   "timezone": "browser",
   "title": "main-loop-insight",
-  "uid": "jEtCc1a4z",
+  "uid": "movement-main-loop-insight",
   "version": 3,
   "weekStart": ""
 }

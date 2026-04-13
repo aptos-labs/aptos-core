@@ -41,7 +41,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
+            "matcher": { "id": "byName", "options": "pod" },
             "properties": [{ "id": "custom.width", "value": 389 }]
           },
           {
@@ -85,7 +85,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "expr": "rate(aptos_executor_execute_block_seconds_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m])",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -103,7 +103,7 @@
             "fields": {
               "Time": { "aggregations": ["last"], "operation": "aggregate" },
               "Value": { "aggregations": ["last"], "operation": "aggregate" },
-              "kubernetes_pod_name": { "aggregations": [], "operation": "groupby" },
+              "pod": { "aggregations": [], "operation": "groupby" },
               "role": { "aggregations": ["last"], "operation": "aggregate" }
             }
           }
@@ -129,7 +129,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
+            "matcher": { "id": "byName", "options": "pod" },
             "properties": [{ "id": "custom.width", "value": 398 }]
           },
           {
@@ -173,7 +173,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(aptos_executor_commit_blocks_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "expr": "rate(aptos_executor_commit_blocks_seconds_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m])",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -191,7 +191,7 @@
             "fields": {
               "Time": { "aggregations": ["last"], "operation": "aggregate" },
               "Value": { "aggregations": ["last"], "operation": "aggregate" },
-              "kubernetes_pod_name": { "aggregations": [], "operation": "groupby" },
+              "pod": { "aggregations": [], "operation": "groupby" },
               "role": { "aggregations": ["last"], "operation": "aggregate" }
             }
           }
@@ -211,7 +211,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
+            "matcher": { "id": "byName", "options": "pod" },
             "properties": [{ "id": "custom.width", "value": 362 }]
           },
           {
@@ -255,7 +255,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(aptos_executor_apply_chunk_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "expr": "rate(aptos_executor_apply_chunk_seconds_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m])",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -267,7 +267,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_executor_execute_chunk_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "expr": "rate(aptos_executor_execute_chunk_seconds_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m])",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
@@ -282,7 +282,7 @@
             "fields": {
               "Time": { "aggregations": ["last"], "operation": "aggregate" },
               "Value": { "aggregations": ["last"], "operation": "aggregate" },
-              "kubernetes_pod_name": { "aggregations": [], "operation": "groupby" },
+              "pod": { "aggregations": [], "operation": "groupby" },
               "role": { "aggregations": ["last"], "operation": "aggregate" }
             }
           }
@@ -308,7 +308,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
+            "matcher": { "id": "byName", "options": "pod" },
             "properties": [{ "id": "custom.width", "value": 366 }]
           },
           {
@@ -352,7 +352,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(aptos_executor_commit_chunk_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\"}[1m])",
+          "expr": "rate(aptos_executor_commit_chunk_seconds_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[1m])",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -370,7 +370,7 @@
             "fields": {
               "Time": { "aggregations": ["last"], "operation": "aggregate" },
               "Value": { "aggregations": ["last"], "operation": "aggregate" },
-              "kubernetes_pod_name": { "aggregations": [], "operation": "groupby" },
+              "pod": { "aggregations": [], "operation": "groupby" },
               "role": { "aggregations": ["last"], "operation": "aggregate" }
             }
           }
@@ -396,7 +396,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
+            "matcher": { "id": "byName", "options": "pod" },
             "properties": [{ "id": "custom.width", "value": 371 }]
           },
           {
@@ -462,7 +462,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(node_linux_disk_num_reads{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(node_linux_disk_num_reads{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[1m])",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -475,7 +475,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(node_linux_disk_num_writes{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(node_linux_disk_num_writes{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[1m])",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -503,7 +503,7 @@
               "Total IOPS": { "aggregations": ["last"], "operation": "aggregate" },
               "Value #Read": { "aggregations": ["last"], "operation": "aggregate" },
               "Value #Write": { "aggregations": ["last"], "operation": "aggregate" },
-              "kubernetes_pod_name": { "aggregations": [], "operation": "groupby" },
+              "pod": { "aggregations": [], "operation": "groupby" },
               "name": { "aggregations": [], "operation": "groupby" },
               "role": { "aggregations": [], "operation": "groupby" }
             }
@@ -526,7 +526,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
+            "matcher": { "id": "byName", "options": "pod" },
             "properties": [{ "id": "custom.width", "value": 509 }]
           },
           {
@@ -566,7 +566,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role_type\", data_type=\"transactions\"} - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",  role=~\"$role_type\", type=\"synced\"}, 0)",
+          "expr": "clamp_min(aptos_data_client_highest_advertised_data{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"$pod\", data_type=\"transactions\"} - on(pod) aptos_state_sync_version{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"$pod\", type=\"synced\"}, 0)",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -583,7 +583,7 @@
           "options": {
             "fields": {
               "Value": { "aggregations": ["last"], "operation": "aggregate" },
-              "kubernetes_pod_name": { "aggregations": [], "operation": "groupby" },
+              "pod": { "aggregations": [], "operation": "groupby" },
               "role": { "aggregations": [], "operation": "groupby" }
             }
           }
@@ -602,11 +602,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -617,7 +613,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -625,7 +621,7 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
@@ -633,35 +629,9 @@
         "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "metrics_source",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -682,7 +652,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -705,7 +675,30 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -725,10 +718,10 @@
         "label": "",
         "multi": true,
         "multiFormat": "",
-        "name": "kubernetes_pod_name",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "query": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -759,7 +752,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "outliers",
-  "uid": "outliers",
+  "uid": "movement-outliers",
   "version": 1,
   "weekStart": ""
 }

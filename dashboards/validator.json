@@ -249,7 +249,7 @@
       "span": 0,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_current_round{role=\"validator\"}[1m]) == 0",
+          "expr": "rate(aptos_consensus_current_round{environment=~\"$environment\"}[1m]) == 0",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -316,17 +316,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "time() - container_start_time_seconds{container=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "time() - container_start_time_seconds{environment=~\"$environment\", container=\"validator\", pod=~\"$pod\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         },
         {
-          "expr": "time() - container_start_time_seconds{container_name=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "time() - container_start_time_seconds{environment=~\"$environment\", container_name=\"validator\", pod=~\"$pod\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "B"
         }
       ],
@@ -386,10 +386,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
+          "expr": "sum by (pod)(aptos_connections{environment=~\"$environment\", network_id=\"Validator\", role_type=\"validator\", pod=~\"$pod\"})",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
@@ -449,17 +449,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_version{type=\"committed\", role=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_state_sync_version{environment=~\"$environment\", type=\"committed\", pod=~\"$pod\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-committed",
+          "legendFormat": "{{pod}}-committed",
           "refId": "A"
         },
         {
-          "expr": "aptos_state_sync_version{type=\"synced\", role=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_state_sync_version{environment=~\"$environment\", type=\"synced\", pod=~\"$pod\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-synced",
+          "legendFormat": "{{pod}}-synced",
           "refId": "B"
         }
       ],
@@ -519,10 +519,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_current_round{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(aptos_consensus_current_round{environment=~\"$environment\", pod=~\"$pod\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
@@ -582,10 +582,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_round{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(aptos_consensus_last_committed_round{environment=~\"$environment\", pod=~\"$pod\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
@@ -645,10 +645,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_version{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(aptos_consensus_last_committed_version{environment=~\"$environment\", pod=~\"$pod\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
@@ -727,10 +727,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum without (state) (rate(aptos_consensus_committed_txns_count{state=\"failed\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])) / sum without (state) (rate(aptos_consensus_committed_txns_count{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]))",
+          "expr": "sum without (state) (rate(aptos_consensus_committed_txns_count{environment=~\"$environment\", state=\"failed\", pod=~\"$pod\"}[1m])) / sum without (state) (rate(aptos_consensus_committed_txns_count{pod=~\"$pod\"}[1m]))",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
@@ -806,10 +806,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(aptos_core_mempool_txn_commit_latency_sum{environment=~\"$environment\", stage=~\"commit_accepted|commit_rejected\", pod=~\"$pod\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", pod=~\"$pod\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
@@ -885,10 +885,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_core_mempool_index_size{environment=~\"$environment\", index=\"system_ttl\", pod=~\"$pod\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
@@ -965,8 +965,8 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_key_manager_state{state=\"keys_still_fresh\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h]) > bool 1",
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "expr": "increase(aptos_key_manager_state{environment=~\"$environment\", state=\"keys_still_fresh\", pod=~\"$pod\"}[1h]) > bool 1",
+          "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
@@ -989,11 +989,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -1004,7 +1000,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -1012,42 +1008,20 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": null,
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "metrics_source",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -1064,7 +1038,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1085,11 +1059,34 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -1103,10 +1100,10 @@
         "label": "",
         "multi": true,
         "multiFormat": "",
-        "name": "kubernetes_pod_name",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "query": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1123,7 +1120,7 @@
   },
   "timezone": "",
   "title": "validator",
-  "uid": "validator",
+  "uid": "movement-validator",
   "version": 2,
   "weekStart": ""
 }

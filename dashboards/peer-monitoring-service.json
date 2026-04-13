@@ -59,7 +59,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_average_ping_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"Validator\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_average_ping_latencies_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"Validator\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -100,7 +100,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_distance_from_validators_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"Validator\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_distance_from_validators_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"Validator\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -141,7 +141,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_node_uptime_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"Validator\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_node_uptime_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"Validator\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -182,7 +182,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_num_connected_peers_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"Validator\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_num_connected_peers_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"Validator\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -223,7 +223,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_average_ping_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"vfn\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_average_ping_latencies_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"vfn\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -264,7 +264,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_distance_from_validators_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"vfn\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_distance_from_validators_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"vfn\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -305,7 +305,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_node_uptime_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"vfn\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_node_uptime_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"vfn\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -346,7 +346,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_num_connected_peers_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"vfn\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_num_connected_peers_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"vfn\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -387,7 +387,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_average_ping_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"Public\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_average_ping_latencies_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"Public\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -428,7 +428,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_distance_from_validators_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"Public\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_distance_from_validators_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"Public\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -469,7 +469,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_node_uptime_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"Public\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_node_uptime_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"Public\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -510,7 +510,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (le) (rate(peer_monitoring_client_num_connected_peers_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", network_id=\"Public\"}[1m]))",
+          "expr": "sum by (le) (rate(peer_monitoring_client_num_connected_peers_bucket{environment=~\"$environment\", pod=~\"$pod\", network_id=\"Public\"}[1m]))",
           "format": "heatmap",
           "hide": false,
           "instant": true,
@@ -575,8 +575,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(peer_monitoring_client_sent_requests{chain_name=~\"$chain_name\",  kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{request_types}}",
+              "expr": "rate(peer_monitoring_client_sent_requests{environment=~\"$environment\",  pod=~\"$pod\"}[$interval])",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{request_types}}",
               "range": true,
               "refId": "A"
             }
@@ -630,8 +630,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(peer_monitoring_client_success_responses{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{response_type}}",
+              "expr": "rate(peer_monitoring_client_success_responses{environment=~\"$environment\", pod=~\"$pod\"}[$interval])",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{response_type}}",
               "range": true,
               "refId": "A"
             }
@@ -685,8 +685,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "peer_monitoring_client_in_flight_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}",
+              "expr": "peer_monitoring_client_in_flight_requests{environment=~\"$environment\", pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}-{{role}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -740,8 +740,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(peer_monitoring_client_error_responses{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{response_type}}",
+              "expr": "rate(peer_monitoring_client_error_responses{environment=~\"$environment\", pod=~\"$pod\"}[$interval])",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{response_type}}",
               "range": true,
               "refId": "A"
             }
@@ -806,7 +806,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(peer_monitoring_client_request_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(peer_monitoring_client_request_latencies_bucket{environment=~\"$environment\", pod=~\"$pod\"}[$__rate_interval])) by (le))",
               "legendFormat": "P99",
               "range": true,
               "refId": "A"
@@ -814,7 +814,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(peer_monitoring_client_request_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.70, sum(rate(peer_monitoring_client_request_latencies_bucket{environment=~\"$environment\", pod=~\"$pod\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P70",
               "range": true,
@@ -872,8 +872,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "peer_monitoring_client_request_latencies_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/peer_monitoring_client_request_latencies_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{request_type}}",
+              "expr": "peer_monitoring_client_request_latencies_sum{environment=~\"$environment\", pod=~\"$pod\"}/peer_monitoring_client_request_latencies_count{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -938,7 +938,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(peer_monitoring_client_request_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",request_type=\"latency_ping\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(peer_monitoring_client_request_latencies_bucket{environment=~\"$environment\", pod=~\"$pod\",request_type=\"latency_ping\"}[$__rate_interval])) by (le))",
               "legendFormat": "P99",
               "range": true,
               "refId": "A"
@@ -946,7 +946,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(peer_monitoring_client_request_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",request_type=\"latency_ping\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.70, sum(rate(peer_monitoring_client_request_latencies_bucket{environment=~\"$environment\", pod=~\"$pod\",request_type=\"latency_ping\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P70",
               "range": true,
@@ -1004,8 +1004,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "peer_monitoring_client_request_latencies_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/peer_monitoring_client_request_latencies_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",request_type=\"latency_ping\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{request_type}}",
+              "expr": "peer_monitoring_client_request_latencies_sum{environment=~\"$environment\", pod=~\"$pod\"}/peer_monitoring_client_request_latencies_count{pod=~\"$pod\",request_type=\"latency_ping\"}",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1066,8 +1066,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_peer_monitoring_service_server_requests_received{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{request_type}}",
+              "expr": "rate(aptos_peer_monitoring_service_server_requests_received{environment=~\"$environment\", pod=~\"$pod\"}[$interval])",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1115,8 +1115,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_peer_monitoring_service_server_responses_sent{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{response_type}}",
+              "expr": "rate(aptos_peer_monitoring_service_server_responses_sent{environment=~\"$environment\", pod=~\"$pod\"}[$interval])",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{response_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1166,7 +1166,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_peer_monitoring_service_server_request_latency_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(aptos_peer_monitoring_service_server_request_latency_bucket{environment=~\"$environment\", pod=~\"$pod\"}[$__rate_interval])) by (le))",
               "legendFormat": "P99",
               "range": true,
               "refId": "A"
@@ -1174,7 +1174,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(aptos_peer_monitoring_service_server_request_latency_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.70, sum(rate(aptos_peer_monitoring_service_server_request_latency_bucket{environment=~\"$environment\", pod=~\"$pod\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P70",
               "range": true,
@@ -1226,8 +1226,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_peer_monitoring_service_server_request_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_peer_monitoring_service_server_request_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{request_type}}",
+              "expr": "aptos_peer_monitoring_service_server_request_latency_sum{environment=~\"$environment\", pod=~\"$pod\"}/aptos_peer_monitoring_service_server_request_latency_count{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1275,8 +1275,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_peer_monitoring_service_server_pending_network_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{state}}",
+              "expr": "rate(aptos_peer_monitoring_service_server_pending_network_events{environment=~\"$environment\", pod=~\"$pod\"}[$interval])",
+              "legendFormat": "{{pod}}-{{role}}-{{network_id}}-{{state}}",
               "range": true,
               "refId": "A"
             }
@@ -1324,8 +1324,8 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_peer_monitoring_service_server_errors{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_type}}",
+              "expr": "rate(aptos_peer_monitoring_service_server_errors{environment=~\"$environment\", pod=~\"$pod\"}[$interval])",
+              "legendFormat": "{{pod}}-{{role}}-{{error_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1348,7 +1348,7 @@
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "VictoriaMetrics Global", "value": "VictoriaMetrics Global" },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -1362,71 +1362,49 @@
         "type": "datasource"
       },
       {
+        "allFormat": "",
         "allValue": ".*",
-        "current": { "selected": false, "text": "vmagent", "value": "vmagent" },
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(node_process_start_time{}, metrics_source)",
+        "definition": "",
         "hide": 0,
         "includeAll": true,
-        "multi": false,
-        "name": "metrics_source",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "current": { "selected": false, "text": "devnet", "value": "devnet" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"},chain_name)",
-        "hide": 0,
-        "includeAll": false,
         "label": "",
         "multi": false,
-        "name": "chain_name",
+        "multiFormat": "",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"},chain_name)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "type": "query"
       },
       {
         "current": { "selected": false, "text": "gcp-forge-0", "value": "gcp-forge-0" },
         "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
-        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"},cluster)",
+        "definition": "label_values(node_process_start_time{},cluster)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "multi": false,
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"},cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
-        "type": "query"
+        "type": "query",
+        "allValue": ".*"
       },
       {
         "current": { "selected": false, "text": "All", "value": "All" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"},namespace)",
+        "definition": "label_values(node_process_start_time{cluster=~\"$cluster\"},namespace)",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -1434,7 +1412,7 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"},namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1444,42 +1422,44 @@
         "tagValuesQuery": "",
         "tagsQuery": "",
         "type": "query",
-        "useTags": false
+        "useTags": false,
+        "allValue": ".*"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
         "allValue": ".*",
         "current": { "selected": false, "text": ["All"], "value": ["$__all"] },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"},kubernetes_pod_name)",
+        "definition": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"},pod)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
-        "name": "kubernetes_pod_name",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"},kubernetes_pod_name)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
-      },
-      {
-        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"},role)",
-        "hide": 0,
-        "includeAll": true,
-        "multi": true,
-        "name": "role",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"},role)",
+          "query": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"},pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1527,7 +1507,7 @@
   },
   "timezone": "",
   "title": "peer-monitoring-service",
-  "uid": "peer_monitoring_service",
+  "uid": "movement-peer-monitoring-service",
   "version": 26,
   "weekStart": ""
 }

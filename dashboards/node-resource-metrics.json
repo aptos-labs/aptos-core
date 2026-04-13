@@ -97,7 +97,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"idle_ms|iowait_ms\"}[$__rate_interval]))",
+          "expr": "sum by (pod) (rate(node_linux_system_cpu_usage{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\", state=~\"idle_ms|iowait_ms\"}[$__rate_interval]))",
           "hide": true,
           "legendFormat": "__auto",
           "range": true,
@@ -106,7 +106,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "sum by (pod) (rate(node_linux_system_cpu_usage{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": true,
           "legendFormat": "__auto",
           "range": true,
@@ -115,7 +115,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (kubernetes_pod_name) (rate(node_linux_system_cpu_usage{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"guest_ms|guest_nice_ms\"}[$__rate_interval]))",
+          "expr": "sum by (pod) (rate(node_linux_system_cpu_usage{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\", state=~\"guest_ms|guest_nice_ms\"}[$__rate_interval]))",
           "hide": true,
           "legendFormat": "__auto",
           "range": true,
@@ -180,10 +180,10 @@
         {
           "datasource": { "type": "prometheus", "uid": "MJnqIFmVk" },
           "editorMode": "code",
-          "expr": "node_process_memory{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "node_process_memory{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -239,10 +239,10 @@
         {
           "datasource": { "type": "prometheus", "uid": "MJnqIFmVk" },
           "editorMode": "code",
-          "expr": "node_system_mem_used{namespace=\"$namespace\",chain_name=\"$chain_name\",role=\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\"}/node_system_mem_total{namespace=\"$namespace\",chain_name=\"$chain_name\",role=\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "node_system_mem_used{environment=~\"$environment\", namespace=\"$namespace\",pod=~\"$pod\"}/node_system_mem_total{namespace=\"$namespace\",pod=~\"$pod\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -298,7 +298,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "1-(node_disk_available_space{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}/node_disk_total_space{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
+          "expr": "1-(node_disk_available_space{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}/node_disk_total_space{namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"})",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
@@ -356,7 +356,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "node_disk_total_space{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - node_disk_available_space{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "node_disk_total_space{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"} - node_disk_available_space{namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
@@ -414,7 +414,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(node_network_total_received{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]) + rate(node_network_total_transmitted{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+          "expr": "rate(node_network_total_received{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]) + rate(node_network_total_transmitted{namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval])",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
@@ -466,9 +466,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(node_linux_disk_num_reads{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]) + rate(node_linux_disk_num_writes{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+          "expr": "rate(node_linux_disk_num_reads{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]) + rate(node_linux_disk_num_writes{namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval])",
           "hide": false,
-          "legendFormat": "{{kubernetes_pod_name}} {{name}}",
+          "legendFormat": "{{pod}} {{name}}",
           "range": true,
           "refId": "B"
         }
@@ -518,7 +518,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(node_linux_disk_num_writes{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "quantile(0.5, rate(node_linux_disk_num_writes{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": false,
           "legendFormat": "P50",
           "range": true,
@@ -527,7 +527,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.75, rate(node_linux_disk_num_writes{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "quantile(0.75, rate(node_linux_disk_num_writes{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": false,
           "legendFormat": "P75",
           "range": true,
@@ -536,7 +536,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(node_linux_disk_num_writes{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "quantile(0.9, rate(node_linux_disk_num_writes{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": false,
           "legendFormat": "P90",
           "range": true,
@@ -545,7 +545,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, rate(node_linux_disk_num_writes{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "quantile(0.99, rate(node_linux_disk_num_writes{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": false,
           "legendFormat": "P99",
           "range": true,
@@ -597,7 +597,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(node_linux_disk_num_reads{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "quantile(0.5, rate(node_linux_disk_num_reads{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": false,
           "legendFormat": "P50",
           "range": true,
@@ -606,7 +606,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.75, rate(node_linux_disk_num_reads{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "quantile(0.75, rate(node_linux_disk_num_reads{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": false,
           "legendFormat": "P75",
           "range": true,
@@ -615,7 +615,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(node_linux_disk_num_reads{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "quantile(0.9, rate(node_linux_disk_num_reads{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": false,
           "legendFormat": "P90",
           "range": true,
@@ -624,7 +624,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, rate(node_linux_disk_num_reads{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval]))",
+          "expr": "quantile(0.99, rate(node_linux_disk_num_reads{environment=~\"$environment\", namespace=~\"$namespace\", cluster=~\"$cluster\", pod=~\"$pod\"}[$__rate_interval]))",
           "hide": false,
           "legendFormat": "P99",
           "range": true,
@@ -676,11 +676,11 @@
         {
           "datasource": { "type": "prometheus", "uid": "MJnqIFmVk" },
           "editorMode": "code",
-          "expr": "node_system_cpu_usage{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", cpu_id=\"cpu\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "node_system_cpu_usage{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", cpu_id=\"cpu\", pod=~\"$pod\"}",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
         }
@@ -697,11 +697,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": {
-          "selected": true,
-          "text": "VictoriaMetrics Global (Non-mainnet)",
-          "value": "VictoriaMetrics Global (Non-mainnet)"
-        },
+        "current": { "selected": true, "text": "mainnet-prometheus", "value": "mainnet-prometheus" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -712,7 +708,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -720,42 +716,20 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": null,
+        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": "",
         "multi": false,
         "multiFormat": "",
-        "name": "metrics_source",
+        "name": "environment",
         "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{}, metrics_source)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": { "query": "label_values(node_process_start_time{}, environment)", "refId": "StandardVariableQuery" },
         "refresh": 1,
         "regex": "",
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "multiFormat": "",
-        "name": "chain_name",
-        "options": [],
-        "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -772,7 +746,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -793,11 +767,34 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\"}, namespace)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "pod",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
@@ -811,34 +808,14 @@
         "label": "",
         "multi": true,
         "multiFormat": "",
-        "name": "kubernetes_pod_name",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "query": "label_values(node_process_start_time{cluster=~\"$cluster\", namespace=~\"$namespace\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allFormat": "",
-        "allValue": "",
-        "current": { "selected": true, "text": ["validator"], "value": ["validator"] },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(role)",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": true,
-        "multiFormat": "",
-        "name": "role",
-        "options": [],
-        "query": { "query": "label_values(role)", "refId": "StandardVariableQuery" },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       }
@@ -851,7 +828,7 @@
   },
   "timezone": "",
   "title": "node-resource-metrics",
-  "uid": "Rgf4wanVk",
+  "uid": "movement-node-resource-metrics",
   "version": 3,
   "weekStart": ""
 }
