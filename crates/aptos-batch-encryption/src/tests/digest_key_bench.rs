@@ -6,8 +6,8 @@ use crate::shared::{digest::DigestKey, digest_key_file};
 use ark_std::rand::thread_rng;
 use std::{path::Path, time::Instant};
 
-const BATCH_SIZES: &[usize] = &[64, 96, 128];
-const NUM_ROUNDS: &[usize] = &[200_000, 300_000, 400_000];
+const BATCH_SIZES: &[usize] = &[128];
+const NUM_ROUNDS: &[usize] = &[216_000];
 
 #[test]
 #[ignore]
@@ -67,7 +67,7 @@ fn bench_digest_key_generate_serialize_deserialize() {
 #[test]
 #[ignore]
 fn bench_digest_key_deserialize_from_file() {
-    let file_path = "/tmp/digest_key_b64_r200000.bcs";
+    let file_path = "/tmp/digest_key_b128_r216000.bcs";
 
     println!();
     println!("Deserializing from: {}", file_path);
