@@ -726,6 +726,17 @@ pub(crate) fn process_committed_transactions(
     };
 
     for transaction in transactions {
+<<<<<<< HEAD
+=======
+        if tracing_enabled {
+            if let Some(hash) = pool
+                .transactions
+                .get_committed_hash(&transaction.sender, transaction.replay_protector)
+            {
+                traced_commit_hashes.push(hash);
+            }
+        }
+>>>>>>> 3f2405c8cf ([mempool] Avoid cloning SignedTransaction for tracing committed hash (#19437))
         pool.log_commit_transaction(
             &transaction.sender,
             transaction.replay_protector,
