@@ -22,12 +22,12 @@ jobs:
       )
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.14"
 
       - name: Install dependencies
         run: pip install requests
@@ -44,7 +44,7 @@ jobs:
 
       - name: Create Pull Request
         id: create-pr
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # pin@v8
         with:
           token: ${{ secrets.APTOS_BOT_PAT }}
           branch: auto/calibrate-execution-performance
