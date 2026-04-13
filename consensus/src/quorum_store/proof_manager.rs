@@ -4,7 +4,10 @@
 use super::batch_store::BatchStore;
 use crate::{
     monitor,
-    quorum_store::{batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters},
+    quorum_store::{
+        batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters,
+        tracing::{observe_batch, BatchStage},
+    },
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, TxnSummaryWithExpiration},
@@ -34,6 +37,7 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
+    batch_expiry_gap_when_init_usecs: u64,
 }
 
 impl ProofManager {
@@ -56,6 +60,7 @@ impl ProofManager {
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
+            batch_expiry_gap_when_init_usecs,
         }
     }
 
@@ -63,6 +68,20 @@ impl ProofManager {
         let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
         let tracing_enabled = store.is_enabled();
         for proof in proofs.into_iter() {
+            // Batch tracing (Prometheus histogram) — works on every node,
+            // not just the batch author. Measures batch_creation → proof_received.
+            let approx_created_ts_usecs = proof
+                .info()
+                .expiration()
+                .saturating_sub(self.batch_expiry_gap_when_init_usecs);
+            observe_batch(
+                approx_created_ts_usecs,
+                proof.info().author(),
+                BatchStage::PROOF_RECEIVED,
+                proof.info(),
+            );
+            // Txn trace (per-txn log) — only fires on the batch author where the
+            // batch digest is registered. Shows per-txn outliers.
             if tracing_enabled {
                 store.record_batch_stage(
                     proof.info().digest(),
