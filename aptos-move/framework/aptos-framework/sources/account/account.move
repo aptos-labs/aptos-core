@@ -14,9 +14,11 @@ module aptos_framework::account {
     use aptos_framework::system_addresses;
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
+    use aptos_std::keyless;
     use aptos_std::multi_ed25519;
     use aptos_std::single_key;
     use aptos_std::multi_key;
+    use aptos_std::single_key::AnyPublicKey;
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
 
@@ -518,8 +520,27 @@ module aptos_framework::account {
     /// # Events
     /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
     entry fun upsert_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, backup_public_key: vector<u8>, backup_key_proof: vector<u8>) acquires Account {
-        // Check that the provided public key is a keyless public key
         let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
+
+        upsert_ed25519_backup_key_on_keyless_account_internal(
+            account,
+            keyless_single_key,
+            backup_public_key,
+            backup_key_proof
+        )
+    }
+
+    /// Arguments:
+    ///   keyless_single_key    expected to be an `AnyPublicKey::Keyless` or an `AnyPublicKey::FederatedKeyless`
+    ///
+    /// Note: The way this was written makes it hard to trivially change it to use the more type-safe `keyless::PublicKey` rather than `AnyPublicKey`
+    public(friend) fun upsert_ed25519_backup_key_on_keyless_account_internal(
+        account: &signer,
+        keyless_single_key: AnyPublicKey,
+        backup_public_key: vector<u8>,
+        backup_key_proof: vector<u8>
+    ) acquires Account {
+        // Check that the provided public key is a keyless public key
         assert!(single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key), error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
 
         let addr = signer::address_of(account);
