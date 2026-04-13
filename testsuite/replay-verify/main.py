@@ -183,6 +183,25 @@ class WorkerPod:
             return self.status.status.container_statuses
         return None
 
+    def get_container_status_summary(self) -> str:
+        """Return a one-line summary of the first container's state."""
+        container_statuses = self.get_container_status()
+        if not container_statuses:
+            return "no-container-status"
+        cs = container_statuses[0]
+        if cs.state:
+            if cs.state.waiting:
+                return f"Waiting({cs.state.waiting.reason}: {cs.state.waiting.message})"
+            if cs.state.running:
+                return f"Running(since {cs.state.running.started_at})"
+            if cs.state.terminated:
+                return f"Terminated(reason={cs.state.terminated.reason}, exit={cs.state.terminated.exit_code})"
+        return "unknown-state"
+
+    def get_age_secs(self) -> float:
+        """Return seconds since this WorkerPod was created."""
+        return time.time() - self.start_time
+
     def has_txn_mismatch(self) -> bool:
         if self.status:
             container_statuses = self.status.status.container_statuses
@@ -258,7 +277,7 @@ class WorkerPod:
                 response = self.client.create_namespaced_pod(
                     namespace=self.namespace, body=pod_manifest
                 )
-                logger.info(f"Created pod {self.name}")
+                logger.info(f"Created pod {self.name} (worker={self.worker_id}, pvc={self.get_claim_name()})")
                 return
             except ApiException as e:
                 logger.warning(
@@ -573,6 +592,8 @@ class ReplayScheduler:
             self.kill_all_pods()
         self.create_tasks()
 
+        schedule_start = time.time()
+        last_summary_time = schedule_start
         while len(self.tasks) > 0:
             pvc_bound_status = self.get_pvc_bound_status()
             for i in range(len(self.current_workers)):
@@ -608,13 +629,14 @@ class ReplayScheduler:
 
                 if self.current_workers[i] is not None:
                     try:
-                        phase = self.current_workers[i].get_phase()
-                        # logger.info(
-                        #     f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
-                        # )
+                        self.current_workers[i].get_phase()
                     except Exception as e:
                         logger.error(f"Failed to get pod status: {e}")
                         self.reschedule_pod(self.current_workers[i], i)
+            now = time.time()
+            if now - last_summary_time >= 600:  # Every 10 minutes
+                self._log_worker_summary(schedule_start, tasks_remaining=len(self.tasks))
+                last_summary_time = now
             time.sleep(QUERY_DELAY)
         logger.info("All tasks have been scheduled")
 
@@ -627,21 +649,34 @@ class ReplayScheduler:
         self.current_workers[worker_idx] = None
 
     def process_completed_pod(self, worker_pod, worker_idx):
+        duration = int(worker_pod.get_age_secs())
+
         if worker_pod.has_txn_mismatch():
             logger.info(f"Worker {worker_pod.name} failed with txn mismatch")
             self.txn_mismatch_logs.append(worker_pod.get_humio_log_link())
 
         if worker_pod.is_failed():
+            reason = worker_pod.get_failure_reason()
             if worker_pod.should_reschedule():
                 logger.info(
-                    f"Worker {worker_pod.name} failed with {worker_pod.get_failure_reason()}. Rescheduling"
+                    f"Worker {worker_idx} completed: {worker_pod.name}, "
+                    f"status=Failed({reason}), duration={duration}s, rescheduling"
                 )
                 self.reschedule_pod(worker_pod, worker_idx)
             else:
+                logger.info(
+                    f"Worker {worker_idx} completed: {worker_pod.name}, "
+                    f"status=Failed({reason}), duration={duration}s"
+                )
                 self.failed_workpod_logs.append(worker_pod.get_humio_log_link())
                 self.current_workers[worker_idx] = None
         else:
+            logger.info(
+                f"Worker {worker_idx} completed: {worker_pod.name}, "
+                f"status=Succeeded, duration={duration}s"
+            )
             self.task_stats[worker_pod.name].set_succeeded()
+            self.current_workers[worker_idx] = None
 
         self.task_stats[worker_pod.name].set_end_time()
 
@@ -663,17 +698,39 @@ class ReplayScheduler:
         )
 
     def collect_all_failed_logs(self) -> tuple[list[str], list[str]]:
-        logger.info("Collecting logs from remaining pods")
+        remaining = sum(1 for w in self.current_workers if w is not None)
+        logger.info(f"Collecting logs from {remaining} remaining pods")
+
+        collect_timeout = 20 * 60  # 20 minutes
+        collect_start = time.time()
+        last_summary_time = collect_start
+
         all_completed = False
         while not all_completed:
+            elapsed = time.time() - collect_start
+            if elapsed > collect_timeout:
+                logger.error(
+                    f"collect_all_failed_logs timed out after {int(elapsed)}s"
+                )
+                self._log_worker_summary(collect_start, log_level=logging.ERROR)
+                for idx, w in enumerate(self.current_workers):
+                    if w is not None:
+                        self.failed_workpod_logs.append(w.get_humio_log_link())
+                        self.current_workers[idx] = None
+                break
+
             all_completed = True
             for idx, worker in enumerate(self.current_workers):
                 if worker is not None:
-                    logger.info(f"Checking worker {idx} {worker.name}")
                     if not worker.is_completed():
                         all_completed = False
                     else:
                         self.process_completed_pod(worker, idx)
+
+            now = time.time()
+            if now - last_summary_time >= 60:  # Every 60 seconds
+                self._log_worker_summary(collect_start)
+                last_summary_time = now
             time.sleep(QUERY_DELAY)
 
         return (self.failed_workpod_logs, self.txn_mismatch_logs)
@@ -681,6 +738,36 @@ class ReplayScheduler:
     def print_stats(self):
         for key, value in self.task_stats.items():
             logger.info(f"{key}: {value}")
+
+    def _log_worker_summary(
+        self,
+        phase_start_time: float,
+        tasks_remaining: int | None = None,
+        log_level: int = logging.INFO,
+    ):
+        """Dump status of every worker slot."""
+        from collections import Counter
+        log = lambda msg: logger.log(log_level, msg)
+        phase_counts = Counter()
+        header = f"=== Worker status (elapsed={int(time.time() - phase_start_time)}s"
+        if tasks_remaining is not None:
+            header += f", tasks remaining={tasks_remaining}"
+        header += ") ==="
+        log(header)
+        for idx, worker in enumerate(self.current_workers):
+            if worker is None:
+                phase_counts["(empty)"] += 1
+            else:
+                phase = worker.get_phase() or "Unknown"
+                phase_counts[phase] += 1
+                detail = ""
+                if phase not in ("Succeeded", "Failed", "Running"):
+                    detail = f", container={worker.get_container_status_summary()}"
+                log(
+                    f"  Worker {idx}: {worker.name}, phase={phase}, age={int(worker.get_age_secs())}s{detail}"
+                )
+        summary = ", ".join(f"{phase}={count}" for phase, count in sorted(phase_counts.items()))
+        log(f"  Summary: {summary}")
 
     # read skip ranges from gcp bucket
 
