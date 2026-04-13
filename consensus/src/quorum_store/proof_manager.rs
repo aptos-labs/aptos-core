@@ -9,7 +9,7 @@ use crate::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
-    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg},
+    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg, TBatchInfo},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
@@ -60,7 +60,15 @@ impl ProofManager {
     }
 
     pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore<BatchInfoExt>>) {
+        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+        let tracing_enabled = store.is_enabled();
         for proof in proofs.into_iter() {
+            if tracing_enabled {
+                store.record_batch_stage(
+                    proof.info().digest(),
+                    aptos_transaction_tracing::types::TransactionStage::QsProofReceived,
+                );
+            }
             self.batch_proof_queue.insert_proof(proof);
         }
         self.update_remaining_txns_and_proofs();
