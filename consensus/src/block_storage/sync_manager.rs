@@ -64,17 +64,63 @@ impl BlockStore {
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
         const MAX_PRECOMMIT_GAP: u64 = 200;
+<<<<<<< HEAD
         let block_not_exist = self.ordered_root().round() < li.commit_info().round()
             && !self.block_exists(li.commit_info().id());
         // TODO move min gap to fallback (30) to config, and if configurable make sure the value is
         // larger than buffer manager MAX_BACKLOG (20)
         let max_commit_gap = 30.max(2 * self.vote_back_pressure_limit);
         let min_commit_round = li.commit_info().round().saturating_sub(max_commit_gap);
+=======
+
+        let ordered_root_round = self.ordered_root().round();
+        let commit_round = li.commit_info().round();
+        let commit_block_id = li.commit_info().id();
+
+        let block_not_in_tree =
+            ordered_root_round < commit_round && !self.block_exists(commit_block_id);
+
+        // If block is not in the tree, check the pending_blocks buffer to determine
+        // the block status and whether to skip sync. The block may have been received
+        // (via opt proposal) but not yet inserted into the block tree.
+        let block_status = if block_not_in_tree {
+            let pending = self.pending_blocks.lock();
+            if pending.has_regular_block_at_round(commit_round) {
+                BlockStatus::RegularBlockPending
+            } else if pending.has_opt_block_at_round(commit_round) {
+                BlockStatus::OptBlockPending
+            } else {
+                BlockStatus::NotReceived
+            }
+        } else {
+            BlockStatus::InTree
+        };
+
+        let max_commit_gap = self.max_commit_gap.max(2 * self.vote_back_pressure_limit);
+
+        let block_not_exist = matches!(block_status, BlockStatus::NotReceived);
+
+        // Skip sync if the block is in the pending buffer, or if the gap is small
+        // enough that the block is likely in-flight from an optimistic proposal.
+        let gap = commit_round.saturating_sub(ordered_root_round);
+        let skip_small_gap = block_not_exist
+            && self
+                .skip_sync_small_gap_rounds
+                .is_some_and(|threshold| gap <= threshold);
+        let min_commit_round = commit_round.saturating_sub(max_commit_gap);
+>>>>>>> 22fceb58ea ([consensus] Skip state sync for small round gaps (#19430))
         let current_commit_round = self.commit_root().round();
+
+        let need_sync = block_not_exist && !skip_small_gap;
 
         if let Some(pre_commit_status) = self.pre_commit_status() {
             let mut status_guard = pre_commit_status.lock();
+<<<<<<< HEAD
             if block_not_exist || status_guard.round() < min_commit_round {
+=======
+            let commit_gap = status_guard.round() < min_commit_round;
+            if need_sync || commit_gap {
+>>>>>>> 22fceb58ea ([consensus] Skip state sync for small round gaps (#19430))
                 // pause the pre_commit so that pre_commit task doesn't over-commit
                 // it can still commit if it receives the LI previously forwarded,
                 // but it won't exceed the LI here
@@ -82,13 +128,46 @@ impl BlockStore {
                 status_guard.pause();
                 true
             } else {
+<<<<<<< HEAD
+=======
+                if block_not_in_tree && !block_not_exist {
+                    counters::STATE_SYNC_SKIPPED
+                        .with_label_values(&["pending_blocks"])
+                        .inc();
+                } else if skip_small_gap {
+                    counters::STATE_SYNC_SKIPPED
+                        .with_label_values(&["small_gap"])
+                        .inc();
+                }
+>>>>>>> 22fceb58ea ([consensus] Skip state sync for small round gaps (#19430))
                 if current_commit_round + MAX_PRECOMMIT_GAP < status_guard.round() {
                     status_guard.pause();
                 }
                 false
             }
         } else {
+<<<<<<< HEAD
             block_not_exist || current_commit_round < min_commit_round
+=======
+            let commit_gap = current_commit_round < min_commit_round;
+            if need_sync || commit_gap {
+                Some(StateSyncTriggerReason {
+                    block_status,
+                    commit_gap,
+                })
+            } else {
+                if block_not_in_tree && !block_not_exist {
+                    counters::STATE_SYNC_SKIPPED
+                        .with_label_values(&["pending_blocks"])
+                        .inc();
+                } else if skip_small_gap {
+                    counters::STATE_SYNC_SKIPPED
+                        .with_label_values(&["small_gap"])
+                        .inc();
+                }
+                None
+            }
+>>>>>>> 22fceb58ea ([consensus] Skip state sync for small round gaps (#19430))
         }
     }
 

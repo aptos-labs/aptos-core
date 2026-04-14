@@ -725,6 +725,19 @@ pub static SYNC_TO_HIGHEST_QC: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+<<<<<<< HEAD
+=======
+/// Count of state syncs skipped, by reason (pending_blocks, small_gap)
+pub static STATE_SYNC_SKIPPED: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_state_sync_skipped",
+        "Count of state syncs skipped by reason",
+        &["reason"]
+    )
+    .unwrap()
+});
+
+>>>>>>> 22fceb58ea ([consensus] Skip state sync for small round gaps (#19430))
 pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_order_vote_added",
