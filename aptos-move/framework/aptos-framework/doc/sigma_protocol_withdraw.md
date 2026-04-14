@@ -421,7 +421,7 @@ For the auditorless case, pass <code><a href="../../aptos-stdlib/../move-stdlib/
 and ensure <code>new_balance</code> / <code>compressed_new_balance</code> have empty R_aud.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_new_withdrawal_statement">new_withdrawal_statement</a>(compressed_ek: <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, compressed_old_balance: &<a href="confidential_balance.md#0x1_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_new_balance: &<a href="confidential_balance.md#0x1_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_ek_aud: &<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, v: <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): (<a href="sigma_protocol_statement.md#0x1_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_Withdrawal">sigma_protocol_withdraw::Withdrawal</a>&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_new_withdrawal_statement">new_withdrawal_statement</a>(compressed_ek: <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, compressed_old_balance: &<a href="confidential_balance.md#0x1_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_new_balance: &<a href="confidential_balance.md#0x1_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_ek_aud: &<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, v: <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="sigma_protocol_statement.md#0x1_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_Withdrawal">sigma_protocol_withdraw::Withdrawal</a>&gt;
 </code></pre>
 
 
@@ -436,7 +436,7 @@ and ensure <code>new_balance</code> / <code>compressed_new_balance</code> have e
     compressed_new_balance: &CompressedBalance&lt;Available&gt;,
     compressed_ek_aud: &Option&lt;CompressedRistretto&gt;,
     v: Scalar,
-): (Statement&lt;<a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_Withdrawal">Withdrawal</a>&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;) {
+): Statement&lt;<a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_Withdrawal">Withdrawal</a>&gt; {
     <b>assert</b>!(
         compressed_new_balance.get_compressed_R_aud().length() == <b>if</b> (compressed_ek_aud.is_some()) { <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_get_num_chunks">get_num_chunks</a>() } <b>else</b> { 0 },
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_E_AUDITOR_COUNT_MISMATCH">E_AUDITOR_COUNT_MISMATCH</a>)
@@ -451,8 +451,7 @@ and ensure <code>new_balance</code> / <code>compressed_new_balance</code> have e
     <b>assert</b>!(b.add_point(compressed_ek) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_IDX_EK">IDX_EK</a>, err);                                                           // ek
     <b>assert</b>!(b.add_points(compressed_old_balance.get_compressed_P()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a>, err);                  // old_P
     <b>assert</b>!(b.add_points(compressed_old_balance.get_compressed_R()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + ell, err);            // old_R
-    <b>let</b> (idx, new_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
-    <b>assert</b>!(idx == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 2 * ell, err);
+    <b>assert</b>!(b.add_points(compressed_new_balance.get_compressed_P()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 2 * ell, err); // new_P
     <b>assert</b>!(b.add_points(compressed_new_balance.get_compressed_R()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 3 * ell, err);        // new_R
 
     <b>if</b> (compressed_ek_aud.is_some()) {
@@ -463,7 +462,7 @@ and ensure <code>new_balance</code> / <code>compressed_new_balance</code> have e
     <b>assert</b>!(b.add_scalar(v) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_IDX_V">IDX_V</a>, err);
     <b>let</b> stmt = b.build();
     <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(&stmt, compressed_ek_aud.is_some());
-    (stmt, new_P)
+    stmt
 }
 </code></pre>
 

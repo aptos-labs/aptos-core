@@ -490,7 +490,7 @@ and ensure <code>amount</code> / <code>new_balance</code> have empty effective-a
 For no voluntary auditors, pass an empty vector for <code>compressed_ek_volun_auds</code>.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_new_transfer_statement">new_transfer_statement</a>(compressed_ek_sender: <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, compressed_ek_recip: <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, compressed_old_balance: &<a href="confidential_balance.md#0x1_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_new_balance: &<a href="confidential_balance.md#0x1_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_amount: &<a href="confidential_amount.md#0x1_confidential_amount_CompressedAmount">confidential_amount::CompressedAmount</a>, compressed_ek_eff_aud: &<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, compressed_ek_volun_auds: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;): (<a href="sigma_protocol_statement.md#0x1_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_Transfer">sigma_protocol_transfer::Transfer</a>&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, <a href="confidential_balance.md#0x1_confidential_balance_Balance">confidential_balance::Balance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Pending">confidential_balance::Pending</a>&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_new_transfer_statement">new_transfer_statement</a>(compressed_ek_sender: <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, compressed_ek_recip: <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, compressed_old_balance: &<a href="confidential_balance.md#0x1_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_new_balance: &<a href="confidential_balance.md#0x1_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_amount: &<a href="confidential_amount.md#0x1_confidential_amount_CompressedAmount">confidential_amount::CompressedAmount</a>, compressed_ek_eff_aud: &<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, compressed_ek_volun_auds: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;): (<a href="sigma_protocol_statement.md#0x1_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_Transfer">sigma_protocol_transfer::Transfer</a>&gt;, <a href="confidential_balance.md#0x1_confidential_balance_Balance">confidential_balance::Balance</a>&lt;<a href="confidential_balance.md#0x1_confidential_balance_Pending">confidential_balance::Pending</a>&gt;)
 </code></pre>
 
 
@@ -507,7 +507,7 @@ For no voluntary auditors, pass an empty vector for <code>compressed_ek_volun_au
     compressed_amount: &CompressedAmount,
     compressed_ek_eff_aud: &Option&lt;CompressedRistretto&gt;,
     compressed_ek_volun_auds: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;,
-): (Statement&lt;<a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_Transfer">Transfer</a>&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;, Balance&lt;Pending&gt;) {
+): (Statement&lt;<a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_Transfer">Transfer</a>&gt;, Balance&lt;Pending&gt;) {
     <b>let</b> has_eff = compressed_ek_eff_aud.is_some();
     <b>let</b> num_volun = compressed_ek_volun_auds.length();
 
@@ -540,8 +540,7 @@ For no voluntary auditors, pass an empty vector for <code>compressed_ek_volun_au
     <b>assert</b>!(b.add_point(compressed_ek_recip) == <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_IDX_EK_RECIP">IDX_EK_RECIP</a>, e);                                                         // ek_recip
     <b>assert</b>!(b.add_points(compressed_old_balance.get_compressed_P()) == <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_START_IDX_OLD_P">START_IDX_OLD_P</a>, e);                            // old_P
     <b>assert</b>!(b.add_points(compressed_old_balance.get_compressed_R()) == <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_START_IDX_OLD_P">START_IDX_OLD_P</a> + ell, e);                      // old_R
-    <b>let</b> (idx, new_balance_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
-    <b>assert</b>!(idx == <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_START_IDX_OLD_P">START_IDX_OLD_P</a> + 2 * ell, e);
+    <b>assert</b>!(b.add_points(compressed_new_balance.get_compressed_P()) == <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_START_IDX_OLD_P">START_IDX_OLD_P</a> + 2 * ell, e); // new_P
     <b>assert</b>!(b.add_points(compressed_new_balance.get_compressed_R()) == <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_START_IDX_OLD_P">START_IDX_OLD_P</a> + 3 * ell, e);                  // new_R
     <b>let</b> (idx, amount_P) = b.add_points_cloned(compressed_amount.get_compressed_P());           // amount_P
     <b>assert</b>!(idx == <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_START_IDX_OLD_P">START_IDX_OLD_P</a> + 4 * ell, e);
@@ -570,8 +569,8 @@ For no voluntary auditors, pass an empty vector for <code>compressed_ek_volun_au
 
     <b>let</b> stmt = b.build();
     <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer_assert_transfer_statement_is_well_formed">assert_transfer_statement_is_well_formed</a>(&stmt, has_eff, num_volun);
-    <b>let</b> recip_pending = new_pending_from_p_and_r(amount_P, recip_R);
-    (stmt, new_balance_P, recip_pending)
+    <b>let</b> amount = new_pending_from_p_and_r(amount_P, recip_R);
+    (stmt, amount)
 }
 </code></pre>
 
