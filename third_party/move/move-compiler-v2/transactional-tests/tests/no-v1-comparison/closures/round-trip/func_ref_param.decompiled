@@ -6,7 +6,7 @@ module 0x77::m {
         _0: |&u64|(bool) has drop,
     }
     fun test() {
-        let _v0 = Func{_0: |arg0| lambda__1__test(arg0)};
+        let _v0 = Func{_0: |x| lambda__1__test(x)};
         let _v1 = 1;
         let _v2 = &_v1;
         let Func{_0: _v3} = _v0;

@@ -681,14 +681,6 @@ impl ConfigOptimizer for StorageConfig {
                 config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
-            // TODO(HotState): Hot state root hash computation is off by default in Mainnet unless
-            // explicitly enabled.
-            if chain_id.is_mainnet()
-                && config_yaml["hot_state_config"]["compute_root_hash"].as_bool() != Some(true)
-            {
-                config.hot_state_config.compute_root_hash = false;
-                modified_config = true;
-            }
             // TODO(HotState): Hotness persistence in write sets is disabled on mainnet and testnet
             // unless explicitly enabled.
             if (chain_id.is_mainnet() || chain_id.is_testnet())

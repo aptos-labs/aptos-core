@@ -9,7 +9,6 @@ use itertools::Itertools;
 use libtest_mimic::{Arguments, Trial};
 use log::{info, warn};
 use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
-use move_compiler_v2::Experiment;
 use move_model::metadata::LanguageVersion;
 use move_prover::{cli::Options, run_move_prover_v2};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
@@ -155,19 +154,7 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()>
 
     let mut error_writer = Buffer::no_color();
     options.language_version = Some(LanguageVersion::latest());
-    let function_value_experiments = vec![
-        Experiment::KEEP_INLINE_FUNS,
-        Experiment::LIFT_INLINE_FUNS,
-        Experiment::SKIP_INLINING_INLINE_FUNS,
-    ];
-    let result = run_move_prover_v2(
-        &mut error_writer,
-        options,
-        function_value_experiments
-            .into_iter()
-            .map(String::from)
-            .collect(),
-    );
+    let result = run_move_prover_v2(&mut error_writer, options, vec![]);
     let mut diags = match result {
         Ok(()) => "".to_string(),
         Err(err) => format!("Move prover returns: {}\n", err),

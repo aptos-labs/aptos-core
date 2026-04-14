@@ -3,7 +3,7 @@
 //# publish
 module 0xc0ffee::m {
     fun apply_repeatedly(p0: |u64|(u64) has copy + drop, p1: u64): |u64|(u64) has copy + drop {
-        |arg0| lambda__1__apply_repeatedly(p1, p0, arg0)
+        |x| lambda__1__apply_repeatedly(p1, p0, x)
     }
     fun lambda__1__apply_repeatedly(p0: u64, p1: |u64|(u64) has copy + drop, p2: u64): u64 {
         let _v0 = 0;
@@ -16,7 +16,7 @@ module 0xc0ffee::m {
         p2
     }
     public fun test(): u64 {
-        let _v0 = apply_repeatedly(|arg0| lambda__1__test(arg0), 10);
+        let _v0 = apply_repeatedly(|x| lambda__1__test(x), 10);
         _v0(1)
     }
     fun lambda__1__test(p0: u64): u64 {

@@ -2,14 +2,17 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    chunky::{types::MissingTranscriptRequest, validation::validate_chunky_transcript},
+    chunky::{
+        types::{ChunkyTranscriptWithHash, MissingTranscriptRequest},
+        validation::validate_chunky_transcript,
+    },
     network::NetworkSender,
     DKGMessage,
 };
 use anyhow::{anyhow, Result};
 use aptos_logger::warn;
 use aptos_types::{
-    dkg::chunky_dkg::{ChunkyDKGSession, ChunkyTranscript, DealerPublicKey},
+    dkg::chunky_dkg::{ChunkyDKGSession, DealerPublicKey},
     epoch_state::EpochState,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
@@ -67,10 +70,10 @@ impl TranscriptFetcher {
     pub async fn run(
         &self,
         network_sender: Arc<NetworkSender>,
-    ) -> Result<HashMap<AccountAddress, ChunkyTranscript>> {
+    ) -> Result<HashMap<AccountAddress, ChunkyTranscriptWithHash>> {
         let mut missing_set: HashSet<AccountAddress> =
             self.missing_dealers.iter().cloned().collect();
-        let mut results: HashMap<AccountAddress, ChunkyTranscript> = HashMap::new();
+        let mut results: HashMap<AccountAddress, ChunkyTranscriptWithHash> = HashMap::new();
 
         let mut pending_requests: FuturesUnordered<RpcFuture> = FuturesUnordered::new();
 
@@ -167,7 +170,7 @@ impl TranscriptFetcher {
         dealer_addr: AccountAddress,
         result: Result<DKGMessage>,
         signing_pubkeys: &[DealerPublicKey],
-    ) -> Result<ChunkyTranscript> {
+    ) -> Result<ChunkyTranscriptWithHash> {
         let response = result?;
         let DKGMessage::MissingTranscriptResponse(response) = response else {
             return Err(anyhow!("unexpected message type"));

@@ -1,0 +1,84 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/closures/stored_fun_values.move:20:9
+   │
+20 │         invariant forall x: u64: !aborts_of<f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/stored_fun_values.move:48: create_invalid
+   =     at tests/sources/functional/closures/stored_fun_values.move:20
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/closures/stored_fun_values.move:73:9
+   │
+73 │         invariant forall x: u64, r: u64: ensures_of<f>(x, r) ==> r >= x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/stored_fun_values.move:93: create_monotone_invalid
+   =     at tests/sources/functional/closures/stored_fun_values.move:71
+   =     at tests/sources/functional/closures/stored_fun_values.move:73
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/closures/stored_fun_values.move:115:9
+    │
+115 │         invariant forall x: u64: !aborts_of<f>(x);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/stored_fun_values.move:129: create_doubler_unsafe
+    =     at tests/sources/functional/closures/stored_fun_values.move:115
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/closures/stored_fun_values.move:145:9
+    │
+145 │         invariant forall a: address: !aborts_of<f>(a);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/stored_fun_values.move:161: create_reader_invalid
+    =     at tests/sources/functional/closures/stored_fun_values.move:145
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/closures/stored_fun_values.move:199:9
+    │
+199 │         invariant forall s: signer: !aborts_of<f>(s);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/stored_fun_values.move:219: create_modifier_invalid
+    =     at tests/sources/functional/closures/stored_fun_values.move:199
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/stored_fun_values.move:422:9
+    │
+422 │ ╭         ensures Counter[std::signer::address_of(s)]
+423 │ │             == old(Counter[std::signer::address_of(s)]); // error: post-condition does not hold
+    │ ╰────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/closures/stored_fun_values.move:415: use_counter_modifier_wrong
+    =     at tests/sources/functional/closures/stored_fun_values.move:420: use_counter_modifier_wrong (spec)
+    =     at tests/sources/functional/closures/stored_fun_values.move:415: use_counter_modifier_wrong
+    =         modifier_addr = <redacted>
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/stored_fun_values.move:416: use_counter_modifier_wrong
+    =     at tests/sources/functional/closures/stored_fun_values.move:417: use_counter_modifier_wrong
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/stored_fun_values.move:418: use_counter_modifier_wrong
+    =     at tests/sources/functional/closures/stored_fun_values.move:421: use_counter_modifier_wrong (spec)
+    =     at tests/sources/functional/closures/stored_fun_values.move:422: use_counter_modifier_wrong (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/stored_fun_values.move:517:9
+    │
+517 │ ╭         ensures Counter[std::signer::address_of(s)]
+518 │ │             == old(Counter[std::signer::address_of(s)]); // error: post-condition does not hold
+    │ ╰────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/closures/stored_fun_values.move:510: use_any_modifier_wrong
+    =     at tests/sources/functional/closures/stored_fun_values.move:515: use_any_modifier_wrong (spec)
+    =     at tests/sources/functional/closures/stored_fun_values.move:510: use_any_modifier_wrong
+    =         modifier_addr = <redacted>
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/stored_fun_values.move:511: use_any_modifier_wrong
+    =     at tests/sources/functional/closures/stored_fun_values.move:512: use_any_modifier_wrong
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/stored_fun_values.move:513: use_any_modifier_wrong
+    =     at tests/sources/functional/closures/stored_fun_values.move:516: use_any_modifier_wrong (spec)
+    =     at tests/sources/functional/closures/stored_fun_values.move:517: use_any_modifier_wrong (spec)

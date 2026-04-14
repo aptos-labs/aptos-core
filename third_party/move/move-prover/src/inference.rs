@@ -376,7 +376,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                             .collect()
                     };
 
-                    let cond_text = generate_inferred_conditions(
+                    let (use_text, cond_text) = generate_inferred_conditions(
                         env,
                         &fun,
                         inferred_sym,
@@ -385,12 +385,20 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                     );
 
                     let final_text = if is_single_line && !cond_text.is_empty() {
-                        format!("\n{}{}", cond_text, indent)
+                        format!("\n{}{}{}", use_text, cond_text, indent)
                     } else {
                         cond_text
                     };
 
                     insertions.push((insert_pos, final_text));
+
+                    if !is_single_line && !use_text.is_empty() {
+                        let use_insert_pos = source[open_brace_pos..]
+                            .find('\n')
+                            .map(|p| open_brace_pos + p + 1)
+                            .unwrap_or(open_brace_pos + 1);
+                        insertions.push((use_insert_pos, use_text));
+                    }
                 } else if let Some(insert_pos) = module_close_insert_pos {
                     // No existing spec block for this function — insert a full block
                     // before the closing `}` of the outer `spec module { }` block.
@@ -578,23 +586,41 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                 };
 
                 // Generate only the inferred condition lines.
-                let cond_text = generate_inferred_conditions(
+                // Returns (use_decls, conditions) separately because `use` must
+                // appear at the top of a spec block, before existing conditions.
+                let (use_text, cond_text) = generate_inferred_conditions(
                     env,
                     &fun,
                     inferred_sym,
                     &inner_indent,
                     &original_prop_keys,
                 );
+                // Filter out spec-level `use` declarations for modules already
+                // imported at module level (e.g. the original source has
+                // `use aptos_framework::object::{Self, …}` so we don't need
+                // `use 0x1::object;` inside the spec block).
+                let use_text = filter_redundant_uses(&source, &use_text);
 
                 // For single-line blocks, wrap the conditions so the block expands:
                 //   `spec foo {}` -> `spec foo {\n    ...\n}`
                 let final_text = if is_single_line && !cond_text.is_empty() {
-                    format!("\n{}{}", cond_text, indent)
+                    format!("\n{}{}{}", use_text, cond_text, indent)
                 } else {
                     cond_text
                 };
 
                 insertions.push((insert_pos, final_text));
+
+                // Insert `use` declarations right after the opening `{` so they
+                // appear before existing user conditions.
+                if !is_single_line && !use_text.is_empty() {
+                    // Find the end of the line containing `{`.
+                    let use_insert_pos = source[open_brace_pos..]
+                        .find('\n')
+                        .map(|p| open_brace_pos + p + 1)
+                        .unwrap_or(open_brace_pos + 1);
+                    insertions.push((use_insert_pos, use_text));
+                }
             } else {
                 // No existing spec block: insert a full spec block after the function definition.
                 let fun_end = fun.get_loc().span().end().to_usize();
@@ -644,6 +670,39 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
 }
 
 /// Detect the leading whitespace of the line containing the given byte offset.
+/// Filter out `use <addr>::<module>;` lines from `use_text` when the module
+/// name is already importable from a module-level `use` in the source.
+/// Detects `use <anything>::<module>::{Self, …}`, `use <anything>::<module>;`,
+/// and `use <anything>::<module> as <alias>;`.
+fn filter_redundant_uses(source: &str, use_text: &str) -> String {
+    if use_text.is_empty() {
+        return String::new();
+    }
+    let filtered: Vec<&str> = use_text
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            // Extract module name from `use <addr>::<module>;`
+            if let Some(rest) = trimmed.strip_prefix("use ") {
+                if let Some(module_name) = rest.trim_end_matches(';').rsplit("::").next() {
+                    // Check if the original source already imports this module
+                    // (with `Self` or as a bare module).
+                    let has_self_import = source.contains(&format!("::{}::{{", module_name))
+                        || source.contains(&format!("::{};", module_name))
+                        || source.contains(&format!("::{}  as ", module_name));
+                    return !has_self_import;
+                }
+            }
+            true
+        })
+        .collect();
+    if filtered.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", filtered.join("\n"))
+    }
+}
+
 fn detect_indent(source: &str, byte_offset: usize) -> String {
     // Find the start of the line containing this offset.
     let line_start = source[..byte_offset]
@@ -664,7 +723,7 @@ fn generate_inferred_conditions(
     inferred_sym: Symbol,
     indent: &str,
     original_property_keys: &std::collections::BTreeSet<Symbol>,
-) -> String {
+) -> (String, String) {
     let sourcifier = Sourcifier::new(env, true);
 
     // Filter to only inferred conditions, properties, and frame_spec; print; then restore.
@@ -699,20 +758,59 @@ fn generate_inferred_conditions(
 
     // Extract the pragma and condition lines from the generated spec block.
     // The format is: "\nspec name(...) {\n    <lines>\n}\n"
+    // Separate `use` declarations from other lines: `use` must appear at the
+    // top of a spec block, so when appending to an existing block they need
+    // to be inserted right after the opening `{`, not before the closing `}`.
+    //
+    // Preserve relative indentation: the sourcifier produces properly indented
+    // output (e.g. block content indented inside `{ }`). Strip only the base
+    // indent (the spec block's content indent level) so deeper lines keep their
+    // extra indentation.
+    let is_content_line = |trimmed: &str| {
+        !trimmed.is_empty() && !trimmed.starts_with("spec ") && trimmed != "{" && trimmed != "}"
+    };
+    let base_indent_len = raw
+        .lines()
+        .filter(|line| is_content_line(line.trim()))
+        .map(|line| line.len() - line.trim_start().len())
+        .min()
+        .unwrap_or(0);
+    let mut use_lines = Vec::new();
     let mut condition_lines = Vec::new();
     for line in raw.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("spec ") || trimmed == "{" || trimmed == "}" {
+        if !is_content_line(trimmed) {
             continue;
         }
-        condition_lines.push(format!("{}{}", indent, trimmed));
+        // Strip the base indent, preserving relative indentation for
+        // continuation lines (e.g. inside `{ let ...; expr }` blocks).
+        let stripped = if line.len() > base_indent_len {
+            &line[base_indent_len..]
+        } else {
+            trimmed
+        };
+        if trimmed.starts_with("use ") {
+            use_lines.push(format!("{}{}", indent, stripped));
+        } else {
+            condition_lines.push(format!("{}{}", indent, stripped));
+        }
     }
 
-    if condition_lines.is_empty() {
-        return String::new();
+    if use_lines.is_empty() && condition_lines.is_empty() {
+        return (String::new(), String::new());
     }
 
-    format!("{}\n", condition_lines.join("\n"))
+    let uses = if use_lines.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", use_lines.join("\n"))
+    };
+    let conds = if condition_lines.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", condition_lines.join("\n"))
+    };
+    (uses, conds)
 }
 
 /// Generate a full `spec fn_name(...) { ... }` block for a function.

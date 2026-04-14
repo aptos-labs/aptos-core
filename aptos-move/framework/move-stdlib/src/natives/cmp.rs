@@ -18,7 +18,7 @@ use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::PartialVMError,
-    values::{Struct, Value},
+    values::{Struct, Value, DEFAULT_MAX_VM_VALUE_NESTED_DEPTH},
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -51,7 +51,17 @@ fn native_compare(
                 + context.abs_val_size_dereferenced(&args[1])?);
     context.charge(cost)?;
 
-    let ordering = args[0].compare(&args[1])?;
+    let check_mask = context
+        .module_storage()
+        .runtime_environment()
+        .vm_config()
+        .include_closure_mask_in_cmp;
+    let ordering = args[0].compare_with_depth(
+        &args[1],
+        1,
+        Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
+        check_mask,
+    )?;
     let ordering_move_variant = match ordering {
         std::cmp::Ordering::Less => ORDERING_LESS_THAN_VARIANT,
         std::cmp::Ordering::Equal => ORDERING_EQUAL_VARIANT,

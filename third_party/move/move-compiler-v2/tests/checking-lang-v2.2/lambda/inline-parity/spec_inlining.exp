@@ -51,12 +51,12 @@ module 0x42::Test {
         predicate(v)
     }
     public fun test_apply(x: u64) {
-        let r1 = apply(x, |arg0| lambda__1__test_apply(arg0));
+        let r1 = apply(x, |x| lambda__1__test_apply(x));
         spec {
             assert r1;
         };
         if (r1) () else abort 1;
-        let r2 = apply(x, |arg0| lambda__2__test_apply(arg0));
+        let r2 = apply(x, |x| lambda__2__test_apply(x));
         spec {
             assert r2;
         };

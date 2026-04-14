@@ -5,9 +5,11 @@ use crate::{smoke_test_environment::SwarmBuilder, utils};
 use aptos_forge::LocalSwarm;
 use aptos_rest_client::Client;
 use aptos_types::{
+    chain_id::ChainId,
     decryption::PerEpochEncryptionKeyResource,
     dkg::chunky_dkg::{
-        AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGSessionState, ChunkyDKGState,
+        initialize_public_parameters, AggregatedSubtranscript, ChunkyDKGSession,
+        ChunkyDKGSessionState, ChunkyDKGState,
     },
     on_chain_config::{FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainRandomnessConfig},
 };
@@ -55,6 +57,9 @@ async fn wait_for_chunky_dkg_finish(
 /// Returns the deserialized `AggregatedSubtranscript`.
 #[allow(dead_code)]
 fn verify_chunky_dkg_transcript(session: &ChunkyDKGSessionState) -> AggregatedSubtranscript {
+    // Ensure test PublicParameters are available for ChunkyDKGSession::new().
+    let _ = initialize_public_parameters(ChainId::test());
+
     let subtranscript: AggregatedSubtranscript =
         bcs::from_bytes(&session.transcript).expect("Failed to deserialize transcript bytes");
 

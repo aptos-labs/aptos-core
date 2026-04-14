@@ -778,8 +778,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                     )),
                 );
                 let closure_exp = lifter.rewrite_exp(lambda.clone().clone());
-                // Only one lift function should be generated.
-                assert_eq!(lifter.lifted_len(), 1);
+                // Lifting may fail (e.g., modified captured variable in lambda).
+                // Skip this lambda and fall back to non-lifted inlining.
+                if lifter.lifted_len() != 1 {
+                    continue;
+                }
                 let func_data = lifter.get_lifted_at(0).unwrap().generate_function_data(env);
                 sym_param_map.insert(para.1 .0, para.0);
                 function_value_map.insert(para.0, closure_exp.clone());

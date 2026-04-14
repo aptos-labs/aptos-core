@@ -438,17 +438,19 @@ pub enum SpecBlockMember_ {
         body: FunctionBody,
     },
     /// Declares which resources a function-typed parameter may modify.
-    /// `modifies_of<param>(formals) target1, target2, ...;`
+    /// `modifies_of<param>(formals) target1, target2, ...;` or `modifies_of<param> *;`
     ModifiesOf {
         fun_param: Name,
         params: Vec<(Var, Type)>,
         targets: Vec<Exp>,
+        all: bool,
     },
     /// Declares which resource types a function-typed parameter may read.
-    /// `reads_of<param> Type1, Type2, ...;`
+    /// `reads_of<param> Type1, Type2, ...;` or `reads_of<param> *;`
     ReadsOf {
         fun_param: Name,
         types: Vec<Type>,
+        all: bool,
     },
     /// Declares which resources a function modifies: `modifies R[addr], S[addr];`
     Modifies {
@@ -815,14 +817,15 @@ pub enum Exp_ {
     ),
     // spec only
     // Behavior predicate for function values in specifications:
-    // requires_of<f[<T1, ..., Tn>]>(args)
-    // aborts_of<f[<T1, ..., Tn>]>(args)
-    // ensures_of<f[<T1, ..., Tn>]>(args)
-    // result_of<f[<T1, ..., Tn>]>(args)
+    // requires_of<target>(args)
+    // aborts_of<target>(args)
+    // ensures_of<target>(args)
+    // result_of<target>(args)
+    // where target is an expression evaluating to function type
+    // (identifier, qualified name, field access chain, etc.)
     Behavior(
         BehaviorKind,
-        NameAccessChain,   // function name
-        Option<Vec<Type>>, // optional type instantiation
+        Box<Exp>,          // target expression (must have function type)
         Spanned<Vec<Exp>>, // arguments
     ), // spec only
     // State-labeled expression in specifications:
@@ -1628,26 +1631,39 @@ impl AstDebug for SpecBlockMember_ {
                 fun_param,
                 params,
                 targets,
+                all,
             } => {
                 w.write(format!("modifies_of<{}>", fun_param));
-                w.write("(");
-                w.list(params, ", ", |w, (v, ty)| {
-                    w.write(format!("{}: ", v));
-                    ty.ast_debug(w);
-                    true
-                });
-                w.write(") ");
-                w.list(targets, ", ", |w, e| {
-                    e.ast_debug(w);
-                    true
-                });
+                if *all {
+                    w.write(" *");
+                } else {
+                    w.write("(");
+                    w.list(params, ", ", |w, (v, ty)| {
+                        w.write(format!("{}: ", v));
+                        ty.ast_debug(w);
+                        true
+                    });
+                    w.write(") ");
+                    w.list(targets, ", ", |w, e| {
+                        e.ast_debug(w);
+                        true
+                    });
+                }
             },
-            SpecBlockMember_::ReadsOf { fun_param, types } => {
+            SpecBlockMember_::ReadsOf {
+                fun_param,
+                types,
+                all,
+            } => {
                 w.write(format!("reads_of<{}> ", fun_param));
-                w.list(types, ", ", |w, ty| {
-                    ty.ast_debug(w);
-                    true
-                });
+                if *all {
+                    w.write("*");
+                } else {
+                    w.list(types, ", ", |w, ty| {
+                        ty.ast_debug(w);
+                        true
+                    });
+                }
             },
             SpecBlockMember_::Modifies { targets } => {
                 w.write("modifies ");
@@ -2361,7 +2377,7 @@ impl AstDebug for Exp_ {
                 s.ast_debug(w);
                 w.write("}");
             },
-            E::Behavior(kind, fn_name, type_args, sp!(_, args)) => {
+            E::Behavior(kind, target, sp!(_, args)) => {
                 let kind_str = match kind {
                     BehaviorKind::RequiresOf => "requires_of",
                     BehaviorKind::AbortsOf => "aborts_of",
@@ -2370,12 +2386,7 @@ impl AstDebug for Exp_ {
                 };
                 w.write(kind_str);
                 w.write("<");
-                fn_name.ast_debug(w);
-                if let Some(tys) = type_args {
-                    w.write("<");
-                    w.comma(tys, |w, ty| ty.ast_debug(w));
-                    w.write(">");
-                }
+                target.ast_debug(w);
                 w.write(">(");
                 w.comma(args, |w, e| e.ast_debug(w));
                 w.write(")");

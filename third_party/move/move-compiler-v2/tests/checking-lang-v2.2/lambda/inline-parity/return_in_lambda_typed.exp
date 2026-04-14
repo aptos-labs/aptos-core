@@ -31,9 +31,9 @@ module 0x42::Test {
         f(x, y)
     }
     public fun main(): u64 {
-        apply(|arg0,arg1| lambda__1__main(arg0, arg1), 10, 100);
-        apply(|arg0,arg1| lambda__2__main(arg0, arg1), 10, 100);
-        apply(|arg0,arg1| lambda__3__main(arg0, arg1), 10, 100)
+        apply(|x,y| lambda__1__main(x, y), 10, 100);
+        apply(|x,y| lambda__2__main(x, y), 10, 100);
+        apply(|x,y| lambda__3__main(x, y), 10, 100)
     }
     fun lambda__1__main(x: u64, y: u64): u64 {
         adder(x, y)

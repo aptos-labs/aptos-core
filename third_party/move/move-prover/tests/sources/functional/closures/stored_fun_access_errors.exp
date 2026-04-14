@@ -1,0 +1,24 @@
+Move prover returns: exiting with compilation errors
+error: stored function accesses resource `stored_fun_access_errors::Config` which is not declared in `modifies_of`/`reads_of` for field `f`
+   ┌─ tests/sources/functional/closures/stored_fun_access_errors.move:68:9
+   │
+68 │         NarrowReader { f: read_both } // error: accesses Config not in reads_of
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: stored function writes resource `stored_fun_access_errors::Counter` but only `reads_of` (not `modifies_of`) is declared for field `f`
+   ┌─ tests/sources/functional/closures/stored_fun_access_errors.move:89:9
+   │
+89 │         ReadOnlyCounter { f: write_counter } // error: writes Counter but only reads_of
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: stored function accesses resource `stored_fun_access_errors::Counter` which is not declared in `modifies_of`/`reads_of` for field `f`
+    ┌─ tests/sources/functional/closures/stored_fun_access_errors.move:105:9
+    │
+105 │         NarrowWriter { f: write_counter } // error: accesses Counter not in modifies_of
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: stored function writes resource `stored_fun_access_errors::Counter` but only `reads_of` (not `modifies_of`) is declared for field `f`
+    ┌─ tests/sources/functional/closures/stored_fun_access_errors.move:122:9
+    │
+122 │         WildcardReader { f: write_counter } // error: writes Counter but only reads_of
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

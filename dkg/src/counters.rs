@@ -3,8 +3,9 @@
 
 use aptos_infallible::duration_since_epoch;
 use aptos_metrics_core::{
-    register_histogram, register_histogram_vec, register_int_gauge, register_int_gauge_vec,
-    Histogram, HistogramVec, IntGauge, IntGaugeVec,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, register_int_gauge_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use move_core_types::account_address::AccountAddress;
@@ -88,6 +89,31 @@ pub static DIGEST_KEY_FILE_SIZE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PUBLIC_PARAMS_SOURCE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_dkg_public_params_source",
+        "Which PublicParameters source was used at startup (file, test_fallback, none)",
+        &["source"]
+    )
+    .unwrap()
+});
+
+pub static PUBLIC_PARAMS_LOAD_DURATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_dkg_public_params_load_duration_seconds",
+        "Time to read and deserialize the PublicParameters blob file"
+    )
+    .unwrap()
+});
+
+pub static PUBLIC_PARAMS_FILE_SIZE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_dkg_public_params_file_size_bytes",
+        "Size of the PublicParameters blob file in bytes (only set when file exists)"
+    )
+    .unwrap()
+});
+
 pub static CHUNKY_DKG_OBJECT_SIZE_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_chunky_dkg_object_size_bytes",
@@ -98,6 +124,23 @@ pub static CHUNKY_DKG_OBJECT_SIZE_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
             64.0, 256.0, 1024.0, 4096.0, 16384.0, 65536.0, 262144.0, 1048576.0, 4194304.0,
             10485760.0,
         ]
+    )
+    .unwrap()
+});
+
+pub static CHUNKY_DKG_TRANSCRIPT_FETCH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_chunky_dkg_transcript_fetch_total",
+        "Fetch outcomes for missing transcript fetcher",
+        &["status"]
+    )
+    .unwrap()
+});
+
+pub static CHUNKY_DKG_SIGNATURE_REQUEST_SKIPPED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_chunky_dkg_signature_request_skipped",
+        "Signature requests skipped because a handler is already in-flight for the same sender"
     )
     .unwrap()
 });

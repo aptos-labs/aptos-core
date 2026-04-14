@@ -79,15 +79,15 @@ module 0x42::LambdaParam {
         b
     }
     fun test_lambda_symbol_param1() {
-        let a = inline_apply2(|arg0| lambda__1__test_lambda_symbol_param1(arg0), 3);
+        let a = inline_apply2(|x| lambda__1__test_lambda_symbol_param1(x), 3);
         if (a == 3) () else abort 0;
     }
     fun test_lambda_symbol_param2() {
-        let a = inline_apply2(|arg0| lambda__1__test_lambda_symbol_param2(arg0), 3);
+        let a = inline_apply2(|x| lambda__1__test_lambda_symbol_param2(x), 3);
         if (a == 3) () else abort 0;
-        let b = inline_apply(|arg0| lambda__2__test_lambda_symbol_param2(arg0), 3);
+        let b = inline_apply(|x| lambda__2__test_lambda_symbol_param2(x), 3);
         if (b == 3) () else abort 0;
-        let b = inline_apply3(|arg0| lambda__3__test_lambda_symbol_param2(arg0), 3);
+        let b = inline_apply3(|x| lambda__3__test_lambda_symbol_param2(x), 3);
         if (b == 3) () else abort 0;
     }
     fun lambda__1__test_lambda_symbol_param1(x: u64): u64 {

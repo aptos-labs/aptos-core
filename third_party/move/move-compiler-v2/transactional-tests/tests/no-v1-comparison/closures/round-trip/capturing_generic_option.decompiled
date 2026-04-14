@@ -101,7 +101,7 @@ module 0x42::test {
     }
     public entry fun test_resource_with_captured_option(p0: &signer) {
         let _v0 = option::some<u64>(100);
-        let _v1 = Validator{check: |arg0| foo(arg0, _v0)};
+        let _v1 = Validator{check: |x| foo(x, _v0)};
         move_to<Validator>(p0, _v1);
     }
     public entry fun test_use_resource_with_captured_option(p0: &signer)

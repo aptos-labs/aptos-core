@@ -119,7 +119,10 @@ module 0x42::state_labels {
         modifies Container[signer::address_of(account)];
         modifies Resource[addr];
         ensures [inferred] result == old(Resource[addr]);
-        ensures [inferred] S1.. |~ publish<Container>(signer::address_of(account), Container{inner: old(Resource[addr]).value});
+        ensures [inferred] {
+            let a = Container{inner: old(Resource[addr]).value};
+            S1.. |~ publish<Container>(signer::address_of(account), a)
+        };
         ensures [inferred] ..S1 |~ remove<Resource>(addr);
         aborts_if [inferred] S1 |~ exists<Container>(signer::address_of(account));
         aborts_if [inferred] !exists<Resource>(addr);
@@ -190,7 +193,10 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[signer::address_of(account)];
         modifies Resource[addr];
-        ensures [inferred] S1.. |~ publish<Resource>(signer::address_of(account), Resource{value: old(Resource[addr]).value + 1});
+        ensures [inferred] {
+            let a = Resource{value: old(Resource[addr]).value + 1};
+            S1.. |~ publish<Resource>(signer::address_of(account), a)
+        };
         ensures [inferred] ..S1 |~ remove<Resource>(addr);
         aborts_if [inferred] S1 |~ exists<Resource>(signer::address_of(account));
         aborts_if [inferred] Resource[addr].value == MAX_U64;
@@ -284,7 +290,7 @@ module 0x42::state_labels {
         use 0x1::signer;
         pragma opaque = true;
         modifies Resource[signer::address_of(account)];
-        ensures [inferred] S1.. |~ result == result_of<read_resource>(addr);
+        ensures [inferred] result == (S1.. |~ result_of<read_resource>(addr));
         ensures [inferred] ..S1 |~ publish<Resource>(signer::address_of(account), Resource{value: 42});
         aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr);
         aborts_if [inferred] exists<Resource>(signer::address_of(account));
@@ -305,7 +311,7 @@ module 0x42::state_labels {
     spec remove_then_try_read(addr1: address, addr2: address): u64 {
         pragma opaque = true;
         modifies Resource[addr1];
-        ensures [inferred] S1.. |~ result == result_of<read_resource>(addr2);
+        ensures [inferred] result == (S1.. |~ result_of<read_resource>(addr2));
         ensures [inferred] ..S1 |~ ensures_of<remove_resource>(addr1, ..S1 |~ result_of<remove_resource>(addr1));
         aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr2);
         aborts_if [inferred] aborts_of<remove_resource>(addr1);
@@ -325,8 +331,8 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr2];
         modifies Resource[addr1];
-        ensures [inferred] ..S1 |~ result_1 == result_of<remove_resource>(addr1);
-        ensures [inferred] S1.. |~ result_2 == result_of<remove_resource>(addr2);
+        ensures [inferred] result_1 == (..S1 |~ result_of<remove_resource>(addr1));
+        ensures [inferred] result_2 == (S1.. |~ result_of<remove_resource>(addr2));
         aborts_if [inferred] S1 |~ aborts_of<remove_resource>(addr2);
         aborts_if [inferred] aborts_of<remove_resource>(addr1);
     }
@@ -349,6 +355,50 @@ module 0x42::state_labels {
         ensures [inferred] ..S1 |~ ensures_of<publish_resource>(account1, v1);
         aborts_if [inferred] S1 |~ aborts_of<publish_resource>(account2, v2);
         aborts_if [inferred] aborts_of<publish_resource>(account1, v1);
+    }
+
+
+    // =========================================================================
+    // Chained calls: result feeds as argument to the next call.
+    // Creates nested result_of with multiple state labels (S1, S2, S3).
+    // The hoisting pass must extract nested label-defining result_of
+    // into spec-level let bindings to avoid duplicate label definitions
+    // across ensures/aborts conditions.
+    // =========================================================================
+
+    /// Swap: read the resource value at addr, then write input back.
+    /// Each call modifies state and returns the old value.
+    fun swap_value(addr: address, input: u64): u64 acquires Resource {
+        let r = &mut Resource[addr];
+        let old_val = r.value;
+        r.value = input;
+        old_val
+    }
+    spec swap_value(addr: address, input: u64): u64 {
+        pragma opaque = true;
+        modifies Resource[addr];
+        ensures [inferred] result == old(Resource[addr]).value;
+        ensures [inferred] update<Resource>(addr, update_field(old(Resource[addr]), value, input));
+        aborts_if [inferred] !exists<Resource>(addr);
+    }
+
+
+    /// Three chained calls where each result feeds as argument to the next.
+    /// Creates nested result_of with 3 state labels (S1, S2, S3).
+    fun chained_swaps(a1: address, a2: address, a3: address): u64 acquires Resource {
+        let x = swap_value(a1, 0);
+        let y = swap_value(a2, x);   // result of first is arg to second
+        swap_value(a3, y)             // result of second is arg to third
+    }
+    spec chained_swaps(a1: address, a2: address, a3: address): u64 {
+        pragma opaque = true;
+        modifies Resource[a3];
+        modifies Resource[a2];
+        modifies Resource[a1];
+        ensures [inferred] result == (S2.. |~ result_of<swap_value>(a3, S1..S2 |~ result_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0))));
+        aborts_if [inferred] S2 |~ aborts_of<swap_value>(a3, S1..S2 |~ result_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0)));
+        aborts_if [inferred] S1 |~ aborts_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0));
+        aborts_if [inferred] aborts_of<swap_value>(a1, 0);
     }
 
 }

@@ -1,8 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::counters;
+use crate::{chunky::types::ChunkyTranscriptWithHash, counters, monitor};
 use anyhow::{anyhow, ensure, Context};
+use aptos_crypto::HashValue;
 use aptos_dkg::pvss::traits::transcript::{HasAggregatableSubtranscript, Transcript};
 use aptos_types::{
     dkg::chunky_dkg::{ChunkyDKGSession, ChunkyTranscript, DealerPublicKey},
@@ -24,7 +25,14 @@ pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
     signing_pubkeys: &[DealerPublicKey],
     epoch_state: &EpochState,
     rng: &mut R,
-) -> anyhow::Result<ChunkyTranscript> {
+) -> anyhow::Result<ChunkyTranscriptWithHash> {
+    // Hash the canonical BCS wire bytes once up front to avoid repeated re-serialization.
+    // Safe because BCS is strictly canonical: deserialize(serialize(x)) == x byte-for-byte.
+    let hash = monitor!(
+        "chunky_validate_transcript_hash",
+        HashValue::sha3_256_of(transcript_bytes)
+    );
+
     // Deserialize transcript
     counters::CHUNKY_DKG_OBJECT_SIZE_BYTES
         .with_label_values(&["received_transcript"])
@@ -33,8 +41,9 @@ pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
         .map_err(|e| anyhow!("[ChunkyDKG] Unable to deserialize chunky transcript: {e}"))?;
 
     // Verify the transcript cryptographically.
-    transcript
-        .verify(
+    monitor!(
+        "chunky_validate_transcript_verify",
+        transcript.verify(
             &dkg_config.threshold_config,
             &dkg_config.public_parameters,
             signing_pubkeys,
@@ -42,7 +51,8 @@ pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
             &dkg_config.session_metadata,
             rng,
         )
-        .context("chunky transcript verification failed")?;
+    )
+    .context("chunky transcript verification failed")?;
 
     // Ensure the transcript's dealer id matches the sender's validator index.
     // Otherwise a malicious validator could replay another validator's legitimately-signed
@@ -67,5 +77,5 @@ pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
         sender_index,
     );
 
-    Ok(transcript)
+    Ok(ChunkyTranscriptWithHash::new(transcript, hash))
 }
