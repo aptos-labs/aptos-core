@@ -1,12 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{get_encryption_key_resource, verify_chunky_dkg_transcript, wait_for_chunky_dkg_finish};
+use super::{
+    get_encryption_key_resource, verify_chunky_dkg_transcript, wait_for_chunky_dkg_finish,
+};
 use crate::{
     smoke_test_environment::SwarmBuilder, txn_emitter::generate_traffic,
     utils::get_on_chain_resource,
 };
-use aptos_forge::{EmitJobMode, Node, Swarm, SwarmExt, TransactionType};
+use aptos_forge::{EmitJobMode, Node, NodeExt, Swarm, SwarmExt, TransactionType};
 use aptos_logger::info;
 use aptos_types::{
     dkg::{chunky_dkg::ChunkyDKGState, DKGState},
@@ -19,8 +21,12 @@ use std::{sync::Arc, time::Duration};
 async fn create_swarm_with_dkg_only(
     num_validators: usize,
     epoch_duration_secs: u64,
-) -> (aptos_forge::LocalSwarm, aptos::test::CliTestFramework, usize) {
-    let (swarm, cli, _faucet) = SwarmBuilder::new_local(num_validators)
+) -> (
+    aptos_forge::LocalSwarm,
+    aptos::test::CliTestFramework,
+    usize,
+) {
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(num_validators)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
             config.api.failpoints_enabled = true;
@@ -91,10 +97,7 @@ script {{
 }
 
 /// Upgrade from shadow mode to full ConfigV1 via governance script.
-async fn upgrade_to_v1(
-    cli: &aptos::test::CliTestFramework,
-    root_idx: usize,
-) {
+async fn upgrade_to_v1(cli: &aptos::test::CliTestFramework, root_idx: usize) {
     let script = r#"
 script {
     use aptos_std::fixed_point64;
@@ -228,10 +231,7 @@ async fn chunky_dkg_shadow_to_v1() {
     let shadow_session =
         wait_for_chunky_dkg_finish(&client, None, estimated_dkg_latency_secs).await;
     let shadow_epoch = shadow_session.target_epoch();
-    info!(
-        "Shadow chunky DKG completed for epoch {}",
-        shadow_epoch
-    );
+    info!("Shadow chunky DKG completed for epoch {}", shadow_epoch);
 
     // Verify transcript is valid.
     verify_chunky_dkg_transcript(&shadow_session);
@@ -247,7 +247,10 @@ async fn chunky_dkg_shadow_to_v1() {
         let dkg_state = get_on_chain_resource::<ChunkyDKGState>(&client).await;
         if let Some(ref completed) = dkg_state.last_completed {
             if completed.target_epoch() > shadow_epoch {
-                info!("V1 chunky DKG completed for epoch {}", completed.target_epoch());
+                info!(
+                    "V1 chunky DKG completed for epoch {}",
+                    completed.target_epoch()
+                );
                 break completed.clone();
             }
         }
@@ -297,4 +300,93 @@ async fn chunky_dkg_shadow_to_v1() {
         "Expected committed encrypted transactions after V1 upgrade"
     );
     info!("Shadow → V1 transition complete: encrypted transactions working");
+}
+
+/// Test that the grace period safety net fires when chunky DKG fails.
+/// Uses a failpoint to prevent chunky DKG from processing the start event,
+/// simulating a stuck chunky DKG. Regular DKG completes normally.
+/// The grace period should force the epoch change.
+#[tokio::test]
+async fn chunky_dkg_shadow_mode_grace_period_failpoint() {
+    let epoch_duration_secs = 20;
+    let grace_period_secs = 30;
+
+    let (swarm, cli, root_idx) = create_swarm_with_dkg_only(4, epoch_duration_secs).await;
+    let client_endpoint = swarm.validators().nth(1).unwrap().rest_api_endpoint();
+    let client = aptos_rest_client::Client::new(client_endpoint);
+
+    // Wait for epoch 2 so the network is stable.
+    swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 3))
+        .await
+        .expect("Waited too long for epoch 2.");
+
+    // Activate failpoint on all validators to block chunky DKG from processing start events.
+    info!("Activating chunky_dkg::process_dkg_start_event failpoint on all validators...");
+    let validator_clients: Vec<_> = swarm.validators().map(|v| v.rest_client()).collect();
+    for client in &validator_clients {
+        client
+            .set_failpoint(
+                "chunky_dkg::process_dkg_start_event".to_string(),
+                "return".to_string(),
+            )
+            .await
+            .expect("Failed to set failpoint");
+    }
+
+    // Enable shadow mode with the grace period.
+    info!(
+        "Enabling shadow mode (grace_period={}s)...",
+        grace_period_secs
+    );
+    enable_shadow_mode(&cli, root_idx, grace_period_secs).await;
+
+    // Wait for the epoch to advance. Regular DKG will complete, but chunky DKG is stuck.
+    // The grace period safety net should force the epoch change.
+    let time_limit_secs = epoch_duration_secs + grace_period_secs + 60; // epoch + grace + buffer
+    let timer = tokio::time::Instant::now();
+    let mut epoch_after_shadow = None;
+
+    info!("Waiting for epoch to advance despite stuck chunky DKG...");
+    while timer.elapsed().as_secs() < time_limit_secs {
+        let ledger = client
+            .get_ledger_information()
+            .await
+            .expect("ledger info")
+            .into_inner();
+        let dkg_state = get_on_chain_resource::<ChunkyDKGState>(&client).await;
+        info!(
+            "epoch={} chunky_in_progress={} chunky_completed={} elapsed={}s",
+            ledger.epoch,
+            dkg_state.in_progress.is_some(),
+            dkg_state.last_completed.is_some(),
+            timer.elapsed().as_secs(),
+        );
+
+        // The governance script triggers an immediate reconfig.
+        // After that epoch, the next epoch boundary should trigger shadow mode.
+        // We need at least one more epoch change where the grace period fires.
+        if ledger.epoch >= 4 {
+            epoch_after_shadow = Some(ledger.epoch);
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    }
+
+    assert!(
+        epoch_after_shadow.is_some(),
+        "Epoch should have advanced despite chunky DKG being stuck (grace period should fire)"
+    );
+    info!(
+        "Grace period safety net worked: epoch advanced to {} with chunky DKG stuck",
+        epoch_after_shadow.unwrap()
+    );
+
+    // Verify chunky DKG did NOT complete (failpoint prevented it).
+    let dkg_state = get_on_chain_resource::<ChunkyDKGState>(&client).await;
+    assert!(
+        dkg_state.in_progress.is_none(),
+        "Chunky DKG in_progress should have been cleared by grace period"
+    );
+    info!("Confirmed: chunky DKG session was cleared by the grace period safety net");
 }

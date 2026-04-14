@@ -4,6 +4,7 @@
 use crate::{
     agg_trx_producer::AggTranscriptProducer,
     chunky::dkg_manager::ChunkyDKGManager,
+    counters,
     dkg_manager::DKGManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,

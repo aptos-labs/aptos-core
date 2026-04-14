@@ -155,10 +155,6 @@ impl OnChainChunkyDKGConfig {
         })
     }
 
-    pub fn default_shadow_enabled() -> Self {
-        Self::new_shadow_v1(50, 67, 30)
-    }
-
     pub fn default_disabled() -> Self {
         OnChainChunkyDKGConfig::Off
     }
