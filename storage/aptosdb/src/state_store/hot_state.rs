@@ -53,6 +53,10 @@ where
         }
     }
 
+    fn from_dashmap(map: DashMap<K, V>) -> Self {
+        Self { inner: map }
+    }
+
     fn get(&self, key: &K) -> Option<Ref<'_, K, V>> {
         self.inner.get(key)
     }
@@ -93,6 +97,12 @@ where
     fn new_empty(max_items_per_shard: usize) -> Self {
         Self {
             shards: arr![Shard::new(max_items_per_shard); 16],
+        }
+    }
+
+    fn from_loaded(shards: [DashMap<K, V>; NUM_STATE_SHARDS]) -> Self {
+        Self {
+            shards: shards.map(Shard::from_dashmap),
         }
     }
 
@@ -160,7 +170,20 @@ pub struct HotState {
 
 impl HotState {
     pub fn new(state: State, config: HotStateConfig) -> Self {
-        let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
+        Self::from_base(
+            Arc::new(HotStateBase::new_empty(config.max_items_per_shard)),
+            state,
+        )
+    }
+
+    pub fn new_from_loaded(
+        state: State,
+        loaded_shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+    ) -> Self {
+        Self::from_base(Arc::new(HotStateBase::from_loaded(loaded_shards)), state)
+    }
+
+    fn from_base(base: Arc<HotStateBase>, state: State) -> Self {
         let view = Arc::new(LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
@@ -309,14 +332,29 @@ impl Committer {
         initial_state: State,
         merged_version: Arc<AtomicU64>,
     ) -> Self {
+        // Compute initial byte totals from the base DashMaps. When the base is
+        // pre-populated (recovery from DB), these are non-zero; when starting
+        // empty they are 0. Without this, a later eviction of a loaded item
+        // would subtract from 0 and underflow.
+        let mut total_key_bytes = 0;
+        let mut total_value_bytes = 0;
+        for shard in base.shards.iter() {
+            for entry in shard.inner.iter() {
+                total_key_bytes += HashValue::LENGTH;
+                total_value_bytes += entry.value().size();
+            }
+        }
+        let heads = std::array::from_fn(|i| initial_state.latest_hot_key(i));
+        let tails = std::array::from_fn(|i| initial_state.oldest_hot_key(i));
+
         Self {
             base,
             committed,
             rx,
-            total_key_bytes: 0,
-            total_value_bytes: 0,
-            heads: arr![None; 16],
-            tails: arr![None; 16],
+            total_key_bytes,
+            total_value_bytes,
+            heads,
+            tails,
             merged_state: initial_state,
             old_views: Vec::new(),
             merged_version,
