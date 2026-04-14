@@ -269,12 +269,12 @@ pub struct FunctionIR {
 
 impl FunctionIR {
     /// Iterate over all instructions across all blocks.
-    pub fn iter_instrs(&self) -> impl Iterator<Item = &Instr> {
+    pub fn instrs(&self) -> impl Iterator<Item = &Instr> {
         self.blocks.iter().flat_map(|b| b.instrs.iter())
     }
 
     /// Iterate mutably over all instructions across all blocks.
-    pub fn iter_instrs_mut(&mut self) -> impl Iterator<Item = &mut Instr> {
+    pub fn instrs_mut(&mut self) -> impl Iterator<Item = &mut Instr> {
         self.blocks.iter_mut().flat_map(|b| b.instrs.iter_mut())
     }
 }

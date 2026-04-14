@@ -4,7 +4,7 @@
 //! Instruction utilities.
 //!
 //! Provides read-only slot visitors (`for_each_def`, `for_each_use`,
-//! `for_each_slot`, `collect_defs_uses`), in-place slot rewriters
+//! `for_each_slot`, `collect_defs_and_uses`), in-place slot rewriters
 //! (`remap_all_slots_with`, `remap_source_slots_with`), and miscellaneous
 //! instruction helpers (`extract_imm_value`, `is_commutative`).
 //!
@@ -63,7 +63,7 @@ pub(crate) fn for_each_slot(instr: &Instr, mut f: impl FnMut(Slot)) {
 }
 
 /// Collect defs and uses into separate lists in a single pass.
-pub(crate) fn collect_defs_uses(instr: &Instr) -> (SlotList, SlotList) {
+pub(crate) fn collect_defs_and_uses(instr: &Instr) -> (SlotList, SlotList) {
     let mut defs = SlotList::new();
     let mut uses = SlotList::new();
     visit_slots::<true, true>(instr, |slot, role| match role {

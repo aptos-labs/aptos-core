@@ -12,7 +12,7 @@ use move_vm_types::loaded_data::runtime_types::Type;
 pub fn lower_function(func_ir: &FunctionIR, ctx: &LoweringContext) -> Result<Vec<MicroOp>> {
     let mut state = LoweringState::new(func_ir, ctx);
     for block in &func_ir.blocks {
-        state.label_map[block.label.0 as usize] = state.ops.len() as u32;
+        state.label_map[block.label.0 as usize] = Some(state.ops.len() as u32);
         let body = &block.instrs;
         let mut i = 0;
         while i < body.len() {
@@ -31,8 +31,8 @@ pub fn lower_function(func_ir: &FunctionIR, ctx: &LoweringContext) -> Result<Vec
 struct LoweringState<'a> {
     ctx: &'a LoweringContext,
     ops: Vec<MicroOp>,
-    /// Label(i) -> micro-op index. Dense: one entry per block, all filled during lowering.
-    label_map: Vec<u32>,
+    /// Label(i) -> micro-op index. Dense: one entry per block; `None` until filled during lowering.
+    label_map: Vec<Option<u32>>,
     /// Indices into ops that need target patching
     branch_fixups: Vec<usize>,
     call_site_cursor: usize,
@@ -59,7 +59,7 @@ impl<'a> LoweringState<'a> {
         LoweringState {
             ctx,
             ops: Vec::new(),
-            label_map: vec![0; func_ir.blocks.len()],
+            label_map: vec![None; func_ir.blocks.len()],
             branch_fixups: Vec::new(),
             call_site_cursor: 0,
             home_slot_types: &func_ir.home_slot_types,
@@ -475,6 +475,7 @@ impl<'a> LoweringState<'a> {
         self.label_map
             .get(label as usize)
             .copied()
+            .flatten()
             .ok_or_else(|| anyhow::anyhow!("unresolved label L{}", label))
     }
 }

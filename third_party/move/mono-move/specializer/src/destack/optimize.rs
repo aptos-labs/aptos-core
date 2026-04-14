@@ -45,7 +45,7 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 ///
 /// Copy propagation is sound for value uses (value equality suffices) but
 /// unsound for storage-location uses (identity of the slot matters).
-/// `remap_source_slots` skips BorrowLoc sources to enforce this.
+/// `remap_source_slots_with` skips BorrowLoc sources to enforce this.
 ///
 /// ## The MutBorrowLoc hidden-write problem
 /// Once a slot is mutably borrowed, it can be silently modified through the
@@ -179,7 +179,7 @@ fn renumber_slots(func: &mut FunctionIR) {
 
     // Pass 1: mark which Home slots are used.
     let mut used = vec![false; old_num_home as usize];
-    for instr in func.iter_instrs() {
+    for instr in func.instrs() {
         for_each_slot(instr, |r| {
             if let Slot::Home(i) = r {
                 used[i as usize] = true;
@@ -206,7 +206,7 @@ fn renumber_slots(func: &mut FunctionIR) {
     }
 
     // Pass 2: apply remap to every instruction. O(1) per slot via direct indexing.
-    for instr in func.iter_instrs_mut() {
+    for instr in func.instrs_mut() {
         let remap_ref = &remap;
         remap_all_slots_with(instr, |slot| match slot {
             Slot::Home(i) => remap_ref[i as usize].map(Slot::Home).unwrap_or(slot),

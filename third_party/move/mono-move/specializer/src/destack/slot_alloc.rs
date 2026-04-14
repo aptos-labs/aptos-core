@@ -8,7 +8,7 @@
 
 use super::{
     analysis::BlockAnalysis,
-    instr_utils::{collect_defs_uses, remap_all_slots_with},
+    instr_utils::{collect_defs_and_uses, remap_all_slots_with},
     ssa_function::SSAFunction,
 };
 use crate::stackless_exec_ir::{BasicBlock, Instr, Slot};
@@ -119,7 +119,7 @@ fn allocate_block_in_place(
     let mut next_slot = start_slot;
 
     for (i, instr) in instrs.iter_mut().enumerate() {
-        let (defs, uses) = collect_defs_uses(instr);
+        let (defs, uses) = collect_defs_and_uses(instr);
 
         // Phase 1: Free use-slots whose last use is this instruction.
         // Done BEFORE def allocation so the freed slot can be immediately reused.
