@@ -33,6 +33,11 @@
       "react-app/jest"
     ]
   },
+  "overrides": {
+    "axios": "^1.15.0",
+    "form-data": "^4.0.5",
+    "@babel/traverse": "^7.24.0"
+  },
   "browserslist": {
     "production": [
       ">0.2%",
