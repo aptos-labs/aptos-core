@@ -65,8 +65,6 @@ impl ProofManager {
     }
 
     pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore<BatchInfoExt>>) {
-        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
-        let tracing_enabled = store.is_enabled();
         for proof in proofs.into_iter() {
             // Batch tracing (Prometheus histogram) — works on every node,
             // not just the batch author. Measures batch_creation → proof_received.
@@ -94,14 +92,6 @@ impl ProofManager {
                         age.as_millis(),
                     );
                 }
-            }
-            // Txn trace (per-txn log) — only fires on the batch author where the
-            // batch digest is registered. Shows per-txn outliers.
-            if tracing_enabled {
-                store.record_batch_stage(
-                    proof.info().digest(),
-                    aptos_transaction_tracing::types::TransactionStage::QsProofReceived,
-                );
             }
             self.batch_proof_queue.insert_proof(proof);
         }

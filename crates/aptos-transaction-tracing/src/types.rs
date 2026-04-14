@@ -12,10 +12,6 @@ pub enum TransactionStage {
     QsBatchPull,
     QsBatchCreated,
     QsProofOfStore,
-    /// Local-clock timestamp when this node's ProofManager received the proof.
-    /// On the batch author: near-instant after QsProofOfStore (validates local path).
-    /// On the leader: shows proof propagation delay from batch author.
-    QsProofReceived,
     BlockProposed,
     /// Local-clock timestamp when this node received the block proposal.
     /// Compared with BlockProposed (leader's block_timestamp) to measure
