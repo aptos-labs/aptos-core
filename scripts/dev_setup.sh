@@ -604,7 +604,7 @@ function install_z3 {
     if [[ "$(uname -m)" == "arm64" ]]; then
       Z3_PKG="z3-$Z3_VERSION-arm64-osx-11.0"
     else
-      Z3_PKG="z3-$Z3_VERSION-x64-osx-11.7.0"
+      Z3_PKG="z3-$Z3_VERSION-x64-osx-11.7.10"
     fi
   else
     echo "Z3 support not configured for this platform (uname=$(uname))"
