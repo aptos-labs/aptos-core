@@ -132,8 +132,9 @@ use move_stackless_bytecode::{
 use num::{bigint::Sign, BigInt, Zero};
 use std::{
     cell::{Cell, RefCell},
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     fmt,
+    hash::{Hash, Hasher},
 };
 
 /// Prefix for inferred intermediate state labels in displayed specs.
@@ -696,8 +697,13 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
 
                 if !state.is_empty() {
                     update_spec(fun_env, &state, &mut analyzer);
-                    // Emit modifies clauses for all captured globals
-                    emit_modifies(fun_env, &state);
+                    // Extract repeated state-neutral sub-expressions into let bindings.
+                    cse_inferred_conditions(fun_env);
+                    // Emit modifies clauses only for opaque specs (they need
+                    // explicit modifies to declare which globals may change).
+                    if !ProverOptions::get(analyzer.global_env()).no_inference_opaque {
+                        emit_modifies(fun_env, &state);
+                    }
                     // Check for inferred conditions referencing non-parameter temporaries
                     check_bad_temps(fun_env);
                 } else {
@@ -793,7 +799,6 @@ fn needs_inference(fun_env: &FunctionEnv) -> bool {
     }
 }
 
-/// Updates the function spec with inferred conditions from WPState
 fn update_spec<'env>(
     fun_env: &FunctionEnv,
     state: &WPState,
@@ -981,11 +986,285 @@ fn update_spec<'env>(
     }
 
     // Add `pragma opaque` so inferred specs are treated as opaque specifications.
-    if ProverOptions::get(env).inference_opaque {
+    if !ProverOptions::get(env).no_inference_opaque {
         let opaque_sym = pool.make(OPAQUE_PRAGMA);
         spec.properties
             .insert(opaque_sym, PropertyValue::Value(Value::Bool(true)));
     }
+}
+
+// =================================================================================================
+// Common Sub-Expression Elimination for Inferred Specs
+
+/// Computes a structural hash of an expression, ignoring NodeIds.
+fn structural_hash(exp: &ExpData) -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
+    structural_hash_impl(exp, &mut hasher);
+    hasher.finish()
+}
+
+fn structural_hash_impl(exp: &ExpData, hasher: &mut impl Hasher) {
+    std::mem::discriminant(exp).hash(hasher);
+    match exp {
+        ExpData::Value(_, v) => v.hash(hasher),
+        ExpData::LocalVar(_, s) => s.hash(hasher),
+        ExpData::Temporary(_, t) => t.hash(hasher),
+        ExpData::Call(_, op, args) => {
+            op.hash(hasher);
+            for a in args {
+                structural_hash_impl(a.as_ref(), hasher);
+            }
+        },
+        ExpData::Invoke(_, f, args) => {
+            structural_hash_impl(f.as_ref(), hasher);
+            for a in args {
+                structural_hash_impl(a.as_ref(), hasher);
+            }
+        },
+        _ => {
+            // For complex expressions (lambda, quant, etc.) just use discriminant.
+            // They won't be CSE candidates anyway.
+        },
+    }
+}
+
+/// Returns the number of nodes in an expression tree.
+fn exp_node_count(exp: &ExpData) -> usize {
+    let mut count = 0;
+    exp.visit_pre_order(&mut |_| {
+        count += 1;
+        true
+    });
+    count
+}
+
+/// Returns true if the expression is too trivial to extract.
+/// Only extract function calls and pack operations — not field accesses, variant tests,
+/// or other small operations that are more readable inline.
+fn is_cse_candidate(exp: &ExpData) -> bool {
+    matches!(
+        exp,
+        ExpData::Call(
+            _,
+            AstOp::MoveFunction(..) | AstOp::SpecFunction(..) | AstOp::Pack(..),
+            _
+        )
+    )
+}
+
+/// Generates a readable name for a CSE binding based on expression structure.
+fn cse_name_for(env: &GlobalEnv, exp: &ExpData, index: usize) -> String {
+    let name = match exp {
+        ExpData::Call(_, AstOp::MoveFunction(mid, fid), _)
+        | ExpData::Call(_, AstOp::Closure(mid, fid, _), _) => {
+            let fun_env = env.get_module(*mid).into_function(*fid);
+            fun_env.get_name().display(env.symbol_pool()).to_string()
+        },
+        ExpData::Call(_, AstOp::SpecFunction(mid, fid, _), _) => {
+            let module = env.get_module(*mid);
+            let spec_fun = module.get_spec_fun(*fid);
+            spec_fun.name.display(env.symbol_pool()).to_string()
+        },
+        ExpData::Call(_, AstOp::Select(_, _, field_id), _) => {
+            field_id.symbol().display(env.symbol_pool()).to_string()
+        },
+        _ => format!("cse_{}", index),
+    };
+    // Strip internal `$` prefix used for auto-generated spec function names
+    let name = name.strip_prefix('$').unwrap_or(&name);
+    // Append index to avoid collision with imported function names
+    format!("{}_{}", name, index)
+}
+
+/// Performs common sub-expression elimination on inferred spec conditions.
+/// Extracts repeated state-neutral sub-expressions into `let` bindings.
+fn cse_inferred_conditions(fun_env: &FunctionEnv) {
+    let env = fun_env.module_env.env;
+    let pool = env.symbol_pool();
+    let loc = fun_env.get_loc();
+    let inferred_sym = pool.make(CONDITION_INFERRED_PROP);
+
+    // Collect inferred condition indices and clone their expressions (to release the borrow).
+    let (inferred_indices, inferred_exps) = {
+        let spec = fun_env.get_spec();
+        let indices: Vec<usize> = spec
+            .conditions
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| {
+                matches!(c.kind, ConditionKind::Ensures | ConditionKind::AbortsIf)
+                    && c.properties.contains_key(&inferred_sym)
+            })
+            .map(|(i, _)| i)
+            .collect();
+        let exps: Vec<Exp> = indices
+            .iter()
+            .map(|&i| spec.conditions[i].exp.clone())
+            .collect();
+        (indices, exps)
+    };
+
+    if inferred_indices.is_empty() {
+        return;
+    }
+
+    // Phase 1: Collect candidate sub-expressions with occurrence counts.
+    // Group by structural hash, then confirm with structural_eq.
+    let mut hash_buckets: HashMap<u64, Vec<(Exp, usize)>> = HashMap::new();
+
+    for exp in &inferred_exps {
+        exp.as_ref().visit_pre_order(&mut |e: &ExpData| {
+            if !is_cse_candidate(e) || !e.is_state_neutral() {
+                return true; // keep visiting children but don't count this node
+            }
+            let h = structural_hash(e);
+            let exp_ref = ExpData::into_exp(e.clone());
+            let bucket = hash_buckets.entry(h).or_default();
+            if let Some(entry) = bucket
+                .iter_mut()
+                .find(|(existing, _)| existing.as_ref().structural_eq(&exp_ref))
+            {
+                entry.1 += 1;
+            } else {
+                bucket.push((exp_ref, 1));
+            }
+            true
+        });
+    }
+
+    // Phase 2: Select candidates. Must appear >= 2 times, have at least 2 nodes
+    // (not a trivial select), and enough total weight to justify a let binding.
+    let mut candidates: Vec<(Exp, usize)> = hash_buckets
+        .into_values()
+        .flatten()
+        .filter(|(_, count)| *count >= 3)
+        .collect();
+
+    if candidates.is_empty() {
+        return;
+    }
+
+    // Sort by node count ascending (extract smallest/deepest first so outer expressions
+    // can reference the let variable after inner ones are replaced).
+    candidates.sort_by_key(|(exp, _)| exp_node_count(exp.as_ref()));
+
+    // Phase 3: Create LetPre conditions and rewrite.
+    let mut let_conditions = Vec::new();
+    let mut used_names: BTreeSet<String> = BTreeSet::new();
+
+    // Collect names that must not be shadowed: parameters, local function names,
+    // and imported member names (from `use Module::member;` declarations).
+    for param in fun_env.get_parameters() {
+        used_names.insert(param.0.display(pool).to_string());
+    }
+    for func in fun_env.module_env.get_functions() {
+        used_names.insert(func.get_name().display(pool).to_string());
+    }
+    for use_decl in fun_env.module_env.get_use_decls() {
+        // Module-level alias (e.g., `use M as Alias;`)
+        if let Some(alias) = use_decl.alias {
+            used_names.insert(alias.display(pool).to_string());
+        }
+        // Member-level imports (e.g., `use M::f;` or `use M::f as g;`)
+        for (_, member_name, alias) in &use_decl.members {
+            let effective_name = alias.unwrap_or(*member_name);
+            used_names.insert(effective_name.display(pool).to_string());
+        }
+    }
+
+    // Process each candidate: create a let binding and rewrite all conditions
+    for (cse_idx, (candidate_exp, _count)) in candidates.iter().enumerate() {
+        // Generate a unique name
+        let mut name = cse_name_for(env, candidate_exp.as_ref(), cse_idx);
+        if used_names.contains(&name) {
+            let base = name.clone();
+            let mut suffix = 1;
+            loop {
+                name = format!("{}_{}", base, suffix);
+                if !used_names.contains(&name) {
+                    break;
+                }
+                suffix += 1;
+            }
+        }
+        used_names.insert(name.clone());
+        let name_sym = pool.make(&name);
+
+        // Create the replacement expression: LocalVar with the let-binding name
+        let cand_type = env.get_node_type(candidate_exp.as_ref().node_id());
+        let var_node = env.new_node(loc.clone(), cand_type);
+        let var_exp: Exp = ExpData::LocalVar(var_node, name_sym).into_exp();
+
+        // Rewrite all inferred conditions, replacing structural matches
+        {
+            let mut spec = fun_env.get_mut_spec();
+            for &idx in &inferred_indices {
+                let old_exp = spec.conditions[idx].exp.clone();
+                let new_exp = rewrite_cse(&old_exp, candidate_exp, &var_exp);
+                spec.conditions[idx].exp = new_exp;
+            }
+        }
+
+        // Create the LetPre condition (must have inferred property so it survives filtering)
+        let_conditions.push(Condition {
+            loc: loc.clone(),
+            kind: ConditionKind::LetPre(name_sym, loc.clone()),
+            properties: BTreeMap::from([(inferred_sym, PropertyValue::Value(Value::Bool(true)))]),
+            exp: candidate_exp.clone(),
+            additional_exps: vec![],
+        });
+    }
+
+    // Phase 4: Also rewrite let-binding expressions (inner lets may reference outer candidates).
+    // Since we processed smallest first, earlier let bindings might contain expressions
+    // that later bindings extracted. Rewrite them.
+    for i in 0..let_conditions.len() {
+        for j in (i + 1)..let_conditions.len() {
+            let candidate = let_conditions[i].exp.clone();
+            let ConditionKind::LetPre(name_sym, _) = let_conditions[i].kind else {
+                continue;
+            };
+            let cand_type = env.get_node_type(candidate.as_ref().node_id());
+            let var_node = env.new_node(loc.clone(), cand_type);
+            let var_exp: Exp = ExpData::LocalVar(var_node, name_sym).into_exp();
+            let old_exp = let_conditions[j].exp.clone();
+            let_conditions[j].exp = rewrite_cse(&old_exp, &candidate, &var_exp);
+        }
+    }
+
+    // Insert let conditions at the front of the spec (before inferred conditions).
+    if !let_conditions.is_empty() {
+        let mut spec = fun_env.get_mut_spec();
+        // Find insertion point: after any non-inferred conditions, before inferred ones.
+        let insert_pos = inferred_indices
+            .first()
+            .copied()
+            .unwrap_or(spec.conditions.len());
+        for (i, let_cond) in let_conditions.into_iter().enumerate() {
+            spec.conditions.insert(insert_pos + i, let_cond);
+        }
+    }
+}
+
+/// Rewrites an expression, replacing all structural matches of `target` with `replacement`.
+fn rewrite_cse(exp: &Exp, target: &Exp, replacement: &Exp) -> Exp {
+    struct CseRewriter<'a> {
+        target: &'a Exp,
+        replacement: &'a Exp,
+    }
+    impl ExpRewriterFunctions for CseRewriter<'_> {
+        fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+            if exp.as_ref().structural_eq(self.target) {
+                return self.replacement.clone();
+            }
+            self.rewrite_exp_descent(exp)
+        }
+    }
+    let mut rewriter = CseRewriter {
+        target,
+        replacement,
+    };
+    rewriter.rewrite_exp(exp.clone())
 }
 
 /// Checks that all inferred conditions only reference parameter temporaries.
@@ -1067,6 +1346,22 @@ fn collect_modifies_targets(exp: &Exp, targets: &mut Vec<Exp>) {
 /// Check if an expression is a trivial boolean `true` literal
 fn is_trivial_true(exp: &Exp) -> bool {
     matches!(exp.as_ref(), ExpData::Value(_, Value::Bool(true)))
+}
+
+/// Check if an expression is a verification-infrastructure assumption that
+/// should be skipped during inference. Matches:
+/// - Direct `WellFormed(x)`
+/// - Quantifiers over `ResourceDomain`: these are implied properties of data
+///   invariants (injected by WellFormed/DataInvariant instrumentation) and do
+///   not need to surface in inference results.
+fn is_well_formed_prop(exp: &Exp) -> bool {
+    match exp.as_ref() {
+        ExpData::Call(_, AstOp::WellFormed, _) => true,
+        ExpData::Quant(_, QuantKind::Forall, ranges, _, _, _) => ranges
+            .iter()
+            .any(|(_, range)| matches!(range.as_ref(), ExpData::Call(_, AstOp::ResourceDomain, _))),
+        _ => false,
+    }
 }
 
 /// An entity determined by an ensures clause: either a temporary or a global expression.
@@ -1846,7 +2141,9 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                                 dests,
                                 &mut_ref_srcs,
                             );
-                            self.add_direct_call_modifies(state, *module_id, *fun_id, srcs);
+                            self.add_direct_call_modifies(
+                                state, *module_id, *fun_id, type_inst, srcs,
+                            );
                         }
                     },
 
@@ -2620,10 +2917,25 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                         // they wrap every ensures in implications like
                         // `WellFormed(a) ==> WellFormed(b) ==> result == a + b`
                         // which are unhelpful for inferred specs.
-                        if matches!(kind, PropKind::Assume)
-                            && matches!(exp.as_ref(), ExpData::Call(_, AstOp::WellFormed, _))
-                        {
+                        // Also skip quantified forms from WellFormedInstrumentation:
+                        // `forall x in ResourceDomain<T>: WellFormed(x)`
+                        if matches!(kind, PropKind::Assume) && is_well_formed_prop(exp) {
                             return;
+                        }
+
+                        // Handle Identical (from spec let bindings) as substitution.
+                        // SpecInstrumentationProcessor emits `let x = e` as
+                        // `Prop(Assume, Identical($tN, e))` where $tN is a spec-only
+                        // temp with no corresponding bytecode Assign. Wrapping the
+                        // state with `implies(Identical($tN, e), ...)` would embed
+                        // an unresolvable temp. Instead, inline the definition.
+                        if let ExpData::Call(_, AstOp::Identical, args) = exp.as_ref() {
+                            if args.len() == 2 {
+                                if let ExpData::Temporary(_, idx) = args[0].as_ref() {
+                                    *state = self.substitute_exp_state(state, *idx, &args[1]);
+                                    return;
+                                }
+                            }
                         }
 
                         // Both assume and assert make P known true at this point.
@@ -3250,6 +3562,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         state: &mut WPState,
         module_id: ModuleId,
         fun_id: FunId,
+        type_inst: &[Type],
         srcs: &[TempIndex],
     ) {
         let callee = self.global_env().get_function(QualifiedId {
@@ -3260,8 +3573,12 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             .get_frame_spec()
             .map(|fs| fs.modifies_targets.clone())
             .unwrap_or_default();
+        let env = self.global_env();
         for target in modifies.iter() {
-            let mut target = target.clone();
+            // Instantiate the callee's type parameters with the call-site types.
+            let mut target = ExpData::rewrite_node_id(target.clone(), &mut |id| {
+                ExpData::instantiate_node(env, id, type_inst)
+            });
             for (idx, src) in srcs.iter().enumerate().rev() {
                 target = self.substitute_temp_with_exp(&target, idx, &self.mk_temporary(*src));
             }

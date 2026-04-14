@@ -715,6 +715,8 @@ pub trait ExpRewriterFunctions {
                 // reads_targets are QualifiedInstId<StructId> (not Exps), so no
                 // expression rewriting needed — just clone the set.
                 reads_targets: fs.reads_targets.clone(),
+                modifies_all: fs.modifies_all,
+                reads_all: fs.reads_all,
             }
         });
 

@@ -12,7 +12,7 @@ module 0xc0ffee::m {
         let _v0 = one();
         let _v1 = one();
         let _v2 = one();
-        let _v3 = |arg0| lambda__1__test(arg0);
+        let _v3 = |x| lambda__1__test(x);
         _v3(1)
     }
     fun lambda__1__test(p0: u64): u64 {

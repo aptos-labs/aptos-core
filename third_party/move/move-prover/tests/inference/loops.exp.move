@@ -177,10 +177,22 @@ module 0x42::loops {
         pragma unroll = 3;
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] 3 < n ==> (S3.. |~ update<Counter>(addr, update_field(S3 |~ global<Counter>(addr), value, (S3 |~ global<Counter>(addr)).value + 1)));
-        ensures [inferred] 2 < n ==> (S2..S3 |~ update<Counter>(addr, update_field(S2 |~ global<Counter>(addr), value, (S2 |~ global<Counter>(addr)).value + 1)));
-        ensures [inferred] 1 < n ==> (S1..S2 |~ update<Counter>(addr, update_field(S1 |~ global<Counter>(addr), value, (S1 |~ global<Counter>(addr)).value + 1)));
-        ensures [inferred] 0 < n ==> (..S1 |~ update<Counter>(addr, update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1)));
+        ensures [inferred] 3 < n ==> {
+            let a = update_field(S3 |~ global<Counter>(addr), value, (S3 |~ global<Counter>(addr)).value + 1);
+            S3.. |~ update<Counter>(addr, a)
+        };
+        ensures [inferred] 2 < n ==> {
+            let a = update_field(S2 |~ global<Counter>(addr), value, (S2 |~ global<Counter>(addr)).value + 1);
+            S2..S3 |~ update<Counter>(addr, a)
+        };
+        ensures [inferred] 1 < n ==> {
+            let a = update_field(S1 |~ global<Counter>(addr), value, (S1 |~ global<Counter>(addr)).value + 1);
+            S1..S2 |~ update<Counter>(addr, a)
+        };
+        ensures [inferred] 0 < n ==> {
+            let a = update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
+            ..S1 |~ update<Counter>(addr, a)
+        };
         aborts_if [inferred] 3 < n && (S3 |~ global<Counter>(addr)).value == MAX_U64;
         aborts_if [inferred] S3 |~ 3 < n && !exists<Counter>(addr);
         aborts_if [inferred] 2 < n && (S2 |~ global<Counter>(addr)).value == MAX_U64;

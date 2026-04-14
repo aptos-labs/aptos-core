@@ -35,13 +35,13 @@ module 0xc0ffee::m {
         f(p)
     }
     fun unused_lambda() {
-        test(0, |arg0| lambda__1__unused_lambda(arg0));
+        test(0, |x| lambda__1__unused_lambda(x));
     }
     fun unused_lambda_suppressed1() {
-        test(0, |arg0| lambda__1__unused_lambda_suppressed1(arg0));
+        test(0, |x| lambda__1__unused_lambda_suppressed1(x));
     }
     fun unused_lambda_suppressed2() {
-        test(0, |arg0| lambda__1__unused_lambda_suppressed2(arg0));
+        test(0, |x| lambda__1__unused_lambda_suppressed2(x));
     }
     fun lambda__1__unused_lambda(x: u64): u64 {
         1

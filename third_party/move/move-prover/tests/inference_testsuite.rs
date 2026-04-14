@@ -14,7 +14,6 @@ use codespan_reporting::term::termcolor::Buffer;
 use libtest_mimic::{Arguments, Trial};
 use log::warn;
 use move_command_line_common::env::read_env_var;
-use move_compiler_v2::Experiment;
 use move_model::metadata::LanguageVersion;
 use move_prover::{
     cli::Options,
@@ -34,12 +33,6 @@ use walkdir::WalkDir;
 const DEBUG: bool = false;
 
 static NOT_CONFIGURED_WARNED: AtomicBool = AtomicBool::new(false);
-
-const FUNCTION_VALUE_EXPERIMENTS: &[&str] = &[
-    Experiment::KEEP_INLINE_FUNS,
-    Experiment::LIFT_INLINE_FUNS,
-    Experiment::SKIP_INLINING_INLINE_FUNS,
-];
 
 fn test_runner(path: &Path) -> anyhow::Result<()> {
     let mut baseline_out = String::new();
@@ -65,10 +58,7 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
     inf_options.backend.stable_test_output = true;
 
     let mut error_writer = Buffer::no_color();
-    let experiments: Vec<String> = FUNCTION_VALUE_EXPERIMENTS
-        .iter()
-        .map(|s| String::from(*s))
-        .collect();
+    let experiments: Vec<String> = vec![];
     let (dump, result) = if DEBUG {
         match run_inference_with_bytecode_dump(&mut error_writer, inf_options, experiments.clone())
         {
@@ -185,12 +175,18 @@ fn make_options(path: &Path) -> anyhow::Result<Options> {
     let mut flags: Vec<String> = vec![
         "mvp_test".to_string(),
         "--verbose=warn".to_string(),
-        "--dependency=../move-stdlib/sources".to_string(),
-        "--dependency=../move-stdlib/nursery/sources".to_string(),
-        "--dependency=../extensions/move-table-extension/sources".to_string(),
+        "--dependency=../../../aptos-move/framework/move-stdlib/sources".to_string(),
+        "--dependency=../../../aptos-move/framework/aptos-stdlib/sources".to_string(),
+        "--dependency=../../../aptos-move/framework/aptos-framework/sources".to_string(),
         "--named-addresses".to_string(),
         "std=0x1".to_string(),
-        "extensions=0x2".to_string(),
+        "aptos_std=0x1".to_string(),
+        "aptos_framework=0x1".to_string(),
+        "aptos_fungible_asset=0xA".to_string(),
+        "aptos_token=0x3".to_string(),
+        "core_resources=0xA550C18".to_string(),
+        "vm_reserved=0x0".to_string(),
+        "vm=0x0".to_string(),
         format!("--output={}", output),
     ];
 

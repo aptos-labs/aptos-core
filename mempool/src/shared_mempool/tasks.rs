@@ -819,11 +819,11 @@ pub(crate) fn process_committed_transactions(
 
     for transaction in transactions {
         if tracing_enabled {
-            if let Some(txn) = pool
+            if let Some(hash) = pool
                 .transactions
-                .get(&transaction.sender, transaction.replay_protector)
+                .get_committed_hash(&transaction.sender, transaction.replay_protector)
             {
-                traced_commit_hashes.push(txn.committed_hash());
+                traced_commit_hashes.push(hash);
             }
         }
         pool.log_commit_transaction(

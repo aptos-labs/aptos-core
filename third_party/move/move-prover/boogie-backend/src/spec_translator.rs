@@ -14,7 +14,8 @@ use crate::{
         boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
         boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
         boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr, MAX_TUPLE_SIZE,
+        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr,
+        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
 };
@@ -39,7 +40,6 @@ use move_model::{
     well_known::{TYPE_INFO_SPEC, TYPE_NAME_GET_SPEC, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT},
 };
 use move_prover_bytecode_pipeline::{
-    mono_analysis,
     mono_analysis::MonoInfo,
     number_operation::{GlobalNumberOperationState, NumOperation::Bitwise},
 };
@@ -1532,9 +1532,10 @@ impl SpecTranslator<'_> {
                         );
                     },
                     _ => {
-                        self.env.error(
-                            &self.env.get_node_loc(fun_exp.node_id()),
-                            "bug: Operation::Behavior expects Temporary, LocalVar, or Closure",
+                        // Arbitrary expression evaluating to a function value (e.g., struct
+                        // field access after data invariant rewriting): use evaluator dispatch
+                        self.translate_behavior_via_evaluator(
+                            node_id, *kind, fun_exp, pred_args, range,
                         );
                     },
                 }
@@ -1692,49 +1693,8 @@ impl SpecTranslator<'_> {
         pre: &Option<MemoryLabel>,
         post: &Option<MemoryLabel>,
     ) -> bool {
-        let mono_info = mono_analysis::get_info(self.env);
-
-        // Look up by boogie type name since Type::Ord includes abilities which may differ
-        let boogie_name = boogie_type(self.env, fun_type, false);
-
-        // Compute the union of used/old memory across all variants (closure + param)
-        let mut union_used_memory = BTreeSet::new();
-        let mut union_old_memory = BTreeSet::new();
-
-        for (ty, closure_infos) in &mono_info.fun_infos {
-            if boogie_type(self.env, ty, false) != boogie_name {
-                continue;
-            }
-            for info in closure_infos {
-                let fun_env = self.env.get_function(info.fun.to_qualified_id());
-                for mem in fun_env.get_spec_used_memory() {
-                    union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
-                }
-                for mem in fun_env.get_spec_old_memory() {
-                    union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
-                }
-            }
-        }
-
-        for (ty, param_infos) in &mono_info.fun_param_infos {
-            if boogie_type(self.env, ty, false) != boogie_name {
-                continue;
-            }
-            for info in param_infos {
-                let fun_env = self.env.get_function(info.fun.to_qualified_id());
-                for access in fun_env.get_fun_param_access_of() {
-                    if access.fun_param == info.param_sym {
-                        for mem in &access.used_memory {
-                            union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
-                        }
-                        for mem in &access.old_memory {
-                            union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+        let (union_used_memory, union_old_memory) =
+            compute_evaluator_memory_union(self.env, fun_type);
 
         // Emit memory args following the same dual-state pattern as build_memory_params.
         // Use resolve_memory_name to resolve labels through the label chain — when a

@@ -2624,6 +2624,26 @@ impl Substitution {
         false
     }
 
+    /// Extracts function arg/result types from a type, considering constraints.
+    /// Returns `Some((arg_ty, result_ty))` if the type is `Type::Fun` or a constrained
+    /// variable with `SomeFunctionValue`.
+    pub fn get_fun_type(&self, t: &Type) -> Option<(Type, Type)> {
+        let t = self.specialize(t);
+        if let Type::Fun(arg_ty, result_ty, _) = &t {
+            return Some((self.specialize(arg_ty), self.specialize(result_ty)));
+        }
+        if let Type::Var(idx) = &t {
+            if let Some(constrs) = self.constraints.get(idx) {
+                for (_, _, c) in constrs {
+                    if let Constraint::SomeFunctionValue(arg_ty, result_ty) = c {
+                        return Some((self.specialize(arg_ty), self.specialize(result_ty)));
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Return either a shallow or deep substitution of the type variable.
     ///
     /// If deep substitution is requested, follow down the substitution chain until either

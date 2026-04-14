@@ -22,6 +22,7 @@ use aptos_types::{
 use futures::future::AbortHandle;
 use futures_util::future::Abortable;
 use move_core_types::account_address::AccountAddress;
+use rand::Rng;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -49,6 +50,14 @@ pub fn start_chunky_subtranscript_certification(
         aggregated_subtranscript.clone(),
     ));
     let task = async move {
+        // Stagger certification broadcasts across validators to avoid
+        // all ~100 validators hitting each other simultaneously.
+        const MAX_CERT_JITTER: Duration = Duration::from_secs(5);
+        let jitter = Duration::from_millis(
+            rand::thread_rng().gen_range(0, MAX_CERT_JITTER.as_millis() as u64),
+        );
+        tokio::time::sleep(jitter).await;
+
         let validated_trx = rb
             .broadcast(req, validation_state)
             .await

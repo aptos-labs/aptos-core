@@ -26,7 +26,7 @@ module 0x42::Test {
         f(x, _y) + g(x, _y)
     }
     public fun main(): u64 {
-        foo(|arg0,arg1| lambda__1__main(arg0, arg1), |arg0,arg1| lambda__2__main(arg0, arg1), 10, 100)
+        foo(|x,y| lambda__1__main(x, y), |x,y| lambda__2__main(x, y), 10, 100)
     }
     fun lambda__1__main(x: u64, param_1: u64): u64 {
         let _ = param_1;

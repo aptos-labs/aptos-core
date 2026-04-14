@@ -2991,17 +2991,29 @@ impl Frame {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_eq(&lhs, &rhs)?;
+                        let check_mask = interpreter.vm_config.include_closure_mask_in_cmp;
                         interpreter
                             .operand_stack
-                            .push(Value::bool(lhs.equals(&rhs)?))?;
+                            .push(Value::bool(lhs.equals_with_depth(
+                                &rhs,
+                                1,
+                                interpreter.vm_config.max_value_nest_depth,
+                                check_mask,
+                            )?))?;
                     },
                     Instruction::Neq => {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_neq(&lhs, &rhs)?;
+                        let check_mask = interpreter.vm_config.include_closure_mask_in_cmp;
                         interpreter
                             .operand_stack
-                            .push(Value::bool(!lhs.equals(&rhs)?))?;
+                            .push(Value::bool(!lhs.equals_with_depth(
+                                &rhs,
+                                1,
+                                interpreter.vm_config.max_value_nest_depth,
+                                check_mask,
+                            )?))?;
                     },
                     Instruction::MutBorrowGlobal(sd_idx) | Instruction::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Instruction::MutBorrowGlobal(_));

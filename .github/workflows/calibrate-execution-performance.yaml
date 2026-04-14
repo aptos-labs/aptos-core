@@ -1,0 +1,70 @@
+name: "calibrate-execution-performance"
+
+on:
+  workflow_run:
+    workflows: ["execution-performance"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  calibrate:
+    # Run only when execution-performance failed on a scheduled/dispatch run (not PRs),
+    # or when manually triggered via workflow_dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'failure' &&
+        github.event.workflow_run.event == 'workflow_dispatch'
+      )
+    runs-on: 2cpu-gh-ubuntu24-x64
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run single-node performance calibration
+        env:
+          HUMIO_READ_TOKEN: ${{ secrets.HUMIO_READ_TOKEN }}
+        run: python3 testsuite/single_node_performance_calibration.py
+
+      - name: Run move-e2e calibration
+        env:
+          HUMIO_READ_TOKEN: ${{ secrets.HUMIO_READ_TOKEN }}
+        run: python3 testsuite/single_node_performance_calibration.py --move-e2e
+
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # pin@v8
+        with:
+          token: ${{ secrets.APTOS_BOT_PAT }}
+          branch: auto/calibrate-execution-performance
+          base: main
+          title: "[ci] Calibrate single-node execution performance values"
+          body: |
+            Auto-generated calibration update after execution-performance CI failure.
+
+            Updates:
+            - `testsuite/single_node_performance_values.tsv`
+            - `aptos-move/e2e-benchmark/data/calibration_values.tsv`
+
+            Triggered by: ${{ github.event_name == 'workflow_dispatch' && 'manual dispatch' || format('execution-performance failure (run {0})', github.event.workflow_run.html_url) }}
+          commit-message: "[ci] Calibrate single-node execution performance values"
+          add-paths: |
+            testsuite/single_node_performance_values.tsv
+            aptos-move/e2e-benchmark/data/calibration_values.tsv
+
+      - name: Log PR URL
+        if: ${{ steps.create-pr.outputs.pull-request-number }}
+        run: |
+          echo "### Calibration PR Created" >> $GITHUB_STEP_SUMMARY
+          echo "- [View Pull Request](${{ steps.create-pr.outputs.pull-request-url }})" >> $GITHUB_STEP_SUMMARY
