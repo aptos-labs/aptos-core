@@ -1106,6 +1106,15 @@ pub static BATCH_COORDINATOR_NUM_BATCH_REQS: Lazy<IntCounterVec> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static REMOTE_BATCH_COORDINATOR_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_remote_batch_coordinator_channel_msgs",
+        "Ingress queue events for remote batch coordinators.",
+        &["state"]
+    )
+    .unwrap()
+});
+
 // Histogram buckets that expand DEFAULT_BUCKETS with more granularity:
 // * 0.3 to 2.0: step 0.1
 // * 2.0 to 4.0: step 0.2

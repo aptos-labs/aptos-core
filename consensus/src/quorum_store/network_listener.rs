@@ -4,21 +4,24 @@
 use crate::{
     monitor,
     quorum_store::{
-        batch_coordinator::BatchCoordinatorCommand, counters,
-        proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
+        batch_coordinator::{BatchCoordinatorCommand, BatchCoordinatorQueueKey},
+        counters,
+        proof_coordinator::ProofCoordinatorCommand,
+        proof_manager::ProofManagerCommand,
     },
     round_manager::VerifiedEvent,
 };
-use aptos_channels::aptos_channel;
+use aptos_channels::aptos_channel::{self, ElementStatus};
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
-use futures::StreamExt;
+use futures::{channel::oneshot, FutureExt, StreamExt};
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
     network_msg_rx: aptos_channel::Receiver<PeerId, (PeerId, VerifiedEvent)>,
     proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
-    remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
+    remote_batch_coordinator_tx:
+        Vec<aptos_channel::Sender<BatchCoordinatorQueueKey, BatchCoordinatorCommand>>,
     proof_manager_tx: Sender<ProofManagerCommand>,
 }
 
@@ -26,7 +29,9 @@ impl NetworkListener {
     pub(crate) fn new(
         network_msg_rx: aptos_channel::Receiver<PeerId, (PeerId, VerifiedEvent)>,
         proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
-        remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
+        remote_batch_coordinator_tx: Vec<
+            aptos_channel::Sender<BatchCoordinatorQueueKey, BatchCoordinatorCommand>,
+        >,
         proof_manager_tx: Sender<ProofManagerCommand>,
     ) -> Self {
         Self {
@@ -87,10 +92,27 @@ impl NetworkListener {
                         counters::BATCH_COORDINATOR_NUM_BATCH_REQS
                             .with_label_values(&[&idx.to_string()])
                             .inc();
+                        let (status_tx, status_rx) = oneshot::channel();
                         self.remote_batch_coordinator_tx[idx]
-                            .send(BatchCoordinatorCommand::NewBatches(author, batches))
-                            .await
+                            .push_with_feedback(
+                                BatchCoordinatorQueueKey::Author(author),
+                                BatchCoordinatorCommand::NewBatches(author, batches),
+                                Some(status_tx),
+                            )
                             .expect("Could not send remote batch");
+                        if matches!(
+                            status_rx.now_or_never(),
+                            Some(Ok(ElementStatus::Dropped(_)))
+                        ) {
+                            counters::QUORUM_STORE_MSG_COUNT
+                                .with_label_values(&["NetworkListener::batchmsg_queue_full"])
+                                .inc();
+                            warn!(
+                                remote_peer = author,
+                                idx = idx,
+                                "QS: dropping remote batch because batch coordinator queue is full"
+                            );
+                        }
                     },
                     VerifiedEvent::ProofOfStoreMsg(proofs) => {
                         counters::QUORUM_STORE_MSG_COUNT
