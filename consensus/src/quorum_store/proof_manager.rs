@@ -5,7 +5,9 @@ use super::batch_store::BatchStore;
 use crate::{
     monitor,
     quorum_store::{
-        batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters,
+        batch_generator::BackPressure,
+        batch_proof_queue::BatchProofQueue,
+        counters,
         tracing::{observe_batch, BatchStage},
     },
 };
