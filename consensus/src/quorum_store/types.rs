@@ -1,18 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use anyhow::{ensure, Context};
+use anyhow::ensure;
 use aptos_consensus_types::{
     common::{BatchPayload, TxnSummaryWithExpiration},
     proof_of_store::{BatchInfo, BatchInfoExt, BatchKind, TBatchInfo},
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, quorum_store::BatchId, transaction::SignedTransaction,
     validator_verifier::ValidatorVerifier, PeerId,
 };
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_name::{DeserializeNameAdapter, SerializeNameAdapter};
 use std::{
@@ -285,44 +283,10 @@ impl<T: TBatchInfo> Batch<T> {
             );
         }
 
-        // For V2 batches, validate that BatchKind matches the transaction types
-        if let Some(batch_kind) = self.batch_info.batch_kind() {
-            match batch_kind {
-                BatchKind::Encrypted => {
-                    let txns = self.payload.txns();
-                    // Ciphertext verification takes ~40us per txn (ED25519 sig check).
-                    txns.par_iter()
-                        .with_min_len(optimal_min_len(txns.len(), 24))
-                        .try_for_each(|txn| -> anyhow::Result<()> {
-                            ensure!(
-                                txn.is_encrypted_txn(),
-                                "Encrypted batch contains non-encrypted transaction"
-                            );
-                            txn.payload()
-                                .as_encrypted_payload()
-                                .expect("already verified is_encrypted_txn")
-                                .verify(txn.sender())
-                                .context("Encrypted transaction ciphertext verification failed")
-                        })?;
-                },
-                BatchKind::Normal => {
-                    for txn in self.payload.txns() {
-                        ensure!(
-                            !txn.is_encrypted_txn(),
-                            "Normal batch contains encrypted transaction"
-                        );
-                    }
-                },
-            }
-        } else {
-            // V1 batches do not support encrypted transactions
-            for txn in self.payload.txns() {
-                ensure!(
-                    !txn.is_encrypted_txn(),
-                    "V1 batch contains encrypted transaction (only supported in V2)"
-                );
-            }
-        }
+        aptos_consensus_types::common::verify_batch_kind_transactions(
+            self.batch_info.batch_kind(),
+            self.payload.txns(),
+        )?;
 
         Ok(())
     }
