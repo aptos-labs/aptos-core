@@ -575,6 +575,14 @@ impl BatchProofQueue {
             counters::BLOCK_BYTES_WHEN_PULL.observe(all_txns.size_in_bytes() as f64);
 
             counters::PROOF_SIZE_WHEN_PULL.observe(proof_of_stores.len() as f64);
+            for (kind, count) in &cur_txns_per_kind {
+                let kind_str = match kind {
+                    BatchKind::Normal => "normal",
+                    BatchKind::Encrypted => "encrypted",
+                };
+                counters::CONSENSUS_PULL_NUM_TXNS_PER_KIND
+                    .observe_with(&["proof", kind_str], *count as f64);
+            }
             // Number of proofs remaining in proof queue after the pull
             self.log_remaining_data_after_pull(&proof_of_stores);
         }
@@ -630,6 +638,14 @@ impl BatchProofQueue {
                 .observe_with(&["optbatch"], pulled_txns.count() as f64);
             counters::CONSENSUS_PULL_SIZE_IN_BYTES
                 .observe_with(&["optbatch"], pulled_txns.size_in_bytes() as f64);
+            for (kind, count) in &cur_txns_per_kind {
+                let kind_str = match kind {
+                    BatchKind::Normal => "normal",
+                    BatchKind::Encrypted => "encrypted",
+                };
+                counters::CONSENSUS_PULL_NUM_TXNS_PER_KIND
+                    .observe_with(&["optbatch", kind_str], *count as f64);
+            }
         }
 
         // Add pulled batches to session
@@ -692,7 +708,7 @@ impl BatchProofQueue {
         PayloadTxnsSize,
         u64,
     ) {
-        let (batches, pulled_txns, unique_txns, is_full, _cur_txns_per_kind) = self
+        let (batches, pulled_txns, unique_txns, is_full, cur_txns_per_kind) = self
             .pull_batches_internal(
                 session,
                 &HashSet::new(),
@@ -724,6 +740,14 @@ impl BatchProofQueue {
             counters::CONSENSUS_PULL_NUM_TXNS.observe_with(&["inline"], pulled_txns.count() as f64);
             counters::CONSENSUS_PULL_SIZE_IN_BYTES
                 .observe_with(&["inline"], pulled_txns.size_in_bytes() as f64);
+            for (kind, count) in &cur_txns_per_kind {
+                let kind_str = match kind {
+                    BatchKind::Normal => "normal",
+                    BatchKind::Encrypted => "encrypted",
+                };
+                counters::CONSENSUS_PULL_NUM_TXNS_PER_KIND
+                    .observe_with(&["inline", kind_str], *count as f64);
+            }
         }
         (result, pulled_txns, unique_txns)
     }
