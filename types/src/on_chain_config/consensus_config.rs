@@ -501,6 +501,13 @@ pub enum ProposerElectionType {
     // or default proposer if round proposer not
     // specified
     RoundProposer(HashMap<Round, AccountAddress>),
+    // Round robin rotation restricted to the first `num_proposers` validators
+    // (ordered by account address). Useful for experiments where only a subset
+    // of the validator set acts as block proposers.
+    RotatingProposerSubset {
+        contiguous_rounds: u32,
+        num_proposers: u64,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

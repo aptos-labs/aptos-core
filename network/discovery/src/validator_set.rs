@@ -130,8 +130,24 @@ pub(crate) fn extract_validator_set_updates(
     let is_pfn_with_validator_connections =
         node_type.is_public_fullnode() && base_config.enable_validator_pfn_connections;
 
+    // Collect validators and, for PFNs that need to skip proposers, sort by
+    // account address and drop the first `num_proposers_to_skip` entries.
+    // The sort must match the ordering used by RotatingProposerSubset in
+    // epoch_manager (which also sorts by account address), so both sides of
+    // the experiment agree on which validators are proposers.
+    let validators: Vec<_> =
+        if is_pfn_with_validator_connections && base_config.num_proposers_to_skip > 0 {
+            let mut all: Vec<_> = node_set.into_iter().collect();
+            all.sort_by_key(|info| *info.account_address());
+            all.into_iter()
+                .skip(base_config.num_proposers_to_skip)
+                .collect()
+        } else {
+            node_set.into_iter().collect()
+        };
+
     // Decode addresses while ignoring bad addresses
-    node_set
+    validators
         .into_iter()
         .map(|info| {
             let peer_id = *info.account_address();

@@ -420,6 +420,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     *default_proposer,
                 ))
             },
+            ProposerElectionType::RotatingProposerSubset {
+                contiguous_rounds,
+                num_proposers,
+            } => {
+                // Sort by account address so the proposer subset is selected in the
+                // same deterministic order that PFNs use when filtering their peer
+                // list (see extract_validator_set_updates in network/discovery).
+                let mut sorted = proposers.clone();
+                sorted.sort();
+                let subset_len = (*num_proposers as usize).min(sorted.len()).max(1);
+                let subset = sorted[..subset_len].to_vec();
+                Arc::new(RotatingProposer::new(subset, *contiguous_rounds))
+            },
         }
     }
 

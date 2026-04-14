@@ -21,6 +21,12 @@ pub struct BaseConfig {
     pub role: RoleType,
     pub waypoint: WaypointConfig,
     pub enable_validator_pfn_connections: bool,
+    /// For PFN nodes: when `enable_validator_pfn_connections` is true, skip
+    /// the first N validators (sorted by account address) when building the
+    /// validator peer set. Set this to the number of proposers in the network
+    /// so that PFNs only connect to non-proposer validators. Default 0 means
+    /// connect to all validators.
+    pub num_proposers_to_skip: usize,
 }
 
 impl Default for BaseConfig {
@@ -31,6 +37,7 @@ impl Default for BaseConfig {
             role: RoleType::Validator,
             waypoint: WaypointConfig::None,
             enable_validator_pfn_connections: false, // Whether to allow direct connections between validators and PFNs
+            num_proposers_to_skip: 0,                // By default, connect to all validators
         }
     }
 }
