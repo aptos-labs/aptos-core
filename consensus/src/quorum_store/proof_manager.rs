@@ -84,7 +84,7 @@ impl ProofManager {
             // batch creation). Catches outliers that Prometheus histograms miss.
             if let Some(age) = age {
                 if age.as_millis() > 500 {
-                    info!(
+                    warn!(
                         "SlowProofReceipt author={} digest={} num_txns={} age_ms={}",
                         proof.info().author(),
                         proof.info().digest(),
