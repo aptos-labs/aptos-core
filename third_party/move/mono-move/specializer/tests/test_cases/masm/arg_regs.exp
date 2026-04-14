@@ -375,7 +375,7 @@ fun call_in_loop() {
   frame_data_size: 16
   code:
     0: StoreImm8 [8] <- #0
-    1: JumpLessU64Imm @7 [0] < #1
+    1: JumpLessEqualU64Imm @7 [0] <= #0
     2: Move8 [40] <- [0]
     3: CallFunc #0
     4: AddU64 [8] <- [40] + [8]

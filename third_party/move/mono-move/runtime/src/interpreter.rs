@@ -244,6 +244,24 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                     return Ok(StepResult::Continue);
                 },
 
+                MicroOp::JumpGreaterU64Imm { target, src, imm } => {
+                    self.pc = if read_u64(fp, src) > imm {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
+                MicroOp::JumpLessEqualU64Imm { target, src, imm } => {
+                    self.pc = if read_u64(fp, src) <= imm {
+                        target.into()
+                    } else {
+                        self.pc + 1
+                    };
+                    return Ok(StepResult::Continue);
+                },
+
                 MicroOp::JumpLessU64 { target, lhs, rhs } => {
                     self.pc = if read_u64(fp, lhs) < read_u64(fp, rhs) {
                         target.into()

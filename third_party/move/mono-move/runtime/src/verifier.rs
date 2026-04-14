@@ -243,6 +243,24 @@ impl FunctionVerifier<'_> {
                 self.check_jump(pc, target);
             },
 
+            MicroOp::JumpGreaterU64Imm {
+                target,
+                src,
+                imm: _,
+            } => {
+                self.check_frame_access_8(pc, src);
+                self.check_jump(pc, target);
+            },
+
+            MicroOp::JumpLessEqualU64Imm {
+                target,
+                src,
+                imm: _,
+            } => {
+                self.check_frame_access_8(pc, src);
+                self.check_jump(pc, target);
+            },
+
             MicroOp::JumpLessU64 { target, lhs, rhs }
             | MicroOp::JumpGreaterEqualU64 { target, lhs, rhs }
             | MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {

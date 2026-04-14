@@ -34,7 +34,7 @@ fun conditional(r0): u64 {
 fun loop_down() {
   frame_data_size: 8
   code:
-    0: JumpLessU64Imm @3 [0] < #1
+    0: JumpLessEqualU64Imm @3 [0] <= #0
     1: SubU64Imm [0] <- [0] - #1
     2: Jump @0
     3: Return

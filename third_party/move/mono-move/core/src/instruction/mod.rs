@@ -317,6 +317,20 @@ pub enum MicroOp {
         imm: u64,
     },
 
+    /// Jump to `target` if the u64 at `src` is **>** `imm`.
+    JumpGreaterU64Imm {
+        target: CodeOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    /// Jump to `target` if the u64 at `src` is **<=** `imm`.
+    JumpLessEqualU64Imm {
+        target: CodeOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
     /// Jump to `target` if u64 at `lhs` < u64 at `rhs`.
     JumpLessU64 {
         target: CodeOffset,
@@ -630,6 +644,16 @@ impl fmt::Display for MicroOp {
                 write!(
                     f,
                     "JumpGreaterEqualU64Imm @{} [{}] >= #{}",
+                    target.0, src.0, imm
+                )
+            },
+            MicroOp::JumpGreaterU64Imm { target, src, imm } => {
+                write!(f, "JumpGreaterU64Imm @{} [{}] > #{}", target.0, src.0, imm)
+            },
+            MicroOp::JumpLessEqualU64Imm { target, src, imm } => {
+                write!(
+                    f,
+                    "JumpLessEqualU64Imm @{} [{}] <= #{}",
                     target.0, src.0, imm
                 )
             },

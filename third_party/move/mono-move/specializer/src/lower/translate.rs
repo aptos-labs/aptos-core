@@ -273,13 +273,24 @@ impl<'a> LoweringState<'a> {
                 let s = self.slot(*cond);
                 let idx = self.ops.len();
                 self.branch_fixups.push(idx);
+                // [TODO]: we are representing booleans as 0/1 in u64 slots here.
+                // This needs to be updated with a more compact boolean representation.
                 self.emit(MicroOp::JumpNotZeroU64 {
                     target: CodeOffset(encode_label(*l)),
                     src: FrameOffset(s.offset),
                 });
             },
-            Instr::BrFalse(Label(_l), _cond) => {
-                bail!("standalone BrFalse not yet lowered (expected compare+branch fusion)");
+            Instr::BrFalse(Label(l), cond) => {
+                let s = self.slot(*cond);
+                let idx = self.ops.len();
+                self.branch_fixups.push(idx);
+                // [TODO]: we are representing booleans as 0/1 in u64 slots here.
+                // This needs to be updated with a more compact boolean representation.
+                self.emit(MicroOp::JumpLessU64Imm {
+                    target: CodeOffset(encode_label(*l)),
+                    src: FrameOffset(s.offset),
+                    imm: 1,
+                });
             },
 
             // --- Fused compare+branch ---
@@ -344,17 +355,15 @@ impl<'a> LoweringState<'a> {
                             src: FrameOffset(s.offset),
                             imm: v,
                         }),
-                        // x > c ↔ x >= c+1
-                        CmpOp::Gt => self.emit(MicroOp::JumpGreaterEqualU64Imm {
+                        CmpOp::Gt => self.emit(MicroOp::JumpGreaterU64Imm {
                             target: CodeOffset(encode_label(*l)),
                             src: FrameOffset(s.offset),
-                            imm: v + 1,
+                            imm: v,
                         }),
-                        // x <= c ↔ x < c+1
-                        CmpOp::Le => self.emit(MicroOp::JumpLessU64Imm {
+                        CmpOp::Le => self.emit(MicroOp::JumpLessEqualU64Imm {
                             target: CodeOffset(encode_label(*l)),
                             src: FrameOffset(s.offset),
-                            imm: v + 1,
+                            imm: v,
                         }),
                         CmpOp::Eq | CmpOp::Neq => {
                             bail!("BrCmpImm {:?} for u64-sized type not yet lowered", op)
@@ -446,6 +455,8 @@ impl<'a> LoweringState<'a> {
                 | MicroOp::JumpNotZeroU64 { target, .. }
                 | MicroOp::JumpGreaterEqualU64Imm { target, .. }
                 | MicroOp::JumpLessU64Imm { target, .. }
+                | MicroOp::JumpGreaterU64Imm { target, .. }
+                | MicroOp::JumpLessEqualU64Imm { target, .. }
                 | MicroOp::JumpLessU64 { target, .. }
                 | MicroOp::JumpGreaterEqualU64 { target, .. }
                 | MicroOp::JumpNotEqualU64 { target, .. } => target.0,
@@ -462,6 +473,8 @@ impl<'a> LoweringState<'a> {
                 | MicroOp::JumpNotZeroU64 { target, .. }
                 | MicroOp::JumpGreaterEqualU64Imm { target, .. }
                 | MicroOp::JumpLessU64Imm { target, .. }
+                | MicroOp::JumpGreaterU64Imm { target, .. }
+                | MicroOp::JumpLessEqualU64Imm { target, .. }
                 | MicroOp::JumpLessU64 { target, .. }
                 | MicroOp::JumpGreaterEqualU64 { target, .. }
                 | MicroOp::JumpNotEqualU64 { target, .. } => target.0 = resolved,

@@ -31,6 +31,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpNotZeroU64 { target, .. }
             | MicroOp::JumpGreaterEqualU64Imm { target, .. }
             | MicroOp::JumpLessU64Imm { target, .. }
+            | MicroOp::JumpGreaterU64Imm { target, .. }
+            | MicroOp::JumpLessEqualU64Imm { target, .. }
             | MicroOp::JumpLessU64 { target, .. }
             | MicroOp::JumpGreaterEqualU64 { target, .. }
             | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
@@ -97,6 +99,16 @@ impl RemapTargets for MicroOp {
                 rhs,
             },
             MicroOp::JumpLessU64Imm { target, src, imm } => MicroOp::JumpLessU64Imm {
+                target: co(target),
+                src,
+                imm,
+            },
+            MicroOp::JumpGreaterU64Imm { target, src, imm } => MicroOp::JumpGreaterU64Imm {
+                target: co(target),
+                src,
+                imm,
+            },
+            MicroOp::JumpLessEqualU64Imm { target, src, imm } => MicroOp::JumpLessEqualU64Imm {
                 target: co(target),
                 src,
                 imm,
@@ -181,6 +193,8 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::JumpNotZeroU64 { .. }
             | MicroOp::JumpGreaterEqualU64Imm { .. }
             | MicroOp::JumpLessU64Imm { .. }
+            | MicroOp::JumpGreaterU64Imm { .. }
+            | MicroOp::JumpLessEqualU64Imm { .. }
             | MicroOp::JumpLessU64 { .. }
             | MicroOp::JumpGreaterEqualU64 { .. }
             | MicroOp::JumpNotEqualU64 { .. } => 3,
