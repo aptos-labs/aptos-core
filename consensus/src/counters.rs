@@ -342,6 +342,26 @@ pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+/// Duration of the full pull loop (outer loop with retries) in seconds
+pub static PULL_LOOP_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_pull_loop_duration_seconds",
+        "Duration of the full payload pull loop including retries",
+    )
+    .unwrap()
+});
+
+/// Number of empty retries in the pull loop before getting a payload
+pub static PULL_LOOP_EMPTY_RETRIES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_pull_loop_empty_retries",
+        "Number of empty retries in the pull loop",
+        // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 retries (10 × 30ms = 300ms max)
+        vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+    )
+    .unwrap()
+});
+
 /// Counts when pipeline backpressure is triggered
 pub static PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
