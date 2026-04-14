@@ -280,6 +280,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chunky_dkg_config_move_struct.ok(),
         );
 
+        counters::CHUNKY_DKG_CONFIG_MODE.set(match &onchain_chunky_dkg_config {
+            OnChainChunkyDKGConfig::Off => 0,
+            OnChainChunkyDKGConfig::ShadowV1(_) => 1,
+            OnChainChunkyDKGConfig::V1(_) => 2,
+        });
+
         let onchain_consensus_config = payload
             .get::<OnChainConsensusConfig>()
             .inspect_err(|e| {
