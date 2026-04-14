@@ -482,15 +482,15 @@ impl RoundManager {
                 .expect("Sending to a self loopback unbounded channel cannot fail");
         }
 
-        // HACK: Simulate slow proposers. The last 2 validators (by ordered index)
-        // delay their proposal by 500ms 10% of the time (round % 10 == 0).
+        // HACK: Simulate slow proposer. The last validator (by ordered index)
+        // delays their proposal by 1s 10% of the time (round % 10 == 0).
         let proposal_delay = {
             let author = self.proposal_generator.author();
             let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
             let n = ordered.len();
             let idx = ordered.iter().position(|a| *a == author);
-            if matches!(idx, Some(i) if i >= n - 2) && new_round_event.round % 10 == 0 {
-                Some(std::time::Duration::from_millis(500))
+            if matches!(idx, Some(i) if i >= n - 1) && new_round_event.round.is_multiple_of(10) {
+                Some(std::time::Duration::from_millis(1000))
             } else {
                 None
             }
@@ -1450,14 +1450,14 @@ impl RoundManager {
 
         let parent = parent_vote.vote_data().proposed().clone();
         let opt_proposal_round = parent.round() + 1;
-        // HACK: Simulate slow opt proposers too.
+        // HACK: Simulate slow opt proposer too.
         let opt_proposal_delay = {
             let author = self.proposal_generator.author();
             let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
             let n = ordered.len();
             let idx = ordered.iter().position(|a| *a == author);
-            if matches!(idx, Some(i) if i >= n - 2) && opt_proposal_round % 10 == 0 {
-                Some(std::time::Duration::from_millis(500))
+            if matches!(idx, Some(i) if i >= n - 1) && opt_proposal_round.is_multiple_of(10) {
+                Some(std::time::Duration::from_millis(1000))
             } else {
                 None
             }
