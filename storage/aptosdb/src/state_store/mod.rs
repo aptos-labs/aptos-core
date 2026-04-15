@@ -51,7 +51,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
-        state::{LedgerState, State},
+        state::{HotStateMetadata, LedgerState, State},
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
@@ -156,7 +156,7 @@ pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
     pub hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub _hot_state_kv_db: Option<Arc<StateKvDb>>,
+    pub hot_state_kv_db: Option<Arc<StateKvDb>>,
     pub state_kv_db: Arc<StateKvDb>,
     pub state_pruner: StatePruner,
     pub skip_usage: bool,
@@ -399,7 +399,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
-            _hot_state_kv_db: hot_state_kv_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage,
@@ -408,15 +408,16 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             hot_state_config,
         )));
-        let persisted_state = PersistedState::new_empty(hot_state_config);
-        let buffered_state = if empty_buffered_state_for_restore {
-            BufferedState::new_at_snapshot(
+        let (buffered_state, persisted_state) = if empty_buffered_state_for_restore {
+            let persisted_state = PersistedState::new_empty(hot_state_config);
+            let buffered_state = BufferedState::new_at_snapshot(
                 &state_db,
                 StateWithSummary::new_empty(hot_state_config),
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
-            )
+            );
+            (buffered_state, persisted_state)
         } else {
             Self::create_buffered_state_from_latest_snapshot(
                 &state_db,
@@ -424,7 +425,7 @@ impl StateStore {
                 hack_for_tests,
                 /*check_max_versions_after_snapshot=*/ true,
                 current_state.clone(),
-                persisted_state.clone(),
+                None,
                 hot_state_config,
             )
             .expect("buffered state creation failed.")
@@ -612,7 +613,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
-            _hot_state_kv_db: hot_state_kv_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage: false,
@@ -620,29 +621,37 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             HotStateConfig::default(),
         )));
-        let persisted_state = PersistedState::new_empty(HotStateConfig::default());
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
             0,
             /*hack_for_tests=*/ false,
             /*check_max_versions_after_snapshot=*/ false,
             current_state.clone(),
-            persisted_state,
+            Some(PersistedState::new_empty(HotStateConfig::default())),
             HotStateConfig::default(),
         )?;
         let base_version = current_state.lock().version();
         Ok(base_version)
     }
 
+    /// Creates a `BufferedState` from the latest state snapshot, optionally replaying
+    /// write sets between the snapshot and the committed version.
+    ///
+    /// `persisted_state`:
+    ///   - `None` — normal startup. The hot state KV and merkle data are loaded from the
+    ///     DB at the snapshot version; entries newer than the snapshot will be replayed.
+    ///   - `Some(ps)` — restore, reset, or test paths where the caller already has a
+    ///     `PersistedState`. The hot state starts empty (placeholder root hash, default
+    ///     metadata).
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         check_max_versions_after_snapshot: bool,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
-        out_persisted_state: PersistedState,
+        persisted_state: Option<PersistedState>,
         hot_state_config: HotStateConfig,
-    ) -> Result<BufferedState> {
+    ) -> Result<(BufferedState, PersistedState)> {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -659,7 +668,6 @@ impl StateStore {
             latest_snapshot_version = latest_snapshot_version,
             "Initializing BufferedState."
         );
-        // TODO(HotState): read hot root hash from DB.
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
                 .state_merkle_db
@@ -669,24 +677,40 @@ impl StateStore {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
+
+        // Load or reuse persisted state. When `persisted_state` is `None` (normal startup),
+        // attempt to recover the hot state from the DB at `latest_snapshot_version` so that
+        // the KV layer and the merkle layer start at the same version. The subsequent replay
+        // will bring both up to the committed version without overlap.
+        let (persisted_state, hot_state_root_hash, hot_state_metadata) = match persisted_state {
+            Some(ps) => (ps, *SPARSE_MERKLE_PLACEHOLDER_HASH, Default::default()),
+            None => Self::load_hot_state_or_empty(
+                state_db,
+                hot_state_config,
+                latest_snapshot_version,
+                usage,
+            ),
+        };
+
         let state = StateWithSummary::new_at_version(
             latest_snapshot_version,
-            *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
+            hot_state_root_hash,
             latest_snapshot_root_hash,
             usage,
             hot_state_config,
+            hot_state_metadata,
         );
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
             state.clone(),
             buffered_state_target_items,
             out_current_state.clone(),
-            out_persisted_state.clone(),
+            persisted_state.clone(),
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
         if hack_for_tests {
-            return Ok(buffered_state);
+            return Ok((buffered_state, persisted_state));
         }
 
         // Make sure the committed transactions is ahead of the latest snapshot.
@@ -701,7 +725,8 @@ impl StateStore {
             );
         }
 
-        if snapshot_next_version > 0
+        if hot_state_root_hash == *SPARSE_MERKLE_PLACEHOLDER_HASH
+            && snapshot_next_version > 0
             && let Some(db) = &state_db.hot_state_merkle_db
         {
             // TODO(HotState): this is needed while starting with an empty hot state during
@@ -725,7 +750,7 @@ impl StateStore {
                 num_transactions,
                 &mut buffered_state,
                 &out_current_state,
-                &out_persisted_state,
+                &persisted_state,
             )?;
         }
 
@@ -740,7 +765,7 @@ impl StateStore {
             latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
             "StateStore initialization finished.",
         );
-        Ok(buffered_state)
+        Ok((buffered_state, persisted_state))
     }
 
     /// Writes a null node for the hot state merkle tree at the given version.
@@ -814,18 +839,94 @@ impl StateStore {
         Ok(())
     }
 
+    /// Tries to load hot state from the persisted DB at `snapshot_version`. Returns an empty
+    /// persisted state when loading is not applicable (disabled, no DB, no snapshot).
+    ///
+    /// Returns three values consumed by different parts of the initialization:
+    ///   - `PersistedState` — fed into `BufferedState` as the base hot state.
+    ///   - `HashValue` — hot state merkle root hash at the snapshot version, used to
+    ///     seed the `StateSummary` inside `StateWithSummary`.
+    ///   - `[HotStateMetadata; NUM_STATE_SHARDS]` — LRU head/tail/counts per shard,
+    ///     used to seed the `State` inside `StateWithSummary` (duplicated from the
+    ///     `State` inside `PersistedState` because they are separate objects that
+    ///     diverge during replay).
+    fn load_hot_state_or_empty(
+        state_db: &Arc<StateDb>,
+        hot_state_config: HotStateConfig,
+        snapshot_version: Option<Version>,
+        usage: StateStorageUsage,
+    ) -> (
+        PersistedState,
+        HashValue,
+        [HotStateMetadata; NUM_STATE_SHARDS],
+    ) {
+        let empty = || {
+            (
+                PersistedState::new_empty(hot_state_config),
+                *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                Default::default(),
+            )
+        };
+
+        if hot_state_config.delete_on_restart {
+            return empty();
+        }
+        let hot_kv_db = match &state_db.hot_state_kv_db {
+            Some(db) => db,
+            None => return empty(),
+        };
+        let version = match snapshot_version {
+            Some(v) => v,
+            None => return empty(),
+        };
+
+        let loaded = hot_kv_db
+            .load_hot_state_kvs(version)
+            .expect("Failed to load hot state KVs from DB.");
+        let metadata = std::array::from_fn(|i| {
+            HotStateMetadata::new(
+                loaded[i].head,
+                loaded[i].tail,
+                loaded[i].num_items,
+                loaded[i].total_value_bytes,
+            )
+        });
+        let dashmaps = loaded.map(|s| s.map);
+        let state = State::new_at_version_with_hot_state_metadata(
+            Some(version),
+            usage,
+            hot_state_config,
+            metadata.clone(),
+        );
+        let hot_state_root_hash = state_db
+            .hot_state_merkle_db
+            .as_ref()
+            .map(|db| {
+                db.get_root_hash(version)
+                    .expect("Failed to query hot state root hash on initialization.")
+            })
+            .unwrap_or(*SPARSE_MERKLE_PLACEHOLDER_HASH);
+
+        (
+            PersistedState::new_from_loaded(state, hot_state_config, dashmaps),
+            hot_state_root_hash,
+            metadata,
+        )
+    }
+
     pub fn reset(&self) {
         self.buffered_state.lock().quit();
-        *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
+        let (buffered_state, _persisted_state) = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,
             false,
             true,
             self.current_state.clone(),
-            self.persisted_state.clone(),
+            Some(self.persisted_state.clone()),
             self.hot_state_config,
         )
         .expect("buffered state creation failed.");
+        *self.buffered_state.lock() = buffered_state;
     }
 
     pub fn buffered_state(&self) -> &Mutex<BufferedState> {
