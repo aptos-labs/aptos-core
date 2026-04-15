@@ -31,7 +31,12 @@ SHARDING_ENABLED = True
 MAX_RETRIES = 5
 RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
-TEARDOWN_DELAY = 30 * 60  # 30 minutes slack to allow for pod setup and teardown
+
+# Timeout chain — each layer is a backstop for the one before:
+#   scheduler (20m) → binary (30m) → K8s TTL controller (40m)
+POD_TIMEOUT = 20 * 60  # scheduler kills stuck pods after 20 min
+BINARY_TIMEOUT = POD_TIMEOUT + 10 * 60  # aptos-debugger self-terminates as backstop
+POD_TTL = BINARY_TIMEOUT + 10 * 60  # K8s TTL controller as last resort
 
 REPLAY_CONCURRENCY_LEVEL = 1
 
@@ -100,13 +105,11 @@ class ReplayConfig:
             self.pvc_number = 35
             self.min_range_size = 10_000
             self.range_size = 5_000_000
-            self.timeout_secs = 9000
         else:
             self.concurrent_replayer = 35
             self.pvc_number = 10
             self.min_range_size = 10_000
             self.range_size = 2_000_000
-            self.timeout_secs = 9000
 
 
 class WorkerPod:
@@ -229,7 +232,7 @@ class WorkerPod:
         pod_manifest["metadata"]["name"] = self.name  # Unique name for each pod
         pod_manifest["metadata"]["labels"]["run"] = self.label
         pod_manifest["spec"]["containers"][0]["image"] = self.image
-        pod_ttl = self.config.timeout_secs + TEARDOWN_DELAY
+        pod_ttl = POD_TTL
         pod_manifest["metadata"]["annotations"][
             "k8s-ttl-controller.twin.sh/ttl"
         ] = f"{pod_ttl}s"
@@ -252,7 +255,7 @@ class WorkerPod:
             "--replay-concurrency-level",
             f"{REPLAY_CONCURRENCY_LEVEL}",
             "--timeout-secs",
-            f"{self.config.timeout_secs}",
+            f"{BINARY_TIMEOUT}",
             "--block-cache-size",
             f"{36 * 1024 * 1024 * 1024}",
         ]
@@ -401,7 +404,9 @@ class ReplayScheduler:
             worker_cnt: {worker_cnt}
             image: {image}
             number_of_pvc: {self.config.pvc_number}
-            timeout_secs: {self.config.timeout_secs}
+            pod_timeout: {POD_TIMEOUT}
+            binary_timeout: {BINARY_TIMEOUT}
+            pod_ttl: {POD_TTL}
             namespace: {self.namespace}"""
 
     def get_label(self):
@@ -607,7 +612,7 @@ class ReplayScheduler:
         schedule_start = time.time()
         last_summary_time = schedule_start
         self.total_tasks = len(self.tasks)
-        pod_timeout = 20 * 60  # 20 minutes — max age before a pod is considered stuck
+        pod_timeout = POD_TIMEOUT
 
         # Keep running while there are tasks to dispatch OR workers still active.
         while len(self.tasks) > 0 or self._has_active_workers():
@@ -634,15 +639,16 @@ class ReplayScheduler:
                             f"attempt {retries}/{MAX_RETRIES}"
                         )
                         if retries < MAX_RETRIES:
-                            self.reschedule_pod(worker, i)
+                            self.kill_pod_and_reschedule_task(worker, i)
                         else:
                             logger.error(
                                 f"Worker {i} exceeded max retries, giving up: {worker.name}"
                             )
+                            worker.delete_pod()
                             self.failed_workpod_logs.append(worker.get_humio_log_link())
                             self.current_workers[i] = None
                         # Sync local var with the slot (now None in both branches:
-                        # reschedule_pod clears it, and the else branch above clears
+                        # kill_pod_and_reschedule_task clears it, and the else branch above clears
                         # it explicitly). This allows the dispatch check below to
                         # immediately fill this slot with a new task.
                         worker = None
@@ -670,7 +676,7 @@ class ReplayScheduler:
                         self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
             # --- Periodic status summary ---
-            # Every 10 min while dispatching, every 60s while waiting.
+            # Every 5 min while dispatching, every 60s while waiting.
             now = time.time()
             summary_interval = 60 if len(self.tasks) == 0 else 300
             if now - last_summary_time >= summary_interval:
@@ -682,7 +688,7 @@ class ReplayScheduler:
         logger.info("All tasks completed")
         return (self.failed_workpod_logs, self.txn_mismatch_logs)
 
-    def reschedule_pod(self, worker_pod: WorkerPod, worker_idx: int):
+    def kill_pod_and_reschedule_task(self, worker_pod: WorkerPod, worker_idx: int):
         # clean up the existing pod
         worker_pod.delete_pod()
         # re-enter the task to the queue
@@ -704,7 +710,7 @@ class ReplayScheduler:
                     f"Worker {worker_idx} completed: {worker_pod.name}, "
                     f"status=Failed({reason}), duration={duration}s, rescheduling"
                 )
-                self.reschedule_pod(worker_pod, worker_idx)
+                self.kill_pod_and_reschedule_task(worker_pod, worker_idx)
             else:
                 logger.info(
                     f"Worker {worker_idx} completed: {worker_pod.name}, "
@@ -755,9 +761,9 @@ class ReplayScheduler:
         phase_counts = Counter()
         header = f"=== Worker status (elapsed={int(time.time() - phase_start_time)}s"
         if tasks_remaining is not None:
-            completed = self.total_tasks - tasks_remaining
-            pct = int(completed / self.total_tasks * 100) if self.total_tasks > 0 else 100
-            header += f", progress={completed}/{self.total_tasks} — {pct}%"
+            dispatched = self.total_tasks - tasks_remaining
+            pct = int(dispatched / self.total_tasks * 100) if self.total_tasks > 0 else 100
+            header += f", dispatched {dispatched}/{self.total_tasks} — {pct}%"
         header += ") ==="
         log("")
         log(header)
