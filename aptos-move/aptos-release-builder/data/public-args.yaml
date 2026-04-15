@@ -1,0 +1,12 @@
+remote_endpoint: ~
+name: "v1.44-public-struct-enum-args"
+proposals:
+  - name: public_struct_enum_args
+    metadata:
+      title: "Proposal to enable public structs and enums as transaction arguments"
+      description: "public structs and enums (AIP-142, https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-142-public-structs-and-enums.md)."
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - public_struct_enum_args
