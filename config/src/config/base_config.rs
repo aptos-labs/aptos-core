@@ -27,6 +27,13 @@ pub struct BaseConfig {
     /// so that PFNs only connect to non-proposer validators. Default 0 means
     /// connect to all validators.
     pub num_proposers_to_skip: usize,
+    /// For PFN nodes: when `enable_validator_pfn_connections` is true, take
+    /// only the first N validators (sorted by account address) when building
+    /// the validator peer set. Set this to the number of proposers in the
+    /// network so that PFNs only connect to proposer validators. Default 0
+    /// means connect to all validators. Cannot be combined with
+    /// `num_proposers_to_skip`.
+    pub num_proposers_to_take: usize,
 }
 
 impl Default for BaseConfig {
@@ -38,6 +45,7 @@ impl Default for BaseConfig {
             waypoint: WaypointConfig::None,
             enable_validator_pfn_connections: false, // Whether to allow direct connections between validators and PFNs
             num_proposers_to_skip: 0,                // By default, connect to all validators
+            num_proposers_to_take: 0,                // By default, connect to all validators
         }
     }
 }

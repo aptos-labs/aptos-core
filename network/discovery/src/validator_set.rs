@@ -130,21 +130,35 @@ pub(crate) fn extract_validator_set_updates(
     let is_pfn_with_validator_connections =
         node_type.is_public_fullnode() && base_config.enable_validator_pfn_connections;
 
-    // Collect validators and, for PFNs that need to skip proposers, sort by
-    // account address and drop the first `num_proposers_to_skip` entries.
+    // Collect validators and, for PFNs that need to skip or isolate proposers,
+    // sort by account address and apply the appropriate filter.
     // The sort must match the ordering used by RotatingProposerSubset in
     // epoch_manager (which also sorts by account address), so both sides of
     // the experiment agree on which validators are proposers.
-    let validators: Vec<_> =
-        if is_pfn_with_validator_connections && base_config.num_proposers_to_skip > 0 {
-            let mut all: Vec<_> = node_set.into_iter().collect();
-            all.sort_by_key(|info| *info.account_address());
+    //
+    // `num_proposers_to_skip > 0`: drop the first N entries (proposers) so
+    //   PFNs only connect to non-proposer validators.
+    // `num_proposers_to_take > 0`: keep only the first N entries (proposers)
+    //   so PFNs only connect to proposer validators.
+    // Both fields default to 0 (connect to all validators). They must not be
+    // set simultaneously.
+    let validators: Vec<_> = if is_pfn_with_validator_connections
+        && (base_config.num_proposers_to_skip > 0 || base_config.num_proposers_to_take > 0)
+    {
+        let mut all: Vec<_> = node_set.into_iter().collect();
+        all.sort_by_key(|info| *info.account_address());
+        if base_config.num_proposers_to_skip > 0 {
             all.into_iter()
                 .skip(base_config.num_proposers_to_skip)
                 .collect()
         } else {
-            node_set.into_iter().collect()
-        };
+            all.into_iter()
+                .take(base_config.num_proposers_to_take)
+                .collect()
+        }
+    } else {
+        node_set.into_iter().collect()
+    };
 
     // Decode addresses while ignoring bad addresses
     validators

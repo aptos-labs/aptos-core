@@ -62,6 +62,12 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_max_load_randomness_mixed" => {
             realistic_env_max_load_randomness_mixed_test(duration)
         },
+        "realistic_env_no_proposer_pfn" => {
+            realistic_env_no_proposer_pfn_test(duration, test_cmd, 7, 0, 3, 3)
+        },
+        "realistic_env_proposer_only_pfn" => {
+            realistic_env_proposer_only_pfn_test(duration, test_cmd, 7, 0, 3, 3)
+        },
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -1009,6 +1015,84 @@ pub(crate) fn realistic_env_no_proposer_pfn_test(
         .with_pfn_override_node_config_fn(Arc::new(move |config, _| {
             config.base.enable_validator_pfn_connections = true;
             config.base.num_proposers_to_skip = num_proposers as usize;
+
+            config.consensus_observer.observer_enabled = true;
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000;
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000;
+        }))
+}
+
+/// A variant of `realistic_env_no_proposer_pfn_test` where PFNs connect
+/// **only** to the proposer validators (instead of avoiding them).
+///
+/// Implementation:
+/// - Genesis sets `RotatingProposerSubset { num_proposers }`, which rotates
+///   among the first `num_proposers` validators sorted by account address.
+/// - All validators enable validator-PFN connections.
+/// - PFNs set `num_proposers_to_take = num_proposers`, which makes the
+///   network discovery layer keep only those same first N validators when
+///   building their peer list.  PFNs therefore only dial the proposer
+///   validators.
+/// Both orderings sort by account address, so they are guaranteed to agree
+/// on which validators are proposers.
+pub(crate) fn realistic_env_proposer_only_pfn_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_vfns: usize,
+    num_pfns: usize,
+    num_proposers: u64,
+) -> ForgeConfig {
+    // Start from the baseline land-blocking config and apply the proposer-subset /
+    // PFN-isolation overrides on top.
+    realistic_env_max_load_test(duration, test_cmd, num_validators, num_vfns, num_pfns)
+        // Restrict block proposals to the first `num_proposers` validators.
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            let duration_secs = duration.as_secs();
+            let long_running = duration_secs >= 2400;
+
+            helm_values["chain"]["epoch_duration_secs"] =
+                (if long_running { 600 } else { 300 }).into();
+
+            let consensus_config = OnChainConsensusConfig::V5 {
+                alg: ConsensusAlgorithmConfig::JolteonV2 {
+                    main: ConsensusConfigV1 {
+                        proposer_election_type: ProposerElectionType::RotatingProposerSubset {
+                            contiguous_rounds: 1,
+                            num_proposers,
+                        },
+                        ..ConsensusConfigV1::default()
+                    },
+                    quorum_store_enabled: true,
+                    order_vote_enabled: true,
+                },
+                vtxn: ValidatorTxnConfig::default_for_genesis(),
+                window_size: None,
+                rand_check_enabled: true,
+            };
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(consensus_config).expect("must serialize");
+
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+        }))
+        // All validators enable validator-PFN connections so PFNs can dial them.
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+        }))
+        // PFNs enable validator connections and are configured to connect only
+        // to the first `num_proposers` validators (sorted by account address),
+        // meaning they only dial the proposer validators.  The ordering used
+        // here matches the RotatingProposerSubset ordering in epoch_manager,
+        // so PFNs will only form direct connections with the proposers.
+        .with_pfn_override_node_config_fn(Arc::new(move |config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.base.num_proposers_to_take = num_proposers as usize;
 
             config.consensus_observer.observer_enabled = true;
             config
