@@ -114,6 +114,21 @@ By relying on the bytecode verifier for these properties, the mono-move runtime 
 - Store a `(offset, size)` list per captured value in the closure body — self-describing but adds variable-size metadata overhead to every closure.
 - Store a pointer to a compile-time-generated layout descriptor — one extra 8-byte pointer per closure, avoids the variable-length list but requires a separate descriptor table.
 
+### Equality and Comparison
+
+The old VM supports structural equality and ordering for closures. Two closures are equal if (a) they wrap the same function (compared by canonical name: module_id + function_name + type_args) and (b) their captured values are equal. Ordering is lexicographic: function identity first, then captured values. Importantly, the old VM compares by canonical name rather than pointer identity, and this works regardless of resolution state — an unresolved closure (carrying the name from serialized data) can be compared with a resolved closure (reading the name from the loaded function).
+
+There are two approaches for mono-move:
+
+**Approach 1: Reimplement current semantics.** Support full structural equality and ordering. This requires:
+- The `Function` struct must carry its canonical identity (module address + module name + function name). Currently it only has `name`. For monomorphized generic functions, the type instantiation must also be stored or recoverable.
+- Unresolved closures must be comparable without triggering resolution — the `ClosureFuncRef::Unresolved` variant already carries the name and type args, so comparison between two unresolved closures works. But comparing a resolved closure with an unresolved one requires the resolved side to have the same canonical name available.
+- Captured values must support recursive structural comparison. This is a major challenge: the runtime must understand the layout of captured values recursively (e.g., a captured struct containing a vector of enums), which requires carrying type layout information at runtime. Unlike regular value comparison — where the compiler knows the full type structure and could emit a specialized comparison routine — closures are opaque at the comparison site. The captured values' types are hidden behind the closure's type signature, so comparison must be driven by runtime layout metadata rather than static code generation.
+
+**Approach 2: Make comparison a runtime error.** Closures are opaque values that cannot be compared. Any `==` or ordering operation on a closure value aborts at runtime. This is simpler and avoids the need to store canonical identity in `Function` or handle mixed resolved/unresolved comparisons. The tradeoff is reduced expressiveness — programs that compare closures (directly or as fields of structs used in collections) would fail at runtime.
+
+The choice depends on whether there is a legitimate use case for closure comparison in practice. Either way, comparison will not be included in the first version of closure support — we'll bundle it with the general implementation of value comparison and equality, which is not yet implemented in mono-move.
+
 ### GC Descriptor
 
 A new `ObjectDescriptor::Closure` variant describes the pointer layout of the captured values region. `func_ptr` is NOT a heap pointer (it lives in the executable arena) and must NOT appear in `pointer_offsets`.
