@@ -18,13 +18,17 @@ Because a cache miss is expensive (storage I/O, deserialization, verification), 
 ### Upgrades invalidate cached data
 
 Move supports module upgrades.
-When a module is upgraded, its size changes, its code changes, and any cached data derived from it (linked function pointers, struct layouts) becomes stale.
-All loaded data (caches included) that depends on upgraded module must be invalidated.
-Readers of the upgraded module or caches depending on the upgraded module must be invalidated.
+When a module is upgraded, its size changes, its code changes, and any cached data derived from it (e.g., linked function pointers) becomes stale.
+As a result, all loaded data (caches included) that depends on upgraded module must be invalidated.
+Readers (transactions) of the upgraded module or caches depending on the upgraded module must also be invalidated if upgrade changes the behavior.
 
-### "Charge once" semantics
+It is worth mentioning that upgrades are not common.
+Also, the most popular modules are framework which has a regular release and is upgraded every 2 weeks.
 
-Modules can be overcharged but to a small factor.
+### Metering first-access only
+
+Multiple accesses to same module `B` should be charged on first-access only.
+While repeated accessed can be overcharged by a small factor, it can easily become too restrictive for contracts.
 If there is a loop that calls into module `B`, gas must not be charged for `B` on every iteration.
 Similarly, if `B` is a hot library (e.g., `0x23::math`) called from many places within a transaction, charging for all call sites would be prohibitively expensive for call-heavy Move programs.
 
@@ -74,8 +78,8 @@ Walk the dependency graph, null out stale entries, mark readers for re-execution
 - Requires maintaining a reverse dependency graph (who depends on B?).
   For transitive dependencies this graph is large and expensive to maintain.
 - Layout dependencies make push nearly useless (see below).
-- Push invalidation does not work well under speculation with Zaptos (unless we de-optimize code during specultive upgrade for safety and then re-optimize back).
-- On framework upgrade, the blast radius is enormous (can be mitiagted by special-casing framework, but similar risks exist for populat third-party modules).
+- Push invalidation does not work well under speculation with Zaptos (unless we de-optimize code during speculative upgrade for safety and then re-optimize back).
+- On framework upgrade, the blast radius is enormous (can be mitigated by special-casing framework, but similar risks exist for popular third-party modules).
 
 ### Pull Invalidation
 
@@ -145,7 +149,7 @@ The loader is responsible for getting modules into memory and ensuring gas is pa
 ### Linking (Phase 2)
 
 Linking is the optimization phase.
-It takes loaded modules and resolves cross-module references: function pointers, struct layouts, type information.s
+It takes loaded modules and resolves cross-module references: function pointers, struct layouts, type information.
 Linking is:
 
 - **Consensus-invisible**: not tracked by Block-STM.
@@ -187,17 +191,19 @@ Storage --> [LOADING] --> loaded modules --> [LINKING] --> linked form --> [CACH
 ```
 
 This separation is what makes the system work: gas is fully determined by the loading phase, while linking quality is a best-effort optimization that cannot affect correctness or consensus.
-It also allows to feature gate loading only while evolvign linking unconditionally.
+This is because linking can use modules from the cache which has non-deterministic state.
+It also allows to feature gate loading only while evolving linking unconditionally.
 
 ## 4. Gas Metering
 
 ### The Core Principle
 
 Never charge gas for objects derived from modules (layouts, linked forms, monomorphized code) directly.
-Instead, use a **proxy** which is cheap to validate and invalidate.
+Instead, use a **proxy** which is cheap to charge, validate and invalidate.
 The module itself is the proxy: charge for the module, and derive everything else from it without additional gas.
+This means the proxy should account for all the "object derivation costs".
 
-### Charge-Once Semantics
+### Meter for First-Access Only
 
 Within a single transaction, each module is charged at most once.
 The transaction maintains a per-transaction visited set (the read-set).
@@ -347,10 +353,11 @@ The information is embedded in the edge itself.
 ### Cons
 
 - Read-set size increases significantly (edges >> modules).
-- Overcharging of popular libraries: every caller of `0x23::math` pays an edge cost, even though from an I/O perspective the module is loaded once.
+- Overcharging of popular libraries: every caller into `0x23::math` pays the cost of the edge, even though from an I/O perspective the module is loaded once.
   This overcharging does reflect the actual work per cross-module call (each call *does* perform extra work), but it penalizes call-heavy programs.
 - The reverse-map problem: keeping track of upstream immediate dependencies of modules achieves the same as edge tracking for push invalidation, without requiring edges in the read-set.
   This undercuts the main advantage.
+- Number of edges is quadratic in the worst case.
 
 ### Comparison
 
@@ -376,13 +383,14 @@ For every cross-module call target `B::foo`, there is a cell that belongs to mod
 
 ```rust
 struct FunctionCell {
-    /// Fast path: pointer to resolved function + version tag or hash.
-    /// Null means "not yet resolved" or "invalidated".
-    base: AtomicPtr<(Function, Version)>,
+    /// Fast path: pointer to resolved function. Function stores its version or
+    /// hash internally for validation. Null means "not yet resolved" or "invalidated".
+    base: AtomicPtr<Function>,
 
     /// Speculative overlay: maps speculative block + txn index version to function.
     /// Empty during committed execution. Used by Zaptos for speculative blocks that publish modules.
-    overlay: SmallVec<(Version, *const Function)>,
+    /// Note: actual data structure need to work under concurrency.
+    overlay: SmallVec<*const Function>,
 }
 ```
 
