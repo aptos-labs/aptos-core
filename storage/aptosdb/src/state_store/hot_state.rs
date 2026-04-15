@@ -267,7 +267,6 @@ struct Committer {
     base: Arc<HotStateBase>,
     committed: Arc<Mutex<CommittedSnapshot>>,
     rx: Receiver<CommitMsg>,
-    total_key_bytes: usize,
     total_value_bytes: usize,
     /// Points to the newest entry. `None` if empty.
     heads: [Option<HashValue>; NUM_STATE_SHARDS],
@@ -309,14 +308,19 @@ impl Committer {
         initial_state: State,
         merged_version: Arc<AtomicU64>,
     ) -> Self {
+        let heads = std::array::from_fn(|i| initial_state.latest_hot_key(i));
+        let tails = std::array::from_fn(|i| initial_state.oldest_hot_key(i));
+        let total_value_bytes = (0..NUM_STATE_SHARDS)
+            .map(|i| initial_state.hot_value_bytes(i))
+            .sum();
+
         Self {
             base,
             committed,
             rx,
-            total_key_bytes: 0,
-            total_value_bytes: 0,
-            heads: arr![None; 16],
-            tails: arr![None; 16],
+            total_value_bytes,
+            heads,
+            tails,
             merged_state: initial_state,
             old_views: Vec::new(),
             merged_version,
@@ -515,17 +519,14 @@ impl Committer {
         for shard_id in 0..NUM_STATE_SHARDS {
             for (key_hash, slot) in delta.shards[shard_id].iter() {
                 if slot.is_hot() {
-                    self.total_key_bytes += HashValue::LENGTH;
                     self.total_value_bytes += slot.size();
                     if let Some(old_slot) = self.base.shards[shard_id].insert(key_hash, slot) {
-                        self.total_key_bytes -= HashValue::LENGTH;
                         self.total_value_bytes -= old_slot.size();
                         n_update += 1;
                     } else {
                         n_insert += 1;
                     }
                 } else if let Some((_, old_slot)) = self.base.shards[shard_id].remove(&key_hash) {
-                    self.total_key_bytes -= HashValue::LENGTH;
                     self.total_value_bytes -= old_slot.size();
                     n_evict += 1;
                 }
@@ -540,11 +541,15 @@ impl Committer {
             debug_assert!(self.validate_lru(shard_id).is_ok());
         }
 
+        let total_items = self.base.len();
         COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
         COUNTER.inc_with_by(&["hot_state_update"], n_update);
         COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
-        GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
-        GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
+        GAUGE.set_with(&["hot_state_items"], total_items as i64);
+        GAUGE.set_with(
+            &["hot_state_key_bytes"],
+            (total_items * HashValue::LENGTH) as i64,
+        );
         GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
 
         self.report_age_metrics();
