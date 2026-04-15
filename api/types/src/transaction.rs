@@ -26,14 +26,12 @@ use aptos_types::{
     function_info::FunctionInfo,
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
     keyless,
-    secret_sharing::Ciphertext,
     transaction::{
         authenticator::{
             AbstractAuthenticator, AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey,
             MultiKeyAuthenticator, SingleKeyAuthenticator, TransactionAuthenticator,
             MAX_NUM_OF_SIGS,
         },
-        encrypted_payload::PayloadAssociatedData,
         webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
@@ -493,20 +491,9 @@ pub struct UserTransactionRequestInner {
 impl VerifyInput for UserTransactionRequestInner {
     fn verify(&self) -> anyhow::Result<()> {
         self.payload.verify()?;
-        // Sender-dependent ciphertext verification for the JSON path.
-        // The BCS path does this in `validate_signed_transaction_payload`.
-        if let TransactionPayload::EncryptedTransactionPayload(
-            EncryptedTransactionPayload::Encrypted(ref p),
-        ) = self.payload
-        {
-            let ciphertext: Ciphertext = bcs::from_bytes(&p.ciphertext.0)
-                .context("Invalid ciphertext: failed to BCS-deserialize")?;
-            let sender = AccountAddress::from(self.sender);
-            let associated_data = PayloadAssociatedData::new(sender);
-            ciphertext
-                .verify(&associated_data)
-                .context("Ciphertext verification failed")?;
-        }
+        // Ciphertext verification for encrypted payloads is done in
+        // `validate_signed_transaction_payload` which has access to the full
+        // SignedTransaction (needed to extract the authenticator's auth_key).
         Ok(())
     }
 }
@@ -1228,9 +1215,9 @@ pub struct DecryptedPayload {
 }
 
 impl VerifyInput for EncryptedTransactionPayload {
-    /// Basic structural checks. Full ciphertext verification with sender happens in
-    /// `UserTransactionRequestInner::verify()` (JSON path) and
-    /// `validate_signed_transaction_payload` (BCS path).
+    /// Basic structural checks. Full ciphertext verification happens in
+    /// `validate_signed_transaction_payload`, after JSON or BCS requests are
+    /// converted into a `SignedTransaction`.
     fn verify(&self) -> anyhow::Result<()> {
         match self {
             EncryptedTransactionPayload::Encrypted(_) => Ok(()),

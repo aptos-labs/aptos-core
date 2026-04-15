@@ -3,13 +3,13 @@
 
 use crate::{
     secret_sharing::{Ciphertext, EvalProof},
-    transaction::{TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig},
+    transaction::{
+        authenticator::AuthenticationKey, TransactionExecutable, TransactionExecutableRef,
+        TransactionExtraConfig,
+    },
 };
 use anyhow::{bail, Result};
-use aptos_batch_encryption::{
-    schemes::fptx_weighted::FPTXWeighted,
-    traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
-};
+use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
@@ -43,11 +43,12 @@ impl Plaintext for DecryptedPayload {}
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PayloadAssociatedData {
     sender: AccountAddress,
+    auth_key: AuthenticationKey,
 }
 
 impl PayloadAssociatedData {
-    pub fn new(sender: AccountAddress) -> Self {
-        Self { sender }
+    pub fn new(sender: AccountAddress, auth_key: AuthenticationKey) -> Self {
+        Self { sender, auth_key }
     }
 }
 
@@ -233,8 +234,12 @@ impl EncryptedPayload {
         // TODO(ibalajiarun): Avoid the clone
     }
 
-    pub fn verify(&self, sender: AccountAddress) -> anyhow::Result<()> {
-        let associated_data = PayloadAssociatedData::new(sender);
-        FPTXWeighted::verify_ct(self.ciphertext(), &associated_data)
+    pub fn verify(
+        &self,
+        sender: AccountAddress,
+        auth_key: AuthenticationKey,
+    ) -> anyhow::Result<()> {
+        let associated_data = PayloadAssociatedData::new(sender, auth_key);
+        self.ciphertext().verify(&associated_data)
     }
 }
