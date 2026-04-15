@@ -20,7 +20,8 @@ use aptos_types::{
     secret_sharing::EncryptionKey,
     transaction::{
         encrypted_payload::{
-            DecryptedPayload, DecryptionNonce, EncryptedPayload, PayloadAssociatedData,
+            DecryptedPlaintext, DecryptionNonce, EncryptedInner, EncryptedPayload,
+            PayloadAssociatedData,
         },
         EntryFunction, Script,
     },
@@ -481,7 +482,7 @@ impl TransactionFactory {
         let decryption_nonce: DecryptionNonce = rand::random();
 
         // Create DecryptedPayload for encryption
-        let decrypted_payload = DecryptedPayload::new(executable, decryption_nonce);
+        let decrypted_payload = DecryptedPlaintext::new(executable, decryption_nonce);
 
         // Create associated data with sender and auth_key to bind the ciphertext
         // to both the sender address and the authenticator's identity.
@@ -502,13 +503,13 @@ impl TransactionFactory {
         let payload_hash = CryptoHash::hash(&decrypted_payload);
 
         // Create encrypted payload
-        Ok(EncryptedPayload::Encrypted {
+        Ok(EncryptedPayload::Encrypted(EncryptedInner {
             ciphertext,
             extra_config,
             payload_hash,
             encryption_epoch,
             claimed_entry_fun: None,
-        })
+        }))
     }
 
     fn expiration_timestamp(&self) -> u64 {

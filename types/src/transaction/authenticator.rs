@@ -2340,14 +2340,22 @@ mod tests {
         };
         let payload_hash = HashValue::random();
         let encryption_epoch = 7;
-        let payload = TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted {
-            ciphertext: ciphertext.clone(),
-            extra_config: extra_config.clone(),
+        let payload = TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted(
+            crate::transaction::encrypted_payload::EncryptedInner {
+                ciphertext: ciphertext.clone(),
+                extra_config: extra_config.clone(),
+                payload_hash,
+                encryption_epoch,
+                claimed_entry_fun: None,
+            },
+        ));
+        (
+            payload,
+            ciphertext,
+            extra_config,
             payload_hash,
             encryption_epoch,
-            claimed_entry_fun: None,
-        });
-        (payload, ciphertext, extra_config, payload_hash, encryption_epoch)
+        )
     }
 
     /// Simulate decryption by mutating the signed transaction's payload
@@ -2361,14 +2369,18 @@ mod tests {
     ) {
         *signed_txn.payload_mut() =
             TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
-                ciphertext,
-                extra_config,
-                payload_hash,
-                encryption_epoch,
-                claimed_entry_fun: None,
+                original: crate::transaction::encrypted_payload::EncryptedInner {
+                    ciphertext,
+                    extra_config,
+                    payload_hash,
+                    encryption_epoch,
+                    claimed_entry_fun: None,
+                },
                 eval_proof: EvalProof::random(),
-                executable: TransactionExecutable::Empty,
-                decryption_nonce: [42; 16],
+                decrypted: crate::transaction::encrypted_payload::DecryptedPlaintext::new(
+                    TransactionExecutable::Empty,
+                    [42; 16],
+                ),
             });
     }
 

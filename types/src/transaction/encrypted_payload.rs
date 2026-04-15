@@ -23,12 +23,12 @@ pub type DecryptionNonce = [u8; DECRYPTION_NONCE_NUM_BYTES];
 #[derive(
     Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
-pub struct DecryptedPayload {
+pub struct DecryptedPlaintext {
     executable: TransactionExecutable,
     decryption_nonce: DecryptionNonce,
 }
 
-impl DecryptedPayload {
+impl DecryptedPlaintext {
     pub fn new(executable: TransactionExecutable, decryption_nonce: DecryptionNonce) -> Self {
         Self {
             executable,
@@ -36,12 +36,16 @@ impl DecryptedPayload {
         }
     }
 
-    pub fn unwrap(self) -> (TransactionExecutable, DecryptionNonce) {
-        (self.executable, self.decryption_nonce)
+    pub fn executable(&self) -> &TransactionExecutable {
+        &self.executable
+    }
+
+    pub fn decryption_nonce(&self) -> &DecryptionNonce {
+        &self.decryption_nonce
     }
 }
 
-impl Plaintext for DecryptedPayload {}
+impl Plaintext for DecryptedPlaintext {}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PayloadAssociatedData {
@@ -84,61 +88,62 @@ pub struct ClaimedEntryFunction {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EncryptedInner {
+    pub ciphertext: Ciphertext,
+    pub extra_config: TransactionExtraConfig,
+    pub payload_hash: HashValue,
+    /// Client-supplied label identifying which epoch's encryption key the
+    /// submitter believes the ciphertext was encrypted under. This is a hint
+    /// used for fast-path rejection when it diverges from the available
+    /// decryption key's epoch — it is not a cryptographic commitment.
+    /// Ciphertext integrity is enforced separately via `Ciphertext::verify`.
+    pub encryption_epoch: u64,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptedPayload {
-    Encrypted {
-        ciphertext: Ciphertext,
-        extra_config: TransactionExtraConfig,
-        payload_hash: HashValue,
-        encryption_epoch: u64,
-        claimed_entry_fun: Option<ClaimedEntryFunction>,
-    },
+    Encrypted(EncryptedInner),
     FailedDecryption {
-        ciphertext: Ciphertext,
-        extra_config: TransactionExtraConfig,
-        payload_hash: HashValue,
-        encryption_epoch: u64,
-        claimed_entry_fun: Option<ClaimedEntryFunction>,
+        original: EncryptedInner,
         eval_proof: Option<EvalProof>,
         reason: DecryptionFailureReason,
     },
     Decrypted {
-        ciphertext: Ciphertext,
-        extra_config: TransactionExtraConfig,
-        payload_hash: HashValue,
-        encryption_epoch: u64,
-        claimed_entry_fun: Option<ClaimedEntryFunction>,
+        original: EncryptedInner,
         eval_proof: EvalProof,
-
-        // decrypted things
-        executable: TransactionExecutable,
-        decryption_nonce: DecryptionNonce,
+        decrypted: DecryptedPlaintext,
     },
 }
 
 impl EncryptedPayload {
-    pub fn ciphertext(&self) -> &Ciphertext {
+    fn original(&self) -> &EncryptedInner {
         match self {
-            Self::Encrypted { ciphertext, .. }
-            | Self::FailedDecryption { ciphertext, .. }
-            | Self::Decrypted { ciphertext, .. } => ciphertext,
+            Self::Encrypted(original)
+            | Self::FailedDecryption { original, .. }
+            | Self::Decrypted { original, .. } => original,
         }
+    }
+
+    pub fn ciphertext(&self) -> &Ciphertext {
+        &self.original().ciphertext
     }
 
     pub fn executable(&self) -> Result<TransactionExecutable> {
         Ok(match self {
-            EncryptedPayload::Encrypted { .. } | EncryptedPayload::FailedDecryption { .. } => {
+            EncryptedPayload::Encrypted(_) | EncryptedPayload::FailedDecryption { .. } => {
                 TransactionExecutable::Encrypted
             },
-            EncryptedPayload::Decrypted { executable, .. } => executable.clone(),
+            EncryptedPayload::Decrypted { decrypted, .. } => decrypted.executable().clone(),
         })
     }
 
     pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         Ok(match self {
-            EncryptedPayload::Encrypted { .. } | EncryptedPayload::FailedDecryption { .. } => {
+            EncryptedPayload::Encrypted(_) | EncryptedPayload::FailedDecryption { .. } => {
                 TransactionExecutableRef::Encrypted
             },
-            EncryptedPayload::Decrypted { executable, .. } => executable.as_ref(),
+            EncryptedPayload::Decrypted { decrypted, .. } => decrypted.executable().as_ref(),
         })
     }
 
@@ -150,95 +155,53 @@ impl EncryptedPayload {
     }
 
     pub fn extra_config(&self) -> &TransactionExtraConfig {
-        match self {
-            EncryptedPayload::Encrypted { extra_config, .. } => extra_config,
-            EncryptedPayload::FailedDecryption { extra_config, .. } => extra_config,
-            EncryptedPayload::Decrypted { extra_config, .. } => extra_config,
-        }
+        &self.original().extra_config
     }
 
     pub fn encryption_epoch(&self) -> u64 {
-        match self {
-            EncryptedPayload::Encrypted {
-                encryption_epoch, ..
-            }
-            | EncryptedPayload::FailedDecryption {
-                encryption_epoch, ..
-            }
-            | EncryptedPayload::Decrypted {
-                encryption_epoch, ..
-            } => *encryption_epoch,
-        }
+        self.original().encryption_epoch
     }
 
     pub fn is_encrypted(&self) -> bool {
-        matches!(self, Self::Encrypted { .. })
+        matches!(self, Self::Encrypted(_))
     }
 
-    pub fn into_decrypted(
+    /// Verify the decrypted plaintext against the stored commitments and, on success,
+    /// transition `self` to `Decrypted`. On mismatch, `self` is left as `Encrypted` and the
+    /// failure reason is returned so the caller can mark the payload failed.
+    pub fn try_into_decrypted(
         &mut self,
         eval_proof: EvalProof,
-        executable: TransactionExecutable,
-        nonce: DecryptionNonce,
-    ) -> anyhow::Result<()> {
-        let Self::Encrypted {
-            ciphertext,
-            extra_config,
-            payload_hash,
-            encryption_epoch,
-            claimed_entry_fun,
-        } = self
-        else {
-            bail!("Payload is not in Encrypted state");
+        plaintext: DecryptedPlaintext,
+    ) -> Result<(), DecryptionFailureReason> {
+        let Self::Encrypted(original) = self else {
+            panic!("try_into_decrypted called on non-Encrypted state");
         };
 
-        *self = Self::Decrypted {
-            ciphertext: ciphertext.clone(),
-            extra_config: extra_config.clone(),
-            payload_hash: *payload_hash,
-            encryption_epoch: *encryption_epoch,
-            eval_proof,
-            executable,
-            decryption_nonce: nonce,
-            claimed_entry_fun: claimed_entry_fun.clone(),
-        };
-        Ok(())
-    }
+        if original.payload_hash != CryptoHash::hash(&plaintext) {
+            return Err(DecryptionFailureReason::PayloadHashMismatch);
+        }
 
-    pub fn verify_payload_hash(&self, decrypted: &DecryptedPayload) -> anyhow::Result<bool> {
-        let Self::Encrypted { payload_hash, .. } = self else {
-            bail!("Payload is not in Encrypted state");
-        };
-
-        Ok(*payload_hash == CryptoHash::hash(decrypted))
-    }
-
-    pub fn entry_fun_matches(&self, decrypted: &DecryptedPayload) -> anyhow::Result<bool> {
-        let Self::Encrypted {
-            claimed_entry_fun, ..
-        } = self
-        else {
-            bail!("Payload is not in Encrypted state");
-        };
-
-        if let Some(claim) = claimed_entry_fun {
-            // If there is a claim about this payload, the payload executable must be an entry
-            // function
-            if let TransactionExecutable::EntryFunction(entry_fun) = &decrypted.executable {
-                if *entry_fun.module() != claim.module {
-                    // module must match
-                    return Ok(false);
-                } else if let Some(claimed_function_id) = &claim.function
-                    && entry_fun.function() != claimed_function_id.as_ident_str()
-                {
-                    // if there is a claimed function name, this must also match
-                    return Ok(false);
-                }
-            } else {
-                return Ok(false);
+        if let Some(claim) = &original.claimed_entry_fun {
+            let TransactionExecutable::EntryFunction(entry_fun) = plaintext.executable() else {
+                return Err(DecryptionFailureReason::ClaimedEntryFunctionMismatch);
+            };
+            if *entry_fun.module() != claim.module {
+                return Err(DecryptionFailureReason::ClaimedEntryFunctionMismatch);
+            }
+            if let Some(claimed_function_id) = &claim.function
+                && entry_fun.function() != claimed_function_id.as_ident_str()
+            {
+                return Err(DecryptionFailureReason::ClaimedEntryFunctionMismatch);
             }
         }
-        Ok(true)
+
+        *self = Self::Decrypted {
+            original: original.clone(),
+            eval_proof,
+            decrypted: plaintext,
+        };
+        Ok(())
     }
 
     pub fn into_failed_decryption_with_reason(
@@ -246,20 +209,9 @@ impl EncryptedPayload {
         eval_proof: Option<EvalProof>,
         reason: DecryptionFailureReason,
     ) -> anyhow::Result<()> {
-        if let Self::Encrypted {
-            ciphertext,
-            extra_config,
-            payload_hash,
-            encryption_epoch,
-            claimed_entry_fun,
-        } = self
-        {
+        if let Self::Encrypted(original) = self {
             *self = Self::FailedDecryption {
-                ciphertext: ciphertext.clone(),
-                extra_config: extra_config.clone(),
-                payload_hash: *payload_hash,
-                encryption_epoch: *encryption_epoch,
-                claimed_entry_fun: claimed_entry_fun.clone(),
+                original: original.clone(),
                 eval_proof,
                 reason,
             };
@@ -285,43 +237,74 @@ mod tests {
     use super::*;
     use crate::transaction::TransactionExtraConfig;
 
-    #[test]
-    fn verify_payload_hash_accepts_matching_hash() {
-        let decrypted = DecryptedPayload::new(TransactionExecutable::Empty, [7; 16]);
-        let encrypted = EncryptedPayload::Encrypted {
+    fn encrypted_with_hash(
+        payload_hash: HashValue,
+        claimed_entry_fun: Option<ClaimedEntryFunction>,
+    ) -> EncryptedPayload {
+        EncryptedPayload::Encrypted(EncryptedInner {
             ciphertext: Ciphertext::random(),
             extra_config: TransactionExtraConfig::V1 {
                 multisig_address: None,
                 replay_protection_nonce: None,
             },
-            payload_hash: CryptoHash::hash(&decrypted),
+            payload_hash,
             encryption_epoch: 7,
-            claimed_entry_fun: None,
-        };
-
-        assert!(encrypted.verify_payload_hash(&decrypted).unwrap());
+            claimed_entry_fun,
+        })
     }
 
     #[test]
-    fn verify_payload_hash_rejects_mismatched_hash() {
-        let decrypted = DecryptedPayload::new(TransactionExecutable::Empty, [7; 16]);
-        let encrypted = EncryptedPayload::Encrypted {
-            ciphertext: Ciphertext::random(),
-            extra_config: TransactionExtraConfig::V1 {
-                multisig_address: None,
-                replay_protection_nonce: None,
-            },
-            payload_hash: HashValue::random(),
-            encryption_epoch: 7,
-            claimed_entry_fun: None,
-        };
+    fn try_into_decrypted_accepts_matching_hash() {
+        let plaintext = DecryptedPlaintext::new(TransactionExecutable::Empty, [7; 16]);
+        let mut encrypted = encrypted_with_hash(CryptoHash::hash(&plaintext), None);
 
-        assert!(!encrypted.verify_payload_hash(&decrypted).unwrap());
+        encrypted
+            .try_into_decrypted(EvalProof::random(), plaintext)
+            .unwrap();
+        assert!(matches!(encrypted, EncryptedPayload::Decrypted { .. }));
+    }
+
+    #[test]
+    fn try_into_decrypted_rejects_mismatched_hash() {
+        let plaintext = DecryptedPlaintext::new(TransactionExecutable::Empty, [7; 16]);
+        let mut encrypted = encrypted_with_hash(HashValue::random(), None);
+
+        assert_eq!(
+            encrypted.try_into_decrypted(EvalProof::random(), plaintext),
+            Err(DecryptionFailureReason::PayloadHashMismatch)
+        );
+        assert!(matches!(encrypted, EncryptedPayload::Encrypted(_)));
+    }
+
+    #[test]
+    fn try_into_decrypted_rejects_mismatched_entry_fun() {
+        use crate::transaction::EntryFunction;
+        use move_core_types::ident_str;
+
+        let entry_fun = EntryFunction::new(
+            ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned()),
+            ident_str!("transfer").to_owned(),
+            vec![],
+            vec![],
+        );
+        let plaintext =
+            DecryptedPlaintext::new(TransactionExecutable::EntryFunction(entry_fun), [7; 16]);
+        let claim = ClaimedEntryFunction {
+            module: ModuleId::new(AccountAddress::ONE, ident_str!("other_module").to_owned()),
+            function: None,
+        };
+        let mut encrypted = encrypted_with_hash(CryptoHash::hash(&plaintext), Some(claim));
+
+        assert_eq!(
+            encrypted.try_into_decrypted(EvalProof::random(), plaintext),
+            Err(DecryptionFailureReason::ClaimedEntryFunctionMismatch)
+        );
+        assert!(matches!(encrypted, EncryptedPayload::Encrypted(_)));
     }
 
     #[test]
     fn state_transitions_preserve_encryption_epoch() {
-        let mut encrypted = EncryptedPayload::Encrypted {
+        let mut encrypted = EncryptedPayload::Encrypted(EncryptedInner {
             ciphertext: Ciphertext::random(),
             extra_config: TransactionExtraConfig::V1 {
                 multisig_address: None,
@@ -330,7 +313,7 @@ mod tests {
             payload_hash: HashValue::random(),
             encryption_epoch: 11,
             claimed_entry_fun: None,
-        };
+        });
 
         assert_eq!(encrypted.encryption_epoch(), 11);
 

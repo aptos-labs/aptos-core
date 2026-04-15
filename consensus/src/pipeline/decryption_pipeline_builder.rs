@@ -25,7 +25,7 @@ use aptos_types::{
         SecretSharedKey,
     },
     transaction::{
-        encrypted_payload::{DecryptedPayload, DecryptionFailureReason, EncryptedPayload},
+        encrypted_payload::{DecryptedPlaintext, DecryptionFailureReason, EncryptedPayload},
         SignedTransaction,
     },
 };
@@ -411,37 +411,18 @@ async fn decrypt_validator_path(
                         let encrypted_payload = txn.payload_mut()
                             .as_encrypted_payload_mut()
                             .expect("must happen");
-                        if !encrypted_payload
-                            .verify_payload_hash(&payload)
-                            .expect("must be encrypted")
+                        match encrypted_payload
+                            .try_into_decrypted(eval_proof.clone(), payload)
                         {
-                            warn!(
-                                "transaction with ciphertext id {:?} has mismatching payload hash",
-                                id
-                            );
-                            num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
-                            mark_txn_failed_decryption(
-                                txn,
-                                Some(eval_proof),
-                                DecryptionFailureReason::PayloadHashMismatch,
-                            )
-                        } else if !encrypted_payload.entry_fun_matches(&payload)
-                            .expect("must be encrypted") {
-                            warn!(
-                                "transaction with ciphertext id {:?} has mismatching entry function",
-                                id
-                            );
-                            num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
-                            mark_txn_failed_decryption(
-                                txn,
-                                Some(eval_proof),
-                                DecryptionFailureReason::ClaimedEntryFunctionMismatch,
-                            )
-                        } else {
-                            let (executable, nonce) = payload.unwrap();
-                            encrypted_payload.into_decrypted(eval_proof, executable, nonce)
-                                .expect("must happen");
-                            txn
+                            Ok(()) => txn,
+                            Err(reason) => {
+                                warn!(
+                                    "transaction with ciphertext id {:?} rejected post-decryption: {:?}",
+                                    id, reason
+                                );
+                                num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
+                                mark_txn_failed_decryption(txn, Some(eval_proof), reason)
+                            },
                         }
                     },
                     Err(e) => {
@@ -510,7 +491,7 @@ fn record_decryption_metrics(result: &DecryptionResult) {
                 DecryptionFailureReason::EpochMismatch => epoch_mismatch += 1,
                 DecryptionFailureReason::ClaimedEntryFunctionMismatch => entry_fun_mismatch += 1,
             },
-            EncryptedPayload::Encrypted { .. } => {
+            EncryptedPayload::Encrypted(_) => {
                 // Still in encrypted state — shouldn't happen after decryption pipeline
                 failed_decryption += 1;
             },
@@ -564,6 +545,6 @@ fn mark_txn_failed_decryption(
 fn do_final_decryption(
     decryption_key: &DecryptionKey,
     prepared_ciphertext_or_error: Result<PreparedCiphertext, MissingEvalProofError>,
-) -> anyhow::Result<DecryptedPayload> {
+) -> anyhow::Result<DecryptedPlaintext> {
     FPTXWeighted::decrypt(decryption_key, &prepared_ciphertext_or_error?)
 }
