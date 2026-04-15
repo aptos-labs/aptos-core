@@ -37,6 +37,7 @@ pub struct TransactionMetadata {
     pub script_size: NumBytes,
     pub is_keyless: bool,
     pub is_slh_dsa_sha2_128s: bool,
+    pub is_encrypted_txn: bool,
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
     /// The transaction index context for the monotonically increasing counter.
@@ -155,6 +156,7 @@ impl TransactionMetadata {
                         .any(|auth| matches!(auth.signature(), aptos_types::transaction::authenticator::AnySignature::SlhDsa_Sha2_128s { .. }))
                 })
                 .unwrap_or(false),
+            is_encrypted_txn: txn.is_encrypted_txn(),
             entry_function_payload: if txn.payload().is_multisig() {
                 None
             } else if let Ok(TransactionExecutableRef::EntryFunction(e)) =
@@ -279,6 +281,10 @@ impl TransactionMetadata {
 
     pub fn is_slh_dsa_sha2_128s(&self) -> bool {
         self.is_slh_dsa_sha2_128s
+    }
+
+    pub fn is_encrypted_txn(&self) -> bool {
+        self.is_encrypted_txn
     }
 
     pub fn entry_function_payload(&self) -> Option<EntryFunction> {

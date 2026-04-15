@@ -1036,6 +1036,25 @@ impl AptosVM {
         })
     }
 
+    /// Charge intrinsic gas and any authentication/encryption surcharges for the transaction.
+    /// Called at the start of each execution path (regular and multisig).
+    fn charge_intrinsic_and_surcharges(
+        gas_meter: &mut impl AptosGasMeter,
+        txn_data: &TransactionMetadata,
+    ) -> Result<(), VMStatus> {
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        if txn_data.is_keyless() {
+            gas_meter.charge_keyless()?;
+        }
+        if txn_data.is_slh_dsa_sha2_128s() {
+            gas_meter.charge_slh_dsa_sha2_128s()?;
+        }
+        if txn_data.is_encrypted_txn() {
+            gas_meter.charge_encrypted_txn_decryption()?;
+        }
+        Ok(())
+    }
+
     fn execute_script_or_entry_function<'a, 'r>(
         &self,
         resolver: &'r impl AptosMoveResolver,
@@ -1058,13 +1077,7 @@ impl AptosVM {
             })
         });
 
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-        if txn_data.is_keyless() {
-            gas_meter.charge_keyless()?;
-        }
-        if txn_data.is_slh_dsa_sha2_128s() {
-            gas_meter.charge_slh_dsa_sha2_128s()?;
-        }
+        Self::charge_intrinsic_and_surcharges(gas_meter, txn_data)?;
 
         match executable {
             TransactionExecutableRef::Script(script) => {
@@ -1227,13 +1240,7 @@ impl AptosVM {
             ))
         });
 
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-        if txn_data.is_keyless() {
-            gas_meter.charge_keyless()?;
-        }
-        if txn_data.is_slh_dsa_sha2_128s() {
-            gas_meter.charge_slh_dsa_sha2_128s()?;
-        }
+        Self::charge_intrinsic_and_surcharges(gas_meter, txn_data)?;
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error = || {

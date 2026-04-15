@@ -213,13 +213,15 @@ impl Dependency {
 impl ExecutionAndIOCosts {
     /// Convert the gas log into a type-erased representation.
     pub fn to_erased(&self, keep_generic_types: bool) -> TypeErasedExecutionAndIoCosts {
-        let mut nodes = vec![];
-
-        nodes.push(Node::new("intrinsic", self.intrinsic_cost));
-
-        nodes.push(Node::new("keyless", self.keyless_cost));
-
-        nodes.push(Node::new("slh_dsa_sha2_128s", self.slh_dsa_sha2_128s_cost));
+        let mut nodes = vec![
+            Node::new("intrinsic", self.intrinsic_cost),
+            Node::new("keyless", self.keyless_cost),
+            Node::new("slh_dsa_sha2_128s", self.slh_dsa_sha2_128s_cost),
+            Node::new(
+                "encrypted_txn_decryption",
+                self.encrypted_txn_decryption_cost,
+            ),
+        ];
 
         if !self.dependencies.is_empty() {
             let deps = Node::new_with_children(

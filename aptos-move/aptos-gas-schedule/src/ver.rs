@@ -10,6 +10,8 @@
 /// Change log:
 /// - V46:
 ///    - New minimum price per gas unit parameter for higher-limit transactions
+///    - Gas charging for encrypted transaction decryption
+///    - Minimum gas unit price for encrypted transactions
 /// - V41:
 ///    - Gas charging for SLH-DSA-SHA2-128s signature verification
 /// - V31:

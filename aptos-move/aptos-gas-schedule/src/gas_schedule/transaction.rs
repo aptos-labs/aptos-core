@@ -286,6 +286,18 @@ crate::gas_schedule::macros::define_gas_parameters!(
             { RELEASE_V1_41.. => "slh_dsa_sha2_128s.base" },
             138_000_000,
         ],
+        [
+            encrypted_txn_decryption_base_cost: InternalGas,
+            { RELEASE_V1_46.. => "encrypted_txn_decryption.base" },
+            // 120ms e2e decryption latency amortized over 32 txns * 100M internal gas/ms.
+            // The per-block max is 64 encrypted txns, so we assume a half-full block.
+            375_000_000,
+        ],
+        [
+            encrypted_txn_min_price_per_gas_unit: FeePerGasUnit,
+            { RELEASE_V1_46.. => "encrypted_txn_min_price_per_gas_unit" },
+            200,  // 2x the current min_price_per_gas_unit (100)
+        ],
     ]
 );
 
@@ -317,5 +329,37 @@ impl TransactionGasParameters {
 impl ToUnitWithParams<TransactionGasParameters, InternalGasUnit> for GasUnit {
     fn multiplier(params: &TransactionGasParameters) -> u64 {
         params.scaling_factor().into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::InitialGasSchedule;
+
+    /// Encrypted transactions must pay at least 2x the base minimum gas unit price
+    /// to reflect their block priority. If governance raises `min_price_per_gas_unit`
+    /// without bumping `encrypted_txn_min_price_per_gas_unit` proportionally, the
+    /// encrypted premium collapses.
+    ///
+    /// In test builds `aptos_global_constants::GAS_UNIT_PRICE` is `0`, so comparing against
+    /// `TransactionGasParameters::initial().min_price_per_gas_unit` directly would make this
+    /// check trivially pass. Instead we simulate mainnet by overriding `min_price_per_gas_unit`
+    /// with its prod value (100) and verify the invariant.
+    #[test]
+    fn encrypted_min_price_is_at_least_2x_base_min_price() {
+        const MAINNET_MIN_PRICE_PER_GAS_UNIT: u64 = 100;
+
+        let mut params = TransactionGasParameters::initial();
+        params.min_price_per_gas_unit = MAINNET_MIN_PRICE_PER_GAS_UNIT.into();
+
+        let base: u64 = u64::from(params.min_price_per_gas_unit);
+        let encrypted: u64 = u64::from(params.encrypted_txn_min_price_per_gas_unit);
+        assert!(
+            encrypted >= base.saturating_mul(2),
+            "encrypted_txn_min_price_per_gas_unit ({}) must be at least 2x min_price_per_gas_unit ({})",
+            encrypted,
+            base,
+        );
     }
 }

@@ -282,7 +282,7 @@ async fn chunky_dkg_shadow_to_v1() {
         &mut swarm,
         &all_validators,
         Duration::from_secs(20),
-        100,
+        200,
         vec![vec![(TransactionType::default(), 1)]],
         true,
         Some(EmitJobMode::MaxLoad {
