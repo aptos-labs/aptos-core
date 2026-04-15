@@ -121,7 +121,7 @@ function install_build_essentials {
   #fi
 }
 
-function install_clang {
+function install_clang_lld {
   PACKAGE_MANAGER=$1
   VERSION=${2:-21}
 
@@ -138,9 +138,13 @@ function install_clang {
     fi
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
+    "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/lld lld "/usr/bin/lld-${VERSION}" 100
   else
     install_pkg clang "$PACKAGE_MANAGER"
     install_pkg llvm "$PACKAGE_MANAGER"
+    if [[ "$(uname)" == "Linux" ]]; then
+      install_pkg lld "$PACKAGE_MANAGER"
+    fi
   fi
 }
 
@@ -724,13 +728,6 @@ function install_postgres {
   fi
 }
 
-function install_lld {
-  # Right now, only install lld for linux
-  if [[ "$(uname)" == "Linux" ]]; then
-    install_pkg lld "$PACKAGE_MANAGER"
-  fi
-}
-
 function install_libdw {
   # Right now, only install libdw for linux
   if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman" ]]; then
@@ -1003,12 +1000,11 @@ install_pkg wget "$PACKAGE_MANAGER"
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
   install_pkg cmake "$PACKAGE_MANAGER"
-  install_clang "$PACKAGE_MANAGER"
+  install_clang_lld "$PACKAGE_MANAGER"
 
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
-  install_lld
   install_libdw
 
   install_rustup "$BATCH_MODE"
