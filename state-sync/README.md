@@ -4,7 +4,7 @@ title: State Sync
 custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/state-sync/README.md
 ---
 
-# State Synchronization (State Sync)
+# State Synchronization (State Sync).
 
 State sync is a component that runs within each Aptos node and is responsible
 for synchronizing the node to the latest blockchain state. It is required by
