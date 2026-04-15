@@ -518,9 +518,9 @@ module aptos_framework::account {
         });
     }
 
-    /// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+    /// Upserts an Ed25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
     /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
-    /// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+    /// This function takes the account's original keyless public key and a Ed25519 backup public key and rotates the account's authentication key to a multi-key of
     /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
     ///
     /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
@@ -529,7 +529,7 @@ module aptos_framework::account {
     /// # Arguments
     /// * `account` - The signer representing the keyless account
     /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
-    /// * `backup_public_key` - The ED25519 public key to add as a backup
+    /// * `backup_public_key` - The Ed25519 public key to add as a backup
     /// * `backup_key_proof` - A signature from the backup key proving ownership
     ///
     /// # Aborts
