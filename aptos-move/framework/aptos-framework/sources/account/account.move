@@ -231,7 +231,7 @@ module aptos_framework::account {
     const ENOT_THE_ORIGINAL_PUBLIC_KEY: u64 = 26;
     /// The set_originating_address is disabled due to potential poisoning from account abstraction
     const ESET_ORIGINATING_ADDRESS_DISABLED: u64 = 27;
-    /// The blob being written into `EncryptedDK` exceeds `MAX_ENCRYPTED_DK_BYTES`.
+    /// The ciphertext being written into `EncryptedDK` exceeds `MAX_ENCRYPTED_DK_BYTES`.
     const EENCRYPTED_DK_TOO_LONG: u64 = 28;
     /// No `EncryptedDK` resource exists for the queried address.
     const EENCRYPTED_DK_NOT_FOUND: u64 = 29;
@@ -514,9 +514,9 @@ module aptos_framework::account {
         });
     }
 
-    /// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+    /// Upserts an Ed25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
     /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
-    /// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+    /// This function takes the account's original keyless public key and a Ed25519 backup public key and rotates the account's authentication key to a multi-key of
     /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
     ///
     /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
@@ -525,7 +525,7 @@ module aptos_framework::account {
     /// # Arguments
     /// * `account` - The signer representing the keyless account
     /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
-    /// * `backup_public_key` - The ED25519 public key to add as a backup
+    /// * `backup_public_key` - The Ed25519 public key to add as a backup
     /// * `backup_key_proof` - A signature from the backup key proving ownership
     ///
     /// # Aborts
@@ -595,6 +595,11 @@ module aptos_framework::account {
     /// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
     /// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
     /// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
+    ///
+    /// SECURITY: This function does not verify that `dk_ciphertext` is a well-formed encryption of the DK corresponding
+    /// to the registered EK on-chain. (It could, in theory, but we've judged the implementation complexity too high.)
+    /// Wallets using this function must be careful to only call this using a `dk_ciphertext` produced from its own
+    /// keyless Ed25519 backup key flow under the user-controlled `backup_public_key`.
     entry fun upsert_ed25519_backup_key_and_encrypt_dk(
         account: &signer,
         keyless_public_key: vector<u8>,
@@ -607,18 +612,18 @@ module aptos_framework::account {
     }
 
     /// Upserts the opaque per-account `EncryptedDK` for `account`. Friend-only so that the policy of who can
-    /// write a blob (and the atomicity guarantees that come with it, e.g. coupling with a key rotation) lives
+    /// write a ciphertext (and the atomicity guarantees that come with it, e.g. coupling with a key rotation) lives
     /// in the calling module rather than at this layer.
-    public(friend) fun upsert_encrypted_dk(account: &signer, blob: vector<u8>) acquires EncryptedDK {
+    public(friend) fun upsert_encrypted_dk(account: &signer, ciphertext: vector<u8>) acquires EncryptedDK {
         assert!(
-            blob.length() <= MAX_ENCRYPTED_DK_BYTES,
+            ciphertext.length() <= MAX_ENCRYPTED_DK_BYTES,
             error::invalid_argument(EENCRYPTED_DK_TOO_LONG)
         );
         let addr = signer::address_of(account);
         if (!exists<EncryptedDK>(addr)) {
-            move_to(account, EncryptedDK::V1 { ciphertext: blob });
+            move_to(account, EncryptedDK::V1 { ciphertext: ciphertext });
         } else {
-            EncryptedDK[addr].ciphertext = blob;
+            EncryptedDK[addr].ciphertext = ciphertext;
         };
     }
 

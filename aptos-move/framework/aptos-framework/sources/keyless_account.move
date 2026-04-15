@@ -233,6 +233,11 @@ module aptos_framework::keyless_account {
     /// `keyless_public_key` and `backup_public_key` must be the (1-of-2) keyless + Ed25519-backup multi-key currently
     /// authorizing this account; otherwise the call aborts. This check pins the function to keyless+backup accounts and
     /// prevents accidentally backing up a DK for an account whose auth key has a different (incompatible) shape.
+    ///
+    /// SECURITY: This function only verifies the ZKPoK for `ek` and *not* that `dk_ciphertext` is a well-formed
+    /// encryption of the DK matching `ek`, nor that the encryption key is one the account's owner actually controls.
+    /// Wallets using this function must be careful to only call this using a `dk_ciphertext` produced from its own
+    /// keyless Ed25519 backup key flow under the user-controlled `backup_public_key`.
     entry fun register_ek_and_encrypt_dk(
         owner: &signer,
         keyless_public_key: vector<u8>,
