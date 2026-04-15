@@ -17,6 +17,7 @@ use aptos_types::{
     state_store::{hot_state::THotStateSlot, state_slot::StateSlot, NUM_STATE_SHARDS},
     transaction::Version,
 };
+#[cfg(test)]
 use arr_macro::arr;
 use dashmap::{mapref::one::Ref, DashMap};
 #[cfg(test)]
@@ -47,10 +48,15 @@ where
     K: Clone + Eq + std::hash::Hash,
     V: Clone,
 {
+    #[cfg(test)]
     fn new(max_items: usize) -> Self {
         Self {
             inner: DashMap::with_capacity(max_items),
         }
+    }
+
+    fn from_dashmap(map: DashMap<K, V>) -> Self {
+        Self { inner: map }
     }
 
     fn get(&self, key: &K) -> Option<Ref<'_, K, V>> {
@@ -90,9 +96,16 @@ where
     K: Clone + Eq + std::hash::Hash,
     V: Clone,
 {
+    #[cfg(test)]
     fn new_empty(max_items_per_shard: usize) -> Self {
         Self {
             shards: arr![Shard::new(max_items_per_shard); 16],
+        }
+    }
+
+    fn from_loaded(shards: [DashMap<K, V>; NUM_STATE_SHARDS]) -> Self {
+        Self {
+            shards: shards.map(Shard::from_dashmap),
         }
     }
 
@@ -160,7 +173,16 @@ pub struct HotState {
 
 impl HotState {
     pub fn new(state: State, config: HotStateConfig) -> Self {
-        let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
+        let empty_shards =
+            std::array::from_fn(|_| DashMap::with_capacity(config.max_items_per_shard));
+        Self::new_from_loaded(state, empty_shards)
+    }
+
+    pub fn new_from_loaded(
+        state: State,
+        loaded_shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+    ) -> Self {
+        let base = Arc::new(HotStateBase::from_loaded(loaded_shards));
         let view = Arc::new(LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
