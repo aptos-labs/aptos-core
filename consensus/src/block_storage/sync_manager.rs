@@ -114,12 +114,6 @@ impl BlockStore {
         sync_info: &SyncInfo,
         mut retriever: BlockRetriever,
     ) -> anyhow::Result<()> {
-        self.sync_to_highest_commit_cert(
-            sync_info.highest_commit_cert().ledger_info(),
-            retriever.network.clone(),
-        )
-        .await;
-
         // When the local ordered round is very old than the received sync_info, this function will
         // (1) resets the block store with highest commit cert = sync_info.highest_quorum_cert()
         // (2) insert all the blocks between (inclusive) highest_commit_cert.commit_info().id() to
@@ -132,6 +126,12 @@ impl BlockStore {
             &mut retriever,
         )
         .await?;
+
+        self.sync_to_highest_commit_cert(
+            sync_info.highest_commit_cert().ledger_info(),
+            retriever.network.clone(),
+        )
+        .await;
 
         // The insert_ordered_cert(order_cert) function call expects that order_cert.commit_info().id() block
         // is already stored in block_store. So, we first call insert_quorum_cert(highest_quorum_cert).

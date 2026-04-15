@@ -188,9 +188,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             ResetSignal::TargetRound(round) => round,
         };
         self.block_queue = BlockQueue::new();
-        self.rand_store
-            .lock()
-            .update_highest_known_round(target_round);
+        self.rand_store.lock().reset(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
