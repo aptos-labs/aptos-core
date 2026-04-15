@@ -64,16 +64,15 @@ Owner region                       Heap
 ┌────────┐                  ┌──────────────────────────┐
 │   ●────┼─────────────────►│ desc_id(4) | size(4)     │  header
 │        │                  ├──────────────────────────┤
-└────────┘                  │ func_ref (N)             │  inline FunctionRef enum
+└────────┘                  │ func_ref                 │  ClosureFuncRef
   8 bytes                   │ mask (8)                 │  ClosureMask bits
-                            ├──────────────────────────┤
-                            │ captured_0               │
-                            │ captured_1               │
-                            │ ...                      │
+                            │ captured_data            │  ClosureCapturedData
                             └──────────────────────────┘
 ```
 
-The `func_ref` field is a `ClosureFuncRef` enum laid out inline in the closure body — the same type used in the `PackClosureOp` micro-op:
+Conceptually, a closure contains two enums. How they are laid out in memory (inline, behind a pointer, etc.) is an implementation detail to be finalized later.
+
+`func_ref` is a `ClosureFuncRef`:
 
 ```rust
 enum ClosureFuncRef {
@@ -85,13 +84,30 @@ enum ClosureFuncRef {
 }
 ```
 
-The concrete in-memory representation of this enum (tag size, padding, payload layout) is an implementation detail to be finalized. The `Unresolved` variant is contingent on the general design of cross-module (indirect) calls, which is not yet implemented — its payload will mirror whatever representation cross-module call targets use.
+The `Unresolved` variant is contingent on the general design of cross-module (indirect) calls, which is not yet implemented — its payload will mirror whatever representation cross-module call targets use.
 
-Neither variant contains heap pointers — `Resolved` points into the executable arena, and `Unresolved` will store or reference its data outside the GC heap. This means the GC does not need to trace `func_ref` and the same closure descriptor works for both variants. In the future, we could consider moving some of the function reference information into the object descriptor itself if that simplifies the layout.
+Neither variant contains heap pointers — `Resolved` points into the executable arena, and `Unresolved` will store or reference its data outside the GC heap. This means the GC does not need to trace `func_ref`. In the future, we could consider moving some of the function reference information into the object descriptor itself if that simplifies the layout.
+
+`captured_data` is a `ClosureCapturedData`:
+
+```rust
+enum ClosureCapturedData {
+    /// Raw BCS bytes from storage, not yet parsed.
+    Raw(/* raw bytes */),
+    /// Materialized flat values, as produced by PackClosure or
+    /// by parsing a Raw closure on first call.
+    Materialized {
+        captured_0,
+        captured_1,
+        ...
+    },
+}
+```
+
+The `Raw` form represents closures loaded from storage whose captured values have not yet been parsed — more on this in the Closure Storage section. The `Materialized` form has captured values laid out flat at their concrete sizes, and some may be heap pointers traced by the GC.
 
 Other fields:
 - **`mask`** (8 bytes): The `ClosureMask` bits (u64). Scalar, not traced by GC.
-- **`captured_0..N`**: The captured values, laid out contiguously at their concrete sizes. Some of these may be heap pointers (vectors, structs, enums, other closures).
 
 ### Reconstructing Captured Value Layout at Call Time
 
@@ -195,10 +211,64 @@ This information is only available at runtime via `func_ptr` → `Function` + `m
 
 ## GC Considerations
 
-1. **Closure heap objects** are traced via `ObjectDescriptor::Closure`. The `func_ref` field contains no heap pointers in either variant, so the GC only needs to trace the captured values region. The same descriptor works for both resolved and unresolved closures.
+1. **Closure heap objects** are traced via `ObjectDescriptor::Closure`. The `func_ref` field contains no heap pointers in either variant, so the GC only needs to trace the captured data region. For `Materialized` closures, `pointer_offsets` lists the captured values that are heap pointers. For `Raw` closures, there are no heap pointers in the captured data (it's an opaque byte blob), so `pointer_offsets` is empty. The two states require different descriptors.
 
-2. **Closures capturing closures**: Works naturally — a captured closure is an 8-byte heap pointer in the captured values region, and its offset appears in `pointer_offsets`.
+2. **Closures capturing closures**: Works naturally for materialized closures — a captured closure is an 8-byte heap pointer in the captured values region, and its offset appears in `pointer_offsets`.
 
 3. **Safe points**: `PackClosure` allocates and is therefore a GC safe point. The specializer must ensure the safe-point layout at the `PackClosure` instruction accounts for any live heap pointers in the frame (including captured values, since GC occurs before the copy).
 
 4. **Stack scanning during calls**: `CallClosure` itself does not allocate — it reads from the closure, copies into the callee's frame, and performs the call. No GC can occur during the interleaving phase. However, the PC after `CallClosure` (the return point) is a safe point, just like after any other call instruction — the callee may trigger GC, and upon return the caller's frame must have a valid pointer layout in the `FrameLayoutMap`.
+
+## Closure Storage
+
+### Current VM
+
+Closures with the `store` ability can be persisted in global state. The old VM uses a self-describing serialized format:
+
+```
+[format_version, module_id, fun_id, ty_args, mask, layout_0, value_0, layout_1, value_1, ...]
+```
+
+The function is identified by canonical name (module_id + fun_id + ty_args), not by a pointer or index. Each captured value is preceded by its `MoveTypeLayout`.
+
+**Why embed layouts?** Without them, deserializing captured values would require loading the target function's module to look up parameter types, applying the mask to select the captured ones, and deriving layouts — which may reference types from yet more modules. Embedding layouts makes the serialized closure fully self-contained: deserialization needs no module loading. The closure remains unresolved (function identified by name only) until it is actually called.
+
+**When are layouts computed?** At `PackClosure` time, but only for storable closures (those wrapping `public` or `#[persistent]` functions). Non-storable closures skip this since they'll never be serialized. `PackClosure` already loads the target function's full definition for cross-module calls, so layout computation piggybacks on that — no additional loading.
+
+**No loading on storage round-trips.** Consider loading a `vector<|u64| -> u64>` from storage, replacing one element, and writing it back. On read, all closures deserialize into unresolved form — no modules loaded. On write-back, the untouched closures still carry their original serialized data, which is written back verbatim. The new closure has its layouts pre-computed from pack time. No module loading occurs at any point.
+
+### Design Goals for mono-move
+
+The mono-move closure storage design should preserve the following properties:
+
+1. **Delay function loading whenever possible.**
+   - No module loading on deserialization.
+   - No module loading on write-back of untouched closures.
+   - (Stretch goal) No module loading on `PackClosure` for cross-module targets. The pack site has access to the target function's parameter signatures via the current module's function handle table, so captured value types and layouts can be determined locally. Function resolution is deferred to `CallClosure`.
+2. **No stored layouts.** Captured value layouts should not need to be stored in the closure or in a side table. They are either embedded in the raw serialized bytes (round-trip case) or derivable on demand from loaded type definitions (materialized case).
+3. **Storage format compatibility** with the current VM, since existing on-chain data must remain readable after migration.
+
+### Proposed Approach for mono-move
+
+The core idea is **lazy deserialization of captured values**, reflected by the `ClosureCapturedData` enum in the heap representation above. A closure loaded from storage is not fully parsed — its captured values stay as a raw BCS blob until the closure is actually called.
+
+**Deserialization (read from storage):** Read the function identity (module_id + fun_id + ty_args) and mask. Store the remaining bytes as a `Raw` blob. No module loading, no value parsing.
+
+**Materialization (on first call):** Parse the raw blob using the embedded layouts to extract individual values into flat memory. Resolve the function reference. This is the only point where module loading occurs.
+
+**Serialization (write to storage):**
+
+- *Raw closure (untouched):* Write back the function identity + mask + original blob verbatim. No loading, no layout computation.
+- *Materialized closure (called or newly packed):* Since the captured values have been materialized, their type definitions must already be loaded. The runtime can walk these definitions to serialize each value directly — no intermediate layout objects or stored layouts needed.
+
+**`PackClosure`:** Stores func_ref + mask + flat captured values. No layout pre-computation — layouts are derived on demand at serialization time if needed.
+
+### Whether to Store Layouts
+
+The current serialized format embeds a `MoveTypeLayout` before each captured value. Our new lazy deserialization design does not need these embedded layouts — the raw blob is stored as opaque bytes and only parsed at materialization time, when type definitions are loaded anyway. The runtime must still be able to read the current format for backward compatibility with existing on-chain data.
+
+The question is whether to continue writing layouts. Two options:
+
+- **Keep writing layouts.** Use the current format as-is. Simple, fully compatible. The downside is that serialization must compute layouts for each captured value, adding complexity and cost at write time.
+
+- **Stop writing layouts.** Define a new format (with a version bump) that stores only the function identity, mask, and captured values. Leaner on-chain footprint. The runtime still reads the old format (recognizing it by version number) but writes the new one. Materialization derives layouts from loaded type definitions at call time. The tradeoff is that the on-chain data is no longer self-describing — external tools (indexers, explorers) can no longer decode captured values without loading the relevant modules to obtain type definitions.
