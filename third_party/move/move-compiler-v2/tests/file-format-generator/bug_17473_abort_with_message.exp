@@ -1,0 +1,28 @@
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xcafe::Module0
+// Function definition at index 0
+#[persistent] public fun f(l0: vector<u8>, l1: bool): vector<u8>
+    local l2: &vector<u8>
+    local l3: u64
+    borrow_loc l0
+    st_loc l2
+    move_loc l1
+    br_false l0
+    move_loc l2
+    // @5
+    pop
+    ld_u64 14566554180833181696
+    st_loc l3
+    move_loc l3
+    move_loc l0
+    // @10
+    abort_msg
+    branch l0
+l0: move_loc l2
+    read_ref
+    ret
+
+
+============ bytecode verification succeeded ========

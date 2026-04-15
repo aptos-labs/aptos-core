@@ -16,7 +16,7 @@ use crate::{
 use anyhow::Result;
 use aptos_batch_encryption::{
     group::{Fr, G2Affine, Pairing},
-    shared::{digest::DigestKey, encryption_key::EncryptionKey},
+    shared::{digest::DigestKey, digest_key_file, encryption_key::EncryptionKey},
 };
 use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -209,33 +209,17 @@ pub static DIGEST_KEY: Lazy<Option<Arc<DigestKey>>> = Lazy::new(|| {
     }
     let path = DIGEST_KEY_PATH.get()?;
     let start = Instant::now();
-    let bytes = match std::fs::read(path) {
-        Ok(b) => b,
-        Err(e) => {
-            tracing::error!(
-                "[DigestKey] failed to read blob file {}: {}",
-                path.display(),
-                e
-            );
-            return None;
-        },
-    };
-    let key: DigestKey = match bcs::from_bytes(&bytes) {
+    let key: DigestKey = match digest_key_file::read_digest_key(path) {
         Ok(k) => k,
         Err(e) => {
-            tracing::error!(
-                "[DigestKey] failed to deserialize blob ({} bytes): {}",
-                bytes.len(),
-                e
-            );
+            tracing::error!("[DigestKey] failed to read file: {}", e);
             return None;
         },
     };
     let elapsed = start.elapsed();
     tracing::info!(
-        "[DigestKey] loaded from {} ({} bytes) in {:?}",
+        "[DigestKey] loaded from {} in {:?}",
         path.display(),
-        bytes.len(),
         elapsed,
     );
     Some(Arc::new(key))

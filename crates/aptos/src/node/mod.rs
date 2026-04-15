@@ -1516,6 +1516,7 @@ impl CliCommand<VerifyDigestKeyResult> for VerifyDigestKey {
     }
 
     async fn execute(self) -> CliTypedResult<VerifyDigestKeyResult> {
+        use aptos_batch_encryption::shared::digest_key_file;
         use aptos_types::secret_sharing::DigestKey;
         use sha2::{Digest, Sha256};
         use std::time::Instant;
@@ -1533,9 +1534,11 @@ impl CliCommand<VerifyDigestKeyResult> for VerifyDigestKey {
         let sha256 = hex::encode(Sha256::digest(&bytes));
         println!("SHA-256: {} in {:.2?}", sha256, t.elapsed());
 
+        drop(bytes);
+
         println!("Deserializing DigestKey...");
         let t = Instant::now();
-        let _key: DigestKey = bcs::from_bytes(&bytes).map_err(|e| {
+        let _key: DigestKey = digest_key_file::read_digest_key(&self.file).map_err(|e| {
             CliError::UnexpectedError(format!(
                 "Failed to deserialize DigestKey ({} bytes): {}",
                 file_size_bytes, e

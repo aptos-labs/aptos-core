@@ -11,14 +11,17 @@ use move_vm_types::loaded_data::runtime_types::Type;
 
 pub fn lower_function(func_ir: &FunctionIR, ctx: &LoweringContext) -> Result<Vec<MicroOp>> {
     let mut state = LoweringState::new(func_ir, ctx);
-    let instrs = &func_ir.instrs;
-    let mut i = 0;
-    while i < instrs.len() {
-        let fused = state.lower_instr(func_ir, &instrs[i], instrs.get(i + 1))?;
-        if fused {
-            i += 2;
-        } else {
-            i += 1;
+    for block in &func_ir.blocks {
+        state.label_map[block.label.0 as usize] = Some(state.ops.len() as u32);
+        let body = &block.instrs;
+        let mut i = 0;
+        while i < body.len() {
+            let fused = state.lower_instr(func_ir, &body[i], body.get(i + 1))?;
+            if fused {
+                i += 2;
+            } else {
+                i += 1;
+            }
         }
     }
     state.fixup_branches()?;
@@ -28,7 +31,7 @@ pub fn lower_function(func_ir: &FunctionIR, ctx: &LoweringContext) -> Result<Vec
 struct LoweringState<'a> {
     ctx: &'a LoweringContext,
     ops: Vec<MicroOp>,
-    /// Label(i) -> micro-op index
+    /// Label(i) -> micro-op index. Dense: one entry per block; `None` until filled during lowering.
     label_map: Vec<Option<u32>>,
     /// Indices into ops that need target patching
     branch_fixups: Vec<usize>,
@@ -42,21 +45,6 @@ struct LoweringState<'a> {
 
 impl<'a> LoweringState<'a> {
     fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext) -> Self {
-        // Find max label to size label_map
-        let max_label = func_ir
-            .instrs
-            .iter()
-            .filter_map(|instr| match instr {
-                Instr::Label(Label(l))
-                | Instr::Branch(Label(l))
-                | Instr::BrTrue(Label(l), _)
-                | Instr::BrFalse(Label(l), _) => Some(*l as usize),
-                _ => None,
-            })
-            .max()
-            .map(|m| m + 1)
-            .unwrap_or(0);
-
         // Initialize active_xfer_slots/types from first callsite's arg_write_slots
         let num_xfer_slots = ctx.num_xfer_slots as usize;
         let mut active_xfer_slots = vec![SlotInfo { offset: 0, size: 0 }; num_xfer_slots];
@@ -71,7 +59,7 @@ impl<'a> LoweringState<'a> {
         LoweringState {
             ctx,
             ops: Vec::new(),
-            label_map: vec![None; max_label],
+            label_map: vec![None; func_ir.blocks.len()],
             branch_fixups: Vec::new(),
             call_site_cursor: 0,
             home_slot_types: &func_ir.home_slot_types,
@@ -161,11 +149,6 @@ impl<'a> LoweringState<'a> {
         next: Option<&Instr>,
     ) -> Result<bool> {
         match instr {
-            // --- Labels ---
-            Instr::Label(Label(l)) => {
-                self.label_map[*l as usize] = Some(self.ops.len() as u32);
-            },
-
             // --- Loads ---
             Instr::LdU64(dst, v) => {
                 let d = self.def_slot(*dst);

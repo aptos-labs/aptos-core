@@ -33,6 +33,7 @@ fun fib(r0): u64 {
     r1: bool
     r2: u64
   code:
+  L2:
     0: r1 := le r0, #1
     1: br_false L0, r1
   L1:

@@ -13,6 +13,7 @@ mod deprecated_usage;
 mod empty_if;
 mod equal_operands_in_bin_op;
 mod known_to_abort;
+mod mutable_view_function;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -26,6 +27,7 @@ mod simpler_numeric_expression;
 mod unnecessary_boolean_identity_comparison;
 mod unnecessary_cast;
 mod unnecessary_numerical_extreme_comparison;
+mod unsafe_friend_package_entry;
 pub(crate) mod unused_common;
 mod unused_constant;
 mod unused_function;
@@ -118,8 +120,10 @@ pub fn get_default_function_linter_pipeline(
     config: &BTreeMap<String, String>,
 ) -> Vec<Box<dyn FunctionChecker>> {
     let mut checks: Vec<Box<dyn FunctionChecker>> = vec![
+        Box::new(mutable_view_function::MutableViewFunction::new()),
         Box::<unused_function::UnusedFunction>::default(),
         Box::<needless_visibility::NeedlessVisibility>::default(),
+        Box::<unsafe_friend_package_entry::UnsafeFriendPackageEntry>::default(),
     ];
     let checks_category = config.get("checks").map_or("default", |s| s.as_str());
     if checks_category == "strict" || checks_category == "experimental" {

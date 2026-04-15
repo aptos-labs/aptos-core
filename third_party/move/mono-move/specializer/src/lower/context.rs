@@ -158,7 +158,7 @@ fn try_build_context_inner(
     let callee_base = frame_data_size + FRAME_METADATA_SIZE as u32;
     let mut call_sites = Vec::new();
 
-    for instr in &func_ir.instrs {
+    for instr in func_ir.instrs() {
         let handle_idx = match instr {
             Instr::Call(_, idx, _) => *idx,
             Instr::CallGeneric(_, idx, _) => {

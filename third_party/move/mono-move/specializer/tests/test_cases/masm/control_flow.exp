@@ -20,6 +20,7 @@ fun conditional(r0): u64 {
     r0: bool
     r1: u64
   code:
+  L2:
     0: br_true L0, r0
   L1:
     1: r1 := ld_u64 0

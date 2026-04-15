@@ -10,7 +10,7 @@
 //! This is sound because Move's borrow checker guarantees that a local cannot
 //! be directly read or written while a mutable reference to it is outstanding.
 
-use super::instr_utils::get_defs_uses;
+use super::instr_utils::{for_each_def, for_each_use};
 use crate::stackless_exec_ir::{Instr, Slot};
 use std::collections::BTreeMap;
 
@@ -51,25 +51,24 @@ impl BlockAnalysis {
         let mut local_def_pos: BTreeMap<Slot, Vec<usize>> = BTreeMap::new();
 
         for (i, instr) in instrs.iter().enumerate() {
-            let (defs, uses) = get_defs_uses(instr);
-            for r in &uses {
+            for_each_use(instr, |r| {
                 if r.is_vid() {
-                    last_use.insert(*r, i);
+                    last_use.insert(r, i);
                 }
                 if r.is_home() {
-                    local_touch_pos.entry(*r).or_default().push(i);
+                    local_touch_pos.entry(r).or_default().push(i);
                 }
-            }
-            for r in &defs {
+            });
+            for_each_def(instr, |r| {
                 if r.is_vid() {
-                    last_use.entry(*r).or_insert(i);
-                    def_pos.entry(*r).or_insert(i);
+                    last_use.entry(r).or_insert(i);
+                    def_pos.entry(r).or_insert(i);
                 }
                 if r.is_home() {
-                    local_touch_pos.entry(*r).or_default().push(i);
-                    local_def_pos.entry(*r).or_default().push(i);
+                    local_touch_pos.entry(r).or_default().push(i);
+                    local_def_pos.entry(r).or_default().push(i);
                 }
-            }
+            });
         }
 
         // Call positions — any instruction that clobbers xfer slots.

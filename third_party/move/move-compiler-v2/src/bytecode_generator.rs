@@ -1385,7 +1385,10 @@ impl Generator<'_> {
                     self.get_node_type(id)
                 };
                 let temp = self.new_temp(ty);
-                self.generate(vec![temp], exp);
+                // Materializing a general expression into a temporary must not let the
+                // current reference mode leak into arbitrary sub-expressions. Preserve
+                // reference mode only for the dedicated direct-selection case above.
+                self.without_reference_mode(|s| s.generate(vec![temp], exp));
                 temp
             },
         }

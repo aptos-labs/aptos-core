@@ -13,30 +13,3 @@ fn smoke_with_setup_for_testing() {
 
     run_smoke::<FPTX>(tc, ek, dk, vks, msk_shares);
 }
-
-#[test]
-fn fptx_serialize_deserialize_setup() {
-    let mut rng = thread_rng();
-    let tc = ShamirThresholdConfig::new(3, 8);
-
-    let setup = FPTX::setup_for_testing(rng.r#gen(), 8, 2, &tc).unwrap();
-
-    let bytes = bcs::to_bytes(&setup).unwrap();
-    let setup2: (
-        <FPTX as BatchThresholdEncryption>::EncryptionKey,
-        <FPTX as BatchThresholdEncryption>::DigestKey,
-        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
-        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
-    ) = bcs::from_bytes(&bytes).unwrap();
-
-    assert_eq!(setup, setup2);
-
-    let json = serde_json::to_string(&setup).unwrap();
-    let setup2: (
-        <FPTX as BatchThresholdEncryption>::EncryptionKey,
-        <FPTX as BatchThresholdEncryption>::DigestKey,
-        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
-        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
-    ) = serde_json::from_str(&json).unwrap();
-    assert_eq!(setup, setup2);
-}

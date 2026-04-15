@@ -104,6 +104,14 @@ impl<K: Hash + Eq> UnorderedSet<K> {
         self.inner.take(value)
     }
 
+    /// Retains only the elements for which the predicate returns `true`.
+    /// The predicate is applied in an arbitrary order — callers must ensure
+    /// that `f` does not depend on the order in which elements are visited.
+    #[inline]
+    pub fn retain(&mut self, f: impl FnMut(&K) -> bool) {
+        self.inner.retain(f);
+    }
+
     /// Reserves space for at least `additional` more elements. Pass the number
     /// of elements you expect to add, not an inflated value — the load factor
     /// is handled internally.

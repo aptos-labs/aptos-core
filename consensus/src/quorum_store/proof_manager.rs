@@ -4,12 +4,17 @@
 use super::batch_store::BatchStore;
 use crate::{
     monitor,
-    quorum_store::{batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters},
+    quorum_store::{
+        batch_generator::BackPressure,
+        batch_proof_queue::BatchProofQueue,
+        counters,
+        tracing::{observe_batch, BatchStage},
+    },
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
-    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg},
+    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg, TBatchInfo},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
@@ -34,6 +39,7 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
+    batch_expiry_gap_when_init_usecs: u64,
 }
 
 impl ProofManager {
@@ -56,11 +62,39 @@ impl ProofManager {
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
+            batch_expiry_gap_when_init_usecs,
         }
     }
 
     pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore<BatchInfoExt>>) {
         for proof in proofs.into_iter() {
+            // Batch tracing (Prometheus histogram) — works on every node,
+            // not just the batch author. Measures batch_creation → proof_received.
+            let approx_created_ts_usecs = proof
+                .info()
+                .expiration()
+                .saturating_sub(self.batch_expiry_gap_when_init_usecs);
+            let age = aptos_infallible::duration_since_epoch()
+                .checked_sub(std::time::Duration::from_micros(approx_created_ts_usecs));
+            observe_batch(
+                approx_created_ts_usecs,
+                proof.info().author(),
+                BatchStage::PROOF_RECEIVED,
+                proof.info(),
+            );
+            // Log on every node when a proof is slow to arrive (> 500ms from
+            // batch creation). Catches outliers that Prometheus histograms miss.
+            if let Some(age) = age {
+                if age.as_millis() > 500 {
+                    warn!(
+                        "SlowProofReceipt author={} digest={} num_txns={} age_ms={}",
+                        proof.info().author(),
+                        proof.info().digest(),
+                        proof.info().num_txns(),
+                        age.as_millis(),
+                    );
+                }
+            }
             self.batch_proof_queue.insert_proof(proof);
         }
         self.update_remaining_txns_and_proofs();

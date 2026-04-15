@@ -1275,11 +1275,18 @@ impl RoundManager {
         if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
             if let Some(payload) = proposal.payload() {
                 let batch_digests = extract_batch_digests(payload);
+                let proposal_info = proposal.author().map(|author| {
+                    aptos_transaction_tracing::types::BlockProposalInfo {
+                        proposer: author.short_str().to_string(),
+                        round: proposal.round(),
+                    }
+                });
                 aptos_transaction_tracing::store::TransactionTraceStore::global()
                     .process_proposed_block(
                         proposal.id(),
                         proposal.timestamp_usecs(),
                         &batch_digests,
+                        proposal_info,
                     );
             }
         }

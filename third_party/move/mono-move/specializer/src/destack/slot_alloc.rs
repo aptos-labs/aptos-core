@@ -8,17 +8,17 @@
 
 use super::{
     analysis::BlockAnalysis,
-    instr_utils::{get_defs_uses, remap_instr, split_into_blocks},
+    instr_utils::{collect_defs_and_uses, remap_all_slots_with},
     ssa_function::SSAFunction,
 };
-use crate::stackless_exec_ir::{Instr, Slot};
+use crate::stackless_exec_ir::{BasicBlock, Instr, Slot};
 use anyhow::{bail, Context, Result};
 use move_vm_types::loaded_data::runtime_types::Type;
-use std::collections::BTreeMap;
+use shared_dsa::UnorderedMap;
 
 /// Output of slot allocation for a single function.
 pub(crate) struct AllocatedFunction {
-    pub instrs: Vec<Instr>,
+    pub blocks: Vec<BasicBlock>,
     pub num_home_slots: u16,
     pub num_xfer_slots: u16,
     pub home_slot_types: Vec<Type>,
@@ -26,26 +26,26 @@ pub(crate) struct AllocatedFunction {
 
 /// Map SSA `Vid`s to real slots across all blocks.
 ///
-/// Pre: SSA instruction stream after fusion passes; vid_types maps each `Vid(i)`
+/// Consumes the SSAFunction and remaps instructions in-place.
+///
+/// Pre: SSA blocks after fusion passes; vid_types maps each `Vid(i)`
 ///      to its type at index `i`.
 /// Post: all `Vid`s replaced with real `Home`/`Xfer` slots.
-pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
+pub(crate) fn allocate_slots(ssa: SSAFunction) -> Result<AllocatedFunction> {
     let num_pinned = ssa.local_types.len() as u16;
-    let blocks = split_into_blocks(&ssa.instrs);
-    let mut result = Vec::with_capacity(ssa.instrs.len());
+    let mut result_blocks = Vec::with_capacity(ssa.blocks.len());
     let mut global_next_slot = num_pinned;
     let mut global_num_xfer_slots: u16 = 0;
-    let mut free_pool: BTreeMap<Type, Vec<Slot>> = BTreeMap::new();
-    let mut real_slot_types: BTreeMap<Slot, Type> = BTreeMap::new();
+    let mut free_pool: UnorderedMap<Type, Vec<Slot>> = UnorderedMap::new();
+    let mut real_slot_types: UnorderedMap<Slot, Type> = UnorderedMap::new();
     for (i, ty) in ssa.local_types.iter().enumerate() {
         real_slot_types.insert(Slot::Home(i as u16), ty.clone());
     }
 
-    for block in blocks {
-        let block_instrs = &ssa.instrs[block.clone()];
-        let analysis = BlockAnalysis::analyze(block_instrs);
-        let (allocated, block_max, block_xfer_slots, returned_pool) = allocate_block(
-            block_instrs,
+    for mut block in ssa.blocks {
+        let analysis = BlockAnalysis::analyze(&block.instrs);
+        let (block_max, block_xfer_slots, returned_pool) = allocate_block_in_place(
+            &mut block.instrs,
             num_pinned,
             global_next_slot,
             free_pool,
@@ -60,7 +60,7 @@ pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
         if block_xfer_slots > global_num_xfer_slots {
             global_num_xfer_slots = block_xfer_slots;
         }
-        result.extend(allocated);
+        result_blocks.push(block);
     }
 
     let mut home_slot_types = Vec::with_capacity(global_next_slot as usize);
@@ -74,7 +74,7 @@ pub(crate) fn allocate_slots(ssa: &SSAFunction) -> Result<AllocatedFunction> {
     }
 
     Ok(AllocatedFunction {
-        instrs: result,
+        blocks: result_blocks,
         num_home_slots: global_next_slot,
         num_xfer_slots: global_num_xfer_slots,
         home_slot_types,
@@ -91,38 +91,35 @@ fn vid_type(vid: Slot, vid_types: &[Type]) -> Result<Type> {
     }
 }
 
-/// Allocate real slots for a single basic block.
+/// Allocate real slots for a single basic block, remapping instructions in-place.
 ///
 /// For each instruction, in order: free last-use sources, allocate defs, remap, free dead defs.
 /// Allocation priority: xfer_precolor > stloc_targets > coalesce_to_local > type-keyed reuse > fresh.
 ///
-/// Returns (remapped instrs, next available slot index, xfer width, updated free pool).
-fn allocate_block(
-    instrs: &[Instr],
+/// Returns (next available slot index, xfer width, updated free pool).
+fn allocate_block_in_place(
+    instrs: &mut [Instr],
     num_pinned: u16,
     start_slot: u16,
-    carry_pool: BTreeMap<Type, Vec<Slot>>,
+    carry_pool: UnorderedMap<Type, Vec<Slot>>,
     vid_types: &[Type],
-    real_slot_types: &mut BTreeMap<Slot, Type>,
+    real_slot_types: &mut UnorderedMap<Slot, Type>,
     analysis: &BlockAnalysis,
-) -> Result<(Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Slot>>)> {
+) -> Result<(u16, u16, UnorderedMap<Type, Vec<Slot>>)> {
     if instrs.is_empty() {
-        return Ok((Vec::new(), start_slot, 0, carry_pool));
+        return Ok((start_slot, 0, carry_pool));
     }
 
-    // Identity mapping for pinned locals so remap_instr leaves them unchanged.
-    let mut vid_to_real: BTreeMap<Slot, Slot> = BTreeMap::new();
+    // Identity mapping for pinned locals so remap_all_slots leaves them unchanged.
+    let mut vid_to_real: UnorderedMap<Slot, Slot> = UnorderedMap::new();
     for r in 0..num_pinned {
         vid_to_real.insert(Slot::Home(r), Slot::Home(r));
     }
     let mut free_pool = carry_pool;
     let mut next_slot = start_slot;
 
-    let mut output = Vec::with_capacity(instrs.len());
-
-    for (i, instr) in instrs.iter().enumerate() {
-        let mut mapped_instr = instr.clone();
-        let (defs, uses) = get_defs_uses(instr);
+    for (i, instr) in instrs.iter_mut().enumerate() {
+        let (defs, uses) = collect_defs_and_uses(instr);
 
         // Phase 1: Free use-slots whose last use is this instruction.
         // Done BEFORE def allocation so the freed slot can be immediately reused.
@@ -168,23 +165,22 @@ fn allocate_block(
             }
         }
 
-        // Phase 3: Rewrite the instruction with real slots.
-        remap_instr(&mut mapped_instr, &vid_to_real);
-        output.push(mapped_instr);
+        // Phase 3: Rewrite the instruction with real slots — in-place.
+        remap_all_slots_with(instr, |s| *vid_to_real.get(&s).unwrap_or(&s));
 
         // Phase 4: Free slots for defs that are never used (last_use == def site).
         for d in &defs {
-            if d.is_vid() && analysis.last_use.get(d) == Some(&i) {
-                if !uses.contains(d)
-                    && let Some(&real) = vid_to_real.get(d)
-                    && matches!(real, Slot::Home(i) if i >= num_pinned)
-                {
-                    let ty = real_slot_types.get(&real).cloned().unwrap_or(Type::Bool);
-                    free_pool.entry(ty).or_default().push(real);
-                }
+            if d.is_vid()
+                && analysis.last_use.get(d) == Some(&i)
+                && !uses.contains(d)
+                && let Some(&real) = vid_to_real.get(d)
+                && matches!(real, Slot::Home(i) if i >= num_pinned)
+            {
+                let ty = real_slot_types.get(&real).cloned().unwrap_or(Type::Bool);
+                free_pool.entry(ty).or_default().push(real);
             }
         }
     }
 
-    Ok((output, next_slot, analysis.max_xfer_width, free_pool))
+    Ok((next_slot, analysis.max_xfer_width, free_pool))
 }

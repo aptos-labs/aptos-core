@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use move_binary_format::{access::ModuleAccess, file_format::CompiledModule};
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
-use specializer::{destack, stackless_exec_ir::Instr};
+use specializer::destack;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -77,12 +77,8 @@ fn print_stats(module_ir: &specializer::stackless_exec_ir::ModuleIR) {
             None => (0, 0),
         };
 
-        // IR stats: count non-label instructions.
-        let ir_instrs = func_ir
-            .instrs
-            .iter()
-            .filter(|i| !matches!(i, Instr::Label(_)))
-            .count();
+        // IR stats: count instructions.
+        let ir_instrs: usize = func_ir.blocks.iter().map(|b| b.instrs.len()).sum();
 
         let num_temps = func_ir
             .num_home_slots

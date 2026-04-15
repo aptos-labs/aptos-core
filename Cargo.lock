@@ -300,6 +300,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-backup-cli",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-build-info",
  "aptos-cached-packages",
@@ -685,6 +686,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "thiserror 1.0.69",
 ]
 
@@ -18251,6 +18253,8 @@ dependencies = [
  "move-model",
  "move-prover-test-utils",
  "move-vm-types",
+ "shared-dsa",
+ "smallvec",
  "triomphe",
 ]
 

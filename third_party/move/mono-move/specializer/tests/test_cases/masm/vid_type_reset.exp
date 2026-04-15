@@ -6,6 +6,7 @@ fun vid_type_mismatch(r0): u64 {
     r1: bool
     r2: u64
   code:
+  L2:
     0: r1 := gt r0, #10
     1: br_false L0, r1
   L1:

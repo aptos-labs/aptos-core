@@ -48,6 +48,7 @@ fun add(r0, r1): u64 {
     r1: u64
     r2: u64
   code:
+  L0:
     0: r2 := add r0, r1
     1: ret [r2]
 }
@@ -57,6 +58,7 @@ fun get_x(r0): u64 {
     r0: &Point
     r1: u64
   code:
+  L0:
     0: r1 := read_field Point::x, r0
     1: ret [r1]
 }
@@ -67,6 +69,7 @@ fun make_point(r0, r1): Point {
     r1: u64
     r2: Point
   code:
+  L0:
     0: r2 := pack Point, [r0, r1]
     1: ret [r2]
 }
@@ -77,6 +80,7 @@ fun max(r0, r1): u64 {
     r1: u64
     r2: bool
   code:
+  L2:
     0: r2 := gt r0, r1
     1: br_false L0, r2
   L1:
