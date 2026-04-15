@@ -17,8 +17,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const DECRYPTION_NONCE_NUM_BYTES: usize = 16;
-pub type DecryptionNonce = [u8; DECRYPTION_NONCE_NUM_BYTES];
+pub type DecryptionNonce = [u8; 16];
 
 #[derive(
     Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
