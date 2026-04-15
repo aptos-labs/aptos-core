@@ -95,6 +95,8 @@ impl Executable {
 }
 
 // TODO: this is likely to change. Placeholder.
+// TODO: refactor to own CompiledModule instead of borrowing it (needed for ModuleIR cache).
+// Split mutable state into a separate struct to avoid borrow conflicts with self.module.
 #[allow(dead_code)]
 pub struct ExecutableBuilder<'a, 'guard, 'ctx> {
     // TODO: support scripts.
@@ -154,7 +156,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             self.resolve_struct_def(struct_def)?;
         }
 
-        let lowered = specializer::destack_and_lower_module(self.module)?;
+        let lowered = specializer::destack_and_lower_module(self.module.clone())?;
 
         // Indexed by definition index. Generic functions that are not
         // lowered leave their slot as None.

@@ -37,51 +37,52 @@ use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed slots
 ///   truly hold dead values, so type-keyed slot recycling is sound.
-pub fn translate_module<'m>(
-    module: &'m CompiledModule,
+pub fn translate_module(
+    module: CompiledModule,
     struct_name_table: &[StructNameIndex],
-) -> Result<ModuleIR<'m>> {
+) -> Result<ModuleIR> {
     let functions = module
         .function_defs
         .iter()
-        .filter_map(|fdef| {
-            fdef.code.as_ref().map(|code| -> Result<FunctionIR> {
-                let handle = module.function_handle_at(fdef.function);
-                let name_idx = handle.name;
-                let handle_idx = fdef.function;
-                let param_sig_toks = &module.signature_at(handle.parameters).0;
-                let local_sig_toks = &module.signature_at(code.locals).0;
-                let num_params = param_sig_toks.len() as u16;
-                let num_locals = local_sig_toks.len() as u16;
-                let all_sig_toks: Vec<SignatureToken> = param_sig_toks
-                    .iter()
-                    .chain(local_sig_toks.iter())
-                    .cloned()
-                    .collect();
-                // [TODO]: we currently convert signature tokens into the runtime type representation, but
-                // this will change to use more efficient cached type representations.
-                let local_types = convert_sig_tokens(module, &all_sig_toks, struct_name_table);
+        .map(|fdef| {
+            let Some(code) = fdef.code.as_ref() else {
+                return Ok(None);
+            };
+            let handle = module.function_handle_at(fdef.function);
+            let name_idx = handle.name;
+            let handle_idx = fdef.function;
+            let param_sig_toks = &module.signature_at(handle.parameters).0;
+            let local_sig_toks = &module.signature_at(code.locals).0;
+            let num_params = param_sig_toks.len() as u16;
+            let num_locals = local_sig_toks.len() as u16;
+            let all_sig_toks: Vec<SignatureToken> = param_sig_toks
+                .iter()
+                .chain(local_sig_toks.iter())
+                .cloned()
+                .collect();
+            // [TODO]: we currently convert signature tokens into the runtime type representation, but
+            // this will change to use more efficient cached type representations.
+            let local_types = convert_sig_tokens(&module, &all_sig_toks, struct_name_table);
 
-                // Pass: Bytecode -> Intra-Block SSA -> Fusion
-                let converter = SsaConverter::new(local_types, struct_name_table);
-                let ssa = converter
-                    .convert_function(module, &code.code)?
-                    .with_fusion_passes();
+            // Pass: Bytecode -> Intra-Block SSA -> Fusion
+            let converter = SsaConverter::new(local_types, struct_name_table);
+            let ssa = converter
+                .convert_function(&module, &code.code)?
+                .with_fusion_passes();
 
-                // Pass: Greedy Slot Allocation (consumes SSA, remaps in-place)
-                let alloc = super::slot_alloc::allocate_slots(ssa)?;
+            // Pass: Greedy Slot Allocation (consumes SSA, remaps in-place)
+            let alloc = super::slot_alloc::allocate_slots(ssa)?;
 
-                Ok(FunctionIR {
-                    name_idx,
-                    handle_idx,
-                    num_params,
-                    num_locals,
-                    num_home_slots: alloc.num_home_slots,
-                    num_xfer_slots: alloc.num_xfer_slots,
-                    blocks: alloc.blocks,
-                    home_slot_types: alloc.home_slot_types,
-                })
-            })
+            Ok(Some(FunctionIR {
+                name_idx,
+                handle_idx,
+                num_params,
+                num_locals,
+                num_home_slots: alloc.num_home_slots,
+                num_xfer_slots: alloc.num_xfer_slots,
+                blocks: alloc.blocks,
+                home_slot_types: alloc.home_slot_types,
+            }))
         })
         .collect::<Result<Vec<_>>>()?;
 

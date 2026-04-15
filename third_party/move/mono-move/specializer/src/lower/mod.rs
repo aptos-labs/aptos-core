@@ -7,14 +7,14 @@ pub mod context;
 pub mod display;
 mod translate;
 
-use mono_move_core::MicroOp;
-use move_binary_format::file_format::IdentifierIndex;
-
 pub use context::{build_func_id_map, try_build_context, LoweringContext, SlotInfo};
 pub use display::MicroOpsFunctionDisplay;
+use mono_move_core::MicroOp;
+use move_binary_format::file_format::IdentifierIndex;
 pub use translate::lower_function;
 
 /// Result of lowering a single non-generic function.
+// TODO: unify with `mono_move_core::Function` once the specializer has access to arenas.
 pub struct LoweredFunction {
     /// Function name, as an index into the module's identifier pool.
     pub name_idx: IdentifierIndex,

@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         .map(|i| StructNameIndex::new(i as u32))
         .collect();
 
-    let module_ir = destack(&module, &struct_name_table)?;
+    let module_ir = destack(module, &struct_name_table)?;
 
     if args.verbose {
         print_stats(&module_ir);
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn print_stats(module_ir: &specializer::stackless_exec_ir::ModuleIR<'_>) {
+fn print_stats(module_ir: &specializer::stackless_exec_ir::ModuleIR) {
     let module = &module_ir.module;
 
     let self_handle = module.module_handle_at(module.self_module_handle_idx);
@@ -63,7 +63,7 @@ fn print_stats(module_ir: &specializer::stackless_exec_ir::ModuleIR<'_>) {
     let mod_name = module.identifier_at(self_handle.name);
     let mod_prefix = format!("0x{}::{}", addr.short_str_lossless(), mod_name);
 
-    for func_ir in &module_ir.functions {
+    for func_ir in module_ir.functions.iter().flatten() {
         let func_name = module.identifier_at(func_ir.name_idx);
 
         // Find the matching FunctionDefinition to get bytecode stats.

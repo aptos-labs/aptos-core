@@ -18,7 +18,7 @@ use move_binary_format::{
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::fmt;
 
-impl fmt::Display for ModuleIR<'_> {
+impl fmt::Display for ModuleIR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let module = &self.module;
         let self_handle = module.module_handle_at(module.self_module_handle_idx);
@@ -31,7 +31,7 @@ impl fmt::Display for ModuleIR<'_> {
             name
         )?;
 
-        for func_ir in &self.functions {
+        for func_ir in self.functions.iter().flatten() {
             writeln!(f)?;
             display_function(f, module, func_ir)?;
         }
