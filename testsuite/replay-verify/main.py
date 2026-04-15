@@ -705,10 +705,12 @@ class ReplayScheduler:
 
         if worker_pod.is_failed():
             reason = worker_pod.get_failure_reason()
-            if worker_pod.should_reschedule():
+            retries = self.task_stats[worker_pod.name].retry_count + 1
+            if worker_pod.should_reschedule() and retries < MAX_RETRIES:
                 logger.info(
                     f"Worker {worker_idx} completed: {worker_pod.name}, "
-                    f"status=Failed({reason}), duration={duration}s, rescheduling"
+                    f"status=Failed({reason}), duration={duration}s, "
+                    f"rescheduling (attempt {retries}/{MAX_RETRIES})"
                 )
                 self.kill_pod_and_reschedule_task(worker_pod, worker_idx)
             else:
