@@ -17,6 +17,7 @@ use aptos_types::{
     state_store::{hot_state::THotStateSlot, state_slot::StateSlot, NUM_STATE_SHARDS},
     transaction::Version,
 };
+#[cfg(test)]
 use arr_macro::arr;
 use dashmap::{mapref::one::Ref, DashMap};
 #[cfg(test)]
@@ -47,10 +48,15 @@ where
     K: Clone + Eq + std::hash::Hash,
     V: Clone,
 {
+    #[cfg(test)]
     fn new(max_items: usize) -> Self {
         Self {
             inner: DashMap::with_capacity(max_items),
         }
+    }
+
+    fn from_dashmap(map: DashMap<K, V>) -> Self {
+        Self { inner: map }
     }
 
     fn get(&self, key: &K) -> Option<Ref<'_, K, V>> {
@@ -90,9 +96,16 @@ where
     K: Clone + Eq + std::hash::Hash,
     V: Clone,
 {
+    #[cfg(test)]
     fn new_empty(max_items_per_shard: usize) -> Self {
         Self {
             shards: arr![Shard::new(max_items_per_shard); 16],
+        }
+    }
+
+    fn from_loaded(shards: [DashMap<K, V>; NUM_STATE_SHARDS]) -> Self {
+        Self {
+            shards: shards.map(Shard::from_dashmap),
         }
     }
 
@@ -160,7 +173,18 @@ pub struct HotState {
 
 impl HotState {
     pub fn new(state: State, config: HotStateConfig) -> Self {
-        let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
+        let empty_shards =
+            std::array::from_fn(|_| DashMap::with_capacity(config.max_items_per_shard));
+        Self::new_from_loaded(state, empty_shards, 0, 0)
+    }
+
+    pub fn new_from_loaded(
+        state: State,
+        loaded_shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+        initial_total_key_bytes: usize,
+        initial_total_value_bytes: usize,
+    ) -> Self {
+        let base = Arc::new(HotStateBase::from_loaded(loaded_shards));
         let view = Arc::new(LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
@@ -175,6 +199,8 @@ impl HotState {
             Arc::clone(&committed),
             state,
             Arc::clone(&merged_version),
+            initial_total_key_bytes,
+            initial_total_value_bytes,
         );
 
         Self {
@@ -292,11 +318,24 @@ impl Committer {
         committed: Arc<Mutex<CommittedSnapshot>>,
         initial_state: State,
         merged_version: Arc<AtomicU64>,
+        initial_total_key_bytes: usize,
+        initial_total_value_bytes: usize,
     ) -> SyncSender<CommitMsg> {
         let (tx, rx) = std::sync::mpsc::sync_channel(MAX_HOT_STATE_COMMIT_BACKLOG);
         std::thread::Builder::new()
             .name("hotstate-commit".to_string())
-            .spawn(move || Self::new(base, committed, rx, initial_state, merged_version).run())
+            .spawn(move || {
+                Self::new(
+                    base,
+                    committed,
+                    rx,
+                    initial_state,
+                    merged_version,
+                    initial_total_key_bytes,
+                    initial_total_value_bytes,
+                )
+                .run()
+            })
             .expect("Failed to spawn hot state committer thread");
 
         tx
@@ -308,15 +347,20 @@ impl Committer {
         rx: Receiver<CommitMsg>,
         initial_state: State,
         merged_version: Arc<AtomicU64>,
+        total_key_bytes: usize,
+        total_value_bytes: usize,
     ) -> Self {
+        let heads = std::array::from_fn(|i| initial_state.latest_hot_key(i));
+        let tails = std::array::from_fn(|i| initial_state.oldest_hot_key(i));
+
         Self {
             base,
             committed,
             rx,
-            total_key_bytes: 0,
-            total_value_bytes: 0,
-            heads: arr![None; 16],
-            tails: arr![None; 16],
+            total_key_bytes,
+            total_value_bytes,
+            heads,
+            tails,
             merged_state: initial_state,
             old_views: Vec::new(),
             merged_version,
