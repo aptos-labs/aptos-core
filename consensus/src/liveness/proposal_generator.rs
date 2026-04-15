@@ -593,7 +593,8 @@ impl ProposalGenerator {
         // All proposed blocks in a branch are guaranteed to have increasing timestamps
         // since their predecessor block will not be added to the BlockStore until
         // the local time exceeds it.
-        let timestamp = self.time_service.get_current_timestamp();
+        // Use a pre-pull timestamp for backpressure calculation and batch age filtering.
+        let pre_pull_timestamp = self.time_service.get_current_timestamp();
 
         let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
@@ -604,7 +605,7 @@ impl ProposalGenerator {
             block_gas_limit_override,
             proposal_delay,
         ) = self
-            .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
+            .calculate_max_block_sizes(voting_power_ratio, pre_pull_timestamp, round)
             .await;
 
         PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING.observe(max_block_txns_after_filtering as f64);
@@ -659,7 +660,7 @@ impl ProposalGenerator {
                     pending_ordering,
                     pending_uncommitted_blocks: pending_blocks.len(),
                     recent_max_fill_fraction: max_fill_fraction,
-                    block_timestamp: timestamp,
+                    block_timestamp: pre_pull_timestamp,
                 },
                 validator_txn_filter,
             )
@@ -677,6 +678,12 @@ impl ProposalGenerator {
         } else if block_gas_limit_override.is_some() {
             payload = payload.transform_to_quorum_store_v2(None, block_gas_limit_override);
         }
+
+        // Set the block timestamp AFTER pulling the payload so it reflects when the
+        // block was actually assembled, not when proposal generation started. This
+        // avoids stale timestamps when the pull loop takes time waiting for batches
+        // (up to quorum_store_poll_time).
+        let timestamp = self.time_service.get_current_timestamp();
         Ok((validator_txns, payload, timestamp.as_micros() as u64))
     }
 
