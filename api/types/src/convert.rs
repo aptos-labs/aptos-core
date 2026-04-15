@@ -16,7 +16,7 @@ use crate::{
     HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
     MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
     SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload, U64,
+    TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -552,7 +552,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 payload_hash: crate::HashValue::from(payload_hash),
                                 ciphertext,
                                 decrypted_payload: inner,
-                                decryption_nonce: U64::from(decryption_nonce),
+                                decryption_nonce: HexEncodedBytes::from(decryption_nonce.to_vec()),
                                 claimed_entry_fun: into_api_claimed_entry_function(
                                     claimed_entry_fun,
                                 ),

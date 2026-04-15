@@ -10,30 +10,33 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
 };
 use serde::{Deserialize, Serialize};
 
+pub const DECRYPTION_NONCE_NUM_BYTES: usize = 16;
+pub type DecryptionNonce = [u8; DECRYPTION_NONCE_NUM_BYTES];
+
 #[derive(
     Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub struct DecryptedPayload {
     executable: TransactionExecutable,
-    decryption_nonce: u64,
+    decryption_nonce: DecryptionNonce,
 }
 
 impl DecryptedPayload {
-    pub fn new(executable: TransactionExecutable, decryption_nonce: u64) -> Self {
+    pub fn new(executable: TransactionExecutable, decryption_nonce: DecryptionNonce) -> Self {
         Self {
             executable,
             decryption_nonce,
         }
     }
 
-    pub fn unwrap(self) -> (TransactionExecutable, u64) {
+    pub fn unwrap(self) -> (TransactionExecutable, DecryptionNonce) {
         (self.executable, self.decryption_nonce)
     }
 }
@@ -67,6 +70,8 @@ pub enum DecryptionFailureReason {
     DecryptionKeyUnavailable,
     /// The claimed entry function does not match the one in the decrypted payload
     ClaimedEntryFunctionMismatch,
+    /// The stored payload hash does not match the decrypted payload.
+    PayloadHashMismatch,
 }
 
 // Mirrors EntryFunction in types/src/transaction/script.rs
@@ -101,7 +106,7 @@ pub enum EncryptedPayload {
 
         // decrypted things
         executable: TransactionExecutable,
-        decryption_nonce: u64,
+        decryption_nonce: DecryptionNonce,
     },
 }
 
@@ -155,7 +160,7 @@ impl EncryptedPayload {
         &mut self,
         eval_proof: EvalProof,
         executable: TransactionExecutable,
-        nonce: u64,
+        nonce: DecryptionNonce,
     ) -> anyhow::Result<()> {
         let Self::Encrypted {
             ciphertext,
@@ -177,6 +182,14 @@ impl EncryptedPayload {
             claimed_entry_fun: claimed_entry_fun.clone(),
         };
         Ok(())
+    }
+
+    pub fn verify_payload_hash(&self, decrypted: &DecryptedPayload) -> anyhow::Result<bool> {
+        let Self::Encrypted { payload_hash, .. } = self else {
+            bail!("Payload is not in Encrypted state");
+        };
+
+        Ok(*payload_hash == CryptoHash::hash(decrypted))
     }
 
     pub fn entry_fun_matches(&self, decrypted: &DecryptedPayload) -> anyhow::Result<bool> {
@@ -241,5 +254,43 @@ impl EncryptedPayload {
     ) -> anyhow::Result<()> {
         let associated_data = PayloadAssociatedData::new(sender, auth_key);
         self.ciphertext().verify(&associated_data)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transaction::TransactionExtraConfig;
+
+    #[test]
+    fn verify_payload_hash_accepts_matching_hash() {
+        let decrypted = DecryptedPayload::new(TransactionExecutable::Empty, [7; 16]);
+        let encrypted = EncryptedPayload::Encrypted {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+            payload_hash: CryptoHash::hash(&decrypted),
+            claimed_entry_fun: None,
+        };
+
+        assert!(encrypted.verify_payload_hash(&decrypted).unwrap());
+    }
+
+    #[test]
+    fn verify_payload_hash_rejects_mismatched_hash() {
+        let decrypted = DecryptedPayload::new(TransactionExecutable::Empty, [7; 16]);
+        let encrypted = EncryptedPayload::Encrypted {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+            payload_hash: HashValue::random(),
+            claimed_entry_fun: None,
+        };
+
+        assert!(!encrypted.verify_payload_hash(&decrypted).unwrap());
     }
 }

@@ -19,7 +19,9 @@ use aptos_types::{
     function_info::FunctionInfo,
     secret_sharing::EncryptionKey,
     transaction::{
-        encrypted_payload::{DecryptedPayload, EncryptedPayload, PayloadAssociatedData},
+        encrypted_payload::{
+            DecryptedPayload, DecryptionNonce, EncryptedPayload, PayloadAssociatedData,
+        },
         EntryFunction, Script,
     },
 };
@@ -471,7 +473,7 @@ impl TransactionFactory {
         let extra_config = payload.extra_config();
 
         // Generate decryption nonce
-        let decryption_nonce: u64 = rand::random();
+        let decryption_nonce: DecryptionNonce = rand::random();
 
         // Create DecryptedPayload for encryption
         let decrypted_payload = DecryptedPayload::new(executable, decryption_nonce);

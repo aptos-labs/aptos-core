@@ -2363,7 +2363,7 @@ mod tests {
                 claimed_entry_fun: None,
                 eval_proof: EvalProof::random(),
                 executable: TransactionExecutable::Empty,
-                decryption_nonce: 42,
+                decryption_nonce: [42; 16],
             });
     }
 

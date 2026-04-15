@@ -98,7 +98,7 @@ pub fn create_encrypted_transaction_plaintext_state() -> SignedTransaction {
         payload_hash: HashValue::random(),
         eval_proof: EvalProof::random(),
         executable: TransactionExecutable::Empty,
-        decryption_nonce: 0,
+        decryption_nonce: [0; 16],
         claimed_entry_fun: None,
     };
 

@@ -650,6 +650,8 @@ DecryptionFailureReason:
       DecryptionKeyUnavailable: UNIT
     4:
       ClaimedEntryFunctionMismatch: UNIT
+    5:
+      PayloadHashMismatch: UNIT
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -704,7 +706,10 @@ EncryptedPayload:
               TYPENAME: EvalProof
           - executable:
               TYPENAME: TransactionExecutable
-          - decryption_nonce: U64
+          - decryption_nonce:
+              TUPLEARRAY:
+                CONTENT: U8
+                SIZE: 16
 EntryFunction:
   STRUCT:
     - module:

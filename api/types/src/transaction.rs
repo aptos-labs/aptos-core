@@ -1211,7 +1211,7 @@ pub struct DecryptedPayload {
     pub ciphertext: HexEncodedBytes,
     pub claimed_entry_fun: Option<ClaimedEntryFunction>,
     pub decrypted_payload: EncryptedTransactionInnerPayload,
-    pub decryption_nonce: U64,
+    pub decryption_nonce: HexEncodedBytes,
 }
 
 impl VerifyInput for EncryptedTransactionPayload {
