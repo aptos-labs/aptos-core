@@ -43,6 +43,16 @@ A function that is captured into a closure is the same function that can be call
 
 3. **No special calling convention.** This avoids duplicating function bodies or introducing closure-specific entry points.
 
+## Function Resolution
+
+The function stored in a closure may or may not be fully resolved at pack time. There are two forms:
+
+1. **Resolved (local)**: An `ExecutableArenaPtr<Function>` pointing to a fully materialized, monomorphized function in the executable arena. This is the case for intra-module closures where the specializer has already lowered the target function. No type arguments are needed — monomorphization has already substituted all type parameters, so even originally-generic local functions are concrete by the time they have an arena pointer.
+
+2. **Unresolved (cross-module)**: A fully qualified function name (module address + module name + function name) plus type arguments. The target module may not be loaded yet, or the specific monomorphized instantiation may not exist. Resolution happens lazily at `CallClosure` time: the runtime resolves the name, triggers loading/specialization if needed, and caches the result.
+
+At `CallClosure` time, the runtime must have a resolved `Function` pointer. If the closure carries an unresolved reference, it is resolved on first call (and the resolved pointer may be cached for subsequent calls if the closure is copied).
+
 ## Heap Representation
 
 A closure is a heap object. Different closures with the same type signature can capture different numbers and sizes of values (determined by the mask and the underlying function), so the closure's total size is not statically known at the call site. Heap allocation gives a uniform 8-byte representation (a pointer) in the frame regardless of what the closure captures.
@@ -52,7 +62,7 @@ Owner region                       Heap
 ┌────────┐                  ┌──────────────────────────┐
 │   ●────┼─────────────────►│ desc_id(4) | size(4)     │  header
 │        │                  ├──────────────────────────┤
-└────────┘                  │ func_ptr (8)             │  pointer to Function
+└────────┘                  │ func_ref (N)             │  inline FunctionRef enum
   8 bytes                   │ mask (8)                 │  ClosureMask bits
                             ├──────────────────────────┤
                             │ captured_0               │
@@ -61,8 +71,23 @@ Owner region                       Heap
                             └──────────────────────────┘
 ```
 
-Fields:
-- **`func_ptr`** (8 bytes): Raw pointer to the target `Function` in the executable arena. NOT a heap pointer — the GC must not trace it.
+The `func_ref` field is a `ClosureFuncRef` enum laid out inline in the closure body — the same type used in the `PackClosureOp` micro-op:
+
+```rust
+enum ClosureFuncRef {
+    /// Local function, already monomorphized and materialized.
+    Resolved(ExecutableArenaPtr<Function>),
+    /// Cross-module function, resolved lazily at call time.
+    /// Exact payload TBD (module id + function name + type args).
+    Unresolved { .. },
+}
+```
+
+The concrete in-memory representation of this enum (tag size, padding, payload layout) is an implementation detail to be finalized. The `Unresolved` variant is contingent on the general design of cross-module (indirect) calls, which is not yet implemented — its payload will mirror whatever representation cross-module call targets use.
+
+Neither variant contains heap pointers — `Resolved` points into the executable arena, and `Unresolved` will store or reference its data outside the GC heap. This means the GC does not need to trace `func_ref` and the same closure descriptor works for both variants. In the future, we could consider moving some of the function reference information into the object descriptor itself if that simplifies the layout.
+
+Other fields:
 - **`mask`** (8 bytes): The `ClosureMask` bits (u64). Scalar, not traced by GC.
 - **`captured_0..N`**: The captured values, laid out contiguously at their concrete sizes. Some of these may be heap pointers (vectors, structs, enums, other closures).
 
@@ -70,7 +95,7 @@ Fields:
 
 At a `CallClosure` site, the caller must read captured values out of the closure and place them into the callee's argument slots. The mask tells *which* parameters are captured, but not their sizes or byte offsets within the closure body.
 
-**Chosen approach**: Derive layout from `func_ptr` + `mask`. The caller reads `func_ptr` from the closure, looks up parameter sizes from the `Function` struct, and combines with the mask to compute both the captured value offsets within the closure body and the target argument slot positions. No extra per-closure metadata needed.
+**Chosen approach**: Derive layout from the resolved `Function` + `mask`. The runtime looks up parameter sizes from the `Function` struct and combines with the mask to compute both the captured value offsets within the closure body and the target argument slot positions. No extra per-closure metadata needed.
 
 ### Safety: Bytecode Verifier Guarantees
 
@@ -95,7 +120,7 @@ Conceptually this is identical to `ObjectDescriptor::Struct` — the GC just nee
 
 ## Micro-Ops
 
-Two fused super-instructions handle closures. Both contain variable-length data and are boxed to keep the base `MicroOp` enum small.
+Two fused super-instructions handle closures. Both contain variable-length data and are boxed to keep the base `MicroOp` enum small. An alternative is to store the variable-length data in a side table and reference it by index from the instruction — this could keep all `MicroOp` variants within a fixed size. Something to revisit if instruction cache behavior or enum size becomes a concern.
 
 ### `PackClosure`
 
@@ -104,7 +129,7 @@ PackClosure(Box<PackClosureOp>)
 
 struct PackClosureOp {
     dst: FrameOffset,
-    func_ptr: ExecutableArenaPtr<Function>,
+    func_ref: ClosureFuncRef,
     mask: u64,
     descriptor_id: DescriptorId,
     /// Each captured value's frame location and byte size, in mask order.
@@ -114,7 +139,7 @@ struct PackClosureOp {
 
 Semantics:
 1. Allocate a heap object with the given `descriptor_id`. **MAY TRIGGER GC.**
-2. Write `func_ptr` and `mask` into the closure header.
+2. Write `func_ref` and `mask` into the closure header.
 3. Copy each captured value from the frame into the closure body.
 4. Write the heap pointer to `dst`.
 
@@ -131,10 +156,11 @@ struct CallClosureOp {
 ```
 
 Semantics:
-1. Read `func_ptr` and `mask` from the closure heap object.
-2. Look up parameter sizes from the `Function` struct to determine captured value layout.
-3. Interleave captured values (from the closure body) and provided arguments (from the caller's frame) into the callee's argument slots, using the mask.
-4. Perform the call (save metadata, set new fp, jump to callee).
+1. Read `func_ref` and `mask` from the closure heap object.
+2. If `func_ref` is unresolved, resolve it (load module, specialize, cache the result).
+3. Look up parameter sizes from the resolved `Function` to determine captured value layout.
+4. Interleave captured values (from the closure body) and provided arguments (from the caller's frame) into the callee's argument slots, using the mask.
+5. Perform the call (save metadata, set new fp, jump to callee).
 
 The runtime interprets the mask at call time because the caller doesn't statically know which function the closure wraps (the closure may have been passed to the caller as an argument with type `|u64| -> u64`).
 
@@ -152,7 +178,7 @@ This information is only available at runtime via `func_ptr` → `Function` + `m
 
 ## GC Considerations
 
-1. **Closure heap objects** are traced via `ObjectDescriptor::Closure`. `func_ptr` is NOT a heap pointer and is not in `pointer_offsets`.
+1. **Closure heap objects** are traced via `ObjectDescriptor::Closure`. The `func_ref` field contains no heap pointers in either variant, so the GC only needs to trace the captured values region. The same descriptor works for both resolved and unresolved closures.
 
 2. **Closures capturing closures**: Works naturally — a captured closure is an 8-byte heap pointer in the captured values region, and its offset appears in `pointer_offsets`.
 
