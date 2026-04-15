@@ -16,7 +16,7 @@ use crate::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
-    well_known::UNSPECIFIED_ABORT_CODE,
+    well_known::{BORROW_GLOBAL, BORROW_GLOBAL_MUT, UNSPECIFIED_ABORT_CODE},
 };
 use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
@@ -2451,9 +2451,9 @@ impl<'a> ExpSourcifier<'a> {
             },
             Operation::BorrowGlobal(kind) => self.parenthesize(context_prio, Prio::Postfix, || {
                 if *kind == ReferenceKind::Mutable {
-                    emit!(self.wr(), "borrow_global_mut")
+                    emit!(self.wr(), BORROW_GLOBAL_MUT)
                 } else {
-                    emit!(self.wr(), "borrow_global")
+                    emit!(self.wr(), BORROW_GLOBAL)
                 }
                 self.print_node_inst(id);
                 self.print_exp_list("(", ")", args)

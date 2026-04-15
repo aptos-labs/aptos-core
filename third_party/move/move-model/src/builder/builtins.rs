@@ -17,6 +17,7 @@ use crate::{
     model::{Parameter, TypeParameter, TypeParameterKind},
     options::ModelBuilderOptions,
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
+    well_known::{BORROW_GLOBAL, BORROW_GLOBAL_MUT},
 };
 use legacy_move_compiler::parser::ast as PA;
 use move_core_types::{
@@ -873,7 +874,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         let ref_param_t = Type::Reference(ReferenceKind::Immutable, Box::new(param_t.clone()));
         let mut_ref_param_t = Type::Reference(ReferenceKind::Mutable, Box::new(param_t.clone()));
         trans.define_spec_or_builtin_fun(
-            trans.builtin_qualified_symbol("borrow_global"),
+            trans.builtin_qualified_symbol(BORROW_GLOBAL),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::BorrowGlobal(ReferenceKind::Immutable),
@@ -885,7 +886,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             },
         );
         trans.define_spec_or_builtin_fun(
-            trans.builtin_qualified_symbol("borrow_global_mut"),
+            trans.builtin_qualified_symbol(BORROW_GLOBAL_MUT),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::BorrowGlobal(ReferenceKind::Mutable),
