@@ -641,8 +641,7 @@ mod tests {
     use super::*;
     use crate::{
         payload::{
-            BatchPointer, InlineBatches, OptBatches, OptQuorumStorePayload,
-            PayloadExecutionLimit,
+            BatchPointer, InlineBatches, OptBatches, OptQuorumStorePayload, PayloadExecutionLimit,
         },
         proof_of_store::{BatchInfo, ProofCache},
     };
@@ -668,6 +667,22 @@ mod tests {
             1000,
             HashValue::random(),
             num_txns,
+            num_bytes,
+            0,
+        )
+    }
+
+    fn make_batch_info_with_txns(author: PeerId, txns: &[SignedTransaction]) -> BatchInfo {
+        let batch_payload = BatchPayload::new(author, txns.to_vec());
+        let digest = batch_payload.hash();
+        let num_bytes = batch_payload.num_bytes() as u64;
+        BatchInfo::new(
+            author,
+            aptos_types::quorum_store::BatchId::new_for_test(1),
+            1,
+            1000,
+            digest,
+            txns.len() as u64,
             num_bytes,
             0,
         )
@@ -893,6 +908,27 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_inline_batches_rejects_v1_batch_with_encrypted_txn() {
+        let author = PeerId::random();
+        let txns = vec![create_encrypted_signed_transaction()];
+        let batch = make_batch_info_with_txns(author, &txns);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("V1 batch contains encrypted transaction"),
+            "Expected V1 encrypted transaction error, got: {}",
+            err
+        );
+    }
+
+    #[test]
     fn test_payload_verify_rejects_encrypted_inline_batch_with_invalid_ciphertext() {
         let (signers, validators) = random_validator_verifier(1, None, false);
         let author = signers[0].author();
@@ -913,8 +949,8 @@ mod tests {
             .verify(
                 &validators,
                 &proof_cache,
-                true,  // quorum_store_enabled
-                true,  // opt_qs_v2_rx_enabled
+                true, // quorum_store_enabled
+                true, // opt_qs_v2_rx_enabled
                 MAX_BATCH_TXNS,
                 MAX_BATCH_BYTES,
             )
