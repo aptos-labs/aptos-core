@@ -115,6 +115,7 @@ MOVE_CRATES="\
   -p move-vm-transactional-tests \
   -p bytecode-verifier-transactional-tests \
   -p bytecode-verifier-tests \
+  -p move-package-manifest \
 "
 
 # This is a list of crates for integration testing.
