@@ -33,6 +33,8 @@ Consequences:
 
 The bytecode verifier rejects closures that capture references (mutable or immutable). Captured values are always owned, by-value data. This eliminates aliasing concerns and simplifies GC — the closure's heap object contains only owned values, never pointers into stack frames or other borrowed state.
 
+This restriction could be relaxed in the future. From the runtime's perspective, a captured reference would be a 16-byte fat pointer `(base_ptr, byte_offset)` stored in the closure's heap body. The GC already handles fat pointers in stack frames — it checks whether `base_ptr` falls in the heap range and only traces/relocates heap pointers, ignoring stack pointers. The same logic would apply to fat pointers inside a closure's captured values, so no new GC mechanism would be needed. The closure's `pointer_offsets` would simply include the `base_ptr` half of any captured reference, just as `FrameLayoutMap` does for references in stack frames today. The main challenge would be on the language/verifier side (ensuring borrow safety when references escape into closures), not the runtime.
+
 ### No Special Calling Convention for Supporting Closures
 
 A function that is captured into a closure is the same function that can be called directly. There is no "closure-specific" variant — the same compiled micro-op sequence executes for both direct calls and closure calls. This means:
