@@ -528,7 +528,7 @@ class ReplayScheduler:
         # Wait for the PVC to be bound before creating other PVCs
         logger.info(
             f"Waiting for the PVC {pvc} to be bound. "
-            "This involves cloning a large disk volume from a snapshot and may take several minutes..."
+            "This involves cloning a large disk volume from a snapshot and may take 10+ minutes..."
         )
         bound_status = self.get_pvc_bound_status()
         while not self.get_pvc_bound_status()[0]:
@@ -606,6 +606,7 @@ class ReplayScheduler:
 
         schedule_start = time.time()
         last_summary_time = schedule_start
+        self.total_tasks = len(self.tasks)
         pod_timeout = 20 * 60  # 20 minutes — max age before a pod is considered stuck
 
         # Keep running while there are tasks to dispatch OR workers still active.
@@ -624,13 +625,13 @@ class ReplayScheduler:
                     elif worker.get_age_secs() > pod_timeout:
                         # Pod has been running too long — reschedule if under
                         # retry limit, otherwise treat as permanent failure.
-                        retries = self.task_stats[worker.name].retry_count
+                        retries = self.task_stats[worker.name].retry_count + 1
                         logger.error(
                             f"Worker {i} timed out: {worker.name}, "
                             f"phase={worker.get_phase()}, "
                             f"container={worker.get_container_status_summary()}, "
                             f"age={int(worker.get_age_secs())}s, "
-                            f"retries={retries}/{MAX_RETRIES}"
+                            f"attempt {retries}/{MAX_RETRIES}"
                         )
                         if retries < MAX_RETRIES:
                             self.reschedule_pod(worker, i)
@@ -665,12 +666,13 @@ class ReplayScheduler:
                     )
                     self.current_workers[i] = worker_pod
                     worker_pod.start()
-                    self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
+                    if worker_pod.name not in self.task_stats:
+                        self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
             # --- Periodic status summary ---
             # Every 10 min while dispatching, every 60s while waiting.
             now = time.time()
-            summary_interval = 60 if len(self.tasks) == 0 else 600
+            summary_interval = 60 if len(self.tasks) == 0 else 300
             if now - last_summary_time >= summary_interval:
                 self._log_worker_summary(schedule_start, tasks_remaining=len(self.tasks))
                 last_summary_time = now
@@ -753,8 +755,11 @@ class ReplayScheduler:
         phase_counts = Counter()
         header = f"=== Worker status (elapsed={int(time.time() - phase_start_time)}s"
         if tasks_remaining is not None:
-            header += f", tasks remaining={tasks_remaining}"
+            completed = self.total_tasks - tasks_remaining
+            pct = int(completed / self.total_tasks * 100) if self.total_tasks > 0 else 100
+            header += f", progress={completed}/{self.total_tasks} — {pct}%"
         header += ") ==="
+        log("")
         log(header)
         empty_count = 0
         for idx, worker in enumerate(self.current_workers):
@@ -771,6 +776,8 @@ class ReplayScheduler:
             )
         summary = ", ".join(f"{phase}={count}" for phase, count in sorted(phase_counts.items()))
         log(f"  Summary: {summary}, empty={empty_count}")
+        log("=== End worker status ==="  )
+        log("")
 
     # read skip ranges from gcp bucket
 
