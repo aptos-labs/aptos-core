@@ -1637,8 +1637,9 @@ mod tests {
         },
         secret_sharing::{Ciphertext, EvalProof},
         transaction::{
-            encrypted_payload::EncryptedPayload, webauthn::AssertionSignature, SignedTransaction,
-            TransactionExecutable, TransactionExtraConfig, TransactionPayload,
+            encrypted_payload::{DecryptedPlaintext, EncryptedInner, EncryptedPayload},
+            webauthn::AssertionSignature,
+            SignedTransaction, TransactionExecutable, TransactionExtraConfig, TransactionPayload,
         },
     };
     use aptos_crypto::{
@@ -2340,15 +2341,14 @@ mod tests {
         };
         let payload_hash = HashValue::random();
         let encryption_epoch = 7;
-        let payload = TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted(
-            crate::transaction::encrypted_payload::EncryptedInner {
+        let payload =
+            TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted(EncryptedInner {
                 ciphertext: ciphertext.clone(),
                 extra_config: extra_config.clone(),
                 payload_hash,
                 encryption_epoch,
                 claimed_entry_fun: None,
-            },
-        ));
+            }));
         (
             payload,
             ciphertext,
@@ -2369,7 +2369,7 @@ mod tests {
     ) {
         *signed_txn.payload_mut() =
             TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
-                original: crate::transaction::encrypted_payload::EncryptedInner {
+                original: EncryptedInner {
                     ciphertext,
                     extra_config,
                     payload_hash,
@@ -2377,10 +2377,7 @@ mod tests {
                     claimed_entry_fun: None,
                 },
                 eval_proof: EvalProof::random(),
-                decrypted: crate::transaction::encrypted_payload::DecryptedPlaintext::new(
-                    TransactionExecutable::Empty,
-                    [42; 16],
-                ),
+                decrypted: DecryptedPlaintext::new(TransactionExecutable::Empty, [42; 16]),
             });
     }
 
