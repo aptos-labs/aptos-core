@@ -2956,6 +2956,17 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             let eval = value(context, pval)?;
             EL::Literal(eval)
         },
+        PB::Range(plo, phi, inclusive) => {
+            let elo = match plo {
+                Some(v) => Some(value(context, v)?),
+                None => None,
+            };
+            let ehi = match phi {
+                Some(v) => Some(value(context, v)?),
+                None => None,
+            };
+            EL::Range(elo, ehi, inclusive)
+        },
     };
     Some(sp(loc, b_))
 }
@@ -3386,8 +3397,8 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
                 .collect();
             unbound_names_binds(unbound, &sp(loc, ls))
         },
-        EL::Literal(_) => {
-            // Literals don't bind any variables
+        EL::Literal(_) | EL::Range(..) => {
+            // Literals and ranges don't bind any variables
         },
     }
 }
@@ -3425,8 +3436,8 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
                 .collect();
             unbound_names_assigns(unbound, &sp(loc, ls))
         },
-        EL::Literal(_) => {
-            // Literals don't have variables to assign
+        EL::Literal(_) | EL::Range(..) => {
+            // Literals and ranges don't have variables to assign
         },
     }
 }

@@ -13,6 +13,10 @@ pub enum TransactionStage {
     QsBatchCreated,
     QsProofOfStore,
     BlockProposed,
+    /// Local-clock timestamp when this node received the block proposal.
+    /// Compared with BlockProposed (leader's block_timestamp) to measure
+    /// clock skew + network delay from leader to this node.
+    BlockReceived,
     BlockOrdered,
     ExecutionStart,
     Executed,
@@ -97,6 +101,15 @@ pub struct BatchPullInfo {
     pub recent_batches: std::sync::Arc<Vec<BatchCreationRecord>>,
 }
 
+/// Block proposal context: who proposed and at what round.
+#[derive(Debug, Clone)]
+pub struct BlockProposalInfo {
+    /// Short hex prefix of the proposer's peer ID.
+    pub proposer: String,
+    /// Consensus round number.
+    pub round: u64,
+}
+
 /// Additional metadata for specific stages.
 #[derive(Debug, Clone)]
 pub enum StageMetadata {
@@ -105,6 +118,8 @@ pub enum StageMetadata {
     /// Arc-wrapped to avoid cloning the inner Vecs when the same pull info
     /// is recorded for multiple traced txns in the same pull round.
     BatchPull(Arc<BatchPullInfo>),
+    /// Block proposal context (proposer + round).
+    BlockProposal(BlockProposalInfo),
 }
 
 /// A single recorded stage in a transaction's lifecycle.

@@ -907,9 +907,47 @@ fn maybe_parse_literal_pattern(context: &mut Context) -> Result<Option<Value>, B
     Ok(None)
 }
 
+/// Whether the token could start a literal pattern value (used to disambiguate
+/// `..` as structural DotDot vs. the start of a range pattern).
+fn is_literal_start_token(tok: Tok) -> bool {
+    matches!(
+        tok,
+        Tok::NumValue
+            | Tok::NumTypedValue
+            | Tok::True
+            | Tok::False
+            | Tok::ByteStringValue
+            | Tok::Minus
+    )
+}
+
+/// If the current token is `..` or `..=`, consume it and an optional literal
+/// upper bound.
+/// Returns `Ok(None)` without consuming anything if the current token is
+/// neither `..` nor `..=`.
+fn maybe_parse_range_suffix(
+    context: &mut Context,
+    lo: Option<&Value>,
+) -> Result<Option<Bind_>, Box<Diagnostic>> {
+    if !matches!(
+        context.tokens.peek(),
+        Tok::PeriodPeriod | Tok::PeriodPeriodEqual
+    ) {
+        return Ok(None);
+    }
+    let inclusive = context.tokens.peek() == Tok::PeriodPeriodEqual;
+    context.tokens.advance()?;
+    let hi = maybe_parse_literal_pattern(context)?;
+    Ok(Some(Bind_::Range(lo.cloned(), hi, inclusive)))
+}
+
 // Parse a binding:
 //      Bind =
 //          <Literal>
+//          | <Literal> ".." <Literal>?
+//          | <Literal> "..=" <Literal>
+//          | ".." <Literal>?
+//          | "..=" <Literal>
 //          | <Var>
 //          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindFieldOrDotDot> "}"
 //          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<BindOrDotDot> "," ")"
@@ -919,7 +957,28 @@ fn maybe_parse_literal_pattern(context: &mut Context) -> Result<Option<Value>, B
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
 
+    // Open-start range: `..hi` or `..=hi` or `..`
+    if let Some(range) = maybe_parse_range_suffix(context, None)? {
+        let end_loc = context.tokens.previous_end_loc();
+        return Ok(spanned(
+            context.tokens.file_hash(),
+            start_loc,
+            end_loc,
+            range,
+        ));
+    }
+
     if let Some(val) = maybe_parse_literal_pattern(context)? {
+        // Check for `lo..hi`, `lo..=hi`, or `lo..` range
+        if let Some(range) = maybe_parse_range_suffix(context, Some(&val))? {
+            let end_loc = context.tokens.previous_end_loc();
+            return Ok(spanned(
+                context.tokens.file_hash(),
+                start_loc,
+                end_loc,
+                range,
+            ));
+        }
         let end_loc = context.tokens.previous_end_loc();
         return Ok(spanned(
             context.tokens.file_hash(),
@@ -1007,30 +1066,42 @@ fn parse_bind_list(context: &mut Context) -> Result<BindList, Box<Diagnostic>> {
 
 /// Parse a <BindField> or a ".."
 /// <BindFieldOrDotDot> = <BindField> | ".."
+/// Note: `..` followed by a literal is parsed as a range pattern (via <BindField>),
+/// not as structural DotDot. `..=` is always a range.
 fn parse_bind_field_or_dotdot(context: &mut Context) -> Result<BindFieldOrDotDot, Box<Diagnostic>> {
     if context.tokens.peek() == Tok::PeriodPeriod {
-        let loc = current_token_loc(context.tokens);
-        require_move_2(context, loc, "`..` patterns");
-        context.tokens.advance()?;
-        Ok(sp(loc, BindFieldOrDotDot_::DotDot))
-    } else {
-        let (f, b) = parse_bind_field(context)?;
-        Ok(sp(f.loc(), BindFieldOrDotDot_::FieldBind(f, b)))
+        if !is_literal_start_token(context.tokens.lookahead()?) {
+            let loc = current_token_loc(context.tokens);
+            require_move_2(context, loc, "`..` patterns");
+            context.tokens.advance()?;
+            return Ok(sp(loc, BindFieldOrDotDot_::DotDot));
+        }
+        // Fall through — `parse_bind_field` will call `parse_bind` which handles ranges
     }
+    let (f, b) = parse_bind_field(context)?;
+    Ok(sp(f.loc(), BindFieldOrDotDot_::FieldBind(f, b)))
 }
 
 /// Parse a <Bind> or a ".."
 /// <BindOrDotDot> = <Bind> | ".."
+/// Note: `..` followed by a literal is parsed as a range pattern (via <Bind>),
+/// not as structural DotDot. `..=` is always a range.
 fn parse_bind_or_dotdot(context: &mut Context) -> Result<BindOrDotDot, Box<Diagnostic>> {
-    if context.tokens.peek() == Tok::PeriodPeriod {
-        let loc = current_token_loc(context.tokens);
-        require_move_2(context, loc, "`..` patterns");
-        context.tokens.advance()?;
-        Ok(sp(loc, BindOrDotDot_::DotDot))
-    } else {
+    if context.tokens.peek() == Tok::PeriodPeriodEqual {
         let b = parse_bind(context)?;
-        Ok(sp(b.loc, BindOrDotDot_::Bind(b)))
+        return Ok(sp(b.loc, BindOrDotDot_::Bind(b)));
     }
+    if context.tokens.peek() == Tok::PeriodPeriod {
+        if !is_literal_start_token(context.tokens.lookahead()?) {
+            let loc = current_token_loc(context.tokens);
+            require_move_2(context, loc, "`..` patterns");
+            context.tokens.advance()?;
+            return Ok(sp(loc, BindOrDotDot_::DotDot));
+        }
+        // Fall through to parse_bind which handles ranges
+    }
+    let b = parse_bind(context)?;
+    Ok(sp(b.loc, BindOrDotDot_::Bind(b)))
 }
 
 // Parse a list of bindings for lambda.

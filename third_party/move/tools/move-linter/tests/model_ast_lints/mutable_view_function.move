@@ -4,7 +4,7 @@ module 0x42::view_function_safety {
     }
 
     fun modify_state() {
-        let state = borrow_global_mut<State>(@0x42);
+        let state = &mut State[@0x42];
         state.val = state.val + 1;
     }
 
@@ -18,7 +18,7 @@ module 0x42::view_function_safety {
     // Should warn: public view directly using borrow_global_mut
     #[view]
     public fun unsafe_view_direct_borrow(): u64 {
-        let state = borrow_global_mut<State>(@0x42);
+        let state = &mut State[@0x42];
         state.val = state.val + 1;
         1
     }
@@ -59,13 +59,13 @@ module 0x42::view_function_safety {
     // Ok: public view that only reads
     #[view]
     public fun safe_pure_view(): u64 {
-        borrow_global<State>(@0x42).val
+        State[@0x42].val
     }
 
     // Should warn: recursive function that modifies state, called by view
     fun recursive_mutating(n: u64) {
         if (n == 0) {
-            let state = borrow_global_mut<State>(@0x42);
+            let state = &mut State[@0x42];
             state.val = state.val + 1;
         } else {
             recursive_mutating(n - 1);
@@ -95,7 +95,7 @@ module 0x42::view_function_safety {
     // Should warn: mutually recursive functions that modify state, called by view
     fun mutual_a(n: u64) {
         if (n == 0) {
-            let state = borrow_global_mut<State>(@0x42);
+            let state = &mut State[@0x42];
             state.val = state.val + 1;
         } else {
             mutual_b(n - 1);
@@ -113,7 +113,7 @@ module 0x42::view_function_safety {
     }
 
     fun z_mutates() {
-        let state = borrow_global_mut<State>(@0x42);
+        let state = &mut State[@0x42];
         state.val = state.val + 1;
     }
 
@@ -159,7 +159,7 @@ module 0x42::view_function_safety {
 
     // Should warn: deep transitive chain (view -> f -> g -> mutate)
     fun deep_level_3() {
-        let state = borrow_global_mut<State>(@0x42);
+        let state = &mut State[@0x42];
         state.val = state.val + 1;
     }
 
@@ -191,7 +191,7 @@ module 0x42::view_friend_visibility {
     // Should warn: friend view that mutates state
     #[view]
     friend fun unsafe_friend_view_mutates(): u64 {
-        let state = borrow_global_mut<State>(@0x42);
+        let state = &mut State[@0x42];
         state.val = state.val + 1;
         1
     }
@@ -205,7 +205,7 @@ module 0x42::view_package_visibility {
     // Should warn: package view that mutates state
     #[view]
     package fun unsafe_package_view_mutates(): u64 {
-        let state = borrow_global_mut<State>(@0x42);
+        let state = &mut State[@0x42];
         state.val = state.val + 1;
         1
     }

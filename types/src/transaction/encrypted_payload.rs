@@ -6,7 +6,10 @@ use crate::{
     transaction::{TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig},
 };
 use anyhow::{bail, Result};
-use aptos_batch_encryption::traits::{AssociatedData, Plaintext};
+use aptos_batch_encryption::{
+    schemes::fptx_weighted::FPTXWeighted,
+    traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
+};
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
@@ -232,6 +235,6 @@ impl EncryptedPayload {
 
     pub fn verify(&self, sender: AccountAddress) -> anyhow::Result<()> {
         let associated_data = PayloadAssociatedData::new(sender);
-        self.ciphertext().verify(&associated_data)
+        FPTXWeighted::verify_ct(self.ciphertext(), &associated_data)
     }
 }

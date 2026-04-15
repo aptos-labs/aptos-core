@@ -6,6 +6,7 @@ fun pack_and_unpack(): u64 {
     r1: u64
     r2: u8
   code:
+  L0:
     0: r1 := ld_u64 3
     1: r2 := ld_u8 2
     2: r0 := pack S, [r1, r2]

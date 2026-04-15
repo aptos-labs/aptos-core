@@ -17,7 +17,7 @@ pub trait BatchThresholdEncryption {
 
     /// A digest key for the scheme. Allows for generating digests given a list of ciphertexts.
     /// Internally, this is a modified KZG setup.
-    type DigestKey: Serialize + DeserializeOwned;
+    type DigestKey;
 
     /// A ciphertext for the scheme.
     type Ciphertext: Serialize

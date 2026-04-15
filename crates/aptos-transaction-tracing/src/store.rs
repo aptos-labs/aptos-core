@@ -153,6 +153,7 @@ impl TransactionTraceStore {
                     format!("{}({})", stage.as_ref(), inclusion.as_ref())
                 },
                 StageMetadata::BatchPull(_) => stage.as_ref().to_string(),
+                StageMetadata::BlockProposal(_) => stage.as_ref().to_string(),
             };
             observe_stage_latency(trace.insertion_time_usecs, &trace.sender_str, &stage_label);
             trace.record_with_metadata(stage, timestamp_usecs, metadata);
@@ -290,7 +291,9 @@ impl TransactionTraceStore {
         block_id: HashValue,
         block_timestamp_usecs: u64,
         batch_digests: &[(HashValue, crate::types::BatchInclusionType)],
+        proposal_info: Option<crate::types::BlockProposalInfo>,
     ) {
+        let now = now_usecs();
         let mut block_traced_txns: Vec<HashValue> = Vec::new();
         for (digest, inclusion) in batch_digests {
             self.record_batch_stage_with_metadata_at(
@@ -303,7 +306,24 @@ impl TransactionTraceStore {
                 block_traced_txns.extend(txn_hashes.iter());
             }
         }
-        self.register_block(block_id, block_traced_txns);
+        self.register_block(block_id, block_traced_txns.clone());
+
+        // Record BlockReceived at local clock for all traced txns in the block.
+        // Also attach proposal info (proposer + round) for diagnosis.
+        if let Some(info) = proposal_info {
+            for hash in &block_traced_txns {
+                self.record_stage_with_metadata_at(
+                    hash,
+                    TransactionStage::BlockReceived,
+                    StageMetadata::BlockProposal(info.clone()),
+                    now,
+                );
+            }
+        } else {
+            for hash in &block_traced_txns {
+                self.record_stage_at(hash, TransactionStage::BlockReceived, now);
+            }
+        }
     }
 
     /// Record execution results (Keep/Retry/Discard) for traced txns in a block.
@@ -699,6 +719,14 @@ fn log_trace(trace: &TransactionTrace) {
                     info.excluded_txn_count,
                     if info.bp_txn { 1 } else { 0 },
                     if info.bp_proof { 1 } else { 0 },
+                )
+            },
+            Some(StageMetadata::BlockProposal(info)) => {
+                format!(
+                    "{}(r={},by={})",
+                    record.stage.as_ref(),
+                    info.round,
+                    info.proposer,
                 )
             },
             None => record.stage.as_ref().to_string(),

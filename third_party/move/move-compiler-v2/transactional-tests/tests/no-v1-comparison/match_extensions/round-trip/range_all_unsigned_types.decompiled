@@ -1,0 +1,168 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/range_all_unsigned_types.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_u128(p0: u128): u128 {
+        let _v0;
+        let _v1;
+        if (p0 >= 0u128) _v1 = p0 < 1000u128 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 >= 1000u128) _v2 = p0 <= 5000u128 else _v2 = false;
+                if (_v2) {
+                    _v0 = 2u128;
+                    break
+                };
+                _v0 = 3u128;
+                break
+            };
+            return 1u128
+        };
+        _v0
+    }
+    public fun test_u16(p0: u16): u16 {
+        let _v0;
+        let _v1;
+        if (p0 >= 0u16) _v1 = p0 < 1000u16 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 >= 1000u16) _v2 = p0 <= 5000u16 else _v2 = false;
+                if (_v2) {
+                    _v0 = 2u16;
+                    break
+                };
+                _v0 = 3u16;
+                break
+            };
+            return 1u16
+        };
+        _v0
+    }
+    public fun test_u256(p0: u256): u256 {
+        let _v0;
+        let _v1;
+        if (p0 >= 0u256) _v1 = p0 < 1000u256 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 >= 1000u256) _v2 = p0 <= 5000u256 else _v2 = false;
+                if (_v2) {
+                    _v0 = 2u256;
+                    break
+                };
+                _v0 = 3u256;
+                break
+            };
+            return 1u256
+        };
+        _v0
+    }
+    public fun test_u32(p0: u32): u32 {
+        let _v0;
+        let _v1;
+        if (p0 >= 0u32) _v1 = p0 < 1000u32 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 >= 1000u32) _v2 = p0 <= 5000u32 else _v2 = false;
+                if (_v2) {
+                    _v0 = 2u32;
+                    break
+                };
+                _v0 = 3u32;
+                break
+            };
+            return 1u32
+        };
+        _v0
+    }
+    public fun test_u64(p0: u64): u64 {
+        let _v0;
+        let _v1;
+        if (p0 >= 0) _v1 = p0 < 1000 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 >= 1000) _v2 = p0 <= 5000 else _v2 = false;
+                if (_v2) {
+                    _v0 = 2;
+                    break
+                };
+                _v0 = 3;
+                break
+            };
+            return 1
+        };
+        _v0
+    }
+    public fun test_u8(p0: u8): u8 {
+        let _v0;
+        let _v1;
+        if (p0 >= 0u8) _v1 = p0 < 10u8 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 >= 10u8) _v2 = p0 <= 100u8 else _v2 = false;
+                if (_v2) {
+                    _v0 = 2u8;
+                    break
+                };
+                _v0 = 3u8;
+                break
+            };
+            return 1u8
+        };
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::test_u8 --args 0u8
+
+//# run 0xc0ffee::m::test_u8 --args 5u8
+
+//# run 0xc0ffee::m::test_u8 --args 10u8
+
+//# run 0xc0ffee::m::test_u8 --args 50u8
+
+//# run 0xc0ffee::m::test_u8 --args 200u8
+
+//# run 0xc0ffee::m::test_u16 --args 0u16
+
+//# run 0xc0ffee::m::test_u16 --args 500u16
+
+//# run 0xc0ffee::m::test_u16 --args 1000u16
+
+//# run 0xc0ffee::m::test_u16 --args 3000u16
+
+//# run 0xc0ffee::m::test_u16 --args 10000u16
+
+//# run 0xc0ffee::m::test_u32 --args 0u32
+
+//# run 0xc0ffee::m::test_u32 --args 1000u32
+
+//# run 0xc0ffee::m::test_u32 --args 5000u32
+
+//# run 0xc0ffee::m::test_u32 --args 10000u32
+
+//# run 0xc0ffee::m::test_u64 --args 0u64
+
+//# run 0xc0ffee::m::test_u64 --args 1000u64
+
+//# run 0xc0ffee::m::test_u64 --args 5000u64
+
+//# run 0xc0ffee::m::test_u64 --args 10000u64
+
+//# run 0xc0ffee::m::test_u128 --args 0u128
+
+//# run 0xc0ffee::m::test_u128 --args 1000u128
+
+//# run 0xc0ffee::m::test_u128 --args 5000u128
+
+//# run 0xc0ffee::m::test_u256 --args 0u256
+
+//# run 0xc0ffee::m::test_u256 --args 1000u256
+
+//# run 0xc0ffee::m::test_u256 --args 5000u256

@@ -68,12 +68,10 @@ impl ConfigOptimizer for BaseConfig {
 
         let mut modified_config = false;
 
-        // Enable validator-PFN connections for all networks except mainnet,
-        // and test environments (e.g., local swarms, and smoke tests).
+        // Enable validator-PFN connections for all networks except test
+        // environments (e.g., local swarms, and smoke tests).
         if local_base_config_yaml["enable_validator_pfn_connections"].is_null() {
-            let should_enable = chain_id
-                .map(|id| !id.is_mainnet() && id != ChainId::test())
-                .unwrap_or(true);
+            let should_enable = chain_id.map(|id| id != ChainId::test()).unwrap_or(true);
             if should_enable {
                 base_config.enable_validator_pfn_connections = true;
                 modified_config = true;
@@ -299,7 +297,7 @@ mod test {
         // Create a node config with PFN validator connections disabled
         let mut node_config = create_config_with_validator_pfn_connections(false);
 
-        // Optimize for mainnet and verify the flag is still disabled
+        // Optimize for mainnet and verify the flag is now enabled
         let modified = BaseConfig::optimize(
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(),
@@ -307,8 +305,8 @@ mod test {
             Some(ChainId::mainnet()),
         )
         .unwrap();
-        assert!(!modified);
-        assert!(!node_config.base.enable_validator_pfn_connections);
+        assert!(modified);
+        assert!(node_config.base.enable_validator_pfn_connections);
     }
 
     #[test]

@@ -9,18 +9,22 @@ Structs and functions for on-chain chunky DKG configurations.
 -  [Resource `ChunkyDKGConfig`](#0x1_chunky_dkg_config_ChunkyDKGConfig)
 -  [Struct `ConfigOff`](#0x1_chunky_dkg_config_ConfigOff)
 -  [Struct `ConfigV1`](#0x1_chunky_dkg_config_ConfigV1)
+-  [Struct `ConfigShadowV1`](#0x1_chunky_dkg_config_ConfigShadowV1)
 -  [Function `initialize`](#0x1_chunky_dkg_config_initialize)
 -  [Function `set_for_next_epoch`](#0x1_chunky_dkg_config_set_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_chunky_dkg_config_on_new_epoch)
 -  [Function `enabled`](#0x1_chunky_dkg_config_enabled)
 -  [Function `new_off`](#0x1_chunky_dkg_config_new_off)
 -  [Function `new_v1`](#0x1_chunky_dkg_config_new_v1)
+-  [Function `new_shadow_v1`](#0x1_chunky_dkg_config_new_shadow_v1)
+-  [Function `grace_period_secs`](#0x1_chunky_dkg_config_grace_period_secs)
 -  [Function `current`](#0x1_chunky_dkg_config_current)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
@@ -52,6 +56,7 @@ The configuration of the on-chain chunky DKG feature.
  Currently the variant type is one of the following.
  - <code><a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigOff">ConfigOff</a></code>
  - <code><a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigV1">ConfigV1</a></code>
+ - <code><a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigShadowV1">ConfigShadowV1</a></code>
 </dd>
 </dl>
 
@@ -114,6 +119,47 @@ A chunky DKG config variant indicating the feature is enabled.
 </dt>
 <dd>
  Any validator subset should be able to reconstruct randomness if <code>subset_power / total_power &gt; reconstruction_threshold</code>.
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_chunky_dkg_config_ConfigShadowV1"></a>
+
+## Struct `ConfigShadowV1`
+
+A chunky DKG config variant for shadow mode: chunky DKG runs alongside regular DKG,
+but epoch change is forced after <code>grace_period_secs</code> if chunky DKG hasn't completed.
+
+
+<pre><code><b>struct</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigShadowV1">ConfigShadowV1</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>secrecy_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>reconstruction_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>grace_period_secs: u64</code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -292,6 +338,72 @@ Create a <code><a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigV1">Con
             <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigV1">ConfigV1</a> { secrecy_threshold, reconstruction_threshold }
         )
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_chunky_dkg_config_new_shadow_v1"></a>
+
+## Function `new_shadow_v1`
+
+Create a <code><a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigShadowV1">ConfigShadowV1</a></code> variant for shadow mode.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_new_shadow_v1">new_shadow_v1</a>(secrecy_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, reconstruction_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, grace_period_secs: u64): <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">chunky_dkg_config::ChunkyDKGConfig</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_new_shadow_v1">new_shadow_v1</a>(
+    secrecy_threshold: FixedPoint64,
+    reconstruction_threshold: FixedPoint64,
+    grace_period_secs: u64
+): <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a> {
+    <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a> {
+        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(
+            <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigShadowV1">ConfigShadowV1</a> { secrecy_threshold, reconstruction_threshold, grace_period_secs }
+        )
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_chunky_dkg_config_grace_period_secs"></a>
+
+## Function `grace_period_secs`
+
+Return the grace period in seconds if configured (i.e. shadow mode), or none otherwise.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_grace_period_secs">grace_period_secs</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_grace_period_secs">grace_period_secs</a>(): Option&lt;u64&gt; <b>acquires</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;(@aptos_framework)) {
+        <b>let</b> config = <b>borrow_global</b>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">ChunkyDKGConfig</a>&gt;(@aptos_framework);
+        <b>let</b> variant_type_name = *config.variant.type_name().bytes();
+        <b>if</b> (variant_type_name == b"<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigShadowV1">0x1::chunky_dkg_config::ConfigShadowV1</a>") {
+            <b>let</b> shadow_v1 = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ConfigShadowV1">ConfigShadowV1</a>&gt;(config.variant);
+            <b>return</b> std::option::some(shadow_v1.grace_period_secs)
+        }
+    };
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
 }
 </code></pre>
 

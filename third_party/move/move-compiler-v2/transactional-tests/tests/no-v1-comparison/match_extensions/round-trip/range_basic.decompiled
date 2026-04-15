@@ -1,0 +1,68 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/range_basic.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_exclusive(p0: u64): u64 {
+        let _v0;
+        if (p0 >= 1) _v0 = p0 < 10 else _v0 = false;
+        if (_v0) return 1;
+        0
+    }
+    public fun test_inclusive(p0: u64): u64 {
+        let _v0;
+        if (p0 >= 1) _v0 = p0 <= 10 else _v0 = false;
+        if (_v0) return 1;
+        0
+    }
+    public fun test_open_end(p0: u64): u64 {
+        if (p0 >= 5) return 1;
+        0
+    }
+    public fun test_open_start(p0: u64): u64 {
+        if (p0 < 10) return 1;
+        0
+    }
+    public fun test_open_start_inclusive(p0: u64): u64 {
+        if (p0 <= 10) return 1;
+        0
+    }
+}
+
+
+//# run 0xc0ffee::m::test_exclusive --args 0u64
+
+//# run 0xc0ffee::m::test_exclusive --args 1u64
+
+//# run 0xc0ffee::m::test_exclusive --args 5u64
+
+//# run 0xc0ffee::m::test_exclusive --args 9u64
+
+//# run 0xc0ffee::m::test_exclusive --args 10u64
+
+//# run 0xc0ffee::m::test_inclusive --args 0u64
+
+//# run 0xc0ffee::m::test_inclusive --args 1u64
+
+//# run 0xc0ffee::m::test_inclusive --args 5u64
+
+//# run 0xc0ffee::m::test_inclusive --args 10u64
+
+//# run 0xc0ffee::m::test_inclusive --args 11u64
+
+//# run 0xc0ffee::m::test_open_end --args 4u64
+
+//# run 0xc0ffee::m::test_open_end --args 5u64
+
+//# run 0xc0ffee::m::test_open_end --args 100u64
+
+//# run 0xc0ffee::m::test_open_start --args 0u64
+
+//# run 0xc0ffee::m::test_open_start --args 9u64
+
+//# run 0xc0ffee::m::test_open_start --args 10u64
+
+//# run 0xc0ffee::m::test_open_start_inclusive --args 0u64
+
+//# run 0xc0ffee::m::test_open_start_inclusive --args 10u64
+
+//# run 0xc0ffee::m::test_open_start_inclusive --args 11u64

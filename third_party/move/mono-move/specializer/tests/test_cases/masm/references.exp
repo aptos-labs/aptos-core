@@ -6,6 +6,7 @@ fun read_field_val(r0): u8 {
     r1: &S
     r2: u8
   code:
+  L0:
     0: r1 := imm_borrow_loc r0
     1: r2 := read_field S::_2, r1
     2: ret [r2]
@@ -16,6 +17,7 @@ fun read_and_add(r0): u64 {
     r0: &u64
     r1: u64
   code:
+  L0:
     0: r1 := read_ref r0
     1: r1 := add r1, #1
     2: ret [r1]
@@ -29,6 +31,7 @@ fun read_field_ref_twice(r0): u64 {
     r3: u64
     r4: u64
   code:
+  L0:
     0: r2 := imm_borrow_loc r0
     1: r1 := imm_borrow_field S::_1, r2
     2: r3 := read_ref r1

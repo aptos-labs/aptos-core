@@ -338,6 +338,16 @@ pub static CONSENSUS_PULL_NUM_UNIQUE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static CONSENSUS_PULL_NUM_TXNS_PER_KIND: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_num_txns_per_kind",
+        "Number of txns pulled for consensus, by pull kind and batch kind (normal, encrypted, or v1).",
+        &["pull_kind", "batch_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
 pub static CONSENSUS_PULL_SIZE_IN_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_consensus_pull_size_in_bytes",

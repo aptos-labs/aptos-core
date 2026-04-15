@@ -6,6 +6,7 @@ fun add_values(r0, r1): u64 {
     r1: u64
     r2: u64
   code:
+  L0:
     0: r2 := add r0, r1
     1: ret [r2]
 }
@@ -16,6 +17,7 @@ fun complex_arith(r0): u64 {
     r1: u64
     r2: u64
   code:
+  L0:
     0: r1 := mul r0, #2
     1: r2 := add r1, #1
     2: ret [r2]

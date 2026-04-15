@@ -291,6 +291,7 @@ module aptos_framework::block {
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start_with_chunky_dkg();
+            reconfiguration_with_dkg::try_complete_after_grace_period();
         };
     }
 

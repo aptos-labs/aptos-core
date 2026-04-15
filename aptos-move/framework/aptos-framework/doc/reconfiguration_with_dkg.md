@@ -12,6 +12,7 @@ Reconfiguration with DKG helper functions.
 -  [Function `maybe_finish_reconfig_with_chunky_dkg`](#0x1_reconfiguration_with_dkg_maybe_finish_reconfig_with_chunky_dkg)
 -  [Function `finish_with_dkg_result`](#0x1_reconfiguration_with_dkg_finish_with_dkg_result)
 -  [Function `finish_with_chunky_dkg_result`](#0x1_reconfiguration_with_dkg_finish_with_chunky_dkg_result)
+-  [Function `try_complete_after_grace_period`](#0x1_reconfiguration_with_dkg_try_complete_after_grace_period)
 -  [Specification](#@Specification_0)
     -  [Function `try_start`](#@Specification_0_try_start)
     -  [Function `try_start_with_chunky_dkg`](#@Specification_0_try_start_with_chunky_dkg)
@@ -25,6 +26,7 @@ Reconfiguration with DKG helper functions.
 <b>use</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config">0x1::chunky_dkg_config</a>;
 <b>use</b> <a href="chunky_dkg_config_seqnum.md#0x1_chunky_dkg_config_seqnum">0x1::chunky_dkg_config_seqnum</a>;
 <b>use</b> <a href="consensus_config.md#0x1_consensus_config">0x1::consensus_config</a>;
+<b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="decryption.md#0x1_decryption">0x1::decryption</a>;
 <b>use</b> <a href="dkg.md#0x1_dkg">0x1::dkg</a>;
 <b>use</b> <a href="execution_config.md#0x1_execution_config">0x1::execution_config</a>;
@@ -41,6 +43,7 @@ Reconfiguration with DKG helper functions.
 <b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
+<b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info">0x1::validator_consensus_info</a>;
 <b>use</b> <a href="version.md#0x1_version">0x1::version</a>;
 </code></pre>
@@ -271,6 +274,52 @@ finish(account) is invoked only when both DKG and Chunky DKG have no in-progress
     <b>let</b> next_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>() + 1;
     <a href="decryption.md#0x1_decryption_set_for_next_epoch">decryption::set_for_next_epoch</a>(next_epoch, encryption_key);
     <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_maybe_finish_reconfig_with_chunky_dkg">maybe_finish_reconfig_with_chunky_dkg</a>(<a href="account.md#0x1_account">account</a>);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_reconfiguration_with_dkg_try_complete_after_grace_period"></a>
+
+## Function `try_complete_after_grace_period`
+
+Safety net for shadow mode: if DKG is done but chunky DKG exceeds its grace period,
+force epoch change. Called from block_prologue_ext_v2 every block after the epoch
+interval has elapsed. No-op unless all conditions are met.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_complete_after_grace_period">try_complete_after_grace_period</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_complete_after_grace_period">try_complete_after_grace_period</a>() {
+    <b>if</b> (!<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_in_progress">reconfiguration_state::is_in_progress</a>()) { <b>return</b> };
+
+    // DKG must be done.
+    <b>if</b> (<a href="dkg.md#0x1_dkg_incomplete_session">dkg::incomplete_session</a>().is_some()) { <b>return</b> };
+
+    // Chunky DKG must still be in progress.
+    <b>let</b> chunky_session = <a href="chunky_dkg.md#0x1_chunky_dkg_incomplete_session">chunky_dkg::incomplete_session</a>();
+    <b>if</b> (chunky_session.is_none()) { <b>return</b> };
+
+    // Grace period must be configured (ConfigShadowV1).
+    <b>let</b> grace_period = <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_grace_period_secs">chunky_dkg_config::grace_period_secs</a>();
+    <b>if</b> (grace_period.is_none()) { <b>return</b> };
+
+    // Check <b>if</b> grace period <b>has</b> elapsed.
+    <b>let</b> start_time_us = <a href="chunky_dkg.md#0x1_chunky_dkg_session_start_time">chunky_dkg::session_start_time</a>(chunky_session.borrow());
+    <b>let</b> grace_period_us = (*grace_period.borrow()) * 1_000_000;
+    <b>if</b> (<a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() - start_time_us &gt;= grace_period_us) {
+        <b>let</b> framework = <a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(@aptos_framework);
+        <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">finish</a>(&framework);
+    };
 }
 </code></pre>
 

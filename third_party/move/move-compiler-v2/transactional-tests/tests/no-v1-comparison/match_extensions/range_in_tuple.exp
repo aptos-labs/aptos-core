@@ -1,0 +1,18 @@
+processed 9 tasks
+task 0 lines 1-27:  publish [module 0xc0ffee::m {]
+task 1 lines 29-29:  run 0xc0ffee::m::test_tuple_both_ranges --args 3u64 15u64
+return values: 1
+task 2 lines 31-31:  run 0xc0ffee::m::test_tuple_both_ranges --args 3u64 25u64
+return values: 0
+task 3 lines 33-33:  run 0xc0ffee::m::test_tuple_both_ranges --args 0u64 15u64
+return values: 0
+task 4 lines 35-35:  run 0xc0ffee::m::test_tuple_range_and_literal --args 5u64 42u64
+return values: 1
+task 5 lines 37-37:  run 0xc0ffee::m::test_tuple_range_and_literal --args 5u64 99u64
+return values: 2
+task 6 lines 39-39:  run 0xc0ffee::m::test_tuple_range_and_literal --args 50u64 42u64
+return values: 0
+task 7 lines 41-41:  run 0xc0ffee::m::test_tuple_range_and_wildcard --args 50u64 999u64
+return values: 1
+task 8 lines 43-43:  run 0xc0ffee::m::test_tuple_range_and_wildcard --args 200u64 999u64
+return values: 2

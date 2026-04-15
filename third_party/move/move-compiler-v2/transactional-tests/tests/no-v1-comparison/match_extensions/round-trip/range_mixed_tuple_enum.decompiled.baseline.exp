@@ -1,0 +1,18 @@
+processed 9 tasks
+task 0 lines 3-90:  publish [module 0xc0ffee::m {]
+task 1 lines 93-93:  run 0xc0ffee::m::test_rgb_all_match
+return values: 1
+task 2 lines 95-95:  run 0xc0ffee::m::test_rgb_first_out
+return values: 2
+task 3 lines 97-97:  run 0xc0ffee::m::test_rgb_second_mismatch
+return values: 2
+task 4 lines 99-99:  run 0xc0ffee::m::test_rgb_tuple_out
+return values: 2
+task 5 lines 101-101:  run 0xc0ffee::m::test_gray_high_low
+return values: 3
+task 6 lines 103-103:  run 0xc0ffee::m::test_gray_high_tuple_out
+return values: 4
+task 7 lines 105-105:  run 0xc0ffee::m::test_gray_low
+return values: 4
+task 8 lines 107-107:  run 0xc0ffee::m::test_named
+return values: 5

@@ -147,6 +147,7 @@ impl<F: FftField> CirculantDomain<F> {
 /// represents that subset. Following the terminology in Arkworks, we call this
 /// subset a "domain".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(bound(serialize = "", deserialize = ""))]
 pub struct ToeplitzDomain<F: FftField + Sized> {
     pub circulant_domain: CirculantDomain<F>,
 }

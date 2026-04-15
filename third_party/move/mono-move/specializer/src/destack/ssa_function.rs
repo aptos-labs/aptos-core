@@ -2,15 +2,20 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Intermediate SSA representation and pre-allocation fusion passes.
+//!
+//! SSA is intra-block and applies only to value IDs, not to params or locals
+//! (which are mutable across blocks). Because the operand stack is empty at
+//! block boundaries, no phi nodes are needed — each value ID is defined exactly
+//! once within its block and never crosses a block boundary.
 
-use super::instr_utils::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
-use crate::stackless_exec_ir::Instr;
+use super::instr_utils::{extract_imm_value, is_commutative};
+use crate::stackless_exec_ir::{BasicBlock, Instr};
 use move_vm_types::loaded_data::runtime_types::Type;
 
 /// Intermediate SSA representation of a single function, before slot allocation.
 pub(crate) struct SSAFunction {
-    /// Stackless instructions in SSA form.
-    pub instrs: Vec<Instr>,
+    /// Basic blocks in SSA form.
+    pub blocks: Vec<BasicBlock>,
     /// Type of each value ID, indexed directly by the value ID number.
     pub vid_types: Vec<Type>,
     /// Types of all locals (params ++ declared locals).
@@ -18,144 +23,105 @@ pub(crate) struct SSAFunction {
 }
 
 impl SSAFunction {
-    /// Fuse consecutive borrow+deref patterns into combined field access instructions.
-    ///
-    /// Safety: relies on the SSA single-use invariant — each `Vid` produced by a
-    /// borrow instruction is consumed exactly once by the immediately following
-    /// `ReadRef`/`WriteRef`. This holds for verified stack-machine bytecode.
-    pub(crate) fn fuse_field_access_instrs(&mut self) {
-        let instrs = &self.instrs;
-        let mut result = Vec::with_capacity(instrs.len());
-        let mut skip_next = false;
-
-        for w in instrs.windows(2) {
-            if skip_next {
-                skip_next = false;
-                continue;
-            }
-
-            let fused = match (&w[0], &w[1]) {
-                (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-                    if *ref_r == *read_src =>
-                {
-                    Some(Instr::ReadField(*dst, *fld, *src))
-                },
-                (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-                    if *ref_r == *read_src =>
-                {
-                    Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
-                },
-                (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
-                    if *ref_r == *write_ref =>
-                {
-                    Some(Instr::WriteField(*fld, *dst_ref, *val))
-                },
-                (
-                    Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref),
-                    Instr::WriteRef(write_ref, val),
-                ) if *ref_r == *write_ref => Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val)),
-                (Instr::ImmBorrowVariantField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
-                    if *ref_r == *read_src =>
-                {
-                    Some(Instr::ReadVariantField(*dst, *fld, *src))
-                },
-                (
-                    Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src),
-                    Instr::ReadRef(dst, read_src),
-                ) if *ref_r == *read_src => Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src)),
-                (
-                    Instr::MutBorrowVariantField(ref_r, fld, dst_ref),
-                    Instr::WriteRef(write_ref, val),
-                ) if *ref_r == *write_ref => Some(Instr::WriteVariantField(*fld, *dst_ref, *val)),
-                (
-                    Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
-                    Instr::WriteRef(write_ref, val),
-                ) if *ref_r == *write_ref => {
-                    Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val))
-                },
-                _ => None,
-            };
-
-            if let Some(fused_instr) = fused {
-                result.push(fused_instr);
-                skip_next = true;
-            } else {
-                result.push(w[0].clone());
-            }
+    /// Run all pre-allocation instruction fusion passes.
+    pub(crate) fn with_fusion_passes(mut self) -> Self {
+        // [TODO]: right now, we have each different fusion operation to be a separate pass.
+        // This is easier to reason about, but we could make it more efficient by
+        // combining the passes.
+        for block in &mut self.blocks {
+            fuse_pairs(&mut block.instrs, try_fuse_field_access);
+            fuse_pairs(&mut block.instrs, try_fuse_immediate_binop);
         }
-
-        // The last instruction is only the second element of the final window,
-        // so it's never pushed as w[0]. Emit it unless it was consumed by fusion.
-        if !skip_next {
-            if let Some(last) = instrs.last() {
-                result.push(last.clone());
-            }
-        }
-
-        self.instrs = result;
+        self
     }
+}
 
-    /// Fuse consecutive `Ld*` + `BinaryOp` pairs into `BinaryOpImm` in the SSA IR.
-    pub(crate) fn fuse_immediate_binops(&mut self) {
-        let instrs = &self.instrs;
-        let blocks = split_into_blocks(instrs);
-        let mut result = Vec::with_capacity(instrs.len());
+/// In-place compaction that fuses consecutive instruction pairs.
+///
+/// For each position, calls `try_fuse(&instrs[r], &instrs[r+1])`. If it returns
+/// `Some(fused)`, the pair is replaced by the single fused instruction. Otherwise
+/// the instruction is kept as-is. Uses a write-cursor so no allocation is needed.
+fn fuse_pairs(instrs: &mut Vec<Instr>, try_fuse: fn(&Instr, &Instr) -> Option<Instr>) {
+    let mut write = 0;
+    let mut read = 0;
+    while read < instrs.len() {
+        let fused = instrs
+            .get(read + 1)
+            .and_then(|next| try_fuse(&instrs[read], next));
 
-        let mut block_idx = 0;
-        let mut skip_next = false;
-
-        for i in 0..instrs.len() {
-            if skip_next {
-                skip_next = false;
-                continue;
-            }
-
-            // Advance to the current block.
-            while block_idx < blocks.len() && i >= blocks[block_idx].end {
-                block_idx += 1;
-            }
-
-            // Only fuse within the same basic block.
-            if i + 1 < instrs.len()
-                && block_idx < blocks.len()
-                && i + 1 < blocks[block_idx].end
-                && let Some((tmp, imm)) = extract_imm_value(&instrs[i])
-            {
-                let fused = match &instrs[i + 1] {
-                    Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
-                        Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm.clone()))
-                    },
-                    Instr::BinaryOp(dst, op, lhs, rhs) if *lhs == tmp && is_commutative(op) => {
-                        Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm.clone()))
-                    },
-                    _ => None,
-                };
-                if let Some(fused_instr) = fused {
-                    debug_assert!(
-                        {
-                            let block = &blocks[block_idx];
-                            instrs[block.clone()]
-                                .iter()
-                                .enumerate()
-                                .filter(|&(j, _)| block.start + j != i + 1)
-                                .all(|(_, ins)| {
-                                    let (_, uses) = get_defs_uses(ins);
-                                    !uses.contains(&tmp)
-                                })
-                        },
-                        "BinaryOpImm SSA fusion: VID {:?} has uses outside the \
-                         consecutive Ld+BinaryOp pair — stack machine invariant violated",
-                        tmp,
-                    );
-                    result.push(fused_instr);
-                    skip_next = true;
-                    continue;
+        match fused {
+            Some(fused_instr) => {
+                instrs[write] = fused_instr;
+                read += 2;
+            },
+            None => {
+                if write != read {
+                    instrs.swap(write, read);
                 }
-            }
-
-            result.push(instrs[i].clone());
+                read += 1;
+            },
         }
+        write += 1;
+    }
+    instrs.truncate(write);
+}
 
-        self.instrs = result;
+/// Try to fuse a borrow+deref pair into a combined field access instruction.
+fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
+    match (first, second) {
+        (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+            if *ref_r == *read_src =>
+        {
+            Some(Instr::ReadField(*dst, *fld, *src))
+        },
+        (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+            if *ref_r == *read_src =>
+        {
+            Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
+        },
+        (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+            if *ref_r == *write_ref =>
+        {
+            Some(Instr::WriteField(*fld, *dst_ref, *val))
+        },
+        (Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+            if *ref_r == *write_ref =>
+        {
+            Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val))
+        },
+        (Instr::ImmBorrowVariantField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+            if *ref_r == *read_src =>
+        {
+            Some(Instr::ReadVariantField(*dst, *fld, *src))
+        },
+        (Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+            if *ref_r == *read_src =>
+        {
+            Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src))
+        },
+        (Instr::MutBorrowVariantField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+            if *ref_r == *write_ref =>
+        {
+            Some(Instr::WriteVariantField(*fld, *dst_ref, *val))
+        },
+        (
+            Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
+            Instr::WriteRef(write_ref, val),
+        ) if *ref_r == *write_ref => Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val)),
+        _ => None,
+    }
+}
+
+/// Try to fuse a `Ld*` + `BinaryOp` pair into a `BinaryOpImm` instruction.
+fn try_fuse_immediate_binop(first: &Instr, second: &Instr) -> Option<Instr> {
+    let (tmp, imm) = extract_imm_value(first)?;
+    match second {
+        Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
+            Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm))
+        },
+        Instr::BinaryOp(dst, op, lhs, rhs) if *lhs == tmp && is_commutative(op) => {
+            Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm))
+        },
+        _ => None,
     }
 }

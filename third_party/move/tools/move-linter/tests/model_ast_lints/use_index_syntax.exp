@@ -1,19 +1,10 @@
 
 Diagnostics:
 warning: [lint] concise vector index notation syntax can be used here instead.
-   ┌─ tests/model_ast_lints/use_index_syntax.move:15:9
-   │
-15 │         vector::borrow(v, i)
-   │         ^^^^^^^^^^^^^^^^^^^^
-   │
-   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
-   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
-
-warning: [lint] concise vector index notation syntax can be used here instead.
    ┌─ tests/model_ast_lints/use_index_syntax.move:20:9
    │
-20 │         vector::borrow_mut(v, i)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+20 │         vector::borrow(v, i)
+   │         ^^^^^^^^^^^^^^^^^^^^
    │
    = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
@@ -21,8 +12,8 @@ warning: [lint] concise vector index notation syntax can be used here instead.
 warning: [lint] concise vector index notation syntax can be used here instead.
    ┌─ tests/model_ast_lints/use_index_syntax.move:25:9
    │
-25 │         *vector::borrow(v, i)
-   │         ^^^^^^^^^^^^^^^^^^^^^
+25 │         vector::borrow_mut(v, i)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
@@ -30,8 +21,8 @@ warning: [lint] concise vector index notation syntax can be used here instead.
 warning: [lint] concise vector index notation syntax can be used here instead.
    ┌─ tests/model_ast_lints/use_index_syntax.move:30:9
    │
-30 │         *vector::borrow_mut(v, i) = x;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 │         *vector::borrow(v, i)
+   │         ^^^^^^^^^^^^^^^^^^^^^
    │
    = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
@@ -39,8 +30,8 @@ warning: [lint] concise vector index notation syntax can be used here instead.
 warning: [lint] concise vector index notation syntax can be used here instead.
    ┌─ tests/model_ast_lints/use_index_syntax.move:35:9
    │
-35 │         vector::borrow(v, i).value
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 │         *vector::borrow_mut(v, i) = x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
@@ -48,8 +39,8 @@ warning: [lint] concise vector index notation syntax can be used here instead.
 warning: [lint] concise vector index notation syntax can be used here instead.
    ┌─ tests/model_ast_lints/use_index_syntax.move:40:9
    │
-40 │         vector::borrow_mut(v, i).value
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+40 │         vector::borrow(v, i).value
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
@@ -57,17 +48,8 @@ warning: [lint] concise vector index notation syntax can be used here instead.
 warning: [lint] concise vector index notation syntax can be used here instead.
    ┌─ tests/model_ast_lints/use_index_syntax.move:45:9
    │
-45 │         vector::borrow_mut(v, i).value = x;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
-   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
-
-warning: [lint] concise vector index notation syntax can be used here instead.
-   ┌─ tests/model_ast_lints/use_index_syntax.move:50:24
-   │
-50 │         vector::borrow(vector::borrow(v, i), j)
-   │                        ^^^^^^^^^^^^^^^^^^^^
+45 │         vector::borrow_mut(v, i).value
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
@@ -75,8 +57,17 @@ warning: [lint] concise vector index notation syntax can be used here instead.
 warning: [lint] concise vector index notation syntax can be used here instead.
    ┌─ tests/model_ast_lints/use_index_syntax.move:50:9
    │
-50 │         vector::borrow(vector::borrow(v, i), j)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+50 │         vector::borrow_mut(v, i).value = x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:55:24
+   │
+55 │         vector::borrow(vector::borrow(v, i), j)
+   │                        ^^^^^^^^^^^^^^^^^^^^
    │
    = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
@@ -84,8 +75,98 @@ warning: [lint] concise vector index notation syntax can be used here instead.
 warning: [lint] concise vector index notation syntax can be used here instead.
    ┌─ tests/model_ast_lints/use_index_syntax.move:55:9
    │
-55 │         *vector::borrow(v, i) > 0
+55 │         vector::borrow(vector::borrow(v, i), j)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise vector index notation syntax can be used here instead.
+   ┌─ tests/model_ast_lints/use_index_syntax.move:60:9
+   │
+60 │         *vector::borrow(v, i) > 0
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
    = Concise vector index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/vector#index-notation-for-vectors.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:101:18
+    │
+101 │         let _r = borrow_global<MyResource>(addr);
+    │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:107:18
+    │
+107 │         let _r = borrow_global_mut<MyResource>(addr);
+    │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:113:9
+    │
+113 │         *borrow_global<MyResource>(addr)
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:118:9
+    │
+118 │         *borrow_global_mut<MyResource>(addr) = x;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:123:9
+    │
+123 │         borrow_global<MyResource>(addr).value
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:128:9
+    │
+128 │         borrow_global_mut<MyResource>(addr).value
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:133:9
+    │
+133 │         borrow_global_mut<MyResource>(addr).value = x;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] concise global storage index notation syntax can be used here instead.
+    ┌─ tests/model_ast_lints/use_index_syntax.move:138:29
+    │
+138 │         helper_takes_immref(borrow_global<MyResource>(addr))
+    │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = Concise global storage index notation syntax is described here: https://aptos.dev/build/smart-contracts/book/global-storage-operators#index-notation-for-storage-operators.
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_index_syntax)]`.
+
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+    ┌─ tests/model_ast_lints/use_index_syntax.move:128:9
+    │
+128 │         borrow_global_mut<MyResource>(addr).value
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
