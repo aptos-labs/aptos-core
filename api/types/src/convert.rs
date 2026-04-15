@@ -16,7 +16,7 @@ use crate::{
     HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
     MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
     SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
+    TransactionPayload, U64, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -491,28 +491,33 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 match encrypted {
                     EP::Encrypted {
                         payload_hash,
+                        encryption_epoch,
                         claimed_entry_fun,
                         ..
                     } => TransactionPayload::EncryptedTransactionPayload(
                         EncryptedTransactionPayload::Encrypted(ApiEncryptedPayload {
                             payload_hash: crate::HashValue::from(payload_hash),
                             ciphertext: ciphertext.clone(),
+                            encryption_epoch: U64::from(encryption_epoch),
                             claimed_entry_fun: into_api_claimed_entry_function(claimed_entry_fun),
                         }),
                     ),
                     EP::FailedDecryption {
                         payload_hash,
+                        encryption_epoch,
                         claimed_entry_fun,
                         ..
                     } => TransactionPayload::EncryptedTransactionPayload(
                         EncryptedTransactionPayload::FailedDecryption(ApiFailedDecryptionPayload {
                             payload_hash: crate::HashValue::from(payload_hash),
                             ciphertext: ciphertext.clone(),
+                            encryption_epoch: U64::from(encryption_epoch),
                             claimed_entry_fun: into_api_claimed_entry_function(claimed_entry_fun),
                         }),
                     ),
                     EP::Decrypted {
                         payload_hash,
+                        encryption_epoch,
                         executable,
                         decryption_nonce,
                         claimed_entry_fun,
@@ -551,6 +556,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             EncryptedTransactionPayload::Decrypted(ApiDecryptedPayload {
                                 payload_hash: crate::HashValue::from(payload_hash),
                                 ciphertext,
+                                encryption_epoch: U64::from(encryption_epoch),
                                 decrypted_payload: inner,
                                 decryption_nonce: HexEncodedBytes::from(decryption_nonce.to_vec()),
                                 claimed_entry_fun: into_api_claimed_entry_function(
@@ -1017,9 +1023,15 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             TransactionPayload::EncryptedTransactionPayload(encrypted) => {
                 // Only the Encrypted variant can be submitted; VerifyInput enforces this.
-                let (payload_hash, ciphertext_bytes, claimed_entry_fun) = match encrypted {
+                let (payload_hash, ciphertext_bytes, encryption_epoch, claimed_entry_fun) =
+                    match encrypted {
                     EncryptedTransactionPayload::Encrypted(p) => {
-                        (p.payload_hash, p.ciphertext, p.claimed_entry_fun)
+                        (
+                            p.payload_hash,
+                            p.ciphertext,
+                            p.encryption_epoch,
+                            p.claimed_entry_fun,
+                        )
                     },
                     _ => bail!("Only encrypted state payloads can be submitted"),
                 };
@@ -1033,6 +1045,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     ciphertext,
                     extra_config,
                     payload_hash: payload_hash.into(),
+                    encryption_epoch: encryption_epoch.into(),
                     claimed_entry_fun: into_claimed_entry_fun(claimed_entry_fun),
                 })
             },

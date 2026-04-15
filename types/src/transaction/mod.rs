@@ -697,6 +697,7 @@ impl RawTransaction {
                 ciphertext,
                 extra_config,
                 payload_hash,
+                encryption_epoch,
                 claimed_entry_fun,
                 ..
             })
@@ -704,6 +705,7 @@ impl RawTransaction {
                 ciphertext,
                 extra_config,
                 payload_hash,
+                encryption_epoch,
                 claimed_entry_fun,
                 ..
             }) => Cow::Owned(RawTransaction {
@@ -713,6 +715,7 @@ impl RawTransaction {
                     ciphertext: ciphertext.clone(),
                     extra_config: extra_config.clone(),
                     payload_hash: *payload_hash,
+                    encryption_epoch: *encryption_epoch,
                     claimed_entry_fun: claimed_entry_fun.clone(),
                 }),
                 max_gas_amount: self.max_gas_amount,

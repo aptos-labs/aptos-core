@@ -385,6 +385,26 @@ async fn decrypt_validator_path(
             .zip(prepared_cts.into_par_iter())
             .map(|(mut txn, (id, prepared_ciphertext_or_error))| {
                 let eval_proof = proofs.get(&id).expect("must exist");
+                let payload_encryption_epoch = txn
+                    .payload()
+                    .as_encrypted_payload()
+                    .expect("must happen")
+                    .encryption_epoch();
+
+                if payload_encryption_epoch != decryption_key.metadata.epoch {
+                    warn!(
+                        "transaction with ciphertext id {:?} has encryption epoch {} but decryption key epoch {}",
+                        id,
+                        payload_encryption_epoch,
+                        decryption_key.metadata.epoch,
+                    );
+                    num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
+                    return mark_txn_failed_decryption(
+                        txn,
+                        Some(eval_proof),
+                        DecryptionFailureReason::EpochMismatch,
+                    );
+                }
 
                 match do_final_decryption(&decryption_key.key, prepared_ciphertext_or_error) {
                     Ok(payload) => {
@@ -472,6 +492,7 @@ fn record_decryption_metrics(result: &DecryptionResult) {
     let mut key_unavailable = 0u64;
     let mut batch_limit_exceeded = 0u64;
     let mut payload_hash_mismatch = 0u64;
+    let mut epoch_mismatch = 0u64;
     let mut entry_fun_mismatch = 0u64;
 
     for txn in &result.decrypted_txns {
@@ -486,6 +507,7 @@ fn record_decryption_metrics(result: &DecryptionResult) {
                 DecryptionFailureReason::ConfigUnavailable => config_unavailable += 1,
                 DecryptionFailureReason::DecryptionKeyUnavailable => key_unavailable += 1,
                 DecryptionFailureReason::PayloadHashMismatch => payload_hash_mismatch += 1,
+                DecryptionFailureReason::EpochMismatch => epoch_mismatch += 1,
                 DecryptionFailureReason::ClaimedEntryFunctionMismatch => entry_fun_mismatch += 1,
             },
             EncryptedPayload::Encrypted { .. } => {
@@ -504,6 +526,7 @@ fn record_decryption_metrics(result: &DecryptionResult) {
         ("key_unavailable", key_unavailable),
         ("batch_limit_exceeded", batch_limit_exceeded),
         ("payload_hash_mismatch", payload_hash_mismatch),
+        ("epoch_mismatch", epoch_mismatch),
         ("entry_fun_mismatch", entry_fun_mismatch),
         ("unencrypted", unencrypted),
     ];

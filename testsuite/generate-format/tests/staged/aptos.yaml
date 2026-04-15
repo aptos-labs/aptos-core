@@ -332,6 +332,8 @@ DecryptionFailureReason:
       ClaimedEntryFunctionMismatch: UNIT
     5:
       PayloadHashMismatch: UNIT
+    6:
+      EpochMismatch: UNIT
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -350,6 +352,7 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - encryption_epoch: U64
           - claimed_entry_fun:
               OPTION:
                 TYPENAME: ClaimedEntryFunction
@@ -362,6 +365,7 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - encryption_epoch: U64
           - claimed_entry_fun:
               OPTION:
                 TYPENAME: ClaimedEntryFunction
@@ -379,6 +383,7 @@ EncryptedPayload:
               TYPENAME: TransactionExtraConfig
           - payload_hash:
               TYPENAME: HashValue
+          - encryption_epoch: U64
           - claimed_entry_fun:
               OPTION:
                 TYPENAME: ClaimedEntryFunction

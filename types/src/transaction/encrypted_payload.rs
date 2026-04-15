@@ -72,6 +72,8 @@ pub enum DecryptionFailureReason {
     ClaimedEntryFunctionMismatch,
     /// The stored payload hash does not match the decrypted payload.
     PayloadHashMismatch,
+    /// The payload was encrypted for a different epoch than the available decryption key.
+    EpochMismatch,
 }
 
 // Mirrors EntryFunction in types/src/transaction/script.rs
@@ -87,12 +89,14 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        encryption_epoch: u64,
         claimed_entry_fun: Option<ClaimedEntryFunction>,
     },
     FailedDecryption {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        encryption_epoch: u64,
         claimed_entry_fun: Option<ClaimedEntryFunction>,
         eval_proof: Option<EvalProof>,
         reason: DecryptionFailureReason,
@@ -101,6 +105,7 @@ pub enum EncryptedPayload {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        encryption_epoch: u64,
         claimed_entry_fun: Option<ClaimedEntryFunction>,
         eval_proof: EvalProof,
 
@@ -152,6 +157,20 @@ impl EncryptedPayload {
         }
     }
 
+    pub fn encryption_epoch(&self) -> u64 {
+        match self {
+            EncryptedPayload::Encrypted {
+                encryption_epoch, ..
+            }
+            | EncryptedPayload::FailedDecryption {
+                encryption_epoch, ..
+            }
+            | EncryptedPayload::Decrypted {
+                encryption_epoch, ..
+            } => *encryption_epoch,
+        }
+    }
+
     pub fn is_encrypted(&self) -> bool {
         matches!(self, Self::Encrypted { .. })
     }
@@ -166,6 +185,7 @@ impl EncryptedPayload {
             ciphertext,
             extra_config,
             payload_hash,
+            encryption_epoch,
             claimed_entry_fun,
         } = self
         else {
@@ -176,6 +196,7 @@ impl EncryptedPayload {
             ciphertext: ciphertext.clone(),
             extra_config: extra_config.clone(),
             payload_hash: *payload_hash,
+            encryption_epoch: *encryption_epoch,
             eval_proof,
             executable,
             decryption_nonce: nonce,
@@ -229,6 +250,7 @@ impl EncryptedPayload {
             ciphertext,
             extra_config,
             payload_hash,
+            encryption_epoch,
             claimed_entry_fun,
         } = self
         {
@@ -236,6 +258,7 @@ impl EncryptedPayload {
                 ciphertext: ciphertext.clone(),
                 extra_config: extra_config.clone(),
                 payload_hash: *payload_hash,
+                encryption_epoch: *encryption_epoch,
                 claimed_entry_fun: claimed_entry_fun.clone(),
                 eval_proof,
                 reason,
@@ -272,6 +295,7 @@ mod tests {
                 replay_protection_nonce: None,
             },
             payload_hash: CryptoHash::hash(&decrypted),
+            encryption_epoch: 7,
             claimed_entry_fun: None,
         };
 
@@ -288,9 +312,31 @@ mod tests {
                 replay_protection_nonce: None,
             },
             payload_hash: HashValue::random(),
+            encryption_epoch: 7,
             claimed_entry_fun: None,
         };
 
         assert!(!encrypted.verify_payload_hash(&decrypted).unwrap());
+    }
+
+    #[test]
+    fn state_transitions_preserve_encryption_epoch() {
+        let mut encrypted = EncryptedPayload::Encrypted {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+            payload_hash: HashValue::random(),
+            encryption_epoch: 11,
+            claimed_entry_fun: None,
+        };
+
+        assert_eq!(encrypted.encryption_epoch(), 11);
+
+        encrypted
+            .into_failed_decryption_with_reason(None, DecryptionFailureReason::EpochMismatch)
+            .unwrap();
+        assert_eq!(encrypted.encryption_epoch(), 11);
     }
 }

@@ -85,6 +85,7 @@ fn failed_encrypted_transaction_increments_sequence_number() {
         ciphertext: ciphertext.clone(),
         extra_config: extra_config.clone(),
         payload_hash,
+        encryption_epoch: 1,
         claimed_entry_fun: None,
     };
     let payload = TransactionPayload::EncryptedPayload(encrypted_payload);
@@ -96,6 +97,7 @@ fn failed_encrypted_transaction_increments_sequence_number() {
         ciphertext,
         extra_config,
         payload_hash,
+        encryption_epoch: 1,
         eval_proof: Some(EvalProof::random()),
         reason: DecryptionFailureReason::CryptoFailure,
         claimed_entry_fun: None,

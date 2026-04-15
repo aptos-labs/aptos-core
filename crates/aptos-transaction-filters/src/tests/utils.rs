@@ -60,6 +60,7 @@ pub fn create_encrypted_transaction() -> SignedTransaction {
             replay_protection_nonce: None,
         },
         payload_hash: HashValue::random(),
+        encryption_epoch: 1,
         claimed_entry_fun: None,
     };
 
@@ -77,6 +78,7 @@ pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
             replay_protection_nonce: None,
         },
         payload_hash: HashValue::random(),
+        encryption_epoch: 1,
         eval_proof: Some(EvalProof::random()),
         reason: DecryptionFailureReason::CryptoFailure,
         claimed_entry_fun: None,
@@ -96,6 +98,7 @@ pub fn create_encrypted_transaction_plaintext_state() -> SignedTransaction {
             replay_protection_nonce: None,
         },
         payload_hash: HashValue::random(),
+        encryption_epoch: 1,
         eval_proof: EvalProof::random(),
         executable: TransactionExecutable::Empty,
         decryption_nonce: [0; 16],

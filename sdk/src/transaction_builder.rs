@@ -126,7 +126,10 @@ impl TransactionBuilder {
     pub fn build(mut self) -> RawTransaction {
         // Read the encryption key at build time (not at builder-creation time)
         // so that epoch-change key rotations are always picked up.
-        let encryption_key = self.encryption_key.read().unwrap().key.clone();
+        let encryption_key_state = self.encryption_key.read().unwrap();
+        let encryption_key = encryption_key_state.key.clone();
+        let encryption_epoch = encryption_key_state.epoch;
+        drop(encryption_key_state);
         if let Some(ref encryption_key) = encryption_key {
             assert!(!self.payload.is_encrypted_variant());
             let encrypted_payload = TransactionFactory::encrypt_payload(
@@ -135,6 +138,7 @@ impl TransactionBuilder {
                 self.auth_key
                     .expect("auth_key must be set for encrypted payloads"),
                 encryption_key,
+                encryption_epoch,
             )
             .expect("Payload must encrypt");
             self.payload = TransactionPayload::EncryptedPayload(encrypted_payload);
@@ -467,6 +471,7 @@ impl TransactionFactory {
         sender: AccountAddress,
         auth_key: AuthenticationKey,
         encryption_key: &EncryptionKey,
+        encryption_epoch: u64,
     ) -> Result<EncryptedPayload> {
         // Convert payload to executable
         let executable = payload.executable()?;
@@ -501,6 +506,7 @@ impl TransactionFactory {
             ciphertext,
             extra_config,
             payload_hash,
+            encryption_epoch,
             claimed_entry_fun: None,
         })
     }
@@ -608,6 +614,7 @@ mod tests {
             sender,
             sender_auth_key,
             &encryption_key,
+            0,
         )
         .unwrap();
 
