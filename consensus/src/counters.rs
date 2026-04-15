@@ -351,8 +351,8 @@ pub static PULL_LOOP_DURATION: Lazy<Histogram> = Lazy::new(|| {
         "Duration of the full payload pull loop including retries",
         // 30ms steps up to 330ms, then coarser up to 1s for non-default configs
         vec![
-            0.005, 0.01, 0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24, 0.27, 0.30, 0.33,
-            0.5, 0.75, 1.0,
+            0.005, 0.01, 0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24, 0.27, 0.30, 0.33, 0.5,
+            0.75, 1.0,
         ],
     )
     .unwrap()
@@ -364,10 +364,7 @@ pub static PULL_LOOP_EMPTY_RETRIES: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_pull_loop_empty_retries",
         "Number of empty retries in the pull loop",
-        vec![
-            0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 15.0, 20.0, 25.0, 30.0,
-            35.0,
-        ],
+        vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0,],
     )
     .unwrap()
 });
