@@ -419,16 +419,16 @@ impl StateKvDb {
             .map(|((_, version), entry_opt)| (version, entry_opt)))
     }
 
-    /// Loads all hot state KV entries from the DB, given the most recently committed version.
+    /// Loads hot state KV entries from the DB as of `snapshot_version`.
     ///
-    /// All entries in the DB must have `hot_since_version <= committed_version` (crash recovery
-    /// truncation is assumed to have already run). For each unique key hash, picks the most
-    /// recent entry. Evicted entries are excluded. The returned shards have correctly assembled
+    /// For each unique key hash, picks the most recent entry with
+    /// `hot_since_version <= snapshot_version`. Entries newer than the snapshot version (written
+    /// between the snapshot and the committed version) are skipped — they will be replayed during
+    /// initialisation. Evicted entries are excluded. The returned shards have correctly assembled
     /// LRU doubly-linked list pointers, ordered by `hot_since_version`.
-    #[allow(dead_code)]
     pub(crate) fn load_hot_state_kvs(
         &self,
-        committed_version: Version,
+        snapshot_version: Version,
     ) -> Result<[LoadedHotStateShard; NUM_STATE_SHARDS]> {
         assert!(
             self.is_hot,
@@ -439,7 +439,7 @@ impl StateKvDb {
 
         let shards: [_; NUM_STATE_SHARDS] = (0..NUM_STATE_SHARDS)
             .into_par_iter()
-            .map(|shard_id| self.load_shard(shard_id, committed_version))
+            .map(|shard_id| self.load_shard(shard_id, snapshot_version))
             .collect::<Result<Vec<_>>>()?
             .try_into()
             .expect("Collected exactly NUM_STATE_SHARDS results");
@@ -448,6 +448,7 @@ impl StateKvDb {
         let elapsed = start.elapsed();
         info!(
             total_items = total_items,
+            snapshot_version = snapshot_version,
             duration_ms = elapsed.as_millis() as u64,
             shard_counts = ?shards.iter().map(|s| s.num_items).collect::<Vec<_>>(),
             "Loaded hot state KVs from DB.",
@@ -459,9 +460,9 @@ impl StateKvDb {
     fn load_shard(
         &self,
         shard_id: usize,
-        committed_version: Version,
+        snapshot_version: Version,
     ) -> Result<LoadedHotStateShard> {
-        let entries = self.scan_shard_entries(shard_id, committed_version)?;
+        let entries = self.scan_shard_entries(shard_id, snapshot_version)?;
         let loaded = Self::assemble_lru_chain(entries);
         Ok(loaded)
     }
@@ -469,12 +470,13 @@ impl StateKvDb {
     // TODO(HotState): The current implementation does a full scan per shard. This can be
     // further sped up (e.g. parallel within-shard scan, prefix-seek per key group, or maintaining
     // a separate index), but is left for later since correctness matters more at this stage.
-    /// Scans a single shard DB and returns the most recent hot entry per key_hash.
-    /// Evicted keys are excluded. The returned entries have uninitialized LRU pointers.
+    /// Scans a single shard DB and returns the most recent hot entry per key_hash as of
+    /// `snapshot_version`. Entries newer than the snapshot are skipped. Evicted keys are excluded.
+    /// The returned entries have uninitialized LRU pointers.
     fn scan_shard_entries(
         &self,
         shard_id: usize,
-        committed_version: Version,
+        snapshot_version: Version,
     ) -> Result<Vec<(HashValue, Version, StateSlotKind)>> {
         let mut iter = self
             .db_shard(shard_id)
@@ -488,15 +490,6 @@ impl StateKvDb {
         for item in iter {
             let ((key_hash, hot_since_version), entry_opt) = item?;
 
-            // After crash recovery truncation, no entry should exist beyond the
-            // committed version.
-            assert!(
-                hot_since_version <= committed_version,
-                "Entry {key_hash} has hot_since_version {hot_since_version} > \
-                 committed_version {committed_version}; \
-                 DB should have been truncated during crash recovery.",
-            );
-
             // New key group?
             if current_key_hash != Some(key_hash) {
                 current_key_hash = Some(key_hash);
@@ -507,7 +500,12 @@ impl StateKvDb {
                 continue;
             }
 
-            // This is the most recent entry for this key_hash.
+            // Skip entries newer than the snapshot version — they will be replayed.
+            if hot_since_version > snapshot_version {
+                continue;
+            }
+
+            // This is the most recent entry for this key_hash at the snapshot version.
             found_for_current = true;
 
             let kind = match entry_opt {
@@ -548,6 +546,7 @@ impl StateKvDb {
         // Collect key_hashes for neighbor lookups before consuming entries.
         let key_hashes: Vec<_> = entries.iter().map(|(kh, _, _)| *kh).collect();
 
+        let mut total_value_bytes = 0;
         for (i, (key_hash, _hot_since_version, kind)) in entries.into_iter().enumerate() {
             let prev = if i + 1 < num_items {
                 Some(key_hashes[i + 1])
@@ -557,6 +556,7 @@ impl StateKvDb {
             let next = if i > 0 { Some(key_hashes[i - 1]) } else { None };
             let slot =
                 StateSlot::new_without_state_key(kind.with_lru_info(LRUEntry { prev, next }));
+            total_value_bytes += slot.size();
             map.insert(key_hash, slot);
         }
 
@@ -568,6 +568,7 @@ impl StateKvDb {
             head,
             tail,
             num_items,
+            total_value_bytes,
         };
         loaded.validate_lru_chain();
         loaded
@@ -575,7 +576,6 @@ impl StateKvDb {
 }
 
 /// Per-shard data recovered from the hot state KV DB.
-#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct LoadedHotStateShard {
     /// All hot entries keyed by state key hash.
@@ -586,6 +586,8 @@ pub(crate) struct LoadedHotStateShard {
     pub tail: Option<HashValue>,
     /// Total number of items in this shard.
     pub num_items: usize,
+    /// Sum of `StateSlot::size()` across all entries in this shard.
+    pub total_value_bytes: usize,
 }
 
 impl LoadedHotStateShard {
