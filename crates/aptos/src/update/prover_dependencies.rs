@@ -36,7 +36,7 @@ pub(crate) const BOOGIE_EXE: &str = "boogie.exe";
 pub(crate) const BOOGIE_EXE: &str = "boogie";
 
 const Z3_BINARY_NAME: &str = "z3";
-const TARGET_Z3_VERSION: &str = "4.13.0";
+const TARGET_Z3_VERSION: &str = "4.14.1";
 
 const Z3_EXE_ENV: &str = "Z3_EXE";
 #[cfg(target_os = "windows")]
