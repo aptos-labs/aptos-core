@@ -197,7 +197,7 @@ impl InnerBuilder {
             let (batch_coordinator_cmd_tx, batch_coordinator_cmd_rx) = aptos_channel::new(
                 QueueStyle::FIFO,
                 config.remote_batch_coordinator_channel_size,
-                Some(&counters::REMOTE_BATCH_COORDINATOR_CHANNEL_MSGS),
+                None,
             );
             remote_batch_coordinator_cmd_tx.push(batch_coordinator_cmd_tx);
             remote_batch_coordinator_cmd_rx.push(batch_coordinator_cmd_rx);

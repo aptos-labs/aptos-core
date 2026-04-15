@@ -129,7 +129,7 @@ impl QuorumStoreCoordinator {
                                 remote_batch_coordinator_shutdown_rx,
                             ) = oneshot::channel();
                             remote_batch_coordinator_cmd_tx
-                                .push(
+                                .push_expect_enqueued(
                                     BatchCoordinatorQueueKey::Control,
                                     BatchCoordinatorCommand::Shutdown(
                                         remote_batch_coordinator_shutdown_tx,

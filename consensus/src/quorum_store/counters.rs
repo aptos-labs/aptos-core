@@ -1106,11 +1106,10 @@ pub static BATCH_COORDINATOR_NUM_BATCH_REQS: Lazy<IntCounterVec> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static REMOTE_BATCH_COORDINATOR_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "quorum_store_remote_batch_coordinator_channel_msgs",
-        "Ingress queue events for remote batch coordinators.",
-        &["state"]
+pub static REMOTE_BATCH_COORDINATOR_DROPPED_MSGS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_remote_batch_coordinator_dropped_msgs",
+        "Dropped messages at remote batch coordinator ingress."
     )
     .unwrap()
 });

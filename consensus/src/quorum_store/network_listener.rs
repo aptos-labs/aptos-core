@@ -11,10 +11,10 @@ use crate::{
     },
     round_manager::VerifiedEvent,
 };
-use aptos_channels::aptos_channel::{self, ElementStatus};
+use aptos_channels::aptos_channel;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
-use futures::{channel::oneshot, FutureExt, StreamExt};
+use futures::StreamExt;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
@@ -92,24 +92,20 @@ impl NetworkListener {
                         counters::BATCH_COORDINATOR_NUM_BATCH_REQS
                             .with_label_values(&[&idx.to_string()])
                             .inc();
-                        let (status_tx, status_rx) = oneshot::channel();
-                        self.remote_batch_coordinator_tx[idx]
-                            .push_with_feedback(
+                        if let Err(err) = self.remote_batch_coordinator_tx[idx]
+                            .push_expect_enqueued(
                                 BatchCoordinatorQueueKey::Author(author),
                                 BatchCoordinatorCommand::NewBatches(author, batches),
-                                Some(status_tx),
                             )
-                            .expect("Could not send remote batch");
-                        if matches!(
-                            status_rx.now_or_never(),
-                            Some(Ok(ElementStatus::Dropped(_)))
-                        ) {
+                        {
+                            counters::REMOTE_BATCH_COORDINATOR_DROPPED_MSGS.inc();
                             counters::QUORUM_STORE_MSG_COUNT
                                 .with_label_values(&["NetworkListener::batchmsg_queue_full"])
                                 .inc();
                             warn!(
                                 remote_peer = author,
                                 idx = idx,
+                                error = ?err,
                                 "QS: dropping remote batch because batch coordinator queue is full"
                             );
                         }

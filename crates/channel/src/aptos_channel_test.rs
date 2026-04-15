@@ -151,3 +151,10 @@ fn test_feedback_on_drop() {
     };
     block_on(task);
 }
+
+#[test]
+fn test_push_expect_enqueued_on_drop() {
+    let (sender, _receiver) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+    sender.push_expect_enqueued(0, 'a').unwrap();
+    assert!(sender.push_expect_enqueued(0, 'b').is_err());
+}
