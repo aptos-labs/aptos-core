@@ -8,6 +8,7 @@ publish = false
 anyhow = { workspace = true }
 clap = { workspace = true }
 mono-move-core = { workspace = true }
+mono-move-gas = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }

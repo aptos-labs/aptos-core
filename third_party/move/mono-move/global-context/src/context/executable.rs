@@ -13,17 +13,12 @@ use crate::{
 use anyhow::{anyhow, bail};
 use fxhash::FxBuildHasher;
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
-use mono_move_core::{
-    ExecutableId, FrameLayoutInfo, Function, MicroOpGasSchedule, SortedSafePointEntries,
-    FRAME_METADATA_SIZE,
-};
-use mono_move_gas::GasInstrumentor;
+use mono_move_core::{ExecutableId, FrameLayoutInfo, Function, SortedSafePointEntries};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex},
     CompiledModule,
 };
-use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 
@@ -159,51 +154,23 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             self.resolve_struct_def(struct_def)?;
         }
 
-        // Specializer pipeline.
-        // TODO: Factor this out into specializer.
-
-        let struct_name_table: Vec<StructNameIndex> = (0..self.module.struct_handles.len())
-            .map(|i| StructNameIndex::new(i as u32))
-            .collect();
-        let module_ir = specializer::destack(self.module.clone(), &struct_name_table)?;
-        let func_id_map = specializer::lower::build_func_id_map(&module_ir.module);
+        let lowered = specializer::destack_and_lower_module(self.module)?;
 
         // Indexed by definition index. Generic functions that are not
         // lowered leave their slot as None.
-        let mut func_ptrs = vec![None; module_ir.functions.len()];
-        for (def_idx, func_ir) in module_ir.functions.iter().enumerate() {
-            let name = module_ir.module.identifier_at(func_ir.name_idx);
-            let name = self.guard.intern_identifier_internal(name);
-
-            // TODO: support generic functions.
-            if let Some(ctx) =
-                specializer::lower::try_build_context(&module_ir.module, func_ir, &func_id_map)?
-            {
-                let micro_ops = specializer::lower::lower_function(func_ir, &ctx)?;
-                let micro_ops = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);
-
-                // Compute frame layout.
-                let args_size = ctx.home_slots[..func_ir.num_params as usize]
-                    .iter()
-                    .map(|s| s.size as usize)
-                    .sum::<usize>();
-                let args_and_locals_size = ctx.frame_data_size as usize;
-                let extended_frame_size = ctx
-                    .call_sites
-                    .iter()
-                    .flat_map(|cs| cs.arg_write_slots.iter().chain(cs.ret_read_slots.iter()))
-                    .map(|s| (s.offset + s.size) as usize)
-                    .max()
-                    .unwrap_or(args_and_locals_size + FRAME_METADATA_SIZE);
-
-                // Allocate micro-ops and frame layout in the executable arena.
-                let code = self.arena.alloc_slice_fill_iter(micro_ops);
+        let mut func_ptrs = vec![None; lowered.functions.len()];
+        for (def_idx, lowered_fn) in lowered.functions.into_iter().enumerate() {
+            if let Some(lf) = lowered_fn {
+                let name = self
+                    .guard
+                    .intern_identifier_internal(self.module.identifier_at(lf.name_idx));
+                let code = self.arena.alloc_slice_fill_iter(lf.code);
                 let func = Function {
                     name,
                     code,
-                    args_size,
-                    args_and_locals_size,
-                    extended_frame_size,
+                    args_size: lf.args_size,
+                    args_and_locals_size: lf.args_and_locals_size,
+                    extended_frame_size: lf.extended_frame_size,
                     // TODO: hardcoded for now.
                     zero_frame: false,
                     frame_layout: FrameLayoutInfo::empty(&self.arena),

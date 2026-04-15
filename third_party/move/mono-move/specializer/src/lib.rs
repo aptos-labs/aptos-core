@@ -5,5 +5,8 @@ pub mod stackless_exec_ir;
 
 pub mod destack;
 pub mod lower;
+pub mod pipeline;
 
 pub use destack::destack;
+pub use lower::{LoweredFunction, LoweredModule};
+pub use pipeline::destack_and_lower_module;

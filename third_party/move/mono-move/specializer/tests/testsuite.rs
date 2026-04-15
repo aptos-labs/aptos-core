@@ -20,7 +20,7 @@ fn make_struct_name_table(module: &CompiledModule) -> Vec<StructNameIndex> {
         .collect()
 }
 
-fn format_micro_ops(module_ir: &ModuleIR) -> String {
+fn format_micro_ops(module_ir: &ModuleIR<'_>) -> String {
     let module = &module_ir.module;
     let func_id_map = build_func_id_map(module);
     let self_handle = module.module_handle_at(module.self_module_handle_idx);
@@ -89,7 +89,7 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
     let module = result.left().ok_or("expected module, got script")?;
     let table = make_struct_name_table(&module);
 
-    let ir = destack(module, &table).map_err(|e| format!("{:#}", e))?;
+    let ir = destack(&module, &table).map_err(|e| format!("{:#}", e))?;
     let mut output = format!("{}", ir);
     output.push_str("\n=== micro-ops ===\n");
     output.push_str(&format_micro_ops(&ir));
@@ -146,7 +146,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         let table = make_struct_name_table(module);
         let masm_output = move_asm::disassembler::disassemble_module(String::new(), module)
             .map_err(|e| format!("disassembly failed: {:#}", e))?;
-        let module_ir = destack(module.clone(), &table).map_err(|e| format!("{:#}", e))?;
+        let module_ir = destack(module, &table).map_err(|e| format!("{:#}", e))?;
         let ir_output = format!("{}", module_ir);
         output.push_str("=== masm ===\n");
         output.push_str(&masm_output);

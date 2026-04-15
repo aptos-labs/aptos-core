@@ -12705,7 +12705,6 @@ dependencies = [
  "move-asm",
  "move-binary-format",
  "move-core-types",
- "move-vm-types",
  "parking_lot 0.12.5",
  "specializer",
 ]
@@ -18246,6 +18245,7 @@ dependencies = [
  "datatest-stable",
  "legacy-move-compiler",
  "mono-move-core",
+ "mono-move-gas",
  "move-asm",
  "move-binary-format",
  "move-bytecode-verifier",

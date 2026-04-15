@@ -303,10 +303,10 @@ impl FunctionIR {
     }
 }
 
-/// IR for a module (wraps the original CompiledModule for pool access).
-pub struct ModuleIR {
+/// IR for a module (borrows the original CompiledModule for pool access).
+pub struct ModuleIR<'m> {
     /// The original compiled module for resolving pool indices.
-    pub module: CompiledModule,
+    pub module: &'m CompiledModule,
     /// One per non-native FunctionDefinition.
     pub functions: Vec<FunctionIR>,
 }

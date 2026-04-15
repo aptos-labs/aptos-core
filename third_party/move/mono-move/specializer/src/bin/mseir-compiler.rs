@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         .map(|i| StructNameIndex::new(i as u32))
         .collect();
 
-    let module_ir = destack(module, &struct_name_table)?;
+    let module_ir = destack(&module, &struct_name_table)?;
 
     if args.verbose {
         print_stats(&module_ir);
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn print_stats(module_ir: &specializer::stackless_exec_ir::ModuleIR) {
+fn print_stats(module_ir: &specializer::stackless_exec_ir::ModuleIR<'_>) {
     let module = &module_ir.module;
 
     let self_handle = module.module_handle_at(module.self_module_handle_idx);

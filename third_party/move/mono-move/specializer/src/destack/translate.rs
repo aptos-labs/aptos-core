@@ -37,10 +37,10 @@ use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed slots
 ///   truly hold dead values, so type-keyed slot recycling is sound.
-pub fn translate_module(
-    module: CompiledModule,
+pub fn translate_module<'m>(
+    module: &'m CompiledModule,
     struct_name_table: &[StructNameIndex],
-) -> Result<ModuleIR> {
+) -> Result<ModuleIR<'m>> {
     let functions = module
         .function_defs
         .iter()
@@ -60,12 +60,12 @@ pub fn translate_module(
                     .collect();
                 // [TODO]: we currently convert signature tokens into the runtime type representation, but
                 // this will change to use more efficient cached type representations.
-                let local_types = convert_sig_tokens(&module, &all_sig_toks, struct_name_table);
+                let local_types = convert_sig_tokens(module, &all_sig_toks, struct_name_table);
 
                 // Pass: Bytecode -> Intra-Block SSA -> Fusion
                 let converter = SsaConverter::new(local_types, struct_name_table);
                 let ssa = converter
-                    .convert_function(&module, &code.code)?
+                    .convert_function(module, &code.code)?
                     .with_fusion_passes();
 
                 // Pass: Greedy Slot Allocation (consumes SSA, remaps in-place)
