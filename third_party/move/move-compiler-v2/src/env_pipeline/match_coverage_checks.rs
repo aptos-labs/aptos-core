@@ -300,6 +300,9 @@ fn collect_and_sort_intervals(
 /// Sweep sorted intervals and find the first gap, if any.
 /// Returns `None` if the intervals fully cover [-inf, +inf).
 /// Returns `Some((gap_lo, gap_hi))` for the first uncovered sub-range.
+///
+/// Assumes intervals have been through `normalize_range`, where `None`
+/// means "extends to the type boundary" (not "unresolved").
 fn find_first_gap(
     intervals: &[(&Option<BigInt>, &Option<BigInt>)],
 ) -> Option<(Option<BigInt>, Option<BigInt>)> {

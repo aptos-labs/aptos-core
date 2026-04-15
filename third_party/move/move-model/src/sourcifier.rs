@@ -3211,12 +3211,14 @@ impl<'a> ExpSourcifier<'a> {
             },
             Pattern::LiteralValue(node_id, val) => {
                 let ty = self.env().get_node_type(*node_id);
-                self.parent.print_value(val, Some(&ty), self.for_spec);
+                let ty = ty.skip_reference();
+                self.parent.print_value(val, Some(ty), self.for_spec);
             },
             Pattern::Range(node_id, lo, hi, inclusive) => {
                 let ty = self.env().get_node_type(*node_id);
+                let ty = ty.skip_reference();
                 if let Some(l) = lo {
-                    self.parent.print_value(l, Some(&ty), self.for_spec);
+                    self.parent.print_value(l, Some(ty), self.for_spec);
                 }
                 if *inclusive {
                     emit!(self.wr(), "..=");
@@ -3224,7 +3226,7 @@ impl<'a> ExpSourcifier<'a> {
                     emit!(self.wr(), "..");
                 }
                 if let Some(h) = hi {
-                    self.parent.print_value(h, Some(&ty), self.for_spec);
+                    self.parent.print_value(h, Some(ty), self.for_spec);
                 }
             },
             Pattern::Error(_) => emit!(self.wr(), "*error*"),

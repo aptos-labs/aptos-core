@@ -2957,8 +2957,14 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             EL::Literal(eval)
         },
         PB::Range(plo, phi, inclusive) => {
-            let elo = plo.and_then(|v| value(context, v));
-            let ehi = phi.and_then(|v| value(context, v));
+            let elo = match plo {
+                Some(v) => Some(value(context, v)?),
+                None => None,
+            };
+            let ehi = match phi {
+                Some(v) => Some(value(context, v)?),
+                None => None,
+            };
             EL::Range(elo, ehi, inclusive)
         },
     };

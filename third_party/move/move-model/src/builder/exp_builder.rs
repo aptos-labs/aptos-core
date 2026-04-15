@@ -2935,7 +2935,14 @@ impl ExpTranslator<'_, '_, '_> {
             EA::LValue_::Range(lo_val, hi_val, inclusive) => {
                 // Translate range pattern. Strip reference from expected type.
                 let inner_expected = expected_type.skip_reference();
-                // Range patterns only allowed on integer types.
+                // Range patterns only allowed on concrete integer types.
+                // Reject PrimitiveType::Num (unresolved spec numeric supertype)
+                // because get_min_value/get_max_value return None for it,
+                // which would silently disable range bound validation.
+                if matches!(inner_expected, Type::Primitive(PrimitiveType::Num)) {
+                    self.error(loc, "range patterns require a concrete integer type");
+                    return self.new_error_pat(loc);
+                }
                 if !inner_expected.is_number() {
                     self.error(
                         loc,

@@ -91,7 +91,7 @@ fn check_match_arm_pattern(env: &GlobalEnv, pat: &Pattern) {
             } else {
                 for p in pats {
                     check_no_literal_or_range(env, p, &format!(
-                        "literal patterns inside struct/enum variants require language version {} or later",
+                        "literal and range patterns inside struct/enum variants require language version {} or later",
                         LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH
                     ));
                 }
