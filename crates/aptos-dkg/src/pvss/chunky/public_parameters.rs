@@ -398,14 +398,13 @@ mod tests {
     use std::time::Instant;
 
     #[test]
-    #[ignore]
     fn test_realistic_serialize_deserialize() {
         let mut rng = thread_rng();
 
         let start = Instant::now();
         println!("{}: Generating pp", chrono::Local::now());
         let pp: PublicParameters<ark_bls12_381::Bls12_381> =
-            PublicParameters::new_for_testing(256, 32, 256, G2Affine::generator(), &mut rng);
+            PublicParameters::new_for_testing(256, 32, 128, G2Affine::generator(), &mut rng);
         println!(
             "{}: time taken: {:?}",
             chrono::Local::now(),
@@ -423,7 +422,7 @@ mod tests {
         println!(
             "{}: pp serialized size: {} MB",
             chrono::Local::now(),
-            bytes.len() / 1000 / 1000
+            bytes.len() / 1024 / 1024
         );
 
         let start = Instant::now();

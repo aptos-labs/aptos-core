@@ -19,7 +19,7 @@ pub struct BabyStepTable<A: AffineRepr> {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub G: A,
     /// Baby steps: compressed(point) -> exponent j (so that point = affinisation of j*G).
-    table: HashMap<Vec<u8>, u32>,
+    table: HashMap<[u8; 8], u32>,
     /// Number of baby steps (table length).
     pub table_size: usize,
     /// Precomputed -table_size*G for giant steps.
@@ -45,7 +45,9 @@ impl<A: AffineRepr> BabyStepTable<A> {
         let mut table = HashMap::with_capacity(table_size);
         for (j, aff) in normalized.into_iter().enumerate() {
             let key = compressed_bytes(&aff).expect("baby-step table: serialization failed");
-            table.insert(key, j as u32);
+            let None = table.insert(key[..8].try_into().unwrap(), j as u32) else {
+                panic!("Table collision; need to increase representation size");
+            };
         }
         let G_neg_table_size = (G * -A::ScalarField::from(table_size as u64)).into_affine();
         Self {
@@ -59,7 +61,7 @@ impl<A: AffineRepr> BabyStepTable<A> {
     /// Look up an affine point in the table; returns the exponent j if point = j*G.
     pub fn get(&self, point: &A) -> Option<u32> {
         let key = compressed_bytes(point).ok()?;
-        self.table.get(&key).copied()
+        self.table.get(&TryInto::<[u8; 8]>::try_into(&key[..8]).unwrap()).copied()
     }
 
     /// Approximate memory size of the table in gigabytes (compressed key + value bytes; HashMap overhead not included).
@@ -103,4 +105,16 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    #[ignore]
+    fn table_serialize() {
+        let G = G1Affine::generator();
+        let table_size = 23;
+        let tbl = BabyStepTable::<G1Affine>::new(G, 1 << table_size);
+        let bytes = bcs::to_bytes(&tbl).unwrap();
+        println!("Table size: {}", tbl.table_size);
+        println!("Serialized size: {} MB", bytes.len() / 1024 / 1024);
+    }
+
 }
