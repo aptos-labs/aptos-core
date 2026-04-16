@@ -678,12 +678,14 @@ pub enum StatusCode {
     // Requested multiplier is not available in any configured tier.
     MULTIPLIER_NOT_AVAILABLE = 52,
 
+    // Gas unit price is below the scaled minimum for high-limit transactions.
+    HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND = 53,
+
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_1 = 53,
-    RESERVED_VALIDATION_ERROR_2 = 54,
-    RESERVED_VALIDATION_ERROR_3 = 55,
-    RESERVED_VALIDATION_ERROR_4 = 56,
-    RESERVED_VALIDATION_ERROR_5 = 57,
+    RESERVED_VALIDATION_ERROR_1 = 54,
+    RESERVED_VALIDATION_ERROR_2 = 55,
+    RESERVED_VALIDATION_ERROR_3 = 56,
+    RESERVED_VALIDATION_ERROR_4 = 57,
 
 
     // When a code module/script is published it is verified. These are the

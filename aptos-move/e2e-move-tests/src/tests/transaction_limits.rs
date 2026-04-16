@@ -21,6 +21,8 @@ use aptos_types::{
 use move_core_types::vm_status::StatusCode;
 use std::str::FromStr;
 
+const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+
 // Default balance is 1M APT.
 const DEFAULT_BALANCE: u64 = 1_000_000_0000_0000;
 // Default stake amount is 0.25 APT.
@@ -70,10 +72,11 @@ fn delegation_pool_delegator(
     }
 }
 
-fn sign_txn_with_limits(
+fn sign_txn_with_limits_and_gas_unit_price(
     h: &mut MoveHarness,
     acc: &Account,
     request: UserTxnLimitsRequest,
+    gas_unit_price: u64,
 ) -> SignedTransaction {
     let payload = match aptos_coin_transfer(*acc.address(), 0) {
         TransactionPayload::EntryFunction(entry_func) => {
@@ -92,8 +95,16 @@ fn sign_txn_with_limits(
     // Override gas unit price because high-limit transactions require
     // 10x default minimum value.
     h.create_transaction_without_sign(acc, payload)
-        .gas_unit_price(1_000)
+        .gas_unit_price(gas_unit_price)
         .sign()
+}
+
+fn sign_txn_with_limits(
+    h: &mut MoveHarness,
+    acc: &Account,
+    request: UserTxnLimitsRequest,
+) -> SignedTransaction {
+    sign_txn_with_limits_and_gas_unit_price(h, acc, request, 10 * DEFAULT_GAS_UNIT_PRICE)
 }
 
 fn encode_tiers(tiers: &[(u64, u64)]) -> (Vec<u8>, Vec<u8>) {
@@ -166,6 +177,33 @@ fn setup_delegation_pool(
 fn run_and_assert_discard(h: &mut MoveHarness, txn: SignedTransaction, code: StatusCode) {
     let status = h.run(txn);
     assert_eq!(status, TransactionStatus::Discard(code));
+}
+
+#[test]
+fn test_high_limit_txn_gas_price_too_low() {
+    let mut h = new_test_harness();
+    let acc = setup_validator(&mut h);
+    h.new_epoch();
+
+    // In test builds, min_price_per_gas_unit defaults to 0. Set it to
+    // DEFAULT_GAS_UNIT_PRICE so the 10x check is meaningful.
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.min_price_per_gas_unit = DEFAULT_GAS_UNIT_PRICE.into();
+    });
+
+    // Gas unit price of DEFAULT_GAS_UNIT_PRICE satisfies the normal minimum
+    // but is below the 10x scaled minimum required for high-limit transactions.
+    let txn = sign_txn_with_limits_and_gas_unit_price(
+        &mut h,
+        &acc,
+        stake_pool_owner(200, 200),
+        DEFAULT_GAS_UNIT_PRICE,
+    );
+    run_and_assert_discard(
+        &mut h,
+        txn,
+        StatusCode::HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+    );
 }
 
 #[test]

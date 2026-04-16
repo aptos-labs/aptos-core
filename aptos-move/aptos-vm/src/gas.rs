@@ -204,7 +204,7 @@ pub(crate) fn check_gas(
             );
             speculative_warn!(log_context, msg.clone());
             return Err(VMStatus::error(
-                StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+                StatusCode::HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND,
                 Some(msg),
             ));
         }
