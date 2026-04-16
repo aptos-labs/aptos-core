@@ -132,40 +132,6 @@ The `ClosureCapturedData` heap object has its own descriptor:
 
 We may consider reusing `ObjectDescriptor::Struct` for the Materialized case in the future, since the GC just needs a size and a list of pointer offsets.
 
-#### Reconstructing Captured Value Layout at Call Time
-
-At a `CallClosure` site, the caller must read captured values out of the closure and place them into the callee's argument slots. The mask tells *which* parameters are captured, but not their sizes or byte offsets within the closure body.
-
-**Chosen approach**: Derive layout from the resolved `Function` + `mask`. The runtime looks up parameter sizes from the `Function` struct and combines with the mask to compute both the captured value offsets within the closure body and the target argument slot positions. No extra per-closure metadata needed.
-
-#### Safety: Bytecode Verifier Guarantees
-
-The old VM performs several runtime checks on closure operations that we rely on the bytecode verifier to enforce instead:
-
-- **Pack visibility**: `check_pack_closure_visibility` checks that the caller can reference the target function (same-module or public). The bytecode verifier's visibility checks guarantee this statically.
-- **Captured value types**: `verify_pack_closure` checks that captured values match the function's parameter types and are not references. The bytecode verifier's type checker and reference checker enforce this.
-- **Closure signature match at call site**: The old VM checks that the number of provided arguments + captured arguments equals the callee's parameter count, and that return counts match. The bytecode verifier's type checker ensures this.
-- **Type depth/size limits**: `check_function_type_count_and_depth` guards against excessively deep function types. The bytecode verifier enforces type complexity limits at load time.
-
-By relying on the bytecode verifier for these properties, the mono-move runtime can skip these checks and trust that the closure's `func_ptr`, `mask`, and captured values are consistent.
-
-**Alternatives considered**:
-
-- Store a `(offset, size)` list per captured value in the closure body — self-describing but adds variable-size metadata overhead to every closure.
-- Store a pointer to a compile-time-generated layout descriptor — one extra 8-byte pointer per closure, avoids the variable-length list but requires a separate descriptor table.
-
-#### Equality and Comparison
-
-The old VM supports structural equality and ordering for closures: compare functions by canonical name (module_id + function_name + type_args), then compare captured values lexicographically. This works across resolution states (resolved vs. unresolved).
-
-Two approaches for mono-move:
-
-- **Reimplement current semantics.** Requires (a) canonical identity in `Function` (currently only has `name`), (b) mixed resolved/unresolved comparison support, and (c) recursive structural comparison of captured values. The last point is the hardest — unlike regular values where the compiler can emit specialized comparison code, closures are opaque at the comparison site, so comparison must be driven by runtime type metadata.
-
-- **Make comparison a runtime error.** Simpler, but programs that compare closures would fail at runtime.
-
-Regardless of which approach is chosen, closure comparison will not be included in the first version — it will be bundled with the general implementation of value comparison, which is not yet implemented in mono-move.
-
 ### Micro-Ops
 
 Two fused super-instructions handle closures. Both contain variable-length data and are boxed to keep the base `MicroOp` enum small. An alternative is to store the variable-length data in a side table and reference it by index from the instruction — this could keep all `MicroOp` variants within a fixed size. Something to revisit if instruction cache behavior or enum size becomes a concern.
@@ -179,7 +145,8 @@ struct PackClosureOp {
     dst: FrameOffset,
     func_ref: ClosureFuncRef,
     mask: u64,
-    descriptor_id: DescriptorId,
+    /// Descriptor for the ClosureCapturedData (Materialized) heap object.
+    captured_descriptor_id: DescriptorId,
     /// Each captured value's frame location and byte size, in mask order.
     captured: Vec<SizedSlot>,
 }
@@ -187,10 +154,10 @@ struct PackClosureOp {
 
 Semantics:
 
-1. Allocate a heap object with the given `descriptor_id`. **MAY TRIGGER GC.**
-2. Write `func_ref` and `mask` into the closure header.
-3. Copy each captured value from the frame into the closure body.
-4. Write the heap pointer to `dst`.
+1. Allocate a `ClosureCapturedData` (Materialized) heap object with `captured_descriptor_id`. **MAY TRIGGER GC.**
+2. Copy each captured value from the frame into the captured data object.
+3. Allocate the closure object, write `func_ref`, `mask`, and a pointer to the captured data object.
+4. Write the closure heap pointer to `dst`.
 
 #### `CallClosure`
 
@@ -209,30 +176,53 @@ Semantics:
 1. Read `func_ref` and `mask` from the closure heap object.
 2. If `func_ref` is unresolved, resolve it (load module, specialize, cache the result).
 3. Look up parameter sizes from the resolved `Function` to determine captured value layout.
-4. Interleave captured values (from the closure body) and provided arguments (from the caller's frame) into the callee's argument slots, using the mask.
+4. Interleave captured values (from the captured data object) and provided arguments (from the caller's frame) into the callee's argument slots, using the mask.
 5. Perform the call (save metadata, set new fp, jump to callee).
 
 The runtime interprets the mask at call time because the caller doesn't statically know which function the closure wraps (the closure may have been passed to the caller as an argument with type `|u64| -> u64`).
+
+**Reconstructing captured value layout.** The mask tells *which* parameters are captured, but not their sizes or byte offsets within the captured data object. The runtime derives this from the resolved `Function` + `mask`: it looks up parameter sizes from the `Function` struct and combines with the mask to compute both the captured value offsets and the target argument slot positions. Alternatives considered: storing a `(offset, size)` list per captured value in the closure body (self-describing but adds overhead), or storing a pointer to a compile-time-generated layout descriptor (extra pointer per closure).
 
 #### Why `CallClosure` must be a fused instruction
 
 A closure is opaque at the call site — the caller only knows the closure's type signature (e.g., `|u64| -> u64`), not which function it wraps. Different closures with the same type can have different underlying functions, different masks, different numbers and sizes of captured values, and different callee frame sizes. The specializer at the `CallClosure` site cannot generate a static sequence of smaller instructions because it doesn't know:
 
-- How many bytes to read from the closure body, or at what offsets
+- How many bytes to read from the captured data object, or at what offsets
 - Which callee argument slots the captured values map to
 - The callee's total argument region size
 
-This information is only available at runtime via `func_ptr` → `Function` + `mask`. Decomposition into smaller instructions is not possible for the general case.
+This information is only available at runtime via `func_ref` → `Function` + `mask`. Decomposition into smaller instructions is not possible for the general case.
 
 `PackClosure` is different: the compiler always knows the concrete function and captured values at the pack site, so decomposition into `HeapNew` + `HeapMoveTo` + `HeapMoveToImm8` is feasible. We use a fused instruction for now to reduce dispatch overhead, but may revisit this if keeping the instruction set smaller turns out to be preferrable.
 
 ### GC Considerations
 
-1. **Closure heap objects** have a fixed descriptor. The `captured_data` field is always a heap pointer and is always in `pointer_offsets`. The `func_ref` field contains no heap pointers. The closure's descriptor never changes.
-2. `**ClosureCapturedData` heap objects** are self-describing via their own `desc_id`. Raw objects use a trivial descriptor (no pointers). Materialized objects use a struct-like descriptor listing the captured values that are heap pointers. This separation is what makes the two-state design GC-safe.
+1. **Safe points**: `PackClosure` allocates and is therefore a GC safe point. The specializer must ensure the safe-point layout at the `PackClosure` instruction accounts for any live heap pointers in the frame (including captured values, since GC occurs before the copy).
+2. **Stack scanning during calls**: For materialized closures, `CallClosure` does not allocate — it reads from the closure, copies into the callee's frame, and performs the call. However, for raw closures, `CallClosure` must materialize the captured data first, which allocates and **may trigger GC**. The PC after `CallClosure` (the return point) is always a safe point, just like after any other call instruction — the callee may trigger GC, and upon return the caller's frame must have a valid pointer layout in the `FrameLayoutMap`.
 3. **Closures capturing closures**: Works naturally for materialized closures — a captured closure is an 8-byte heap pointer in the captured values region, and its offset appears in the Materialized object's `pointer_offsets`.
-4. **Safe points**: `PackClosure` allocates and is therefore a GC safe point. The specializer must ensure the safe-point layout at the `PackClosure` instruction accounts for any live heap pointers in the frame (including captured values, since GC occurs before the copy).
-5. **Stack scanning during calls**: `CallClosure` itself does not allocate — it reads from the closure, copies into the callee's frame, and performs the call. No GC can occur during the interleaving phase. However, the PC after `CallClosure` (the return point) is a safe point, just like after any other call instruction — the callee may trigger GC, and upon return the caller's frame must have a valid pointer layout in the `FrameLayoutMap`.
+
+### Equality and Comparison
+
+The old VM supports structural equality and ordering for closures: compare functions by canonical name (module_id + function_name + type_args), then compare captured values lexicographically. This works across resolution states (resolved vs. unresolved).
+
+Two approaches for mono-move:
+
+- **Reimplement current semantics.** Requires (a) canonical identity in `Function` (currently only has `name`), (b) mixed resolved/unresolved comparison support, and (c) recursive structural comparison of captured values. The last point is the hardest — unlike regular values where the compiler can emit specialized comparison code, closures are opaque at the comparison site, so comparison must be driven by runtime type metadata.
+
+- **Make comparison a runtime error.** Simpler, but programs that compare closures would fail at runtime.
+
+Regardless of which approach is chosen, closure comparison will not be included in the first version — it will be bundled with the general implementation of value comparison, which is not yet implemented in mono-move.
+
+### Safety: Bytecode Verifier Guarantees
+
+The old VM performs several runtime checks on closure operations that we rely on the bytecode verifier to enforce instead:
+
+- **Pack visibility**: `check_pack_closure_visibility` checks that the caller can reference the target function (same-module or public). The bytecode verifier's visibility checks guarantee this statically.
+- **Captured value types**: `verify_pack_closure` checks that captured values match the function's parameter types and are not references. The bytecode verifier's type checker and reference checker enforce this.
+- **Closure signature match at call site**: The old VM checks that the number of provided arguments + captured arguments equals the callee's parameter count, and that return counts match. The bytecode verifier's type checker ensures this.
+- **Type depth/size limits**: `check_function_type_count_and_depth` guards against excessively deep function types. The bytecode verifier enforces type complexity limits at load time.
+
+By relying on the bytecode verifier for these properties, the mono-move runtime can skip these checks and trust that the closure's `func_ref`, `mask`, and captured values are consistent.
 
 ## Closure Storage
 
@@ -278,7 +268,7 @@ The core idea is **lazy deserialization of captured values**, reflected by the `
 - *Raw closure (untouched):* Write back the function identity + mask + original blob verbatim. No loading, no layout computation.
 - *Materialized closure (called or newly packed):* Since the captured values have been materialized, their type definitions must already be loaded. The runtime can walk these definitions to serialize each value directly — no intermediate layout objects or stored layouts needed.
 
-`**PackClosure`:** Stores func_ref + mask + flat captured values. No layout pre-computation — layouts are derived on demand at serialization time if needed.
+**`PackClosure`:** Stores func_ref + mask + flat captured values. No layout pre-computation — layouts are derived on demand at serialization time if needed.
 
 ### Whether to Store Layouts
 
@@ -294,5 +284,4 @@ The question is whether to continue writing layouts. Two options:
 The design includes lazy resolution (`ClosureFuncRef`: unresolved → resolved) and lazy deserialization (`ClosureCapturedData`: raw → materialized). Both transitions happen when the closure is called. Two sub-questions:
 
 1. **Should there be interior mutability at all?** That is, should the resolved/materialized state be cached so that subsequent calls (on copies of the closure) don't repeat the work? The alternative is to resolve and materialize from scratch on every call, treating the closure as immutable.
-2. **If yes, where does the cached state live?** One option is to modify the closure heap object in place — but this complicates the runtime (the GC descriptor may need to change between raw and materialized states, and the closure is no longer a pure value). Another option is to cache the resolved function and materialized values in a side table outside the closure, leaving the heap object untouched. A side table works naturally for caching the resolved function pointer, but is harder for captured values — materialized values live on the GC heap and need to be traced, so splitting them from the closure object introduces complexity in ownership and lifetime management.
-
+2. **If yes, where does the cached state live?** For `ClosureCapturedData`, the current design already supports in-place updates: the closure object holds a pointer to the captured data heap object, so materializing just means allocating a new Materialized object and updating the pointer — the closure's own descriptor doesn't change. For `ClosureFuncRef`, caching the resolved pointer is straightforward if it's stored inline (just overwrite it). Alternatively, resolved functions could be cached in a side table outside the closure, leaving the heap object untouched. A side table works naturally for function pointers but is harder for captured values — materialized values live on the GC heap and need to be traced, so splitting them from the closure introduces complexity in ownership and lifetime management.
