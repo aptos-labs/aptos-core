@@ -318,27 +318,30 @@ impl SecretShareItem {
         share: SecretShare,
         share_weights: &HashMap<Author, u64>,
     ) -> anyhow::Result<()> {
-        let item = std::mem::replace(self, Self::new(Author::ONE));
-        let share_weight = *share_weights
-            .get(share.author())
-            .ok_or_else(|| anyhow::anyhow!("Author {} not found in weights", share.author()))?;
-        let new_item = match item {
-            SecretShareItem::PendingMetadata(mut share_aggregator) => {
+        match self {
+            SecretShareItem::PendingMetadata(_) => {
+                let share_weight = *share_weights.get(share.author()).ok_or_else(|| {
+                    anyhow::anyhow!("Author {} not found in weights", share.author())
+                })?;
+                let SecretShareItem::PendingMetadata(mut share_aggregator) =
+                    std::mem::replace(self, Self::new(Author::ONE))
+                else {
+                    unreachable!("variant gated above")
+                };
                 let metadata = share.metadata.clone();
                 share_aggregator.retain(share.metadata(), share_weights);
                 share_aggregator.add_share(share, share_weight);
-                SecretShareItem::PendingDecision {
+                *self = SecretShareItem::PendingDecision {
                     metadata,
                     share_aggregator,
-                }
+                };
+                Ok(())
             },
             SecretShareItem::PendingDecision { .. } => {
-                bail!("Cannot add self share in PendingDecision state");
+                bail!("Cannot add self share in PendingDecision state")
             },
-            SecretShareItem::Aggregating { .. } | SecretShareItem::Decided { .. } => return Ok(()),
-        };
-        let _ = std::mem::replace(self, new_item);
-        Ok(())
+            SecretShareItem::Aggregating { .. } | SecretShareItem::Decided { .. } => Ok(()),
+        }
     }
 
     fn get_all_shares_authors(&self) -> Option<HashSet<Author>> {
@@ -836,5 +839,104 @@ mod tests {
             .expect("Timed out waiting for decision")
             .expect("Channel closed unexpectedly");
         assert_eq!(unwrap_success(result).metadata, metadata);
+    }
+
+    fn variant_name(item: &SecretShareItem) -> &'static str {
+        match item {
+            SecretShareItem::PendingMetadata(_) => "PendingMetadata",
+            SecretShareItem::PendingDecision { .. } => "PendingDecision",
+            SecretShareItem::Aggregating { .. } => "Aggregating",
+            SecretShareItem::Decided { .. } => "Decided",
+        }
+    }
+
+    #[test]
+    fn test_add_share_with_metadata_on_pending_decision_preserves_state() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let peer_weights = ctx.secret_share_config.get_peer_weights().clone();
+
+        let mut aggregator = SecretShareAggregator::new(ctx.authors[0]);
+        let peer_share = create_secret_share(&ctx, 1, &metadata);
+        let w1 = ctx
+            .secret_share_config
+            .get_peer_weight(&ctx.authors[1])
+            .unwrap();
+        aggregator.add_share(peer_share, w1);
+
+        let shares_before = aggregator.shares.clone();
+        let total_weight_before = aggregator.total_weight;
+
+        let mut item = SecretShareItem::PendingDecision {
+            metadata: metadata.clone(),
+            share_aggregator: aggregator,
+        };
+
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        let result = item.add_share_with_metadata(self_share, &peer_weights);
+        assert!(result.is_err());
+
+        match &item {
+            SecretShareItem::PendingDecision {
+                metadata: m,
+                share_aggregator,
+            } => {
+                assert_eq!(m, &metadata);
+                assert_eq!(share_aggregator.shares.len(), shares_before.len());
+                for (author, share) in &shares_before {
+                    let got = share_aggregator
+                        .shares
+                        .get(author)
+                        .expect("share should be preserved");
+                    assert_eq!(got.author, share.author);
+                    assert_eq!(got.metadata, share.metadata);
+                }
+                assert_eq!(share_aggregator.total_weight, total_weight_before);
+            },
+            other => panic!("Expected PendingDecision, got {}", variant_name(other)),
+        }
+    }
+
+    #[test]
+    fn test_add_share_with_metadata_unknown_author_preserves_state() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let peer_weights = ctx.secret_share_config.get_peer_weights().clone();
+
+        let mut aggregator = SecretShareAggregator::new(ctx.authors[0]);
+        let peer_share = create_secret_share(&ctx, 1, &metadata);
+        let w1 = ctx
+            .secret_share_config
+            .get_peer_weight(&ctx.authors[1])
+            .unwrap();
+        aggregator.add_share(peer_share, w1);
+
+        let shares_before = aggregator.shares.clone();
+        let total_weight_before = aggregator.total_weight;
+
+        let mut item = SecretShareItem::PendingMetadata(aggregator);
+
+        let unknown_author = Author::random();
+        let self_share_template = create_secret_share(&ctx, 0, &metadata);
+        let unknown_share = SecretShare::new(
+            unknown_author,
+            metadata.clone(),
+            self_share_template.share.clone(),
+        );
+        let result = item.add_share_with_metadata(unknown_share, &peer_weights);
+        assert!(result.is_err());
+
+        match &item {
+            SecretShareItem::PendingMetadata(aggr) => {
+                assert_eq!(aggr.shares.len(), shares_before.len());
+                for (author, share) in &shares_before {
+                    let got = aggr.shares.get(author).expect("share should be preserved");
+                    assert_eq!(got.author, share.author);
+                    assert_eq!(got.metadata, share.metadata);
+                }
+                assert_eq!(aggr.total_weight, total_weight_before);
+            },
+            other => panic!("Expected PendingMetadata, got {}", variant_name(other)),
+        }
     }
 }
