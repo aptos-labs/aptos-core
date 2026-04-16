@@ -79,6 +79,10 @@ pub struct StateMerkleDb {
 }
 
 impl StateMerkleDb {
+    pub(crate) fn is_hot(&self) -> bool {
+        self.is_hot
+    }
+
     fn db_tag(&self) -> &'static str {
         if self.is_hot {
             "hot"
