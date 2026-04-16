@@ -987,6 +987,41 @@ mod tests {
     }
 
     #[test]
+    fn test_get_all_shares_authors_returns_none_for_terminal_and_preaggregation_states() {
+        // The share-requester task relies on `get_all_shares_authors` returning
+        // `None` for any state in which requesting more shares is useless:
+        //   - Aggregating / Decided: we already have (or are finalizing) enough
+        //     shares; retry is driven by `process_aggregation_result` instead.
+        //   - Skipped: round has no encrypted txns.
+        //   - PendingMetadata: self-share not yet derived, we have no metadata
+        //     to request against.
+        // Only `PendingDecision` returns `Some(known_authors)`.
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 5);
+
+        // Aggregating
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        let item = SecretShareItem::Aggregating {
+            metadata: metadata.clone(),
+            self_share: self_share.clone(),
+            pending_shares: HashMap::new(),
+        };
+        assert!(item.get_all_shares_authors().is_none());
+
+        // Decided
+        let item = SecretShareItem::Decided { self_share };
+        assert!(item.get_all_shares_authors().is_none());
+
+        // Skipped
+        let item = SecretShareItem::Skipped;
+        assert!(item.get_all_shares_authors().is_none());
+
+        // PendingMetadata
+        let item = SecretShareItem::PendingMetadata(SecretShareAggregator::new(ctx.authors[0]));
+        assert!(item.get_all_shares_authors().is_none());
+    }
+
+    #[test]
     fn test_mark_round_skipped_rejects_future_shares() {
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
         let (mut store, _rx) = make_store(&ctx);
