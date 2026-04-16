@@ -24,6 +24,7 @@ Confidential Asset (CA) Standard: privacy-focused fungible asset transfers with 
 -  [Enum `ConfidentialityForAssetTypeChanged`](#0x1_confidential_asset_ConfidentialityForAssetTypeChanged)
 -  [Enum `GlobalAuditorChanged`](#0x1_confidential_asset_GlobalAuditorChanged)
 -  [Enum `AssetSpecificAuditorChanged`](#0x1_confidential_asset_AssetSpecificAuditorChanged)
+-  [Enum `EmergencyPauseChanged`](#0x1_confidential_asset_EmergencyPauseChanged)
 -  [Enum `RegistrationProof`](#0x1_confidential_asset_RegistrationProof)
 -  [Enum `WithdrawalProof`](#0x1_confidential_asset_WithdrawalProof)
 -  [Enum `TransferProof`](#0x1_confidential_asset_TransferProof)
@@ -53,6 +54,8 @@ Confidential Asset (CA) Standard: privacy-focused fungible asset transfers with 
 -  [Function `set_asset_specific_auditor`](#0x1_confidential_asset_set_asset_specific_auditor)
 -  [Function `set_global_auditor`](#0x1_confidential_asset_set_global_auditor)
 -  [Function `update_auditor`](#0x1_confidential_asset_update_auditor)
+-  [Function `set_emergency_paused`](#0x1_confidential_asset_set_emergency_paused)
+-  [Function `is_emergency_paused`](#0x1_confidential_asset_is_emergency_paused)
 -  [Function `has_confidential_store`](#0x1_confidential_asset_has_confidential_store)
 -  [Function `is_confidentiality_enabled_for_asset_type`](#0x1_confidential_asset_is_confidentiality_enabled_for_asset_type)
 -  [Function `is_allow_listing_required`](#0x1_confidential_asset_is_allow_listing_required)
@@ -86,6 +89,7 @@ Confidential Asset (CA) Standard: privacy-focused fungible asset transfers with 
 -  [Function `assert_valid_withdrawal_proof`](#0x1_confidential_asset_assert_valid_withdrawal_proof)
 -  [Function `assert_valid_transfer_proof`](#0x1_confidential_asset_assert_valid_transfer_proof)
 -  [Function `assert_valid_key_rotation_proof`](#0x1_confidential_asset_assert_valid_key_rotation_proof)
+-  [Specification](#@Specification_2)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -109,7 +113,6 @@ Confidential Asset (CA) Standard: privacy-focused fungible asset transfers with 
 <b>use</b> <a href="sigma_protocol_registration.md#0x1_sigma_protocol_registration">0x1::sigma_protocol_registration</a>;
 <b>use</b> <a href="sigma_protocol_statement.md#0x1_sigma_protocol_statement">0x1::sigma_protocol_statement</a>;
 <b>use</b> <a href="sigma_protocol_transfer.md#0x1_sigma_protocol_transfer">0x1::sigma_protocol_transfer</a>;
-<b>use</b> <a href="sigma_protocol_utils.md#0x1_sigma_protocol_utils">0x1::sigma_protocol_utils</a>;
 <b>use</b> <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw">0x1::sigma_protocol_withdraw</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -302,6 +305,46 @@ Global configuration for the confidential asset protocol, installed during <code
 </dt>
 <dd>
  Used to derive a signer that owns all the FAs' primary stores and <code><a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a></code> objects.
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>V2</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>allow_list_enabled: bool</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>global_auditor: <a href="confidential_asset.md#0x1_confidential_asset_AuditorConfig">confidential_asset::AuditorConfig</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>extend_ref: <a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>emergency_paused: bool</code>
+</dt>
+<dd>
+ When true, all user operations are paused. Managed by governance via <code>set_emergency_paused</code>.
 </dd>
 </dl>
 
@@ -1098,6 +1141,46 @@ enum <a href="confidential_asset.md#0x1_confidential_asset_AssetSpecificAuditorC
 
 </details>
 
+<a id="0x1_confidential_asset_EmergencyPauseChanged"></a>
+
+## Enum `EmergencyPauseChanged`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+enum <a href="confidential_asset.md#0x1_confidential_asset_EmergencyPauseChanged">EmergencyPauseChanged</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>paused: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+</details>
+
 <a id="0x1_confidential_asset_RegistrationProof"></a>
 
 ## Enum `RegistrationProof`
@@ -1387,6 +1470,16 @@ The encryption key must not be the identity (zero) point.
 
 
 
+<a id="0x1_confidential_asset_E_EMERGENCY_PAUSED"></a>
+
+All user operations are paused by governance via emergency pause.
+
+
+<pre><code><b>const</b> <a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>: u64 = 20;
+</code></pre>
+
+
+
 <a id="0x1_confidential_asset_E_INCOMING_TRANSFERS_NOT_PAUSED"></a>
 
 Incoming transfers must be paused before key rotation.
@@ -1631,11 +1724,12 @@ Called once when this module is first published on-chain.
     <b>let</b> <a href="chain_id.md#0x1_chain_id">chain_id</a> = <a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>();
     <b>move_to</b>(
         deployer,
-        GlobalConfig::V1 {
+        GlobalConfig::V2 {
             allow_list_enabled: <a href="chain_id.md#0x1_chain_id">chain_id</a> == <a href="confidential_asset.md#0x1_confidential_asset_MAINNET_CHAIN_ID">MAINNET_CHAIN_ID</a> || <a href="chain_id.md#0x1_chain_id">chain_id</a> == <a href="confidential_asset.md#0x1_confidential_asset_TESTNET_CHAIN_ID">TESTNET_CHAIN_ID</a>,
             global_auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 },
             // DO NOT CHANGE: using long syntax until framework change is released <b>to</b> mainnet
-            extend_ref: <a href="object.md#0x1_object_create_object">object::create_object</a>(deployer_address).generate_extend_ref()
+            extend_ref: <a href="object.md#0x1_object_create_object">object::create_object</a>(deployer_address).generate_extend_ref(),
+            emergency_paused: <b>false</b>,
         }
     );
 }
@@ -1778,6 +1872,7 @@ Registers a confidential store for a specified asset type, encrypted under the g
     ek: CompressedRistretto,
     proof: <a href="confidential_asset.md#0x1_confidential_asset_RegistrationProof">RegistrationProof</a>
 ) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a>, <a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a> {
+    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_safe_for_confidentiality">is_safe_for_confidentiality</a>(&asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_UNSAFE_DISPATCHABLE_FA">E_UNSAFE_DISPATCHABLE_FA</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_confidentiality_enabled_for_asset_type">is_confidentiality_enabled_for_asset_type</a>(asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_ASSET_TYPE_DISALLOWED">E_ASSET_TYPE_DISALLOWED</a>));
 
@@ -1832,6 +1927,7 @@ Deposits tokens from the sender's primary FA store into their pending balance.
 ) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a>, <a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(depositor);
 
+    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_safe_for_confidentiality">is_safe_for_confidentiality</a>(&asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_UNSAFE_DISPATCHABLE_FA">E_UNSAFE_DISPATCHABLE_FA</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_confidentiality_enabled_for_asset_type">is_confidentiality_enabled_for_asset_type</a>(asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_ASSET_TYPE_DISALLOWED">E_ASSET_TYPE_DISALLOWED</a>));
     <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_incoming_transfers_paused">incoming_transfers_paused</a>(addr, asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_INCOMING_TRANSFERS_PAUSED">E_INCOMING_TRANSFERS_PAUSED</a>));
@@ -1935,6 +2031,7 @@ Withdraws tokens from the sender's available balance to recipient's primary FA s
     amount: u64,
     proof: <a href="confidential_asset.md#0x1_confidential_asset_WithdrawalProof">WithdrawalProof</a>
 ) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a>, <a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a> {
+    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_safe_for_confidentiality">is_safe_for_confidentiality</a>(&asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_UNSAFE_DISPATCHABLE_FA">E_UNSAFE_DISPATCHABLE_FA</a>));
 
     <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
@@ -2072,6 +2169,7 @@ Transfers a secret amount of tokens from sender's available balance to recipient
     proof: <a href="confidential_asset.md#0x1_confidential_asset_TransferProof">TransferProof</a>,
     memo: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_AssetConfig">AssetConfig</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
+    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_safe_for_confidentiality">is_safe_for_confidentiality</a>(&asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_UNSAFE_DISPATCHABLE_FA">E_UNSAFE_DISPATCHABLE_FA</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_confidentiality_enabled_for_asset_type">is_confidentiality_enabled_for_asset_type</a>(asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_ASSET_TYPE_DISALLOWED">E_ASSET_TYPE_DISALLOWED</a>));
     <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_incoming_transfers_paused">incoming_transfers_paused</a>(<b>to</b>, asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_INCOMING_TRANSFERS_PAUSED">E_INCOMING_TRANSFERS_PAUSED</a>));
@@ -2147,7 +2245,7 @@ Deserializes cryptographic data and forwards to <code>rotate_encryption_key</cod
     new_R: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, // part of the proof
     sigma_proto_comm: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, // part of the proof
     sigma_proto_resp: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, // part of the proof
-) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a> {
+) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
     // Just parse stuff and forward <b>to</b> the more type-safe function
     <b>let</b> compressed_new_ek = new_compressed_point_from_bytes(new_ek).extract();
     <b>let</b> compressed_new_R = deserialize_compressed_points(new_R);
@@ -2187,7 +2285,8 @@ Deserializes cryptographic data and forwards to <code>rotate_encryption_key</cod
     asset_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;,
     proof: <a href="confidential_asset.md#0x1_confidential_asset_KeyRotationProof">KeyRotationProof</a>,
     resume_incoming_transfers: bool,
-) {
+) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
+    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>));
     // Step 1: Assert (a) incoming transfers are paused & (b) pending balance is zero / <b>has</b> been rolled over
     <b>let</b> ca_store = <a href="confidential_asset.md#0x1_confidential_asset_borrow_confidential_store_mut">borrow_confidential_store_mut</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), asset_type);
     // (a) Assert incoming transfers are paused & unpause them after, <b>if</b> flag is set.
@@ -2318,7 +2417,9 @@ Rolls over pending balance into available balance, resetting pending to zero.
 <pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_rollover_pending_balance">rollover_pending_balance</a>(
     sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     asset_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
-) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a> {
+) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
+    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>));
+
     <b>let</b> user = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>let</b> ca_store = <a href="confidential_asset.md#0x1_confidential_asset_borrow_confidential_store_mut">borrow_confidential_store_mut</a>(user, asset_type);
 
@@ -2360,7 +2461,7 @@ Rollover + pause incoming transfers (required before key rotation).
 <pre><code><b>public</b> entry <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_rollover_pending_balance_and_pause">rollover_pending_balance_and_pause</a>(
     sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     asset_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
-) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a> {
+) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
     <a href="confidential_asset.md#0x1_confidential_asset_rollover_pending_balance">rollover_pending_balance</a>(sender, asset_type);
     <a href="confidential_asset.md#0x1_confidential_asset_set_incoming_transfers_paused">set_incoming_transfers_paused</a>(sender, asset_type, <b>true</b>);
 }
@@ -2390,7 +2491,9 @@ Pauses or resumes incoming transfers. Pausing is required before key rotation.
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     asset_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;,
     paused: bool
-) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a> {
+) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>, <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
+    <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>));
+
     <b>let</b> ca_store = <a href="confidential_asset.md#0x1_confidential_asset_borrow_confidential_store_mut">borrow_confidential_store_mut</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), asset_type);
     <b>let</b> old_paused = ca_store.pause_incoming;
     <b>if</b> (old_paused != paused) {
@@ -2610,6 +2713,79 @@ Returns <code><b>true</b></code> if the auditor config actually changed.
     auditor.ek = new_ek;
 
     changed
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_confidential_asset_set_emergency_paused"></a>
+
+## Function `set_emergency_paused`
+
+Pauses or unpauses all user operations. Upgrades GlobalConfig from V1 to V2 on first call (for testnet compatibility).
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_set_emergency_paused">set_emergency_paused</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, paused: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_set_emergency_paused">set_emergency_paused</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, paused: bool) <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a>&gt;(@aptos_framework);
+    <b>if</b> (config is GlobalConfig::V2) {
+        <b>let</b> GlobalConfig::V2 { emergency_paused, .. } = config;
+        <b>if</b> (*emergency_paused != paused) {
+            *emergency_paused = paused;
+            <a href="event.md#0x1_event_emit">event::emit</a>(EmergencyPauseChanged::V1 { paused });
+        }
+    } <b>else</b> {
+        // Upgrade V1 → V2: <b>move_from</b>, destructure, reconstruct <b>with</b> new field
+        <b>let</b> GlobalConfig::V1 { allow_list_enabled, global_auditor, extend_ref } =
+            <b>move_from</b>&lt;<a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a>&gt;(@aptos_framework);
+        <b>move_to</b>(aptos_framework, GlobalConfig::V2 {
+            allow_list_enabled, global_auditor, extend_ref, emergency_paused: paused,
+        });
+        // V1 is implicitly unpaused, so only emit <b>if</b> actually changing <b>to</b> paused
+        <b>if</b> (paused) {
+            <a href="event.md#0x1_event_emit">event::emit</a>(EmergencyPauseChanged::V1 { paused });
+        }
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_confidential_asset_is_emergency_paused"></a>
+
+## Function `is_emergency_paused`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(): bool <b>acquires</b> <a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a> {
+    <b>let</b> config = <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x1_confidential_asset_GlobalConfig">GlobalConfig</a>&gt;(@aptos_framework);
+    match (config) {
+        GlobalConfig::V2 { emergency_paused, .. } =&gt; *emergency_paused,
+        _ =&gt; <b>false</b>,
+    }
 }
 </code></pre>
 
@@ -3623,6 +3799,15 @@ Verifies range proofs + $\Sigma$-protocol for transfer. Returns (new_balance, re
 
 
 </details>
+
+<a id="@Specification_2"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
