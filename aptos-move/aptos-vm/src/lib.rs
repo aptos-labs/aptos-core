@@ -120,6 +120,7 @@ pub mod system_module_names;
 pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
+mod transaction_validation_versioned;
 pub mod validator_txns;
 pub mod verifier;
 
