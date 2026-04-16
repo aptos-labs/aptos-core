@@ -20,6 +20,7 @@ Reconfiguration with DKG helper functions.
     -  [Function `maybe_finish_reconfig_with_chunky_dkg`](#@Specification_0_maybe_finish_reconfig_with_chunky_dkg)
     -  [Function `finish_with_dkg_result`](#@Specification_0_finish_with_dkg_result)
     -  [Function `finish_with_chunky_dkg_result`](#@Specification_0_finish_with_chunky_dkg_result)
+    -  [Function `try_complete_after_grace_period`](#@Specification_0_try_complete_after_grace_period)
 
 
 <pre><code><b>use</b> <a href="chunky_dkg.md#0x1_chunky_dkg">0x1::chunky_dkg</a>;
@@ -465,6 +466,22 @@ interval has elapsed. No-op unless all conditions are met.
 
 
 <pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_chunky_dkg_result">finish_with_chunky_dkg_result</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, chunky_dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, encryption_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_0_try_complete_after_grace_period"></a>
+
+### Function `try_complete_after_grace_period`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_complete_after_grace_period">try_complete_after_grace_period</a>()
 </code></pre>
 
 
