@@ -17,6 +17,7 @@ use aptos_types::{
     state_store::{hot_state::THotStateSlot, state_slot::StateSlot, NUM_STATE_SHARDS},
     transaction::Version,
 };
+#[cfg(test)]
 use arr_macro::arr;
 use dashmap::{mapref::one::Ref, DashMap};
 #[cfg(test)]
@@ -47,10 +48,15 @@ where
     K: Clone + Eq + std::hash::Hash,
     V: Clone,
 {
+    #[cfg(test)]
     fn new(max_items: usize) -> Self {
         Self {
             inner: DashMap::with_capacity(max_items),
         }
+    }
+
+    fn from_dashmap(map: DashMap<K, V>) -> Self {
+        Self { inner: map }
     }
 
     fn get(&self, key: &K) -> Option<Ref<'_, K, V>> {
@@ -90,9 +96,16 @@ where
     K: Clone + Eq + std::hash::Hash,
     V: Clone,
 {
+    #[cfg(test)]
     fn new_empty(max_items_per_shard: usize) -> Self {
         Self {
             shards: arr![Shard::new(max_items_per_shard); 16],
+        }
+    }
+
+    fn from_loaded(shards: [DashMap<K, V>; NUM_STATE_SHARDS]) -> Self {
+        Self {
+            shards: shards.map(Shard::from_dashmap),
         }
     }
 
@@ -160,7 +173,16 @@ pub struct HotState {
 
 impl HotState {
     pub fn new(state: State, config: HotStateConfig) -> Self {
-        let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
+        let empty_shards =
+            std::array::from_fn(|_| DashMap::with_capacity(config.max_items_per_shard));
+        Self::new_from_loaded(state, empty_shards)
+    }
+
+    pub fn new_from_loaded(
+        state: State,
+        loaded_shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+    ) -> Self {
+        let base = Arc::new(HotStateBase::from_loaded(loaded_shards));
         let view = Arc::new(LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
@@ -308,13 +330,17 @@ impl Committer {
         initial_state: State,
         merged_version: Arc<AtomicU64>,
     ) -> Self {
+        let heads = std::array::from_fn(|i| initial_state.latest_hot_key(i));
+        let tails = std::array::from_fn(|i| initial_state.oldest_hot_key(i));
+        let total_value_bytes = std::array::from_fn(|i| initial_state.hot_value_bytes(i));
+
         Self {
             base,
             committed,
             rx,
-            total_value_bytes: [0; NUM_STATE_SHARDS],
-            heads: arr![None; 16],
-            tails: arr![None; 16],
+            total_value_bytes,
+            heads,
+            tails,
             merged_state: initial_state,
             old_views: Vec::new(),
             merged_version,
@@ -387,7 +413,49 @@ impl Committer {
     /// `HackReset` is a hack used by `hack_reset` and is only sent when no commits are in flight,
     /// so it must be the sole message in the channel. `next_to_commit` asserts this before
     /// calling.
+    ///
+    // TODO(HotState): The DashMaps and the LRU metadata in `State` are loaded together (from
+    // `load_hot_state_kvs`) but arrive here through separate paths — the DashMaps via
+    // `new_from_loaded` at `PersistedState` construction, the `State` via `hack_reset`. The
+    // assertions below guard against the two getting out of sync. Consider passing them
+    // together through a single path to make consistency structural.
     fn handle_reset(&mut self, state: State, ack: Sender<()>) {
+        for i in 0..NUM_STATE_SHARDS {
+            let head = state.latest_hot_key(i);
+            let tail = state.oldest_hot_key(i);
+            assert_eq!(
+                self.base.shards[i].len(),
+                state.num_hot_items(i),
+                "Shard {i}: DashMap/metadata item count mismatch on reset.",
+            );
+            match (head, tail) {
+                (None, None) => assert_eq!(
+                    self.base.shards[i].len(),
+                    0,
+                    "Shard {i}: head and tail are None but DashMap is not empty.",
+                ),
+                (Some(h), Some(t)) => {
+                    let head_entry = self.base.shards[i]
+                        .get(&h)
+                        .unwrap_or_else(|| panic!("Shard {i}: head not in DashMap."));
+                    assert!(
+                        head_entry.prev().is_none(),
+                        "Shard {i}: head has a prev pointer."
+                    );
+                    let tail_entry = self.base.shards[i]
+                        .get(&t)
+                        .unwrap_or_else(|| panic!("Shard {i}: tail not in DashMap."));
+                    assert!(
+                        tail_entry.next().is_none(),
+                        "Shard {i}: tail has a next pointer."
+                    );
+                },
+                _ => panic!("Shard {i}: head and tail must both be None or both be Some."),
+            }
+            self.heads[i] = head;
+            self.tails[i] = tail;
+            self.total_value_bytes[i] = state.hot_value_bytes(i);
+        }
         self.merged_state = state;
         self.merged_version
             .store(self.merged_state.next_version(), Ordering::Release);
