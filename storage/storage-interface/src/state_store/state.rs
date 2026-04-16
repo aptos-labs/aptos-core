@@ -46,12 +46,17 @@ pub struct HotStateMetadata {
 }
 
 impl HotStateMetadata {
-    fn new() -> Self {
+    pub fn new(
+        latest: Option<HashValue>,
+        oldest: Option<HashValue>,
+        num_items: usize,
+        total_value_bytes: usize,
+    ) -> Self {
         Self {
-            latest: None,
-            oldest: None,
-            num_items: 0,
-            total_value_bytes: 0,
+            latest,
+            oldest,
+            num_items,
+            total_value_bytes,
         }
     }
 }
@@ -95,10 +100,24 @@ impl State {
         usage: StateStorageUsage,
         hot_state_config: HotStateConfig,
     ) -> Self {
+        Self::new_at_version_with_hot_state_metadata(
+            version,
+            usage,
+            hot_state_config,
+            arr![HotStateMetadata::default(); 16],
+        )
+    }
+
+    pub fn new_at_version_with_hot_state_metadata(
+        version: Option<Version>,
+        usage: StateStorageUsage,
+        hot_state_config: HotStateConfig,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
+    ) -> Self {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
-            arr![HotStateMetadata::new(); 16],
+            hot_state_metadata,
             usage,
             hot_state_config,
         )
