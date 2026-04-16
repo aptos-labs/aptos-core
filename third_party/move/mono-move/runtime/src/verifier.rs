@@ -216,36 +216,34 @@ impl FunctionVerifier<'_> {
                 self.check_frame_access(Some(pc), dst, size);
             },
 
-            MicroOp::Jump { target } => {
+            MicroOp::Jump { target, .. } => {
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpNotZeroU64 { target, src } => {
+            MicroOp::JumpNotZeroU64 { target, src, .. } => {
                 self.check_frame_access_8(pc, src);
                 self.check_jump(pc, target);
             },
 
-            MicroOp::JumpGreaterEqualU64Imm {
-                target,
-                src,
-                imm: _,
+            MicroOp::JumpGreaterEqualU64Imm { target, src, .. } => {
+                self.check_frame_access_8(pc, src);
+                self.check_jump(pc, target);
+            },
+
+            MicroOp::JumpLessU64Imm { target, src, .. } => {
+                self.check_frame_access_8(pc, src);
+                self.check_jump(pc, target);
+            },
+
+            MicroOp::JumpLessU64 {
+                target, lhs, rhs, ..
+            }
+            | MicroOp::JumpGreaterEqualU64 {
+                target, lhs, rhs, ..
+            }
+            | MicroOp::JumpNotEqualU64 {
+                target, lhs, rhs, ..
             } => {
-                self.check_frame_access_8(pc, src);
-                self.check_jump(pc, target);
-            },
-
-            MicroOp::JumpLessU64Imm {
-                target,
-                src,
-                imm: _,
-            } => {
-                self.check_frame_access_8(pc, src);
-                self.check_jump(pc, target);
-            },
-
-            MicroOp::JumpLessU64 { target, lhs, rhs }
-            | MicroOp::JumpGreaterEqualU64 { target, lhs, rhs }
-            | MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
                 self.check_frame_access_8(pc, lhs);
                 self.check_frame_access_8(pc, rhs);
                 self.check_jump(pc, target);
@@ -405,9 +403,6 @@ impl FunctionVerifier<'_> {
                 self.check_nonzero_size(pc, size);
                 self.check_frame_access(Some(pc), src, size);
             },
-
-            // Inserted by the instrumentation pass; no frame accesses to verify.
-            MicroOp::Charge { .. } => {},
         }
     }
 

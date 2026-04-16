@@ -180,7 +180,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 specializer::lower::try_build_context(&module_ir.module, func_ir, &func_id_map)?
             {
                 let micro_ops = specializer::lower::lower_function(func_ir, &ctx)?;
-                let micro_ops = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);
+                let (micro_ops, entry_gas) = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);
 
                 // Compute frame layout.
                 let args_size = ctx.home_slots[..func_ir.num_params as usize]
@@ -204,6 +204,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                     args_size,
                     args_and_locals_size,
                     extended_frame_size,
+                    entry_gas,
                     // TODO: hardcoded for now.
                     zero_frame: false,
                     frame_layout: FrameLayoutInfo::empty(&self.arena),

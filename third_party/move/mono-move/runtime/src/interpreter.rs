@@ -217,61 +217,109 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                     return self.call(func, fp, ptr.as_ref_unchecked());
                 },
 
-                MicroOp::JumpNotZeroU64 { target, src } => {
-                    self.pc = if read_u64(fp, src) != 0 {
-                        target.into()
+                MicroOp::JumpNotZeroU64 {
+                    target,
+                    src,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    if read_u64(fp, src) != 0 {
+                        self.gas_meter.charge(gas_taken as u64)?;
+                        self.pc = target.into();
                     } else {
-                        self.pc + 1
-                    };
+                        self.gas_meter.charge(gas_fallthrough as u64)?;
+                        self.pc = self.pc + 1;
+                    }
                     return Ok(StepResult::Continue);
                 },
 
-                MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) >= imm {
-                        target.into()
+                MicroOp::JumpGreaterEqualU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    if read_u64(fp, src) >= imm {
+                        self.gas_meter.charge(gas_taken as u64)?;
+                        self.pc = target.into();
                     } else {
-                        self.pc + 1
-                    };
+                        self.gas_meter.charge(gas_fallthrough as u64)?;
+                        self.pc = self.pc + 1;
+                    }
                     return Ok(StepResult::Continue);
                 },
 
-                MicroOp::JumpLessU64Imm { target, src, imm } => {
-                    self.pc = if read_u64(fp, src) < imm {
-                        target.into()
+                MicroOp::JumpLessU64Imm {
+                    target,
+                    src,
+                    imm,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    if read_u64(fp, src) < imm {
+                        self.gas_meter.charge(gas_taken as u64)?;
+                        self.pc = target.into();
                     } else {
-                        self.pc + 1
-                    };
+                        self.gas_meter.charge(gas_fallthrough as u64)?;
+                        self.pc = self.pc + 1;
+                    }
                     return Ok(StepResult::Continue);
                 },
 
-                MicroOp::JumpLessU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) < read_u64(fp, rhs) {
-                        target.into()
+                MicroOp::JumpLessU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    if read_u64(fp, lhs) < read_u64(fp, rhs) {
+                        self.gas_meter.charge(gas_taken as u64)?;
+                        self.pc = target.into();
                     } else {
-                        self.pc + 1
-                    };
+                        self.gas_meter.charge(gas_fallthrough as u64)?;
+                        self.pc = self.pc + 1;
+                    }
                     return Ok(StepResult::Continue);
                 },
 
-                MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) >= read_u64(fp, rhs) {
-                        target.into()
+                MicroOp::JumpGreaterEqualU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    if read_u64(fp, lhs) >= read_u64(fp, rhs) {
+                        self.gas_meter.charge(gas_taken as u64)?;
+                        self.pc = target.into();
                     } else {
-                        self.pc + 1
-                    };
+                        self.gas_meter.charge(gas_fallthrough as u64)?;
+                        self.pc = self.pc + 1;
+                    }
                     return Ok(StepResult::Continue);
                 },
 
-                MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
-                    self.pc = if read_u64(fp, lhs) != read_u64(fp, rhs) {
-                        target.into()
+                MicroOp::JumpNotEqualU64 {
+                    target,
+                    lhs,
+                    rhs,
+                    gas_taken,
+                    gas_fallthrough,
+                } => {
+                    if read_u64(fp, lhs) != read_u64(fp, rhs) {
+                        self.gas_meter.charge(gas_taken as u64)?;
+                        self.pc = target.into();
                     } else {
-                        self.pc + 1
-                    };
+                        self.gas_meter.charge(gas_fallthrough as u64)?;
+                        self.pc = self.pc + 1;
+                    }
                     return Ok(StepResult::Continue);
                 },
 
-                MicroOp::Jump { target } => {
+                MicroOp::Jump { target, gas } => {
+                    self.gas_meter.charge(gas)?;
                     self.pc = target.into();
                     return Ok(StepResult::Continue);
                 },
@@ -626,10 +674,6 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                     write_ptr(fp, dst, obj_ptr);
                     write_u64(fp, dst + 8, offset as u64);
                 },
-
-                MicroOp::Charge { cost } => {
-                    self.gas_meter.charge(cost)?;
-                },
             }
         }
 
@@ -650,6 +694,8 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
         fp: *mut u8,
         callee: &Function,
     ) -> ExecutionResult<StepResult> {
+        // Charge the callee's entry block before any of its instructions execute.
+        self.gas_meter.charge(callee.entry_gas)?;
         unsafe {
             let new_fp = fp.add(caller.args_and_locals_size + FRAME_METADATA_SIZE);
             let stack_end = self.stack.as_ptr().add(self.stack.len());
@@ -685,6 +731,11 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
     // (VecPushBack, etc.) take &mut self, which may alias these fields.
     // Write back only on CallFunc/Return.
     pub fn run(&mut self) -> ExecutionResult<()> {
+        // Charge the entry block of the function being executed before any
+        // instructions run. For functions entered via CallLocalFunc this is
+        // handled inside call(); here we handle the root invocation.
+        let entry_gas = unsafe { self.current_func.as_ref() }.entry_gas;
+        self.gas_meter.charge(entry_gas)?;
         loop {
             match self.step()? {
                 StepResult::Continue => {},

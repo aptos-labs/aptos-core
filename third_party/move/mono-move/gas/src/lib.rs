@@ -5,35 +5,46 @@
 //!
 //! This crate has **no dependency on any instruction set**. It defines the
 //! interfaces and the generic instrumentation pass; concrete instruction sets
-//! (micro-ops, stackless IR, …) plug in by implementing four traits:
+//! (micro-ops, stackless IR, …) plug in by implementing three traits:
 //!
-//! | Trait                     | Purpose                                        |
-//! |---------------------------|------------------------------------------------|
-//! | [`HasCfgInfo`]            | Identifies basic-block boundaries              |
-//! | [`RemapTargets`]          | Rewrites branch targets after charge insertion |
-//! | [`GasSchedule<I>`]        | Maps each instruction to its [`InstrCost`]     |
-//! | [`GasMeteredInstruction`] | Constructs charge instructions within the ISA  |
+//! | Trait                 | Purpose                                                        |
+//! |-----------------------|----------------------------------------------------------------|
+//! | [`HasCfgInfo`]        | Identifies basic-block boundaries                             |
+//! | [`GasSchedule<I>`]    | Maps each instruction to its static base cost                 |
+//! | [`ChargeOnJump`]      | Writes destination-block costs into jump instructions         |
 //!
 //! ## Integration
 //!
-//! A new instruction set plugs in by adding a `Charge` variant to its
-//! instruction type and implementing the four traits above.
-//! [`GasInstrumentor::run`] then instruments any `Vec<I>` at compile time.
+//! A new instruction set plugs in by implementing the three traits above.
+//! [`GasInstrumentor::run`] then instruments any `Vec<I>` at compile time,
+//! returning the annotated instruction sequence and the entry-block cost:
 //!
-//! The interpreter handles the charge variant:
+//! ```text
+//! let (ops, entry_gas) = GasInstrumentor::new(MySchedule).run(ops);
+//! // store entry_gas in the function's metadata
+//! ```
+//!
+//! At runtime the interpreter charges gas when executing a jump (before
+//! entering the destination block) and at function entry (using `entry_gas`):
 //!
 //! ```text
 //! match instr {
-//!     MyOp::Charge { cost } => gas_meter.charge(cost)?,
+//!     MyOp::Jump { target, gas } => { gas_meter.charge(gas)?; pc = target; }
+//!     MyOp::CondJump { target, gas_taken, gas_fallthrough } => {
+//!         if cond { gas_meter.charge(gas_taken)?; pc = target; }
+//!         else    { gas_meter.charge(gas_fallthrough)?; pc += 1; }
+//!     }
 //!     ...
 //! }
+//! // at function call time:
+//! gas_meter.charge(callee.entry_gas)?;
 //! ```
 
 pub mod cfg;
 pub mod instrument;
 
 pub use cfg::{compute_basic_blocks, BasicBlock, HasCfgInfo};
-pub use instrument::{GasInstrumentor, GasMeteredInstruction, RemapTargets};
+pub use instrument::{ChargeOnJump, GasInstrumentor};
 use thiserror::Error;
 
 // ---------------------------------------------------------------------------
@@ -95,39 +106,12 @@ impl GasMeter for NoOpGasMeter {
 // Gas schedule
 // ---------------------------------------------------------------------------
 
-/// The cost of a single instruction, as reported by [`GasSchedule::cost`].
-#[derive(Debug)]
-pub struct InstrCost<I> {
-    /// Accumulated into the enclosing `Charge` op for the basic block.
-    pub base: u64,
-
-    /// A fully-formed gas charge instruction to insert immediately after
-    /// the instruction, if any.
-    pub dynamic: Option<I>,
-}
-
-impl<I> InstrCost<I> {
-    pub fn constant(base: u64) -> Self {
-        Self {
-            base,
-            dynamic: None,
-        }
-    }
-}
-
-/// Maps instructions to their gas cost.
+/// Maps instructions to their static base gas cost.
 ///
 /// The instrumentation pass calls [`GasSchedule::cost`] once per instruction
-/// and bakes all parameters into the emitted charge ops — the interpreter
-/// never consults the schedule at runtime.
-///
-/// # Constraint
-///
-/// Branch instructions (those for which [`HasCfgInfo::branch_target`] returns
-/// `Some`) must not have a dynamic cost component. The dynamic charge op is
-/// inserted immediately after the instruction, so on the taken path execution
-/// jumps away and the charge is never reached. For unconditional jumps it is
-/// completely unreachable.
+/// and accumulates the results into a block-level cost that is baked into each
+/// block's entry jumps — the interpreter never consults the schedule at
+/// runtime.
 pub trait GasSchedule<I> {
-    fn cost(&self, instr: &I) -> InstrCost<I>;
+    fn cost(&self, instr: &I) -> u64;
 }

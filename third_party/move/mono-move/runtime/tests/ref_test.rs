@@ -59,6 +59,7 @@ fn ref_basic() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(r#ref), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let gas_meter = SimpleGasMeter::new(u64::MAX);
@@ -123,6 +124,7 @@ fn ref_survives_gc() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let gas_meter = SimpleGasMeter::new(u64::MAX);
@@ -176,6 +178,7 @@ fn ref_cross_frame() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(c_ref_base)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     });
 
     // -- Function 0: main --
@@ -216,6 +219,7 @@ fn ref_cross_frame() {
             FO(m_callee_ref),
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     });
 
     let descriptors = vec![ObjectDescriptor::Trivial];
@@ -302,6 +306,7 @@ fn ref_multiple_borrows() {
             FO(vec_ref),
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let gas_meter = SimpleGasMeter::new(u64::MAX);
@@ -369,6 +374,7 @@ fn ref_borrow_local() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(ref_base), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let gas_meter = SimpleGasMeter::new(u64::MAX);
@@ -456,6 +462,7 @@ fn ref_nested_vectors() {
             FO(inner_ref),
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
         elem_size: 8,
@@ -544,6 +551,7 @@ fn ref_survives_double_gc() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let gas_meter = SimpleGasMeter::new(u64::MAX);
@@ -605,6 +613,7 @@ fn ref_struct_field_borrow() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -664,6 +673,7 @@ fn ref_struct_field_survives_gc() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,

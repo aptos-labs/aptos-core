@@ -288,6 +288,7 @@ impl<'a> LoweringState<'a> {
                 self.branch_fixups.push(idx);
                 self.emit(MicroOp::Jump {
                     target: CodeOffset(encode_label(*l)),
+                    gas: 0,
                 });
             },
             Instr::BrTrue(Label(l), cond) => {
@@ -297,6 +298,8 @@ impl<'a> LoweringState<'a> {
                 self.emit(MicroOp::JumpNotZeroU64 {
                     target: CodeOffset(encode_label(*l)),
                     src: FrameOffset(s.offset),
+                    gas_taken: 0,
+                    gas_fallthrough: 0,
                 });
             },
             Instr::BrFalse(Label(_l), _cond) => {
@@ -396,6 +399,8 @@ impl<'a> LoweringState<'a> {
                     target: CodeOffset(encode_label(*l)),
                     lhs: FrameOffset(l_slot.offset),
                     rhs: FrameOffset(r_slot.offset),
+                    gas_taken: 0,
+                    gas_fallthrough: 0,
                 });
                 Some(true)
             },
@@ -424,6 +429,8 @@ impl<'a> LoweringState<'a> {
                     target: CodeOffset(encode_label(*l)),
                     src: FrameOffset(s.offset),
                     imm: v + 1,
+                    gas_taken: 0,
+                    gas_fallthrough: 0,
                 });
                 Some(true)
             },
@@ -437,6 +444,8 @@ impl<'a> LoweringState<'a> {
                     target: CodeOffset(encode_label(*l)),
                     src: FrameOffset(s.offset),
                     imm: v,
+                    gas_taken: 0,
+                    gas_fallthrough: 0,
                 });
                 Some(true)
             },
@@ -448,7 +457,7 @@ impl<'a> LoweringState<'a> {
         for &idx in &self.branch_fixups {
             // Extract the encoded label from the op, resolve it, then patch.
             let encoded = match &self.ops[idx] {
-                MicroOp::Jump { target } => target.0,
+                MicroOp::Jump { target, .. } => target.0,
                 MicroOp::JumpNotZeroU64 { target, .. } => target.0,
                 MicroOp::JumpGreaterEqualU64Imm { target, .. } => target.0,
                 MicroOp::JumpLessU64 { target, .. } => target.0,
@@ -461,7 +470,7 @@ impl<'a> LoweringState<'a> {
             let label = decode_label(encoded);
             let resolved = self.resolve_label(label)?;
             match &mut self.ops[idx] {
-                MicroOp::Jump { target } => target.0 = resolved,
+                MicroOp::Jump { target, .. } => target.0 = resolved,
                 MicroOp::JumpNotZeroU64 { target, .. } => target.0 = resolved,
                 MicroOp::JumpGreaterEqualU64Imm { target, .. } => target.0 = resolved,
                 MicroOp::JumpLessU64 { target, .. } => target.0 = resolved,

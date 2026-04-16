@@ -139,6 +139,7 @@ fn make_gc_stress_program(
             FO(callee_vec_ref),
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(arena),
+        entry_gas: 0,
     });
 
     // -- Function 0: main --
@@ -165,16 +166,16 @@ fn make_gc_stress_program(
         StoreImm8 { dst: FO(const_hundred), imm: 100 },
 
         // ---- LOOP (PC 4) ----
-        JumpGreaterEqualU64Imm { target: CO(30), src: FO(i), imm: num_iterations },
+        JumpGreaterEqualU64Imm { target: CO(30), src: FO(i), imm: num_iterations, gas_taken: 0, gas_fallthrough: 0 },
 
         // PC 5: r1 = random (action)
         StoreRandomU64 { dst: FO(r1) },
         // PC 6: tmp = r1 % 100
         ModU64 { dst: FO(tmp), lhs: FO(r1), rhs: FO(const_hundred) },
         // PC 7: if tmp >= 45: goto GARBAGE (PC 25)
-        JumpGreaterEqualU64Imm { target: CO(25), src: FO(tmp), imm: 45 },
+        JumpGreaterEqualU64Imm { target: CO(25), src: FO(tmp), imm: 45, gas_taken: 0, gas_fallthrough: 0 },
         // PC 8: if tmp >= 30: goto POP (PC 20)
-        JumpGreaterEqualU64Imm { target: CO(20), src: FO(tmp), imm: 30 },
+        JumpGreaterEqualU64Imm { target: CO(20), src: FO(tmp), imm: 30, gas_taken: 0, gas_fallthrough: 0 },
 
         // ---- PUSH_OR_REPLACE (action 0..29) ----
         // PC 9: r1 = random (val)
@@ -187,11 +188,11 @@ fn make_gc_stress_program(
         // PC 12: len = VecLen(outer_vec_ref)
         VecLen { dst: FO(len), vec_ref: FO(outer_vec_ref) },
         // PC 13: if len >= max_len: goto REPLACE (PC 16)
-        JumpGreaterEqualU64Imm { target: CO(16), src: FO(len), imm: max_len },
+        JumpGreaterEqualU64Imm { target: CO(16), src: FO(len), imm: max_len, gas_taken: 0, gas_fallthrough: 0 },
         // ---- PUSH (PC 14) ----
         VecPushBack { vec_ref: FO(outer_vec_ref), elem: FO(entry_ptr), elem_size: 8, descriptor_id: DescriptorId(2) },
         // PC 15: goto NEXT (PC 28)
-        Jump { target: CO(28) },
+        Jump { target: CO(28), gas: 0 },
 
         // ---- REPLACE (PC 16) ----
         // PC 16: r1 = random (idx_raw)
@@ -201,19 +202,19 @@ fn make_gc_stress_program(
         // PC 18: outer_vec[tmp] = entry_ptr
         VecStoreElem { vec_ref: FO(outer_vec_ref), idx: FO(tmp), src: FO(entry_ptr), elem_size: 8 },
         // PC 19: goto NEXT (PC 28)
-        Jump { target: CO(28) },
+        Jump { target: CO(28), gas: 0 },
 
         // ---- POP (PC 20) ----
         // PC 20: len = VecLen(outer_vec_ref)
         VecLen { dst: FO(len), vec_ref: FO(outer_vec_ref) },
         // PC 21: if len > 0: goto DO_POP (PC 23)
-        JumpNotZeroU64 { target: CO(23), src: FO(len) },
+        JumpNotZeroU64 { target: CO(23), src: FO(len), gas_taken: 0, gas_fallthrough: 0 },
         // PC 22: len == 0, skip → goto NEXT (PC 28)
-        Jump { target: CO(28) },
+        Jump { target: CO(28), gas: 0 },
         // PC 23: VecPopBack(outer_vec_ref) — discard into r1
         VecPopBack { dst: FO(r1), vec_ref: FO(outer_vec_ref), elem_size: 8 },
         // PC 24: goto NEXT (PC 28)
-        Jump { target: CO(28) },
+        Jump { target: CO(28), gas: 0 },
 
         // ---- GARBAGE (PC 25) ----
         // PC 25: r1 = random (val)
@@ -227,7 +228,7 @@ fn make_gc_stress_program(
         // ---- NEXT (PC 28) ----
         AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },
         // PC 29: goto LOOP (PC 4)
-        Jump { target: CO(4) },
+        Jump { target: CO(4), gas: 0 },
 
         // ---- DONE (PC 30) ----
         Return,
@@ -245,6 +246,7 @@ fn make_gc_stress_program(
             FO(entry_ptr),
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(arena),
+        entry_gas: 0,
     });
 
     let descriptors = vec![

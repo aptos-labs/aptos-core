@@ -183,6 +183,11 @@ pub struct Function {
     /// frames may scan the same memory. The forwarding markers in
     /// `gc_copy_object` handle double-scans correctly.
     pub frame_layout: FrameLayoutInfo,
+    /// Static gas cost of the entry basic block (block 0).
+    ///
+    /// Charged at call time, before any instruction in block 0 executes
+    /// (charge-before-work). Set by [`mono_move_gas::GasInstrumentor::run`].
+    pub entry_gas: u64,
     /// Per-safe-point frame layouts.
     ///
     /// During GC, for each frame on the call stack, the GC scans the
@@ -222,6 +227,17 @@ impl Function {
         unsafe { self.safe_point_layouts.layout_at(pc) }
     }
 
+    /// Replaces every [`MicroOp::CallFunc`] (index-based dispatch) with
+    /// [`MicroOp::CallLocalFunc`] (direct pointer dispatch).
+    ///
+    /// `func_ptrs` is indexed by definition index and may contain `None`
+    /// for functions that were not lowered (e.g. generic functions).
+    ///
+    /// # Safety
+    ///
+    /// The caller must have exclusive access to the functions and their
+    /// arena-allocated code. The arena must outlive all uses of the patched
+    /// code.
     /// Replaces every [`MicroOp::CallFunc`] (index-based dispatch) with
     /// [`MicroOp::CallLocalFunc`] (direct pointer dispatch).
     ///

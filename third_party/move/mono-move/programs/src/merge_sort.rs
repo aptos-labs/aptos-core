@@ -117,6 +117,7 @@ mod micro_op {
                 extended_frame_size: (callee_hi + 8) as usize,
                 zero_frame: true,
                 frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(vec_ref)]),
+                entry_gas: 0,
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
         };
@@ -152,7 +153,7 @@ mod micro_op {
             let code = vec![
                 // if lo + 1 < hi, continue; else return
                 AddU64Imm { dst: FO(tmp), src: FO(lo), imm: 1 },
-                JumpLessU64 { target: CO(3), lhs: FO(tmp), rhs: FO(hi) },
+                JumpLessU64 { target: CO(3), lhs: FO(tmp), rhs: FO(hi), gas_taken: 0, gas_fallthrough: 0 },
                 Return,
                 // mid = (lo + hi) / 2
                 AddU64 { dst: FO(mid), lhs: FO(lo), rhs: FO(hi) },
@@ -185,6 +186,7 @@ mod micro_op {
                 extended_frame_size: (callee_3 + 8) as usize,
                 zero_frame: true,
                 frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec)]),
+                entry_gas: 0,
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
         };
@@ -232,51 +234,51 @@ mod micro_op {
                 SlotBorrow { dst: FO(tmp_ref), local: FO(tmp) },                 // 4
 
                 // MERGE_LOOP (5): both halves have elements?
-                JumpLessU64 { target: CO(8), lhs: FO(i), rhs: FO(mid) },        // 5
-                JumpLessU64 { target: CO(25), lhs: FO(j), rhs: FO(hi) },        // 6: drain right
-                Jump { target: CO(31) },                                         // 7: copy back
-                JumpLessU64 { target: CO(10), lhs: FO(j), rhs: FO(hi) },        // 8
-                Jump { target: CO(19) },                                         // 9: drain left
+                JumpLessU64 { target: CO(8), lhs: FO(i), rhs: FO(mid), gas_taken: 0, gas_fallthrough: 0 },        // 5
+                JumpLessU64 { target: CO(25), lhs: FO(j), rhs: FO(hi), gas_taken: 0, gas_fallthrough: 0 },        // 6: drain right
+                Jump { target: CO(31), gas: 0 },                                         // 7: copy back
+                JumpLessU64 { target: CO(10), lhs: FO(j), rhs: FO(hi), gas_taken: 0, gas_fallthrough: 0 },        // 8
+                Jump { target: CO(19), gas: 0 },                                         // 9: drain left
 
                 // COMPARE (10): both i and j valid
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
                               idx: FO(i), elem_size: 8 },                       // 10
                 VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
                               idx: FO(j), elem_size: 8 },                       // 11
-                JumpLessU64 { target: CO(16), lhs: FO(elem_a), rhs: FO(elem_b) }, // 12
+                JumpLessU64 { target: CO(16), lhs: FO(elem_a), rhs: FO(elem_b), gas_taken: 0, gas_fallthrough: 0 }, // 12
                 // a >= b: push b
                 VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: DescriptorId(0) }, // 13
                 AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 14
-                Jump { target: CO(5) },                                          // 15
+                Jump { target: CO(5), gas: 0 },                                          // 15
 
                 // PUSH_LEFT (16): a < b, push a
                 VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: DescriptorId(0) }, // 16
                 AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 17
-                Jump { target: CO(5) },                                          // 18
+                Jump { target: CO(5), gas: 0 },                                          // 18
 
                 // DRAIN_LEFT (19): right exhausted
-                JumpLessU64 { target: CO(21), lhs: FO(i), rhs: FO(mid) },       // 19
-                Jump { target: CO(31) },                                         // 20
+                JumpLessU64 { target: CO(21), lhs: FO(i), rhs: FO(mid), gas_taken: 0, gas_fallthrough: 0 },       // 19
+                Jump { target: CO(31), gas: 0 },                                         // 20
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
                               idx: FO(i), elem_size: 8 },                       // 21
                 VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: DescriptorId(0) }, // 22
                 AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 23
-                Jump { target: CO(19) },                                         // 24
+                Jump { target: CO(19), gas: 0 },                                         // 24
 
                 // DRAIN_RIGHT (25): left exhausted
-                JumpLessU64 { target: CO(27), lhs: FO(j), rhs: FO(hi) },        // 25
-                Jump { target: CO(31) },                                         // 26
+                JumpLessU64 { target: CO(27), lhs: FO(j), rhs: FO(hi), gas_taken: 0, gas_fallthrough: 0 },        // 25
+                Jump { target: CO(31), gas: 0 },                                         // 26
                 VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
                               idx: FO(j), elem_size: 8 },                       // 27
                 VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: DescriptorId(0) }, // 28
                 AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 29
-                Jump { target: CO(25) },                                         // 30
+                Jump { target: CO(25), gas: 0 },                                         // 30
 
                 // COPY_BACK (31): copy tmp back into vec[lo..hi)
                 Move8 { dst: FO(k), src: FO(lo) },                              // 31
                 StoreImm8 { dst: FO(tmp_idx), imm: 0 },                         // 32
                 // COPY_LOOP (33)
-                JumpLessU64 { target: CO(35), lhs: FO(k), rhs: FO(hi) },        // 33
+                JumpLessU64 { target: CO(35), lhs: FO(k), rhs: FO(hi), gas_taken: 0, gas_fallthrough: 0 },        // 33
                 Return,                                                          // 34
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(tmp_ref),
                               idx: FO(tmp_idx), elem_size: 8 },                 // 35
@@ -284,7 +286,7 @@ mod micro_op {
                                src: FO(elem_a), elem_size: 8 },                 // 36
                 AddU64Imm { dst: FO(k), src: FO(k), imm: 1 },                  // 37
                 AddU64Imm { dst: FO(tmp_idx), src: FO(tmp_idx), imm: 1 },      // 38
-                Jump { target: CO(33) },                                         // 39
+                Jump { target: CO(33), gas: 0 },                                         // 39
             ];
 
             let code = arena.alloc_slice_fill_iter(code);
@@ -301,6 +303,7 @@ mod micro_op {
                     FO(vec_ref),
                     FO(tmp_ref),
                 ]),
+                entry_gas: 0,
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
             })
         };

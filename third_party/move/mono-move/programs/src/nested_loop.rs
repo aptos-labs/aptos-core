@@ -85,21 +85,21 @@ mod micro_op {
             StoreImm8 { dst: FO(sum), imm: 0 },                    // 0
             StoreImm8 { dst: FO(i), imm: 0 },                      // 1
             // OUTER_LOOP (2): if i < n goto OUTER_BODY
-            JumpLessU64 { target: CO(4), lhs: FO(i), rhs: FO(n) }, // 2
-            Jump { target: CO(13) },                                // 3: goto END
+            JumpLessU64 { target: CO(4), lhs: FO(i), rhs: FO(n), gas_taken: 0, gas_fallthrough: 0 }, // 2
+            Jump { target: CO(13), gas: 0 },                                // 3: goto END
             // OUTER_BODY: j = 0
             StoreImm8 { dst: FO(j), imm: 0 },                      // 4
             // INNER_LOOP (5): if j < n goto INNER_BODY
-            JumpLessU64 { target: CO(7), lhs: FO(j), rhs: FO(n) }, // 5
-            Jump { target: CO(11) },                                // 6: goto INNER_END
+            JumpLessU64 { target: CO(7), lhs: FO(j), rhs: FO(n), gas_taken: 0, gas_fallthrough: 0 }, // 5
+            Jump { target: CO(11), gas: 0 },                                // 6: goto INNER_END
             // INNER_BODY: sum += i ^ j; j += 1
             XorU64 { dst: FO(tmp), lhs: FO(i), rhs: FO(j) },      // 7
             AddU64 { dst: FO(sum), lhs: FO(sum), rhs: FO(tmp) },   // 8
             AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },          // 9
-            Jump { target: CO(5) },                                 // 10: goto INNER_LOOP
+            Jump { target: CO(5), gas: 0 },                                 // 10: goto INNER_LOOP
             // INNER_END (11): i += 1; goto OUTER_LOOP
             AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },          // 11
-            Jump { target: CO(2) },                                 // 12: goto OUTER_LOOP
+            Jump { target: CO(2), gas: 0 },                                 // 12: goto OUTER_LOOP
             // END (13): result = sum
             Move8 { dst: FO(n), src: FO(sum) },                    // 13
             Return,                                                 // 14
@@ -116,6 +116,7 @@ mod micro_op {
                 + mono_move_core::FRAME_METADATA_SIZE,
             zero_frame: false,
             frame_layout: FrameLayoutInfo::empty(&arena),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(&arena),
         });
 

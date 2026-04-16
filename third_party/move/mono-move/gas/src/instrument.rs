@@ -1,70 +1,75 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Generic instrumentation pass: insert gas charge ops into a flat
-//! instruction sequence.
+//! Generic instrumentation pass: embed block gas costs into jump instructions.
 //!
-//! Two kinds of charge ops are inserted:
+//! Each basic block's static cost is baked into the jump instructions that
+//! *enter* the block, so the interpreter charges gas before executing any
+//! work in the block (charge-before-work).
 //!
-//! - **`Charge`** — for each basic block, prepended at the block entry
-//!   with the summed static costs of all instructions in the block.
-//! - An optional dynamic charge op — for each instruction with a
-//!   runtime-variable cost component, appended immediately after it.
+//! ## Gas embedding
 //!
-//! ## Dead code
+//! - **Entry block (block 0)**: its cost is returned as `entry_gas` from
+//!   [`GasInstrumentor::run`] and stored in the function's metadata. The
+//!   runtime charges it at call time, before any instruction in block 0
+//!   executes.
 //!
-//! The pass instruments every basic block, including unreachable ones,
-//! potentially doubling program size in the worst case.
+//! - **All other blocks**: each block's cost is written into the jump
+//!   instruction(s) that target the block. The interpreter charges the cost
+//!   before taking the jump.
 //!
-//! TODO: the compiler should eliminate dead basic blocks before this pass
-//! runs, both to avoid wasted allocation and to prevent dead `Charge` ops
-//! from polluting the instruction cache.
+//! For **unconditional** jumps, `with_gas` receives the destination block's
+//! cost as `taken` and `0` as `fallthrough`.
 //!
-//! ## Branch-target remapping
+//! For **conditional** jumps, `with_gas` receives the taken block's cost as
+//! `taken` and the fallthrough block's cost as `fallthrough`.
 //!
-//! Inserting charge ops shifts instruction indices, so all branch targets are
-//! rewritten to account for all inserted charge ops. The [`RemapTargets`]
-//! trait lets each instruction type perform this rewrite without the gas
-//! crate knowing instruction internals.
+//! For **return** and other instructions without a branch target, `with_gas`
+//! is not called — these terminators carry no gas charge because their block's
+//! cost was already charged on entry.
+//!
+//! ## No instruction insertion
+//!
+//! This pass produces an output sequence of the **same length** as the input.
+//! Branch targets remain valid without any remapping.
 
-use crate::{compute_basic_blocks, GasSchedule, HasCfgInfo, InstrCost};
+use crate::{compute_basic_blocks, GasSchedule, HasCfgInfo};
 
 // ---------------------------------------------------------------------------
 // Traits
 // ---------------------------------------------------------------------------
 
-/// Constructs gas charge instructions within an ISA.
+/// Embeds destination-block gas costs into a jump instruction.
 ///
-/// Implemented alongside the ISA's instruction type.
-pub trait GasMeteredInstruction: Sized {
-    /// Construct a static gas charge.
-    ///
-    /// In practice, `cost` will be the pre-summed static cost of every
-    /// instruction in a basic block, computed at instrumentation time.
-    fn charge(cost: u64) -> Self;
-}
-
-/// Rewrites branch-target instruction indices inside an instruction.
+/// Implemented alongside the ISA's instruction type. [`GasInstrumentor::run`]
+/// calls `with_gas` on every jump instruction (those for which
+/// [`HasCfgInfo::branch_target`] returns `Some`).
 ///
-/// Implemented alongside [`HasCfgInfo`]. [`GasInstrumentor::run`] calls
-/// this on every instruction to fix up branch targets after inserting charge
-/// ops. Non-branching instructions return `self` unchanged.
-pub trait RemapTargets: Sized + HasCfgInfo {
-    /// Return a copy of `self` with every branch target index `t` replaced
-    /// by `remap(t)`.
-    fn remap_targets(self, remap: impl Fn(usize) -> usize) -> Self;
+/// - `taken`: cost of the block reached by the primary jump target.
+/// - `fallthrough`: cost of the block reached by falling through to the next
+///   instruction. Zero for unconditional jumps (their fallthrough is dead code
+///   and is never charged).
+///
+/// For non-jump instructions (return, arithmetic, etc.) the implementation
+/// should return `self` unchanged.
+pub trait ChargeOnJump: Sized {
+    /// Return a copy of `self` with the given block costs embedded.
+    fn with_gas(self, taken: u64, fallthrough: u64) -> Self;
 }
 
 // ---------------------------------------------------------------------------
 // GasInstrumentor
 // ---------------------------------------------------------------------------
 
-/// Inserts gas charge ops into a flat instruction sequence.
+/// Annotates jump instructions with destination-block gas costs.
 ///
-/// For each basic block, prepends a static block charge with the summed base
-/// costs. For each `Dynamic`-cost instruction, also inserts a runtime charge
-/// immediately after it. Branch targets are remapped to account for all
-/// inserted ops.
+/// For each basic block, computes the sum of the base costs of all
+/// instructions, then writes that cost into every jump instruction that
+/// targets the block. The entry block's cost is returned separately as
+/// `entry_gas` and must be charged at the call site.
+///
+/// The output sequence has the **same length** as the input — no instructions
+/// are inserted and no branch targets need remapping.
 ///
 /// TODO: this runs as a separate pass over the instruction sequence. Ideally
 /// it would be fused with an earlier compiler pass to avoid redundant
@@ -79,54 +84,78 @@ impl<S> GasInstrumentor<S> {
         Self { schedule }
     }
 
-    pub fn run<I>(&self, ops: Vec<I>) -> Vec<I>
+    /// Instrument `ops` and return `(annotated_ops, entry_gas)`.
+    ///
+    /// `entry_gas` is the static cost of block 0. The caller must store it in
+    /// the function's metadata and charge it at call time before executing any
+    /// instruction.
+    pub fn run<I>(&self, ops: Vec<I>) -> (Vec<I>, u64)
     where
-        I: HasCfgInfo + RemapTargets + GasMeteredInstruction,
+        I: HasCfgInfo + ChargeOnJump,
         S: GasSchedule<I>,
     {
         if ops.is_empty() {
-            return vec![];
+            return (vec![], 0);
         }
 
         let blocks = compute_basic_blocks(&ops);
-        let block_starts: Vec<usize> = blocks.iter().map(|bb| bb.start).collect();
 
-        let costs: Vec<InstrCost<I>> = ops.iter().map(|op| self.schedule.cost(op)).collect();
-
+        // Compute the static cost of each basic block.
         let block_costs: Vec<u64> = blocks
             .iter()
-            .map(|bb| (bb.start..bb.end).map(|i| costs[i].base).sum())
-            .collect();
-
-        // d_before[i] = number of dynamic-cost instructions at indices < i.
-        let mut n_dynamic = 0usize;
-        let d_before: Vec<usize> = costs
-            .iter()
-            .map(|c| {
-                let d = n_dynamic;
-                if c.dynamic.is_some() {
-                    n_dynamic += 1;
-                }
-                d
+            .map(|bb| {
+                (bb.start..bb.end)
+                    .map(|i| self.schedule.cost(&ops[i]))
+                    .sum()
             })
             .collect();
 
-        let remap = |t: usize| t + block_starts.partition_point(|&s| s < t) + d_before[t];
+        // entry_gas = cost of block 0, charged at function call time.
+        let entry_gas = block_costs.first().copied().unwrap_or(0);
 
-        let mut result = Vec::with_capacity(ops.len() + blocks.len() + n_dynamic);
-        let mut bi = 0usize;
-        for (i, (op, cost)) in ops.into_iter().zip(costs).enumerate() {
-            if bi < block_starts.len() && block_starts[bi] == i {
-                result.push(I::charge(block_costs[bi]));
-                bi += 1;
-            }
-            result.push(op.remap_targets(remap));
-            if let Some(dynamic) = cost.dynamic {
-                result.push(dynamic);
-            }
+        // Build a lookup table: cost_at_start[i] = cost of the block whose
+        // leader is at index i, or 0 if no block starts there.
+        // Size is ops.len()+1 so that `bb.end` for the last block is in bounds.
+        let mut cost_at_start = vec![0u64; ops.len() + 1];
+        for (bb, &cost) in blocks.iter().zip(&block_costs) {
+            cost_at_start[bb.start] = cost;
         }
 
-        result
+        // For each block terminator that is a jump, record the (taken, fallthrough)
+        // destination costs to embed.
+        let mut gas_vec: Vec<Option<(u64, u64)>> = vec![None; ops.len()];
+        for bb in &blocks {
+            let term_idx = bb.end - 1;
+            if let Some(taken_target) = ops[term_idx].branch_target() {
+                let taken_cost = *cost_at_start.get(taken_target).unwrap_or(&0);
+                let fallthrough_cost = *cost_at_start.get(bb.end).unwrap_or(&0);
+                gas_vec[term_idx] = Some((taken_cost, fallthrough_cost));
+            }
+            // Return and other non-jump terminators: no gas annotation.
+        }
+
+        let instrumented = ops
+            .into_iter()
+            .enumerate()
+            .map(|(i, op)| match gas_vec[i] {
+                Some((taken, fallthrough)) => op.with_gas(taken, fallthrough),
+                None => op,
+            })
+            .collect();
+
+        (instrumented, entry_gas)
+    }
+
+    /// Instrument every function in `program` and return the results in the
+    /// same order as `(annotated_ops, entry_gas)` pairs.
+    ///
+    /// Equivalent to calling [`run`](Self::run) on each element individually.
+    pub fn run_all<I>(&self, program: Vec<Vec<I>>) -> Vec<(Vec<I>, u64)>
+    where
+        I: HasCfgInfo + ChargeOnJump,
+        S: GasSchedule<I>,
+    {
+        program.into_iter().map(|ops| self.run(ops)).collect()
     }
 }
 
@@ -137,39 +166,46 @@ impl<S> GasInstrumentor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::GasSchedule;
 
     // Minimal stub instruction set for testing.
+    //
+    // Jump and CondJump carry gas fields that `with_gas` populates.
+    // Return and Nop have no gas fields.
     #[derive(Debug, Clone, PartialEq)]
     enum TestOp {
         Nop,
-        Jump(usize),
-        CondJump(usize),
+        Jump {
+            target: usize,
+            gas: u64,
+        },
+        CondJump {
+            target: usize,
+            gas_taken: u64,
+            gas_fallthrough: u64,
+        },
         Return,
-        Charge(u64),
-        ChargeDynamic(u64),
     }
 
-    impl GasMeteredInstruction for TestOp {
-        fn charge(cost: u64) -> Self {
-            TestOp::Charge(cost)
+    impl ChargeOnJump for TestOp {
+        fn with_gas(self, taken: u64, fallthrough: u64) -> Self {
+            match self {
+                TestOp::Jump { target, .. } => TestOp::Jump { target, gas: taken },
+                TestOp::CondJump { target, .. } => TestOp::CondJump {
+                    target,
+                    gas_taken: taken,
+                    gas_fallthrough: fallthrough,
+                },
+                other => other,
+            }
         }
     }
 
     impl HasCfgInfo for TestOp {
         fn branch_target(&self) -> Option<usize> {
             match self {
-                TestOp::Jump(t) | TestOp::CondJump(t) => Some(*t),
+                TestOp::Jump { target, .. } | TestOp::CondJump { target, .. } => Some(*target),
                 _ => None,
-            }
-        }
-    }
-
-    impl RemapTargets for TestOp {
-        fn remap_targets(self, remap: impl Fn(usize) -> usize) -> Self {
-            match self {
-                TestOp::Jump(t) => TestOp::Jump(remap(t)),
-                TestOp::CondJump(t) => TestOp::CondJump(remap(t)),
-                other => other,
             }
         }
     }
@@ -178,221 +214,181 @@ mod tests {
     fn empty() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
-                InstrCost::constant(0)
+            fn cost(&self, _: &TestOp) -> u64 {
+                0
             }
         }
-        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(vec![]);
-        assert!(r.is_empty());
+        let (ops, entry_gas) = GasInstrumentor::new(TestSchedule).run(vec![]);
+        assert!(ops.is_empty());
+        assert_eq!(entry_gas, 0);
     }
 
+    /// Single block: entry_gas = sum of all instruction costs; no jump to annotate.
+    ///
     /// Input:
     ///   0: Nop    — cost 2
     ///   1: Nop    — cost 2
     ///   2: Return — cost 2
     ///
     /// Output:
-    ///   0: Charge(6)
-    ///   1: Nop
-    ///   2: Nop
-    ///   3: Return
+    ///   ops: [Nop, Nop, Return]  (unchanged — Return has no branch_target)
+    ///   entry_gas: 6
     #[test]
-    fn single_block_cost_is_sum() {
+    fn single_block_entry_gas_is_sum() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
-                InstrCost::constant(2)
+            fn cost(&self, _: &TestOp) -> u64 {
+                2
             }
         }
         let ops = vec![TestOp::Nop, TestOp::Nop, TestOp::Return];
-        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
-        assert_eq!(r, vec![
-            TestOp::Charge(6),
-            TestOp::Nop,
-            TestOp::Nop,
-            TestOp::Return,
-        ]);
+        let (result, entry_gas) = GasInstrumentor::new(TestSchedule).run(ops);
+        assert_eq!(result, vec![TestOp::Nop, TestOp::Nop, TestOp::Return]);
+        assert_eq!(entry_gas, 6);
     }
 
+    /// Unconditional jump carries the destination block's cost.
+    ///
     /// Input:
     ///   0: Jump(2) — cost 1
-    ///   1: Nop     — cost 1
+    ///   1: Nop     — cost 1  (dead block — cost never charged)
     ///   2: Return  — cost 1
     ///
-    /// Output:
-    ///   0: Charge(1)
-    ///   1: Jump(4)
-    ///   2: Charge(1)
-    ///   3: Nop
-    ///   4: Charge(1)
-    ///   5: Return
-    #[test]
-    fn jump_target_remapped_to_charge() {
-        struct TestSchedule;
-        impl GasSchedule<TestOp> for TestSchedule {
-            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
-                InstrCost::constant(1)
-            }
-        }
-        let ops = vec![TestOp::Jump(2), TestOp::Nop, TestOp::Return];
-        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
-        assert_eq!(r, vec![
-            TestOp::Charge(1),
-            TestOp::Jump(4),
-            TestOp::Charge(1),
-            TestOp::Nop,
-            TestOp::Charge(1),
-            TestOp::Return,
-        ]);
-    }
-
-    /// Input:
-    ///   0: CondJump(3) — cost 1
-    ///   1: Nop         — cost 1
-    ///   2: Jump(0)     — cost 1
-    ///   3: Return      — cost 1
+    /// Blocks:
+    ///   [0..1]: Jump(2), cost 1   → entry_gas
+    ///   [1..2]: Nop,     cost 1   (dead)
+    ///   [2..3]: Return,  cost 1
+    ///
+    /// Jump(2).gas = cost(block at 2) = 1
     ///
     /// Output:
-    ///   0: Charge(1)
-    ///   1: CondJump(5)
-    ///   2: Charge(2)
-    ///   3: Nop
-    ///   4: Jump(0)
-    ///   5: Charge(1)
-    ///   6: Return
+    ///   ops: [Jump { target:2, gas:1 }, Nop, Return]
+    ///   entry_gas: 1
     #[test]
-    fn back_edge_remapped_to_charge() {
+    fn unconditional_jump_carries_dest_cost() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
-                InstrCost::constant(1)
+            fn cost(&self, _: &TestOp) -> u64 {
+                1
             }
         }
         let ops = vec![
-            TestOp::CondJump(3),
+            TestOp::Jump { target: 2, gas: 0 },
             TestOp::Nop,
-            TestOp::Jump(0),
             TestOp::Return,
         ];
-        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
-        assert_eq!(r, vec![
-            TestOp::Charge(1),
-            TestOp::CondJump(5),
-            TestOp::Charge(2),
+        let (result, entry_gas) = GasInstrumentor::new(TestSchedule).run(ops);
+        assert_eq!(result, vec![
+            TestOp::Jump { target: 2, gas: 1 },
             TestOp::Nop,
-            TestOp::Jump(0),
-            TestOp::Charge(1),
             TestOp::Return,
         ]);
+        assert_eq!(entry_gas, 1);
     }
 
+    /// Conditional jump carries both the taken and fallthrough block costs.
+    /// Back-edge jump carries the loop header's cost (ensuring correct per-iteration charge).
+    ///
+    /// Input:
+    ///   0: CondJump(3) — cost 1  (loop header: taken → exit, fallthrough → body)
+    ///   1: Nop         — cost 1
+    ///   2: Jump(0)     — cost 1  (back edge: destination is the loop header)
+    ///   3: Return      — cost 1
+    ///
+    /// Blocks and costs:
+    ///   [0..1]: CondJump, cost 1   → entry_gas = 1
+    ///   [1..3]: {Nop, Jump(0)}, cost 2
+    ///   [3..4]: Return, cost 1
+    ///
+    /// CondJump(3): gas_taken = cost(block at 3) = 1, gas_fallthrough = cost(block at 1) = 2
+    /// Jump(0):     gas      = cost(block at 0) = 1
+    ///
+    /// Output:
+    ///   ops: [CondJump{3,taken=1,fall=2}, Nop, Jump{0,gas=1}, Return]
+    ///   entry_gas: 1
+    #[test]
+    fn back_edge_carries_loop_header_cost() {
+        struct TestSchedule;
+        impl GasSchedule<TestOp> for TestSchedule {
+            fn cost(&self, _: &TestOp) -> u64 {
+                1
+            }
+        }
+        let ops = vec![
+            TestOp::CondJump {
+                target: 3,
+                gas_taken: 0,
+                gas_fallthrough: 0,
+            },
+            TestOp::Nop,
+            TestOp::Jump { target: 0, gas: 0 },
+            TestOp::Return,
+        ];
+        let (result, entry_gas) = GasInstrumentor::new(TestSchedule).run(ops);
+        assert_eq!(result, vec![
+            TestOp::CondJump {
+                target: 3,
+                gas_taken: 1,
+                gas_fallthrough: 2
+            },
+            TestOp::Nop,
+            TestOp::Jump { target: 0, gas: 1 },
+            TestOp::Return,
+        ]);
+        assert_eq!(entry_gas, 1);
+    }
+
+    /// Mixed instruction costs: verify that block sums are correct.
+    ///
     /// Input:
     ///   0: Nop         — cost 1
     ///   1: CondJump(2) — cost 2
     ///   2: Nop         — cost 1
     ///   3: Return      — cost 3
     ///
+    /// Blocks:
+    ///   [0..2]: {Nop, CondJump(2)}, cost 1+2 = 3   → entry_gas = 3
+    ///   [2..4]: {Nop, Return},      cost 1+3 = 4
+    ///
+    /// CondJump(2): gas_taken = 4 (taken to block at 2), gas_fallthrough = 4 (fallthrough to 2)
+    ///   (both paths lead to block [2..4] in this degenerate case)
+    ///
     /// Output:
-    ///   0: Charge(3)
-    ///   1: Nop
-    ///   2: CondJump(3)
-    ///   3: Charge(4)
-    ///   4: Nop
-    ///   5: Return
+    ///   ops: [Nop, CondJump{2,taken=4,fall=4}, Nop, Return]
+    ///   entry_gas: 3
     #[test]
     fn blocks_have_correct_costs() {
         struct TestSchedule;
         impl GasSchedule<TestOp> for TestSchedule {
-            fn cost(&self, i: &TestOp) -> InstrCost<TestOp> {
-                InstrCost::constant(match i {
+            fn cost(&self, i: &TestOp) -> u64 {
+                match i {
                     TestOp::Nop => 1,
-                    TestOp::Jump(_) | TestOp::CondJump(_) => 2,
+                    TestOp::Jump { .. } | TestOp::CondJump { .. } => 2,
                     TestOp::Return => 3,
-                    _ => 0,
-                })
+                }
             }
         }
         let ops = vec![
             TestOp::Nop,
-            TestOp::CondJump(2),
+            TestOp::CondJump {
+                target: 2,
+                gas_taken: 0,
+                gas_fallthrough: 0,
+            },
             TestOp::Nop,
             TestOp::Return,
         ];
-        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
-        assert_eq!(r, vec![
-            TestOp::Charge(3),
+        let (result, entry_gas) = GasInstrumentor::new(TestSchedule).run(ops);
+        assert_eq!(result, vec![
             TestOp::Nop,
-            TestOp::CondJump(3),
-            TestOp::Charge(4),
+            TestOp::CondJump {
+                target: 2,
+                gas_taken: 4,
+                gas_fallthrough: 4
+            },
             TestOp::Nop,
             TestOp::Return,
         ]);
-    }
-
-    /// Input:
-    ///   0: Nop    — base: 5, dynamic: Some(ChargeDynamic(3))
-    ///   1: Return — base: 5, dynamic: None
-    ///
-    /// Output:
-    ///   0: Charge(10)
-    ///   1: Nop
-    ///   2: ChargeDynamic(3)
-    ///   3: Return
-    #[test]
-    fn dynamic_charges_inserted_after_instruction() {
-        struct TestSchedule;
-        impl GasSchedule<TestOp> for TestSchedule {
-            fn cost(&self, op: &TestOp) -> InstrCost<TestOp> {
-                match op {
-                    TestOp::Nop => InstrCost {
-                        base: 5,
-                        dynamic: Some(TestOp::ChargeDynamic(3)),
-                    },
-                    _ => InstrCost::constant(5),
-                }
-            }
-        }
-        let ops = vec![TestOp::Nop, TestOp::Return];
-        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
-        assert_eq!(r, vec![
-            TestOp::Charge(10),
-            TestOp::Nop,
-            TestOp::ChargeDynamic(3),
-            TestOp::Return,
-        ]);
-    }
-
-    /// Dead code: Nop at index 1 is unreachable but still gets a Charge op.
-    ///
-    /// Input:
-    ///   0: Jump(2) — cost 1
-    ///   1: Nop     — cost 1 (dead)
-    ///   2: Return  — cost 1
-    ///
-    /// Output:
-    ///   0: Charge(1)
-    ///   1: Jump(4)
-    ///   2: Charge(1)
-    ///   3: Nop
-    ///   4: Charge(1)
-    ///   5: Return
-    #[test]
-    fn dead_code_block_still_instrumented() {
-        struct TestSchedule;
-        impl GasSchedule<TestOp> for TestSchedule {
-            fn cost(&self, _: &TestOp) -> InstrCost<TestOp> {
-                InstrCost::constant(1)
-            }
-        }
-        let ops = vec![TestOp::Jump(2), TestOp::Nop, TestOp::Return];
-        let r: Vec<TestOp> = GasInstrumentor::new(TestSchedule).run(ops);
-        assert_eq!(r, vec![
-            TestOp::Charge(1),
-            TestOp::Jump(4),
-            TestOp::Charge(1),
-            TestOp::Nop,
-            TestOp::Charge(1),
-            TestOp::Return,
-        ]);
+        assert_eq!(entry_gas, 3);
     }
 }

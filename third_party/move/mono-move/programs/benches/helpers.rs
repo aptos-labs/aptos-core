@@ -36,11 +36,12 @@ pub unsafe fn gas_instrument(
             // SAFETY: caller guarantees the pointer is valid.
             let func = unsafe { fp.as_ref_unchecked() };
             let raw = unsafe { func.code.as_ref_unchecked() };
-            let instrumented = instrumentor.run(raw.to_vec());
+            let (instrumented, entry_gas) = instrumentor.run(raw.to_vec());
             let code = arena.alloc_slice_copy(&instrumented);
             Some(arena.alloc(Function {
                 name: func.name,
                 code,
+                entry_gas,
                 args_size: func.args_size,
                 args_and_locals_size: func.args_and_locals_size,
                 extended_frame_size: func.extended_frame_size,

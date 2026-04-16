@@ -51,6 +51,7 @@ fn enum_basic() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(shape)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -108,6 +109,7 @@ fn enum_survives_gc() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(shape)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -172,6 +174,7 @@ fn enum_gc_traces_refs() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(val), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![
         ObjectDescriptor::Enum {
@@ -226,7 +229,7 @@ fn enum_pattern_match() {
         StoreImm8 { dst: FO(tmp), imm: 25 },
         MicroOp::enum_store8(FO(op), 8, FO(tmp)),
         MicroOp::enum_get_tag(FO(op), FO(tmp)),
-        JumpNotZeroU64 { target: CO(12), src: FO(tmp) },
+        JumpNotZeroU64 { target: CO(12), src: FO(tmp), gas_taken: 0, gas_fallthrough: 0 },
         MicroOp::enum_load8(FO(op), 0, FO(result)),
         MicroOp::enum_load8(FO(op), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
@@ -243,6 +246,7 @@ fn enum_pattern_match() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(op)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -295,6 +299,7 @@ fn enum_variant_switch() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(e)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 16,
@@ -349,6 +354,7 @@ fn enum_borrow_field() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(e), FO(r#ref), FO(e_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Enum {
         size: 24,
@@ -408,6 +414,7 @@ fn enum_gc_variant_switching() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(ctr), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![
         ObjectDescriptor::Enum {
@@ -472,6 +479,7 @@ fn enum_in_struct() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(wrapper), FO(payload)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![
         ObjectDescriptor::Struct {
@@ -550,6 +558,7 @@ fn enum_in_vector() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(e), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![
         ObjectDescriptor::Enum {

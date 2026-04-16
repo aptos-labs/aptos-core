@@ -295,12 +295,21 @@ pub enum MicroOp {
     Return,
 
     /// Unconditional jump.
-    Jump { target: CodeOffset },
+    ///
+    /// `gas` is the static cost of the destination block, charged before
+    /// the jump executes (charge-before-work).
+    Jump { target: CodeOffset, gas: u64 },
 
     /// Jump to `target` if the u64 at `src` is **not** zero.
+    ///
+    /// `gas_taken` / `gas_fallthrough` are the static costs of the taken and
+    /// fallthrough destination blocks, respectively. The interpreter charges
+    /// exactly one of these before transferring control.
     JumpNotZeroU64 {
         target: CodeOffset,
         src: FrameOffset,
+        gas_taken: u32,
+        gas_fallthrough: u32,
     },
 
     /// Jump to `target` if the u64 at `src` is **>=** `imm`.
@@ -308,6 +317,8 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u32,
+        gas_fallthrough: u32,
     },
 
     /// Jump to `target` if the u64 at `src` is **<** `imm`.
@@ -315,6 +326,8 @@ pub enum MicroOp {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
+        gas_taken: u32,
+        gas_fallthrough: u32,
     },
 
     /// Jump to `target` if u64 at `lhs` < u64 at `rhs`.
@@ -322,6 +335,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u32,
+        gas_fallthrough: u32,
     },
 
     /// Jump to `target` if u64 at `lhs` >= u64 at `rhs`.
@@ -329,6 +344,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u32,
+        gas_fallthrough: u32,
     },
 
     /// Jump to `target` if u64 at `lhs` != u64 at `rhs`.
@@ -336,6 +353,8 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+        gas_taken: u32,
+        gas_fallthrough: u32,
     },
 
     //======================================================================
@@ -547,15 +566,6 @@ pub enum MicroOp {
     },
 
     //======================================================================
-    // Gas metering
-    //======================================================================
-    // Inserted by the instrumentation pass; never emitted directly by user code.
-    //======================================================================
-    /// Charge a pre-computed static gas cost for the current basic block.
-    /// The interpreter must call the gas meter and abort on exhaustion.
-    Charge { cost: u64 },
-
-    //======================================================================
     // Debugging
     //======================================================================
     /// Advance the interpreter's RNG and write a random u64 to `dst`.
@@ -620,21 +630,46 @@ impl fmt::Display for MicroOp {
             MicroOp::Return => {
                 write!(f, "Return")
             },
-            MicroOp::Jump { target } => {
-                write!(f, "Jump @{}", target.0)
+            MicroOp::Jump { target, gas } => {
+                write!(f, "Jump @{} gas={}", target.0, gas)
             },
-            MicroOp::JumpNotZeroU64 { target, src } => {
-                write!(f, "JumpNotZeroU64 @{} [{}]", target.0, src.0)
-            },
-            MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
+            MicroOp::JumpNotZeroU64 {
+                target,
+                src,
+                gas_taken,
+                gas_fallthrough,
+            } => {
                 write!(
                     f,
-                    "JumpGreaterEqualU64Imm @{} [{}] >= #{}",
-                    target.0, src.0, imm
+                    "JumpNotZeroU64 @{} [{}] gas={}/{}",
+                    target.0, src.0, gas_taken, gas_fallthrough
                 )
             },
-            MicroOp::JumpLessU64 { target, lhs, rhs } => {
-                write!(f, "JumpLessU64 @{} [{}] < [{}]", target.0, lhs.0, rhs.0)
+            MicroOp::JumpGreaterEqualU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpGreaterEqualU64Imm @{} [{}] >= #{} gas={}/{}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpLessU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpLessU64 @{} [{}] < [{}] gas={}/{}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
+                )
             },
             MicroOp::VecNew { dst } => {
                 write!(f, "VecNew [{}]", dst.0)
@@ -779,28 +814,47 @@ impl fmt::Display for MicroOp {
             MicroOp::XorU64 { dst, lhs, rhs } => {
                 write!(f, "XorU64 [{}] <- [{}] ^ [{}]", dst.0, lhs.0, rhs.0)
             },
-            MicroOp::JumpLessU64Imm { target, src, imm } => {
-                write!(f, "JumpLessU64Imm @{} [{}] < #{}", target.0, src.0, imm)
-            },
-            MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => {
+            MicroOp::JumpLessU64Imm {
+                target,
+                src,
+                imm,
+                gas_taken,
+                gas_fallthrough,
+            } => {
                 write!(
                     f,
-                    "JumpGreaterEqualU64 @{} [{}] >= [{}]",
-                    target.0, lhs.0, rhs.0
+                    "JumpLessU64Imm @{} [{}] < #{} gas={}/{}",
+                    target.0, src.0, imm, gas_taken, gas_fallthrough
                 )
             },
-            MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
+            MicroOp::JumpGreaterEqualU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
                 write!(
                     f,
-                    "JumpNotEqualU64 @{} [{}] != [{}]",
-                    target.0, lhs.0, rhs.0
+                    "JumpGreaterEqualU64 @{} [{}] >= [{}] gas={}/{}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
+                )
+            },
+            MicroOp::JumpNotEqualU64 {
+                target,
+                lhs,
+                rhs,
+                gas_taken,
+                gas_fallthrough,
+            } => {
+                write!(
+                    f,
+                    "JumpNotEqualU64 @{} [{}] != [{}] gas={}/{}",
+                    target.0, lhs.0, rhs.0, gas_taken, gas_fallthrough
                 )
             },
             MicroOp::ForceGC => {
                 write!(f, "ForceGC")
-            },
-            MicroOp::Charge { cost } => {
-                write!(f, "Charge #{}", cost)
             },
         }
     }
@@ -957,8 +1011,8 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // Current size is 24 bytes due to large variants (e.g.
+        // Current size is 32 bytes due to large variants (e.g.
         // JumpGreaterEqualU64Imm). We should aim to bring this down to 16.
-        assert_eq!(std::mem::size_of::<MicroOp>(), 24);
+        assert_eq!(std::mem::size_of::<MicroOp>(), 32);
     }
 }

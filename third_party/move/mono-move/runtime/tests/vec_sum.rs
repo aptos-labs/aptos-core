@@ -32,20 +32,20 @@ fn make_vec_sum_program(
         VecNew { dst: FO(slot_vec) },
         SlotBorrow { dst: FO(slot_vec_ref), local: FO(slot_vec) },
         StoreImm8 { dst: FO(slot_i), imm: 0 },
-        JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },
+        JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n, gas_taken: 0, gas_fallthrough: 0 },
         VecPushBack { vec_ref: FO(slot_vec_ref), elem: FO(slot_i), elem_size: 8, descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(slot_tmp), imm: 1 },
         AddU64 { dst: FO(slot_i), lhs: FO(slot_i), rhs: FO(slot_tmp) },
-        JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },
-        JumpNotZeroU64 { target: CO(4), src: FO(slot_i) },
+        JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n, gas_taken: 0, gas_fallthrough: 0 },
+        JumpNotZeroU64 { target: CO(4), src: FO(slot_i), gas_taken: 0, gas_fallthrough: 0 },
         StoreImm8 { dst: FO(slot_result), imm: 0 },
         VecLen { dst: FO(slot_i), vec_ref: FO(slot_vec_ref) },
-        JumpNotZeroU64 { target: CO(13), src: FO(slot_i) },
+        JumpNotZeroU64 { target: CO(13), src: FO(slot_i), gas_taken: 0, gas_fallthrough: 0 },
         Return,
         VecPopBack { dst: FO(slot_tmp), vec_ref: FO(slot_vec_ref), elem_size: 8 },
         AddU64 { dst: FO(slot_result), lhs: FO(slot_result), rhs: FO(slot_tmp) },
         VecLen { dst: FO(slot_i), vec_ref: FO(slot_vec_ref) },
-        JumpNotZeroU64 { target: CO(13), src: FO(slot_i) },
+        JumpNotZeroU64 { target: CO(13), src: FO(slot_i), gas_taken: 0, gas_fallthrough: 0 },
         Return,
     ]);
     let func = arena.alloc(Function {
@@ -57,6 +57,7 @@ fn make_vec_sum_program(
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(arena, vec![FO(slot_vec), FO(slot_vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(arena),
+        entry_gas: 0,
     });
 
     let descriptors = vec![ObjectDescriptor::Trivial];

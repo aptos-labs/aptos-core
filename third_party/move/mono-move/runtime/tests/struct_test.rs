@@ -43,6 +43,7 @@ fn struct_inline() {
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(&arena),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let gas_meter = SimpleGasMeter::new(u64::MAX);
@@ -89,6 +90,7 @@ fn struct_inline_borrow() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(r#ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
     let gas_meter = SimpleGasMeter::new(u64::MAX);
@@ -135,6 +137,7 @@ fn struct_heap_basic() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -185,6 +188,7 @@ fn struct_heap_survives_gc() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -256,6 +260,7 @@ fn struct_with_vector_field() {
             FO(ctr_ref),
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![
         ObjectDescriptor::Struct {
@@ -324,6 +329,7 @@ fn struct_borrow_field() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,
@@ -380,6 +386,7 @@ fn struct_borrow_survives_gc() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        entry_gas: 0,
     })];
     let descriptors = vec![ObjectDescriptor::Struct {
         size: 16,

@@ -28,6 +28,7 @@ fn minimal_func(arena: &ExecutableArena) -> &Function {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(arena),
                 safe_point_layouts: SortedSafePointEntries::empty(arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     }
@@ -55,7 +56,7 @@ fn valid_with_arithmetic_and_jumps() {
         StoreImm8 { dst: FO(0), imm: 10 },
         StoreImm8 { dst: FO(8), imm: 1 },
         SubU64Imm { dst: FO(0), src: FO(0), imm: 1 },
-        JumpNotZeroU64 { target: CO(2), src: FO(0) },
+        JumpNotZeroU64 { target: CO(2), src: FO(0), gas_taken: 0, gas_fallthrough: 0 },
         Return,
     ]);
     // SAFETY: Arena is alive for the duration of the test.
@@ -70,6 +71,7 @@ fn valid_with_arithmetic_and_jumps() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -103,6 +105,7 @@ fn valid_with_vec_and_pointer_slots() {
                 zero_frame: true,
                 frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -130,6 +133,7 @@ fn frame_bounds_store_u64() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -165,6 +169,7 @@ fn frame_bounds_mov() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -198,6 +203,7 @@ fn frame_bounds_fat_ptr_write() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -224,6 +230,7 @@ fn frame_bounds_callfunc_metadata() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -253,6 +260,7 @@ fn pointer_slots_offset_out_of_bounds() {
                 zero_frame: true,
                 frame_layout: FrameLayoutInfo::new(&arena, vec![FO(100)]), // offset 100 + 8 > extended_frame_size 32
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -278,6 +286,7 @@ fn pointer_slots_overlaps_metadata() {
                 zero_frame: true,
                 frame_layout: FrameLayoutInfo::new(&arena, vec![FO(8)]), // offset 8 overlaps metadata [8, 32) since args_and_locals_size = 8
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -303,6 +312,7 @@ fn args_size_exceeds_data_size() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -325,7 +335,10 @@ fn invalid_jump_target() {
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
                 code: arena.alloc_slice_fill_iter(vec![
-                    Jump { target: CO(5) }, // only 2 instructions -> 5 >= 2
+                    Jump {
+                        target: CO(5),
+                        gas: 0,
+                    }, // only 2 instructions -> 5 >= 2
                     Return,
                 ]),
                 args_size: 0,
@@ -334,6 +347,7 @@ fn invalid_jump_target() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -356,6 +370,8 @@ fn invalid_conditional_jump_target() {
                     JumpNotZeroU64 {
                         target: CO(99),
                         src: FO(0),
+                        gas_taken: 0,
+                        gas_fallthrough: 0,
                     },
                     Return,
                 ]),
@@ -365,6 +381,7 @@ fn invalid_conditional_jump_target() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -394,6 +411,7 @@ fn invalid_callfunc_func_id() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -440,6 +458,7 @@ fn invalid_descriptor_id() {
                 zero_frame: true,
                 frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -475,6 +494,7 @@ fn zero_size_mov() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -517,6 +537,7 @@ fn zero_elem_size_vec_push() {
                 zero_frame: true,
                 frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -544,6 +565,7 @@ fn empty_code() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -567,6 +589,7 @@ fn zero_frame_size() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };
@@ -593,7 +616,10 @@ fn multiple_errors_collected() {
                         dst: FO(100),
                         imm: 0,
                     }, // out of bounds
-                    Jump { target: CO(99) }, // invalid target
+                    Jump {
+                        target: CO(99),
+                        gas: 0,
+                    }, // invalid target
                     Return,
                 ]),
                 args_size: 0,
@@ -602,6 +628,7 @@ fn multiple_errors_collected() {
                 zero_frame: false,
                 frame_layout: FrameLayoutInfo::empty(&arena),
                 safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                entry_gas: 0,
             })
             .as_ref_unchecked()
     };

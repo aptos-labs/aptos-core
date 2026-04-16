@@ -62,11 +62,11 @@ mod micro_op {
         #[rustfmt::skip]
         let code = vec![
             // if n != 0 goto CHECKGE2
-            JumpNotZeroU64 { target: CO(3), src: FO(n) },
+            JumpNotZeroU64 { target: CO(3), src: FO(n), gas_taken: 0, gas_fallthrough: 0 },
             StoreImm8 { dst: FO(result), imm: 0 },
             Return,
             // CHECKGE2: if n >= 2 goto RECURSE
-            JumpGreaterEqualU64Imm { target: CO(6), src: FO(n), imm: 2 },
+            JumpGreaterEqualU64Imm { target: CO(6), src: FO(n), imm: 2, gas_taken: 0, gas_fallthrough: 0 },
             StoreImm8 { dst: FO(result), imm: 1 },
             Return,
             // RECURSE: tmp = fib(n - 1)
@@ -91,6 +91,7 @@ mod micro_op {
             extended_frame_size: (callee_n + 8) as usize,
             zero_frame: false,
             frame_layout: FrameLayoutInfo::empty(&arena),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(&arena),
         });
 

@@ -107,7 +107,7 @@ mod micro_op {
             StoreImm8 { dst: FO(c4),  imm: 4 },               // 2: const4 = 4
 
             // LOOP (3): if i < n goto BODY else goto END
-            JumpLessU64 { target: CO(6), lhs: FO(i), rhs: FO(n) }, // 3
+            JumpLessU64 { target: CO(6), lhs: FO(i), rhs: FO(n), gas_taken: 0, gas_fallthrough: 0 }, // 3
             Move8 { dst: FO(n), src: FO(sum) },                // 4: result = sum
             Return,                                            // 5
 
@@ -115,29 +115,29 @@ mod micro_op {
             ModU64 { dst: FO(r), lhs: FO(i), rhs: FO(c4) },  // 6
 
             // if r >= 1 goto GE1 else CASE0
-            JumpGreaterEqualU64Imm { target: CO(10), src: FO(r), imm: 1 }, // 7
+            JumpGreaterEqualU64Imm { target: CO(10), src: FO(r), imm: 1, gas_taken: 0, gas_fallthrough: 0 }, // 7
             // CASE0 (8): sum += 10; goto MERGE
             AddU64Imm { dst: FO(sum), src: FO(sum), imm: 10 }, // 8
-            Jump { target: CO(17) },                           // 9
+            Jump { target: CO(17), gas: 0 },                   // 9
 
             // GE1 (10): if r >= 2 goto GE2 else CASE1
-            JumpGreaterEqualU64Imm { target: CO(13), src: FO(r), imm: 2 }, // 10
+            JumpGreaterEqualU64Imm { target: CO(13), src: FO(r), imm: 2, gas_taken: 0, gas_fallthrough: 0 }, // 10
             // CASE1 (11): sum += 20; goto MERGE
             AddU64Imm { dst: FO(sum), src: FO(sum), imm: 20 }, // 11
-            Jump { target: CO(17) },                           // 12
+            Jump { target: CO(17), gas: 0 },                   // 12
 
             // GE2 (13): if r >= 3 goto CASE3 else CASE2
-            JumpGreaterEqualU64Imm { target: CO(16), src: FO(r), imm: 3 }, // 13
+            JumpGreaterEqualU64Imm { target: CO(16), src: FO(r), imm: 3, gas_taken: 0, gas_fallthrough: 0 }, // 13
             // CASE2 (14): sum += 30; goto MERGE
             AddU64Imm { dst: FO(sum), src: FO(sum), imm: 30 }, // 14
-            Jump { target: CO(17) },                           // 15
+            Jump { target: CO(17), gas: 0 },                   // 15
 
             // CASE3 (16): sum += 40 (fallthrough to MERGE)
             AddU64Imm { dst: FO(sum), src: FO(sum), imm: 40 }, // 16
 
             // MERGE (17): i += 1; goto LOOP
             AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },     // 17
-            Jump { target: CO(3) },                            // 18
+            Jump { target: CO(3), gas: 0 },                    // 18
         ];
 
         let code = arena.alloc_slice_fill_iter(code);
@@ -151,6 +151,7 @@ mod micro_op {
                 + mono_move_core::FRAME_METADATA_SIZE,
             zero_frame: false,
             frame_layout: FrameLayoutInfo::empty(&arena),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(&arena),
         });
 

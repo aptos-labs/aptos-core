@@ -355,6 +355,7 @@ mod micro_op {
             extended_frame_size: 24 + FRAME_METADATA_SIZE,
             zero_frame: true,
             frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(nodes), FO(free_list)]),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
@@ -390,21 +391,21 @@ mod micro_op {
             Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                        // 2
             Move8 { dst: FO(idx), src: FO(root) },                                // 3: idx = root
             // -- LOOP (4) --
-            JumpGreaterEqualU64Imm { target: CO(15), src: FO(idx), imm: NULL },   // 4: NULL? → NONE
+            JumpGreaterEqualU64Imm { target: CO(15), src: FO(idx), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },   // 4: NULL? → NONE
             VecLoadElem { dst: FO(node_key), vec_ref: FO(nodes_ref),
                           idx: FO(idx), elem_size: NODE_SIZE },                    // 5: node = nodes[idx]
-            JumpLessU64 { target: CO(11), lhs: FO(key), rhs: FO(node_key) },      // 6: key < node.key → LEFT
-            JumpLessU64 { target: CO(13), lhs: FO(node_key), rhs: FO(key) },      // 7: node.key < key → RIGHT
+            JumpLessU64 { target: CO(11), lhs: FO(key), rhs: FO(node_key), gas_taken: 0, gas_fallthrough: 0 },      // 6: key < node.key → LEFT
+            JumpLessU64 { target: CO(13), lhs: FO(node_key), rhs: FO(key), gas_taken: 0, gas_fallthrough: 0 },      // 7: node.key < key → RIGHT
             // EQUAL (8)
             StoreImm8 { dst: FO(tag), imm: 1 },                                   // 8
             Move8 { dst: FO(value), src: FO(node_val) },                           // 9
             Return,                                                                // 10
             // GO_LEFT (11)
             Move8 { dst: FO(idx), src: FO(node_left) },                           // 11
-            Jump { target: CO(4) },                                                // 12
+            Jump { target: CO(4), gas: 0 },                                                // 12
             // GO_RIGHT (13)
             Move8 { dst: FO(idx), src: FO(node_right) },                          // 13
-            Jump { target: CO(4) },                                                // 14
+            Jump { target: CO(4), gas: 0 },                                                // 14
             // NONE (15)
             StoreImm8 { dst: FO(tag), imm: 0 },                                   // 15
             StoreImm8 { dst: FO(value), imm: 0 },                                 // 16
@@ -421,6 +422,7 @@ mod micro_op {
             extended_frame_size: 96 + FRAME_METADATA_SIZE,
             zero_frame: false,
             frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
@@ -466,7 +468,7 @@ mod micro_op {
             Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                         // 2
             // -- if root != NULL → LOOP_SETUP; else fall through to INSERT_ROOT --
             JumpLessU64Imm { target: CO(10),
-                             src: FO(root), imm: NULL },                           // 3: → LOOP_SETUP
+                             src: FO(root), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },                           // 3: → LOOP_SETUP
             // -- INSERT_ROOT (4): bst.root = alloc_node(bst, key, value); return --
             Move8 { dst: FO(c0), src: FO(bst) },                                  // 4
             Move8 { dst: FO(c1), src: FO(key) },                                  // 5
@@ -481,10 +483,10 @@ mod micro_op {
                           idx: FO(idx), elem_size: NODE_SIZE },                    // 11
             // -- key < node_key? (GO_LEFT falls through, skip if >=) --
             JumpGreaterEqualU64 { target: CO(23),
-                                  lhs: FO(key), rhs: FO(node_key) },              // 12: key >= node_key → NOT_LESS
+                                  lhs: FO(key), rhs: FO(node_key), gas_taken: 0, gas_fallthrough: 0 },              // 12: key >= node_key → NOT_LESS
             // GO_LEFT (13): key < node_key
             JumpLessU64Imm { target: CO(21),
-                             src: FO(node_left), imm: NULL },                     // 13: left != NULL → CONTINUE_LEFT
+                             src: FO(node_left), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },                     // 13: left != NULL → CONTINUE_LEFT
             // INSERT_LEFT (14): node.left = alloc_node(...); store node; return
             Move8 { dst: FO(c0), src: FO(bst) },                                  // 14
             Move8 { dst: FO(c1), src: FO(key) },                                  // 15
@@ -496,13 +498,13 @@ mod micro_op {
             Return,                                                                // 20
             // CONTINUE_LEFT (21)
             Move8 { dst: FO(idx), src: FO(node_left) },                           // 21
-            Jump { target: CO(11) },                                               // 22
+            Jump { target: CO(11), gas: 0 },                                               // 22
             // -- NOT_LESS (23): key > node_key? --
             JumpGreaterEqualU64 { target: CO(34),
-                                  lhs: FO(node_key), rhs: FO(key) },              // 23: node_key >= key → EQUAL
+                                  lhs: FO(node_key), rhs: FO(key), gas_taken: 0, gas_fallthrough: 0 },              // 23: node_key >= key → EQUAL
             // GO_RIGHT (24): key > node_key
             JumpLessU64Imm { target: CO(32),
-                             src: FO(node_right), imm: NULL },                    // 24: right != NULL → CONTINUE_RIGHT
+                             src: FO(node_right), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },                    // 24: right != NULL → CONTINUE_RIGHT
             // INSERT_RIGHT (25): node.right = alloc_node(...); store node; return
             Move8 { dst: FO(c0), src: FO(bst) },                                  // 25
             Move8 { dst: FO(c1), src: FO(key) },                                  // 26
@@ -514,7 +516,7 @@ mod micro_op {
             Return,                                                                // 31
             // CONTINUE_RIGHT (32)
             Move8 { dst: FO(idx), src: FO(node_right) },                          // 32
-            Jump { target: CO(11) },                                               // 33
+            Jump { target: CO(11), gas: 0 },                                               // 33
             // -- EQUAL (34): node.value = value; store node; return --
             Move8 { dst: FO(node_val), src: FO(value) },                           // 34
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(idx),
@@ -532,6 +534,7 @@ mod micro_op {
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
             frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
@@ -580,12 +583,12 @@ mod micro_op {
             StoreImm8 { dst: FO(new_node_right), imm: NULL },                     // 6
             // Check free_list
             VecLen { dst: FO(fl_len), vec_ref: FO(free_list_ref) },                // 7
-            JumpNotZeroU64 { target: CO(12), src: FO(fl_len) },                    // 8: → POP
+            JumpNotZeroU64 { target: CO(12), src: FO(fl_len), gas_taken: 0, gas_fallthrough: 0 },                    // 8: → POP
             // PUSH path: idx = nodes.len(); nodes.push(new_node)
             VecLen { dst: FO(idx), vec_ref: FO(nodes_ref) },                       // 9
             VecPushBack { vec_ref: FO(nodes_ref), elem: FO(new_node),
                           elem_size: NODE_SIZE, descriptor_id: DESC_TRIVIAL },     // 10
-            Jump { target: CO(14) },                                               // 11: → DONE
+            Jump { target: CO(14), gas: 0 },                                               // 11: → DONE
             // POP path (12): idx = free_list.pop(); nodes[idx] = new_node
             VecPopBack { dst: FO(idx), vec_ref: FO(free_list_ref),
                          elem_size: 8 },                                           // 12
@@ -611,6 +614,7 @@ mod micro_op {
                 FO(nodes_ref),
                 FO(free_list_ref),
             ]),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
@@ -656,30 +660,30 @@ mod micro_op {
             Move8 { dst: FO(idx), src: FO(root) },                                // 4
             // -- LOOP (5): while idx != NULL --
             JumpGreaterEqualU64Imm { target: CO(27),
-                                     src: FO(idx), imm: NULL },                   // 5: → DONE
+                                     src: FO(idx), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },                   // 5: → DONE
             VecLoadElem { dst: FO(node), vec_ref: FO(nodes_ref),
                           idx: FO(idx), elem_size: NODE_SIZE },                    // 6
             // -- key < node_key? --
             JumpGreaterEqualU64 { target: CO(11),
-                                  lhs: FO(key), rhs: FO(node_key) },              // 7: key >= → NOT_LESS
+                                  lhs: FO(key), rhs: FO(node_key), gas_taken: 0, gas_fallthrough: 0 },              // 7: key >= → NOT_LESS
             // GO_LEFT: key < node_key
             Move8 { dst: FO(parent), src: FO(idx) },                              // 8
             Move8 { dst: FO(idx), src: FO(node_left) },                           // 9
-            Jump { target: CO(5) },                                                // 10
+            Jump { target: CO(5), gas: 0 },                                                // 10
             // -- NOT_LESS (11): key > node_key? --
             JumpGreaterEqualU64 { target: CO(15),
-                                  lhs: FO(node_key), rhs: FO(key) },              // 11: node_key >= key → EQUAL
+                                  lhs: FO(node_key), rhs: FO(key), gas_taken: 0, gas_fallthrough: 0 },              // 11: node_key >= key → EQUAL
             // GO_RIGHT: key > node_key
             Move8 { dst: FO(parent), src: FO(idx) },                              // 12
             Move8 { dst: FO(idx), src: FO(node_right) },                          // 13
-            Jump { target: CO(5) },                                                // 14
+            Jump { target: CO(5), gas: 0 },                                                // 14
             // -- EQUAL (15): remove_node(bst, idx) → c0 holds replacement --
             Move8 { dst: FO(c0), src: FO(bst) },                                  // 15
             Move8 { dst: FO(c1), src: FO(idx) },                                  // 16
             CallFunc { func_id: remove_node_id },                                  // 17
             // -- if parent != NULL → HAS_PARENT --
             JumpLessU64Imm { target: CO(21),
-                             src: FO(parent), imm: NULL },                        // 18: → HAS_PARENT
+                             src: FO(parent), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },                        // 18: → HAS_PARENT
             // UPDATE_ROOT: parent == NULL, bst.root = replacement (c0)
             Op::struct_store8(FO(bst), BST_ROOT, FO(c0)),                          // 19
             Return,                                                                // 20
@@ -687,10 +691,10 @@ mod micro_op {
             VecLoadElem { dst: FO(node), vec_ref: FO(nodes_ref),
                           idx: FO(parent), elem_size: NODE_SIZE },                 // 21
             JumpNotEqualU64 { target: CO(25),
-                              lhs: FO(node_left), rhs: FO(idx) },                 // 22: → UPDATE_RIGHT
+                              lhs: FO(node_left), rhs: FO(idx), gas_taken: 0, gas_fallthrough: 0 },                 // 22: → UPDATE_RIGHT
             // UPDATE_LEFT: parent.left = replacement (c0)
             Move8 { dst: FO(node_left), src: FO(c0) },                            // 23
-            Jump { target: CO(26) },                                               // 24: → STORE_PARENT
+            Jump { target: CO(26), gas: 0 },                                               // 24: → STORE_PARENT
             // UPDATE_RIGHT (25): parent.right = replacement (c0)
             Move8 { dst: FO(node_right), src: FO(c0) },                           // 25
             // -- STORE_PARENT (26): shared epilogue --
@@ -709,6 +713,7 @@ mod micro_op {
             extended_frame_size: (c1 + 8) as usize,
             zero_frame: true,
             frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
@@ -757,25 +762,25 @@ mod micro_op {
             Move8 { dst: FO(right), src: FO(scratch_right) },                      // 5
             // -- if left == NULL: free idx, return right --
             JumpLessU64Imm { target: CO(9),
-                             src: FO(left), imm: NULL },                           // 6: left != NULL → HAS_LEFT
+                             src: FO(left), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },                           // 6: left != NULL → HAS_LEFT
             Move8 { dst: FO(result), src: FO(right) },                            // 7
-            Jump { target: CO(33) },                                               // 8: → FREE_RETURN
+            Jump { target: CO(33), gas: 0 },                                               // 8: → FREE_RETURN
             // -- HAS_LEFT (9): if right == NULL: free idx, return left --
             JumpLessU64Imm { target: CO(12),
-                             src: FO(right), imm: NULL },                          // 9: right != NULL → HAS_BOTH
+                             src: FO(right), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },                          // 9: right != NULL → HAS_BOTH
             Move8 { dst: FO(result), src: FO(left) },                             // 10
-            Jump { target: CO(33) },                                               // 11: → FREE_RETURN
+            Jump { target: CO(33), gas: 0 },                                               // 11: → FREE_RETURN
             // -- HAS_BOTH (12): load nodes[right], check right.left --
             VecLoadElem { dst: FO(scratch), vec_ref: FO(nodes_ref),
                           idx: FO(right), elem_size: NODE_SIZE },                  // 12
             JumpLessU64Imm { target: CO(18),
-                             src: FO(scratch_left), imm: NULL },                   // 13: right.left != NULL → DEEP
+                             src: FO(scratch_left), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },                   // 13: right.left != NULL → DEEP
             // SIMPLE_SUCCESSOR (14): right.left == NULL, right adopts left
             Move8 { dst: FO(scratch_left), src: FO(left) },                       // 14
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(right),
                            src: FO(scratch), elem_size: NODE_SIZE },               // 15
             Move8 { dst: FO(result), src: FO(right) },                            // 16
-            Jump { target: CO(33) },                                               // 17: → FREE_RETURN
+            Jump { target: CO(33), gas: 0 },                                               // 17: → FREE_RETURN
             // -- DEEP_SUCCESSOR (18): walk left to find in-order successor --
             Move8 { dst: FO(parent), src: FO(right) },                            // 18
             Move8 { dst: FO(cur), src: FO(scratch_left) },                        // 19
@@ -783,10 +788,10 @@ mod micro_op {
             VecLoadElem { dst: FO(scratch), vec_ref: FO(nodes_ref),
                           idx: FO(cur), elem_size: NODE_SIZE },                    // 20
             JumpGreaterEqualU64Imm { target: CO(25),
-                                     src: FO(scratch_left), imm: NULL },           // 21: cur.left == NULL → WALK_DONE
+                                     src: FO(scratch_left), imm: NULL, gas_taken: 0, gas_fallthrough: 0 },           // 21: cur.left == NULL → WALK_DONE
             Move8 { dst: FO(parent), src: FO(cur) },                              // 22
             Move8 { dst: FO(cur), src: FO(scratch_left) },                        // 23
-            Jump { target: CO(20) },                                               // 24
+            Jump { target: CO(20), gas: 0 },                                               // 24
             // -- WALK_DONE (25): scratch = nodes[cur] --
             // Save cur.right, then set cur's children to left/right from removed node
             Move8 { dst: FO(cur_right), src: FO(scratch_right) },                 // 25
@@ -822,6 +827,7 @@ mod micro_op {
                 FO(nodes_ref),
                 FO(free_list_ref),
             ]),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
@@ -867,7 +873,7 @@ mod micro_op {
             StoreImm8 { dst: FO(i), imm: 0 },                                    // 4
             // -- LOOP (5) --
             JumpGreaterEqualU64 { target: CO(28),
-                                  lhs: FO(i), rhs: FO(len) },                    // 5: → DONE
+                                  lhs: FO(i), rhs: FO(len), gas_taken: 0, gas_fallthrough: 0 },                    // 5: → DONE
             // Load triple
             VecLoadElem { dst: FO(op_code), vec_ref: FO(ops_ref),
                           idx: FO(i), elem_size: 8 },                            // 6
@@ -879,28 +885,28 @@ mod micro_op {
                           idx: FO(i), elem_size: 8 },                            // 10
             AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                       // 11
             // -- Dispatch --
-            JumpNotZeroU64 { target: CO(18), src: FO(op_code) },                 // 12: → CHECK_GET
+            JumpNotZeroU64 { target: CO(18), src: FO(op_code), gas_taken: 0, gas_fallthrough: 0 },                 // 12: → CHECK_GET
             // INSERT (13)
             Move8 { dst: FO(c0), src: FO(bst) },                                 // 13
             Move8 { dst: FO(c1), src: FO(key) },                                 // 14
             Move8 { dst: FO(c2), src: FO(value) },                               // 15
             CallFunc { func_id: FN_INSERT as u32 },                               // 16
-            Jump { target: CO(5) },                                               // 17
+            Jump { target: CO(5), gas: 0 },                                               // 17
             // CHECK_GET (18)
             JumpGreaterEqualU64Imm { target: CO(24),
-                                      src: FO(op_code), imm: 2 },               // 18: → REMOVE
+                                      src: FO(op_code), imm: 2, gas_taken: 0, gas_fallthrough: 0 },               // 18: → REMOVE
             // GET (19)
             Move8 { dst: FO(c0), src: FO(bst) },                                 // 19
             Move8 { dst: FO(c1), src: FO(key) },                                 // 20
             CallFunc { func_id: FN_GET as u32 },                                  // 21
-            Jump { target: CO(5) },                                               // 22
+            Jump { target: CO(5), gas: 0 },                                               // 22
             // skip (23) — padding for alignment, shouldn't be reached
-            Jump { target: CO(5) },                                               // 23
+            Jump { target: CO(5), gas: 0 },                                               // 23
             // REMOVE (24)
             Move8 { dst: FO(c0), src: FO(bst) },                                 // 24
             Move8 { dst: FO(c1), src: FO(key) },                                 // 25
             CallFunc { func_id: FN_REMOVE as u32 },                               // 26
-            Jump { target: CO(5) },                                               // 27
+            Jump { target: CO(5), gas: 0 },                                               // 27
             // DONE (28)
             Return,                                                               // 28
         ];
@@ -915,6 +921,7 @@ mod micro_op {
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
             frame_layout: FrameLayoutInfo::new(arena, vec![FO(ops), FO(bst), FO(ops_ref)]),
+            entry_gas: 0,
             safe_point_layouts: SortedSafePointEntries::empty(arena),
         })
     }
