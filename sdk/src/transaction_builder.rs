@@ -42,6 +42,7 @@ pub struct TransactionBuilder {
     expiration_timestamp_secs: u64,
     chain_id: ChainId,
     encryption_key: Arc<RwLock<EncryptionKeyState>>,
+    auth_key: Option<AuthenticationKey>,
 }
 
 impl TransactionBuilder {
@@ -60,6 +61,7 @@ impl TransactionBuilder {
             sender: None,
             sequence_number: None,
             encryption_key: Arc::new(RwLock::new(EncryptionKeyState::default())),
+            auth_key: None,
         }
     }
 
@@ -93,6 +95,11 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn auth_key(mut self, auth_key: Option<AuthenticationKey>) -> Self {
+        self.auth_key = auth_key;
+        self
+    }
+
     pub fn has_nonce(&self) -> bool {
         self.payload.replay_protection_nonce().is_some()
     }
@@ -123,6 +130,8 @@ impl TransactionBuilder {
             let encrypted_payload = TransactionFactory::encrypt_payload(
                 self.payload.clone(),
                 self.sender.expect("sender must have been set"),
+                self.auth_key
+                    .expect("auth_key must be set for encrypted payloads"),
                 encryption_key,
             )
             .expect("Payload must encrypt");
@@ -445,6 +454,7 @@ impl TransactionFactory {
             expiration_timestamp_secs: self.expiration_timestamp(),
             chain_id: self.chain_id,
             encryption_key: self.encryption_key.clone(),
+            auth_key: None,
         }
     }
 
@@ -453,6 +463,7 @@ impl TransactionFactory {
     fn encrypt_payload(
         payload: TransactionPayload,
         sender: AccountAddress,
+        auth_key: AuthenticationKey,
         encryption_key: &EncryptionKey,
     ) -> Result<EncryptedPayload> {
         // Convert payload to executable
@@ -465,8 +476,9 @@ impl TransactionFactory {
         // Create DecryptedPayload for encryption
         let decrypted_payload = DecryptedPayload::new(executable, decryption_nonce);
 
-        // Create associated data
-        let associated_data = PayloadAssociatedData::new(sender);
+        // Create associated data with sender and auth_key to bind the ciphertext
+        // to both the sender address and the authenticator's identity.
+        let associated_data = PayloadAssociatedData::new(sender, auth_key);
 
         // Encrypt the payload
         // Note: FPTXWeighted::encrypt requires CryptoRng from ark_std::rand, so we use StdRng
@@ -512,7 +524,12 @@ impl TransactionFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_batch_encryption::traits::BatchThresholdEncryption;
+    use aptos_crypto::{
+        ed25519::Ed25519PrivateKey, weighted_config::WeightedConfigArkworks, PrivateKey, Uniform,
+    };
     use aptos_types::transaction::{ReplayProtector, TransactionPayload};
+    use rand::Rng;
 
     fn test_payload() -> TransactionPayload {
         aptos_stdlib::aptos_account_transfer(AccountAddress::ONE, 100)
@@ -562,5 +579,42 @@ mod tests {
             ReplayProtector::SequenceNumber(5)
         );
         assert!(raw_txn.payload_ref().replay_protection_nonce().is_none());
+    }
+
+    #[test]
+    fn test_encrypted_payload_verification_binds_sender_and_auth_key() {
+        let mut rng = rand::thread_rng();
+        let threshold_config = WeightedConfigArkworks::new(1, vec![1]).unwrap();
+        let (encryption_key, _, _, _) =
+            FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &threshold_config).unwrap();
+
+        let sender_private_key = Ed25519PrivateKey::generate_for_testing();
+        let sender_public_key = sender_private_key.public_key();
+        let sender_auth_key = AuthenticationKey::ed25519(&sender_public_key);
+        let sender = sender_auth_key.account_address();
+        let wrong_private_key = Ed25519PrivateKey::generate(&mut rand::thread_rng());
+        let wrong_auth_key = AuthenticationKey::ed25519(&wrong_private_key.public_key());
+        assert_ne!(wrong_auth_key, sender_auth_key);
+        let wrong_sender = if sender == AccountAddress::ONE {
+            AccountAddress::TWO
+        } else {
+            AccountAddress::ONE
+        };
+
+        let encrypted_payload = TransactionFactory::encrypt_payload(
+            test_payload(),
+            sender,
+            sender_auth_key,
+            &encryption_key,
+        )
+        .unwrap();
+
+        encrypted_payload
+            .verify(sender, sender_auth_key)
+            .expect("sender and auth_key used for encryption should verify");
+        assert!(encrypted_payload.verify(sender, wrong_auth_key).is_err());
+        assert!(encrypted_payload
+            .verify(wrong_sender, AuthenticationKey::ed25519(&sender_public_key))
+            .is_err());
     }
 }

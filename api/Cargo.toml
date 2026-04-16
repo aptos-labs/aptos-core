@@ -51,6 +51,7 @@ tokio = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
+aptos-batch-encryption = { workspace = true }
 aptos-cached-packages = { workspace = true, features = ["testing"] }
 aptos-framework = { workspace = true }
 aptos-gas-meter = { workspace = true }

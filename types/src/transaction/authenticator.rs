@@ -821,6 +821,36 @@ impl AccountAuthenticator {
         }
     }
 
+    /// Return the authentication key derived from `self`'s public key and scheme id,
+    /// or `None` for authenticator types that don't support stateless key derivation
+    /// (V1 Abstract, NoAccountAuthenticator).
+    pub fn authentication_key(&self) -> Option<AuthenticationKey> {
+        match self {
+            Self::Ed25519 { .. }
+            | Self::MultiEd25519 { .. }
+            | Self::SingleKey { .. }
+            | Self::MultiKey { .. } => Some(AuthenticationKey::from_preimage(
+                self.public_key_bytes(),
+                self.scheme(),
+            )),
+            Self::Abstract { authenticator } => {
+                match authenticator.auth_data().abstract_public_key() {
+                    Some(abstract_public_key) => {
+                        // DerivableV1: derive auth key from function_info + abstract_public_key
+                        let func_info_bytes = bcs::to_bytes(authenticator.function_info())
+                            .expect("FunctionInfo serialization should not fail");
+                        Some(AuthenticationKey::domain_abstraction_address(
+                            func_info_bytes,
+                            abstract_public_key,
+                        ))
+                    },
+                    None => None, // V1 Abstract: no public key available
+                }
+            },
+            Self::NoAccountAuthenticator => None,
+        }
+    }
+
     /// Return an authentication proof derived from `self`'s public key and scheme id
     pub fn authentication_proof(&self) -> AuthenticationProof {
         match self {
@@ -1622,6 +1652,46 @@ mod tests {
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
         assert!(AuthenticationKey::from_str("").is_err());
+    }
+
+    #[test]
+    fn authentication_key_derivation_matches_supported_authenticators() {
+        let sender = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender.public_key();
+        let ed25519_auth =
+            AccountAuthenticator::ed25519(sender_pub.clone(), Ed25519Signature::dummy_signature());
+        assert_eq!(
+            ed25519_auth.authentication_key(),
+            Some(AuthenticationKey::ed25519(&sender_pub)),
+        );
+
+        let function_info = FunctionInfo::new(
+            AccountAddress::ONE,
+            "test_module".to_owned(),
+            "test_function".to_owned(),
+        );
+        let abstract_public_key = b"derivable-auth-key".to_vec();
+        let derivable_auth = AccountAuthenticator::derivable_abstraction(
+            function_info.clone(),
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            abstract_public_key.clone(),
+        );
+        assert_eq!(
+            derivable_auth.authentication_key(),
+            Some(AuthenticationKey::domain_abstraction_address(
+                bcs::to_bytes(&function_info).unwrap(),
+                &abstract_public_key,
+            )),
+        );
+
+        let v1_abstract_auth =
+            AccountAuthenticator::abstraction(function_info, vec![7, 8, 9], vec![10, 11, 12]);
+        assert_eq!(v1_abstract_auth.authentication_key(), None);
+        assert_eq!(
+            AccountAuthenticator::NoAccountAuthenticator.authentication_key(),
+            None
+        );
     }
 
     #[test]
