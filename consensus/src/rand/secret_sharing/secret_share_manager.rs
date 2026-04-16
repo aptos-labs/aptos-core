@@ -166,6 +166,7 @@ impl SecretShareManager {
                 if let Some(item) = self.block_queue.item_mut(round) {
                     item.resolve_round_without_key(round);
                 }
+                self.secret_share_store.lock().mark_round_skipped(round);
                 return;
             },
             Err(e) => {
