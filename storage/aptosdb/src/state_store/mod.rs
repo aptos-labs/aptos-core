@@ -75,6 +75,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use dashmap::DashMap;
 use claims::{assert_ge, assert_le};
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -100,6 +101,14 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
+
+/// Hot state data loaded from DB, bundling DashMaps and their metadata together.
+/// These two are produced by `load_hot_state_kvs` and must stay paired until consumed
+/// by `PersistedState` construction.
+pub(crate) struct LoadedHotState {
+    pub shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+    pub metadata: [HotStateMetadata; NUM_STATE_SHARDS],
+}
 
 pub(crate) struct StatePruner {
     pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StaleNodeIndexSchema>>,
@@ -408,34 +417,44 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             hot_state_config,
         )));
-        let (persisted_state, hot_state_metadata) = if empty_buffered_state_for_restore {
-            (
-                PersistedState::new_empty(hot_state_config),
-                Default::default(),
-            )
-        } else {
-            Self::load_hot_state_or_empty(&state_db, hot_state_config)
-        };
-        let buffered_state = if empty_buffered_state_for_restore {
-            BufferedState::new_at_snapshot(
+        let (persisted_state, buffered_state) = if empty_buffered_state_for_restore {
+            let snapshot = StateWithSummary::new_empty(hot_state_config);
+            let persisted_state =
+                PersistedState::new_at_snapshot(snapshot.clone(), hot_state_config);
+            let buffered_state = BufferedState::new_at_snapshot(
                 &state_db,
-                StateWithSummary::new_empty(hot_state_config),
+                snapshot,
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
-            )
+            );
+            (persisted_state, buffered_state)
         } else {
-            Self::create_buffered_state_from_latest_snapshot(
+            let loaded = Self::load_hot_state(&state_db, hot_state_config);
+            let metadata = loaded
+                .as_ref()
+                .map_or(Default::default(), |l| l.metadata.clone());
+            let (snapshot, num_transactions) =
+                Self::build_latest_snapshot_state(&state_db, metadata, hot_state_config)
+                    .expect("Failed to build snapshot state.");
+            let persisted_state = match loaded {
+                Some(loaded) => {
+                    PersistedState::new_from_loaded(snapshot.clone(), loaded.shards)
+                },
+                None => PersistedState::new_at_snapshot(snapshot.clone(), hot_state_config),
+            };
+            let buffered_state = Self::create_buffered_state_from_snapshot(
                 &state_db,
+                snapshot,
+                num_transactions,
                 buffered_state_target_items,
                 hack_for_tests,
                 /*check_max_versions_after_snapshot=*/ true,
                 current_state.clone(),
                 persisted_state.clone(),
-                hot_state_metadata,
-                hot_state_config,
             )
-            .expect("buffered state creation failed.")
+            .expect("buffered state creation failed.");
+            (persisted_state, buffered_state)
         };
 
         Self {
@@ -652,32 +671,36 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             HotStateConfig::default(),
         )));
-        let _ = Self::create_buffered_state_from_latest_snapshot(
+        let (snapshot, num_transactions) = Self::build_latest_snapshot_state(
             &state_db,
+            Default::default(),
+            HotStateConfig::default(),
+        )?;
+        let persisted_state =
+            PersistedState::new_at_snapshot(snapshot.clone(), HotStateConfig::default());
+        let _ = Self::create_buffered_state_from_snapshot(
+            &state_db,
+            snapshot,
+            num_transactions,
             0,
             /*hack_for_tests=*/ false,
             /*check_max_versions_after_snapshot=*/ false,
             current_state.clone(),
-            PersistedState::new_empty(HotStateConfig::default()),
-            Default::default(),
-            HotStateConfig::default(),
+            persisted_state,
         )?;
         let base_version = current_state.lock().version();
         Ok(base_version)
     }
 
-    /// Creates a `BufferedState` from the latest state snapshot, replaying write sets
-    /// between the snapshot and the committed version.
-    fn create_buffered_state_from_latest_snapshot(
+    /// Queries the latest state snapshot and builds a `StateWithSummary` at that version.
+    ///
+    /// Returns `(snapshot_state, num_transactions)` — the latter is the total number of
+    /// committed transactions, needed to decide whether replay is required.
+    fn build_latest_snapshot_state(
         state_db: &Arc<StateDb>,
-        buffered_state_target_items: usize,
-        hack_for_tests: bool,
-        check_max_versions_after_snapshot: bool,
-        out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
-        out_persisted_state: PersistedState,
         hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         hot_state_config: HotStateConfig,
-    ) -> Result<BufferedState> {
+    ) -> Result<(StateWithSummary, Version)> {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -692,7 +715,7 @@ impl StateStore {
         info!(
             num_transactions = num_transactions,
             latest_snapshot_version = latest_snapshot_version,
-            "Initializing BufferedState."
+            "Building snapshot state."
         );
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
@@ -721,12 +744,30 @@ impl StateStore {
             hot_state_config,
             hot_state_metadata,
         );
+        Ok((state, num_transactions))
+    }
+
+    /// Creates a `BufferedState` from the given snapshot, replaying write sets between the
+    /// snapshot and the committed version.
+    ///
+    /// The `persisted_state` must already be at the snapshot state — either freshly
+    /// constructed from the same `StateWithSummary`, or reset via `hack_reset`.
+    fn create_buffered_state_from_snapshot(
+        state_db: &Arc<StateDb>,
+        snapshot: StateWithSummary,
+        num_transactions: Version,
+        buffered_state_target_items: usize,
+        hack_for_tests: bool,
+        check_max_versions_after_snapshot: bool,
+        out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
+        persisted_state: PersistedState,
+    ) -> Result<BufferedState> {
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
-            state.clone(),
+            snapshot.clone(),
             buffered_state_target_items,
             out_current_state.clone(),
-            out_persisted_state.clone(),
+            persisted_state.clone(),
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
@@ -735,7 +776,7 @@ impl StateStore {
         }
 
         // Make sure the committed transactions is ahead of the latest snapshot.
-        let snapshot_next_version = latest_snapshot_version.map_or(0, |v| v + 1);
+        let snapshot_next_version = snapshot.next_version();
 
         // For non-restore cases, always snapshot_next_version <= num_transactions.
         if snapshot_next_version > num_transactions {
@@ -746,7 +787,7 @@ impl StateStore {
             );
         }
 
-        if hot_state_root_hash == *SPARSE_MERKLE_PLACEHOLDER_HASH
+        if snapshot.summary().hot_root_hash() == *SPARSE_MERKLE_PLACEHOLDER_HASH
             && snapshot_next_version > 0
             && let Some(db) = &state_db.hot_state_merkle_db
         {
@@ -770,7 +811,7 @@ impl StateStore {
                 num_transactions,
                 &mut buffered_state,
                 &out_current_state,
-                &out_persisted_state,
+                &persisted_state,
             )?;
         }
 
@@ -858,40 +899,23 @@ impl StateStore {
         Ok(())
     }
 
-    /// Tries to load the hot state from DB at the latest snapshot version. Returns an empty
-    /// persisted state when loading is not applicable (disabled, no DB, no snapshot).
+    /// Tries to load the hot state DashMaps and metadata from DB at the latest snapshot version.
+    /// Returns `None` when loading is not applicable (disabled, no DB, no snapshot).
     ///
-    /// Returns:
-    ///   - `PersistedState` — fed into `BufferedState` as the base hot state.
-    ///   - `[HotStateMetadata; NUM_STATE_SHARDS]` — per-shard LRU metadata for seeding
-    ///     the speculative `State` (which diverges from the `PersistedState`'s `State`
-    ///     during replay).
-    fn load_hot_state_or_empty(
+    /// The returned `LoadedHotState` bundles the DashMaps and metadata together — they must
+    /// stay paired until consumed by `PersistedState` construction.
+    fn load_hot_state(
         state_db: &Arc<StateDb>,
         hot_state_config: HotStateConfig,
-    ) -> (PersistedState, [HotStateMetadata; NUM_STATE_SHARDS]) {
-        let empty = || {
-            (
-                PersistedState::new_empty(hot_state_config),
-                Default::default(),
-            )
-        };
-
+    ) -> Option<LoadedHotState> {
         if hot_state_config.delete_on_restart {
-            return empty();
+            return None;
         }
-        let hot_kv_db = match &state_db.hot_state_kv_db {
-            Some(db) => db,
-            None => return empty(),
-        };
-        let snapshot_version = match state_db
+        let hot_kv_db = state_db.hot_state_kv_db.as_ref()?;
+        let snapshot_version = state_db
             .state_merkle_db
             .get_state_snapshot_version_before(Version::MAX)
-            .expect("Failed to query latest snapshot on initialization.")
-        {
-            Some(v) => v,
-            None => return empty(),
-        };
+            .expect("Failed to query latest snapshot on initialization.")?;
 
         let loaded = hot_kv_db
             .load_hot_state_kvs(snapshot_version)
@@ -904,21 +928,9 @@ impl StateStore {
                 loaded[i].total_value_bytes,
             )
         });
-        let dashmaps = loaded.map(|s| s.map);
-        let usage = state_db
-            .get_state_storage_usage(Some(snapshot_version))
-            .expect("Failed to query state storage usage on initialization.");
-        let state = State::new_at_version_with_hot_state_metadata(
-            Some(snapshot_version),
-            usage,
-            hot_state_config,
-            metadata.clone(),
-        );
+        let shards = loaded.map(|s| s.map);
 
-        (
-            PersistedState::new_from_loaded(state, hot_state_config, dashmaps),
-            metadata,
-        )
+        Some(LoadedHotState { shards, metadata })
     }
 
     pub fn reset(&self) {
@@ -926,15 +938,22 @@ impl StateStore {
         // TODO(HotState): restore does not reconstruct the hot state yet, so we pass empty
         // metadata here. This is safe because callers (restore / state-sync) open the DB with
         // `empty_buffered_state_for_restore`, so the DashMaps are always empty.
-        *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
+        let (snapshot, num_transactions) = Self::build_latest_snapshot_state(
             &self.state_db,
-            self.buffered_state_target_items,
-            false,
-            true,
-            self.current_state.clone(),
-            self.persisted_state.clone(),
             Default::default(),
             self.hot_state_config,
+        )
+        .expect("Failed to build snapshot state.");
+        self.persisted_state.hack_reset(snapshot.clone());
+        *self.buffered_state.lock() = Self::create_buffered_state_from_snapshot(
+            &self.state_db,
+            snapshot,
+            num_transactions,
+            self.buffered_state_target_items,
+            /*hack_for_tests=*/ false,
+            /*check_max_versions_after_snapshot=*/ true,
+            self.current_state.clone(),
+            self.persisted_state.clone(),
         )
         .expect("buffered state creation failed.");
     }
