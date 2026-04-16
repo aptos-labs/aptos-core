@@ -414,6 +414,42 @@ impl Committer {
     /// so it must be the sole message in the channel. `next_to_commit` asserts this before
     /// calling.
     fn handle_reset(&mut self, state: State, ack: Sender<()>) {
+        for i in 0..NUM_STATE_SHARDS {
+            let head = state.latest_hot_key(i);
+            let tail = state.oldest_hot_key(i);
+            assert_eq!(
+                self.base.shards[i].len(),
+                state.num_hot_items(i),
+                "Shard {i}: DashMap/metadata item count mismatch on reset.",
+            );
+            match (head, tail) {
+                (None, None) => assert_eq!(
+                    self.base.shards[i].len(),
+                    0,
+                    "Shard {i}: head and tail are None but DashMap is not empty.",
+                ),
+                (Some(h), Some(t)) => {
+                    let head_entry = self.base.shards[i]
+                        .get(&h)
+                        .expect("Shard {i}: head not in DashMap.");
+                    assert!(
+                        head_entry.prev().is_none(),
+                        "Shard {i}: head has a prev pointer."
+                    );
+                    let tail_entry = self.base.shards[i]
+                        .get(&t)
+                        .expect("Shard {i}: tail not in DashMap.");
+                    assert!(
+                        tail_entry.next().is_none(),
+                        "Shard {i}: tail has a next pointer."
+                    );
+                },
+                _ => panic!("Shard {i}: head and tail must both be None or both be Some."),
+            }
+            self.heads[i] = head;
+            self.tails[i] = tail;
+            self.total_value_bytes[i] = state.hot_value_bytes(i);
+        }
         self.merged_state = state;
         self.merged_version
             .store(self.merged_state.next_version(), Ordering::Release);

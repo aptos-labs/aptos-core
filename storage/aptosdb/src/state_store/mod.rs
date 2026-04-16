@@ -615,6 +615,7 @@ impl StateStore {
             .expect("State merkle max version cannot be None.");
         if target_version < state_merkle_max_version {
             info!(
+                is_hot = state_merkle_db.is_hot(),
                 state_merkle_max_version = state_merkle_max_version,
                 target_version = target_version,
                 "Start state merkle truncation..."
@@ -922,6 +923,9 @@ impl StateStore {
 
     pub fn reset(&self) {
         self.buffered_state.lock().quit();
+        // TODO(HotState): restore does not reconstruct the hot state yet, so we pass empty
+        // metadata here. This is safe because callers (restore / state-sync) open the DB with
+        // `empty_buffered_state_for_restore`, so the DashMaps are always empty.
         *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,
