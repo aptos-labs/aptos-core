@@ -42,6 +42,7 @@ pub struct HotStateMetadata {
     latest: Option<HashValue>,
     oldest: Option<HashValue>,
     num_items: usize,
+    total_value_bytes: usize,
 }
 
 impl HotStateMetadata {
@@ -50,6 +51,7 @@ impl HotStateMetadata {
             latest: None,
             oldest: None,
             num_items: 0,
+            total_value_bytes: 0,
         }
     }
 }
@@ -160,6 +162,10 @@ impl State {
         self.hot_state_metadata[shard_id].num_items
     }
 
+    pub fn hot_value_bytes(&self, shard_id: usize) -> usize {
+        self.hot_state_metadata[shard_id].total_value_bytes
+    }
+
     fn update(
         &self,
         persisted_hot_state: Arc<dyn HotStateView>,
@@ -211,6 +217,7 @@ impl State {
                         hot_metadata.latest,
                         hot_metadata.oldest,
                         hot_metadata.num_items,
+                        hot_metadata.total_value_bytes,
                     );
                     let mut all_updates = per_version.iter();
                     let mut insertions = HashMap::new();
@@ -285,7 +292,8 @@ impl State {
                         }
                     }
 
-                    let (new_items, new_head, new_tail, new_num_items) = lru.into_updates();
+                    let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
+                        lru.into_updates();
                     let new_items = new_items.into_iter().collect_vec();
 
                     // TODO(aldenhu): change interface to take iter of ref
@@ -294,6 +302,7 @@ impl State {
                         latest: new_head,
                         oldest: new_tail,
                         num_items: new_num_items,
+                        total_value_bytes: new_total_value_bytes,
                     };
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
                     (
