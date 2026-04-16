@@ -21,9 +21,8 @@ use crate::{
         acquires_checker, ast_simplifier, closure_checker, cmp_rewriter,
         cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
         inlining_optimization, lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
-        recursive_struct_checker, rewrite_target::RewritingScope, seqs_in_binop_checker,
-        spec_checker, spec_rewriter, struct_usage_collector, unused_params_checker,
-        EnvProcessorPipeline,
+        recursive_struct_checker, rewrite_target::RewritingScope, spec_checker, spec_rewriter,
+        struct_usage_collector, unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -436,18 +435,6 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
     if options.experiment_on(Experiment::ACCESS_CHECK) {
         env_pipeline.add("access check before inlining", |env: &mut GlobalEnv| {
             function_checker::check_access_before_inlining(env)
-        });
-    }
-
-    let check_seqs_in_binops = !options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_0)
-        && options.experiment_on(Experiment::SEQS_IN_BINOPS_CHECK);
-    if check_seqs_in_binops {
-        env_pipeline.add("binop side effect check", |env| {
-            // This check should be done before inlining.
-            seqs_in_binop_checker::checker(env)
         });
     }
 

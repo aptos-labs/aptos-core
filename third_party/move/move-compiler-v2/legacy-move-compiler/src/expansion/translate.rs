@@ -2092,8 +2092,7 @@ fn name_access_chain(
         },
         (_, PN::Two(sp!(_, LN::Name(n1)), n2)) => {
             if let Some((mident, mem)) = context.aliases.member_alias_get(&n1).filter(|_| {
-                context.env.flags().lang_v2()
-                    && is_valid_struct_constant_or_schema_name(n1.value.as_str())
+                is_valid_struct_constant_or_schema_name(n1.value.as_str())
                     && is_valid_struct_constant_or_schema_name(n2.value.as_str())
             }) {
                 // n1 is interpreted as a type and n2 as a variant in the type
@@ -2286,17 +2285,6 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::Move(v) => EE::Move(v),
         PE::Copy(v) => EE::Copy(v),
-        PE::Name(_pn, Some(_ty)) if !context.in_spec_context && !context.env.flags().lang_v2() => {
-            context.env.add_diag(diag!(
-                Syntax::SpecContextRestricted,
-                (
-                    loc,
-                    "Expected name to be followed by a brace-enclosed list of field expressions \
-                     or a parenthesized list of arguments for a function call",
-                )
-            ));
-            EE::UnresolvedError
-        },
         PE::Name(pn, ptys_opt) => {
             let en_opt = name_access_chain(context, Access::Term, pn);
             let tys_opt = optional_types(context, ptys_opt);
@@ -2576,25 +2564,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             exp(context, *e),
             tys.into_iter().map(|ty| type_(context, ty)).collect(),
         ),
-        PE::Index(e, i) => {
-            if context.env.flags().lang_v2() || context.in_spec_context {
-                EE::Index(exp(context, *e), exp(context, *i))
-            } else {
-                // If it is a name, call `name_access_chain` to avoid
-                // the unused alias warning
-                if let PE::Name(pn, _) = e.value {
-                    let _ = name_access_chain(context, Access::Term, pn);
-                }
-                context.env.add_diag(diag!(
-                    Syntax::UnsupportedLanguageItem,
-                    (
-                        loc,
-                        "`_[_]` index operator in non-specification code only allowed in Move 2 and beyond"
-                    )
-                ));
-                EE::UnresolvedError
-            }
-        },
+        PE::Index(e, i) => EE::Index(exp(context, *e), exp(context, *i)),
         PE::Annotate(e, ty) => EE::Annotate(exp(context, *e), type_(context, ty)),
         PE::Spec(_) if context.in_spec_context => {
             context.env.add_diag(diag!(
@@ -2880,9 +2850,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
     use P::Bind_ as PB;
     let b_ = match pb_ {
         PB::Var(v) => {
-            if context.env.flags().lang_v2()
-                && is_valid_struct_constant_or_schema_name(v.value().as_str())
-            {
+            if is_valid_struct_constant_or_schema_name(v.value().as_str()) {
                 // Interpret as an unqualified module access
                 EL::Unpack(
                     sp(v.loc(), ModuleAccess_::Name(v.0)),
@@ -2987,7 +2955,7 @@ fn lvalues(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<LValue> {
                 pes.into_iter().map(|pe| assign(context, pe)).collect();
             L::Assigns(sp(loc, al_opt?))
         },
-        PE::Index(_, _) if context.env.flags().lang_v2() => {
+        PE::Index(_, _) => {
             let er = exp(context, sp(loc, e_));
             L::Mutate(er)
         },

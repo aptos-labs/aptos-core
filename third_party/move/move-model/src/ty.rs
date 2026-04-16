@@ -441,7 +441,16 @@ impl Constraint {
             }
         }
         match (abilities, result) {
-            (Some(abs), Some(Type::Fun(arg, res, _))) => Some(Type::Fun(arg, res, abs)),
+            (Some(abs), Some(Type::Fun(arg, res, _))) => {
+                // Function types can have at most copy, drop, and store. The `key` ability
+                // is never achievable for function values, so these constraints are
+                // incompatible.
+                if abs.setminus(AbilitySet::PUBLIC_FUNCTIONS).is_empty() {
+                    Some(Type::Fun(arg, res, abs))
+                } else {
+                    None
+                }
+            },
             (Some(abs), Some(Type::Primitive(PrimitiveType::U64)))
                 if !abs.has_ability(Ability::Key) =>
             {
@@ -631,6 +640,33 @@ impl Constraint {
             },
             (Constraint::SomeNumber(_), Constraint::HasAbilities(a1, _)) => {
                 let unsupported_abilities = a1.setminus(AbilitySet::PRIMITIVES);
+                if !unsupported_abilities.is_empty() {
+                    return Err(TypeUnificationError::MissingAbilitiesForConstraints(
+                        loc.clone(),
+                        self.clone(),
+                        unsupported_abilities,
+                        ctx_opt,
+                    ));
+                }
+                Ok(false)
+            },
+            // Check compatibility between ability and function value type.
+            // Function values can have at most copy, drop, and store (the last only for
+            // public functions). They can never have the `key` ability.
+            (Constraint::HasAbilities(a1, _), Constraint::SomeFunctionValue(..)) => {
+                let unsupported_abilities = a1.setminus(AbilitySet::PUBLIC_FUNCTIONS);
+                if !unsupported_abilities.is_empty() {
+                    return Err(TypeUnificationError::MissingAbilitiesForConstraints(
+                        loc.clone(),
+                        other.clone(),
+                        unsupported_abilities,
+                        ctx_opt,
+                    ));
+                }
+                Ok(false)
+            },
+            (Constraint::SomeFunctionValue(..), Constraint::HasAbilities(a1, _)) => {
+                let unsupported_abilities = a1.setminus(AbilitySet::PUBLIC_FUNCTIONS);
                 if !unsupported_abilities.is_empty() {
                     return Err(TypeUnificationError::MissingAbilitiesForConstraints(
                         loc.clone(),

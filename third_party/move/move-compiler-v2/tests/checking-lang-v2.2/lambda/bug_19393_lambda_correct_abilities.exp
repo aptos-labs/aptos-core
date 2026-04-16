@@ -1,0 +1,51 @@
+// -- Model dump before first bytecode pipeline
+module 0xa::test {
+    private fun ok() {
+        test::require_none<||u64>(closure#0test::__lambda__1__ok());
+        test::require_drop<||u64 has drop>(closure#0test::__lambda__2__ok());
+        test::require_copy_drop<||u64 has copy + drop>(closure#0test::__lambda__3__ok());
+        Tuple()
+    }
+    private fun require_copy_drop<T>(_x: T) {
+        Tuple()
+    }
+    private fun require_drop<T>(_x: T) {
+        Tuple()
+    }
+    private fun require_none<T>(_x: T) {
+        Tuple()
+    }
+    private fun __lambda__1__ok(): u64 {
+        1
+    }
+    private fun __lambda__2__ok(): u64 {
+        1
+    }
+    private fun __lambda__3__ok(): u64 {
+        1
+    }
+} // end 0xa::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0xa::test {
+    fun ok() {
+        require_none<||u64>(|| lambda__1__ok());
+        require_drop<||u64 has drop>(|| lambda__2__ok());
+        require_copy_drop<||u64 has copy + drop>(|| lambda__3__ok());
+    }
+    fun require_copy_drop<T: copy + drop>(_x: T) {
+    }
+    fun require_drop<T: drop>(_x: T) {
+    }
+    fun require_none<T>(_x: T) {
+    }
+    fun lambda__1__ok(): u64 {
+        1
+    }
+    fun lambda__2__ok(): u64 {
+        1
+    }
+    fun lambda__3__ok(): u64 {
+        1
+    }
+}

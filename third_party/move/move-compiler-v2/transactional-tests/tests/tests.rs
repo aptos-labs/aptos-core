@@ -96,16 +96,6 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: COMMON_EXCLUSIONS,
         cross_compile: false,
     },
-    // Test `/operator_eval/` with language version 1 and 2
-    TestConfig {
-        name: "operator-eval-lang-1",
-        runner: |p| run(p, get_config_by_name("operator-eval-lang-1")),
-        experiments: &[(Experiment::OPTIMIZE, true)],
-        language_version: LanguageVersion::V1,
-        include: &["/operator_eval/"],
-        exclude: &["/structs_visibility/"],
-        cross_compile: false,
-    },
     TestConfig {
         name: "operator-eval-lang-2",
         runner: |p| run(p, get_config_by_name("operator-eval-lang-2")),
