@@ -789,6 +789,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_store_aggregation_with_malformed_vector_share() {
+        // Defense-in-depth: if a share with the wrong vector length somehow bypasses
+        // structural checks and reaches aggregation, reconstruction must return an
+        // error rather than panic (which would crash the node).
+        let ctx = TestContext::new(vec![1, 2, 2, 1]);
+        let (mut store, mut rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        // self share (weight 1)
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        store.add_self_share(self_share).unwrap();
+
+        // good peer shares (weight 2 and 2) -- total weight 5 == threshold
+        for i in 1..=2 {
+            let share = create_secret_share(&ctx, i, &metadata);
+            store.add_share(share).unwrap();
+        }
+
+        // Malformed share from author[3] (weight 1 but length 3). Pushed in past the
+        // verifier, which in production catches this at optimistic_verify.
+        let mut malformed = create_secret_share(&ctx, 3, &metadata);
+        let extra = malformed.share.1[0].clone();
+        malformed.share.1.push(extra.clone());
+        malformed.share.1.push(extra);
+        store.add_share(malformed).unwrap();
+
+        // Without the defense-in-depth fix to `get_virtual_player`, reconstruct would
+        // panic inside spawn_blocking and this timeout would fire.
+        use futures::StreamExt;
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for aggregation result (panic inside spawn_blocking?)")
+            .expect("Channel closed unexpectedly");
+        // Threshold is 5 and weights [1,2,2] after evicting the bad share sum to 5,
+        // so aggregation succeeds on the retry.
+        assert_eq!(unwrap_success(result).metadata, metadata);
+    }
+
+    #[tokio::test]
     async fn test_store_failure_recovery_with_new_share() {
         // 3 validators, weights [1,1,1], threshold = 3
         // self(0) + good(1) + bad(2) → aggregation triggers
