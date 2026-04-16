@@ -267,8 +267,7 @@ struct Committer {
     base: Arc<HotStateBase>,
     committed: Arc<Mutex<CommittedSnapshot>>,
     rx: Receiver<CommitMsg>,
-    total_key_bytes: usize,
-    total_value_bytes: usize,
+    total_value_bytes: [usize; NUM_STATE_SHARDS],
     /// Points to the newest entry. `None` if empty.
     heads: [Option<HashValue>; NUM_STATE_SHARDS],
     /// Points to the oldest entry. `None` if empty.
@@ -313,8 +312,7 @@ impl Committer {
             base,
             committed,
             rx,
-            total_key_bytes: 0,
-            total_value_bytes: 0,
+            total_value_bytes: [0; NUM_STATE_SHARDS],
             heads: arr![None; 16],
             tails: arr![None; 16],
             merged_state: initial_state,
@@ -515,21 +513,16 @@ impl Committer {
         for shard_id in 0..NUM_STATE_SHARDS {
             for (key_hash, slot) in delta.shards[shard_id].iter() {
                 if slot.is_hot() {
-                    self.total_key_bytes += HashValue::LENGTH;
-                    self.total_value_bytes += slot.size();
-                    if let Some(old_slot) = self.base.shards[shard_id].insert(key_hash, slot) {
-                        self.total_key_bytes -= HashValue::LENGTH;
-                        self.total_value_bytes -= old_slot.size();
+                    if self.base.shards[shard_id].insert(key_hash, slot).is_some() {
                         n_update += 1;
                     } else {
                         n_insert += 1;
                     }
-                } else if let Some((_, old_slot)) = self.base.shards[shard_id].remove(&key_hash) {
-                    self.total_key_bytes -= HashValue::LENGTH;
-                    self.total_value_bytes -= old_slot.size();
+                } else if self.base.shards[shard_id].remove(&key_hash).is_some() {
                     n_evict += 1;
                 }
             }
+            self.total_value_bytes[shard_id] = target.hot_value_bytes(shard_id);
             self.heads[shard_id] = target.latest_hot_key(shard_id);
             self.tails[shard_id] = target.oldest_hot_key(shard_id);
             assert_eq!(
@@ -540,12 +533,19 @@ impl Committer {
             debug_assert!(self.validate_lru(shard_id).is_ok());
         }
 
+        let total_items = self.base.len();
         COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
         COUNTER.inc_with_by(&["hot_state_update"], n_update);
         COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
-        GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
-        GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
-        GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
+        GAUGE.set_with(&["hot_state_items"], total_items as i64);
+        GAUGE.set_with(
+            &["hot_state_key_bytes"],
+            (total_items * HashValue::LENGTH) as i64,
+        );
+        GAUGE.set_with(
+            &["hot_state_value_bytes"],
+            self.total_value_bytes.iter().sum::<usize>() as i64,
+        );
 
         self.report_age_metrics();
     }
@@ -599,27 +599,33 @@ impl Committer {
         {
             let mut num_visited = 0;
             let mut current = *head;
+            let mut total_value_bytes = 0;
             while let Some(key_hash) = current {
                 let entry = shard.get(&key_hash).expect("Must exist.");
                 num_visited += 1;
                 ensure!(num_visited <= shard.len());
                 ensure!(entry.is_hot());
                 current = entry.next().copied();
+                total_value_bytes += entry.size();
             }
             ensure!(num_visited == shard.len());
+            ensure!(total_value_bytes == self.total_value_bytes[shard_id]);
         }
 
         {
             let mut num_visited = 0;
             let mut current = *tail;
+            let mut total_value_bytes = 0;
             while let Some(key_hash) = current {
                 let entry = shard.get(&key_hash).expect("Must exist.");
                 num_visited += 1;
                 ensure!(num_visited <= shard.len());
                 ensure!(entry.is_hot());
                 current = entry.prev().copied();
+                total_value_bytes += entry.size();
             }
             ensure!(num_visited == shard.len());
+            ensure!(total_value_bytes == self.total_value_bytes[shard_id]);
         }
 
         Ok(())
