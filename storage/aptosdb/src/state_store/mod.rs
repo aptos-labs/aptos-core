@@ -491,17 +491,9 @@ impl StateStore {
             overall_commit_progress,
             crash_if_difference_is_too_large,
         );
-        Self::sync_state_merkle_commit_progress(
-            ledger_metadata_db,
-            &state_merkle_db,
-            overall_commit_progress,
-            crash_if_difference_is_too_large,
-        );
-
         // When `delete_on_restart` in config is flipped from true to false, the node will have been
         // running for a while, so its hot_state_kv_db is extremely unlikely to not have a progress
-        // marker and `sync_state_kv_commit_progress` should work. Same for hot_state_merkle_db
-        // below.
+        // marker and `sync_state_kv_commit_progress` should work.
         if !delete_hot_state_on_restart && let Some(db) = &hot_state_kv_db {
             Self::sync_state_kv_commit_progress(
                 db,
@@ -509,13 +501,41 @@ impl StateStore {
                 crash_if_difference_is_too_large,
             );
         }
+
+        // Find truncation targets for both state merkle DBs independently.
+        let cold_merkle_target = Self::find_state_merkle_truncation_target(
+            ledger_metadata_db,
+            &state_merkle_db,
+            overall_commit_progress,
+            crash_if_difference_is_too_large,
+        );
+        let hot_merkle_target =
+            if !delete_hot_state_on_restart && let Some(db) = &hot_state_merkle_db {
+                Some(Self::find_state_merkle_truncation_target(
+                    ledger_metadata_db,
+                    db,
+                    overall_commit_progress,
+                    crash_if_difference_is_too_large,
+                ))
+            } else {
+                None
+            };
+
+        // Truncate both merkle DBs to the min of their targets so they end up at the
+        // same snapshot version. After a partial-commit crash one DB may be one snapshot
+        // ahead of the other; using the min guarantees they are consistent on restart.
+        let merkle_target = hot_merkle_target.map_or(cold_merkle_target, |hot| {
+            std::cmp::min(cold_merkle_target, hot)
+        });
+        info!(
+            cold_merkle_target = cold_merkle_target,
+            hot_merkle_target = hot_merkle_target,
+            merkle_target = merkle_target,
+            "State merkle truncation targets.",
+        );
+        Self::truncate_state_merkle_if_needed(&state_merkle_db, merkle_target);
         if !delete_hot_state_on_restart && let Some(db) = &hot_state_merkle_db {
-            Self::sync_state_merkle_commit_progress(
-                ledger_metadata_db,
-                db,
-                overall_commit_progress,
-                crash_if_difference_is_too_large,
-            );
+            Self::truncate_state_merkle_if_needed(db, merkle_target);
         }
     }
 
@@ -553,14 +573,14 @@ impl StateStore {
         .expect("Failed to truncate state K/V db.");
     }
 
-    /// Reads the state merkle max version and truncates the state merkle DB back to
-    /// the tree root at or before `overall_commit_progress`.
-    fn sync_state_merkle_commit_progress(
+    /// Validates the state merkle DB commit progress and returns the tree root version
+    /// at or before `overall_commit_progress`.
+    fn find_state_merkle_truncation_target(
         ledger_metadata_db: &LedgerMetadataDb,
         state_merkle_db: &StateMerkleDb,
         overall_commit_progress: Version,
         crash_if_difference_is_too_large: bool,
-    ) {
+    ) -> Version {
         let state_merkle_max_version = get_max_version_in_state_merkle_db(state_merkle_db)
             .expect("Failed to get state merkle max version.")
             .expect("State merkle max version cannot be None.");
@@ -570,25 +590,29 @@ impl StateStore {
                 assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
         }
-        let state_merkle_target_version = find_tree_root_at_or_before(
-            ledger_metadata_db,
-            state_merkle_db,
-            overall_commit_progress,
-        )
-        .expect("DB read failed.")
-        .unwrap_or_else(|| {
-            panic!(
-                "Could not find a valid root before or at version {}, maybe it was pruned?",
-                overall_commit_progress
-            )
-        });
-        if state_merkle_target_version < state_merkle_max_version {
+        find_tree_root_at_or_before(ledger_metadata_db, state_merkle_db, overall_commit_progress)
+            .expect("DB read failed.")
+            .unwrap_or_else(|| {
+                panic!(
+                    "Could not find a valid root before or at version {}, maybe it was pruned?",
+                    overall_commit_progress
+                )
+            })
+    }
+
+    /// Truncates the state merkle DB back to `target_version` if the DB is ahead.
+    fn truncate_state_merkle_if_needed(state_merkle_db: &StateMerkleDb, target_version: Version) {
+        let state_merkle_max_version = get_max_version_in_state_merkle_db(state_merkle_db)
+            .expect("Failed to get state merkle max version.")
+            .expect("State merkle max version cannot be None.");
+        if target_version < state_merkle_max_version {
             info!(
+                is_hot = state_merkle_db.is_hot(),
                 state_merkle_max_version = state_merkle_max_version,
-                target_version = state_merkle_target_version,
+                target_version = target_version,
                 "Start state merkle truncation..."
             );
-            truncate_state_merkle_db(state_merkle_db, state_merkle_target_version)
+            truncate_state_merkle_db(state_merkle_db, target_version)
                 .expect("Failed to truncate state merkle db.");
         }
     }
