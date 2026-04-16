@@ -24,20 +24,29 @@ pub struct PersistedState {
 impl PersistedState {
     const MAX_PENDING_DROPS: usize = 8;
 
-    pub fn new_empty(config: HotStateConfig) -> Self {
-        let state = State::new_empty(config);
-        let hot_state = Arc::new(HotState::new(state, config));
-        let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
+    /// Constructs a `PersistedState` at the given snapshot with pre-loaded DashMaps.
+    ///
+    /// The `StateWithSummary` provides the canonical `State` (including hot state metadata)
+    /// and `StateSummary`. The loaded DashMaps must match the metadata — this is guaranteed
+    /// when both come from the same `LoadedHotState`.
+    pub fn new_from_loaded(
+        state_with_summary: StateWithSummary,
+        loaded_shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+    ) -> Self {
+        let (state, summary) = state_with_summary.into_inner();
+        let hot_state = Arc::new(HotState::new_from_loaded(state, loaded_shards));
+        let summary = Arc::new(Mutex::new(summary));
         Self { hot_state, summary }
     }
 
-    pub fn new_from_loaded(
-        state: State,
+    /// Constructs a `PersistedState` at the given snapshot with empty DashMaps.
+    pub fn new_at_snapshot(
+        state_with_summary: StateWithSummary,
         config: HotStateConfig,
-        loaded_shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
     ) -> Self {
-        let hot_state = Arc::new(HotState::new_from_loaded(state, loaded_shards));
-        let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
+        let (state, summary) = state_with_summary.into_inner();
+        let hot_state = Arc::new(HotState::new(state, config));
+        let summary = Arc::new(Mutex::new(summary));
         Self { hot_state, summary }
     }
 

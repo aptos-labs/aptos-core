@@ -52,6 +52,11 @@ pub(crate) enum CommitMessage<T> {
 }
 
 impl BufferedState {
+    /// Creates a new `BufferedState` at the given snapshot.
+    ///
+    /// The `out_persisted_state` must already be at the snapshot state — this method does
+    /// NOT call `hack_reset`. Callers that reuse an existing `PersistedState` (e.g. restore)
+    /// must call `hack_reset` themselves before calling this method.
     pub(crate) fn new_at_snapshot(
         state_db: &Arc<StateDb>,
         last_snapshot: StateWithSummary,
@@ -64,7 +69,6 @@ impl BufferedState {
         let arc_state_db = Arc::clone(state_db);
         *out_current_state.lock() =
             LedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
-        out_persisted_state.hack_reset(last_snapshot.clone());
 
         let persisted_state_clone = out_persisted_state.clone();
         let last_snapshot_clone = last_snapshot.clone();
