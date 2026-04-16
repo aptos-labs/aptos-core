@@ -299,7 +299,11 @@ impl<E: Pairing> PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G_1 = *pp_elgamal.message_base();
         let pk_range_proof = match maybe_hiding_kzg_setup {
-            Some((ck, vk)) => dekart_univariate_v2::Proof::setup(ell, vk, ck).0,
+            Some((ck, vk)) => {
+                let setup = dekart_univariate_v2::Proof::setup(ell, vk, ck).0;
+                assert!(setup.max_n == max_num_chunks_padded);
+                setup
+            },
             None => {
                 dekart_univariate_v2::Proof::setup_for_testing(
                     max_num_chunks_padded,
@@ -404,7 +408,7 @@ mod tests {
         let start = Instant::now();
         println!("{}: Generating pp", chrono::Local::now());
         let pp: PublicParameters<ark_bls12_381::Bls12_381> =
-            PublicParameters::new_for_testing(256, 32, 128, G2Affine::generator(), &mut rng);
+            PublicParameters::new_for_testing(256, 32, 256, G2Affine::generator(), &mut rng);
         println!(
             "{}: time taken: {:?}",
             chrono::Local::now(),
