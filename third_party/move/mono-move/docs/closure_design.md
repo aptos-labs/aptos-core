@@ -60,17 +60,26 @@ At `CallClosure` time, the runtime must have a resolved `Function` pointer. If t
 A closure is a heap object. Different closures with the same type signature can capture different numbers and sizes of values (determined by the mask and the underlying function), so the closure's total size is not statically known at the call site. Heap allocation gives a uniform 8-byte representation (a pointer) in the frame regardless of what the closure captures.
 
 ```
-Owner region                       Heap
-┌────────┐                  ┌──────────────────────────┐
-│   ●────┼─────────────────►│ desc_id(4) | size(4)     │  header
-│        │                  ├──────────────────────────┤
-└────────┘                  │ func_ref                 │  ClosureFuncRef
-  8 bytes                   │ mask (8)                 │  ClosureMask bits
-                            │ captured_data            │  ClosureCapturedData
-                            └──────────────────────────┘
+Owner region          Heap (closure)                    Heap (captured data)
+┌────────┐     ┌──────────────────────────┐      ┌──────────────────────────┐
+│   ●────┼────►│ desc_id(4) | size(4)     │      │ desc_id(4) | size(4)     │
+│        │     ├──────────────────────────┤      ├──────────────────────────┤
+└────────┘     │ func_ref                 │      │ tag = RAW                │
+  8 bytes      │ mask (8)                 │      │ raw bytes ...            │
+               │ captured_data ●──────────┼─────►│                          │
+               └──────────────────────────┘      └──────────────────────────┘
+                                                         OR
+                                                 ┌──────────────────────────┐
+                                                 │ desc_id(4) | size(4)     │
+                                                 ├──────────────────────────┤
+                                                 │ tag = MATERIALIZED       │
+                                                 │ captured_0               │
+                                                 │ captured_1               │
+                                                 │ ...                      │
+                                                 └──────────────────────────┘
 ```
 
-Conceptually, a closure contains two enums. How they are laid out in memory (inline, behind a pointer, etc.) is an implementation detail to be finalized later.
+Conceptually, a closure contains two enums: `ClosureFuncRef` and `ClosureCapturedData`.
 
 `func_ref` is a `ClosureFuncRef`:
 
@@ -84,11 +93,9 @@ enum ClosureFuncRef {
 }
 ```
 
-The `Unresolved` variant is contingent on the general design of cross-module (indirect) calls, which is not yet implemented — its payload will mirror whatever representation cross-module call targets use.
+The `Unresolved` variant is contingent on the general design of cross-module (indirect) calls, which is not yet implemented — its payload will mirror whatever representation cross-module call targets use. The exact representation of `ClosureFuncRef` (inline in the closure, a heap object, a pointer to some other table) is not yet decided. Neither variant contains heap pointers — `Resolved` points into the executable arena, and `Unresolved` will store or reference its data outside the GC heap.
 
-Neither variant contains heap pointers — `Resolved` points into the executable arena, and `Unresolved` will store or reference its data outside the GC heap. This means the GC does not need to trace `func_ref`. In the future, we could consider moving some of the function reference information into the object descriptor itself if that simplifies the layout.
-
-`captured_data` is a `ClosureCapturedData`:
+`captured_data` is a pointer to a `ClosureCapturedData` heap object:
 
 ```rust
 enum ClosureCapturedData {
@@ -104,7 +111,9 @@ enum ClosureCapturedData {
 }
 ```
 
-The `Raw` form represents closures loaded from storage whose captured values have not yet been parsed — more on this in the Closure Storage section. The `Materialized` form has captured values laid out flat at their concrete sizes, and some may be heap pointers traced by the GC.
+Unlike `ClosureFuncRef`, `ClosureCapturedData` is always a separate heap object — this is necessary for GC correctness. The two variants have different pointer layouts (Raw has no heap pointers; Materialized may have several), so they need different object descriptors. By making `captured_data` a pointer to a separate heap object with its own `desc_id`, each variant is self-describing and the closure's own descriptor stays fixed (it always marks `captured_data` as a heap pointer). The captured data object contains a tag field to distinguish Raw from Materialized. We could also consider letting the `desc_id` itself serve as the tag (since the two variants already need different descriptors), but for now we keep an explicit tag for clarity.
+
+The `Raw` form represents closures loaded from storage whose captured values have not yet been parsed — more on this in the Closure Storage section. The `Materialized` form has captured values laid out flat at their concrete sizes. To materialize, the runtime allocates a new Materialized heap object and updates the pointer in the closure — the old Raw object becomes garbage.
 
 Other fields:
 - **`mask`** (8 bytes): The `ClosureMask` bits (u64). Scalar, not traced by GC.
@@ -211,15 +220,19 @@ This information is only available at runtime via `func_ptr` → `Function` + `m
 
 ## GC Considerations
 
-1. **Closure heap objects** are traced via `ObjectDescriptor::Closure`. The `func_ref` field contains no heap pointers in either variant, so the GC only needs to trace the captured data region. For `Materialized` closures, `pointer_offsets` lists the captured values that are heap pointers. For `Raw` closures, there are no heap pointers in the captured data (it's an opaque byte blob), so `pointer_offsets` is empty. The two states require different descriptors.
+1. **Closure heap objects** have a fixed descriptor. The `captured_data` field is always a heap pointer and is always in `pointer_offsets`. The `func_ref` field contains no heap pointers. The closure's descriptor never changes.
 
-2. **Closures capturing closures**: Works naturally for materialized closures — a captured closure is an 8-byte heap pointer in the captured values region, and its offset appears in `pointer_offsets`.
+2. **`ClosureCapturedData` heap objects** are self-describing via their own `desc_id`. Raw objects use a trivial descriptor (no pointers). Materialized objects use a struct-like descriptor listing the captured values that are heap pointers. This separation is what makes the two-state design GC-safe.
+
+3. **Closures capturing closures**: Works naturally for materialized closures — a captured closure is an 8-byte heap pointer in the captured values region, and its offset appears in the Materialized object's `pointer_offsets`.
 
 3. **Safe points**: `PackClosure` allocates and is therefore a GC safe point. The specializer must ensure the safe-point layout at the `PackClosure` instruction accounts for any live heap pointers in the frame (including captured values, since GC occurs before the copy).
 
 4. **Stack scanning during calls**: `CallClosure` itself does not allocate — it reads from the closure, copies into the callee's frame, and performs the call. No GC can occur during the interleaving phase. However, the PC after `CallClosure` (the return point) is a safe point, just like after any other call instruction — the callee may trigger GC, and upon return the caller's frame must have a valid pointer layout in the `FrameLayoutMap`.
 
 ## Closure Storage
+
+*Note: the closure storage design is contingent on the general design of global storage in mono-move, which is not yet finalized. Details here may change.*
 
 ### Current VM
 
@@ -272,3 +285,11 @@ The question is whether to continue writing layouts. Two options:
 - **Keep writing layouts.** Use the current format as-is. Simple, fully compatible. The downside is that serialization must compute layouts for each captured value, adding complexity and cost at write time.
 
 - **Stop writing layouts.** Define a new format (with a version bump) that stores only the function identity, mask, and captured values. Leaner on-chain footprint. The runtime still reads the old format (recognizing it by version number) but writes the new one. Materialization derives layouts from loaded type definitions at call time. The tradeoff is that the on-chain data is no longer self-describing — external tools (indexers, explorers) can no longer decode captured values without loading the relevant modules to obtain type definitions.
+
+## Interior Mutability (Open Question)
+
+The design includes lazy resolution (`ClosureFuncRef`: unresolved → resolved) and lazy deserialization (`ClosureCapturedData`: raw → materialized). Both transitions happen when the closure is called. Two sub-questions:
+
+1. **Should there be interior mutability at all?** That is, should the resolved/materialized state be cached so that subsequent calls (on copies of the closure) don't repeat the work? The alternative is to resolve and materialize from scratch on every call, treating the closure as immutable.
+
+2. **If yes, where does the cached state live?** One option is to modify the closure heap object in place — but this complicates the runtime (the GC descriptor may need to change between raw and materialized states, and the closure is no longer a pure value). Another option is to cache the resolved function and materialized values in a side table outside the closure, leaving the heap object untouched. A side table works naturally for caching the resolved function pointer, but is harder for captured values — materialized values live on the GC heap and need to be traced, so splitting them from the closure object introduces complexity in ownership and lifetime management.
