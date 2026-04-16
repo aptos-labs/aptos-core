@@ -706,22 +706,9 @@ impl StateStore {
         {
             // TODO(HotState): this is needed while starting with an empty hot state during
             // development.
-            let prev_version = snapshot_next_version - 1;
-            let tree_update_batch = TreeUpdateBatch {
-                node_batch: vec![vec![(NodeKey::new_empty_path(prev_version), Node::Null)]],
-                stale_node_index_batch: vec![],
-            };
-            let raw_batch = db.create_jmt_commit_batch_for_shard(
-                prev_version,
-                /* shard_id = */ None,
-                &tree_update_batch,
-                /* previous_epoch_ending_version = */ None,
-            )?;
-            db.commit_top_levels(prev_version, raw_batch)?;
-            info!("Wrote null node for hot state at version {prev_version}");
+            Self::write_hot_state_null_node(db, snapshot_next_version - 1)?;
         }
 
-        // Replaying the committed write sets after the latest snapshot.
         if snapshot_next_version < num_transactions {
             if check_max_versions_after_snapshot {
                 ensure!(
@@ -731,47 +718,13 @@ impl StateStore {
                     num_transactions,
                 );
             }
-            info!("Replaying writesets from {snapshot_next_version} to {num_transactions} to let state Merkle DB catch up.");
-
-            let write_sets = state_db
-                .ledger_db
-                .write_set_db()
-                .get_write_sets(snapshot_next_version, num_transactions)?;
-            let txn_info_iter = state_db
-                .ledger_db
-                .transaction_info_db()
-                .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
-            let all_checkpoint_indices = txn_info_iter
-                .into_iter()
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .positions(|txn_info| txn_info.has_state_checkpoint_hash())
-                .collect();
-
-            let state_update_refs = StateUpdateRefs::index_write_sets(
-                state.next_version(),
-                &write_sets,
-                write_sets.len(),
-                all_checkpoint_indices,
-            );
-            let current_state = out_current_state.lock().clone();
-            let (hot_state, state) = out_persisted_state.get_state();
-            let (new_state, _state_reads, hot_state_updates) = current_state
-                .ledger_state()
-                .update_with_db_reader(&state, hot_state, &state_update_refs, state_db.clone())?;
-            let state_summary = out_persisted_state.get_state_summary();
-            let new_state_summary = current_state.ledger_state_summary().update(
-                &ProvableStateSummary::new(state_summary, state_db.as_ref()),
-                &hot_state_updates,
-                &state_update_refs,
-            )?;
-            let updated =
-                LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
-
-            // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
-            buffered_state.update(
-                updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
-                true, /* sync_commit */
+            Self::replay_write_sets_after_snapshot(
+                state_db,
+                snapshot_next_version,
+                num_transactions,
+                &mut buffered_state,
+                &out_current_state,
+                &out_persisted_state,
             )?;
         }
 
@@ -787,6 +740,76 @@ impl StateStore {
             "StateStore initialization finished.",
         );
         Ok(buffered_state)
+    }
+
+    /// Writes a null node for the hot state merkle tree at the given version.
+    fn write_hot_state_null_node(db: &StateMerkleDb, version: Version) -> Result<()> {
+        let tree_update_batch = TreeUpdateBatch {
+            node_batch: vec![vec![(NodeKey::new_empty_path(version), Node::Null)]],
+            stale_node_index_batch: vec![],
+        };
+        let raw_batch = db.create_jmt_commit_batch_for_shard(
+            version,
+            /* shard_id = */ None,
+            &tree_update_batch,
+            /* previous_epoch_ending_version = */ None,
+        )?;
+        db.commit_top_levels(version, raw_batch)?;
+        info!("Wrote null node for hot state merkle db at version {version}");
+        Ok(())
+    }
+
+    /// Replays all write sets after the previously committed snapshot until things have caught up.
+    fn replay_write_sets_after_snapshot(
+        state_db: &Arc<StateDb>,
+        snapshot_next_version: Version,
+        num_transactions: u64,
+        buffered_state: &mut BufferedState,
+        out_current_state: &Mutex<LedgerStateWithSummary>,
+        persisted_state: &PersistedState,
+    ) -> Result<()> {
+        info!("Replaying writesets from {snapshot_next_version} to {num_transactions} to let state Merkle DB catch up.");
+
+        let write_sets = state_db
+            .ledger_db
+            .write_set_db()
+            .get_write_sets(snapshot_next_version, num_transactions)?;
+        let txn_info_iter = state_db
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
+        let all_checkpoint_indices = txn_info_iter
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .positions(|txn_info| txn_info.has_state_checkpoint_hash())
+            .collect();
+
+        let state_update_refs = StateUpdateRefs::index_write_sets(
+            snapshot_next_version,
+            &write_sets,
+            write_sets.len(),
+            all_checkpoint_indices,
+        );
+        let current_state = out_current_state.lock().clone();
+        let (hot_state, state) = persisted_state.get_state();
+        let (new_state, _state_reads, hot_state_updates) = current_state
+            .ledger_state()
+            .update_with_db_reader(&state, hot_state, &state_update_refs, state_db.clone())?;
+        let state_summary = persisted_state.get_state_summary();
+        let new_state_summary = current_state.ledger_state_summary().update(
+            &ProvableStateSummary::new(state_summary, state_db.as_ref()),
+            &hot_state_updates,
+            &state_update_refs,
+        )?;
+        let updated = LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
+
+        // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
+        buffered_state.update(
+            updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
+            true, /* sync_commit */
+        )?;
+        Ok(())
     }
 
     pub fn reset(&self) {
