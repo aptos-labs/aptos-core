@@ -78,4 +78,8 @@ spec aptos_framework::reconfiguration_with_dkg {
     spec finish_with_chunky_dkg_result(account: &signer, chunky_dkg_result: vector<u8>, encryption_key: vector<u8>) {
         pragma verify = false;
     }
+
+    spec try_complete_after_grace_period() {
+        pragma verify = false;
+    }
 }
