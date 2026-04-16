@@ -311,26 +311,32 @@ fn run_prover_benchmark(
     mut options: Options,
 ) -> anyhow::Result<()> {
     info!("starting prover benchmark");
-    // Determine sources and dependencies from the env
-    let mut sources = BTreeSet::new();
+    // Determine sources and dependencies from the env.
+    // We collect parent *directories* (not individual files) for both sources and deps so that
+    // the Move compiler finds all `.move` AND `.spec.move` files in each directory.
+    let mut sources: Vec<String> = vec![];
     let mut deps: Vec<String> = vec![];
     for module in env.get_modules() {
         let file_name = module.get_source_path().to_string_lossy().to_string();
-        if module.is_primary_target() {
-            sources.insert(module.get_source_path().to_string_lossy().to_string());
-        } else if let Some(p) = Path::new(&file_name)
+        let target = if module.is_primary_target() {
+            &mut sources
+        } else {
+            &mut deps
+        };
+        if let Some(p) = Path::new(&file_name)
             .parent()
             .and_then(|p| p.canonicalize().ok())
         {
-            // The prover doesn't like to have `p` and `p/s` as dep paths, filter those out
+            // The prover doesn't like to have `p` and `p/s` as paths, filter those out
             let p = p.to_string_lossy().to_string();
             let mut done = false;
-            for d in &mut deps {
-                if p.starts_with(&*d) {
-                    // p is subsumed
+            for d in target.iter_mut() {
+                // Use Path::starts_with for component-level prefix checks.
+                if Path::new(&p).starts_with(&*d) {
+                    // p is subsumed by d
                     done = true;
                     break;
-                } else if d.starts_with(&p) {
+                } else if Path::new(&*d).starts_with(&p) {
                     // p is more general or equal to d, swap it out
                     *d = p.to_string();
                     done = true;
@@ -338,12 +344,14 @@ fn run_prover_benchmark(
                 }
             }
             if !done {
-                deps.push(p)
+                target.push(p)
             }
         } else {
             bail!("invalid file path `{}`", file_name)
         }
     }
+    // Remove from `deps` any path that is already covered by a `sources` entry so the directory is not compiled twice.
+    deps.retain(|d| !sources.iter().any(|s| Path::new(d).starts_with(s)));
 
     // Enrich the prover options by the aliases in the env
     for (alias, address) in env.get_address_alias_map() {
