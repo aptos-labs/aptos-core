@@ -2,6 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use mono_move_gas::NoOpGasMeter;
+
+#[path = "helpers.rs"]
+mod helpers;
 
 const N_OPS: u64 = 5000;
 const KEY_RANGE: u64 = 2500;
@@ -28,14 +32,14 @@ fn bench_bst(c: &mut Criterion) {
             b.iter(|| native_run_ops(black_box(&ops)));
         });
 
+        // plain (no gas instrumentation)
         let (functions, descriptors, _arena) = micro_op_bst();
         // SAFETY: Exclusive access during bench setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions) };
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let gas_meter = SimpleGasMeter::new(u64::MAX);
-                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+                    let mut ctx = InterpreterContext::new(&descriptors, NoOpGasMeter, unsafe {
                         functions[6].unwrap().as_ref_unchecked()
                     });
                     let vec_ptr = ctx
@@ -48,6 +52,31 @@ fn bench_bst(c: &mut Criterion) {
                 BatchSize::SmallInput,
             );
         });
+
+        // with gas instrumentation
+        let (functions, _, _arena) = micro_op_bst();
+        // SAFETY: Exclusive access during bench setup; arena is alive.
+        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
+        // SAFETY: Exclusive access during bench setup; arena is alive.
+        unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
+        group.bench_function("micro_op/gas", |b| {
+            b.iter_batched(
+                || {
+                    let gas_meter = SimpleGasMeter::new(u64::MAX);
+                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+                        functions_gas[6].unwrap().as_ref_unchecked()
+                    });
+                    let vec_ptr = ctx
+                        .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
+                        .unwrap();
+                    ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
+                    ctx
+                },
+                |mut ctx| ctx.run().unwrap(),
+                BatchSize::SmallInput,
+            );
+        });
+
         group.finish();
     }
 

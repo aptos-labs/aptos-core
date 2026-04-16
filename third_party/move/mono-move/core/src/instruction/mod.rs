@@ -176,7 +176,7 @@ impl std::fmt::Display for DescriptorId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum MicroOp {
     //======================================================================
     // Data movement

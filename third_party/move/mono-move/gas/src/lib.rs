@@ -78,6 +78,19 @@ impl GasMeter for SimpleGasMeter {
     }
 }
 
+/// A no-op gas meter for testing.
+pub struct NoOpGasMeter;
+
+impl GasMeter for NoOpGasMeter {
+    fn charge(&mut self, _amount: u64) -> Result<(), GasExhaustedError> {
+        Ok(())
+    }
+
+    fn balance(&self) -> u64 {
+        u64::MAX
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Gas schedule
 // ---------------------------------------------------------------------------
