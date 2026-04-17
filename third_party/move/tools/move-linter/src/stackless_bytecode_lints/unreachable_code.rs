@@ -23,9 +23,13 @@ impl StacklessBytecodeChecker for UnreachableCode {
     }
 
     fn check(&self, target: &FunctionTarget) {
-        let Some(annotation) = target.get_annotations().get::<ReachableStateAnnotation>() else {
-            return;
-        };
+        let annotation = target
+            .get_annotations()
+            .get::<ReachableStateAnnotation>()
+            .expect(
+                "ReachableStateAnnotation missing: \
+                 UnreachableCodeProcessor must run before the lint pipeline",
+            );
         let code = target.get_bytecode();
 
         // Two passes: a dead instruction can carry a Loc that encloses a
