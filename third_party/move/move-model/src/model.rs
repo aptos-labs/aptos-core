@@ -1722,6 +1722,9 @@ impl GlobalEnv {
             used_modules_including_specs: Default::default(),
             friend_modules: Default::default(),
         });
+        // The new module's `function_data` contributes call-graph edges that
+        // can make arbitrary cached inverse/transitive entries stale.
+        self.call_graph_cache.invalidate();
         id
     }
 
@@ -1954,6 +1957,11 @@ impl GlobalEnv {
         mod_data.friend_decls = friend_decls;
         mod_data.compiled_module = Some(module);
         mod_data.source_map = Some(source_map);
+        // Attaching bytecode may populate/overwrite `used_funs`/`called_funs`
+        // on existing `FunctionData`, and may insert new struct-API
+        // `FunctionData` entries. Either can make arbitrary entries in the
+        // cross-function call-graph caches stale.
+        self.call_graph_cache.invalidate();
     }
 
     /// Updates modules previously loaded into the environment
