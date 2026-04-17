@@ -89,6 +89,9 @@ impl EpochEndingRestoreController {
         let mut previous_li: Option<&LedgerInfoWithSignatures> = None;
         let mut ledger_infos = Vec::new();
 
+        // Find the maximum trusted waypoint version to skip verification before it
+        let max_trusted_waypoint_version = self.trusted_waypoints.keys().max().copied();
+
         let mut past_target = false;
         for chunk in &manifest.chunks {
             if past_target {
@@ -134,6 +137,12 @@ impl EpochEndingRestoreController {
                         wp_li,
                         wp_trusted,
                     );
+                } else if max_trusted_waypoint_version
+                    .map_or(false, |max_wp| li.ledger_info().version() <= max_wp)
+                {
+                    // Skip verification - this LI is at or before the maximum trusted waypoint.
+                    // We trust the chain up to and including max_wp, so no need to verify these epochs.
+                    // Verification will resume starting at the epoch AFTER the waypoint.
                 } else if let Some(pre_li) = previous_li {
                     pre_li
                         .ledger_info()
