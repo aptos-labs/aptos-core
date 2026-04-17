@@ -5056,6 +5056,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "claims",
+ "core_affinity",
  "crossbeam-channel",
  "derive_more 0.99.17",
  "fail",

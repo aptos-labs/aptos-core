@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+mod affinity;
 pub(crate) mod vm_wrapper;
 
 use crate::counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS};
@@ -19,7 +20,7 @@ use aptos_block_executor::{
     txn_provider::TxnProvider,
     types::InputOutputKey,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
@@ -602,14 +603,7 @@ impl<
         let pool = match &mut *RAYON_EXEC_POOL.lock().unwrap() {
             Some((pool, n)) if *n == num_threads => Arc::clone(pool),
             slot => {
-                info!(num_threads = num_threads, "Creating par_exec thread pool");
-                let pool = Arc::new(
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(num_threads)
-                        .thread_name(|index| format!("par_exec-{}", index))
-                        .build()
-                        .unwrap(),
-                );
+                let pool = Arc::new(build_par_exec_pool(num_threads));
                 *slot = Some((Arc::clone(&pool), num_threads));
                 pool
             },
@@ -624,6 +618,57 @@ impl<
             transaction_commit_listener,
         )
     }
+}
+
+/// Builds the rayon thread pool that backs parallel block execution.
+///
+/// When the process has at least as many physical cores available as worker
+/// threads, each worker is pinned 1:1 to a distinct physical core so two
+/// workers never land on HT siblings of the same core (which hurts throughput
+/// on CPU-bound workloads). If the topology cannot be detected (non-Linux,
+/// sysfs unreadable) or we have more threads than physical cores, the pool
+/// is built without pinning and the OS scheduler decides placement.
+fn build_par_exec_pool(num_threads: usize) -> rayon::ThreadPool {
+    let mut builder = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .thread_name(|index| format!("par_exec-{}", index));
+
+    let physical_cores = affinity::allowed_physical_cores();
+    match &physical_cores {
+        Some(cores) if num_threads > 0 && cores.len() >= num_threads => {
+            info!(
+                num_threads = num_threads,
+                num_physical_cores = cores.len(),
+                "Creating par_exec thread pool with per-worker physical-core pinning",
+            );
+            let cores = cores.clone();
+            builder = builder.start_handler(move |index| {
+                let core = cores[index];
+                if !core_affinity::set_for_current(core) {
+                    warn!(
+                        thread_index = index,
+                        core_id = core.id,
+                        "Failed to pin par_exec thread to physical core; running unpinned",
+                    );
+                }
+            });
+        },
+        Some(cores) => {
+            info!(
+                num_threads = num_threads,
+                num_physical_cores = cores.len(),
+                "Creating par_exec thread pool without pinning (more threads than physical cores)",
+            );
+        },
+        None => {
+            info!(
+                num_threads = num_threads,
+                "Creating par_exec thread pool without pinning (CPU topology unavailable)",
+            );
+        },
+    }
+
+    builder.build().unwrap()
 }
 
 // Same as AptosBlockExecutorWrapper with AptosExecutorTask
