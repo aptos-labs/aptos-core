@@ -4844,6 +4844,7 @@ impl ModuleBuilder<'_, '_> {
                 using_funs: RefCell::default(),
                 transitive_closure_of_used_funs: RefCell::default(),
                 used_functions_with_transitive_inline: RefCell::default(),
+                using_functions_with_transitive_inline: RefCell::default(),
                 used_structs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
@@ -4890,6 +4891,7 @@ impl ModuleBuilder<'_, '_> {
                 using_funs: RefCell::default(),
                 transitive_closure_of_used_funs: RefCell::default(),
                 used_functions_with_transitive_inline: RefCell::default(),
+                using_functions_with_transitive_inline: RefCell::default(),
                 used_structs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
