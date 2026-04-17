@@ -215,7 +215,7 @@ Several operations need to traverse the captured values' structure at runtime, w
 
 **`bcs::to_bytes`.** BCS serialization of a closure (e.g., when a struct containing a closure is serialized) requires traversing captured values using their type layouts.
 
-The plan is to reimplement the current equality semantics, but this is not a priority for the initial implementation — it will be supported incrementally. The same infrastructure (runtime type traversal of captured values) will serve all three use cases above.
+The plan is to reimplement the current semantics, but this is not a priority for the initial implementation — it will be supported incrementally. The same infrastructure (runtime type traversal of captured values) will serve all three use cases above. If the complexity proves too high, making some or all of these operations runtime errors for closures remains an option to be reevaluated in the future.
 
 ### Safety: Bytecode Verifier Guarantees
 
@@ -280,9 +280,8 @@ The current serialized format embeds a `MoveTypeLayout` before each captured val
 
 The initial plan is to **keep writing layouts**, maintaining full backward compatibility with the V1 format. This avoids having to update peripheral systems (indexers, explorers, SDKs) that rely on the self-describing format to decode closure data. A future V2 format that omits layouts (leaner on-chain footprint, but no longer self-describing) could be introduced later with a separate migration plan.
 
-## Interior Mutability (Open Question)
+## Interior Mutability
 
-The design includes lazy resolution (`ClosureFuncRef`: unresolved → resolved) and lazy deserialization (`ClosureCapturedData`: raw → materialized). Both transitions happen when the closure is called. Two sub-questions:
+The design includes lazy resolution (`ClosureFuncRef`: unresolved → resolved) and lazy deserialization (`ClosureCapturedData`: raw → materialized). Closures require interior mutability to cache these transitions — without it, repeated calls on copies of the same closure (a common pattern: copy then call) would re-resolve and re-materialize each time, and operations like equality, formatting, and serialization that need materialized values would also pay this cost repeatedly.
 
-1. **Should there be interior mutability at all?** That is, should the resolved/materialized state be cached so that subsequent calls (on copies of the closure) don't repeat the work? The alternative is to resolve and materialize from scratch on every call, treating the closure as immutable.
-2. **If yes, where does the cached state live?** For `ClosureCapturedData`, the current design already supports in-place updates: the closure object holds a pointer to the captured data heap object, so materializing just means allocating a new Materialized object and updating the pointer — the closure's own descriptor doesn't change. For `ClosureFuncRef`, caching the resolved pointer is straightforward if it's stored inline (just overwrite it). Alternatively, resolved functions could be cached in a side table outside the closure, leaving the heap object untouched. A side table works naturally for function pointers but is harder for captured values — materialized values live on the GC heap and need to be traced, so splitting them from the closure introduces complexity in ownership and lifetime management.
+**Where the cached state lives.** For `ClosureCapturedData`, the current design already supports in-place updates: the closure object holds a pointer to the captured data heap object, so materializing just means allocating a new Materialized object and updating the pointer — the closure's own descriptor doesn't change. For `ClosureFuncRef`, caching the resolved pointer is straightforward if it's stored inline (just overwrite it). Alternatively, resolved functions could be cached in a side table outside the closure, leaving the heap object untouched. A side table works naturally for function pointers but is harder for captured values — materialized values live on the GC heap and need to be traced, so splitting them from the closure introduces complexity in ownership and lifetime management.
