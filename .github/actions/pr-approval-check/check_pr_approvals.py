@@ -109,7 +109,7 @@ def get_pr_reviews(repo: str, pr_number: int, token: str) -> dict[str, str]:
     States emitted by the API: APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED.
     Later reviews overwrite earlier ones for the same user (last review wins).
     """
-    reviews: dict[str, str] = {}
+    all_reviews: list[dict] = []
     page = 1
     while True:
         url = (
@@ -119,13 +119,14 @@ def get_pr_reviews(repo: str, pr_number: int, token: str) -> dict[str, str]:
         data = github_get(url, token)
         if not data:
             break
-        for review in data:
-            login: str = review["user"]["login"]
-            state: str = review["state"]
-            reviews[login] = state
+        all_reviews.extend(data)
         if len(data) < 100:
             break
         page += 1
+
+    reviews: dict[str, str] = {}
+    for review in sorted(all_reviews, key=lambda r: r["id"]):
+        reviews[review["user"]["login"]] = review["state"]
     return reviews
 
 

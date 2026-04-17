@@ -436,8 +436,8 @@ class TestGetOrgTeamMembers(unittest.TestCase):
 
 class TestGetPrReviews(unittest.TestCase):
 
-    def _review(self, login, state):
-        return {"user": {"login": login}, "state": state}
+    def _review(self, login, state, review_id=1):
+        return {"id": review_id, "user": {"login": login}, "state": state}
 
     @patch("check_pr_approvals.github_get")
     def test_single_page(self, mock_get):
@@ -454,8 +454,8 @@ class TestGetPrReviews(unittest.TestCase):
 
     @patch("check_pr_approvals.github_get")
     def test_full_page_triggers_second_fetch(self, mock_get):
-        page1 = [self._review(f"user{i}", "APPROVED") for i in range(100)]
-        page2 = [self._review("extra", "APPROVED")]
+        page1 = [self._review(f"user{i}", "APPROVED", review_id=i) for i in range(100)]
+        page2 = [self._review("extra", "APPROVED", review_id=100)]
         mock_get.side_effect = [page1, page2]
         result = get_pr_reviews("owner/repo", 1, "token")
         self.assertEqual(mock_get.call_count, 2)
@@ -465,8 +465,8 @@ class TestGetPrReviews(unittest.TestCase):
     def test_last_review_wins(self, mock_get):
         # Reviews are returned in chronological order; later entries overwrite earlier.
         mock_get.return_value = [
-            self._review("alice", "APPROVED"),
-            self._review("alice", "CHANGES_REQUESTED"),
+            self._review("alice", "APPROVED", review_id=1),
+            self._review("alice", "CHANGES_REQUESTED", review_id=2),
         ]
         result = get_pr_reviews("owner/repo", 1, "token")
         self.assertEqual(result["alice"], "CHANGES_REQUESTED")
