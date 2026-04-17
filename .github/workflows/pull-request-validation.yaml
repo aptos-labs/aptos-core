@@ -21,6 +21,116 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-license-compliance:
+    name: "Check for post-license-change commits"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to check commits
+
+      - name: Check for commits from aptos-labs after license change
+        run: |
+          set -e
+
+          # The cutoff commit - last commit before aptos-labs changed to permissioned license
+          CUTOFF_COMMIT="54418cb44d0da652bff0167509ff5bac84fb010a"
+
+          echo "=========================================="
+          echo "License Compliance Check"
+          echo "=========================================="
+          echo "Checking for commits from aptos-labs/aptos-core"
+          echo "Cutoff commit: $CUTOFF_COMMIT (inclusive - this and all after are forbidden)"
+          echo ""
+
+          # Add aptos-labs as a remote if it doesn't exist
+          if ! git remote | grep -q "^aptos-labs$"; then
+            git remote add aptos-labs https://github.com/aptos-labs/aptos-core.git
+          fi
+
+          # Fetch from aptos-labs (suppress .gitmodules warnings)
+          git fetch aptos-labs --quiet 2>&1 | grep -v "\.gitmodules" || true
+
+          # Get the main/master branch from aptos-labs
+          APTOS_BRANCH=""
+          for branch in main master; do
+            if git show-ref --verify --quiet refs/remotes/aptos-labs/$branch; then
+              APTOS_BRANCH=$branch
+              break
+            fi
+          done
+
+          if [ -z "$APTOS_BRANCH" ]; then
+            echo "❌ ERROR: Could not find main or master branch in aptos-labs remote"
+            exit 1
+          fi
+
+          # Verify the cutoff commit exists in aptos-labs (but should NOT be in our repo)
+          if ! git cat-file -e "$CUTOFF_COMMIT" 2>/dev/null; then
+            echo "❌ ERROR: Cutoff commit $CUTOFF_COMMIT not found in aptos-labs remote"
+            exit 1
+          fi
+
+          # Get commits from cutoff onwards, including the cutoff itself (suppress .gitmodules warnings)
+          CUTOFF_ONLY=$(git log --format=%H "$CUTOFF_COMMIT^..$CUTOFF_COMMIT" 2>/dev/null || echo "")
+          AFTER_CUTOFF=$(git log --format=%H "$CUTOFF_COMMIT..aptos-labs/$APTOS_BRANCH" 2>/dev/null || echo "")
+          FORBIDDEN_COMMITS=$(printf "%s\n%s" "$CUTOFF_ONLY" "$AFTER_CUTOFF" | grep -v '^$')
+
+          FORBIDDEN_COUNT=$(echo "$FORBIDDEN_COMMITS" | wc -l | tr -d ' ')
+          echo "Found $FORBIDDEN_COUNT forbidden commit(s) in aptos-labs history to check against"
+          echo ""
+          echo "Checking these commits against PR branch HEAD..."
+
+          # Check if any of these commits are in our current branch
+          VIOLATIONS_FOUND=0
+
+          if [ -n "$FORBIDDEN_COMMITS" ]; then
+            for commit in $FORBIDDEN_COMMITS; do
+              # Check if this commit is an ancestor of HEAD
+              if git merge-base --is-ancestor "$commit" HEAD 2>/dev/null; then
+                if [ $VIOLATIONS_FOUND -eq 0 ]; then
+                  echo ""
+                  echo "❌ LICENSE VIOLATION DETECTED!"
+                  echo "=========================================="
+                  echo "The following commits from aptos-labs/aptos-core"
+                  echo "after the license change were found:"
+                  echo ""
+                fi
+
+                # Get commit details
+                COMMIT_DATE=$(git show -s --format=%ci "$commit")
+                COMMIT_SUBJECT=$(git show -s --format=%s "$commit")
+                COMMIT_AUTHOR=$(git show -s --format="%an <%ae>" "$commit")
+
+                echo "Commit: $commit"
+                echo "Date:   $COMMIT_DATE"
+                echo "Author: $COMMIT_AUTHOR"
+                echo "Title:  $COMMIT_SUBJECT"
+                echo ""
+
+                VIOLATIONS_FOUND=$((VIOLATIONS_FOUND + 1))
+              fi
+            done
+          fi
+
+          if [ $VIOLATIONS_FOUND -gt 0 ]; then
+            echo "=========================================="
+            echo "❌ FAILURE: Found $VIOLATIONS_FOUND commit(s) from aptos-labs"
+            echo "after the license change (commit $CUTOFF_COMMIT)"
+            echo ""
+            echo "These commits are under a permissioned license and"
+            echo "cannot be included in this repository."
+            echo ""
+            echo "Please rebase your branch to remove these commits."
+            echo "=========================================="
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ No license violations detected"
+          echo "Checked $FORBIDDEN_COUNT commits from aptos-labs against this PR branch"
+
   check-dynamic-deps:
     runs-on: macos-latest
     steps:
@@ -28,7 +138,7 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ inputs.GIT_SHA }}
-          
+
       # This will exit with failure if any of the banned dynamic deps are found.
       - run: ./crates/aptos/scripts/check_dynamic_deps.sh
   
