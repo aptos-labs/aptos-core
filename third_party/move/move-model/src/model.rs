@@ -5832,6 +5832,7 @@ impl<'env> FunctionEnv<'env> {
         }
         let mut result = BTreeSet::new();
         let mut visited = BTreeSet::new();
+        visited.insert(self.get_qualified_id());
         let mut reachable_funcs = VecDeque::new();
         reachable_funcs.push_back(self.clone());
         while let Some(fnc) = reachable_funcs.pop_front() {
