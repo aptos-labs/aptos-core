@@ -136,6 +136,8 @@ We may consider reusing `ObjectDescriptor::Struct` for the Materialized case in 
 
 Two fused super-instructions handle closures. Both contain variable-length data and are boxed to keep the base `MicroOp` enum small. An alternative is to store the variable-length data in a side table and reference it by index from the instruction — this could keep all `MicroOp` variants within a fixed size. Something to revisit if instruction cache behavior or enum size becomes a concern.
 
+The current design specifies separate `SizedSlot` entries for each captured/provided argument, allowing them to be at arbitrary frame offsets. An alternative is to require the compiler to lay out all arguments contiguously, so the instruction only needs a start offset and total size — enabling a single `memcpy` instead of per-argument copies. This could be explored as an optimization.
+
 #### `PackClosure`
 
 ```rust
@@ -181,6 +183,8 @@ Semantics:
 
 The runtime interprets the mask at call time because the caller doesn't statically know which function the closure wraps (the closure may have been passed to the caller as an argument with type `|u64| -> u64`).
 
+*TODO*: There may be additional runtime consistency checks needed at `CallClosure` time (e.g., verifying that the resolved function's signature is compatible with the provided arguments). The exact set of checks is to be determined.
+
 **Reconstructing captured value layout.** The mask tells *which* parameters are captured, but not their sizes or byte offsets within the captured data object. The runtime derives this from the resolved `Function` + `mask`: it looks up parameter sizes from the `Function` struct and combines with the mask to compute both the captured value offsets and the target argument slot positions. Alternatives considered: storing a `(offset, size)` list per captured value in the closure body (self-describing but adds overhead), or storing a pointer to a compile-time-generated layout descriptor (extra pointer per closure).
 
 #### Why `CallClosure` must be a fused instruction
@@ -201,17 +205,17 @@ This information is only available at runtime via `func_ref` → `Function` + `m
 2. **Stack scanning during calls**: For materialized closures, `CallClosure` does not allocate — it reads from the closure, copies into the callee's frame, and performs the call. However, for raw closures, `CallClosure` must materialize the captured data first, which allocates and **may trigger GC**. The PC after `CallClosure` (the return point) is always a safe point, just like after any other call instruction — the callee may trigger GC, and upon return the caller's frame must have a valid pointer layout in the `FrameLayoutMap`.
 3. **Closures capturing closures**: Works naturally for materialized closures — a captured closure is an 8-byte heap pointer in the captured values region, and its offset appears in the Materialized object's `pointer_offsets`.
 
-### Equality and Comparison
+### Operations Requiring Structural Access to Captured Values
 
-The old VM supports structural equality and ordering for closures: compare functions by canonical name (module_id + function_name + type_args), then compare captured values lexicographically. This works across resolution states (resolved vs. unresolved).
+Several operations need to traverse the captured values' structure at runtime, which is challenging because closures are opaque — the captured types are hidden behind the closure's type signature.
 
-Two approaches for mono-move:
+**Equality and comparison.** The old VM supports structural equality and ordering for closures: compare functions by canonical name (module_id + function_name + type_args), then compare captured values lexicographically. This works across resolution states (resolved vs. unresolved). Reimplementing this requires (a) canonical identity in `Function` (currently only has `name`), (b) mixed resolved/unresolved comparison support, and (c) recursive structural comparison of captured values driven by runtime type metadata.
 
-- **Reimplement current semantics.** Requires (a) canonical identity in `Function` (currently only has `name`), (b) mixed resolved/unresolved comparison support, and (c) recursive structural comparison of captured values. The last point is the hardest — unlike regular values where the compiler can emit specialized comparison code, closures are opaque at the comparison site, so comparison must be driven by runtime type metadata.
+**String formatting.** Debug/display representations of closures need to format captured values, which requires knowing their types.
 
-- **Make comparison a runtime error.** Simpler, but programs that compare closures would fail at runtime.
+**`bcs::to_bytes`.** BCS serialization of a closure (e.g., when a struct containing a closure is serialized) requires traversing captured values using their type layouts.
 
-Regardless of which approach is chosen, closure comparison will not be included in the first version — it will be bundled with the general implementation of value comparison, which is not yet implemented in mono-move.
+The plan is to reimplement the current equality semantics, but this is not a priority for the initial implementation — it will be supported incrementally. The same infrastructure (runtime type traversal of captured values) will serve all three use cases above.
 
 ### Safety: Bytecode Verifier Guarantees
 
@@ -272,12 +276,9 @@ The core idea is **lazy deserialization of captured values**, reflected by the `
 
 ### Whether to Store Layouts
 
-The current serialized format embeds a `MoveTypeLayout` before each captured value. Our new lazy deserialization design does not need these embedded layouts — the raw blob is stored as opaque bytes and only parsed at materialization time, when type definitions are loaded anyway. The runtime must still be able to read the current format for backward compatibility with existing on-chain data.
+The current serialized format embeds a `MoveTypeLayout` before each captured value. Our lazy deserialization design does not strictly need these embedded layouts — the raw blob is stored as opaque bytes and only parsed at materialization time, when type definitions are loaded anyway.
 
-The question is whether to continue writing layouts. Two options:
-
-- **Keep writing layouts.** Use the current format as-is. Simple, fully compatible. The downside is that serialization must compute layouts for each captured value, adding complexity and cost at write time.
-- **Stop writing layouts.** Define a new format (with a version bump) that stores only the function identity, mask, and captured values. Leaner on-chain footprint. The runtime still reads the old format (recognizing it by version number) but writes the new one. Materialization derives layouts from loaded type definitions at call time. The tradeoff is that the on-chain data is no longer self-describing — external tools (indexers, explorers) can no longer decode captured values without loading the relevant modules to obtain type definitions.
+The initial plan is to **keep writing layouts**, maintaining full backward compatibility with the V1 format. This avoids having to update peripheral systems (indexers, explorers, SDKs) that rely on the self-describing format to decode closure data. A future V2 format that omits layouts (leaner on-chain footprint, but no longer self-describing) could be introduced later with a separate migration plan.
 
 ## Interior Mutability (Open Question)
 
