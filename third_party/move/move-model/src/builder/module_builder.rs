@@ -4838,14 +4838,7 @@ impl ModuleBuilder<'_, '_> {
                 spec: spec.into(),
                 def,
                 called_funs,
-                calling_funs: RefCell::default(),
-                transitive_closure_of_called_funs: RefCell::default(),
                 used_funs,
-                using_funs: RefCell::default(),
-                transitive_closure_of_used_funs: RefCell::default(),
-                used_functions_with_transitive_inline: RefCell::default(),
-                using_functions_with_transitive_inline: RefCell::default(),
-                used_structs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }
@@ -4885,14 +4878,7 @@ impl ModuleBuilder<'_, '_> {
                 spec: spec.into(),
                 def: None,
                 called_funs: Some(Default::default()),
-                calling_funs: RefCell::default(),
-                transitive_closure_of_called_funs: RefCell::default(),
                 used_funs: Some(Default::default()),
-                using_funs: RefCell::default(),
-                transitive_closure_of_used_funs: RefCell::default(),
-                used_functions_with_transitive_inline: RefCell::default(),
-                using_functions_with_transitive_inline: RefCell::default(),
-                used_structs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }
