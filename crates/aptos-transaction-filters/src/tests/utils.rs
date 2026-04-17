@@ -13,7 +13,9 @@ use aptos_types::{
     secret_sharing::{Ciphertext, EvalProof},
     transaction::{
         authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
-        encrypted_payload::{DecryptionFailureReason, EncryptedPayload},
+        encrypted_payload::{
+            DecryptedPlaintext, DecryptionFailureReason, EncryptedInner, EncryptedPayload,
+        },
         EntryFunction, Multisig, MultisigTransactionPayload, RawTransaction, Script,
         SignedTransaction, TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
         TransactionPayload, TransactionPayloadInner,
@@ -53,15 +55,16 @@ pub fn create_encrypted_and_plaintext_transactions() -> Vec<SignedTransaction> {
 /// Creates and returns an encrypted transaction
 #[cfg(test)]
 pub fn create_encrypted_transaction() -> SignedTransaction {
-    let encrypted_payload = EncryptedPayload::Encrypted {
+    let encrypted_payload = EncryptedPayload::Encrypted(EncryptedInner {
         ciphertext: Ciphertext::random(),
         extra_config: TransactionExtraConfig::V1 {
             multisig_address: None,
             replay_protection_nonce: None,
         },
         payload_hash: HashValue::random(),
+        encryption_epoch: 1,
         claimed_entry_fun: None,
-    };
+    });
 
     let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
     create_signed_transaction(transaction_payload, false)
@@ -71,15 +74,18 @@ pub fn create_encrypted_transaction() -> SignedTransaction {
 #[cfg(test)]
 pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
     let encrypted_payload = EncryptedPayload::FailedDecryption {
-        ciphertext: Ciphertext::random(),
-        extra_config: TransactionExtraConfig::V1 {
-            multisig_address: None,
-            replay_protection_nonce: None,
+        original: EncryptedInner {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+            payload_hash: HashValue::random(),
+            encryption_epoch: 1,
+            claimed_entry_fun: None,
         },
-        payload_hash: HashValue::random(),
         eval_proof: Some(EvalProof::random()),
         reason: DecryptionFailureReason::CryptoFailure,
-        claimed_entry_fun: None,
     };
 
     let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
@@ -90,16 +96,18 @@ pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
 #[cfg(test)]
 pub fn create_encrypted_transaction_plaintext_state() -> SignedTransaction {
     let encrypted_payload = EncryptedPayload::Decrypted {
-        ciphertext: Ciphertext::random(),
-        extra_config: TransactionExtraConfig::V1 {
-            multisig_address: None,
-            replay_protection_nonce: None,
+        original: EncryptedInner {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+            payload_hash: HashValue::random(),
+            encryption_epoch: 1,
+            claimed_entry_fun: None,
         },
-        payload_hash: HashValue::random(),
         eval_proof: EvalProof::random(),
-        executable: TransactionExecutable::Empty,
-        decryption_nonce: 0,
-        claimed_entry_fun: None,
+        decrypted: DecryptedPlaintext::new(TransactionExecutable::Empty, [0; 16]),
     };
 
     let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);

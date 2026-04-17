@@ -1191,6 +1191,7 @@ pub struct EncryptedPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub encryption_epoch: U64,
     pub claimed_entry_fun: Option<ClaimedEntryFunction>,
 }
 
@@ -1200,6 +1201,7 @@ pub struct FailedDecryptionPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub encryption_epoch: U64,
     pub claimed_entry_fun: Option<ClaimedEntryFunction>,
 }
 
@@ -1209,9 +1211,10 @@ pub struct DecryptedPayload {
     pub payload_hash: HashValue,
     /// BCS-serialized ciphertext bytes, hex-encoded.
     pub ciphertext: HexEncodedBytes,
+    pub encryption_epoch: U64,
     pub claimed_entry_fun: Option<ClaimedEntryFunction>,
     pub decrypted_payload: EncryptedTransactionInnerPayload,
-    pub decryption_nonce: U64,
+    pub decryption_nonce: HexEncodedBytes,
 }
 
 impl VerifyInput for EncryptedTransactionPayload {

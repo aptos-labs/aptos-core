@@ -638,6 +638,14 @@ DecKeyMetadata:
   STRUCT:
     - epoch: U64
     - round: U64
+DecryptedPlaintext:
+  STRUCT:
+    - executable:
+        TYPENAME: TransactionExecutable
+    - decryption_nonce:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 16
 DecryptionFailureReason:
   ENUM:
     0:
@@ -650,6 +658,10 @@ DecryptionFailureReason:
       DecryptionKeyUnavailable: UNIT
     4:
       ClaimedEntryFunctionMismatch: UNIT
+    5:
+      PayloadHashMismatch: UNIT
+    6:
+      EpochMismatch: UNIT
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -657,32 +669,29 @@ Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
   NEWTYPESTRUCT: BYTES
+EncryptedInner:
+  STRUCT:
+    - ciphertext:
+        TYPENAME: Ciphertext
+    - extra_config:
+        TYPENAME: TransactionExtraConfig
+    - payload_hash:
+        TYPENAME: HashValue
+    - encryption_epoch: U64
+    - claimed_entry_fun:
+        OPTION:
+          TYPENAME: ClaimedEntryFunction
 EncryptedPayload:
   ENUM:
     0:
       Encrypted:
-        STRUCT:
-          - ciphertext:
-              TYPENAME: Ciphertext
-          - extra_config:
-              TYPENAME: TransactionExtraConfig
-          - payload_hash:
-              TYPENAME: HashValue
-          - claimed_entry_fun:
-              OPTION:
-                TYPENAME: ClaimedEntryFunction
+        NEWTYPE:
+          TYPENAME: EncryptedInner
     1:
       FailedDecryption:
         STRUCT:
-          - ciphertext:
-              TYPENAME: Ciphertext
-          - extra_config:
-              TYPENAME: TransactionExtraConfig
-          - payload_hash:
-              TYPENAME: HashValue
-          - claimed_entry_fun:
-              OPTION:
-                TYPENAME: ClaimedEntryFunction
+          - original:
+              TYPENAME: EncryptedInner
           - eval_proof:
               OPTION:
                 TYPENAME: EvalProof
@@ -691,20 +700,12 @@ EncryptedPayload:
     2:
       Decrypted:
         STRUCT:
-          - ciphertext:
-              TYPENAME: Ciphertext
-          - extra_config:
-              TYPENAME: TransactionExtraConfig
-          - payload_hash:
-              TYPENAME: HashValue
-          - claimed_entry_fun:
-              OPTION:
-                TYPENAME: ClaimedEntryFunction
+          - original:
+              TYPENAME: EncryptedInner
           - eval_proof:
               TYPENAME: EvalProof
-          - executable:
-              TYPENAME: TransactionExecutable
-          - decryption_nonce: U64
+          - decrypted:
+              TYPENAME: DecryptedPlaintext
 EntryFunction:
   STRUCT:
     - module:

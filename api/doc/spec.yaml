@@ -13288,6 +13288,7 @@ components:
       required:
       - payload_hash
       - ciphertext
+      - encryption_epoch
       - decrypted_payload
       - decryption_nonce
       properties:
@@ -13297,12 +13298,14 @@ components:
           allOf:
           - $ref: '#/components/schemas/HexEncodedBytes'
           - description: BCS-serialized ciphertext bytes, hex-encoded.
+        encryption_epoch:
+          $ref: '#/components/schemas/U64'
         claimed_entry_fun:
           $ref: '#/components/schemas/ClaimedEntryFunction'
         decrypted_payload:
           $ref: '#/components/schemas/EncryptedTransactionInnerPayload'
         decryption_nonce:
-          $ref: '#/components/schemas/U64'
+          $ref: '#/components/schemas/HexEncodedBytes'
     DeleteModule:
       type: object
       description: Delete a module
@@ -13431,6 +13434,7 @@ components:
       required:
       - payload_hash
       - ciphertext
+      - encryption_epoch
       properties:
         payload_hash:
           $ref: '#/components/schemas/HashValue'
@@ -13438,6 +13442,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/HexEncodedBytes'
           - description: BCS-serialized ciphertext bytes, hex-encoded.
+        encryption_epoch:
+          $ref: '#/components/schemas/U64'
         claimed_entry_fun:
           $ref: '#/components/schemas/ClaimedEntryFunction'
     EncryptedTransactionInnerPayload:
@@ -13678,6 +13684,7 @@ components:
       required:
       - payload_hash
       - ciphertext
+      - encryption_epoch
       properties:
         payload_hash:
           $ref: '#/components/schemas/HashValue'
@@ -13685,6 +13692,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/HexEncodedBytes'
           - description: BCS-serialized ciphertext bytes, hex-encoded.
+        encryption_epoch:
+          $ref: '#/components/schemas/U64'
         claimed_entry_fun:
           $ref: '#/components/schemas/ClaimedEntryFunction'
     FederatedKeyless:

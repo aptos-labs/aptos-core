@@ -19,7 +19,10 @@ use aptos_types::{
     function_info::FunctionInfo,
     secret_sharing::EncryptionKey,
     transaction::{
-        encrypted_payload::{DecryptedPayload, EncryptedPayload, PayloadAssociatedData},
+        encrypted_payload::{
+            DecryptedPlaintext, DecryptionNonce, EncryptedInner, EncryptedPayload,
+            PayloadAssociatedData,
+        },
         EntryFunction, Script,
     },
 };
@@ -124,7 +127,10 @@ impl TransactionBuilder {
     pub fn build(mut self) -> RawTransaction {
         // Read the encryption key at build time (not at builder-creation time)
         // so that epoch-change key rotations are always picked up.
-        let encryption_key = self.encryption_key.read().unwrap().key.clone();
+        let encryption_key_state = self.encryption_key.read().unwrap();
+        let encryption_key = encryption_key_state.key.clone();
+        let encryption_epoch = encryption_key_state.epoch;
+        drop(encryption_key_state);
         if let Some(ref encryption_key) = encryption_key {
             assert!(!self.payload.is_encrypted_variant());
             let encrypted_payload = TransactionFactory::encrypt_payload(
@@ -133,6 +139,7 @@ impl TransactionBuilder {
                 self.auth_key
                     .expect("auth_key must be set for encrypted payloads"),
                 encryption_key,
+                encryption_epoch,
             )
             .expect("Payload must encrypt");
             self.payload = TransactionPayload::EncryptedPayload(encrypted_payload);
@@ -465,16 +472,17 @@ impl TransactionFactory {
         sender: AccountAddress,
         auth_key: AuthenticationKey,
         encryption_key: &EncryptionKey,
+        encryption_epoch: u64,
     ) -> Result<EncryptedPayload> {
         // Convert payload to executable
         let executable = payload.executable()?;
         let extra_config = payload.extra_config();
 
         // Generate decryption nonce
-        let decryption_nonce: u64 = rand::random();
+        let decryption_nonce: DecryptionNonce = rand::random();
 
         // Create DecryptedPayload for encryption
-        let decrypted_payload = DecryptedPayload::new(executable, decryption_nonce);
+        let decrypted_payload = DecryptedPlaintext::new(executable, decryption_nonce);
 
         // Create associated data with sender and auth_key to bind the ciphertext
         // to both the sender address and the authenticator's identity.
@@ -495,12 +503,13 @@ impl TransactionFactory {
         let payload_hash = CryptoHash::hash(&decrypted_payload);
 
         // Create encrypted payload
-        Ok(EncryptedPayload::Encrypted {
+        Ok(EncryptedPayload::Encrypted(EncryptedInner {
             ciphertext,
             extra_config,
             payload_hash,
+            encryption_epoch,
             claimed_entry_fun: None,
-        })
+        }))
     }
 
     fn expiration_timestamp(&self) -> u64 {
@@ -606,6 +615,7 @@ mod tests {
             sender,
             sender_auth_key,
             &encryption_key,
+            0,
         )
         .unwrap();
 

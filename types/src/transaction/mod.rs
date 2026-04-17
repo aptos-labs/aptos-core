@@ -694,27 +694,17 @@ impl RawTransaction {
     pub fn as_encrypted_variant(&self) -> Cow<'_, Self> {
         match &self.payload {
             TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
-                ciphertext,
-                extra_config,
-                payload_hash,
-                claimed_entry_fun,
-                ..
+                original, ..
             })
             | TransactionPayload::EncryptedPayload(EncryptedPayload::FailedDecryption {
-                ciphertext,
-                extra_config,
-                payload_hash,
-                claimed_entry_fun,
+                original,
                 ..
             }) => Cow::Owned(RawTransaction {
                 sender: self.sender,
                 sequence_number: self.sequence_number,
-                payload: TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted {
-                    ciphertext: ciphertext.clone(),
-                    extra_config: extra_config.clone(),
-                    payload_hash: *payload_hash,
-                    claimed_entry_fun: claimed_entry_fun.clone(),
-                }),
+                payload: TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted(
+                    original.clone(),
+                )),
                 max_gas_amount: self.max_gas_amount,
                 gas_unit_price: self.gas_unit_price,
                 expiration_timestamp_secs: self.expiration_timestamp_secs,

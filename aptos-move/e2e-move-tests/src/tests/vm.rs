@@ -9,7 +9,7 @@ use aptos_types::{
     secret_sharing::{Ciphertext, EvalProof},
     state_store::state_key::StateKey,
     transaction::{
-        encrypted_payload::{DecryptionFailureReason, EncryptedPayload},
+        encrypted_payload::{DecryptionFailureReason, EncryptedInner, EncryptedPayload},
         ExecutionStatus, TransactionExtraConfig, TransactionPayload,
     },
     write_set::WriteOp,
@@ -81,24 +81,28 @@ fn failed_encrypted_transaction_increments_sequence_number() {
 
     // Sign the transaction in the Encrypted state (the original state before decryption
     // is attempted). The signature is verified against this state.
-    let encrypted_payload = EncryptedPayload::Encrypted {
+    let encrypted_payload = EncryptedPayload::Encrypted(EncryptedInner {
         ciphertext: ciphertext.clone(),
         extra_config: extra_config.clone(),
         payload_hash,
+        encryption_epoch: 1,
         claimed_entry_fun: None,
-    };
+    });
     let payload = TransactionPayload::EncryptedPayload(encrypted_payload);
     let mut txn = h.create_transaction_payload(&sender, payload);
 
     // Mutate the payload to simulate a failed decryption attempt, as the block executor
     // would do after failing to decrypt the ciphertext.
     let failed_payload = EncryptedPayload::FailedDecryption {
-        ciphertext,
-        extra_config,
-        payload_hash,
+        original: EncryptedInner {
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch: 1,
+            claimed_entry_fun: None,
+        },
         eval_proof: Some(EvalProof::random()),
         reason: DecryptionFailureReason::CryptoFailure,
-        claimed_entry_fun: None,
     };
     *txn.payload_mut() = TransactionPayload::EncryptedPayload(failed_payload);
 

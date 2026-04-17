@@ -489,36 +489,36 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let ciphertext = HexEncodedBytes::from(bcs::to_bytes(encrypted.ciphertext())?);
 
                 match encrypted {
-                    EP::Encrypted {
-                        payload_hash,
-                        claimed_entry_fun,
-                        ..
-                    } => TransactionPayload::EncryptedTransactionPayload(
+                    EP::Encrypted(inner) => TransactionPayload::EncryptedTransactionPayload(
                         EncryptedTransactionPayload::Encrypted(ApiEncryptedPayload {
-                            payload_hash: crate::HashValue::from(payload_hash),
+                            payload_hash: crate::HashValue::from(inner.payload_hash),
                             ciphertext: ciphertext.clone(),
-                            claimed_entry_fun: into_api_claimed_entry_function(claimed_entry_fun),
+                            encryption_epoch: U64::from(inner.encryption_epoch),
+                            claimed_entry_fun: into_api_claimed_entry_function(
+                                inner.claimed_entry_fun.clone(),
+                            ),
                         }),
                     ),
-                    EP::FailedDecryption {
-                        payload_hash,
-                        claimed_entry_fun,
-                        ..
-                    } => TransactionPayload::EncryptedTransactionPayload(
-                        EncryptedTransactionPayload::FailedDecryption(ApiFailedDecryptionPayload {
-                            payload_hash: crate::HashValue::from(payload_hash),
-                            ciphertext: ciphertext.clone(),
-                            claimed_entry_fun: into_api_claimed_entry_function(claimed_entry_fun),
-                        }),
-                    ),
+                    EP::FailedDecryption { original, .. } => {
+                        TransactionPayload::EncryptedTransactionPayload(
+                            EncryptedTransactionPayload::FailedDecryption(
+                                ApiFailedDecryptionPayload {
+                                    payload_hash: crate::HashValue::from(original.payload_hash),
+                                    ciphertext: ciphertext.clone(),
+                                    encryption_epoch: U64::from(original.encryption_epoch),
+                                    claimed_entry_fun: into_api_claimed_entry_function(
+                                        original.claimed_entry_fun.clone(),
+                                    ),
+                                },
+                            ),
+                        )
+                    },
                     EP::Decrypted {
-                        payload_hash,
-                        executable,
-                        decryption_nonce,
-                        claimed_entry_fun,
+                        original,
+                        decrypted,
                         ..
                     } => {
-                        let inner = match executable {
+                        let inner = match decrypted.executable() {
                             aptos_types::transaction::TransactionExecutable::EntryFunction(
                                 entry_function,
                             ) if multisig_address.is_some() => {
@@ -549,12 +549,15 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         };
                         TransactionPayload::EncryptedTransactionPayload(
                             EncryptedTransactionPayload::Decrypted(ApiDecryptedPayload {
-                                payload_hash: crate::HashValue::from(payload_hash),
+                                payload_hash: crate::HashValue::from(original.payload_hash),
                                 ciphertext,
+                                encryption_epoch: U64::from(original.encryption_epoch),
                                 decrypted_payload: inner,
-                                decryption_nonce: U64::from(decryption_nonce),
+                                decryption_nonce: HexEncodedBytes::from(
+                                    decrypted.decryption_nonce().to_vec(),
+                                ),
                                 claimed_entry_fun: into_api_claimed_entry_function(
-                                    claimed_entry_fun,
+                                    original.claimed_entry_fun.clone(),
                                 ),
                             }),
                         )
@@ -1017,24 +1020,31 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             TransactionPayload::EncryptedTransactionPayload(encrypted) => {
                 // Only the Encrypted variant can be submitted; VerifyInput enforces this.
-                let (payload_hash, ciphertext_bytes, claimed_entry_fun) = match encrypted {
-                    EncryptedTransactionPayload::Encrypted(p) => {
-                        (p.payload_hash, p.ciphertext, p.claimed_entry_fun)
-                    },
-                    _ => bail!("Only encrypted state payloads can be submitted"),
-                };
+                let (payload_hash, ciphertext_bytes, encryption_epoch, claimed_entry_fun) =
+                    match encrypted {
+                        EncryptedTransactionPayload::Encrypted(p) => (
+                            p.payload_hash,
+                            p.ciphertext,
+                            p.encryption_epoch,
+                            p.claimed_entry_fun,
+                        ),
+                        _ => bail!("Only encrypted state payloads can be submitted"),
+                    };
                 let ciphertext: Ciphertext = bcs::from_bytes(&ciphertext_bytes.0)
                     .context("Failed to BCS-deserialize ciphertext")?;
                 let extra_config = ExtraConfig::V1 {
                     multisig_address: None,
                     replay_protection_nonce: nonce,
                 };
-                Target::EncryptedPayload(EncryptedPayload::Encrypted {
-                    ciphertext,
-                    extra_config,
-                    payload_hash: payload_hash.into(),
-                    claimed_entry_fun: into_claimed_entry_fun(claimed_entry_fun),
-                })
+                Target::EncryptedPayload(EncryptedPayload::Encrypted(
+                    aptos_types::transaction::encrypted_payload::EncryptedInner {
+                        ciphertext,
+                        extra_config,
+                        payload_hash: payload_hash.into(),
+                        encryption_epoch: encryption_epoch.into(),
+                        claimed_entry_fun: into_claimed_entry_fun(claimed_entry_fun),
+                    },
+                ))
             },
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {

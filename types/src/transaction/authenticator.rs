@@ -1637,8 +1637,9 @@ mod tests {
         },
         secret_sharing::{Ciphertext, EvalProof},
         transaction::{
-            encrypted_payload::EncryptedPayload, webauthn::AssertionSignature, SignedTransaction,
-            TransactionExecutable, TransactionExtraConfig, TransactionPayload,
+            encrypted_payload::{DecryptedPlaintext, EncryptedInner, EncryptedPayload},
+            webauthn::AssertionSignature,
+            SignedTransaction, TransactionExecutable, TransactionExtraConfig, TransactionPayload,
         },
     };
     use aptos_crypto::{
@@ -2331,6 +2332,7 @@ mod tests {
         Ciphertext,
         TransactionExtraConfig,
         HashValue,
+        u64,
     ) {
         let ciphertext = Ciphertext::random();
         let extra_config = TransactionExtraConfig::V1 {
@@ -2338,13 +2340,22 @@ mod tests {
             replay_protection_nonce: None,
         };
         let payload_hash = HashValue::random();
-        let payload = TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted {
-            ciphertext: ciphertext.clone(),
-            extra_config: extra_config.clone(),
+        let encryption_epoch = 7;
+        let payload =
+            TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted(EncryptedInner {
+                ciphertext: ciphertext.clone(),
+                extra_config: extra_config.clone(),
+                payload_hash,
+                encryption_epoch,
+                claimed_entry_fun: None,
+            }));
+        (
+            payload,
+            ciphertext,
+            extra_config,
             payload_hash,
-            claimed_entry_fun: None,
-        });
-        (payload, ciphertext, extra_config, payload_hash)
+            encryption_epoch,
+        )
     }
 
     /// Simulate decryption by mutating the signed transaction's payload
@@ -2354,16 +2365,19 @@ mod tests {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        encryption_epoch: u64,
     ) {
         *signed_txn.payload_mut() =
             TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
-                ciphertext,
-                extra_config,
-                payload_hash,
-                claimed_entry_fun: None,
+                original: EncryptedInner {
+                    ciphertext,
+                    extra_config,
+                    payload_hash,
+                    encryption_epoch,
+                    claimed_entry_fun: None,
+                },
                 eval_proof: EvalProof::random(),
-                executable: TransactionExecutable::Empty,
-                decryption_nonce: 42,
+                decrypted: DecryptedPlaintext::new(TransactionExecutable::Empty, [42; 16]),
             });
     }
 
@@ -2373,7 +2387,8 @@ mod tests {
         let sender_pub = sender_key.public_key();
         let sender_addr = AuthenticationKey::ed25519(&sender_pub).account_address();
 
-        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let (payload, ciphertext, extra_config, payload_hash, encryption_epoch) =
+            make_encrypted_payload();
         let raw_txn = RawTransaction::new(
             sender_addr,
             0,
@@ -2390,7 +2405,13 @@ mod tests {
         signed_txn.verify_signature().unwrap();
 
         // Simulate decryption (Encrypted -> Decrypted).
-        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+        simulate_decryption(
+            &mut signed_txn,
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch,
+        );
 
         // Signature should still verify because as_encrypted_variant() converts back.
         signed_txn.verify_signature().unwrap();
@@ -2406,7 +2427,8 @@ mod tests {
         let fee_payer_pub = fee_payer_key.public_key();
         let fee_payer_addr = AuthenticationKey::ed25519(&fee_payer_pub).account_address();
 
-        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let (payload, ciphertext, extra_config, payload_hash, encryption_epoch) =
+            make_encrypted_payload();
         let raw_txn = RawTransaction::new(
             sender_addr,
             0,
@@ -2439,7 +2461,13 @@ mod tests {
         signed_txn.verify_signature().unwrap();
 
         // Simulate decryption.
-        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+        simulate_decryption(
+            &mut signed_txn,
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch,
+        );
 
         // Signature should still verify.
         signed_txn.verify_signature().unwrap();
@@ -2455,7 +2483,8 @@ mod tests {
         let secondary_pub = secondary_key.public_key();
         let secondary_addr = AuthenticationKey::ed25519(&secondary_pub).account_address();
 
-        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let (payload, ciphertext, extra_config, payload_hash, encryption_epoch) =
+            make_encrypted_payload();
         let raw_txn = RawTransaction::new(
             sender_addr,
             0,
@@ -2481,7 +2510,13 @@ mod tests {
 
         signed_txn.verify_signature().unwrap();
 
-        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+        simulate_decryption(
+            &mut signed_txn,
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch,
+        );
 
         signed_txn.verify_signature().unwrap();
     }
@@ -2493,7 +2528,8 @@ mod tests {
         let sender_addr =
             AuthenticationKey::any_key(AnyPublicKey::ed25519(sender_pub.clone())).account_address();
 
-        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let (payload, ciphertext, extra_config, payload_hash, encryption_epoch) =
+            make_encrypted_payload();
         let raw_txn = RawTransaction::new(
             sender_addr,
             0,
@@ -2514,7 +2550,13 @@ mod tests {
 
         signed_txn.verify_signature().unwrap();
 
-        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+        simulate_decryption(
+            &mut signed_txn,
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch,
+        );
 
         signed_txn.verify_signature().unwrap();
     }

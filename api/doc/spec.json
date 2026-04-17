@@ -17840,6 +17840,7 @@
         "required": [
           "payload_hash",
           "ciphertext",
+          "encryption_epoch",
           "decrypted_payload",
           "decryption_nonce"
         ],
@@ -17857,6 +17858,9 @@
               }
             ]
           },
+          "encryption_epoch": {
+            "$ref": "#/components/schemas/U64"
+          },
           "claimed_entry_fun": {
             "$ref": "#/components/schemas/ClaimedEntryFunction"
           },
@@ -17864,7 +17868,7 @@
             "$ref": "#/components/schemas/EncryptedTransactionInnerPayload"
           },
           "decryption_nonce": {
-            "$ref": "#/components/schemas/U64"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -18048,7 +18052,8 @@
         "description": "Payload is still encrypted and cannot be read.",
         "required": [
           "payload_hash",
-          "ciphertext"
+          "ciphertext",
+          "encryption_epoch"
         ],
         "properties": {
           "payload_hash": {
@@ -18063,6 +18068,9 @@
                 "description": "BCS-serialized ciphertext bytes, hex-encoded."
               }
             ]
+          },
+          "encryption_epoch": {
+            "$ref": "#/components/schemas/U64"
           },
           "claimed_entry_fun": {
             "$ref": "#/components/schemas/ClaimedEntryFunction"
@@ -18424,7 +18432,8 @@
         "description": "Decryption was attempted but failed.",
         "required": [
           "payload_hash",
-          "ciphertext"
+          "ciphertext",
+          "encryption_epoch"
         ],
         "properties": {
           "payload_hash": {
@@ -18439,6 +18448,9 @@
                 "description": "BCS-serialized ciphertext bytes, hex-encoded."
               }
             ]
+          },
+          "encryption_epoch": {
+            "$ref": "#/components/schemas/U64"
           },
           "claimed_entry_fun": {
             "$ref": "#/components/schemas/ClaimedEntryFunction"
