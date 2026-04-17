@@ -22,11 +22,11 @@ use crate::{
 };
 use aptos_api_types::AptosErrorCode;
 use aptos_cli_common::{
-    check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, get_sequence_number,
-    load_account_arg, parse_json_file, prompt_yes_with_override, write_to_file, CliCommand,
-    CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode, MoveManifestAccountWrapper,
-    ProfileOptions, PromptOptions, RestOptions, SaveFile, TransactionOptions, TransactionSummary,
-    GIT_IGNORE,
+    check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, format_txn_status,
+    get_sequence_number, load_account_arg, parse_json_file, prompt_yes_with_override,
+    write_to_file, CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode,
+    MoveManifestAccountWrapper, ProfileOptions, PromptOptions, RestOptions, SaveFile,
+    TransactionOptions, TransactionSummary, GIT_IGNORE,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
@@ -2728,7 +2728,7 @@ impl CliCommand<TransactionSummary> for Replay {
             success,
             timestamp_us: None,
             version: Some(self.txn_id),
-            vm_status: Some(vm_status.to_string()),
+            vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
             deployed_object_address: None,
         };
 
