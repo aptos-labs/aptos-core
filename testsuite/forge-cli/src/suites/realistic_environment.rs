@@ -564,7 +564,7 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
             config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
             config.consensus_observer.enable_v2_message_sending = true;
-            config.consensus.decryption_setup_blob_path =
+            config.consensus.digest_key_blob_path =
                 Some("/opt/aptos/genesis/decryption_setup.blob".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
@@ -636,7 +636,7 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
             config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
             config.consensus_observer.enable_v2_message_sending = true;
-            config.consensus.decryption_setup_blob_path =
+            config.consensus.digest_key_blob_path =
                 Some("/opt/aptos/genesis/decryption_setup.blob".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
