@@ -4,7 +4,10 @@
 #![allow(clippy::unwrap_used)]
 
 use aptos_consensus_types::{
-    block::Block, common::Payload, payload::OptQuorumStorePayload, proof_of_store::TBatchInfo,
+    block::Block,
+    common::{Author, Payload},
+    payload::OptQuorumStorePayload,
+    proof_of_store::TBatchInfo,
 };
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
@@ -195,7 +198,7 @@ pub static TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(||
     .unwrap()
 });
 
-pub fn update_batch_stats(block: &Block) {
+pub fn update_batch_stats(block: &Block, my_author: Author) {
     let (proof_num, proof_txn_num, proof_txn_bytes) = block.proof_stats();
     BATCH_NUM_PER_BLOCK
         .with_label_values(&["proof"])
@@ -228,19 +231,20 @@ pub fn update_batch_stats(block: &Block) {
         .with_label_values(&["opt_batch"])
         .observe(opt_batch_txn_bytes as f64);
 
-    update_committed_batches_by_author(block);
+    update_committed_batches_by_author(block, my_author);
 }
 
-fn update_committed_batches_by_author(block: &Block) {
+fn update_committed_batches_by_author(block: &Block, my_author: Author) {
     let Some(payload) = block.payload() else {
         return;
     };
     let Payload::OptQuorumStore(opt_qs) = payload else {
         return;
     };
+    let is_self_proposed = block.author() == Some(my_author);
 
     // Helper to record per-author stats for a batch type
-    fn record_batch_author(author: aptos_types::PeerId, num_txns: u64, batch_type: &str) {
+    let record_batch_author = |author: aptos_types::PeerId, num_txns: u64, batch_type: &str| {
         let author_str = author.short_str();
         COMMITTED_BATCHES_BY_AUTHOR
             .with_label_values(&[author_str.as_str(), batch_type])
@@ -248,7 +252,12 @@ fn update_committed_batches_by_author(block: &Block) {
         COMMITTED_TXNS_BY_AUTHOR
             .with_label_values(&[author_str.as_str(), batch_type])
             .inc_by(num_txns);
-    }
+        if is_self_proposed {
+            SELF_PROPOSED_BATCHES_BY_TYPE_AND_AUTHOR
+                .with_label_values(&[author_str.as_str(), batch_type])
+                .inc();
+        }
+    };
 
     match opt_qs {
         OptQuorumStorePayload::V1(p) => {
@@ -1143,6 +1152,16 @@ pub static COMMITTED_BATCHES_BY_AUTHOR: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "quorum_store_committed_batches_by_author",
         "Number of committed batches by author and batch type (proof, opt_batch, inline_batch)",
+        &["author", "type"]
+    )
+    .unwrap()
+});
+
+/// Committed batches in blocks this validator proposed, labeled by batch author + type
+pub static SELF_PROPOSED_BATCHES_BY_TYPE_AND_AUTHOR: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_self_proposed_batches_by_type_and_author",
+        "Committed batches in blocks this validator proposed, by batch author and type",
         &["author", "type"]
     )
     .unwrap()

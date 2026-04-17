@@ -1473,6 +1473,7 @@ impl RoundManager {
             let sync_info = self.block_store.sync_info();
             let proposal_generator = self.proposal_generator.clone();
             let proposer_election = self.proposer_election.clone();
+            counters::SELF_OPT_PROPOSAL_SPAWNED.inc();
             tokio::spawn(async move {
                 if let Err(e) = monitor!(
                     "generate_and_send_opt_proposal",

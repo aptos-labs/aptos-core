@@ -7,7 +7,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     quorum_store,
 };
-use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{block::Block, common::Author, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorError};
 use aptos_logger::prelude::warn;
@@ -125,6 +125,24 @@ pub static COMMITTED_OPT_BLOCKS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_committed_opt_blocks_count",
         "Count of the committed opt blocks since last restart."
+    )
+    .unwrap()
+});
+
+/// Number of opt proposals this validator spawned as leader
+pub static SELF_OPT_PROPOSAL_SPAWNED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_self_opt_proposal_spawned",
+        "Number of opt proposals this validator spawned as leader"
+    )
+    .unwrap()
+});
+
+/// Number of this validator's opt proposals that committed successfully
+pub static SELF_OPT_PROPOSAL_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_self_opt_proposal_committed",
+        "Number of opt proposals this validator spawned that committed"
     )
     .unwrap()
 });
@@ -1353,7 +1371,7 @@ pub static FETCH_COMMIT_HISTORY_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     )
 });
 
-pub fn update_counters_for_block(block: &Block) {
+pub fn update_counters_for_block(block: &Block, my_author: Author) {
     observe_block(block.timestamp_usecs(), BlockStage::COMMITTED);
     NUM_BYTES_PER_BLOCK.observe(block.payload().map_or(0, |payload| payload.size()) as f64);
     COMMITTED_BLOCKS_COUNT.inc();
@@ -1362,6 +1380,9 @@ pub fn update_counters_for_block(block: &Block) {
         observe_block(block.timestamp_usecs(), BlockStage::COMMITTED_OPT_BLOCK);
         COMMITTED_OPT_BLOCKS_COUNT.inc();
         LAST_COMMITTED_OPT_BLOCK_ROUND.set(block.round() as i64);
+        if block.author() == Some(my_author) {
+            SELF_OPT_PROPOSAL_COMMITTED.inc();
+        }
     }
     let failed_rounds = block
         .block_data()
@@ -1371,7 +1392,7 @@ pub fn update_counters_for_block(block: &Block) {
     if failed_rounds > 0 {
         COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
     }
-    quorum_store::counters::update_batch_stats(block);
+    quorum_store::counters::update_batch_stats(block, my_author);
 }
 
 pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
@@ -1405,9 +1426,12 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
 }
 
 /// Update various counters for committed blocks
-pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlock>]) {
+pub fn update_counters_for_committed_blocks(
+    blocks_to_commit: &[Arc<PipelinedBlock>],
+    my_author: Author,
+) {
     for block in blocks_to_commit {
-        update_counters_for_block(block.block());
+        update_counters_for_block(block.block(), my_author);
         update_counters_for_compute_result(&block.compute_result());
     }
 }
