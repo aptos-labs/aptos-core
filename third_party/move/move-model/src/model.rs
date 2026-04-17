@@ -140,6 +140,11 @@ impl Loc {
         self.inlined_from_loc.is_some()
     }
 
+    /// Returns the immediate `inlined-from` link of this location, if any.
+    pub fn inlined_from_loc(&self) -> Option<&Loc> {
+        self.inlined_from_loc.as_deref()
+    }
+
     // If `self` is an inlined `Loc`, then add the same
     // inlining info to the parameter `loc`.
     fn inline_if_needed(&self, loc: Loc) -> Loc {

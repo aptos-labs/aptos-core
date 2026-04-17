@@ -1,0 +1,21 @@
+
+Diagnostics:
+warning: [lint] unreachable code
+  ┌─ tests/default-only/unreachable_code_conditional_loop.move:8:17
+  │
+8 │ ╭                 noop();    // dead region 1
+9 │ │                 noop();
+  │ ╰──────────────────────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unreachable_code)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unreachable_code.
+
+warning: [lint] unreachable code
+   ┌─ tests/default-only/unreachable_code_conditional_loop.move:13:13
+   │
+13 │ ╭             noop();        // dead region 2
+14 │ │             noop();
+   │ ╰──────────────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unreachable_code)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unreachable_code.
