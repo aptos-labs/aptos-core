@@ -342,6 +342,8 @@ pub struct TransactionSummary {
 /// `TransactionSummary`. Prefers the VM-enriched `ExecutionStatus` (which
 /// carries abort location and `AbortInfo`) over the top-level `VMStatus`,
 /// whose `Display` impl drops both. `fallback` is used only for `Retry`.
+///
+/// TODO: See if we can unify this with `fn explain_vm_status` in `api/src/view_function.rs`
 pub fn format_txn_status(status: &TransactionStatus, fallback: &VMStatus) -> String {
     fn loc(l: &AbortLocation) -> String {
         match l {
@@ -351,6 +353,15 @@ pub fn format_txn_status(status: &TransactionStatus, fallback: &VMStatus) -> Str
             AbortLocation::Script => "script".to_string(),
         }
     }
+
+    fn format_description(desc: &str) -> &str {
+        if desc.trim_start().is_empty() {
+            "(no description)"
+        } else {
+            desc
+        }
+    }
+
     match status {
         TransactionStatus::Keep(ExecutionStatus::Success) => "Executed successfully".to_string(),
         TransactionStatus::Keep(ExecutionStatus::OutOfGas) => "Out of gas".to_string(),
@@ -364,9 +375,14 @@ pub fn format_txn_status(status: &TransactionStatus, fallback: &VMStatus) -> Str
                 loc(location),
                 i.reason_name,
                 code,
-                i.description
+                format_description(&i.description)
             ),
-            Some(i) => format!("Move abort in {}: {:#x}: {}", loc(location), code, i.description),
+            Some(i) => format!(
+                "Move abort in {}: {:#x}: {}",
+                loc(location),
+                code,
+                format_description(&i.description)
+            ),
             None => format!("Move abort in {}: {:#x}", loc(location), code),
         },
         TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
@@ -546,11 +562,17 @@ mod tests {
     #[test]
     fn success_and_out_of_gas() {
         assert_eq!(
-            format_txn_status(&TransactionStatus::Keep(ExecutionStatus::Success), &fallback()),
+            format_txn_status(
+                &TransactionStatus::Keep(ExecutionStatus::Success),
+                &fallback()
+            ),
             "Executed successfully",
         );
         assert_eq!(
-            format_txn_status(&TransactionStatus::Keep(ExecutionStatus::OutOfGas), &fallback()),
+            format_txn_status(
+                &TransactionStatus::Keep(ExecutionStatus::OutOfGas),
+                &fallback()
+            ),
             "Out of gas",
         );
     }
