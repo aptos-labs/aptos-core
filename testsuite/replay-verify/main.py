@@ -29,8 +29,9 @@ from archive_disk_utils import (
 
 SHARDING_ENABLED = True
 MAX_RETRIES = 5
-RETRY_DELAY = 20  # seconds
+RETRY_DELAY = 5  # seconds
 QUERY_DELAY = 5  # seconds
+POD_STATUS_CACHE_TTL = 3  # seconds — reuse cached pod status for this long
 
 # Timeout chain — each layer is a backstop for the one before:
 #   scheduler (20m) → binary (30m) → K8s TTL controller (40m)
@@ -56,6 +57,47 @@ class Network(Enum):
             return cls[name.upper()]
         except KeyError:
             raise ValueError(f"{name} is not a valid Network name")
+
+
+class LocalPhase(Enum):
+    """Local state for a WorkerPod.
+
+    State transitions happen only inside WorkerPod.update_status. A pod
+    starts in UNKNOWN and moves through non-terminal states (PENDING,
+    RUNNING) mirroring the K8s phase as seen from successful status
+    fetches. The three terminal states — SUCCEEDED, FAILED, LOST — never
+    transition out: once terminal, the pod stays there.
+
+    Non-terminal states can only move forward (UNKNOWN → PENDING →
+    RUNNING) or directly to any terminal state. The specific terminal
+    state depends on how the pod ended: SUCCEEDED (K8s phase Succeeded),
+    FAILED (K8s phase Failed, including evictions), or LOST (status fetch
+    raised an exception after retries — the pod is presumed gone or the
+    API is unreachable).
+
+    State semantics:
+      UNKNOWN   — no status has been fetched yet
+      PENDING   — K8s phase Pending (scheduling, pulling image, attaching volumes)
+      RUNNING   — K8s phase Running (container is executing)
+      SUCCEEDED — K8s phase Succeeded (container exited 0) — terminal
+      FAILED    — K8s phase Failed (container exited non-zero, or evicted) — terminal
+      LOST      — status fetch raised after retries; pod presumed gone — terminal
+
+    Scheduler treatment of terminal states:
+      SUCCEEDED — task marked succeeded, slot freed
+      FAILED    — if evicted → reschedule task (up to MAX_RETRIES),
+                  else → treat as permanent failure
+      LOST      — reschedule task (up to MAX_RETRIES), else → permanent failure
+    """
+    UNKNOWN = "Unknown"
+    PENDING = "Pending"
+    RUNNING = "Running"
+    SUCCEEDED = "Succeeded"
+    FAILED = "Failed"
+    LOST = "Lost"
+
+    def __str__(self):
+        return self.value
 
 
 logging.basicConfig(level=logging.INFO)
@@ -131,6 +173,8 @@ class WorkerPod:
         self.start_version = start_version
         self.end_version = end_version
         self.status = None
+        self.status_fetched_at = 0.0
+        self.local_phase = LocalPhase.UNKNOWN
         self.log = None
         self.namespace = namespace
         self.network = network
@@ -141,44 +185,71 @@ class WorkerPod:
         self.config = replay_config
 
     def update_status(self) -> None:
-        if self.status is not None and self.status.status.phase in [
-            "Succeeded",
-            "Failed",
-        ]:
+        """Refresh self.local_phase from the K8s API (with caching).
+
+        This is the ONLY method that mutates self.local_phase and self.status.
+        All other getters (is_completed, get_phase, etc.) call this then read
+        the state — they never fetch or transition on their own.
+
+        Caching rules:
+          - Terminal phases (SUCCEEDED/FAILED/LOST) are cached forever.
+          - Non-terminal phases are cached for POD_STATUS_CACHE_TTL seconds.
+          - Any exception during fetch transitions the pod to LOST.
+        """
+        # Terminal phases never change — no need to refetch
+        if self.local_phase in (LocalPhase.SUCCEEDED, LocalPhase.FAILED, LocalPhase.LOST):
             return
-        self.status = self.get_pod_status()
+        # Non-terminal phases — reuse the cached status if it's still fresh
+        if (
+            self.status is not None
+            and time.time() - self.status_fetched_at < POD_STATUS_CACHE_TTL
+        ):
+            return
+        try:
+            self.status = self._get_pod_status_api_call()
+            self.status_fetched_at = time.time()
+            phase_str = self.status.status.phase
+            try:
+                self.local_phase = LocalPhase(phase_str)
+            except ValueError:
+                self.local_phase = LocalPhase.UNKNOWN
+        except Exception as e:
+            # _get_pod_status_api_call already retries 5x internally; if we still get
+            # an exception, consider the pod permanently LOST. Clear the
+            # cached status — the last-known state is no longer trustworthy.
+            logger.error(f"Pod {self.name} marked LOST after status fetch failed: {e}")
+            self.local_phase = LocalPhase.LOST
+            self.status = None
 
     def is_completed(self) -> bool:
-        try:
-            self.update_status()
-            if self.status and self.status.status.phase in ["Succeeded", "Failed"]:
-                return True
-        except Exception as e:
-            logger.error(f"Failed to get pod status: {e}")
-        return False
+        self.update_status()
+        return self.local_phase in (
+            LocalPhase.SUCCEEDED,
+            LocalPhase.FAILED,
+            LocalPhase.LOST,
+        )
 
     def is_failed(self) -> bool:
         self.update_status()
-        if self.status and self.status.status.phase == "Failed":
-            return True
-        return False
+        return self.local_phase in (LocalPhase.FAILED, LocalPhase.LOST)
 
     def should_reschedule(self) -> bool:
-        if self.get_failure_reason() == "Evicted":
+        self.update_status()
+        if self.local_phase == LocalPhase.LOST:
             return True
-        return False
+        return self.get_failure_reason() == "Evicted"
 
     def get_failure_reason(self) -> str | None:
         self.update_status()
-        if self.status and self.status.status.phase == "Failed":
+        if self.local_phase == LocalPhase.LOST:
+            return "Lost"
+        if self.local_phase == LocalPhase.FAILED and self.status:
             return self.status.status.reason
         return None
 
-    def get_phase(self) -> str | None:
+    def get_phase(self) -> LocalPhase:
         self.update_status()
-        if self.status:
-            return self.status.status.phase
-        return None
+        return self.local_phase
 
     def get_container_status(self) -> list[client.V1ContainerStatus] | None:
         self.update_status()
@@ -188,6 +259,9 @@ class WorkerPod:
 
     def get_container_status_summary(self) -> str:
         """Return a one-line summary of the first container's state."""
+        self.update_status()
+        if self.local_phase == LocalPhase.LOST:
+            return "pod-lost"
         container_statuses = self.get_container_status()
         if not container_statuses:
             return "no-container-status"
@@ -206,14 +280,15 @@ class WorkerPod:
         return time.time() - self.start_time
 
     def has_txn_mismatch(self) -> bool:
-        if self.status:
-            container_statuses = self.status.status.container_statuses
-            if (
-                container_statuses
-                and container_statuses[0].state
-                and container_statuses[0].state.terminated
-            ):
-                return container_statuses[0].state.terminated.exit_code == 2
+        if self.local_phase == LocalPhase.LOST or not self.status:
+            return False
+        container_statuses = self.status.status.container_statuses
+        if (
+            container_statuses
+            and container_statuses[0].state
+            and container_statuses[0].state.terminated
+        ):
+            return container_statuses[0].state.terminated.exit_code == 2
         return False
 
     def get_target_db_dir(self) -> str:
@@ -288,6 +363,24 @@ class WorkerPod:
                 )
                 time.sleep(RETRY_DELAY)
 
+    def delete_pod(self) -> None:
+        """Delete the pod. Best-effort — never throws.
+
+        Transitions to LOST only if not already terminal (preserves
+        SUCCEEDED/FAILED in case this is called after the pod finished).
+        """
+        if self.local_phase not in (
+            LocalPhase.SUCCEEDED,
+            LocalPhase.FAILED,
+            LocalPhase.LOST,
+        ):
+            self.local_phase = LocalPhase.LOST
+            self.status = None
+        try:
+            self._delete_pod_api_call()
+        except Exception as e:
+            logger.warning(f"Best-effort delete of pod {self.name} failed: {e}")
+
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
         wait=wait_fixed(RETRY_DELAY),
@@ -296,28 +389,20 @@ class WorkerPod:
             f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
         ),
     )
-    def delete_pod(self):
+    def _delete_pod_api_call(self):
         try:
-            response = self.client.delete_namespaced_pod(
+            return self.client.delete_namespaced_pod(
                 name=self.name,
                 namespace=self.namespace,
                 body=client.V1DeleteOptions(
                     propagation_policy="Foreground", grace_period_seconds=0
                 ),
             )
-            return response
         except ApiException as e:
             if e.status == 404:  # Pod not found
                 logger.info(f"Pod {self.name} already deleted or doesn't exist")
                 return None  # Consider this a success
             raise  # Re-raise other API exceptions for retry
-
-    def get_pod_exit_code(self):
-        # Check the status of the pod containers
-        for container_status in self.status.status.container_statuses:
-            if container_status.state.terminated:
-                return container_status.state.terminated.exit_code
-        return None
 
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
@@ -327,7 +412,7 @@ class WorkerPod:
             f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
         ),
     )
-    def get_pod_status(self):
+    def _get_pod_status_api_call(self):
         pod_status = self.client.read_namespaced_pod_status(
             name=self.name, namespace=self.namespace
         )
@@ -343,13 +428,12 @@ class TaskStats:
         self.start_time: float = time.time()
         self.end_time: float | None = None
         self.retry_count: int = 0
-        self.durations: list[float] = []
         self.succeeded: bool = False
 
     def set_end_time(self) -> None:
-        if self.end_time is None:
-            self.end_time = time.time()
-            self.durations.append(self.end_time - self.start_time)
+        # Unconditional update — on retries, the final call wins so the
+        # recorded end_time reflects when the task actually finished.
+        self.end_time = time.time()
 
     def increment_retry_count(self) -> None:
         self.retry_count += 1
@@ -357,8 +441,29 @@ class TaskStats:
     def set_succeeded(self):
         self.succeeded = True
 
+    @property
+    def duration_secs(self) -> float | None:
+        if self.end_time is None:
+            return None
+        return self.end_time - self.start_time
+
+    def _fmt_time(self, t: float | None) -> str:
+        if t is None:
+            return "?"
+        return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
+
     def __str__(self) -> str:
-        return f"Succeeded: {self.succeeded}, Start time: {self.start_time}, End time: {self.end_time}, Duration: {self.durations}, Retry count: {self.retry_count}"
+        duration = self.duration_secs
+        duration_str = f"{duration:.1f}s" if duration is not None else "?"
+        return (
+            f"Succeeded: {self.succeeded}, "
+            f"Start: {self._fmt_time(self.start_time)}, "
+            f"End: {self._fmt_time(self.end_time)}, "
+            f"Duration: {duration_str}, "
+            f"Retry count: {self.retry_count}"
+        )
 
 
 class ReplayScheduler:
@@ -774,15 +879,17 @@ class ReplayScheduler:
             if worker is None:
                 empty_count += 1
                 continue
-            phase = worker.get_phase() or "Unknown"
+            phase = worker.get_phase()
             phase_counts[phase] += 1
             detail = ""
-            if phase not in ("Succeeded", "Failed", "Running"):
+            if phase not in (LocalPhase.SUCCEEDED, LocalPhase.FAILED, LocalPhase.RUNNING):
                 detail = f", container={worker.get_container_status_summary()}"
             log(
                 f"  Worker {idx}: {worker.name}, phase={phase}, age={int(worker.get_age_secs())}s{detail}"
             )
-        summary = ", ".join(f"{phase}={count}" for phase, count in sorted(phase_counts.items()))
+        summary = ", ".join(
+            f"{phase}={count}" for phase, count in sorted(phase_counts.items(), key=lambda x: x[0].value)
+        )
         log(f"  Summary: {summary}, empty={empty_count}")
         log("=== End worker status ==="  )
         log("")
