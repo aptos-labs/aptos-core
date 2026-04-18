@@ -53,6 +53,10 @@ spec aptos_framework::jwks {
         pragma verify = false;
     }
 
+    spec initialize_with_defaults(fx: &signer, providers: vector<OIDCProvider>, patches: vector<Patch>) {
+        pragma verify = false;
+    }
+
     spec try_get_jwk_by_id(provider_jwks: &ProviderJWKs, jwk_id: vector<u8>): Option<JWK> {
         pragma verify_duration_estimate = 80;
     }

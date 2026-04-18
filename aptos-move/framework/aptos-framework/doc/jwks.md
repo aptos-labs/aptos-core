@@ -46,6 +46,7 @@ have a simple layout which is easily accessible in Rust.
 -  [Function `new_rsa_jwk`](#0x1_jwks_new_rsa_jwk)
 -  [Function `new_unsupported_jwk`](#0x1_jwks_new_unsupported_jwk)
 -  [Function `initialize`](#0x1_jwks_initialize)
+-  [Function `initialize_with_defaults`](#0x1_jwks_initialize_with_defaults)
 -  [Function `remove_oidc_provider_internal`](#0x1_jwks_remove_oidc_provider_internal)
 -  [Function `upsert_into_observed_jwks`](#0x1_jwks_upsert_into_observed_jwks)
 -  [Function `remove_issuer_from_observed_jwks`](#0x1_jwks_remove_issuer_from_observed_jwks)
@@ -66,6 +67,7 @@ have a simple layout which is easily accessible in Rust.
     -  [Function `remove_oidc_provider_for_next_epoch`](#@Specification_1_remove_oidc_provider_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
     -  [Function `set_patches`](#@Specification_1_set_patches)
+    -  [Function `initialize_with_defaults`](#@Specification_1_initialize_with_defaults)
     -  [Function `upsert_into_observed_jwks`](#@Specification_1_upsert_into_observed_jwks)
     -  [Function `remove_issuer_from_observed_jwks`](#@Specification_1_remove_issuer_from_observed_jwks)
     -  [Function `regenerate_patched_jwks`](#@Specification_1_regenerate_patched_jwks)
@@ -1406,6 +1408,36 @@ Initialize some JWK resources. Should only be invoked by genesis.
 
 </details>
 
+<a id="0x1_jwks_initialize_with_defaults"></a>
+
+## Function `initialize_with_defaults`
+
+Initialize some JWK resources. Should only be invoked by genesis.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_initialize_with_defaults">initialize_with_defaults</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_OIDCProvider">jwks::OIDCProvider</a>&gt;, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_initialize_with_defaults">initialize_with_defaults</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_OIDCProvider">OIDCProvider</a>&gt;, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">Patch</a>&gt;) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> { providers });
+    <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
+    <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_Patches">Patches</a> { patches });
+    <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
+    <a href="jwks.md#0x1_jwks_regenerate_patched_jwks">regenerate_patched_jwks</a>();
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_jwks_remove_oidc_provider_internal"></a>
 
 ## Function `remove_oidc_provider_internal`
@@ -2031,6 +2063,22 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 
 
 <pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize_with_defaults"></a>
+
+### Function `initialize_with_defaults`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_initialize_with_defaults">initialize_with_defaults</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_OIDCProvider">jwks::OIDCProvider</a>&gt;, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
