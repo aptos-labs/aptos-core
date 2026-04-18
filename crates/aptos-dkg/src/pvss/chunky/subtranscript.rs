@@ -89,7 +89,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         _sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        self.Vs[player.id]
+        self.Vs[player.get_id()]
             .iter()
             .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
             .collect()
@@ -107,7 +107,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let Cs = &self.Cs[player.id];
+        let Cs = &self.Cs[player.get_id()];
         debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
 
         if !Cs.is_empty()

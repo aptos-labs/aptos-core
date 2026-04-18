@@ -12,15 +12,14 @@ use crate::{
 use anyhow::{anyhow, bail, ensure, Context};
 #[cfg(any(test, feature = "testing"))]
 use aptos_crypto::Uniform;
-use aptos_crypto::{arkworks::shamir::Reconstructable, bls12381, bls12381::PrivateKey};
+use aptos_crypto::{
+    arkworks::shamir::Reconstructable, bls12381, bls12381::PrivateKey, TSecretSharingConfig,
+};
 use aptos_dkg::{
     pvss,
-    pvss::{
-        traits::{
-            transcript::{Aggregatable, AggregatableTranscript, Aggregated, TranscriptCore},
-            Convert, Transcript,
-        },
-        Player,
+    pvss::traits::{
+        transcript::{Aggregatable, AggregatableTranscript, Aggregated, TranscriptCore},
+        Convert, Transcript,
     },
 };
 use fixed::types::U64F64;
@@ -255,7 +254,10 @@ impl DKGTrait for RealDKG {
             &pub_params.pvss_config.eks,
             input_secret,
             &aux,
-            &Player { id: my_index },
+            &pub_params
+                .pvss_config
+                .wconfig
+                .get_player(my_index),
             rng,
         );
         Transcripts {
@@ -281,7 +283,7 @@ impl DKGTrait for RealDKG {
         let main_trx_dealers = trx.main.get_dealers();
         let mut dealer_set = HashSet::with_capacity(main_trx_dealers.len());
         for dealer in main_trx_dealers.iter() {
-            if let Some(dealer_addr) = all_validator_addrs.get(dealer.id) {
+            if let Some(dealer_addr) = all_validator_addrs.get(dealer.get()) {
                 dealer_set.insert(*dealer_addr);
             } else {
                 bail!("invalid dealer idx");
@@ -313,7 +315,7 @@ impl DKGTrait for RealDKG {
             .main
             .get_dealers()
             .iter()
-            .map(|player| player.id)
+            .map(|player| player.get())
             .collect::<Vec<usize>>();
         let num_validators = params.session_metadata.dealer_validator_set.len();
         ensure!(
@@ -371,9 +373,10 @@ impl DKGTrait for RealDKG {
     ) -> anyhow::Result<(Self::DealtSecretShare, Self::DealtPubKeyShare)> {
         let (sk, pk) = trx.main.decrypt_own_share(
             &pub_params.pvss_config.wconfig,
-            &Player {
-                id: player_idx as usize,
-            },
+            &pub_params
+                .pvss_config
+                .wconfig
+                .get_player(player_idx as usize),
             dk,
             &pub_params.pvss_config.pp,
         );
@@ -389,7 +392,12 @@ impl DKGTrait for RealDKG {
     ) -> anyhow::Result<Self::DealtSecret> {
         let player_share_pairs: Vec<_> = input_player_share_pairs
             .into_iter()
-            .map(|(x, y)| (Player { id: x as usize }, y.main))
+            .map(|(x, y)| {
+                (
+                    pub_params.pvss_config.wconfig.get_player(x as usize),
+                    y.main,
+                )
+            })
             .collect();
         let reconstructed_secret = <WTrx as TranscriptCore>::DealtSecretKey::reconstruct(
             &pub_params.pvss_config.wconfig,
@@ -404,7 +412,7 @@ impl DKGTrait for RealDKG {
             .main
             .get_dealers()
             .into_iter()
-            .map(|x| x.id as u64)
+            .map(|x| x.get() as u64)
             .collect()
     }
 }

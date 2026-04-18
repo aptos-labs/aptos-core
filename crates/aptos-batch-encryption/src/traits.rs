@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::errors::MissingEvalProofError;
 use anyhow::Result;
-use aptos_crypto::player::Player;
+use aptos_crypto::player::{Player, RawPlayerIndex};
 use aptos_dkg::pvss::traits::TranscriptCore;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
@@ -220,9 +220,13 @@ impl Plaintext for String {}
 impl AssociatedData for String {}
 
 pub trait VerificationKey: Serialize + DeserializeOwned {
-    fn player(&self) -> Player;
+    /// Returns the untrusted wire-level player index. Callers that need a
+    /// validated `Player` must look it up via `TSecretSharingConfig`.
+    fn raw_player(&self) -> RawPlayerIndex;
 }
 
 pub trait DecryptionKeyShare: Serialize + DeserializeOwned + Clone {
-    fn player(&self) -> Player;
+    /// Returns the untrusted wire-level player index. Callers that need a
+    /// validated `Player` must look it up via `TSecretSharingConfig`.
+    fn raw_player(&self) -> RawPlayerIndex;
 }

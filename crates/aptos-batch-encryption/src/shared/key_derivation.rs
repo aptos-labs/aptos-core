@@ -13,7 +13,7 @@ use aptos_crypto::{
         serialization::{ark_de, ark_se},
         shamir::{Reconstructable, ShamirGroupShare, ShamirThresholdConfig},
     },
-    player::Player,
+    player::RawPlayerIndex,
 };
 use ark_ec::{pairing::Pairing as _, AffineRepr};
 use ark_ff::UniformRand as _;
@@ -25,7 +25,8 @@ use serde::{Deserialize, Serialize};
 pub struct BIBEMasterSecretKeyShare {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) mpk_g2: G2Affine,
-    pub(crate) player: Player,
+    /// Wire-level player index; validate against the config before trusting.
+    pub(crate) player: RawPlayerIndex,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) shamir_share_eval: Fr,
 }
@@ -36,7 +37,7 @@ pub struct BIBEDecryptionKeyShareValue {
     pub(crate) signature_share_eval: G1Affine,
 }
 
-pub type BIBEDecryptionKeyShare = (Player, BIBEDecryptionKeyShareValue);
+pub type BIBEDecryptionKeyShare = (RawPlayerIndex, BIBEDecryptionKeyShareValue);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEDecryptionKey {
@@ -45,7 +46,7 @@ pub struct BIBEDecryptionKey {
 }
 
 impl DecryptionKeyShare for BIBEDecryptionKeyShare {
-    fn player(&self) -> Player {
+    fn raw_player(&self) -> RawPlayerIndex {
         self.0
     }
 }
@@ -56,11 +57,12 @@ pub struct BIBEVerificationKey {
     pub(crate) mpk_g2: G2Affine,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) vk_g2: G2Affine,
-    pub(crate) player: Player,
+    /// Wire-level player index; validate against the config before trusting.
+    pub(crate) player: RawPlayerIndex,
 }
 
 impl VerificationKey for BIBEVerificationKey {
-    fn player(&self) -> Player {
+    fn raw_player(&self) -> RawPlayerIndex {
         self.player
     }
 }
@@ -87,13 +89,13 @@ pub fn gen_msk_shares<R: RngCore + CryptoRng>(
                 (
                     BIBEMasterSecretKeyShare {
                         mpk_g2: mpk,
-                        player,
+                        player: player.into(),
                         shamir_share_eval,
                     },
                     BIBEVerificationKey {
                         mpk_g2: mpk,
                         vk_g2: (G2Affine::generator() * shamir_share_eval).into(),
-                        player,
+                        player: player.into(),
                     },
                 )
             })
@@ -158,13 +160,13 @@ impl Reconstructable<ShamirThresholdConfig<Fr>> for BIBEDecryptionKey {
 
     fn reconstruct(
         threshold_config: &ShamirThresholdConfig<Fr>,
-        shares: &[BIBEDecryptionKeyShare],
+        shares: &[aptos_crypto::arkworks::shamir::ShamirShare<BIBEDecryptionKeyShareValue>],
     ) -> Result<Self> {
         let signature_g1 = G1Affine::reconstruct(
             threshold_config,
             &shares
                 .iter()
-                .map(|share| (share.0, share.1.signature_share_eval))
+                .map(|(player, share)| (*player, share.signature_share_eval))
                 .collect::<Vec<ShamirGroupShare<G1Affine>>>(),
         )?;
 
@@ -205,8 +207,11 @@ mod tests {
             dk_shares.push(dk_share);
         }
 
-        let shares_threshold: Vec<BIBEDecryptionKeyShare> =
-            dk_shares.choose_multiple(&mut rng, 6).cloned().collect();
+        use aptos_crypto::TSecretSharingConfig as _;
+        let shares_threshold: Vec<_> = dk_shares
+            .choose_multiple(&mut rng, 6)
+            .map(|(raw, v)| (tc.try_get_player_from_raw(*raw).unwrap(), v.clone()))
+            .collect();
         let dk = BIBEDecryptionKey::reconstruct(&tc, &shares_threshold).unwrap();
 
         EncryptionKey::new(mpk, G2Affine::generator())

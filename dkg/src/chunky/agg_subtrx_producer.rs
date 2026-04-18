@@ -15,10 +15,7 @@ use anyhow::{ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_crypto::HashValue;
-use aptos_dkg::pvss::{
-    traits::transcript::{Aggregatable, Aggregated},
-    Player,
-};
+use aptos_dkg::pvss::traits::transcript::{Aggregatable, Aggregated};
 use aptos_infallible::RwLock;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
@@ -266,14 +263,14 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                 // non-deterministic); AggregatedSubtranscript is BCSCryptoHash'd for certification.
                 let mut contributors: Vec<_> = inner_state.contributors.iter().copied().collect();
                 contributors.sort();
-                let dealers: Vec<Player> = contributors
+                let dealers: Vec<aptos_crypto::player::RawPlayerIndex> = contributors
                     .iter()
                     .map(|addr| {
                         self.epoch_state
                             .verifier
                             .address_to_validator_index()
                             .get(addr)
-                            .map(|&index| Player { id: index })
+                            .map(|&index| aptos_crypto::player::RawPlayerIndex(index))
                             .expect("Request must be sent to validators in current set only")
                     })
                     .collect();

@@ -71,9 +71,9 @@ pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
         dealers.len(),
     );
     ensure!(
-        dealers[0].id == sender_index,
+        dealers[0].get() == sender_index,
         "[ChunkyDKG] transcript dealer id {} does not match sender validator index {}",
-        dealers[0].id,
+        dealers[0].get(),
         sender_index,
     );
 

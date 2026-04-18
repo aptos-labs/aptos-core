@@ -235,16 +235,16 @@ impl WeightedVUF for PinkasWUF {
 
         let mut pis = Vec::with_capacity(proof.len());
         for (player, _) in proof {
-            if player.id >= apks.len() {
+            if player.get_id() >= apks.len() {
                 bail!(
                     "Player index {} falls outside APK vector of length {}",
-                    player.id,
+                    player.get_id(),
                     apks.len()
                 );
             }
 
             pis.push(
-                apks[player.id]
+                apks[player.get_id()]
                     .as_ref()
                     .ok_or_else(|| anyhow!("Missing APK for player {}", player.get_id()))?
                     .0
@@ -297,10 +297,10 @@ impl PinkasWUF {
         let mut k = 0;
         for (player, share) in proof {
             for j in 0..wc.get_player_weight(player) {
-                sub_player_ids.push(wc.get_virtual_player(player, j).id);
+                sub_player_ids.push(wc.get_virtual_player(player, j).get_id());
             }
 
-            let apk = apks[player.id]
+            let apk = apks[player.get_id()]
                 .as_ref()
                 .ok_or_else(|| anyhow!("Missing APK for player {}", player.get_id()))?;
 

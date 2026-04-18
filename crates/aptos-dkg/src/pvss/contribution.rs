@@ -1,29 +1,32 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    pvss::{schnorr, Player},
-    utils::HasMultiExp,
-};
+use crate::{pvss::schnorr, utils::HasMultiExp};
 use anyhow::bail;
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, player::RawPlayerIndex};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::Scalar;
 use group::Group;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, ops::Mul};
 
-/// A PVSS contribution, which is signed as part of the PVSS transcript
+/// A PVSS contribution, which is signed as part of the PVSS transcript.
+///
+/// Note that `player` is a `RawPlayerIndex` (untrusted wire-level identifier),
+/// not a validated `Player`. The receiver is responsible for validating the
+/// index via `TSecretSharingConfig::try_get_player_from_raw` before using it
+/// in any trusting way. `RawPlayerIndex` is BCS-identical to the legacy
+/// `Player { id: usize }`, so signed byte layouts are preserved.
 /// TODO(TechDebt): CryptoHasher does not work with lifetimes. So we cannot make this struct store
 ///  references, which causes unnecessary cloning in the code.
 #[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct Contribution<Gr, A> {
     pub comm: Gr,
-    pub player: Player,
+    pub player: RawPlayerIndex,
     pub aux: A,
 }
 
-pub type SoK<Gr> = (Player, Gr, bls12381::Signature, schnorr::PoK<Gr>);
+pub type SoK<Gr> = (RawPlayerIndex, Gr, bls12381::Signature, schnorr::PoK<Gr>);
 
 pub fn batch_verify_soks<Gr, A>(
     soks: &[SoK<Gr>],

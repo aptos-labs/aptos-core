@@ -61,9 +61,7 @@ impl<F: FftField> traits::TSecretSharingConfig for ShamirThresholdConfig<F> {
     where
         R: RngCore + CryptoRng,
     {
-        Player {
-            id: rng.gen_range(0, self.n),
-        }
+        Player::new_unchecked(rng.gen_range(0, self.n))
     }
 
     /// For testing only.

@@ -161,12 +161,12 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
 
     /// Returns the weight of a specific player.
     pub fn get_player_weight(&self, player: &Player) -> usize {
-        self.weights[player.id]
+        self.weights[player.get_id()]
     }
 
     /// Returns the starting index of a player's shares in the flattened vector of all weighted shares.
     pub fn get_player_starting_index(&self, player: &Player) -> usize {
-        self.starting_index[player.id]
+        self.starting_index[player.get_id()]
     }
 
     /// In an unweighted secret sharing scheme, each player has one share. We can weigh such a scheme
@@ -176,11 +176,11 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     /// This function returns the "virtual" player associated with the $i$th sub-share of this player.
     pub fn get_virtual_player(&self, player: &Player, j: usize) -> Player {
         // println!("WeightedConfig::get_virtual_player({player}, {i})");
-        assert_lt!(j, self.weights[player.id]);
+        assert_lt!(j, self.weights[player.get_id()]);
 
-        let id = self.get_share_index(player.id, j).unwrap();
+        let id = self.get_share_index(player.get_id(), j).unwrap();
 
-        Player { id }
+        Player::new_unchecked(id)
     }
 
     /// Returns all "virtual" players corresponding to a given player based on their weight.
@@ -318,9 +318,7 @@ impl<TC: ThresholdConfig> traits::TSecretSharingConfig for WeightedConfig<TC> {
     where
         R: RngCore + CryptoRng,
     {
-        Player {
-            id: rng.gen_range(0, self.get_total_num_players()),
-        }
+        Player::new_unchecked(rng.gen_range(0, self.get_total_num_players()))
     }
 
     fn get_random_eligible_subset_of_players<R>(&self, rng: &mut R) -> Vec<Player>
@@ -453,22 +451,22 @@ mod test {
         let wc = WeightedConfigBlstrs::new(1, vec![1]).unwrap();
         assert_eq!(wc.starting_index.len(), 1);
         assert_eq!(wc.starting_index[0], 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).get_id(), 0);
 
         // 1-out-of-2, weights 2
         let wc = WeightedConfigBlstrs::new(1, vec![2]).unwrap();
         assert_eq!(wc.starting_index.len(), 1);
         assert_eq!(wc.starting_index[0], 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 1).id, 1);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).get_id(), 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 1).get_id(), 1);
 
         // 1-out-of-2, weights 1, 1
         let wc = WeightedConfigBlstrs::new(1, vec![1, 1]).unwrap();
         assert_eq!(wc.starting_index.len(), 2);
         assert_eq!(wc.starting_index[0], 0);
         assert_eq!(wc.starting_index[1], 1);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(1), 0).id, 1);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).get_id(), 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(1), 0).get_id(), 1);
 
         // 3-out-of-5, some weights are 0.
         let wc = WeightedConfigBlstrs::new(1, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0])
@@ -477,20 +475,20 @@ mod test {
             vec![0, 0, 0, 0, 2, 4, 6, 6, 6, 6, 9, 12, 15, 15, 15],
             wc.starting_index
         );
-        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 0).id, 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 1).id, 1);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 0).id, 2);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 1).id, 3);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 0).id, 4);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 1).id, 5);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 0).id, 6);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 1).id, 7);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 2).id, 8);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 0).id, 9);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 1).id, 10);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 2).id, 11);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 0).id, 12);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 1).id, 13);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 2).id, 14);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 0).get_id(), 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 1).get_id(), 1);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 0).get_id(), 2);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 1).get_id(), 3);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 0).get_id(), 4);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 1).get_id(), 5);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 0).get_id(), 6);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 1).get_id(), 7);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 2).get_id(), 8);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 0).get_id(), 9);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 1).get_id(), 10);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 2).get_id(), 11);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 0).get_id(), 12);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 1).get_id(), 13);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 2).get_id(), 14);
     }
 }

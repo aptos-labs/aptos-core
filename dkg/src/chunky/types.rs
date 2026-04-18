@@ -1,9 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_crypto::HashValue;
+use aptos_crypto::{player::RawPlayerIndex, HashValue};
 use aptos_crypto_derive::CryptoHasher;
-use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
+use aptos_dkg::pvss::traits::transcript::HasAggregatableSubtranscript;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     dkg::{
@@ -57,7 +57,7 @@ impl ChunkyDKGTranscriptRequest {
 pub struct ChunkyDKGSubtranscriptSignatureRequest {
     pub dealer_epoch: u64,
     pub subtranscript_hash: HashValue,
-    pub aggregated_subtrx_dealers: Vec<Player>,
+    pub aggregated_subtrx_dealers: Vec<RawPlayerIndex>,
     /// Per-dealer transcript hash, same order as `aggregated_subtrx_dealers`.
     /// Allows the responder to detect equivocated transcripts (not just missing ones).
     pub dealer_transcript_hashes: Vec<HashValue>,
@@ -67,7 +67,7 @@ impl ChunkyDKGSubtranscriptSignatureRequest {
     pub fn new(
         dealer_epoch: u64,
         subtranscript_hash: HashValue,
-        aggregated_subtrx_dealers: Vec<Player>,
+        aggregated_subtrx_dealers: Vec<RawPlayerIndex>,
         dealer_transcript_hashes: Vec<HashValue>,
     ) -> Self {
         Self {

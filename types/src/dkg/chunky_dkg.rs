@@ -271,10 +271,14 @@ pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKey
 }
 
 /// An aggregated transcript with the list of dealers who contributed to it.
+///
+/// `dealers` carries untrusted wire-level indices. Callers that need validated
+/// `Player` values must go through
+/// `TSecretSharingConfig::try_get_player_from_raw`.
 #[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregatedSubtranscript {
     pub subtranscript: ChunkySubtranscript,
-    pub dealers: Vec<Player>,
+    pub dealers: Vec<aptos_crypto::player::RawPlayerIndex>,
 }
 
 impl AggregatedSubtranscript {

@@ -16,7 +16,7 @@ use crate::{
     },
     traits::BatchThresholdEncryption as _,
 };
-use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, TSecretSharingConfig as _};
 use aptos_dkg::pvss::traits::Reconstructable as _;
 use ark_std::{
     rand::{thread_rng, Rng as _, RngCore as _},
@@ -70,9 +70,12 @@ fn test_bibe_ct_encrypt_decrypt_ts() {
     let ct_bytes = run_ts("bibe_ciphertext_encrypt", &ek_bytes).unwrap();
     let ct: BIBECiphertext = bcs::from_bytes(&ct_bytes).unwrap();
 
-    let dk = BIBEDecryptionKey::reconstruct(&tc, &[msk_shares[0]
-        .derive_decryption_key_share(&digest)
-        .unwrap()])
+    use aptos_crypto::TSecretSharingConfig as _;
+    let raw_share = msk_shares[0].derive_decryption_key_share(&digest).unwrap();
+    let dk = BIBEDecryptionKey::reconstruct(&tc, &[(
+        tc.try_get_player_from_raw(raw_share.0).unwrap(),
+        raw_share.1,
+    )])
     .unwrap();
 
     let decrypted_plaintext: String = dk
@@ -156,9 +159,11 @@ fn test_ct_encrypt_decrypt_ts() {
     let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
     let pfs = pfs.compute_all(&dk);
 
-    let dk = BIBEDecryptionKey::reconstruct(&tc, &[msk_shares[0]
-        .derive_decryption_key_share(&digest)
-        .unwrap()])
+    let raw_share = msk_shares[0].derive_decryption_key_share(&digest).unwrap();
+    let dk = BIBEDecryptionKey::reconstruct(&tc, &[(
+        tc.try_get_player_from_raw(raw_share.0).unwrap(),
+        raw_share.1,
+    )])
     .unwrap();
 
     let decrypted_plaintext: String = dk.decrypt(&ct.prepare(&digest, &pfs).unwrap()).unwrap();

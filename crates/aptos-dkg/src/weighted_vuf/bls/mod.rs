@@ -114,7 +114,7 @@ impl WeightedVUF for BlsWUF {
 
         for (player, _, _) in apks_and_proofs {
             for j in 0..wc.get_player_weight(player) {
-                sub_player_ids.push(wc.get_virtual_player(player, j).id);
+                sub_player_ids.push(wc.get_virtual_player(player, j).get_id());
             }
         }
 

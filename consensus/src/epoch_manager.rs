@@ -74,7 +74,7 @@ use aptos_consensus_types::{
     proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
 };
-use aptos_crypto::bls12381::PrivateKey;
+use aptos_crypto::{bls12381::PrivateKey, TSecretSharingConfig};
 use aptos_dkg::{
     pvss::{traits::TranscriptCore, Player},
     weighted_vuf::traits::WeightedVUF,
@@ -1098,7 +1098,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .map(|id| {
                 transcript
                     .main
-                    .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &Player { id })
+                    .get_public_key_share(
+                        &dkg_pub_params.pvss_config.wconfig,
+                        &dkg_pub_params.pvss_config.wconfig.get_player(id),
+                    )
             })
             .collect::<Vec<_>>();
 
@@ -1203,7 +1206,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .ok_or(NoSecretSharingReason::NoTrustedSetupAvailable)?
             .clone();
 
-        let current_player = Player { id: my_index };
+        let current_player = dkg_session.threshold_config.get_player(my_index);
 
         let (encryption_key, verification_keys, msk_share) = FPTXWeighted::setup(
             &digest_key,

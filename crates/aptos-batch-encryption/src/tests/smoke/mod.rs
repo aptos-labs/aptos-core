@@ -51,7 +51,7 @@ pub fn run_smoke<Scheme: BatchThresholdEncryption>(
         .map(|player| {
             dk_shares
                 .iter()
-                .find(|share| share.player() == player)
+                .find(|share| share.raw_player().get() == player.get_id())
                 .unwrap()
                 .clone()
         })

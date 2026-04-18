@@ -9,7 +9,7 @@ use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifi
 use aptos_batch_encryption::{
     schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
 };
-use aptos_crypto::{hash::HashValue, player::Player};
+use aptos_crypto::{hash::HashValue, TSecretSharingConfig};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
@@ -74,6 +74,18 @@ impl SecretShare {
 
     pub fn verify(&self, config: &SecretShareConfig) -> anyhow::Result<()> {
         let index = config.get_id(self.author())?;
+        // Enforce that the wire-level player index embedded in the share matches
+        // the index derived from the authenticated sender. Without this check, a
+        // malicious peer could deserialize a share with an arbitrary raw index
+        // and bypass the type-safety of `Player`.
+        let share_raw_index = self.share().0.get();
+        if share_raw_index != index {
+            anyhow::bail!(
+                "SecretShare raw player index {} does not match sender-derived index {}",
+                share_raw_index,
+                index
+            );
+        }
         let decryption_key_share = self.share().clone();
         config
             .verification_keys
@@ -164,7 +176,7 @@ impl SecretShareConfig {
             .address_to_validator_index()
             .iter()
             .map(|(author, &index)| {
-                let weight = config.get_player_weight(&Player { id: index });
+                let weight = config.get_player_weight(&config.get_player(index));
                 (*author, weight as u64)
             })
             .collect();

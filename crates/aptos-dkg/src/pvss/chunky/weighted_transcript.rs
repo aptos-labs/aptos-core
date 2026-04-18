@@ -69,7 +69,9 @@ pub const DST: &[u8; 39] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_FS_DST";
 /// Weighted chunky PVSS transcript.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<P: Pairing> {
-    dealer: Player,
+    /// Untrusted wire-level dealer index. Validated against the secret sharing
+    /// config before use (see `TranscriptCore::verify` path).
+    dealer: aptos_crypto::player::RawPlayerIndex,
     /// This is the aggregatable subtranscript
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     // Even though `Subtranscript` implements serde, we need this attribute macro because `Pairing` does not implement serde
@@ -145,7 +147,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         );
 
         // Initialize the PVSS SoK context
-        let sok_cntxt = SokContext::new(spk.clone(), session_id, dealer.id, Self::dst());
+        let sok_cntxt = SokContext::new(spk.clone(), session_id, dealer.get_id(), Self::dst());
 
         // Step 1: sample the polynomial and compute the Shamir shares
         let (f, mut f_evals) = sc
@@ -169,13 +171,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let V0 = *g2_affine.last().unwrap();
 
         Transcript {
-            dealer: *dealer,
+            dealer: (*dealer).into(),
             subtrs: Subtranscript { V0, Vs, Cs, Rs },
             sharing_proof,
         }
     }
 
-    fn get_dealers(&self) -> Vec<Player> {
+    fn get_dealers(&self) -> Vec<aptos_crypto::player::RawPlayerIndex> {
         vec![self.dealer]
     }
 
@@ -188,7 +190,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell);
 
         Transcript {
-            dealer: sc.get_player(0),
+            dealer: sc.get_player(0).into(),
             subtrs: Subtranscript::generate(sc, num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(

@@ -128,7 +128,7 @@ impl<
         GenericSigning { trs, sig }
     }
 
-    fn get_dealers(&self) -> Vec<Player> {
+    fn get_dealers(&self) -> Vec<aptos_crypto::player::RawPlayerIndex> {
         T::get_dealers(&self.trs)
     }
 
@@ -178,7 +178,7 @@ impl<
         let dealer = dealers
             .first()
             .ok_or_else(|| anyhow!("signed transcript has no dealers"))?;
-        let idx = dealer.id;
+        let idx = dealer.get();
         let spk = spks.get(idx).ok_or_else(|| {
             anyhow!(
                 "dealer index {} out of range for spks (len {})",

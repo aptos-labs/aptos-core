@@ -354,7 +354,7 @@ fn wvuf_augment_random_keypair<
         b.iter_with_setup(
             || {
                 // Ugh, borrow checker...
-                let id = wc.get_random_player(&mut thread_rng()).id;
+                let id = wc.get_random_player(&mut thread_rng()).get_id();
                 (sks[id].clone(), pks[id].clone())
             },
             |(sk, pk)| WVUF::augment_key_pair(vuf_pp, sk, pk, rng),
@@ -415,7 +415,7 @@ fn wvuf_augment_random_pubkey<
         b.iter_with_setup(
             || {
                 // Ugh, borrow checker...
-                let id = wc.get_random_player(rng).id;
+                let id = wc.get_random_player(rng).get_id();
                 let pk = pks[id].clone();
                 let delta = deltas[id].clone();
 
@@ -446,7 +446,7 @@ fn wvuf_create_share_random<
         b.iter_with_setup(
             || {
                 let player = wc.get_random_player(rng);
-                &asks[player.id]
+                &asks[player.get_id()]
             },
             |ask| WVUF::create_share(ask, BENCH_MSG),
         )
@@ -472,7 +472,7 @@ fn wvuf_create_share_specific<
 {
     group.bench_function(format!("create_share_specific/{}/{}", name, wc), move |b| {
         b.iter_with_setup(
-            || &asks[player.id],
+            || &asks[player.get_id()],
             |ask| WVUF::create_share(ask, BENCH_MSG),
         )
     });
@@ -499,7 +499,7 @@ fn wvuf_create_share_average<
             let shares: Vec<_> = (0..n)
                 .map(|i| {
                     let player = wc.get_player(i);
-                    &asks[player.id]
+                    &asks[player.get_id()]
                 })
                 .collect();
 
@@ -542,9 +542,9 @@ fn wvuf_verify_share_random<
         b.iter_with_setup(
             || {
                 let player = wc.get_random_player(rng);
-                let ask = &asks[player.id];
+                let ask = &asks[player.get_id()];
 
-                (WVUF::create_share(ask, BENCH_MSG), &apks[player.id])
+                (WVUF::create_share(ask, BENCH_MSG), &apks[player.get_id()])
             },
             |(proof, apk)| WVUF::verify_share(vuf_pp, apk, BENCH_MSG, &proof),
         )
@@ -574,8 +574,8 @@ fn wvuf_verify_share_average<
             let shares: Vec<_> = (0..n)
                 .map(|i| {
                     let player = wc.get_player(i);
-                    let ask = &asks[player.id];
-                    (WVUF::create_share(ask, BENCH_MSG), &apks[player.id])
+                    let ask = &asks[player.get_id()];
+                    (WVUF::create_share(ask, BENCH_MSG), &apks[player.get_id()])
                 })
                 .collect();
 
@@ -647,8 +647,8 @@ fn wvuf_verify_share_specific<
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     println!("Player weight: {:?}", wc.get_player_weight(player));
-    let ask = &asks[player.id];
-    let apk = &apks[player.id];
+    let ask = &asks[player.get_id()];
+    let apk = &apks[player.get_id()];
     group.bench_function(format!("verify_share_specific/{}/{}", name, wc), move |b| {
         b.iter_with_setup(
             || WVUF::create_share(ask, BENCH_MSG),
@@ -954,8 +954,8 @@ fn get_apks_and_proofs<
         .map(|p| {
             (
                 *p,
-                apks[p.id].clone(),
-                WVUF::create_share(&asks[p.id], BENCH_MSG),
+                apks[p.get_id()].clone(),
+                WVUF::create_share(&asks[p.get_id()], BENCH_MSG),
             )
         })
         .collect::<Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)>>()

@@ -238,9 +238,12 @@ pub mod tests {
 
         let ct = ek.bibe_encrypt(&mut rng, &plaintext, id).unwrap();
 
-        let dk = BIBEDecryptionKey::reconstruct(&tc, &[msk_shares[0]
-            .derive_decryption_key_share(&digest)
-            .unwrap()])
+        use aptos_crypto::TSecretSharingConfig as _;
+        let raw_share = msk_shares[0].derive_decryption_key_share(&digest).unwrap();
+        let dk = BIBEDecryptionKey::reconstruct(&tc, &[(
+            tc.try_get_player_from_raw(raw_share.0).unwrap(),
+            raw_share.1,
+        )])
         .unwrap();
 
         let decrypted_plaintext: String = dk

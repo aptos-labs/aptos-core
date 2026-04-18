@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
-use aptos_crypto::bls12381::Signature;
+use aptos_crypto::{bls12381::Signature, TSecretSharingConfig};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::{
     pvss::{Player, WeightedConfigBlstrs},
@@ -221,7 +221,11 @@ impl Share {
                         share.author
                     )
                 })?;
-            apks_and_proofs.push((Player { id }, apk.clone(), share.share().share));
+            apks_and_proofs.push((
+                rand_config.wconfig.get_player(id),
+                apk.clone(),
+                share.share().share,
+            ));
         }
         Ok(apks_and_proofs)
     }
@@ -694,9 +698,7 @@ impl RandConfig {
     }
 
     pub fn get_peer_weight(&self, peer: &Author) -> u64 {
-        let player = Player {
-            id: self.get_id(peer),
-        };
+        let player = self.wconfig.get_player(self.get_id(peer));
         self.wconfig.get_player_weight(&player) as u64
     }
 
@@ -815,7 +817,7 @@ mod tests {
                 .map(|id| {
                     transcript
                         .main
-                        .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &Player { id })
+                        .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &dkg_pub_params.pvss_config.wconfig.get_player(id))
                 })
                 .collect::<Vec<_>>();
             let vuf_pub_params = WvufPP::from(&dkg_pub_params.pvss_config.pp);

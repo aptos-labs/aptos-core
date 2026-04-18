@@ -92,7 +92,7 @@ macro_rules! dealt_secret_key_impl {
                 assert_ge!(shares.len(), sc.get_threshold());
                 assert_le!(shares.len(), sc.get_total_num_players());
 
-                let ids = shares.iter().map(|(p, _)| p.id).collect::<Vec<usize>>();
+                let ids = shares.iter().map(|(p, _)| p.get_id()).collect::<Vec<usize>>();
                 let lagr = lagrange_coefficients(
                     sc.get_batch_evaluation_domain(),
                     ids.as_slice(),

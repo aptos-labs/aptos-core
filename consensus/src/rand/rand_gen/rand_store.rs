@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::{Author, Round};
+use aptos_crypto::TSecretSharingConfig as _;
 use aptos_logger::warn;
 use aptos_types::randomness::{FullRandMetadata, RandMetadata, Randomness};
 use futures::future::{BoxFuture, Shared};
@@ -391,7 +392,7 @@ mod tests {
         types::{MockShare, RandConfig},
     };
     use aptos_consensus_types::common::Author;
-    use aptos_crypto::{bls12381, HashValue, Uniform};
+    use aptos_crypto::{bls12381, HashValue, TSecretSharingConfig as _, Uniform};
     use aptos_dkg::{
         pvss::{traits::TranscriptCore, Player, WeightedConfigBlstrs},
         weighted_vuf::traits::WeightedVUF,
@@ -479,7 +480,7 @@ mod tests {
                 .map(|id| {
                     transcript
                         .main
-                        .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &Player { id })
+                        .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &dkg_pub_params.pvss_config.wconfig.get_player(id))
                 })
                 .collect::<Vec<_>>();
             let vuf_pub_params = WvufPP::from(&dkg_pub_params.pvss_config.pp);

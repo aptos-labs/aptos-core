@@ -59,7 +59,9 @@ pub const DST: &[u8; 42] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_v2_FS_DST";
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<E: Pairing> {
-    dealer: Player,
+    /// Untrusted wire-level dealer index. Validated against the secret sharing
+    /// config before use.
+    dealer: aptos_crypto::player::RawPlayerIndex,
     /// This is the aggregatable subtranscript
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub subtrs: Subtranscript<E>,
@@ -134,7 +136,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         );
 
         // Initialize the PVSS SoK context
-        let sok_cntxt = SokContext::new(spk.clone(), session_id, dealer.id, Self::dst());
+        let sok_cntxt = SokContext::new(spk.clone(), session_id, dealer.get_id(), Self::dst());
 
         let (f, f_evals) = sc
             .get_threshold_config()
@@ -148,7 +150,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let V0_proj: E::G2 = pp.get_commitment_base() * f[0];
 
         Transcript {
-            dealer: *dealer,
+            dealer: (*dealer).into(),
             subtrs: Subtranscript {
                 V0: V0_proj.into_affine(), // TODO: the Vs were already affine this time because they're serialized as a statement; ideally should do this all together
                 Vs,
@@ -159,7 +161,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         }
     }
 
-    fn get_dealers(&self) -> Vec<Player> {
+    fn get_dealers(&self) -> Vec<aptos_crypto::player::RawPlayerIndex> {
         vec![self.dealer]
     }
 
@@ -172,7 +174,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell);
 
         Transcript {
-            dealer: sc.get_player(0),
+            dealer: sc.get_player(0).into(),
             subtrs: Subtranscript::generate(sc, num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(

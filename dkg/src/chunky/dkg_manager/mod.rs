@@ -19,8 +19,8 @@ use crate::{
 };
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::{hash::CryptoHash, HashValue, SigningKey, Uniform};
-use aptos_dkg::pvss::{traits::transcript::Aggregatable, Player};
+use aptos_crypto::{hash::CryptoHash, HashValue, SigningKey, TSecretSharingConfig, Uniform};
+use aptos_dkg::pvss::traits::transcript::Aggregatable;
 use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_logger::{debug, error, info, warn};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -402,7 +402,7 @@ impl ChunkyDKGManager {
             let mut rng = StdRng::from_rng(thread_rng()).unwrap();
             let input_secret = ChunkyInputSecret::generate(&mut rng);
 
-            let dealer = Player { id: my_index };
+            let dealer = dkg_config_clone.threshold_config.get_player(my_index);
             let session_id = dkg_session_metadata_clone;
 
             dkg_config_clone.deal(
@@ -900,7 +900,7 @@ impl ChunkyDKGManager {
                 epoch_state
                     .verifier
                     .get_ordered_account_addresses()
-                    .get(player.id)
+                    .get(player.get())
                     .copied()
             })
             .collect();

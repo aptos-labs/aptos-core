@@ -95,7 +95,7 @@ impl traits::TranscriptCore for Transcript {
         _sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.get_id()]))
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
@@ -109,10 +109,10 @@ impl traits::TranscriptCore for Transcript {
         dk: &Self::DecryptPrivKey,
         _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let ctxt = self.C[player.id]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
+        let ctxt = self.C[player.get_id()]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
         let ephemeral_key = self.C_0.mul(dk.dk); // (g_1^r)^{sk_i} = ek_i^r
         let dealt_secret_key_share = ctxt.sub(ephemeral_key);
-        let dealt_pub_key_share = self.V[player.id]; // g_2^{f(\omega^i})
+        let dealt_pub_key_share = self.V[player.get_id()]; // g_2^{f(\omega^i})
 
         (
             Self::DealtSecretKeyShare::new(Self::DealtSecretKey::new(dealt_secret_key_share)),
@@ -180,7 +180,7 @@ impl traits::Transcript for Transcript {
         let sig = Transcript::sign_contribution(ssk, dealer, aux, &V[sc.n]);
 
         Transcript {
-            soks: vec![(*dealer, V[sc.n], sig, pok)],
+            soks: vec![((*dealer).into(), V[sc.n], sig, pok)],
             hat_w: g_2.mul(r),
             V,
             C,
@@ -188,11 +188,11 @@ impl traits::Transcript for Transcript {
         }
     }
 
-    fn get_dealers(&self) -> Vec<Player> {
+    fn get_dealers(&self) -> Vec<aptos_crypto::player::RawPlayerIndex> {
         self.soks
             .iter()
             .map(|(p, _, _, _)| *p)
-            .collect::<Vec<Player>>()
+            .collect::<Vec<aptos_crypto::player::RawPlayerIndex>>()
     }
 
     #[allow(non_snake_case)]
@@ -207,11 +207,11 @@ impl traits::Transcript for Transcript {
         let sk = bls12381::PrivateKey::genesis();
         Transcript {
             soks: vec![(
-                sc.get_player(0),
+                sc.get_player(0).into(),
                 random_g2_point(rng),
                 sk.sign(&Contribution::<G2Projective, usize> {
                     comm: random_g2_point(rng),
-                    player: sc.get_player(0),
+                    player: sc.get_player(0).into(),
                     aux: 0,
                 })
                 .unwrap(),
@@ -367,7 +367,7 @@ impl MalleableTranscript for Transcript {
     ) {
         let comm = self.V.last().unwrap();
         let sig = Transcript::sign_contribution(ssk, player, aux, comm);
-        self.soks[0].0 = *player;
+        self.soks[0].0 = (*player).into();
         self.soks[0].1 = *comm;
         self.soks[0].2 = sig;
     }
@@ -382,7 +382,7 @@ impl Transcript {
     ) -> bls12381::Signature {
         sk.sign(&Contribution::<G2Projective, A> {
             comm: *comm,
-            player: *player,
+            player: (*player).into(),
             aux: aux.clone(),
         })
         .expect("signing of PVSS contribution should have succeeded")

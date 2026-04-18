@@ -148,8 +148,8 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
         .get_random_eligible_subset_of_players(rng)
         .into_iter()
         .map(|p| {
-            let ask = &augmented_key_pairs[p.id].0;
-            let apk = augmented_key_pairs[p.id].1.clone();
+            let ask = &augmented_key_pairs[p.get_id()].0;
+            let apk = augmented_key_pairs[p.get_id()].1.clone();
 
             let proof = WVUF::create_share(ask, msg);
             WVUF::verify_share(&vuf_pp, &apk, msg, &proof).expect("WVUF proof share should verify");

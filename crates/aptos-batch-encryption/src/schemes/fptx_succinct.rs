@@ -17,6 +17,7 @@ use crate::{
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::Result;
+use aptos_crypto::TSecretSharingConfig as _;
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, TranscriptCore},
     Player,
@@ -158,7 +159,11 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         shares: &[Self::DecryptionKeyShare],
         config: &Self::ThresholdConfig,
     ) -> anyhow::Result<Self::DecryptionKey> {
-        BIBEDecryptionKey::reconstruct(config, shares)
+        let validated: Vec<_> = shares
+            .iter()
+            .map(|(raw, v)| Ok((config.try_get_player_from_raw(*raw)?, v.clone())))
+            .collect::<anyhow::Result<_>>()?;
+        BIBEDecryptionKey::reconstruct(config, &validated)
     }
 
     fn prepare_ct(

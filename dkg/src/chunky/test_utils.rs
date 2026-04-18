@@ -96,9 +96,8 @@ impl ChunkyTestSetup {
     ) -> (ChunkyDKGTranscript, ChunkyTranscript) {
         let mut rng = StdRng::from_rng(thread_rng()).unwrap();
         let input_secret = ChunkyInputSecret::generate(&mut rng);
-        let dealer = Player {
-            id: validator_index,
-        };
+        use aptos_crypto::TSecretSharingConfig as _;
+        let dealer = self.dkg_config.threshold_config.get_player(validator_index);
 
         let trx = self.dkg_config.deal(
             &self.private_keys[validator_index],
@@ -146,10 +145,10 @@ impl ChunkyTestSetup {
             .verifier
             .address_to_validator_index()
             .clone();
-        let dealers: Vec<Player> = contributor_addrs
+        let dealers: Vec<aptos_crypto::player::RawPlayerIndex> = contributor_addrs
             .into_iter()
-            .map(|addr| Player {
-                id: *addr_to_index.get(&addr).unwrap(),
+            .map(|addr| {
+                aptos_crypto::player::RawPlayerIndex(*addr_to_index.get(&addr).unwrap())
             })
             .collect();
 
@@ -186,10 +185,10 @@ impl ChunkyTestSetup {
             .verifier
             .address_to_validator_index()
             .clone();
-        let dealers: Vec<Player> = contributor_addrs
+        let dealers: Vec<aptos_crypto::player::RawPlayerIndex> = contributor_addrs
             .iter()
-            .map(|addr| Player {
-                id: *addr_to_index.get(addr).unwrap(),
+            .map(|addr| {
+                aptos_crypto::player::RawPlayerIndex(*addr_to_index.get(addr).unwrap())
             })
             .collect();
 

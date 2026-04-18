@@ -21,6 +21,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{
     arkworks::serialization::{ark_de, ark_se},
+    player::RawPlayerIndex,
     weighted_config::WeightedConfigArkworks,
     TSecretSharingConfig as _,
 };
@@ -35,10 +36,10 @@ use serde::{Deserialize, Serialize};
 
 pub struct FPTXWeighted {}
 
-pub type WeightedBIBEDecryptionKeyShare = (Player, Vec<BIBEDecryptionKeyShareValue>);
+pub type WeightedBIBEDecryptionKeyShare = (RawPlayerIndex, Vec<BIBEDecryptionKeyShareValue>);
 
 impl DecryptionKeyShare for WeightedBIBEDecryptionKeyShare {
-    fn player(&self) -> Player {
+    fn raw_player(&self) -> RawPlayerIndex {
         self.0
     }
 }
@@ -47,7 +48,9 @@ impl DecryptionKeyShare for WeightedBIBEDecryptionKeyShare {
 pub struct WeightedBIBEMasterSecretKeyShare {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) mpk_g2: G2Affine,
-    pub(crate) weighted_player: Player,
+    /// Wire-level weighted-player index. Validate against the config before
+    /// trusting.
+    pub(crate) weighted_player: RawPlayerIndex,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) shamir_share_evals: Vec<Fr>,
 }
@@ -59,7 +62,7 @@ impl WeightedBIBEMasterSecretKeyShare {
     ) -> Self {
         Self {
             mpk_g2: virtualized_msk_shares[0].mpk_g2,
-            weighted_player,
+            weighted_player: weighted_player.into(),
             shamir_share_evals: virtualized_msk_shares
                 .iter()
                 .map(|share| share.shamir_share_eval)
@@ -70,16 +73,18 @@ impl WeightedBIBEMasterSecretKeyShare {
     pub fn virtualized_sk_shares(
         &self,
         tc: &WeightedConfigArkworks<Fr>,
-    ) -> Vec<BIBEMasterSecretKeyShare> {
-        tc.get_all_virtual_players(&self.weighted_player)
+    ) -> Result<Vec<BIBEMasterSecretKeyShare>> {
+        let weighted_player = tc.try_get_player_from_raw(self.weighted_player)?;
+        Ok(tc
+            .get_all_virtual_players(&weighted_player)
             .into_iter()
             .enumerate()
             .map(|(i, virt_player)| BIBEMasterSecretKeyShare {
                 mpk_g2: self.mpk_g2,
-                player: virt_player,
+                player: virt_player.into(),
                 shamir_share_eval: self.shamir_share_evals[i],
             })
-            .collect()
+            .collect())
     }
 
     pub fn derive_decryption_key_share(
@@ -119,7 +124,9 @@ pub struct WeightedBIBEVerificationKey {
     pub(crate) mpk_g2: G2Affine,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) vks_g2: Vec<G2Affine>,
-    pub(crate) weighted_player: Player,
+    /// Wire-level weighted-player index. Validate against the config before
+    /// trusting.
+    pub(crate) weighted_player: RawPlayerIndex,
 }
 
 impl WeightedBIBEVerificationKey {
@@ -129,21 +136,26 @@ impl WeightedBIBEVerificationKey {
     ) -> Self {
         Self {
             mpk_g2: virtualized_vks[0].mpk_g2,
-            weighted_player,
+            weighted_player: weighted_player.into(),
             vks_g2: virtualized_vks.iter().map(|share| share.vk_g2).collect(),
         }
     }
 
-    pub fn virtualized_vks(&self, tc: &WeightedConfigArkworks<Fr>) -> Vec<BIBEVerificationKey> {
-        tc.get_all_virtual_players(&self.weighted_player)
+    pub fn virtualized_vks(
+        &self,
+        tc: &WeightedConfigArkworks<Fr>,
+    ) -> Result<Vec<BIBEVerificationKey>> {
+        let weighted_player = tc.try_get_player_from_raw(self.weighted_player)?;
+        Ok(tc
+            .get_all_virtual_players(&weighted_player)
             .into_iter()
             .enumerate()
             .map(|(i, virt_player)| BIBEVerificationKey {
                 mpk_g2: self.mpk_g2,
-                player: virt_player,
+                player: virt_player.into(),
                 vk_g2: self.vks_g2[i],
             })
-            .collect()
+            .collect())
     }
 
     pub fn verify_decryption_key_share(
@@ -171,7 +183,7 @@ impl WeightedBIBEVerificationKey {
 }
 
 impl VerificationKey for WeightedBIBEVerificationKey {
-    fn player(&self) -> Player {
+    fn raw_player(&self) -> RawPlayerIndex {
         self.weighted_player
     }
 }
@@ -246,7 +258,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
             .get_players()
             .into_iter()
             .map(|p| Self::VerificationKey {
-                weighted_player: p,
+                weighted_player: p.into(),
                 mpk_g2,
                 vks_g2: subtranscript
                     .get_public_key_share(threshold_config, &p)
@@ -258,7 +270,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
 
         let msk_share = Self::MasterSecretKeyShare {
             mpk_g2,
-            weighted_player: current_player,
+            weighted_player: current_player.into(),
             shamir_share_evals: subtranscript
                 .decrypt_own_share(
                     threshold_config,
@@ -272,7 +284,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
                 .collect(),
         };
 
-        vks[msk_share.weighted_player.get_id()]
+        vks[msk_share.weighted_player.get()]
             .vks_g2
             .iter()
             .zip(msk_share.shamir_share_evals.clone())
@@ -375,7 +387,11 @@ impl BatchThresholdEncryption for FPTXWeighted {
         shares: &[Self::DecryptionKeyShare],
         config: &Self::ThresholdConfig,
     ) -> anyhow::Result<Self::DecryptionKey> {
-        BIBEDecryptionKey::reconstruct(config, shares)
+        let validated: Vec<_> = shares
+            .iter()
+            .map(|(raw, v)| Ok((config.try_get_player_from_raw(*raw)?, v.clone())))
+            .collect::<anyhow::Result<_>>()?;
+        BIBEDecryptionKey::reconstruct(config, &validated)
     }
 
     fn prepare_ct(

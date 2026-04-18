@@ -179,7 +179,7 @@ impl<T: Transcript + TranscriptCore<SecretSharingConfig = ThresholdConfigBlstrs>
         }
     }
 
-    fn get_dealers(&self) -> Vec<Player> {
+    fn get_dealers(&self) -> Vec<aptos_crypto::player::RawPlayerIndex> {
         T::get_dealers(&self.trx)
     }
 

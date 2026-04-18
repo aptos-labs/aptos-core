@@ -321,17 +321,43 @@ pub trait Genesis: PrivateKey {
 /// Trait defining the interface for secret sharing schemes.
 pub trait TSecretSharingConfig: Display {
     /// Creates a new player ID; a number from 0 to `n-1`, where `n = get_total_num_players(&self)`.
+    /// Panics if `i >= n`; use `try_get_player` when `i` comes from untrusted
+    /// input (e.g. a deserialized wire message).
     fn get_player(&self, i: usize) -> Player {
         let n = self.get_total_num_players();
         assert_lt!(i, n);
 
-        Player { id: i }
+        Player::new_unchecked(i)
+    }
+
+    /// Fallible variant of `get_player`. Returns an error when `i >= n`, making
+    /// it safe to call on attacker-controlled input.
+    fn try_get_player(&self, i: usize) -> anyhow::Result<Player> {
+        let n = self.get_total_num_players();
+        if i >= n {
+            anyhow::bail!(
+                "Player index {} is out of range for scheme with {} players",
+                i,
+                n
+            );
+        }
+        Ok(Player::new_unchecked(i))
+    }
+
+    /// Validates a wire-level `RawPlayerIndex` and returns the corresponding
+    /// `Player`. This is the only conversion path from untrusted bytes to a
+    /// `Player`.
+    fn try_get_player_from_raw(
+        &self,
+        raw: crate::player::RawPlayerIndex,
+    ) -> anyhow::Result<Player> {
+        self.try_get_player(raw.get())
     }
 
     /// Returns a vec of all player IDs.
     fn get_players(&self) -> Vec<Player> {
         (0..self.get_total_num_players())
-            .map(|i| Player { id: i })
+            .map(Player::new_unchecked)
             .collect()
     }
 

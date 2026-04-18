@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::Author;
+use aptos_crypto::TSecretSharingConfig as _;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::RBMessage;
@@ -203,7 +204,7 @@ mod tests {
             .map(|id| {
                 transcript
                     .main
-                    .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &Player { id })
+                    .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &dkg_pub_params.pvss_config.wconfig.get_player(id))
             })
             .collect::<Vec<_>>();
         let vuf_pub_params = WvufPP::from(&dkg_pub_params.pvss_config.pp);

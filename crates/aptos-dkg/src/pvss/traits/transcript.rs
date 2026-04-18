@@ -164,11 +164,15 @@ pub trait Transcript: TranscriptCore {
         rng: &mut R,
     ) -> Self;
 
-    /// Returns the set of player IDs who have contributed to this transcript.
-    /// In other words, the transcript could have been dealt by one player, in which case
-    /// the set is of size 1, or the transcript could have been obtained by aggregating `n`
-    /// other transcripts, in which case the set will be of size `n`.
-    fn get_dealers(&self) -> Vec<Player>;
+    /// Returns the wire-level indices of the dealers who contributed to this
+    /// transcript. The transcript could have been dealt by one player (size 1)
+    /// or aggregated from `n` transcripts (size `n`).
+    ///
+    /// The returned indices are **untrusted** — they come straight from the
+    /// serialized transcript and have not been bounds-checked. Callers that
+    /// need a validated `Player` must go through
+    /// `TSecretSharingConfig::try_get_player_from_raw`.
+    fn get_dealers(&self) -> Vec<aptos_crypto::player::RawPlayerIndex>;
 
     /// Generates a random looking transcript (but not a valid one).
     /// Useful for testing and benchmarking.

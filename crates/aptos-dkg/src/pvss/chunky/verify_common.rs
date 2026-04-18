@@ -8,9 +8,12 @@
 //! the dealer's signing key, session, and domain-separation tag.
 
 use super::{subtranscript::Subtranscript, EncryptPubKey};
-use crate::pvss::{chunky, chunky::chunked_elgamal::num_chunks_per_scalar, Player};
+use crate::pvss::{chunky, chunky::chunked_elgamal::num_chunks_per_scalar};
 use anyhow::bail;
-use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
+use aptos_crypto::{
+    bls12381, player::RawPlayerIndex, weighted_config::WeightedConfigArkworks,
+    TSecretSharingConfig as _,
+};
 use ark_ec::pairing::Pairing;
 use serde::Serialize;
 
@@ -57,7 +60,7 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     pp: &chunky::PublicParameters<E>,
     subtrs: &Subtranscript<E>,
-    dealer: &Player,
+    dealer: &RawPlayerIndex,
     spks: &[bls12381::PublicKey],
     eks: &[EncryptPubKey<E>],
     sid: &'a A,
@@ -148,18 +151,18 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
 
     // The previous checks should imply that Cs_flat.len() = sc.get_total_weight()
 
-    if dealer.id >= spks.len() {
+    if dealer.get() >= spks.len() {
         bail!(
             "Dealer id {} is out of bounds for {} signing public keys",
-            dealer.id,
+            dealer.get(),
             spks.len()
         );
     }
 
     Ok(SokContext::new(
-        spks[dealer.id].clone(),
+        spks[dealer.get()].clone(),
         sid,
-        dealer.id,
+        dealer.get(),
         dst,
     ))
 }

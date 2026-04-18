@@ -27,7 +27,9 @@ use std::ops::Mul;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, BCSCryptoHash, CryptoHasher)]
 #[allow(non_snake_case)]
 pub struct Transcript {
-    dealers: Vec<Player>,
+    /// Untrusted wire-level dealer indices. Validated against the secret
+    /// sharing config before use.
+    dealers: Vec<aptos_crypto::player::RawPlayerIndex>,
     /// Public key shares from 0 to n-1, public key is in V[n]
     V: Vec<G2Projective>,
     /// Secret key shares
@@ -71,7 +73,7 @@ impl traits::TranscriptCore for Transcript {
         _sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.get_id()]))
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
@@ -85,7 +87,7 @@ impl traits::TranscriptCore for Transcript {
         _dk: &Self::DecryptPrivKey,
         _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        (self.C[player.id], self.get_public_key_share(sc, player))
+        (self.C[player.get_id()], self.get_public_key_share(sc, player))
     }
 }
 
@@ -129,13 +131,13 @@ impl traits::Transcript for Transcript {
         debug_assert_eq!(C.len(), sc.n);
 
         Transcript {
-            dealers: vec![*dealer],
+            dealers: vec![(*dealer).into()],
             V,
             C,
         }
     }
 
-    fn get_dealers(&self) -> Vec<Player> {
+    fn get_dealers(&self) -> Vec<aptos_crypto::player::RawPlayerIndex> {
         self.dealers.clone()
     }
 
@@ -149,7 +151,7 @@ impl traits::Transcript for Transcript {
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
         Transcript {
-            dealers: vec![sc.get_player(0)],
+            dealers: vec![sc.get_player(0).into()],
             V: insecure_random_g2_points(sc.n + 1, rng),
             C: random_scalars(sc.n, rng),
         }
@@ -244,6 +246,6 @@ impl MalleableTranscript for Transcript {
         _aux: &A,
         player: &Player,
     ) {
-        self.dealers = vec![*player];
+        self.dealers = vec![(*player).into()];
     }
 }
