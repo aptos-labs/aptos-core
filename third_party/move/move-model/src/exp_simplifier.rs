@@ -2987,7 +2987,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
     /// or `None` if unfolding is not possible.
     fn try_unfold_spec_fun(
         &mut self,
-        _call_id: NodeId,
+        call_id: NodeId,
         mid: ModuleId,
         fid: SpecFunId,
         args: &[Exp],
@@ -2995,19 +2995,31 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         if self.spec_fun_unfold_depth >= MAX_SPEC_FUN_UNFOLD_DEPTH {
             return None;
         }
+        // Extract body and param_map in a nested scope so that borrows of env
+        // through module/decl are released before we use env again below.
+        let (body, param_map) = {
+            let env = self.env();
+            let module = env.get_module(mid);
+            let decl = module.get_spec_fun(fid);
+            if decl.is_native || decl.uninterpreted || decl.is_move_fun || decl.body.is_none() {
+                return None;
+            }
+            let body = decl.body.as_ref().unwrap().clone();
+            let param_map: BTreeMap<Symbol, Exp> = decl
+                .params
+                .iter()
+                .enumerate()
+                .filter_map(|(i, param)| args.get(i).map(|a| (param.0, a.clone())))
+                .collect();
+            (body, param_map)
+        };
         let env = self.env();
-        let module = env.get_module(mid);
-        let decl = module.get_spec_fun(fid);
-        if decl.is_native || decl.uninterpreted || decl.is_move_fun || decl.body.is_none() {
-            return None;
-        }
-        let body = decl.body.as_ref().unwrap().clone();
-        let param_map: BTreeMap<Symbol, Exp> = decl
-            .params
-            .iter()
-            .enumerate()
-            .filter_map(|(i, param)| args.get(i).map(|a| (param.0, a.clone())))
-            .collect();
+        // Get the call-site type instantiation. These are the actual type arguments
+        // substituted for the spec function's own TypeParameter(i) placeholders.
+        // Without applying them to the body, TypeParameter(i) in nested spec calls
+        // (e.g., spec_len<K,V> inside spec_table_len<K,V>) remain unresolved and
+        // render as `#i` in the output.
+        let type_inst = env.get_node_instantiation(call_id);
         let mut replacer = |_id: NodeId, target: RewriteTarget| -> Option<Exp> {
             if let RewriteTarget::LocalVar(sym) = target {
                 param_map.get(&sym).cloned()
@@ -3016,7 +3028,15 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             }
         };
         let substituted = ExpRewriter::new(env, &mut replacer).rewrite_exp(body);
-        Some(substituted)
+        // Apply call-site type instantiation to body nodes so TypeParameter(i)
+        // in the spec function body are replaced with the actual type arguments.
+        if !type_inst.is_empty() {
+            Some(ExpData::rewrite_node_id(substituted, &mut |id| {
+                ExpData::instantiate_node(env, id, &type_inst)
+            }))
+        } else {
+            Some(substituted)
+        }
     }
 }
 
