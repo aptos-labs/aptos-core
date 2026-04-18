@@ -90,6 +90,9 @@ module aptos_framework::confidential_asset {
     /// Memo in confidential transfer must not exceed `MAX_MEMO_BYTES`.
     const E_MEMO_TOO_LONG: u64 = 19;
 
+    /// All user operations are paused by governance via emergency pause.
+    const E_EMERGENCY_PAUSED: u64 = 20;
+
     /// An internal error occurred: there is either a bug or a misconfiguration in the contract.
     const E_INTERNAL_ERROR: u64 = 999;
 
@@ -155,6 +158,13 @@ module aptos_framework::confidential_asset {
 
             /// Used to derive a signer that owns all the FAs' primary stores and `AssetConfig` objects.
             extend_ref: ExtendRef
+        },
+        V2 {
+            allow_list_enabled: bool,
+            global_auditor: AuditorConfig,
+            extend_ref: ExtendRef,
+            /// When true, all user operations are paused. Managed by governance via `set_emergency_paused`.
+            emergency_paused: bool,
         }
     }
 
@@ -292,6 +302,11 @@ module aptos_framework::confidential_asset {
         V1 { asset_type: Object<fungible_asset::Metadata>, new: AuditorConfig }
     }
 
+    #[event]
+    enum EmergencyPauseChanged has drop, store {
+        V1 { paused: bool }
+    }
+
     // === Module initialization (5 out of 13) ===
 
     /// Called once when this module is first published on-chain.
@@ -328,11 +343,12 @@ module aptos_framework::confidential_asset {
         let chain_id = chain_id::get();
         move_to(
             deployer,
-            GlobalConfig::V1 {
+            GlobalConfig::V2 {
                 allow_list_enabled: chain_id == MAINNET_CHAIN_ID || chain_id == TESTNET_CHAIN_ID,
                 global_auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 },
                 // DO NOT CHANGE: using long syntax until framework change is released to mainnet
-                extend_ref: object::create_object(deployer_address).generate_extend_ref()
+                extend_ref: object::create_object(deployer_address).generate_extend_ref(),
+                emergency_paused: false,
             }
         );
     }
@@ -404,6 +420,7 @@ module aptos_framework::confidential_asset {
         ek: CompressedRistretto,
         proof: RegistrationProof
     ) acquires GlobalConfig, AssetConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
 
@@ -438,6 +455,7 @@ module aptos_framework::confidential_asset {
     ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
         let addr = signer::address_of(depositor);
 
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(addr, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
@@ -501,6 +519,7 @@ module aptos_framework::confidential_asset {
         amount: u64,
         proof: WithdrawalProof
     ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
 
         let sender_addr = signer::address_of(sender);
@@ -598,6 +617,7 @@ module aptos_framework::confidential_asset {
         proof: TransferProof,
         memo: vector<u8>,
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(to, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
@@ -653,7 +673,7 @@ module aptos_framework::confidential_asset {
         new_R: vector<vector<u8>>, // part of the proof
         sigma_proto_comm: vector<vector<u8>>, // part of the proof
         sigma_proto_resp: vector<vector<u8>>, // part of the proof
-    ) acquires ConfidentialStore {
+    ) acquires ConfidentialStore, GlobalConfig {
         // Just parse stuff and forward to the more type-safe function
         let compressed_new_ek = new_compressed_point_from_bytes(new_ek).extract();
         let compressed_new_R = deserialize_compressed_points(new_R);
@@ -673,7 +693,8 @@ module aptos_framework::confidential_asset {
         asset_type: Object<fungible_asset::Metadata>,
         proof: KeyRotationProof,
         resume_incoming_transfers: bool,
-    ) {
+    ) acquires ConfidentialStore, GlobalConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         // Step 1: Assert (a) incoming transfers are paused & (b) pending balance is zero / has been rolled over
         let ca_store = borrow_confidential_store_mut(signer::address_of(owner), asset_type);
         // (a) Assert incoming transfers are paused & unpause them after, if flag is set.
@@ -744,7 +765,9 @@ module aptos_framework::confidential_asset {
     public entry fun rollover_pending_balance(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
+    ) acquires ConfidentialStore, GlobalConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
+
         let user = signer::address_of(sender);
         let ca_store = borrow_confidential_store_mut(user, asset_type);
 
@@ -766,7 +789,7 @@ module aptos_framework::confidential_asset {
     public entry fun rollover_pending_balance_and_pause(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
+    ) acquires ConfidentialStore, GlobalConfig {
         rollover_pending_balance(sender, asset_type);
         set_incoming_transfers_paused(sender, asset_type, true);
     }
@@ -787,7 +810,9 @@ module aptos_framework::confidential_asset {
         owner: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         paused: bool
-    ) acquires ConfidentialStore {
+    ) acquires ConfidentialStore, GlobalConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
+
         let ca_store = borrow_confidential_store_mut(signer::address_of(owner), asset_type);
         let old_paused = ca_store.pause_incoming;
         if (old_paused != paused) {
@@ -896,11 +921,44 @@ module aptos_framework::confidential_asset {
         changed
     }
 
+    /// Pauses or unpauses all user operations. Upgrades GlobalConfig from V1 to V2 on first call (for testnet compatibility).
+    public fun set_emergency_paused(aptos_framework: &signer, paused: bool) acquires GlobalConfig {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        let config = borrow_global_mut<GlobalConfig>(@aptos_framework);
+        if (config is GlobalConfig::V2) {
+            let GlobalConfig::V2 { emergency_paused, .. } = config;
+            if (*emergency_paused != paused) {
+                *emergency_paused = paused;
+                event::emit(EmergencyPauseChanged::V1 { paused });
+            }
+        } else {
+            // Upgrade V1 → V2: move_from, destructure, reconstruct with new field
+            let GlobalConfig::V1 { allow_list_enabled, global_auditor, extend_ref } =
+                move_from<GlobalConfig>(@aptos_framework);
+            move_to(aptos_framework, GlobalConfig::V2 {
+                allow_list_enabled, global_auditor, extend_ref, emergency_paused: paused,
+            });
+            // V1 is implicitly unpaused, so only emit if actually changing to paused
+            if (paused) {
+                event::emit(EmergencyPauseChanged::V1 { paused });
+            }
+        }
+    }
+
     // ============================================================== //
     //     End of SECURITY-SENSITIVE public governance functions      //
     // ============================================================== //
 
     // === Public view functions (9 out of 13) ===
+
+    #[view]
+    public fun is_emergency_paused(): bool acquires GlobalConfig {
+        let config = borrow_global<GlobalConfig>(@aptos_framework);
+        match (config) {
+            GlobalConfig::V2 { emergency_paused, .. } => *emergency_paused,
+            _ => false,
+        }
+    }
 
     #[view]
     public fun has_confidential_store(
