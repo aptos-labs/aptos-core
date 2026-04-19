@@ -67,7 +67,7 @@ use aptos_vm::{
     block_executor::AptosVMBlockExecutorWrapper,
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
-    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     AptosVM, VMValidator,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -1389,7 +1389,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
         let env = AptosEnvironment::new(&self.state_store);
         let resolver = self.state_store.as_move_resolver();
-        let vm = MoveVmExt::new(&env);
+        let vm = AptosVM::new(&env);
         let module_storage = self.state_store.as_aptos_code_storage(&env);
 
         let mut i = 0;
@@ -1528,7 +1528,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 }),
             );
             let resolver = self.state_store.as_move_resolver();
-            let vm = MoveVmExt::new(&env);
+            let vm = AptosVM::new(&env);
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
@@ -1591,7 +1591,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         let (write_set, events) = {
             let env = AptosEnvironment::new(&self.state_store);
             let resolver = self.state_store.as_move_resolver();
-            let vm = MoveVmExt::new(&env);
+            let vm = AptosVM::new(&env);
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
@@ -1637,7 +1637,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let env = AptosEnvironment::new(&self.state_store);
         let resolver = self.state_store.as_move_resolver();
-        let vm = MoveVmExt::new(&env);
+        let vm = AptosVM::new(&env);
 
         let module_storage = self.state_store.as_aptos_code_storage(&env);
 
@@ -1681,7 +1681,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     ) -> Result<SerializedReturnValues, VMStatus> {
         let env = AptosEnvironment::new(&self.state_store);
         let resolver = self.state_store.as_move_resolver();
-        let vm = MoveVmExt::new(&env);
+        let vm = AptosVM::new(&env);
 
         let module_storage = self.state_store.as_aptos_code_storage(&env);
 

@@ -19,7 +19,7 @@ use crate::{
             },
             view_with_change_set::ExecutorViewWithChangeSet,
         },
-        AptosMoveResolver, AsExecutorView, AsResourceGroupView, MoveVmExt, SessionExt, SessionId,
+        AptosMoveResolver, AsExecutorView, AsResourceGroupView, SessionExt, SessionId,
         UserTransactionContext,
     },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -285,7 +285,7 @@ pub(crate) fn get_or_vm_startup_failure<'a, T>(
 
 pub struct AptosVM {
     is_simulation: bool,
-    move_vm: MoveVmExt,
+    env: AptosEnvironment,
     /// If true, user payloads are allowed not to run extra checks and instead trace execution. If
     /// so, Block-STM replays the trace and performs these checks at post-commit time once. Note
     /// that checks might still be performed in-place based on a heuristic such as payload type.
@@ -299,7 +299,7 @@ impl AptosVM {
     pub fn new(env: &AptosEnvironment) -> Self {
         Self {
             is_simulation: false,
-            move_vm: MoveVmExt::new(env),
+            env: env.clone(),
             // There is no tracing by default because it can only be done if there is access to
             // Block-STM.
             async_runtime_checks_enabled: false,
@@ -322,33 +322,39 @@ impl AptosVM {
         session_id: SessionId,
         user_transaction_context_opt: Option<UserTransactionContext>,
     ) -> SessionExt<'r, R> {
-        self.move_vm
-            .new_session(resolver, session_id, user_transaction_context_opt)
+        SessionExt::new(
+            session_id,
+            self.env.chain_id(),
+            self.env.features(),
+            self.env.vm_config(),
+            user_transaction_context_opt,
+            resolver,
+        )
     }
 
     #[inline(always)]
     pub(crate) fn features(&self) -> &Features {
-        self.move_vm.env.features()
+        self.env.features()
     }
 
     #[inline(always)]
     pub(crate) fn timed_features(&self) -> &TimedFeatures {
-        self.move_vm.env.timed_features()
+        self.env.timed_features()
     }
 
     #[inline(always)]
     fn deserializer_config(&self) -> &DeserializerConfig {
-        &self.move_vm.env.vm_config().deserializer_config
+        &self.env.vm_config().deserializer_config
     }
 
     #[inline(always)]
     fn chain_id(&self) -> ChainId {
-        self.move_vm.env.chain_id()
+        self.env.chain_id()
     }
 
     #[inline(always)]
     pub(crate) fn gas_feature_version(&self) -> u64 {
-        self.move_vm.env.gas_feature_version()
+        self.env.gas_feature_version()
     }
 
     #[inline(always)]
@@ -356,7 +362,7 @@ impl AptosVM {
         &self,
         log_context: &AdapterLogSchema,
     ) -> Result<&AptosGasParameters, VMStatus> {
-        get_or_vm_startup_failure(self.move_vm.env.gas_params(), log_context)
+        get_or_vm_startup_failure(self.env.gas_params(), log_context)
     }
 
     #[inline(always)]
@@ -364,17 +370,17 @@ impl AptosVM {
         &self,
         log_context: &AdapterLogSchema,
     ) -> Result<&StorageGasParameters, VMStatus> {
-        get_or_vm_startup_failure(self.move_vm.env.storage_gas_params(), log_context)
+        get_or_vm_startup_failure(self.env.storage_gas_params(), log_context)
     }
 
     #[inline(always)]
     pub fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.move_vm.env.runtime_environment()
+        self.env.runtime_environment()
     }
 
     #[inline(always)]
     pub fn environment(&self) -> AptosEnvironment {
-        self.move_vm.env.clone()
+        self.env.clone()
     }
 
     /// Returns true if runtime checks for this transaction should be performed asynchronously,
@@ -3700,7 +3706,7 @@ pub(crate) fn should_create_account_resource(
 
 #[cfg(test)]
 mod tests {
-    use crate::{move_vm_ext::MoveVmExt, AptosVM};
+    use crate::AptosVM;
     use aptos_types::{
         account_address::AccountAddress,
         account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
@@ -3715,8 +3721,6 @@ mod tests {
 
         assert_send::<AptosVM>();
         assert_sync::<AptosVM>();
-        assert_send::<MoveVmExt>();
-        assert_sync::<MoveVmExt>();
     }
 
     #[test]
