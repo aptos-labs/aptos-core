@@ -516,6 +516,7 @@ fn test_load_write_then_load_roundtrip() {
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
             superseded_version: None,
@@ -525,6 +526,7 @@ fn test_load_write_then_load_roundtrip() {
     shards[key2.get_shard_id()]
         .insertions
         .insert(*key2.crypto_hash_ref(), HotInsertionOp {
+            state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
             superseded_version: None,
@@ -639,6 +641,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
             superseded_version: None,
@@ -648,6 +651,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     shards[key2.get_shard_id()]
         .insertions
         .insert(*key2.crypto_hash_ref(), HotInsertionOp {
+            state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
             superseded_version: Some(80),
@@ -784,6 +788,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val_old.clone()), 100),
             value_version: Some(100),
             superseded_version: None,
@@ -804,6 +809,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
     shards2[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val_new.clone()), 200),
             value_version: Some(200),
             superseded_version: Some(100),

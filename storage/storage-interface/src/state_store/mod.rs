@@ -13,13 +13,17 @@ pub mod versioned_state_value;
 use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    state_store::{hot_state::HotStateValue, NUM_STATE_SHARDS},
+    state_store::{hot_state::HotStateValue, state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct HotInsertionOp {
+    /// The key associated with this insertion. Carried alongside the hash so that downstream
+    /// consumers (hot JMT commit, etc.) don't need to recover it from a slot that may lack
+    /// one (e.g. loaded from the hot state KV DB, which stores only the key hash).
+    pub state_key: StateKey,
     pub value: HotStateValue,
     /// `Some(version)` for occupied entries and `None` for vacant.
     pub value_version: Option<Version>,
@@ -28,7 +32,7 @@ pub struct HotInsertionOp {
     pub superseded_version: Option<Version>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct HotEvictionOp {
     pub eviction_version: Version,
     /// The `hot_since_version` of the DB entry being superseded. `None` if the key was never
@@ -36,7 +40,7 @@ pub struct HotEvictionOp {
     pub superseded_version: Option<Version>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct HotStateShardUpdates {
     pub insertions: HashMap<HashValue, HotInsertionOp>,
     // TODO(HotState): per-block eviction tracking will be needed for cold-write elimination.
@@ -81,9 +85,29 @@ impl HotStateShardUpdates {
         self.evictions.insert(key_hash, evict);
         Ok(())
     }
+
+    /// Merges `other` into `self`, treating `other` as logically later in time. When the same
+    /// key appears in both, the earlier DB-level `superseded_version` is preserved so pruner
+    /// targeting stays correct across insert/evict/reinsert chains. Errors if `other` evicts a
+    /// key `self` has already evicted.
+    pub fn merge(&mut self, other: HotStateShardUpdates) -> Result<()> {
+        for (key_hash, op) in other.insertions {
+            self.insert(key_hash, op);
+        }
+        for (key_hash, evict) in other.evictions {
+            self.evict(key_hash, evict)?;
+        }
+        Ok(())
+    }
 }
 
-#[derive(Debug)]
+/// Creates an empty `[HotStateShardUpdates; NUM_STATE_SHARDS]`, used as the seed for accumulating
+/// hot state updates across chunks.
+pub fn empty_hot_state_shard_updates() -> [HotStateShardUpdates; NUM_STATE_SHARDS] {
+    std::array::from_fn(|_| HotStateShardUpdates::default())
+}
+
+#[derive(Clone, Debug)]
 pub struct HotStateUpdates {
     pub for_last_checkpoint: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
     pub for_latest: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
@@ -108,6 +132,7 @@ mod tests {
 
     fn insertion(superseded: Option<Version>, value_version: Option<Version>) -> HotInsertionOp {
         HotInsertionOp {
+            state_key: StateKey::raw(b"test"),
             value: HotStateValue::new(None, value_version.unwrap_or(0)),
             value_version,
             superseded_version: superseded,
