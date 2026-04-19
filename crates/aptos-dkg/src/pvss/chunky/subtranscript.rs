@@ -108,7 +108,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         let Cs = &self.Cs[player.id];
-        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
+        debug_assert_eq!(
+            Cs.len(),
+            sc.get_player_weight(player)
+                .expect("player id is in bounds")
+        );
 
         if !Cs.is_empty()
             && let Some(first_key) = self.Rs.first()
@@ -301,7 +305,9 @@ impl<E: Pairing> Subtranscript<E> {
         let Cs: Vec<Vec<Vec<E::G1Affine>>> = (0..sc.get_total_num_players())
             .map(|i| {
                 let player = sc.get_player(i);
-                let w = sc.get_player_weight(&player);
+                let w = sc
+                    .get_player_weight(&player)
+                    .expect("player id from sc.get_player is in bounds");
                 repeat_with(|| unsafe_random_points(num_chunks_per_share, rng))
                     .take(w)
                     .collect()

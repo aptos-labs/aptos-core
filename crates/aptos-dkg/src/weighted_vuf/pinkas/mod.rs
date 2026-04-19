@@ -296,8 +296,13 @@ impl PinkasWUF {
 
         let mut k = 0;
         for (player, share) in proof {
-            for j in 0..wc.get_player_weight(player) {
-                sub_player_ids.push(wc.get_virtual_player(player, j).id);
+            let w = wc.get_player_weight(player)?;
+            for j in 0..w {
+                sub_player_ids.push(
+                    wc.get_virtual_player(player, j)
+                        .expect("j < weight holds by construction")
+                        .id,
+                );
             }
 
             let apk = apks[player.id]
@@ -307,7 +312,6 @@ impl PinkasWUF {
             rks.push(&apk.0.rks);
             shares.push(share);
 
-            let w = wc.get_player_weight(player);
             ranges.push(k..k + w);
             k += w;
         }

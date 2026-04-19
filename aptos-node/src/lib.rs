@@ -743,7 +743,7 @@ pub fn setup_environment_and_start_node(
 
     // Initialize the DigestKey and PublicParameters for chunky DKG
     aptos_dkg_runtime::initialize_digest_key_with_counters(
-        node_config.consensus.decryption_setup_blob_path.as_ref(),
+        node_config.consensus.digest_key_blob_path.as_ref(),
         chain_id,
         node_config.base.role.is_validator(),
     );
