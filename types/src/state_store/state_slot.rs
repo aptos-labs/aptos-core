@@ -146,17 +146,20 @@ impl StateSlot {
     }
 
     /// When committing speculative state to the DB, determine if to make changes to the JMT.
+    ///
+    /// Resolves `maybe_update_cold_state` first so slots that carry no cold JMT change —
+    /// notably LRU-churn updates on DB-loaded neighbor slots, which lack a `state_key` — are
+    /// short-circuited before we demand the key.
     pub fn maybe_update_jmt(
         &self,
         min_version: Version,
     ) -> Option<(HashValue, Option<(HashValue, StateKey)>)> {
+        let value_opt = self.maybe_update_cold_state(min_version)?;
         let state_key = self.expect_state_key();
-        self.maybe_update_cold_state(min_version).map(|value_opt| {
-            (
-                *state_key.crypto_hash_ref(),
-                value_opt.map(|v| (CryptoHash::hash(v), state_key.clone())),
-            )
-        })
+        Some((
+            *state_key.crypto_hash_ref(),
+            value_opt.map(|v| (CryptoHash::hash(v), state_key.clone())),
+        ))
     }
 
     // TODO(HotState): db returns cold slot directly
