@@ -3162,12 +3162,16 @@ impl<'a> ExpSourcifier<'a> {
             // Notice that if we did not special case this here, the generic closure
             // sourcifier would generate `|arg| f(arg)`.
             if args.is_empty() && mask.captured_count() == 0 {
+                let module_full = self.env().get_module(*mid).get_full_name_str();
                 let fun_env = self.env().get_module(*mid).into_function(*fid);
+                // Always use the fully qualified name (addr::module::fn) for behavior
+                // predicate targets. A short name risks collision with user let-bindings
+                // or parameters of the same name, causing the re-parsed spec to resolve
+                // to the local binding instead of the function.
                 emit!(
                     self.wr(),
-                    "{}{}",
-                    self.parent
-                        .module_qualifier(&self.type_display_context, *mid),
+                    "{}::{}",
+                    module_full,
                     self.sym(fun_env.get_name())
                 );
                 // Print type arguments if any

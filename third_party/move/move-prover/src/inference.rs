@@ -335,6 +335,22 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
             let module_id = module.get_id();
 
             let mut insertions: Vec<(usize, String)> = Vec::new();
+            // Track use module names already present in the spec file and those
+            // already scheduled for insertion, to prevent duplicate `use`
+            // declarations across multiple function spec blocks (Move spec `use`
+            // declarations share the module-level namespace).
+            let mut inserted_use_modules: std::collections::BTreeSet<String> = source
+                .lines()
+                .filter_map(|line| {
+                    let trimmed = line.trim();
+                    trimmed.strip_prefix("use ").and_then(|rest| {
+                        rest.trim_end_matches(';')
+                            .rsplit("::")
+                            .next()
+                            .map(str::to_string)
+                    })
+                })
+                .collect();
 
             // Find the position before the last `}` in the spec file — this is
             // the closing brace of the outer `spec module_name { }` block and
@@ -421,7 +437,8 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                     );
 
                     let final_text = if is_single_line && !cond_text.is_empty() {
-                        format!("\n{}{}{}", use_text, cond_text, indent)
+                        let deduped_use = filter_new_uses(&use_text, &mut inserted_use_modules);
+                        format!("\n{}{}{}", deduped_use, cond_text, indent)
                     } else {
                         cond_text
                     };
@@ -429,18 +446,36 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                     insertions.push((insert_pos, final_text));
 
                     if !is_single_line && !use_text.is_empty() {
-                        let use_insert_pos = source[open_brace_pos..]
-                            .find('\n')
-                            .map(|p| open_brace_pos + p + 1)
-                            .unwrap_or(open_brace_pos + 1);
-                        insertions.push((use_insert_pos, use_text));
+                        let deduped = filter_new_uses(&use_text, &mut inserted_use_modules);
+                        if !deduped.is_empty() {
+                            let use_insert_pos = source[open_brace_pos..]
+                                .find('\n')
+                                .map(|p| open_brace_pos + p + 1)
+                                .unwrap_or(open_brace_pos + 1);
+                            insertions.push((use_insert_pos, deduped));
+                        }
                     }
                 } else if let Some(insert_pos) = module_close_insert_pos {
                     // No existing spec block for this function — insert a full block
                     // before the closing `}` of the outer `spec module { }` block.
                     let indent = "    ";
                     let spec_text = generate_full_spec_block(env, &fun, inferred_sym, indent);
-                    insertions.push((insert_pos, format!("{}\n", spec_text)));
+                    // Filter duplicate `use` declarations from the new spec block
+                    // using the same tracking set as existing-block insertions.
+                    let filtered_spec: String = spec_text
+                        .lines()
+                        .filter(|line| {
+                            let trimmed = line.trim();
+                            if let Some(rest) = trimmed.strip_prefix("use ") {
+                                if let Some(m) = rest.trim_end_matches(';').rsplit("::").next() {
+                                    return inserted_use_modules.insert(m.to_string());
+                                }
+                            }
+                            true
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    insertions.push((insert_pos, format!("{}\n", filtered_spec)));
                 }
             }
 
@@ -584,10 +619,15 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
 
             let fun_id = fun.get_id();
 
-            // Check if there's an existing standalone spec block for this function.
+            // Check if there's an existing standalone spec block for this function
+            // in the SOURCE file (not in a separate .spec.move file). Without the
+            // file_id check, spec blocks from a companion .spec.move file would be
+            // matched here, but their byte offsets belong to that file — indexing
+            // them into the source file's content produces wrong results and panics.
             let existing_spec_block = spec_block_infos.iter().find(|info| {
-                matches!(&info.target, SpecBlockTarget::Function(mid, fid)
-                    if *mid == module_id && *fid == fun_id)
+                info.loc.file_id() == file_id
+                    && matches!(&info.target, SpecBlockTarget::Function(mid, fid)
+                        if *mid == module_id && *fid == fun_id)
             });
 
             if let Some(spec_info) = existing_spec_block {
@@ -766,6 +806,34 @@ fn filter_redundant_uses(source: &str, use_text: &str) -> String {
                         || source.contains(&format!("::{};", module_name))
                         || source.contains(&format!("::{}  as ", module_name));
                     return !has_self_import;
+                }
+            }
+            true
+        })
+        .collect();
+    if filtered.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", filtered.join("\n"))
+    }
+}
+
+/// Filter `use_text` to only include `use` lines whose module names have not
+/// been seen before, then record those new module names in `seen`. This
+/// prevents duplicate `use` declarations when the same module is referenced
+/// from multiple function spec blocks in the same spec file.
+fn filter_new_uses(use_text: &str, seen: &mut std::collections::BTreeSet<String>) -> String {
+    if use_text.is_empty() {
+        return String::new();
+    }
+    let filtered: Vec<&str> = use_text
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            if let Some(rest) = trimmed.strip_prefix("use ") {
+                if let Some(module_name) = rest.trim_end_matches(';').rsplit("::").next() {
+                    // `insert` returns true if the module was not already present.
+                    return seen.insert(module_name.to_string());
                 }
             }
             true

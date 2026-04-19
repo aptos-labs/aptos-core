@@ -342,9 +342,9 @@ module 0x42::mutations {
     }
     spec pass_ref_to_fn(p: &mut Point, val: u64) {
         pragma opaque = true;
-        ensures [inferred] p == update_field(old(p), x, result_of<write_to_ref>(old(p).x, val));
-        ensures [inferred] ensures_of<write_to_ref>(old(p).x, val, result_of<write_to_ref>(old(p).x, val));
-        aborts_if [inferred] aborts_of<write_to_ref>(p.x, val);
+        ensures [inferred] p == update_field(old(p), x, result_of<0x42::mutations::write_to_ref>(old(p).x, val));
+        ensures [inferred] ensures_of<0x42::mutations::write_to_ref>(old(p).x, val, result_of<0x42::mutations::write_to_ref>(old(p).x, val));
+        aborts_if [inferred] aborts_of<0x42::mutations::write_to_ref>(p.x, val);
     }
 
 
@@ -357,9 +357,9 @@ module 0x42::mutations {
     }
     spec create_pass_continue(p: Point, val: u64): Point {
         pragma opaque = true;
-        ensures [inferred] result == update_field(p, x, result_of<write_to_ref>(p.x, val));
-        ensures [inferred] ensures_of<write_to_ref>(p.x, val, result_of<write_to_ref>(p.x, val));
-        aborts_if [inferred] aborts_of<write_to_ref>(p.x, val);
+        ensures [inferred] result == update_field(p, x, result_of<0x42::mutations::write_to_ref>(p.x, val));
+        ensures [inferred] ensures_of<0x42::mutations::write_to_ref>(p.x, val, result_of<0x42::mutations::write_to_ref>(p.x, val));
+        aborts_if [inferred] aborts_of<0x42::mutations::write_to_ref>(p.x, val);
     }
 
 
@@ -386,14 +386,14 @@ module 0x42::mutations {
     spec call_replace(r: &mut u64): u64 {
         pragma opaque = true;
         ensures [inferred] result == {
-            let (_t0,_t1) = result_of<replace_ref>(old(r), 99);
+            let (_t0,_t1) = result_of<0x42::mutations::replace_ref>(old(r), 99);
             _t0
         };
         ensures [inferred] r == {
-            let (_t0,_t1) = result_of<replace_ref>(old(r), 99);
+            let (_t0,_t1) = result_of<0x42::mutations::replace_ref>(old(r), 99);
             _t1
         };
-        aborts_if [inferred] aborts_of<replace_ref>(r, 99);
+        aborts_if [inferred] aborts_of<0x42::mutations::replace_ref>(r, 99);
     }
 
 
@@ -743,12 +743,12 @@ module 0x42::mutations {
         pragma opaque = true;
         modifies Counter[a2];
         modifies Counter[a1];
-        ensures [inferred] S1.. |~ ensures_of<increment_global>(a2);
+        ensures [inferred] S1.. |~ ensures_of<0x42::mutations::increment_global>(a2);
         ensures [inferred] {
             let a = update_field(old(Counter[a1]), value, v);
             ..S1 |~ update<Counter>(a1, a)
         };
-        aborts_if [inferred] S1 |~ aborts_of<increment_global>(a2);
+        aborts_if [inferred] S1 |~ aborts_of<0x42::mutations::increment_global>(a2);
         aborts_if [inferred] !exists<Counter>(a1);
     }
 
@@ -766,9 +766,9 @@ module 0x42::mutations {
             let a = update_field(S1 |~ global<Counter>(a1), value, v);
             S1.. |~ update<Counter>(a1, a)
         };
-        ensures [inferred] ..S1 |~ ensures_of<increment_global>(a2);
+        ensures [inferred] ..S1 |~ ensures_of<0x42::mutations::increment_global>(a2);
         aborts_if [inferred] S1 |~ !exists<Counter>(a1);
-        aborts_if [inferred] aborts_of<increment_global>(a2);
+        aborts_if [inferred] aborts_of<0x42::mutations::increment_global>(a2);
     }
 
 

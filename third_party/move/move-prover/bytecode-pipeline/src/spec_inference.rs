@@ -940,7 +940,7 @@ fn update_spec<'env>(
         .map(|e| stripper.rewrite_exp(e.clone()))
         .collect();
 
-    // Add each ensures condition separately, filtering out trivial `true` conditions.
+    // Add each ensures condition separately, filtering out trivial `true` conditions
     if infer_ensures {
         let ensures_conds: Vec<_> = stripped_ensures
             .iter()
@@ -1042,14 +1042,21 @@ fn exp_node_count(exp: &ExpData) -> usize {
 /// Only extract function calls and pack operations — not field accesses, variant tests,
 /// or other small operations that are more readable inline.
 fn is_cse_candidate(exp: &ExpData) -> bool {
-    matches!(
+    if !matches!(
         exp,
         ExpData::Call(
             _,
             AstOp::MoveFunction(..) | AstOp::SpecFunction(..) | AstOp::Pack(..),
             _
         )
-    )
+    ) {
+        return false;
+    }
+    // Don't hoist subexpressions that contain quantifier-bound (free) local
+    // variables.  Such variables are only in scope inside the quantifier body;
+    // extracting the expression into a top-level `let` binding makes them
+    // undeclared and produces a compilation error (e.g., `undeclared x`).
+    exp.free_vars().is_empty()
 }
 
 /// Generates a readable name for a CSE binding based on expression structure.
@@ -3339,7 +3346,21 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         }
 
         // &mut src post-values: src_j ↦ result_of<f>(args)[num_explicit + j]
+        //
+        // For &mut params that are ALREADY in captured_mut_params, do NOT add them
+        // to all_subs. Their old(param) pattern will be replaced by
+        // substitute_old_param_in_state below. Adding them here would cause
+        // substitute_multiple_temps_in_state to also replace `param` inside
+        // `old(param)` in the state (turning it into `old(result_of<...>)`),
+        // and then substitute_old_param_in_state would find another `old(param)`
+        // inside the substitution value and replace it again, producing a
+        // doubly-applied result_of — e.g. result_of<f>(result_of<f>(c, a), a)
+        // instead of the correct result_of<f>(c, a).
         for (j, (_, idx)) in mut_ref_srcs.iter().enumerate() {
+            if self.is_mut_ref_param(*idx) && state.captured_mut_params.contains(idx) {
+                // Already captured: handled exclusively by substitute_old_param_in_state.
+                continue;
+            }
             let result_exp = self.mk_result_of_at_with_state(
                 fun_exp.clone(),
                 args.clone(),

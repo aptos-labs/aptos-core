@@ -76,8 +76,8 @@ module 0x42::state_labels {
     spec call_remove(addr: address): Resource {
         pragma opaque = true;
         modifies Resource[addr];
-        ensures [inferred] result == result_of<remove_resource>(addr);
-        aborts_if [inferred] aborts_of<remove_resource>(addr);
+        ensures [inferred] result == result_of<0x42::state_labels::remove_resource>(addr);
+        aborts_if [inferred] aborts_of<0x42::state_labels::remove_resource>(addr);
     }
 
 
@@ -92,8 +92,8 @@ module 0x42::state_labels {
         use 0x1::signer;
         pragma opaque = true;
         modifies Resource[signer::address_of(account)];
-        ensures [inferred] ensures_of<publish_resource>(account, value);
-        aborts_if [inferred] aborts_of<publish_resource>(account, value);
+        ensures [inferred] ensures_of<0x42::state_labels::publish_resource>(account, value);
+        aborts_if [inferred] aborts_of<0x42::state_labels::publish_resource>(account, value);
     }
 
 
@@ -290,9 +290,9 @@ module 0x42::state_labels {
         use 0x1::signer;
         pragma opaque = true;
         modifies Resource[signer::address_of(account)];
-        ensures [inferred] result == (S1.. |~ result_of<read_resource>(addr));
+        ensures [inferred] result == (S1.. |~ result_of<0x42::state_labels::read_resource>(addr));
         ensures [inferred] ..S1 |~ publish<Resource>(signer::address_of(account), Resource{value: 42});
-        aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr);
+        aborts_if [inferred] S1 |~ aborts_of<0x42::state_labels::read_resource>(addr);
         aborts_if [inferred] exists<Resource>(signer::address_of(account));
     }
 
@@ -311,10 +311,10 @@ module 0x42::state_labels {
     spec remove_then_try_read(addr1: address, addr2: address): u64 {
         pragma opaque = true;
         modifies Resource[addr1];
-        ensures [inferred] result == (S1.. |~ result_of<read_resource>(addr2));
-        ensures [inferred] ..S1 |~ ensures_of<remove_resource>(addr1, ..S1 |~ result_of<remove_resource>(addr1));
-        aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr2);
-        aborts_if [inferred] aborts_of<remove_resource>(addr1);
+        ensures [inferred] result == (S1.. |~ result_of<0x42::state_labels::read_resource>(addr2));
+        ensures [inferred] ..S1 |~ ensures_of<0x42::state_labels::remove_resource>(addr1, ..S1 |~ result_of<0x42::state_labels::remove_resource>(addr1));
+        aborts_if [inferred] S1 |~ aborts_of<0x42::state_labels::read_resource>(addr2);
+        aborts_if [inferred] aborts_of<0x42::state_labels::remove_resource>(addr1);
     }
 
 
@@ -331,10 +331,10 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr2];
         modifies Resource[addr1];
-        ensures [inferred] result_1 == (..S1 |~ result_of<remove_resource>(addr1));
-        ensures [inferred] result_2 == (S1.. |~ result_of<remove_resource>(addr2));
-        aborts_if [inferred] S1 |~ aborts_of<remove_resource>(addr2);
-        aborts_if [inferred] aborts_of<remove_resource>(addr1);
+        ensures [inferred] result_1 == (..S1 |~ result_of<0x42::state_labels::remove_resource>(addr1));
+        ensures [inferred] result_2 == (S1.. |~ result_of<0x42::state_labels::remove_resource>(addr2));
+        aborts_if [inferred] S1 |~ aborts_of<0x42::state_labels::remove_resource>(addr2);
+        aborts_if [inferred] aborts_of<0x42::state_labels::remove_resource>(addr1);
     }
 
 
@@ -351,10 +351,10 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[signer::address_of(account2)];
         modifies Resource[signer::address_of(account1)];
-        ensures [inferred] S1.. |~ ensures_of<publish_resource>(account2, v2);
-        ensures [inferred] ..S1 |~ ensures_of<publish_resource>(account1, v1);
-        aborts_if [inferred] S1 |~ aborts_of<publish_resource>(account2, v2);
-        aborts_if [inferred] aborts_of<publish_resource>(account1, v1);
+        ensures [inferred] S1.. |~ ensures_of<0x42::state_labels::publish_resource>(account2, v2);
+        ensures [inferred] ..S1 |~ ensures_of<0x42::state_labels::publish_resource>(account1, v1);
+        aborts_if [inferred] S1 |~ aborts_of<0x42::state_labels::publish_resource>(account2, v2);
+        aborts_if [inferred] aborts_of<0x42::state_labels::publish_resource>(account1, v1);
     }
 
 
@@ -395,10 +395,10 @@ module 0x42::state_labels {
         modifies Resource[a3];
         modifies Resource[a2];
         modifies Resource[a1];
-        ensures [inferred] result == (S2.. |~ result_of<swap_value>(a3, S1..S2 |~ result_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0))));
-        aborts_if [inferred] S2 |~ aborts_of<swap_value>(a3, S1..S2 |~ result_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0)));
-        aborts_if [inferred] S1 |~ aborts_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0));
-        aborts_if [inferred] aborts_of<swap_value>(a1, 0);
+        ensures [inferred] result == (S2.. |~ result_of<0x42::state_labels::swap_value>(a3, S1..S2 |~ result_of<0x42::state_labels::swap_value>(a2, ..S1 |~ result_of<0x42::state_labels::swap_value>(a1, 0))));
+        aborts_if [inferred] S2 |~ aborts_of<0x42::state_labels::swap_value>(a3, S1..S2 |~ result_of<0x42::state_labels::swap_value>(a2, ..S1 |~ result_of<0x42::state_labels::swap_value>(a1, 0)));
+        aborts_if [inferred] S1 |~ aborts_of<0x42::state_labels::swap_value>(a2, ..S1 |~ result_of<0x42::state_labels::swap_value>(a1, 0));
+        aborts_if [inferred] aborts_of<0x42::state_labels::swap_value>(a1, 0);
     }
 
 }
