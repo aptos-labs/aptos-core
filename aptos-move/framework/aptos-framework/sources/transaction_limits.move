@@ -24,9 +24,9 @@ module aptos_framework::transaction_limits {
 
     /// No stake pool exists at the specified address.
     const ESTAKE_POOL_NOT_FOUND: u64 = 1;
-    /// Sender is not the owner of the specified stake pool.
+    /// Fee payer is not the owner of the specified stake pool.
     const ENOT_STAKE_POOL_OWNER: u64 = 2;
-    /// Sender is not the delegated voter of the specified stake pool.
+    /// Fee payer is not the delegated voter of the specified stake pool.
     const ENOT_DELEGATED_VOTER: u64 = 3;
     /// No delegation pool exists at the specified address.
     const EDELEGATION_POOL_NOT_FOUND: u64 = 4;
@@ -180,8 +180,8 @@ module aptos_framework::transaction_limits {
         );
     }
 
-    /// Governance entry to update stake thresholds and multipliers.
-    public entry fun update_config(
+    /// Governance-only: update stake thresholds and multipliers.
+    public fun update_config(
         aptos_framework: &signer,
         execution_min_stakes: vector<u64>,
         execution_multipliers_bps: vector<u64>,
@@ -242,18 +242,18 @@ module aptos_framework::transaction_limits {
         );
     }
 
-    /// Only called during prologue to validate that the sender qualifies for
-    /// the requested limit multipliers.
+    /// Only called during prologue to validate that the fee payer qualifies
+    /// for the requested limit multipliers.
     friend fun validate_high_txn_limits(
-        sender: address, request: UserTxnLimitsRequest
+        fee_payer: address, request: UserTxnLimitsRequest
     ) acquires TxnLimitsConfig {
         match(request) {
             StakePoolOwner { multipliers } => {
                 assert!(
-                    stake::owner_cap_exists(sender),
+                    stake::owner_cap_exists(fee_payer),
                     error::permission_denied(ENOT_STAKE_POOL_OWNER)
                 );
-                let pool_address = stake::get_pool_address_for_owner(sender);
+                let pool_address = stake::get_pool_address_for_owner(fee_payer);
                 let stake_amount = aptos_governance::get_voting_power(pool_address);
                 validate_enough_stake(stake_amount, multipliers);
             },
@@ -263,7 +263,7 @@ module aptos_framework::transaction_limits {
                     error::not_found(ESTAKE_POOL_NOT_FOUND)
                 );
                 assert!(
-                    sender == stake::get_delegated_voter(pool_address),
+                    fee_payer == stake::get_delegated_voter(pool_address),
                     error::permission_denied(ENOT_DELEGATED_VOTER)
                 );
                 let stake_amount = aptos_governance::get_voting_power(pool_address);
@@ -275,7 +275,7 @@ module aptos_framework::transaction_limits {
                     error::not_found(EDELEGATION_POOL_NOT_FOUND)
                 );
                 let (active, _, pending_inactive) = delegation_pool::get_stake(
-                    pool_address, sender
+                    pool_address, fee_payer
                 );
                 validate_enough_stake(active + pending_inactive, multipliers);
             }
@@ -468,7 +468,6 @@ module aptos_framework::transaction_limits {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10007)]
-    // EINVALID_MULTIPLIER
     fun test_validate_enough_stake_too_small_execution_multiplier(
         aptos_framework: &signer
     ) acquires TxnLimitsConfig {
@@ -480,7 +479,6 @@ module aptos_framework::transaction_limits {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10007)]
-    // EINVALID_MULTIPLIER
     fun test_validate_enough_stake_too_small_io_multiplier(
         aptos_framework: &signer
     ) acquires TxnLimitsConfig {
@@ -492,7 +490,6 @@ module aptos_framework::transaction_limits {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10007)]
-    // EINVALID_MULTIPLIER
     fun test_validate_enough_stake_too_large_execution_multiplier(
         aptos_framework: &signer
     ) acquires TxnLimitsConfig {

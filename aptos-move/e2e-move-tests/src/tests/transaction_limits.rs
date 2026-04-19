@@ -8,7 +8,7 @@ use aptos_cached_packages::aptos_stdlib::{
     aptos_coin_transfer, delegation_pool_add_stake, delegation_pool_initialize_delegation_pool,
     stake_set_delegated_voter,
 };
-use aptos_language_e2e_tests::account::Account;
+use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     account_address::AccountAddress,
     move_utils::MemberId,
@@ -18,26 +18,27 @@ use aptos_types::{
         TransactionPayload, TransactionPayloadInner, TransactionStatus, UserTxnLimitsRequest,
     },
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{ident_str, language_storage::StructTag, vm_status::StatusCode};
+use serde::Serialize;
 use std::str::FromStr;
 
 const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
 
 // Default balance is 1M APT.
-const DEFAULT_BALANCE: u64 = 1_000_000_0000_0000;
+const DEFAULT_BALANCE: u64 = 100_000_000_000_000;
 // Default stake amount is 0.25 APT.
-const DEFAULT_STAKE: u64 = 2500_0000;
+const DEFAULT_STAKE: u64 = 25_000_000;
 
 // Minimum stake for delegation 20 APT (has to be above 10 APT)
-const DEFAULT_DELEGATION_STAKE: u64 = 20_0000_0000;
+const DEFAULT_DELEGATION_STAKE: u64 = 2_000_000_000;
 
 // Default tiers: 0.1 APT, 1 APT and 5 APT.
 const DEFAULT_EXECUTION_TIERS: [(u64, u64); 3] =
-    [(1000_0000, 200), (1_0000_0000, 400), (5_0000_0000, 800)];
+    [(10_000_000, 200), (100_000_000, 400), (500_000_000, 800)];
 
 // Default tiers: 0.2 APT, 2 APT and 10 APT.
 const DEFAULT_IO_TIERS: [(u64, u64); 3] =
-    [(2000_0000, 200), (2_0000_0000, 400), (10_0000_0000, 800)];
+    [(20_000_000, 200), (200_000_000, 400), (1_000_000_000, 800)];
 
 fn stake_pool_owner(execution_bps: u64, io_bps: u64) -> UserTxnLimitsRequest {
     UserTxnLimitsRequest::StakePoolOwner {
@@ -72,13 +73,11 @@ fn delegation_pool_delegator(
     }
 }
 
-fn sign_txn_with_limits_and_gas_unit_price(
-    h: &mut MoveHarness,
-    acc: &Account,
+fn payload_with_limits(
+    sender_addr: AccountAddress,
     request: UserTxnLimitsRequest,
-    gas_unit_price: u64,
-) -> SignedTransaction {
-    let payload = match aptos_coin_transfer(*acc.address(), 0) {
+) -> TransactionPayload {
+    match aptos_coin_transfer(sender_addr, 0) {
         TransactionPayload::EntryFunction(entry_func) => {
             TransactionPayload::Payload(TransactionPayloadInner::V1 {
                 executable: TransactionExecutable::EntryFunction(entry_func),
@@ -90,11 +89,18 @@ fn sign_txn_with_limits_and_gas_unit_price(
             })
         },
         _ => unreachable!(),
-    };
+    }
+}
 
+fn sign_txn_with_limits_and_gas_unit_price(
+    h: &mut MoveHarness,
+    acc: &Account,
+    request: UserTxnLimitsRequest,
+    gas_unit_price: u64,
+) -> SignedTransaction {
     // Override gas unit price because high-limit transactions require
     // 10x default minimum value.
-    h.create_transaction_without_sign(acc, payload)
+    h.create_transaction_without_sign(acc, payload_with_limits(*acc.address(), request))
         .gas_unit_price(gas_unit_price)
         .sign()
 }
@@ -107,13 +113,45 @@ fn sign_txn_with_limits(
     sign_txn_with_limits_and_gas_unit_price(h, acc, request, 10 * DEFAULT_GAS_UNIT_PRICE)
 }
 
-fn encode_tiers(tiers: &[(u64, u64)]) -> (Vec<u8>, Vec<u8>) {
-    let stakes: Vec<u64> = tiers.iter().map(|(s, _)| *s).collect();
-    let multipliers: Vec<u64> = tiers.iter().map(|(_, m)| *m).collect();
-    (
-        bcs::to_bytes(&stakes).unwrap(),
-        bcs::to_bytes(&multipliers).unwrap(),
-    )
+fn sign_fee_payer_txn_with_limits(
+    h: &mut MoveHarness,
+    sender: &Account,
+    fee_payer: &Account,
+    request: UserTxnLimitsRequest,
+) -> SignedTransaction {
+    TransactionBuilder::new(sender.clone())
+        .fee_payer(fee_payer.clone())
+        .payload(payload_with_limits(*sender.address(), request))
+        .sequence_number(h.sequence_number(sender.address()))
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(10 * DEFAULT_GAS_UNIT_PRICE)
+        .sign_fee_payer()
+}
+
+// Mirrors `0x1::transaction_limits::TxnLimitTier` for BCS serialization.
+#[derive(Serialize)]
+struct TxnLimitTier {
+    min_stake: u64,
+    multiplier_bps: u64,
+}
+
+// Mirrors `0x1::transaction_limits::TxnLimitsConfig` for BCS serialization.
+#[derive(Serialize)]
+enum TxnLimitsConfig {
+    V1 {
+        execution_tiers: Vec<TxnLimitTier>,
+        io_tiers: Vec<TxnLimitTier>,
+    },
+}
+
+fn to_tiers(tiers: &[(u64, u64)]) -> Vec<TxnLimitTier> {
+    tiers
+        .iter()
+        .map(|(min_stake, multiplier_bps)| TxnLimitTier {
+            min_stake: *min_stake,
+            multiplier_bps: *multiplier_bps,
+        })
+        .collect()
 }
 
 fn new_test_harness() -> MoveHarness {
@@ -122,21 +160,17 @@ fn new_test_harness() -> MoveHarness {
 
 fn new_test_harness_with_tiers(execution: &[(u64, u64)], io: &[(u64, u64)]) -> MoveHarness {
     let mut h = MoveHarness::new();
-    let framework = h.aptos_framework_account();
-    let (execution_min_stake, execution_multipliers) = encode_tiers(execution);
-    let (io_min_stake, io_multipliers) = encode_tiers(io);
-    let status = h.run_entry_function(
-        &framework,
-        MemberId::from_str("0x1::transaction_limits::update_config").unwrap(),
-        vec![],
-        vec![
-            execution_min_stake,
-            execution_multipliers,
-            io_min_stake,
-            io_multipliers,
-        ],
-    );
-    assert_success!(status);
+    let config = TxnLimitsConfig::V1 {
+        execution_tiers: to_tiers(execution),
+        io_tiers: to_tiers(io),
+    };
+    let struct_tag = StructTag {
+        address: AccountAddress::ONE,
+        module: ident_str!("transaction_limits").to_owned(),
+        name: ident_str!("TxnLimitsConfig").to_owned(),
+        type_args: vec![],
+    };
+    h.set_resource(AccountAddress::ONE, struct_tag, &config);
     h
 }
 
@@ -185,10 +219,11 @@ fn test_high_limit_txn_gas_price_too_low() {
     let acc = setup_validator(&mut h);
     h.new_epoch();
 
-    // In test builds, min_price_per_gas_unit defaults to 0. Set it to
-    // DEFAULT_GAS_UNIT_PRICE so the 10x check is meaningful.
+    // In test builds, gas price parameters default to 0. Set them so the
+    // high-limit threshold (10x the base) is meaningful.
     h.modify_gas_schedule(|params| {
         params.vm.txn.min_price_per_gas_unit = DEFAULT_GAS_UNIT_PRICE.into();
+        params.vm.txn.high_limit_txn_min_price_per_gas_unit = (10 * DEFAULT_GAS_UNIT_PRICE).into();
     });
 
     // Gas unit price of DEFAULT_GAS_UNIT_PRICE satisfies the normal minimum
@@ -397,4 +432,28 @@ fn test_delegation_pool_insufficient_stake() {
         delegation_pool_delegator(pool_addr, 800, 800),
     );
     run_and_assert_discard(&mut h, txn, StatusCode::INSUFFICIENT_STAKE);
+}
+
+#[test]
+fn test_fee_payer_provides_stake() {
+    let mut h = new_test_harness();
+    let sender = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
+    let fee_payer = setup_validator(&mut h);
+    h.new_epoch();
+
+    let txn =
+        sign_fee_payer_txn_with_limits(&mut h, &sender, &fee_payer, stake_pool_owner(200, 200));
+    assert_success!(h.run(txn));
+}
+
+#[test]
+fn test_sender_stake_ignored_for_fee_payer_txn() {
+    let mut h = new_test_harness();
+    let sender = setup_validator(&mut h);
+    let fee_payer = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
+    h.new_epoch();
+
+    let txn =
+        sign_fee_payer_txn_with_limits(&mut h, &sender, &fee_payer, stake_pool_owner(200, 200));
+    run_and_assert_discard(&mut h, txn, StatusCode::NOT_STAKE_POOL_OWNER);
 }

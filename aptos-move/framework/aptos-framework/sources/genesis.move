@@ -138,21 +138,21 @@ module aptos_framework::genesis {
             &aptos_framework_account,
             // Execution tiers:
             //   2x: 1M APT
-            //   4x: 10M APT
-            //   8x: 50M APT
+            //   4x: 5M APT
+            //   8x: 10M APT
             vector[
                 transaction_limits::new_tier(1_000_000_0000_0000, 200),
-                transaction_limits::new_tier(10_000_000_0000_0000, 400),
-                transaction_limits::new_tier(50_000_000_0000_0000, 800),
+                transaction_limits::new_tier(5_000_000_0000_0000, 400),
+                transaction_limits::new_tier(10_000_000_0000_0000, 800),
             ],
             // IO tiers:
             //   2x: 5M APT
-            //   4x: 20M APT
-            //   8x: 100M APT
+            //   4x: 10M APT
+            //   8x: 20M APT
             vector[
                 transaction_limits::new_tier(5_000_000_0000_0000, 200),
-                transaction_limits::new_tier(20_000_000_0000_0000, 400),
-                transaction_limits::new_tier(100_000_000_0000_0000, 800),
+                transaction_limits::new_tier(10_000_000_0000_0000, 400),
+                transaction_limits::new_tier(20_000_000_0000_0000, 800),
             ],
         );
     }

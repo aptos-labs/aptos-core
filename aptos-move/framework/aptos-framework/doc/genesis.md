@@ -373,21 +373,21 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
         &aptos_framework_account,
         // Execution tiers:
         //   2x: 1M APT
-        //   4x: 10M APT
-        //   8x: 50M APT
+        //   4x: 5M APT
+        //   8x: 10M APT
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
             <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(1_000_000_0000_0000, 200),
-            <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(10_000_000_0000_0000, 400),
-            <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(50_000_000_0000_0000, 800),
+            <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(5_000_000_0000_0000, 400),
+            <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(10_000_000_0000_0000, 800),
         ],
         // IO tiers:
         //   2x: 5M APT
-        //   4x: 20M APT
-        //   8x: 100M APT
+        //   4x: 10M APT
+        //   8x: 20M APT
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
             <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(5_000_000_0000_0000, 200),
-            <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(20_000_000_0000_0000, 400),
-            <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(100_000_000_0000_0000, 800),
+            <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(10_000_000_0000_0000, 400),
+            <a href="transaction_limits.md#0x1_transaction_limits_new_tier">transaction_limits::new_tier</a>(20_000_000_0000_0000, 800),
         ],
     );
 }

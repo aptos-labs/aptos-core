@@ -280,7 +280,7 @@ INVARIANT: must match Rust enum for BCS serialization.
 
 <a id="0x1_transaction_limits_ENOT_DELEGATED_VOTER"></a>
 
-Sender is not the delegated voter of the specified stake pool.
+Fee payer is not the delegated voter of the specified stake pool.
 
 
 <pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_ENOT_DELEGATED_VOTER">ENOT_DELEGATED_VOTER</a>: u64 = 3;
@@ -330,7 +330,7 @@ Requested multiplier is not available in any configured tier.
 
 <a id="0x1_transaction_limits_ENOT_STAKE_POOL_OWNER"></a>
 
-Sender is not the owner of the specified stake pool.
+Fee payer is not the owner of the specified stake pool.
 
 
 <pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_ENOT_STAKE_POOL_OWNER">ENOT_STAKE_POOL_OWNER</a>: u64 = 2;
@@ -579,10 +579,10 @@ Only called during genesis.
 
 ## Function `update_config`
 
-Governance entry to update stake thresholds and multipliers.
+Governance-only: update stake thresholds and multipliers.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_update_config">update_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, execution_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, execution_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, io_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, io_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_update_config">update_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, execution_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, execution_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, io_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, io_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -591,7 +591,7 @@ Governance entry to update stake thresholds and multipliers.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_update_config">update_config</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_update_config">update_config</a>(
     aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     execution_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     execution_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -681,11 +681,11 @@ matching the requested multipliers.
 
 ## Function `validate_high_txn_limits`
 
-Only called during prologue to validate that the sender qualifies for
-the requested limit multipliers.
+Only called during prologue to validate that the fee payer qualifies
+for the requested limit multipliers.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_validate_high_txn_limits">validate_high_txn_limits</a>(sender: <b>address</b>, request: <a href="transaction_limits.md#0x1_transaction_limits_UserTxnLimitsRequest">transaction_limits::UserTxnLimitsRequest</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_validate_high_txn_limits">validate_high_txn_limits</a>(fee_payer: <b>address</b>, request: <a href="transaction_limits.md#0x1_transaction_limits_UserTxnLimitsRequest">transaction_limits::UserTxnLimitsRequest</a>)
 </code></pre>
 
 
@@ -695,15 +695,15 @@ the requested limit multipliers.
 
 
 <pre><code><b>friend</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_validate_high_txn_limits">validate_high_txn_limits</a>(
-    sender: <b>address</b>, request: <a href="transaction_limits.md#0x1_transaction_limits_UserTxnLimitsRequest">UserTxnLimitsRequest</a>
+    fee_payer: <b>address</b>, request: <a href="transaction_limits.md#0x1_transaction_limits_UserTxnLimitsRequest">UserTxnLimitsRequest</a>
 ) <b>acquires</b> <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitsConfig">TxnLimitsConfig</a> {
     match(request) {
         StakePoolOwner { multipliers } =&gt; {
             <b>assert</b>!(
-                <a href="stake.md#0x1_stake_owner_cap_exists">stake::owner_cap_exists</a>(sender),
+                <a href="stake.md#0x1_stake_owner_cap_exists">stake::owner_cap_exists</a>(fee_payer),
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="transaction_limits.md#0x1_transaction_limits_ENOT_STAKE_POOL_OWNER">ENOT_STAKE_POOL_OWNER</a>)
             );
-            <b>let</b> pool_address = <a href="stake.md#0x1_stake_get_pool_address_for_owner">stake::get_pool_address_for_owner</a>(sender);
+            <b>let</b> pool_address = <a href="stake.md#0x1_stake_get_pool_address_for_owner">stake::get_pool_address_for_owner</a>(fee_payer);
             <b>let</b> stake_amount = <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">aptos_governance::get_voting_power</a>(pool_address);
             <a href="transaction_limits.md#0x1_transaction_limits_validate_enough_stake">validate_enough_stake</a>(stake_amount, multipliers);
         },
@@ -713,7 +713,7 @@ the requested limit multipliers.
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="transaction_limits.md#0x1_transaction_limits_ESTAKE_POOL_NOT_FOUND">ESTAKE_POOL_NOT_FOUND</a>)
             );
             <b>assert</b>!(
-                sender == <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(pool_address),
+                fee_payer == <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(pool_address),
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="transaction_limits.md#0x1_transaction_limits_ENOT_DELEGATED_VOTER">ENOT_DELEGATED_VOTER</a>)
             );
             <b>let</b> stake_amount = <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">aptos_governance::get_voting_power</a>(pool_address);
@@ -725,7 +725,7 @@ the requested limit multipliers.
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="transaction_limits.md#0x1_transaction_limits_EDELEGATION_POOL_NOT_FOUND">EDELEGATION_POOL_NOT_FOUND</a>)
             );
             <b>let</b> (active, _, pending_inactive) = <a href="delegation_pool.md#0x1_delegation_pool_get_stake">delegation_pool::get_stake</a>(
-                pool_address, sender
+                pool_address, fee_payer
             );
             <a href="transaction_limits.md#0x1_transaction_limits_validate_enough_stake">validate_enough_stake</a>(active + pending_inactive, multipliers);
         }

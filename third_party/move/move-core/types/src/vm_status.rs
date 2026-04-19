@@ -663,11 +663,11 @@ pub enum StatusCode {
     EMPTY_PAYLOAD_PROVIDED = 43,
     TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE = 44,
     INVALID_NUMBER_OF_AUTHENTICATION_PROOFS = 45,
-    // Sender is not the owner of the specified stake pool.
+    // Fee payer is not the owner of the specified stake pool.
     NOT_STAKE_POOL_OWNER = 46,
-    // Sender is not the delegated voter of the specified stake pool.
+    // Fee payer is not the delegated voter of the specified stake pool.
     NOT_DELEGATED_VOTER = 47,
-    // Sender's committed stake is insufficient for the requested multiplier tier.
+    // Fee payer's committed stake is insufficient for the requested multiplier tier.
     INSUFFICIENT_STAKE = 48,
     // Multiplier must be > 100 bps (> 1x).
     INVALID_HIGH_TXN_LIMITS_MULTIPLIER = 49,
@@ -677,7 +677,6 @@ pub enum StatusCode {
     DELEGATION_POOL_NOT_FOUND = 51,
     // Requested multiplier is not available in any configured tier.
     MULTIPLIER_NOT_AVAILABLE = 52,
-
     // Gas unit price is below the scaled minimum for high-limit transactions.
     HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND = 53,
 

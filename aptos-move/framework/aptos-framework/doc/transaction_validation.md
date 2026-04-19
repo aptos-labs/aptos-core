@@ -595,7 +595,7 @@ Only called during genesis to initialize system resources for this module.
 
     <b>if</b> (txn_limits_request.is_some()) {
         <a href="transaction_limits.md#0x1_transaction_limits_validate_high_txn_limits">transaction_limits::validate_high_txn_limits</a>(
-            sender_address,
+            gas_payer_address,
             txn_limits_request.destroy_some(),
         );
     };

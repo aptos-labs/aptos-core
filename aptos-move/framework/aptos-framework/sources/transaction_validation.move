@@ -185,7 +185,7 @@ module aptos_framework::transaction_validation {
 
         if (txn_limits_request.is_some()) {
             transaction_limits::validate_high_txn_limits(
-                sender_address,
+                gas_payer_address,
                 txn_limits_request.destroy_some(),
             );
         };

@@ -1143,14 +1143,6 @@ pub enum EntryFunctionCall {
 
     TransactionFeeConvertToAptosFaBurnRef {},
 
-    /// Governance entry to update stake thresholds and multipliers.
-    TransactionLimitsUpdateConfig {
-        execution_min_stakes: Vec<u64>,
-        execution_multipliers_bps: Vec<u64>,
-        io_min_stakes: Vec<u64>,
-        io_multipliers_bps: Vec<u64>,
-    },
-
     /// Used in on-chain governances to update the major version for the next epoch.
     /// Example usage:
     /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
@@ -1922,17 +1914,6 @@ impl EntryFunctionCall {
             TransactionFeeConvertToAptosFaBurnRef {} => {
                 transaction_fee_convert_to_aptos_fa_burn_ref()
             },
-            TransactionLimitsUpdateConfig {
-                execution_min_stakes,
-                execution_multipliers_bps,
-                io_min_stakes,
-                io_multipliers_bps,
-            } => transaction_limits_update_config(
-                execution_min_stakes,
-                execution_multipliers_bps,
-                io_min_stakes,
-                io_multipliers_bps,
-            ),
             VersionSetForNextEpoch { major } => version_set_for_next_epoch(major),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
@@ -5152,32 +5133,6 @@ pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
     ))
 }
 
-/// Governance entry to update stake thresholds and multipliers.
-pub fn transaction_limits_update_config(
-    execution_min_stakes: Vec<u64>,
-    execution_multipliers_bps: Vec<u64>,
-    io_min_stakes: Vec<u64>,
-    io_multipliers_bps: Vec<u64>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("transaction_limits").to_owned(),
-        ),
-        ident_str!("update_config").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&execution_min_stakes).unwrap(),
-            bcs::to_bytes(&execution_multipliers_bps).unwrap(),
-            bcs::to_bytes(&io_min_stakes).unwrap(),
-            bcs::to_bytes(&io_multipliers_bps).unwrap(),
-        ],
-    ))
-}
-
 /// Used in on-chain governances to update the major version for the next epoch.
 /// Example usage:
 /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
@@ -7341,21 +7296,6 @@ mod decoder {
         }
     }
 
-    pub fn transaction_limits_update_config(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::TransactionLimitsUpdateConfig {
-                execution_min_stakes: bcs::from_bytes(script.args().get(0)?).ok()?,
-                execution_multipliers_bps: bcs::from_bytes(script.args().get(1)?).ok()?,
-                io_min_stakes: bcs::from_bytes(script.args().get(2)?).ok()?,
-                io_multipliers_bps: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn version_set_for_next_epoch(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetForNextEpoch {
@@ -8152,10 +8092,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),
             Box::new(decoder::transaction_fee_convert_to_aptos_fa_burn_ref),
-        );
-        map.insert(
-            "transaction_limits_update_config".to_string(),
-            Box::new(decoder::transaction_limits_update_config),
         );
         map.insert(
             "version_set_for_next_epoch".to_string(),

@@ -915,14 +915,14 @@ impl RequestedMultipliers {
 /// INVARIANT: must match Move representation for BCS serialization.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum UserTxnLimitsRequest {
-    /// Sender owns a stake pool.
+    /// Fee payer owns a stake pool.
     StakePoolOwner { multipliers: RequestedMultipliers },
-    /// Sender is the delegated voter of the specified stake pool.
+    /// Fee payer is the delegated voter of the specified stake pool.
     DelegatedVoter {
         pool_address: AccountAddress,
         multipliers: RequestedMultipliers,
     },
-    /// Sender is a delegator in the specified delegation pool.
+    /// Fee payer is a delegator in the specified delegation pool.
     DelegationPoolDelegator {
         pool_address: AccountAddress,
         multipliers: RequestedMultipliers,

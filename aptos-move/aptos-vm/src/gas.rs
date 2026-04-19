@@ -193,13 +193,10 @@ pub(crate) fn check_gas(
         &txn_metadata.txn_limits,
         Some(TxnLimitsRequest::Staking(..))
     ) {
-        // For higher-limit transactions, we require higher minimum gas unit price.
-        let scaled_min_price_per_gas_unit =
-            u64::from(txn_gas_params.min_price_per_gas_unit).saturating_mul(10);
-        if u64::from(txn_metadata.gas_unit_price()) < scaled_min_price_per_gas_unit {
+        if txn_metadata.gas_unit_price() < txn_gas_params.high_limit_txn_min_price_per_gas_unit {
             let msg = format!(
                 "[VM] High-limit txn gas price too low; min {}, submitted {}",
-                scaled_min_price_per_gas_unit,
+                txn_gas_params.high_limit_txn_min_price_per_gas_unit,
                 txn_metadata.gas_unit_price(),
             );
             speculative_warn!(log_context, msg.clone());
