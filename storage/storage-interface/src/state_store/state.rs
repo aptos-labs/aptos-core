@@ -335,6 +335,7 @@ impl State {
             let superseded_version =
                 lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
             return Some(HotInsertionOp {
+                state_key: (*key).clone(),
                 value: HotStateValue::new(state_value_opt.cloned(), update.version),
                 value_version: state_value_opt.map(|_| update.version),
                 superseded_version,
@@ -358,6 +359,7 @@ impl State {
                 let value = HotStateValue::clone_from_slot(&slot_to_insert);
                 let superseded_version = lru.insert(key, slot_to_insert);
                 Some(HotInsertionOp {
+                    state_key: (*key).clone(),
                     value,
                     value_version,
                     superseded_version,
@@ -373,6 +375,7 @@ impl State {
             let value = HotStateValue::clone_from_slot(&slot);
             let superseded_version = lru.insert(key, slot);
             Some(HotInsertionOp {
+                state_key: (*key).clone(),
                 value,
                 value_version,
                 superseded_version,
