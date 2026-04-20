@@ -856,7 +856,9 @@ impl StateStore {
 
         // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
         buffered_state.update(
-            updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
+            updated,
+            hot_state_updates,
+            0,    /* estimated_items, doesn't matter since we sync-commit */
             true, /* sync_commit */
         )?;
         Ok(())
@@ -1709,6 +1711,7 @@ mod test_only {
                         new_ledger_state,
                         new_state_summary,
                     ),
+                    hot_state_updates,
                     0,    /* estimated_items, doesn't matter since we sync-commit */
                     true, /* sync_commit */
                 )
