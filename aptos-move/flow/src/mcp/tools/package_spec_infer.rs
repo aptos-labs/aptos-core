@@ -101,6 +101,7 @@ impl FlowSession {
                     .join("output.bpl")
                     .to_string_lossy()
                     .into_owned();
+                aptos_framework::prover::set_aptos_custom_natives(&mut options);
 
                 // 5. Clear leftover diagnostics from previous runs, then run inference.
                 data.env().clear_diag();

@@ -324,6 +324,14 @@ pub enum BehaviorKind {
     ResultOf,
 }
 
+impl BehaviorKind {
+    /// Returns true if this is a two-state predicate (ensures_of, result_of)
+    /// that requires both pre and post memory states.
+    pub fn is_two_state(&self) -> bool {
+        matches!(self, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
+    }
+}
+
 impl fmt::Display for BehaviorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use BehaviorKind::*;
@@ -2387,8 +2395,8 @@ impl ExpData {
                         | Shr | And | Or | Eq | Neq | Lt | Gt | Le | Ge | Copy | Move | Not
                         | Cast | Negate | Exists(..) | BorrowGlobal(..) | Borrow(..) | Deref
                         | MoveTo | MoveFrom | Freeze(..) | Abort(..) | Vector | Len | TypeValue
-                        | TypeDomain | ResourceDomain | Global(..) | CanModify | Old
-                        | Trace(..) | SpecPublish(..) | SpecRemove(..) | SpecUpdate(..)
+                        | TypeDomain | ResourceDomain | StateDomain | Global(..) | CanModify
+                        | Old | Trace(..) | SpecPublish(..) | SpecRemove(..) | SpecUpdate(..)
                         | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
                         | ContainsVec | InRangeRange | InRangeVec | RangeVec | MaxU8 | MaxU16
                         | MaxU32 | MaxU64 | MaxU128 | MaxU256 | Bv2Int | Int2Bv | AbortFlag
@@ -2628,6 +2636,7 @@ pub enum Operation {
     TypeValue,
     TypeDomain,
     ResourceDomain,
+    StateDomain,
     Global(Option<MemoryLabel>),
     CanModify,
     Old,
@@ -3478,6 +3487,17 @@ impl fmt::Display for EnvDisplay<'_, PropertyBag> {
 /// # Purity of Expressions
 
 impl Operation {
+    /// Returns all `MemoryLabel` values embedded in this operation.
+    pub fn memory_labels(&self) -> Vec<MemoryLabel> {
+        use Operation::*;
+        match self {
+            Global(Some(l)) | Exists(Some(l)) => vec![*l],
+            Behavior(_, range) | SpecFunction(_, _, range) => range.labels().collect(),
+            SpecPublish(range) | SpecRemove(range) | SpecUpdate(range) => range.labels().collect(),
+            _ => vec![],
+        }
+    }
+
     /// Determines whether this operation depends on global memory
     pub fn uses_no_memory<F>(&self, check_pure: &F) -> bool
     where
@@ -3636,6 +3656,7 @@ impl Operation {
             // Operation with no effect
             TestVariants(..) => true, // Cannot abort
             NoOp => true,
+            StateDomain => true, // Spec domain, not runtime
         }
     }
 

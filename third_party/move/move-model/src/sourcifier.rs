@@ -52,11 +52,10 @@ fn is_simple_quant(
     triggers: &[Vec<Exp>],
     where_clause: &Option<Exp>,
 ) -> bool {
-    triggers.is_empty()
-        && where_clause.is_none()
-        && ranges.iter().all(|(_, range)| {
-            matches!(range.as_ref(), ExpData::Call(_, Operation::TypeDomain, args) if args.is_empty())
-        })
+    triggers.is_empty() && where_clause.is_none() && ranges.iter().all(|(_, range)| {
+        matches!(range.as_ref(), ExpData::Call(_, Operation::TypeDomain, args) if args.is_empty())
+            || matches!(range.as_ref(), ExpData::Call(_, Operation::StateDomain, _))
+    })
 }
 
 // NOTE: has_any_state_label was removed — replaced by is_state_neutral which also
@@ -2013,6 +2012,8 @@ impl<'a> ExpSourcifier<'a> {
                     emit!(self.wr(), " in ");
                     self.print_exp(Prio::General, false, range);
                 }
+            } else if matches!(range.as_ref(), ExpData::Call(_, Operation::StateDomain, _)) {
+                emit!(self.wr(), " in *");
             } else {
                 emit!(self.wr(), " in ");
                 self.print_exp(Prio::General, false, range);
@@ -2706,6 +2707,7 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_node_inst(id);
                 emit!(self.wr(), "()")
             }),
+            Operation::StateDomain => emit!(self.wr(), "*"),
             Operation::MaxU8 => emit!(self.wr(), "MAX_U8"),
             Operation::MaxU16 => emit!(self.wr(), "MAX_U16"),
             Operation::MaxU32 => emit!(self.wr(), "MAX_U32"),

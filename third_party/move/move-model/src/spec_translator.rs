@@ -89,7 +89,7 @@ impl ProofAction {
                 if let Some(e) = opt_exp {
                     *e = freshener.rewrite_exp(e.clone());
                 }
-            },
+            }
         }
     }
 }
@@ -175,7 +175,7 @@ impl TranslatedSpec {
     pub fn pre_conditions<'a, T: ExpGenerator<'a>>(
         &self,
         _builder: &T,
-    ) -> impl Iterator<Item = (Loc, Exp)> + '_ + use<'_, T> {
+    ) -> impl Iterator<Item=(Loc, Exp)> + '_ + use < '_, T > {
         self.pre.iter().cloned()
     }
 
@@ -341,7 +341,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     pub fn translate_invariants(
         auto_trace: bool,
         builder: &'b mut T,
-        invariants: impl Iterator<Item = (&'b GlobalInvariant, Vec<Type>)>,
+        invariants: impl Iterator<Item=(&'b GlobalInvariant, Vec<Type>)>,
     ) -> TranslatedSpec {
         let fun_env = builder.function_env().clone();
         let mut translator = SpecTranslator {
@@ -416,7 +416,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     pub fn translate_invariants_by_id(
         auto_trace: bool,
         builder: &'b mut T,
-        inv_ids: impl Iterator<Item = (GlobalId, Vec<Type>)>,
+        inv_ids: impl Iterator<Item=(GlobalId, Vec<Type>)>,
     ) -> TranslatedSpec {
         let global_env = builder.global_env();
         SpecTranslator::translate_invariants(
@@ -516,8 +516,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         if self.result.aborts.is_empty()
             && self.result.aborts_with.is_empty()
             && self
-                .fun_env
-                .is_pragma_true(ABORTS_IF_IS_STRICT_PRAGMA, || false)
+            .fun_env
+            .is_pragma_true(ABORTS_IF_IS_STRICT_PRAGMA, || false)
         {
             self.result.aborts.push((
                 self.fun_env.get_loc().at_end(),
@@ -541,7 +541,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                     ExpData::Call(id, oper, args) if args.len() == 1 => {
                         ExpData::Call(*id, oper.clone(), vec![self.auto_trace(&loc, &args[0])])
                             .into_exp()
-                    },
+                    }
                     _ => target.clone(),
                 };
                 let exp = self.translate_exp(&exp, false);
@@ -625,7 +625,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                         op.clone(),
                         args.iter().map(|e| self.auto_trace_sub(e)).collect(),
                     )
-                    .into_exp(),
+                        .into_exp(),
                 ),
                 ExpData::LocalVar(_, sym) => (self.let_locals.contains_key(sym), e),
                 ExpData::Call(id, Operation::Global(None), args) => (
@@ -633,14 +633,14 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                     ExpData::Call(*id, Operation::Global(None), vec![
                         self.auto_trace_sub(&args[0])
                     ])
-                    .into_exp(),
+                        .into_exp(),
                 ),
                 ExpData::Call(id, Operation::Exists(None), args) => (
                     true,
                     ExpData::Call(*id, Operation::Exists(None), vec![
                         self.auto_trace_sub(&args[0])
                     ])
-                    .into_exp(),
+                        .into_exp(),
                 ),
                 _ => (false, e),
             };
@@ -706,7 +706,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     /// Save memory for multiple resources using the shared old label.
     fn save_memory_shared<'c>(
         &mut self,
-        used_memory: impl IntoIterator<Item = &'c QualifiedInstId<StructId>>,
+        used_memory: impl IntoIterator<Item=&'c QualifiedInstId<StructId>>,
         inst: &[Type],
     ) -> MemoryLabel {
         let label = self.get_or_create_old_label();
@@ -735,7 +735,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                     .lets
                     .push((loc.clone(), self.in_post_state, temp, exp));
                 // No proof action emitted for Let — it's already in result.lets.
-            },
+            }
             Proof::Assert(loc, exp) => {
                 let exp = self.translate_exp(exp, false);
                 let guarded = self.guard_proof_exp(exp, &path_cond);
@@ -743,19 +743,19 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                     loc.clone(),
                     ProofAction::Assert(guarded, "proof assertion not satisfied".to_string()),
                 );
-            },
+            }
             Proof::Assume(loc, exp) => {
                 let exp = self.translate_exp(exp, false);
                 let guarded = self.guard_proof_exp(exp, &path_cond);
                 self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
-            },
+            }
             Proof::Split(loc, exp) => {
                 let exp = self.translate_exp(exp, false);
                 // Don't wrap with `==>`: for splits the guard is handled separately
                 // by the instrumentation to preserve the split expression's type and
                 // to produce correct case-split semantics.
                 self.push_proof_action(loc.clone(), ProofAction::Split(exp, path_cond.clone()));
-            },
+            }
             Proof::IfElse(_loc, cond, then_p, else_p) => {
                 let cond = self.translate_exp(cond, false);
                 let then_cond = match &path_cond {
@@ -779,24 +779,24 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                     self.translate_proof(eb, Some(else_cond));
                     self.let_locals = saved;
                 }
-            },
+            }
             Proof::Block(_loc, stmts) => {
                 let saved_let_locals = self.let_locals.clone();
                 for stmt in stmts {
                     self.translate_proof(stmt, path_cond.clone());
                 }
                 self.let_locals = saved_let_locals;
-            },
+            }
             Proof::Post(_loc, inner) => {
                 let saved = self.in_post_state;
                 self.in_post_state = true;
                 self.translate_proof(inner, path_cond);
                 self.in_post_state = saved;
-            },
+            }
             Proof::Apply(loc, qid, args) => {
                 let args: Vec<Exp> = args.iter().map(|a| self.translate_exp(a, false)).collect();
                 self.expand_lemma_apply(loc, *qid, &args, &path_cond);
-            },
+            }
             Proof::ForallApply(loc, binds, pats, qid, args) => {
                 let args: Vec<Exp> = args.iter().map(|a| self.translate_exp(a, false)).collect();
                 let pats: Vec<Vec<Exp>> = pats
@@ -809,7 +809,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                     })
                     .collect();
                 self.expand_forall_lemma_apply(loc, binds, &pats, *qid, &args, &path_cond);
-            },
+            }
             Proof::Calc(loc, steps) => {
                 let env = self.builder.global_env();
                 for (lhs, op, rhs) in steps {
@@ -823,7 +823,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                         ProofAction::Assert(guarded, "calc step not satisfied".to_string()),
                     );
                 }
-            },
+            }
         }
     }
 
@@ -862,7 +862,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                         }
                     }
                     None
-                },
+                }
                 RewriteTarget::Temporary(idx) => args.get(idx).cloned(),
             }
         };
@@ -986,7 +986,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             None,
             body,
         )
-        .into_exp();
+            .into_exp();
 
         let guarded = self.guard_proof_exp(quant_exp, path_cond);
         self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
@@ -1045,7 +1045,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                         labels,
                     )
                 }
-            },
+            }
             ExpData::Call(id, Operation::Trace(TraceKind::User), args) => {
                 // Generate an error if a TRACE is applied to an expression where it is not
                 // allowed, i.e. if there are free LocalVar terms, excluding locals from lets.
@@ -1061,8 +1061,8 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                              on quantified variables or spec function parameters",
                     )
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
         if is_old {
             self.in_old = true;
@@ -1123,7 +1123,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     Global(Some(self.save_memory(self.builder.get_memory_of_node(id)))),
                     args.to_owned(),
                 )
-                .into_exp(),
+                    .into_exp(),
             ),
             Exists(None) if self.in_old => Some(
                 Call(
@@ -1131,7 +1131,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     Exists(Some(self.save_memory(self.builder.get_memory_of_node(id)))),
                     args.to_owned(),
                 )
-                .into_exp(),
+                    .into_exp(),
             ),
             // SpecFunction with labels from state labels: still may need pre-state SaveMem
             SpecFunction(mid, fid, range) if !range.is_default() => {
@@ -1158,7 +1158,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 } else {
                     None
                 }
-            },
+            }
             // SpecFunction in old context: save memory for pre-state
             SpecFunction(mid, fid, range) if self.in_old => {
                 let used_memory = {
@@ -1173,7 +1173,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     post: range.post,
                 };
                 Some(Call(id, SpecFunction(*mid, *fid, new_range), args.to_owned()).into_exp())
-            },
+            }
             // SpecFunction outside old but uses_old: save memory for pre-state
             SpecFunction(mid, fid, range) if !self.in_old => {
                 let (uses_old, has_old_memory, used_memory) = {
@@ -1196,28 +1196,54 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 } else {
                     None
                 }
-            },
+            }
             // Behavior with labels already set: leave as-is
             Behavior(_, range) if !range.is_default() => None,
             // Behavior that needs pre-state label
             Behavior(kind, range) if needs_pre_label(kind, self.in_old) => {
+                let env = self.builder.global_env();
                 if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
                     args.first().map(|a| a.as_ref())
                 {
-                    let fun_env = self.builder.global_env().get_function(mid.qualified(*fid));
+                    let fun_env = env.get_function(mid.qualified(*fid));
                     let used_memory = fun_env.get_spec_used_memory().clone();
-                    let inst = self
-                        .builder
-                        .global_env()
-                        .get_node_instantiation(*closure_id);
+                    let inst = env.get_node_instantiation(*closure_id);
                     let label = self.save_memory_shared(&used_memory, &inst);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
                     };
                     Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
+                } else if let Some(ExpData::Call(
+                                       _,
+                                       Operation::Select(smid, sid, field_id),
+                                       _,
+                                   )) = args.first().map(|a| a.as_ref())
+                {
+                    // Struct-field function value (e.g. `pool.pricing.0`):
+                    // the closure's memory footprint is declared by the
+                    // struct's field spec (`reads_of<f> …` / `modifies_of<f> …`).
+                    // Using `self.fun_env.get_spec_used_memory()` here would miss
+                    // these resources, leaving the pre-state label unsaved at
+                    // procedure entry.
+                    let struct_env =
+                        env.get_module(*smid).into_struct(*sid);
+                    let field_sym = field_id.symbol();
+                    let memory = collect_field_access_memory(env, &struct_env, field_sym);
+                    let label = self.save_memory_shared(&memory, self.type_args);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
                 } else {
-                    // Temporary/LocalVar: use enclosing function's spec_used_memory
+                    // Temporary (function parameter), let-bound local, etc.:
+                    // fall back to the enclosing function's spec_used_memory.
+                    // For function-typed parameters with `modifies_of` /
+                    // `reads_of` declarations, the env_pipeline spec rewriter
+                    // already propagates the parameter's access_of memory into
+                    // the function's spec_used_memory / spec_old_memory, so
+                    // this fallback covers the fun-param case too.
                     let used_memory = self.fun_env.get_spec_used_memory().clone();
                     let label = self.save_memory_shared(&used_memory, self.type_args);
                     let new_range = MemoryRange {
@@ -1226,12 +1252,12 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     };
                     Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
                 }
-            },
+            }
             Old => Some(args[0].to_owned()),
             Result(n) => {
                 self.builder.set_loc_from_node(id);
                 Some(self.builder.mk_temporary(self.ret_locals[*n]))
-            },
+            }
             Trace(kind) => {
                 let exp = args[0].to_owned();
                 let env = self.builder.global_env();
@@ -1241,7 +1267,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     .debug_traces
                     .push((trace_id, *kind, exp.clone()));
                 Some(exp)
-            },
+            }
             _ => None,
         }
     }
@@ -1257,7 +1283,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
     fn rewrite_enter_scope<'c>(
         &mut self,
         _id: NodeId,
-        decls: impl Iterator<Item = &'c (NodeId, Symbol)>,
+        decls: impl Iterator<Item=&'c (NodeId, Symbol)>,
     ) {
         self.shadowed.push(decls.map(|(_, name)| *name).collect())
     }
@@ -1272,4 +1298,42 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
 /// `aborts_of` and `requires_of` only need pre-state if inside `old()`.
 fn needs_pre_label(kind: &BehaviorKind, in_old: bool) -> bool {
     in_old || matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
+}
+
+/// Memory accessed by a struct field's function value, as declared by the
+/// struct's `reads_of<f> …` / `modifies_of<f> …` specs. Used to populate
+/// `saved_memory` when a behavioral predicate like `result_of<s.f>(…)` needs
+/// a pre-state label: without this the Boogie evaluator's `old_*` memory
+/// slot would reference an unsaved snapshot variable.
+///
+/// Wildcard (`*`) is approximated by all `key` structs reachable from the
+/// current `GlobalEnv`. Mono-based exact expansion isn't available here
+/// (the spec translator runs before `mono_analysis`), so over-saving is
+/// acceptable: extra saved memory only adds a cheap `SaveMem` at procedure
+/// entry without affecting verification soundness.
+fn collect_field_access_memory(
+    env: &crate::model::GlobalEnv,
+    struct_env: &crate::model::StructEnv,
+    field_sym: Symbol,
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut memory: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
+    for access in struct_env.get_field_access_of() {
+        if access.fun_param != field_sym {
+            continue;
+        }
+        if access.frame_spec.modifies_all || access.frame_spec.reads_all {
+            for module in env.get_modules() {
+                for s in module.get_structs() {
+                    if s.get_abilities().has_key() {
+                        memory.insert(s.get_qualified_id().instantiate(vec![]));
+                    }
+                }
+            }
+        } else {
+            memory.extend(access.used_memory.iter().cloned());
+            memory.extend(access.old_memory.iter().cloned());
+        }
+        break;
+    }
+    memory
 }

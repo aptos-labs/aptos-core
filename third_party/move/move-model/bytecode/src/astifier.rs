@@ -2400,7 +2400,8 @@ impl AssignTransformer<'_> {
                 | Operation::SpecPublish(..)
                 | Operation::SpecRemove(..)
                 | Operation::SpecUpdate(..)
-                | Operation::NoOp => false,
+                | Operation::NoOp
+                | Operation::StateDomain => false,
             },
             ExpData::Value(..)
             | ExpData::Temporary(..)

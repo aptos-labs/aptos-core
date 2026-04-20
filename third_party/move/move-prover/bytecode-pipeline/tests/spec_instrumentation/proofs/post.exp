@@ -144,7 +144,7 @@ fun TestPost::scale($t0|x: u64, $t1|factor: u64): u64 {
   2: $t3 := *($t0, $t1) on_abort goto 7 with $t4
   3: label L1
      # VC: proof assertion not satisfied at tests/spec_instrumentation/proofs/post.move:32:14+26
-  4: assert Eq<u64>($t3, $t2)
+  4: assert Eq<u64>($t3, Mul($t0, $t1))
      # VC: post-condition does not hold at tests/spec_instrumentation/proofs/post.move:29:9+29
   5: assert Eq<u64>($t3, Mul($t0, $t1))
   6: return $t3

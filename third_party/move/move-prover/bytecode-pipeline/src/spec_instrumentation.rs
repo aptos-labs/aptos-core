@@ -470,13 +470,17 @@ impl<'a> Instrumenter<'a> {
             split_points: vec![],
             freshen_counter: 0,
         };
+        // Always inline spec lets in proof actions, independent of the
+        // `inline_spec_lets` option. Proof-action exps are recorded in
+        // `split_points` outside the bytecode, so they are not rewritten by
+        // the subsequent live-var analysis — inlining here is the only way
+        // to ensure they reference only stable Move-level temps.
+        let mut spec = spec;
+        instrumenter.inline_lets_in_proof_actions(&mut spec);
         if ProverOptions::get(instrumenter.builder.global_env()).inline_spec_lets {
-            let mut spec = spec;
             instrumenter.inline_lets(&mut spec, false);
-            instrumenter.instrument(&spec, &inlined_props);
-        } else {
-            instrumenter.instrument(&spec, &inlined_props);
         }
+        instrumenter.instrument(&spec, &inlined_props);
 
         // Extract split points before consuming the instrumenter.
         let split_points = std::mem::take(&mut instrumenter.split_points);
@@ -1099,6 +1103,63 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
+    /// Inline spec let bindings into proof-block actions only, leaving
+    /// `spec.lets` and all other conditions untouched. Proof actions are
+    /// recorded out of band (notably `Split` exps in `split_points`), so
+    /// the bytecode-level temp remap performed by later live-var analysis
+    /// does not reach them. Substituting here replaces references to
+    /// spec-let temps with their defining expressions, which use only
+    /// Move-level temps that survive the remap with stable indices.
+    fn inline_lets_in_proof_actions(&mut self, spec: &mut TranslatedSpec) {
+        let env = self.builder.global_env();
+        let substitute_exp =
+            |env: &GlobalEnv, cond: &mut Exp, temp: TempIndex, replacement: &Exp| {
+                let replacement = replacement.clone();
+                let mut replacer =
+                    |_id: move_model::model::NodeId, target: RewriteTarget| -> Option<Exp> {
+                        if let RewriteTarget::Temporary(idx) = target {
+                            if idx == temp {
+                                return Some(replacement.clone());
+                            }
+                        }
+                        None
+                    };
+                *cond = ExpRewriter::new(env, &mut replacer).rewrite_exp(cond.clone());
+            };
+        let substitute_proof_action =
+            |env: &GlobalEnv, action: &mut ProofAction, temp, replacement: &Exp| match action {
+                ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => {
+                    substitute_exp(env, exp, temp, replacement);
+                },
+                ProofAction::Split(exp, guard) => {
+                    substitute_exp(env, exp, temp, replacement);
+                    if let Some(g) = guard {
+                        substitute_exp(env, g, temp, replacement);
+                    }
+                },
+            };
+        // Build a working vector where each let's rhs has all prior lets
+        // already inlined into it — this mirrors the chained substitution in
+        // `inline_lets` so that transitive references between lets resolve
+        // correctly before they are applied to the proof actions.
+        let mut resolved_lets: Vec<(TempIndex, Exp)> = Vec::new();
+        for (_, _, temp, exp) in &spec.lets {
+            let mut rhs = exp.clone();
+            for (prev_temp, prev_exp) in &resolved_lets {
+                substitute_exp(env, &mut rhs, *prev_temp, prev_exp);
+            }
+            resolved_lets.push((*temp, rhs));
+        }
+        for (temp, exp) in &resolved_lets {
+            for (_, action) in &mut spec.pre_proof {
+                substitute_proof_action(env, action, *temp, exp);
+            }
+            for (_, action) in &mut spec.post_proof {
+                substitute_proof_action(env, action, *temp, exp);
+            }
+        }
+    }
+
     /// Inline let bindings by substituting the expression directly into conditions.
     /// For `LetPre` expressions in post-state conditions, annotates memory references
     /// with pre-state labels to preserve pre-state evaluation semantics.
@@ -1375,6 +1436,7 @@ impl<'a> Instrumenter<'a> {
                 | Operation::Exists(_)
                 | Operation::CanModify
                 | Operation::ResourceDomain
+                | Operation::StateDomain
                 | Operation::Behavior(..),
                 _,
             ) = e

@@ -26,6 +26,15 @@ struct MovePackageVerifyParams {
     exclude: Option<Vec<String>>,
     /// Solver timeout per verification condition, in seconds. Default: 10. Maximum: 60.
     timeout: Option<usize>,
+    /// If set, generate an independent verification condition for each
+    /// assertion in a function instead of a single combined condition. Can
+    /// help when a function mixes provable-but-hard asserts with asserts
+    /// that produce counterexamples; useful for diagnosing per-function
+    /// timeouts.
+    split_vcs_by_assert: Option<bool>,
+    /// Maximum number of counterexamples reported per verification
+    /// condition.
+    error_limit: Option<usize>,
 }
 
 const DEFAULT_VC_TIMEOUT: usize = 10;
@@ -45,16 +54,21 @@ impl FlowSession {
         Parameters(params): Parameters<MovePackageVerifyParams>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         log::info!(
-            "move_package_verify({}, filter={:?}, exclude={:?}, timeout={:?})",
+            "move_package_verify({}, filter={:?}, exclude={:?}, timeout={:?}, \
+             split_vcs_by_assert={:?}, error_limit={:?})",
             params.package_path,
             params.filter,
             params.exclude,
-            params.timeout
+            params.timeout,
+            params.split_vcs_by_assert,
+            params.error_limit
         );
         let (pkg, _) = self.resolve_package(&params.package_path).await?;
         let filter = params.filter.clone();
         let exclude = params.exclude.clone();
         let vc_timeout = params.timeout.unwrap_or(DEFAULT_VC_TIMEOUT);
+        let split_vcs_by_assert = params.split_vcs_by_assert.unwrap_or(false);
+        let error_limit = params.error_limit;
 
         if vc_timeout > MAX_VC_TIMEOUT {
             return Ok(CallToolResult::error(vec![Content::text(
@@ -120,6 +134,10 @@ impl FlowSession {
                 options.prover.verify_scope = verification_scope;
                 options.prover.verify_exclude = verify_exclude;
                 options.backend.vc_timeout = vc_timeout;
+                options.backend.split_vcs_by_assert = split_vcs_by_assert;
+                if let Some(n) = error_limit {
+                    options.backend.error_limit = n;
+                }
                 aptos_framework::prover::configure_aptos_custom_natives(&mut options);
                 #[cfg(test)]
                 {
@@ -131,6 +149,7 @@ impl FlowSession {
                     .join("output.bpl")
                     .to_string_lossy()
                     .into_owned();
+                aptos_framework::prover::set_aptos_custom_natives(&mut options);
 
                 // 6. Clear leftover diagnostics from previous runs, then run the prover.
                 data.env().clear_diag();

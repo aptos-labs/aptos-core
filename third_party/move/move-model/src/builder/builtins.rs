@@ -971,6 +971,20 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             },
         );
 
+        // State domain (for quantifying over state labels: `forall S in *:`)
+        trans.define_spec_or_builtin_fun(
+            trans.builtin_qualified_symbol("$spec_state_domain"),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::StateDomain,
+                type_params: vec![],
+                type_param_constraints: BTreeMap::default(),
+                params: vec![],
+                result_type: Type::StateDomain,
+                visibility: Spec,
+            },
+        );
+
         // Old
         trans.define_spec_or_builtin_fun(
             trans.builtin_qualified_symbol("old"),

@@ -539,6 +539,7 @@ impl Analyzer<'_> {
                     let fun_type =
                         self.normalize_fun_ty(self.instantiate(target.get_local_type(dests[0])));
                     let fun = mid.qualified_inst(*fid, self.instantiate_vec(targs));
+                    self.add_closure_spec_memory(&fun);
                     self.info
                         .fun_infos
                         .entry(fun_type)
@@ -595,6 +596,27 @@ impl Analyzer<'_> {
         }
     }
 
+    /// When a closure value targeting `fun` is recorded, register the resource
+    /// memory accessed by `fun`'s spec. Behavioral predicates (`aborts_of`,
+    /// `ensures_of`, `result_of`) evaluate the target's spec, so its memory
+    /// must be in `structs` for Boogie to emit the `_$memory` declarations —
+    /// even when the closure is never called directly under the current
+    /// verification filter.
+    fn add_closure_spec_memory(&mut self, fun: &QualifiedInstId<FunId>) {
+        let fun_env = self.env.get_function(fun.to_qualified_id());
+        let mems: Vec<_> = fun_env
+            .get_spec_used_memory()
+            .iter()
+            .chain(fun_env.get_spec_old_memory().iter())
+            .cloned()
+            .collect();
+        for mem in mems {
+            let mem = mem.instantiate(&fun.inst);
+            let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
+            self.add_struct(struct_env, &mem.inst);
+        }
+    }
+
     fn instantiate_mem(&self, mem: QualifiedInstId<StructId>) -> QualifiedInstId<StructId> {
         if let Some(inst) = &self.inst_opt {
             mem.instantiate(inst)
@@ -631,6 +653,7 @@ impl Analyzer<'_> {
                 let fun = mid.qualified_inst(*fid, inst);
                 let fun_type =
                     self.normalize_fun_ty(self.instantiate(&self.env.get_node_type(*node_id)));
+                self.add_closure_spec_memory(&fun);
                 self.info
                     .fun_infos
                     .entry(fun_type)

@@ -118,6 +118,18 @@ pub struct ProverOptions {
     #[clap(long = "skip-instance-check")]
     pub skip_instance_check: bool,
 
+    /// Generate an independent verification condition for each assertion in a
+    /// function instead of a single combined condition. Can help when a
+    /// function contains both provable-but-hard asserts and asserts that
+    /// produce counterexamples; useful for diagnosing per-function timeouts.
+    #[clap(long)]
+    pub split_vcs_by_assert: bool,
+
+    /// Maximum number of counterexamples reported per verification
+    /// condition.
+    #[clap(long)]
+    pub error_limit: Option<usize>,
+
     /// Internal flag: use a temp dir for boogie output so parallel invocations
     /// don't interfere. Set automatically by test harnesses.
     #[clap(long, hide = true)]
@@ -281,6 +293,9 @@ impl ProverOptions {
                 loop_unroll: self.loop_unroll.or(base_opts.backend.loop_unroll),
                 skip_instance_check: self.skip_instance_check
                     || base_opts.backend.skip_instance_check,
+                split_vcs_by_assert: self.split_vcs_by_assert
+                    || base_opts.backend.split_vcs_by_assert,
+                error_limit: self.error_limit.unwrap_or(base_opts.backend.error_limit),
                 ..base_opts.backend
             },
             ..base_opts
@@ -299,6 +314,17 @@ impl ProverOptions {
             ..Self::default()
         }
     }
+}
+
+/// Configures Aptos-specific native function specifications on the given
+/// prover options. This loads `aptos-natives.bpl` and the module instance
+/// names needed for types like `object` and `aggregator_v2`.
+pub fn set_aptos_custom_natives(options: &mut Options) {
+    options.backend.custom_natives =
+        Some(move_prover_boogie_backend::options::CustomNativeOptions {
+            template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
+            module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
+        });
 }
 
 fn run_prover_benchmark(
