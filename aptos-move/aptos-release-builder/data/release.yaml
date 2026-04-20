@@ -1,14 +1,19 @@
 ---
 remote_endpoint: https://testnet.movementnetwork.xyz/
-name: "v0.1"
+name: "disable-concurrent-fungible-balance"
 proposals:
-  - name: enable_default_account_resource
+  - name: disable_concurrent_fungible_balance
     metadata:
-      title: "Enable default account resource"
-      description: "This is for enabling the default account resource"
+      title: "Disable concurrent fungible balance"
+      description: "This is for disabling concurrent fungible balance"
+      source_code_url: "https://github.com/movementlabsxyz/aptos-core"
+      discussion_url: "https://github.com/movementlabsxyz/aptos-core"
     execution_mode: RootSigner
     update_sequence:
+      - Framework:
+          bytecode_version: 7
+          git_hash: ~
       - FeatureFlag:
-          enabled:
-            - default_account_resource
-          disabled: []
+          enabled: []
+          disabled:
+            - concurrent_fungible_balance

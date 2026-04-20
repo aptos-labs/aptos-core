@@ -1,0 +1,6 @@
+{
+  "title": "Disable concurrent fungible balance",
+  "description": "This is for disabling concurrent fungible balance",
+  "source_code_url": "https://github.com/movementlabsxyz/aptos-core",
+  "discussion_url": "https://github.com/movementlabsxyz/aptos-core"
+}
