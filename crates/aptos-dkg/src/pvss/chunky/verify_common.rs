@@ -103,7 +103,7 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
 
     for i in 0..sc.get_total_num_players() {
         let player = sc.get_player(i);
-        let expected_weight = sc.get_player_weight(&player);
+        let expected_weight = sc.get_player_weight(&player)?;
         let got_cs = subtrs.Cs[i].len();
         if got_cs != expected_weight {
             bail!(

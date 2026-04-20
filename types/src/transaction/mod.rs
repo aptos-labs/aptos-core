@@ -694,27 +694,17 @@ impl RawTransaction {
     pub fn as_encrypted_variant(&self) -> Cow<'_, Self> {
         match &self.payload {
             TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
-                ciphertext,
-                extra_config,
-                payload_hash,
-                claimed_entry_fun,
-                ..
+                original, ..
             })
             | TransactionPayload::EncryptedPayload(EncryptedPayload::FailedDecryption {
-                ciphertext,
-                extra_config,
-                payload_hash,
-                claimed_entry_fun,
+                original,
                 ..
             }) => Cow::Owned(RawTransaction {
                 sender: self.sender,
                 sequence_number: self.sequence_number,
-                payload: TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted {
-                    ciphertext: ciphertext.clone(),
-                    extra_config: extra_config.clone(),
-                    payload_hash: *payload_hash,
-                    claimed_entry_fun: claimed_entry_fun.clone(),
-                }),
+                payload: TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted(
+                    original.clone(),
+                )),
                 max_gas_amount: self.max_gas_amount,
                 gas_unit_price: self.gas_unit_price,
                 expiration_timestamp_secs: self.expiration_timestamp_secs,
@@ -894,6 +884,71 @@ impl TransactionExecutableRef<'_> {
     }
 }
 
+/// Multipliers for higher transaction limits, expressed in basis points
+/// (100 = 1x, 200 = 2x, 250 = 2.5x).
+///
+/// INVARIANT: must match Move representation for BCS serialization.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum RequestedMultipliers {
+    V1 { execution_bps: u64, io_bps: u64 },
+}
+
+impl RequestedMultipliers {
+    pub fn execution_bps(&self) -> u64 {
+        match self {
+            Self::V1 { execution_bps, .. } => *execution_bps,
+        }
+    }
+
+    pub fn io_bps(&self) -> u64 {
+        match self {
+            Self::V1 { io_bps, .. } => *io_bps,
+        }
+    }
+}
+
+/// Request for higher transaction execution limits, carried in the transaction
+/// payload. Backed by staking proof (pool ownership, delegated voter, or
+/// delegation pool delegator). BCS-serialized and deserialized by the Move
+/// prologue.
+///
+/// INVARIANT: must match Move representation for BCS serialization.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum UserTxnLimitsRequest {
+    /// Fee payer owns a stake pool.
+    StakePoolOwner { multipliers: RequestedMultipliers },
+    /// Fee payer is the delegated voter of the specified stake pool.
+    DelegatedVoter {
+        pool_address: AccountAddress,
+        multipliers: RequestedMultipliers,
+    },
+    /// Fee payer is a delegator in the specified delegation pool.
+    DelegationPoolDelegator {
+        pool_address: AccountAddress,
+        multipliers: RequestedMultipliers,
+    },
+}
+
+impl UserTxnLimitsRequest {
+    pub fn multipliers(&self) -> &RequestedMultipliers {
+        match self {
+            Self::StakePoolOwner { multipliers, .. }
+            | Self::DelegatedVoter { multipliers, .. }
+            | Self::DelegationPoolDelegator { multipliers, .. } => multipliers,
+        }
+    }
+}
+
+/// VM-internal higher-limit request.
+/// This is NOT serialized in the transaction payload.
+#[derive(Clone, Debug)]
+pub enum TxnLimitsRequest {
+    /// An approved governance proposal script.
+    ApprovedGovernanceScript,
+    /// A user-submitted staking-backed request.
+    Staking(UserTxnLimitsRequest),
+}
+
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionExtraConfig {
     V1 {
@@ -901,6 +956,13 @@ pub enum TransactionExtraConfig {
         // None for regular transactions
         // Some(nonce) for orderless transactions
         replay_protection_nonce: Option<u64>,
+    },
+    V2 {
+        multisig_address: Option<AccountAddress>,
+        replay_protection_nonce: Option<u64>,
+        /// If set, the transaction requests increased gas limits backed by
+        /// staking proof.
+        txn_limits_request: Option<UserTxnLimitsRequest>,
     },
 }
 
@@ -1052,6 +1114,16 @@ impl TransactionPayload {
                         replay_protection_nonce: replay_protection_nonce
                             .or_else(|| Some(replay_nonce_f())),
                     },
+                    TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce,
+                        txn_limits_request,
+                    } => TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce: replay_protection_nonce
+                            .or_else(|| Some(replay_nonce_f())),
+                        txn_limits_request,
+                    },
                 }
             }
             TransactionPayload::Payload(TransactionPayloadInner::V1 {
@@ -1079,6 +1151,21 @@ impl TransactionPayload {
                 TransactionExtraConfig::V1 {
                     multisig_address,
                     replay_protection_nonce: Some(replay_protection_nonce),
+                }
+            },
+            TransactionExtraConfig::V2 {
+                multisig_address,
+                replay_protection_nonce: old_replay_protection_nonce,
+                txn_limits_request,
+            } => {
+                assert!(
+                    old_replay_protection_nonce.is_none(),
+                    "trying to set replay protection nonce twice."
+                );
+                TransactionExtraConfig::V2 {
+                    multisig_address,
+                    replay_protection_nonce: Some(replay_protection_nonce),
+                    txn_limits_request,
                 }
             },
         };
@@ -1117,6 +1204,10 @@ impl TransactionExtraConfig {
             Self::V1 {
                 replay_protection_nonce,
                 ..
+            }
+            | Self::V2 {
+                replay_protection_nonce,
+                ..
             } => *replay_protection_nonce,
         }
     }
@@ -1128,9 +1219,20 @@ impl TransactionExtraConfig {
     pub fn multisig_address(&self) -> Option<AccountAddress> {
         match self {
             Self::V1 {
-                multisig_address,
-                replay_protection_nonce: _,
+                multisig_address, ..
+            }
+            | Self::V2 {
+                multisig_address, ..
             } => *multisig_address,
+        }
+    }
+
+    pub fn txn_limits_request(&self) -> Option<&UserTxnLimitsRequest> {
+        match self {
+            Self::V1 { .. } => None,
+            Self::V2 {
+                txn_limits_request, ..
+            } => txn_limits_request.as_ref(),
         }
     }
 }

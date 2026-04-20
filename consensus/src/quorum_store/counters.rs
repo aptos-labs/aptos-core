@@ -338,6 +338,16 @@ pub static CONSENSUS_PULL_NUM_UNIQUE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static CONSENSUS_PULL_NUM_TXNS_PER_KIND: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_num_txns_per_kind",
+        "Number of txns pulled for consensus, by pull kind and batch kind (normal, encrypted, or v1).",
+        &["pull_kind", "batch_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
 pub static CONSENSUS_PULL_SIZE_IN_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_consensus_pull_size_in_bytes",
@@ -1102,6 +1112,14 @@ pub static BATCH_COORDINATOR_NUM_BATCH_REQS: Lazy<IntCounterVec> = Lazy::new(|| 
         "quorum_store_batch_coord_requests",
         "Number of requests to batch coordinator.",
         &["bucket"]
+    )
+    .unwrap()
+});
+
+pub static REMOTE_BATCH_COORDINATOR_DROPPED_MSGS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_remote_batch_coordinator_dropped_msgs",
+        "Dropped messages at remote batch coordinator ingress."
     )
     .unwrap()
 });

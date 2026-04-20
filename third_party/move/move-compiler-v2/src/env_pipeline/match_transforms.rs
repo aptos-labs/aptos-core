@@ -115,6 +115,59 @@ fn make_deref_eq(env: &GlobalEnv, loc: &Loc, lhs: Exp, val: &Value) -> Exp {
     make_eq(env, loc, cmp_lhs, val_exp)
 }
 
+/// Create a comparison expression: `lhs op rhs`.
+fn make_cmp(env: &GlobalEnv, loc: &Loc, op: Operation, lhs: Exp, rhs: Exp) -> Exp {
+    let id = env.new_node(loc.clone(), Type::Primitive(PrimitiveType::Bool));
+    ExpData::Call(id, op, vec![lhs, rhs]).into_exp()
+}
+
+/// Create a range check condition for a discriminator against a range pattern.
+/// Handles `Deref` for reference types (same pattern as `make_deref_eq`).
+/// `lo` bound -> `Ge(disc, lo)` condition
+/// `hi` bound -> `Lt(disc, hi)` (exclusive) or `Le(disc, hi)` (inclusive)
+/// Both `None` -> `true` (matches everything)
+fn make_range_check(
+    env: &GlobalEnv,
+    loc: &Loc,
+    disc: Exp,
+    lo: &Option<Value>,
+    hi: &Option<Value>,
+    inclusive: bool,
+) -> Exp {
+    let ty = env.get_node_type(disc.node_id());
+    let (cmp_disc, base_ty) = if let Type::Reference(_, inner) = &ty {
+        let inner_ty = inner.as_ref().clone();
+        let deref_id = env.new_node(loc.clone(), inner_ty.clone());
+        let deref_exp = ExpData::Call(deref_id, Operation::Deref, vec![disc]).into_exp();
+        (deref_exp, inner_ty)
+    } else {
+        (disc, ty)
+    };
+
+    let mut conditions = Vec::new();
+
+    if let Some(lo_val) = lo {
+        // disc >= lo
+        let lo_id = env.new_node(loc.clone(), base_ty.clone());
+        let lo_exp = ExpData::Value(lo_id, lo_val.clone()).into_exp();
+        conditions.push(make_cmp(env, loc, Operation::Ge, cmp_disc.clone(), lo_exp));
+    }
+
+    if let Some(hi_val) = hi {
+        let hi_id = env.new_node(loc.clone(), base_ty.clone());
+        let hi_exp = ExpData::Value(hi_id, hi_val.clone()).into_exp();
+        if inclusive {
+            // disc <= hi
+            conditions.push(make_cmp(env, loc, Operation::Le, cmp_disc, hi_exp));
+        } else {
+            // disc < hi
+            conditions.push(make_cmp(env, loc, Operation::Lt, cmp_disc, hi_exp));
+        }
+    }
+
+    conjoin(env, loc, conditions).unwrap_or_else(|| make_true(env, loc))
+}
+
 /// Combine a list of boolean conditions with `&&`. Returns `None` if the list is empty.
 fn conjoin(env: &GlobalEnv, loc: &Loc, conditions: Vec<Exp>) -> Option<Exp> {
     conditions.into_iter().reduce(|acc, cond| {
@@ -204,12 +257,12 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
 }
 
 impl MatchTransformer<'_> {
-    /// Flag any remaining literal patterns as a compiler bug.
+    /// Flag any remaining literal or range patterns as a compiler bug.
     fn reject_remaining_literals(&self, arms: &[MatchArm]) {
         for arm in arms {
             arm.pattern.visit_pre_post(&mut |is_post, pat| {
                 if !is_post {
-                    if let Pattern::LiteralValue(id, _) = pat {
+                    if let Pattern::LiteralValue(id, _) | Pattern::Range(id, ..) = pat {
                         self.env.diag(
                             Severity::Bug,
                             &self.env.get_node_loc(*id),
@@ -285,22 +338,29 @@ fn is_suitable_type(ty: &Type) -> bool {
     }
 }
 
-/// Check if a pattern is suitable (literals, wildcards, vars, or tuples thereof).
+/// Check if a pattern is suitable (literals, ranges, wildcards, vars, or tuples thereof).
 fn is_suitable_pattern(pat: &Pattern) -> bool {
     match pat {
-        Pattern::Wildcard(_) | Pattern::Var(_, _) | Pattern::LiteralValue(_, _) => true,
+        Pattern::Wildcard(_)
+        | Pattern::Var(_, _)
+        | Pattern::LiteralValue(_, _)
+        | Pattern::Range(..) => true,
         Pattern::Tuple(_, pats) => pats.iter().all(is_suitable_pattern),
         Pattern::Struct(..) | Pattern::Error(_) => false,
     }
 }
 
 /// Check if a pattern unconditionally matches any value (wildcard, variable,
-/// or a tuple of all catch-all patterns).
+/// unbounded range, or a tuple of all catch-all patterns).
 fn is_catch_all_pattern(pat: &Pattern) -> bool {
     match pat {
         Pattern::Wildcard(_) | Pattern::Var(_, _) => true,
+        Pattern::Range(_, None, None, _) => true,
         Pattern::Tuple(_, pats) => pats.iter().all(is_catch_all_pattern),
-        _ => false,
+        Pattern::LiteralValue(..)
+        | Pattern::Range(..)
+        | Pattern::Struct(..)
+        | Pattern::Error(_) => false,
     }
 }
 
@@ -308,8 +368,13 @@ fn is_catch_all_pattern(pat: &Pattern) -> bool {
 fn pattern_has_vars(pat: &Pattern) -> bool {
     match pat {
         Pattern::Var(..) => true,
-        Pattern::Tuple(_, pats) => pats.iter().any(pattern_has_vars),
-        _ => false,
+        Pattern::Tuple(_, pats) | Pattern::Struct(_, _, _, pats) => {
+            pats.iter().any(pattern_has_vars)
+        },
+        Pattern::Wildcard(_)
+        | Pattern::LiteralValue(..)
+        | Pattern::Range(..)
+        | Pattern::Error(_) => false,
     }
 }
 
@@ -328,10 +393,10 @@ fn has_nested_literals(arms: &[MatchArm]) -> bool {
 /// Recursive check: `inside_struct` tracks whether we're under a Struct node.
 fn has_nested_literal_in(pat: &Pattern, inside_struct: bool) -> bool {
     match pat {
-        Pattern::LiteralValue(..) => inside_struct,
+        Pattern::LiteralValue(..) | Pattern::Range(..) => inside_struct,
         Pattern::Struct(_, _, _, pats) => pats.iter().any(|p| has_nested_literal_in(p, true)),
         Pattern::Tuple(_, pats) => pats.iter().any(|p| has_nested_literal_in(p, inside_struct)),
-        _ => false,
+        Pattern::Wildcard(_) | Pattern::Var(..) | Pattern::Error(_) => false,
     }
 }
 
@@ -396,6 +461,16 @@ fn extract_literals_from_pattern(
             let var_id = env.new_node(loc.clone(), ty.clone());
             let var_exp = make_local_var(env, &loc, ty.clone(), sym);
             conditions.push(make_deref_eq(env, &loc, var_exp, val));
+            Pattern::Var(var_id, sym)
+        },
+        Pattern::Range(id, lo, hi, inclusive) if inside_struct => {
+            let ty = env.get_node_type(*id);
+            let loc = env.get_node_loc(*id);
+            let sym = TempSymbol::NestedLiteralTemp(*counter).create(env);
+            *counter += 1;
+            let var_id = env.new_node(loc.clone(), ty.clone());
+            let var_exp = make_local_var(env, &loc, ty.clone(), sym);
+            conditions.push(make_range_check(env, &loc, var_exp, lo, hi, *inclusive));
             Pattern::Var(var_id, sym)
         },
         Pattern::Struct(id, sid, variant, pats) => {
@@ -529,6 +604,10 @@ fn generate_pattern_condition(env: &GlobalEnv, discriminator: &Exp, pattern: &Pa
 
         Pattern::LiteralValue(_, val) => make_deref_eq(env, &loc, discriminator.clone(), val),
 
+        Pattern::Range(_, lo, hi, inclusive) => {
+            make_range_check(env, &loc, discriminator.clone(), lo, hi, *inclusive)
+        },
+
         Pattern::Tuple(_, pats) => {
             let discriminator_ty = env.get_node_type(discriminator.node_id());
             if let Type::Tuple(_) = discriminator_ty {
@@ -578,16 +657,23 @@ fn generate_tuple_condition(env: &GlobalEnv, tuple_exp: &Exp, patterns: &[Patter
         },
     };
 
-    // Generate Eq conditions for each literal pattern
+    // Generate conditions for each literal or range pattern
     let conditions: Vec<Exp> = patterns
         .iter()
         .enumerate()
-        .filter_map(|(idx, pat)| {
-            if let Pattern::LiteralValue(_, val) = pat {
+        .filter_map(|(idx, pat)| match pat {
+            Pattern::LiteralValue(_, val) => {
                 Some(make_deref_eq(env, &loc, elem_exps[idx].clone(), val))
-            } else {
-                None
-            }
+            },
+            Pattern::Range(_, lo, hi, inclusive) => Some(make_range_check(
+                env,
+                &loc,
+                elem_exps[idx].clone(),
+                lo,
+                hi,
+                *inclusive,
+            )),
+            _ => None,
         })
         .collect();
 
@@ -680,10 +766,13 @@ fn is_mixed_tuple_match(env: &GlobalEnv, discriminator: &Exp, arms: &[MatchArm])
                 // Check each position
                 pats.iter().enumerate().all(|(idx, pat)| {
                     if is_suitable_type(&elem_tys[idx]) {
-                        // Primitive positions: must be literal, wildcard, or var
+                        // Primitive positions: must be literal, range, wildcard, or var
                         matches!(
                             pat,
-                            Pattern::LiteralValue(..) | Pattern::Wildcard(_) | Pattern::Var(_, _)
+                            Pattern::LiteralValue(..)
+                                | Pattern::Range(..)
+                                | Pattern::Wildcard(_)
+                                | Pattern::Var(_, _)
                         )
                     } else {
                         // Non-primitive positions: must be struct, wildcard, or var
@@ -928,6 +1017,11 @@ fn transform_mixed_arm(
                         let (sym, _) = &prim_temps[seq];
                         let var_exp = make_local_var(env, &loc, elem_tys[pos].clone(), *sym);
                         conditions.push(make_deref_eq(env, &loc, var_exp, val));
+                    },
+                    Pattern::Range(_, lo, hi, inclusive) => {
+                        let (sym, _) = &prim_temps[seq];
+                        let var_exp = make_local_var(env, &loc, elem_tys[pos].clone(), *sym);
+                        conditions.push(make_range_check(env, &loc, var_exp, lo, hi, *inclusive));
                     },
                     Pattern::Var(_, var_sym) => {
                         var_bindings.push((*var_sym, seq));

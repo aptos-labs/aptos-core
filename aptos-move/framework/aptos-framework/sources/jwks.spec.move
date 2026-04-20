@@ -49,6 +49,10 @@ spec aptos_framework::jwks {
         pragma verify_duration_estimate = 80;
     }
 
+    spec remove_oidc_provider_for_next_epoch {
+        pragma verify = false;
+    }
+
     spec try_get_jwk_by_id(provider_jwks: &ProviderJWKs, jwk_id: vector<u8>): Option<JWK> {
         pragma verify_duration_estimate = 80;
     }

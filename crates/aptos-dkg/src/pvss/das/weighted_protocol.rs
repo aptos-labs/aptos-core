@@ -104,7 +104,9 @@ impl traits::TranscriptCore for Transcript {
         sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        let weight = sc.get_player_weight(player);
+        let weight = sc
+            .get_player_weight(player)
+            .expect("player id is in bounds");
         let mut pk_shares = Vec::with_capacity(weight);
 
         for j in 0..weight {
@@ -129,7 +131,9 @@ impl traits::TranscriptCore for Transcript {
         dk: &Self::DecryptPrivKey,
         _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let weight = sc.get_player_weight(player);
+        let weight = sc
+            .get_player_weight(player)
+            .expect("player id is in bounds");
         let mut sk_shares = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
@@ -208,7 +212,9 @@ impl traits::Transcript for Transcript {
 
         let mut C = Vec::with_capacity(W);
         for i in 0..n {
-            let w_i = sc.get_player_weight(&sc.get_player(i));
+            let w_i = sc
+                .get_player_weight(&sc.get_player(i))
+                .expect("player id from sc.get_player is in bounds");
 
             let bases = vec![h, Into::<G1Projective>::into(&eks[i])];
             for j in 0..w_i {
@@ -344,7 +350,7 @@ impl AggregatableTranscript for Transcript {
 
         for i in 0..n {
             let p = sc.get_player(i);
-            let weight = sc.get_player_weight(&p);
+            let weight = sc.get_player_weight(&p)?;
             let s_i = sc.get_player_starting_index(&p);
 
             lc_R_hat.push(g2_multi_exp(
@@ -518,7 +524,7 @@ impl Transcript {
             .collect::<Vec<G1Affine>>();
         for i in 0..n {
             let p = sc.get_player(i);
-            let weight = sc.get_player_weight(&p);
+            let weight = sc.get_player_weight(&p)?;
             for j in 0..weight {
                 let k = sc.get_share_index(i, j).unwrap();
                 let lhs = pairing(&h_1_aff, &V_hat_aff[k]).add(pairing(&eks[i], &R_hat_aff[k]));

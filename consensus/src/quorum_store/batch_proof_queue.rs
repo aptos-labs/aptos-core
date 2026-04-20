@@ -136,6 +136,29 @@ impl<'a> PullSession<'a> {
     }
 }
 
+fn batch_kind_metric_label(kind: Option<BatchKind>) -> &'static str {
+    match kind {
+        Some(BatchKind::Normal) => "normal",
+        Some(BatchKind::Encrypted) => "encrypted",
+        None => "v1",
+    }
+}
+
+fn observe_pulled_txns_per_kind<'a, T: TBatchInfo + 'a>(
+    pull_kind: &str,
+    batches: impl Iterator<Item = &'a T>,
+) {
+    let mut txns_per_kind = HashMap::new();
+    for batch in batches {
+        *txns_per_kind.entry(batch.batch_kind()).or_insert(0) += batch.num_txns();
+    }
+
+    for (kind, count) in txns_per_kind {
+        counters::CONSENSUS_PULL_NUM_TXNS_PER_KIND
+            .observe_with(&[pull_kind, batch_kind_metric_label(kind)], count as f64);
+    }
+}
+
 pub struct BatchProofQueue {
     my_peer_id: PeerId,
     // Queue per peer for batches WITH proofs
@@ -575,6 +598,7 @@ impl BatchProofQueue {
             counters::BLOCK_BYTES_WHEN_PULL.observe(all_txns.size_in_bytes() as f64);
 
             counters::PROOF_SIZE_WHEN_PULL.observe(proof_of_stores.len() as f64);
+            observe_pulled_txns_per_kind("proof", proof_of_stores.iter().map(|proof| proof.info()));
             // Number of proofs remaining in proof queue after the pull
             self.log_remaining_data_after_pull(&proof_of_stores);
         }
@@ -630,6 +654,7 @@ impl BatchProofQueue {
                 .observe_with(&["optbatch"], pulled_txns.count() as f64);
             counters::CONSENSUS_PULL_SIZE_IN_BYTES
                 .observe_with(&["optbatch"], pulled_txns.size_in_bytes() as f64);
+            observe_pulled_txns_per_kind("optbatch", result.iter());
         }
 
         // Add pulled batches to session
@@ -706,10 +731,10 @@ impl BatchProofQueue {
                 "inline",
             );
         let mut result = Vec::new();
-        for batch in batches.into_iter() {
+        for batch in &batches {
             if let Ok(mut persisted_value) = self.batch_store.get_batch_from_local(batch.digest()) {
                 if let Some(txns) = persisted_value.take_payload() {
-                    result.push((batch, txns));
+                    result.push((batch.clone(), txns));
                 }
             } else {
                 warn!(
@@ -724,6 +749,7 @@ impl BatchProofQueue {
             counters::CONSENSUS_PULL_NUM_TXNS.observe_with(&["inline"], pulled_txns.count() as f64);
             counters::CONSENSUS_PULL_SIZE_IN_BYTES
                 .observe_with(&["inline"], pulled_txns.size_in_bytes() as f64);
+            observe_pulled_txns_per_kind("inline", batches.iter());
         }
         (result, pulled_txns, unique_txns)
     }

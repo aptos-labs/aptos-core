@@ -57,8 +57,8 @@ warning: [lint] Needless mutable reference or borrow: consider using immutable r
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
     ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:118:17
     │
-118 │         let r = borrow_global_mut<R>(addr);
-    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+118 │         let r = &mut R[addr];
+    │                 ^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
@@ -66,8 +66,8 @@ warning: [lint] Needless mutable reference or borrow: consider using immutable r
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
     ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:123:17
     │
-123 │         let r = borrow_global_mut<R>(addr);
-    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+123 │         let r = &mut R[addr];
+    │                 ^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
@@ -84,8 +84,8 @@ warning: [lint] Needless mutable reference or borrow: consider using immutable r
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
     ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:130:19
     │
-130 │         let ref = borrow_global_mut<S>(addr);
-    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+130 │         let ref = &mut S[addr];
+    │                   ^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.

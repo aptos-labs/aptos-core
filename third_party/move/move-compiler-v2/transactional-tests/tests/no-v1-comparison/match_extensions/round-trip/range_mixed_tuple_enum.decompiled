@@ -1,0 +1,107 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/range_mixed_tuple_enum.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum Color has drop {
+        RGB {
+            _0: u8,
+            _1: u8,
+            _2: u8,
+        }
+        Grayscale {
+            _0: u8,
+        }
+        Named,
+    }
+    fun classify(p0: Color, p1: u64): u64 {
+        let _v0 = p0;
+        let _v1 = &_v0;
+        loop {
+            let _v2;
+            let _v3;
+            let _v4;
+            if (_v1 is RGB) {
+                _v4 = &_v1._0;
+                let _v5 = &_v1._1;
+                let _v6 = &_v1._2;
+                if (p1 >= 88) _v3 = p1 < 99 else _v3 = false;
+                if (_v3) {
+                    let _v7;
+                    let _v8;
+                    if (*_v4 >= 0u8) _v8 = *_v4 < 25u8 else _v8 = false;
+                    if (_v8) _v7 = *_v5 == 28u8 else _v7 = false;
+                    if (_v7) if (*_v6 >= 55u8) _v2 = *_v6 < 66u8 else _v2 = false else _v2 = false
+                } else _v2 = false;
+                if (_v2) break
+            };
+            'l0: loop {
+                'l1: loop {
+                    loop {
+                        if (!(_v1 is RGB)) {
+                            if (_v1 is Grayscale) {
+                                _v4 = &_v1._0;
+                                if (p1 >= 0) _v3 = p1 < 50 else _v3 = false;
+                                if (_v3) if (*_v4 >= 128u8) _v2 = *_v4 <= MAX_U8 else _v2 = false else _v2 = false;
+                                if (_v2) break 'l0
+                            };
+                            if (_v1 is Grayscale) break;
+                            if (_v1 is Named) break 'l1;
+                            abort 14566554180833181697
+                        };
+                        let Color::RGB{_0: _v9, _1: _v10, _2: _v11} = _v0;
+                        return 2
+                    };
+                    let Color::Grayscale{_0: _v12} = _v0;
+                    return 4
+                };
+                let Color::Named{} = _v0;
+                return 5
+            };
+            let Color::Grayscale{_0: _v13} = _v0;
+            return 3
+        };
+        let Color::RGB{_0: _v14, _1: _v15, _2: _v16} = _v0;
+        1
+    }
+    public fun test_gray_high_low(): u64 {
+        classify(Color::Grayscale{_0: 200u8}, 25)
+    }
+    public fun test_gray_high_tuple_out(): u64 {
+        classify(Color::Grayscale{_0: 200u8}, 50)
+    }
+    public fun test_gray_low(): u64 {
+        classify(Color::Grayscale{_0: 100u8}, 25)
+    }
+    public fun test_named(): u64 {
+        classify(Color::Named{}, 0)
+    }
+    public fun test_rgb_all_match(): u64 {
+        classify(Color::RGB{_0: 10u8, _1: 28u8, _2: 60u8}, 90)
+    }
+    public fun test_rgb_first_out(): u64 {
+        classify(Color::RGB{_0: 30u8, _1: 28u8, _2: 60u8}, 90)
+    }
+    public fun test_rgb_second_mismatch(): u64 {
+        classify(Color::RGB{_0: 10u8, _1: 29u8, _2: 60u8}, 90)
+    }
+    public fun test_rgb_tuple_out(): u64 {
+        classify(Color::RGB{_0: 10u8, _1: 28u8, _2: 60u8}, 100)
+    }
+}
+
+
+//# run 0xc0ffee::m::test_rgb_all_match
+
+//# run 0xc0ffee::m::test_rgb_first_out
+
+//# run 0xc0ffee::m::test_rgb_second_mismatch
+
+//# run 0xc0ffee::m::test_rgb_tuple_out
+
+//# run 0xc0ffee::m::test_gray_high_low
+
+//# run 0xc0ffee::m::test_gray_high_tuple_out
+
+//# run 0xc0ffee::m::test_gray_low
+
+//# run 0xc0ffee::m::test_named

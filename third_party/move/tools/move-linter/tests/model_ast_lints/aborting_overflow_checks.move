@@ -84,21 +84,21 @@ module 0xc0ffee::m {
       abort 1
     };
 
-    let c = borrow_global<Counter>(addr).i;
+    let c = Counter[addr].i;
     if (c > c + b) {
       c + b
     } else {
       abort 1
     };
 
-    let nc = borrow_global<NestedCounter>(addr);
+    let nc = &NestedCounter[addr];
     if (nc.n.i > nc.n.i + b) {
       nc.n.i + b
     } else {
       abort 1
     };
 
-    let hnc = borrow_global<HyperNestedCounter>(addr);
+    let hnc = &HyperNestedCounter[addr];
     if (hnc.n.n.i > hnc.n.n.i + b) {
       hnc.n.n.i + b
     } else {

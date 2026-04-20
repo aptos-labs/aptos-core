@@ -7,11 +7,11 @@ module 0x42::m {
     }
 
     public fun test_borrow_global(addr: address): u64 acquires MyResource {
-        borrow_global<MyResource>(addr).value
+        MyResource[addr].value
     }
 
     public fun test_borrow_global_mut(addr: address) acquires MyResource {
-        borrow_global_mut<MyResource>(addr).value = 100;
+        MyResource[addr].value = 100;
     }
 
     public fun test_move_from(addr: address): MyResource acquires MyResource {

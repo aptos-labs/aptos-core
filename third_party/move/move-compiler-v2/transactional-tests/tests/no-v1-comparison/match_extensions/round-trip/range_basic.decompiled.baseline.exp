@@ -1,0 +1,40 @@
+processed 20 tasks
+task 0 lines 3-29:  publish [module 0xc0ffee::m {]
+task 1 lines 32-32:  run 0xc0ffee::m::test_exclusive --args 0u64
+return values: 0
+task 2 lines 34-34:  run 0xc0ffee::m::test_exclusive --args 1u64
+return values: 1
+task 3 lines 36-36:  run 0xc0ffee::m::test_exclusive --args 5u64
+return values: 1
+task 4 lines 38-38:  run 0xc0ffee::m::test_exclusive --args 9u64
+return values: 1
+task 5 lines 40-40:  run 0xc0ffee::m::test_exclusive --args 10u64
+return values: 0
+task 6 lines 42-42:  run 0xc0ffee::m::test_inclusive --args 0u64
+return values: 0
+task 7 lines 44-44:  run 0xc0ffee::m::test_inclusive --args 1u64
+return values: 1
+task 8 lines 46-46:  run 0xc0ffee::m::test_inclusive --args 5u64
+return values: 1
+task 9 lines 48-48:  run 0xc0ffee::m::test_inclusive --args 10u64
+return values: 1
+task 10 lines 50-50:  run 0xc0ffee::m::test_inclusive --args 11u64
+return values: 0
+task 11 lines 52-52:  run 0xc0ffee::m::test_open_end --args 4u64
+return values: 0
+task 12 lines 54-54:  run 0xc0ffee::m::test_open_end --args 5u64
+return values: 1
+task 13 lines 56-56:  run 0xc0ffee::m::test_open_end --args 100u64
+return values: 1
+task 14 lines 58-58:  run 0xc0ffee::m::test_open_start --args 0u64
+return values: 1
+task 15 lines 60-60:  run 0xc0ffee::m::test_open_start --args 9u64
+return values: 1
+task 16 lines 62-62:  run 0xc0ffee::m::test_open_start --args 10u64
+return values: 0
+task 17 lines 64-64:  run 0xc0ffee::m::test_open_start_inclusive --args 0u64
+return values: 1
+task 18 lines 66-66:  run 0xc0ffee::m::test_open_start_inclusive --args 10u64
+return values: 1
+task 19 lines 68-68:  run 0xc0ffee::m::test_open_start_inclusive --args 11u64
+return values: 0

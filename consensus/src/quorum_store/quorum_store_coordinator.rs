@@ -4,8 +4,11 @@
 use crate::{
     monitor,
     quorum_store::{
-        batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGeneratorCommand,
-        counters, proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
+        batch_coordinator::{BatchCoordinatorCommand, BatchCoordinatorQueueKey},
+        batch_generator::BatchGeneratorCommand,
+        counters,
+        proof_coordinator::ProofCoordinatorCommand,
+        proof_manager::ProofManagerCommand,
     },
     round_manager::VerifiedEvent,
 };
@@ -24,7 +27,8 @@ pub enum CoordinatorCommand {
 pub struct QuorumStoreCoordinator {
     my_peer_id: PeerId,
     batch_generator_cmd_tx: mpsc::Sender<BatchGeneratorCommand>,
-    remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
+    remote_batch_coordinator_cmd_tx:
+        Vec<aptos_channel::Sender<BatchCoordinatorQueueKey, BatchCoordinatorCommand>>,
     proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
     proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
     quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>,
@@ -34,7 +38,9 @@ impl QuorumStoreCoordinator {
     pub(crate) fn new(
         my_peer_id: PeerId,
         batch_generator_cmd_tx: mpsc::Sender<BatchGeneratorCommand>,
-        remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
+        remote_batch_coordinator_cmd_tx: Vec<
+            aptos_channel::Sender<BatchCoordinatorQueueKey, BatchCoordinatorCommand>,
+        >,
         proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
         proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
         quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>,
@@ -123,10 +129,12 @@ impl QuorumStoreCoordinator {
                                 remote_batch_coordinator_shutdown_rx,
                             ) = oneshot::channel();
                             remote_batch_coordinator_cmd_tx
-                                .send(BatchCoordinatorCommand::Shutdown(
-                                    remote_batch_coordinator_shutdown_tx,
-                                ))
-                                .await
+                                .push_expect_enqueued(
+                                    BatchCoordinatorQueueKey::Control,
+                                    BatchCoordinatorCommand::Shutdown(
+                                        remote_batch_coordinator_shutdown_tx,
+                                    ),
+                                )
                                 .expect("Failed to send to Remote BatchCoordinator");
                             remote_batch_coordinator_shutdown_rx
                                 .await

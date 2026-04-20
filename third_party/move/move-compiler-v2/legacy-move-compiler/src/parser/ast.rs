@@ -592,6 +592,9 @@ pub enum Bind_ {
     // Literal value pattern (for primitive pattern matching)
     // true, false, 0, 1, byte strings, etc.
     Literal(Value),
+    // Range pattern: (lo, hi, inclusive_upper)
+    // lo..hi, lo..=hi, lo.., ..hi, ..=hi, ..
+    Range(Option<Value>, Option<Value>, bool),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
@@ -2539,6 +2542,19 @@ impl AstDebug for Bind_ {
             },
             B::Literal(val) => {
                 val.value.ast_debug(w);
+            },
+            B::Range(lo, hi, inclusive) => {
+                if let Some(l) = lo {
+                    l.value.ast_debug(w);
+                }
+                if *inclusive {
+                    w.write("..=");
+                } else {
+                    w.write("..");
+                }
+                if let Some(h) = hi {
+                    h.value.ast_debug(w);
+                }
             },
         }
     }

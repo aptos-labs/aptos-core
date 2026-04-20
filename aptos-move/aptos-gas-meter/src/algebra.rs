@@ -5,6 +5,7 @@ use crate::traits::GasAlgebra;
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, NumBytes, NumModules, Octa};
 use aptos_gas_schedule::{gas_feature_versions, VMGasParameters};
 use aptos_logger::error;
+use aptos_types::transaction::TxnLimitsRequest;
 use aptos_vm_types::{
     resolver::BlockSynchronizationKillSwitch,
     storage::{io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters},
@@ -64,26 +65,43 @@ where
         gas_feature_version: u64,
         vm_gas_params: VMGasParameters,
         storage_gas_params: StorageGasParameters,
-        is_approved_gov_script: bool,
+        txn_limits_request: Option<&TxnLimitsRequest>,
         balance: impl Into<Gas>,
         block_synchronization_kill_switch: &'a T,
     ) -> Self {
         let balance = balance.into().to_unit_with_params(&vm_gas_params.txn);
 
-        let (max_execution_gas, max_io_gas, max_storage_fee) = if is_approved_gov_script
-            && gas_feature_version >= gas_feature_versions::RELEASE_V1_13
-        {
-            (
-                vm_gas_params.txn.max_execution_gas_gov,
-                vm_gas_params.txn.max_io_gas_gov,
-                vm_gas_params.txn.max_storage_fee_gov,
-            )
-        } else {
-            (
+        let (max_execution_gas, max_io_gas, max_storage_fee) = match txn_limits_request {
+            Some(TxnLimitsRequest::ApprovedGovernanceScript)
+                if gas_feature_version >= gas_feature_versions::RELEASE_V1_13 =>
+            {
+                (
+                    vm_gas_params.txn.max_execution_gas_gov,
+                    vm_gas_params.txn.max_io_gas_gov,
+                    vm_gas_params.txn.max_storage_fee_gov,
+                )
+            },
+            Some(TxnLimitsRequest::Staking(request)) => {
+                let m = request.multipliers();
+                let max_execution_gas = u64::from(vm_gas_params.txn.max_execution_gas)
+                    .saturating_mul(m.execution_bps())
+                    / 100;
+                let max_io_gas =
+                    u64::from(vm_gas_params.txn.max_io_gas).saturating_mul(m.io_bps()) / 100;
+
+                (
+                    InternalGas::new(max_execution_gas),
+                    InternalGas::new(max_io_gas),
+                    // Storage limits are kept as is.
+                    vm_gas_params.txn.max_storage_fee,
+                )
+            },
+            // Pre v1.13 governance scripts or no request: use standard limits.
+            None | Some(TxnLimitsRequest::ApprovedGovernanceScript) => (
                 vm_gas_params.txn.max_execution_gas,
                 vm_gas_params.txn.max_io_gas,
                 vm_gas_params.txn.max_storage_fee,
-            )
+            ),
         };
 
         Self {

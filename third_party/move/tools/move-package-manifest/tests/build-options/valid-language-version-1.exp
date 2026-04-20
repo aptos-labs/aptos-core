@@ -13,7 +13,7 @@ PackageManifest {
     build: Some(
         BuildOptions {
             language_version: Some(
-                V1,
+                V2_4,
             ),
         },
     ),

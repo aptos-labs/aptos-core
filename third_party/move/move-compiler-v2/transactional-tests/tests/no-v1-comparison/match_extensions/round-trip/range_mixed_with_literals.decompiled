@@ -1,0 +1,67 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/range_mixed_with_literals.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_literal_sandwich(p0: u8): u64 {
+        'l0: loop {
+            loop {
+                if (!(p0 == 0u8)) {
+                    let _v0;
+                    if (p0 >= 1u8) _v0 = p0 <= 254u8 else _v0 = false;
+                    if (_v0) break;
+                    if (p0 == MAX_U8) break 'l0;
+                    abort 14566554180833181697
+                };
+                return 1
+            };
+            return 2
+        };
+        3
+    }
+    public fun test_mixed(p0: u64): u64 {
+        'l1: loop {
+            'l2: loop {
+                'l0: loop {
+                    loop {
+                        if (!(p0 == 0)) {
+                            let _v0;
+                            let _v1;
+                            if (p0 >= 1) _v0 = p0 < 10 else _v0 = false;
+                            if (_v0) break;
+                            if (p0 == 10) break 'l0;
+                            if (p0 >= 11) _v1 = p0 < 100 else _v1 = false;
+                            if (!_v1) break 'l1;
+                            break 'l2
+                        };
+                        return 1
+                    };
+                    return 2
+                };
+                return 3
+            };
+            return 4
+        };
+        5
+    }
+}
+
+
+//# run 0xc0ffee::m::test_mixed --args 0u64
+
+//# run 0xc0ffee::m::test_mixed --args 1u64
+
+//# run 0xc0ffee::m::test_mixed --args 5u64
+
+//# run 0xc0ffee::m::test_mixed --args 9u64
+
+//# run 0xc0ffee::m::test_mixed --args 10u64
+
+//# run 0xc0ffee::m::test_mixed --args 50u64
+
+//# run 0xc0ffee::m::test_mixed --args 100u64
+
+//# run 0xc0ffee::m::test_literal_sandwich --args 0u8
+
+//# run 0xc0ffee::m::test_literal_sandwich --args 128u8
+
+//# run 0xc0ffee::m::test_literal_sandwich --args 255u8

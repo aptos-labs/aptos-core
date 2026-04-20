@@ -1,20 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::AptosVM;
 use aptos_crypto::HashValue;
 use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    on_chain_config::{TimedFeatureFlag, TimedFeatures},
+    on_chain_config::{ApprovedExecutionHashes, ConfigStorage, OnChainConfig, TimedFeatureFlag},
     transaction::{
         authenticator::AuthenticationProof,
         user_transaction_context::{TransactionIndexKind, UserTransactionContext},
         AuxiliaryInfo, EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector,
         SignedTransaction, TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
-        TransactionPayload, TransactionPayloadInner,
+        TransactionPayload, TransactionPayloadInner, TxnLimitsRequest,
     },
 };
+use move_core_types::vm_status::{StatusCode, VMStatus};
 
 pub struct TransactionMetadata {
     pub sender: AccountAddress,
@@ -39,24 +41,80 @@ pub struct TransactionMetadata {
     pub multisig_payload: Option<Multisig>,
     /// The transaction index context for the monotonically increasing counter.
     pub transaction_index_kind: TransactionIndexKind,
+    /// Transaction limits request (requested by user or set by the system).
+    pub txn_limits: Option<TxnLimitsRequest>,
 }
 
 impl TransactionMetadata {
-    pub fn new(
+    pub(crate) fn new(
+        vm: &AptosVM,
+        resolver: &impl ConfigStorage,
         txn: &SignedTransaction,
         auxiliary_info: &AuxiliaryInfo,
-        timed_features: &TimedFeatures,
-    ) -> Self {
+    ) -> Result<Self, VMStatus> {
         // Use full transaction size (including authenticator) when the feature is enabled,
         // otherwise use the raw transaction size for backwards compatibility.
-        let transaction_size =
-            if timed_features.is_enabled(TimedFeatureFlag::UseFullTransactionSizeForGasCheck) {
-                txn.txn_bytes_len()
+        let transaction_size = if vm
+            .timed_features()
+            .is_enabled(TimedFeatureFlag::UseFullTransactionSizeForGasCheck)
+        {
+            txn.txn_bytes_len()
+        } else {
+            txn.raw_txn_bytes_len()
+        };
+
+        let (script_hash, is_approved_gov_script) =
+            if let Ok(TransactionExecutableRef::Script(s)) = txn.payload().executable_ref() {
+                let script_hash = HashValue::sha3_256_of(s.code()).to_vec();
+                let is_approved_gov_script = ApprovedExecutionHashes::fetch_config(resolver)
+                    .is_some_and(|approved| {
+                        approved
+                            .entries
+                            .iter()
+                            .any(|(_, hash)| hash == &script_hash)
+                    });
+                (script_hash, is_approved_gov_script)
             } else {
-                txn.raw_txn_bytes_len()
+                (vec![], false)
             };
 
-        Self {
+        let txn_limits = if is_approved_gov_script {
+            Some(TxnLimitsRequest::ApprovedGovernanceScript)
+        } else if let Some(request) = txn.extra_config().txn_limits_request() {
+            if !vm.features().is_transaction_limits_enabled() {
+                return Err(VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some("Transaction limits feature is not yet supported".to_string()),
+                ));
+            }
+
+            // This runs before the prologue & gas meter creation, preventing the
+            // meter from operating with a 0, nonsensical, or overflowing limit. The
+            // Move prologue additionally validates that the multiplier exists in the
+            // on-chain config.
+            //
+            // INVARIANT: these bounds must match Move constants defined in
+            // transaction_limits.move.
+            const MIN_MULTIPLIER_BPS: u64 = 100;
+            const MAX_MULTIPLIER_BPS: u64 = 10000;
+
+            let m = request.multipliers();
+            if m.execution_bps() <= MIN_MULTIPLIER_BPS
+                || MAX_MULTIPLIER_BPS < m.execution_bps()
+                || m.io_bps() <= MIN_MULTIPLIER_BPS
+                || MAX_MULTIPLIER_BPS < m.io_bps()
+            {
+                return Err(VMStatus::error(
+                    StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
+                    Some("Multipliers must be in (1x, 100x] range".to_string()),
+                ));
+            }
+            Some(TxnLimitsRequest::Staking(request.clone()))
+        } else {
+            None
+        };
+
+        Ok(Self {
             sender: txn.sender(),
             authentication_proof: txn.authenticator().sender().authentication_proof(),
             secondary_signers: txn.authenticator().secondary_signer_addresses(),
@@ -77,13 +135,7 @@ impl TransactionMetadata {
             transaction_size: (transaction_size as u64).into(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id(),
-            script_hash: if let Ok(TransactionExecutableRef::Script(s)) =
-                txn.payload().executable_ref()
-            {
-                HashValue::sha3_256_of(s.code()).to_vec()
-            } else {
-                vec![]
-            },
+            script_hash,
             script_size: if let Ok(TransactionExecutableRef::Script(s)) =
                 txn.payload().executable_ref()
             {
@@ -120,7 +172,10 @@ impl TransactionMetadata {
                         TransactionExtraConfig::V1 {
                             multisig_address: Some(multisig_address),
                             ..
-                        },
+                        } | TransactionExtraConfig::V2 {
+                            multisig_address: Some(multisig_address),
+                            ..
+                        }
                 }) => Some(Multisig {
                     multisig_address: *multisig_address,
                     transaction_payload: match executable {
@@ -131,27 +186,24 @@ impl TransactionMetadata {
                         _ => None,
                     },
                 }),
-                TransactionPayload::EncryptedPayload(ep) => match ep.extra_config() {
-                    TransactionExtraConfig::V1 {
-                        multisig_address: Some(multisig_address),
-                        ..
-                    } => Some(Multisig {
-                        multisig_address: *multisig_address,
+                TransactionPayload::EncryptedPayload(ep) => {
+                    ep.extra_config().multisig_address().map(|multisig_address| Multisig {
+                        multisig_address,
                         transaction_payload: match ep.executable_ref() {
                             Ok(TransactionExecutableRef::EntryFunction(e)) => {
                                 Some(MultisigTransactionPayload::EntryFunction(e.clone()))
                             },
                             _ => None,
                         },
-                    }),
-                    _ => None,
+                    })
                 },
-                TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config: TransactionExtraConfig:: V1 { multisig_address: None, ..}, .. }) |
+                TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config: TransactionExtraConfig::V1 { multisig_address: None, ..} | TransactionExtraConfig::V2 { multisig_address: None, ..}, .. }) |
                 TransactionPayload::Script(_) |
                 TransactionPayload::ModuleBundle(_) | TransactionPayload::EntryFunction(_) => None,
             },
             transaction_index_kind: auxiliary_info.transaction_index_kind(),
-        }
+            txn_limits,
+        })
     }
 
     pub fn max_gas_amount(&self) -> Gas {
@@ -268,5 +320,12 @@ impl TransactionMetadata {
             },
             TransactionIndexKind::NotAvailable => None,
         }
+    }
+
+    /// Returns true if this is a governance proposal script that was approved.
+    pub fn is_approved_gov_script(&self) -> bool {
+        self.txn_limits
+            .as_ref()
+            .is_some_and(|r| matches!(r, TxnLimitsRequest::ApprovedGovernanceScript))
     }
 }

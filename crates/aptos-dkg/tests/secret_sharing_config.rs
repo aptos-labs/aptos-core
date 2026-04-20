@@ -18,7 +18,10 @@ fn print_best_worst_avg_case_subsets() {
     for wc in wcs {
         println!("{wc}");
         for i in 0..wc.get_total_num_players() {
-            print!("p[{i}]: {}, ", wc.get_player_weight(&wc.get_player(i)));
+            print!(
+                "p[{i}]: {}, ",
+                wc.get_player_weight(&wc.get_player(i)).unwrap()
+            );
         }
         println!();
 

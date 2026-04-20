@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot mutably borrow from an immutable ref
+  ┌─ tests/checking/typing/enum_mut_borrow_through_immutable_ref.move:9:17
+  │
+9 │         let r = &mut imm.x;
+  │                 ^^^^^^^^^^

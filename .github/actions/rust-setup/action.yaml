@@ -18,7 +18,13 @@ runs:
   steps:
     - if: ${{inputs.macos != 'true'}}
       name: Linux - Setup dependencies
-      run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
+      run: |
+        sudo apt-get update
+        sudo apt-get install build-essential ca-certificates curl git gnupg libpq-dev libssl-dev lsb-release lsof pkg-config software-properties-common wget --no-install-recommends --assume-yes
+        sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh 21
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100
+        sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-21 100
       shell: bash
 
     - uses: dsherret/rust-toolchain-file@v1

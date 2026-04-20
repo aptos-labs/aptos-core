@@ -562,6 +562,7 @@ async fn test_large_total_stake() {
             genesis_config.epoch_duration_secs = 4;
             genesis_config.recurring_lockup_duration_secs = 4;
             genesis_config.voting_duration_secs = 3;
+            genesis_config.min_stake = 10_000_000;
             genesis_config.randomness_config_override =
                 Some(OnChainRandomnessConfig::default_disabled());
         }))
@@ -572,7 +573,8 @@ async fn test_large_total_stake() {
     let rest_client = swarm.validators().next().unwrap().rest_client();
 
     let mut keygen = KeyGen::from_os_rng();
-    let (validator_cli_index, keys) = init_validator_account(&mut cli, &mut keygen, None).await;
+    let (validator_cli_index, keys) =
+        init_validator_account(&mut cli, &mut keygen, Some(200_000_000)).await;
     // faucet can make our root LocalAccount sequence number get out of sync.
     swarm
         .chain_info()
@@ -592,6 +594,10 @@ async fn test_large_total_stake() {
     )
     .await
     .unwrap();
+
+    cli.add_stake(validator_cli_index, 100_000_000)
+        .await
+        .unwrap();
 
     cli.join_validator_set(validator_cli_index, None)
         .await

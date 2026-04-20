@@ -52,4 +52,4 @@ error: match not exhaustive
 126 │         match (x) {
     │                ^
     │
-    = missing `_`
+    = missing at least `2..`

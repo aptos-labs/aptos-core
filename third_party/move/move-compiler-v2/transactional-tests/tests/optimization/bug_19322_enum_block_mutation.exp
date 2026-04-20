@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 1-23:  publish [module 0x42::m {]
+task 1 lines 25-25:  run 0x42::m::test_struct_block_mutation
+return values: 10
+task 2 lines 27-27:  run 0x42::m::test_enum_block_mutation
+return values: 10

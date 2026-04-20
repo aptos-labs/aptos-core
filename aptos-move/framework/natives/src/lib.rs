@@ -80,7 +80,7 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "confidential_range_proofs",
-        cryptography::bulletproofs::make_all(builder)
+        cryptography::bulletproofs::make_batch_verify_native(builder)
     );
     add_natives_from_module!(
         "transaction_context",

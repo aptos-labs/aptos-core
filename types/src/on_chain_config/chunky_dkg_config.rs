@@ -43,6 +43,17 @@ impl AsMoveAny for ConfigV1 {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ConfigShadowV1 {
+    pub secrecy_threshold: FixedPoint64MoveStruct,
+    pub reconstruction_threshold: FixedPoint64MoveStruct,
+    pub grace_period_secs: u64,
+}
+
+impl AsMoveAny for ConfigShadowV1 {
+    const MOVE_TYPE_NAME: &'static str = "0x1::chunky_dkg_config::ConfigShadowV1";
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ChunkyDKGConfigMoveStruct {
     variant: MoveAny,
 }
@@ -51,6 +62,7 @@ pub struct ChunkyDKGConfigMoveStruct {
 pub enum OnChainChunkyDKGConfig {
     Off,
     V1(ConfigV1),
+    ShadowV1(ConfigShadowV1),
 }
 
 impl OnChainChunkyDKGConfig {
@@ -98,6 +110,10 @@ impl TryFrom<ChunkyDKGConfigMoveStruct> for OnChainChunkyDKGConfig {
                 let v1 = MoveAny::unpack(ConfigV1::MOVE_TYPE_NAME, variant)?;
                 Ok(OnChainChunkyDKGConfig::V1(v1))
             },
+            ConfigShadowV1::MOVE_TYPE_NAME => {
+                let sv1 = MoveAny::unpack(ConfigShadowV1::MOVE_TYPE_NAME, variant)?;
+                Ok(OnChainChunkyDKGConfig::ShadowV1(sv1))
+            },
             unknown => bail!("unknown variant type: {}", unknown),
         }
     }
@@ -108,6 +124,9 @@ impl From<OnChainChunkyDKGConfig> for ChunkyDKGConfigMoveStruct {
         let variant = match value {
             OnChainChunkyDKGConfig::Off => MoveAny::pack(ConfigOff::MOVE_TYPE_NAME, ConfigOff {}),
             OnChainChunkyDKGConfig::V1(v1) => MoveAny::pack(ConfigV1::MOVE_TYPE_NAME, v1),
+            OnChainChunkyDKGConfig::ShadowV1(sv1) => {
+                MoveAny::pack(ConfigShadowV1::MOVE_TYPE_NAME, sv1)
+            },
         };
         ChunkyDKGConfigMoveStruct { variant }
     }
@@ -116,6 +135,24 @@ impl From<OnChainChunkyDKGConfig> for ChunkyDKGConfigMoveStruct {
 impl OnChainChunkyDKGConfig {
     pub fn default_enabled() -> Self {
         OnChainChunkyDKGConfig::V1(ConfigV1::default())
+    }
+
+    pub fn new_shadow_v1(
+        secrecy_threshold_in_percentage: u64,
+        reconstruct_threshold_in_percentage: u64,
+        grace_period_secs: u64,
+    ) -> Self {
+        let secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(secrecy_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        let reconstruction_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(reconstruct_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        Self::ShadowV1(ConfigShadowV1 {
+            secrecy_threshold,
+            reconstruction_threshold,
+            grace_period_secs,
+        })
     }
 
     pub fn default_disabled() -> Self {
@@ -133,14 +170,19 @@ impl OnChainChunkyDKGConfig {
     pub fn chunky_dkg_enabled(&self) -> bool {
         match self {
             OnChainChunkyDKGConfig::Off => false,
-            OnChainChunkyDKGConfig::V1(_) => true,
+            OnChainChunkyDKGConfig::V1(_) | OnChainChunkyDKGConfig::ShadowV1(_) => true,
         }
+    }
+
+    pub fn is_shadow_mode(&self) -> bool {
+        matches!(self, OnChainChunkyDKGConfig::ShadowV1(_))
     }
 
     pub fn secrecy_threshold(&self) -> Option<U64F64> {
         match self {
             OnChainChunkyDKGConfig::Off => None,
             OnChainChunkyDKGConfig::V1(v1) => Some(v1.secrecy_threshold.as_u64f64()),
+            OnChainChunkyDKGConfig::ShadowV1(sv1) => Some(sv1.secrecy_threshold.as_u64f64()),
         }
     }
 
@@ -148,6 +190,7 @@ impl OnChainChunkyDKGConfig {
         match self {
             OnChainChunkyDKGConfig::Off => None,
             OnChainChunkyDKGConfig::V1(v1) => Some(v1.reconstruction_threshold.as_u64f64()),
+            OnChainChunkyDKGConfig::ShadowV1(sv1) => Some(sv1.reconstruction_threshold.as_u64f64()),
         }
     }
 }

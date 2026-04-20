@@ -2191,6 +2191,10 @@ impl Generator<'_> {
                 // Value patterns should have been transformed to if-else before bytecode generation
                 self.internal_error(id, "unexpected value pattern in bytecode generation")
             },
+            Pattern::Range(..) => {
+                // Range patterns should have been transformed to if-else before bytecode generation
+                self.internal_error(id, "unexpected range pattern in bytecode generation")
+            },
             Pattern::Error(_) => self.internal_error(id, "unexpected error pattern"),
         }
     }
