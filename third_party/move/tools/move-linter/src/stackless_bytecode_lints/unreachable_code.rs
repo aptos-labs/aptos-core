@@ -54,6 +54,10 @@ impl StacklessBytecodeChecker for UnreachableCode {
         for (offset, instr) in code.iter().enumerate() {
             if annotation.is_definitely_not_reachable(offset as CodeOffset) {
                 let loc = target.get_bytecode_loc(instr.get_attr_id());
+                // The two skip paths below use `continue` rather than flushing the
+                // current run on purpose: when two dead instructions are split only
+                // by skipped ones, we still want them reported as a single warning
+                // instead of two adjacent ones.
                 // Skip code from inlining — not actionable at this site.
                 if loc.is_inlined() {
                     continue;
@@ -96,6 +100,13 @@ fn call_site_loc(loc: &Loc) -> Loc {
 }
 
 /// Span-only enclosure (ignores `inlined_from_loc`, unlike `Loc::is_enclosing`).
+///
+/// The scaffolding-skip heuristic in `check` relies on a compiler invariant:
+/// synthesized bytecode instructions (merge labels, back-jumps, trailing `Ret`)
+/// inherit the `Loc` of their enclosing AST node rather than getting a distinct
+/// `Loc`. The filter detects such instructions by checking whether a dead
+/// instruction's `Loc` physically wraps a reachable instruction's `Loc`.
+/// If that compiler invariant ever changes, this heuristic will need updating.
 fn encloses_by_span(outer: &Loc, inner: &Loc) -> bool {
     outer.file_id() == inner.file_id()
         && inner.span().start() >= outer.span().start()

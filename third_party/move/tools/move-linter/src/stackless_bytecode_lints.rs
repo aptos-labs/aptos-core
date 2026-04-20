@@ -2,7 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module (and its submodules) contain various stackless-bytecode-based lint checks.
-//! Live variable analysis is a prerequisite for this lint processor.
+//!
+//! Prerequisite analyses (must be registered before the lint processor in the pipeline):
+//! - Live variable analysis.
+//! - Reachable state analysis.
+//!
+//! When adding a new lint check that depends on additional analyses, register
+//! those analyses as prerequisites and document them here.
+//!
 //! The lint checks also assume that all the correctness checks have already been performed.
 
 mod avoid_copy_on_identity_comparison;
