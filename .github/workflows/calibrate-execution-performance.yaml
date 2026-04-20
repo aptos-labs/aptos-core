@@ -68,3 +68,12 @@ jobs:
         run: |
           echo "### Calibration PR Created" >> $GITHUB_STEP_SUMMARY
           echo "- [View Pull Request](${{ steps.create-pr.outputs.pull-request-url }})" >> $GITHUB_STEP_SUMMARY
+
+      - name: Post calibration PR to Slack
+        if: ${{ steps.create-pr.outputs.pull-request-number }}
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
+        with:
+          webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "<!subteam^${{ vars.MOVE_ONCALL_SLACK_SUBTEAM_ID }}|move-current-oncall> :memo: Calibration PR opened: <${{ steps.create-pr.outputs.pull-request-url }}|#${{ steps.create-pr.outputs.pull-request-number }}>"
