@@ -80,6 +80,7 @@ mod dbtool_tests {
         storage::{local_fs::LocalFs, BackupStorage},
         utils::test_utils::start_local_backup_service,
     };
+    use aptos_backup_service::start_backup_service;
     use aptos_db::AptosDB;
     use aptos_executor_test_helpers::integration_test_impl::{
         test_execution_with_storage_impl, test_execution_with_storage_impl_inner,
@@ -87,13 +88,17 @@ mod dbtool_tests {
     use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
     use aptos_types::{
+        aggregate_signature::AggregateSignature,
+        ledger_info::LedgerInfoWithSignatures,
         state_store::state_key::{inner::StateKeyTag::AccessPath, prefix::StateKeyPrefix},
         transaction::Version,
+        waypoint::Waypoint,
     };
     use clap::Parser;
     use std::{
         default::Default,
         fs,
+        net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
         ops::Deref,
         path::{Path, PathBuf},
         sync::Arc,
@@ -276,6 +281,80 @@ mod dbtool_tests {
             .unwrap();
         assert_metadata_view_eq(&old_metaview, &new_metaview);
         rt.shutdown_timeout(Duration::from_secs(1));
+    }
+
+    fn run_bootstrap_db_restore(
+        rt: &Runtime,
+        backup_dir: &Path,
+        target_db_dir: &Path,
+        start: Version,
+        end: Version,
+        trusted_waypoints: &[Waypoint],
+    ) -> anyhow::Result<()> {
+        let mut restore_args = vec![
+            "aptos-db-tool".to_string(),
+            "restore".to_string(),
+            "bootstrap-db".to_string(),
+            "--ledger-history-start-version".to_string(),
+            start.to_string(),
+            "--target-version".to_string(),
+            end.to_string(),
+            "--target-db-dir".to_string(),
+            target_db_dir.to_str().unwrap().to_string(),
+            "--local-fs-dir".to_string(),
+            backup_dir.to_str().unwrap().to_string(),
+        ];
+        for waypoint in trusted_waypoints {
+            restore_args.push("--trust-waypoint".to_string());
+            restore_args.push(waypoint.to_string());
+        }
+        rt.block_on(DBTool::try_parse_from(restore_args).unwrap().run())
+    }
+
+    fn corrupt_epoch_ending_chunk(chunk_path: &Path, target_version: Version) {
+        let chunk_bytes = fs::read(chunk_path).unwrap();
+        let mut cursor = 0usize;
+        let mut restored = Vec::new();
+        let mut ledger_info_versions = Vec::new();
+        let mut corrupted = false;
+
+        while cursor < chunk_bytes.len() {
+            let record_len =
+                u32::from_be_bytes(chunk_bytes[cursor..cursor + 4].try_into().unwrap()) as usize;
+            cursor += 4;
+
+            let record = &chunk_bytes[cursor..cursor + record_len];
+            cursor += record_len;
+
+            let mut ledger_info: LedgerInfoWithSignatures = bcs::from_bytes(record).unwrap();
+            let version = ledger_info.ledger_info().version();
+            ledger_info_versions.push(version);
+            if version == target_version {
+                ledger_info = LedgerInfoWithSignatures::new(
+                    ledger_info.ledger_info().clone(),
+                    AggregateSignature::empty(),
+                );
+                corrupted = true;
+            }
+
+            let encoded = bcs::to_bytes(&ledger_info).unwrap();
+            restored.extend_from_slice(&(encoded.len() as u32).to_be_bytes());
+            restored.extend_from_slice(&encoded);
+        }
+
+        assert!(
+            corrupted,
+            "failed to corrupt ledger info at version {target_version}; chunk versions: {:?}",
+            ledger_info_versions
+        );
+        fs::write(chunk_path, restored).unwrap();
+    }
+
+    fn reserve_local_port() -> u16 {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        port
     }
 
     #[cfg(test)]
@@ -576,6 +655,127 @@ mod dbtool_tests {
 
         (rt, server_addr)
     }
+
+    #[test]
+    fn test_restore_db_with_trusted_waypoint_smoke() {
+        let backup_dir = TempPath::new();
+        backup_dir.create_as_dir().unwrap();
+        let old_db_dir = TempPath::new();
+        let source_db = test_execution_with_storage_impl_inner(false, old_db_dir.path());
+        let port = reserve_local_port();
+        let rt = start_backup_service(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port),
+            Arc::clone(&source_db),
+        );
+        let server_addr = format!(" http://localhost:{}", port);
+
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "backup",
+                "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
+                "epoch-ending",
+                "--start-epoch",
+                "0",
+                "--end-epoch",
+                "3",
+                "--local-fs-dir",
+                backup_dir.path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+
+        for epoch in ["0", "1", "2"] {
+            rt.block_on(
+                DBTool::try_parse_from([
+                    "aptos-db-tool",
+                    "backup",
+                    "oneoff",
+                    "--backup-service-address",
+                    server_addr.as_str(),
+                    "state-snapshot",
+                    "--state-snapshot-epoch",
+                    epoch,
+                    "--local-fs-dir",
+                    backup_dir.path().to_str().unwrap(),
+                ])
+                .unwrap()
+                .run(),
+            )
+            .unwrap();
+        }
+
+        for (start_version, num_transactions) in [("0", "15"), ("15", "15")] {
+            rt.block_on(
+                DBTool::try_parse_from([
+                    "aptos-db-tool",
+                    "backup",
+                    "oneoff",
+                    "--backup-service-address",
+                    server_addr.as_str(),
+                    "transaction",
+                    "--start-version",
+                    start_version,
+                    "--num_transactions",
+                    num_transactions,
+                    "--local-fs-dir",
+                    backup_dir.path().to_str().unwrap(),
+                ])
+                .unwrap()
+                .run(),
+            )
+            .unwrap();
+        }
+
+        let epoch_change_proof = source_db.get_epoch_ending_ledger_infos(2, 3).unwrap();
+        let trusted_waypoint =
+            Waypoint::new_epoch_boundary(epoch_change_proof.ledger_info_with_sigs[0].ledger_info())
+                .unwrap();
+
+        let epoch_backup_handle = fs::read_dir(backup_dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.is_dir()
+                    && path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.starts_with("epoch_ending_0-"))
+            })
+            .expect("missing epoch ending backup");
+        let chunk_path = epoch_backup_handle.join("0-.chunk");
+        corrupt_epoch_ending_chunk(&chunk_path, 11);
+
+        let failing_db_dir = TempPath::new();
+        failing_db_dir.create_as_dir().unwrap();
+        assert!(
+            run_bootstrap_db_restore(&rt, backup_dir.path(), failing_db_dir.path(), 16, 16, &[],)
+                .is_err(),
+            "restore should fail when an earlier epoch ending LI is unverifiable",
+        );
+
+        let restored_db_dir = TempPath::new();
+        restored_db_dir.create_as_dir().unwrap();
+        run_bootstrap_db_restore(
+            &rt,
+            backup_dir.path(),
+            restored_db_dir.path(),
+            16,
+            16,
+            &[trusted_waypoint],
+        )
+        .unwrap();
+
+        let restored_db = AptosDB::new_for_test(restored_db_dir.path());
+        assert_eq!(restored_db.get_latest_ledger_info_version().unwrap(), 16);
+
+        rt.shutdown_timeout(Duration::from_secs(1));
+    }
+
     #[test]
     fn test_restore_db_with_replay() {
         let backup_dir = TempPath::new();
