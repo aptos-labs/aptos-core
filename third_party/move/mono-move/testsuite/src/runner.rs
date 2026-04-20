@@ -58,10 +58,11 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
                     storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
 
                     // V2 path.
-                    let id = guard.intern_address_name(module.self_addr(), module.self_name());
                     let executable = mono_move_orchestrator::build_executable(&guard, module)
                         .map_err(|err| anyhow!("Failed to build executable: {}", err))?;
-                    guard.insert_executable(id, executable);
+                    guard
+                        .insert_executable(executable)
+                        .map_err(|err| anyhow!("Failed to insert executable: {}", err))?;
                 }
             },
             Step::Execute {

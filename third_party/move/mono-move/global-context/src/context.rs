@@ -36,7 +36,7 @@ use crate::maintenance_config::MaintenanceConfig;
 use anyhow::{bail, Result};
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::{types::StructLayout, ExecutableId};
+use mono_move_core::{types::StructLayout, ExecutableId, ExecutableSlot};
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
@@ -289,22 +289,27 @@ impl<'ctx> MaintenanceGuard<'ctx> {
 
 impl<'ctx> ExecutionGuard<'ctx> {
     /// Inserts a loaded executable into the cache, keyed by its interned ID.
+    ///
+    /// Returns an error only if the cache detects an invariant violation
+    /// during install. Under normal operation this method always returns
+    /// `Ok`.
     pub fn insert_executable<'guard>(
         &'guard self,
-        key: ArenaRef<'guard, ExecutableId>,
         executable: Box<Executable>,
-    ) -> &'guard Executable {
-        // TODO: use ID stored inside executable instead.
+    ) -> anyhow::Result<&'guard Executable>
+    where
+        'ctx: 'guard,
+    {
         let ptr = self
             .ctx
             .executable_cache
-            .insert(key.into_global_arena_ptr(), executable);
+            .insert(executable.id(), executable)?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
         // the execution phase (guard is alive). If the executable was already
         // in the cache, it is also alive (maintenance has not reset caches).
-        unsafe { ptr.as_ref_unchecked() }
+        Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
     /// Looks up a cached executable by its interned ID and returns a reference
@@ -322,6 +327,31 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // and can only be freed during the maintenance phase, while we are in
         // the execution phase (guard is alive).
         Some(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// Returns the stable slot for `key`, creating an empty one if absent.
+    /// The returned pointer is valid for the cache's lifetime. Takes a
+    /// shard write lock on the create path.
+    pub fn get_or_create_slot<'guard>(
+        &'guard self,
+        key: ArenaRef<'guard, ExecutableId>,
+    ) -> ExecutableSlot {
+        self.ctx
+            .executable_cache
+            .get_or_create_slot(key.into_global_arena_ptr())
+    }
+
+    /// Wraps an [`Executable::id`] pointer in a guard-scoped [`ArenaRef`],
+    /// matching the key shape used by the executable cache.
+    pub fn arena_ref_for_executable_id<'guard>(
+        &'guard self,
+        ptr: GlobalArenaPtr<ExecutableId>,
+    ) -> ArenaRef<'guard, ExecutableId>
+    where
+        'ctx: 'guard,
+    {
+        // SAFETY: interned ids are alive for the entire execution phase.
+        unsafe { self.arena_ref(ptr) }
     }
 
     // ====================================================================

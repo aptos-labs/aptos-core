@@ -74,4 +74,4 @@ mod leaked;
 
 pub use executable_arena::{ExecutableArena, ExecutableArenaPtr};
 pub use global_arena::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-pub use leaked::LeakedBoxPtr;
+pub use leaked::{LeakedBoxPtr, VersionedLeakedBoxPtr};

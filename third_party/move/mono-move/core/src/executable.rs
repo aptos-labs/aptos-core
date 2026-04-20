@@ -5,10 +5,13 @@ use crate::{
     types::{InternedType, Type},
     Function,
 };
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_alloc::{
+    ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr, LeakedBoxPtr, VersionedLeakedBoxPtr,
+};
 use move_core_types::account_address::AccountAddress;
 use parking_lot::Mutex;
 use shared_dsa::UnorderedMap;
+use std::sync::{Arc, OnceLock};
 
 /// Identifies an executable (module or script) by its address and name.
 ///   - For modules, constructed from module address and name.
@@ -40,6 +43,69 @@ impl ExecutableId {
     /// Returns the arena pointer to the name.
     pub fn name(&self) -> GlobalArenaPtr<str> {
         self.name
+    }
+}
+
+// ================================================================================================
+// Executable cache slot and mandatory dependencies
+// ================================================================================================
+
+/// Stable slot pointer for an executable in the cache. May be empty if the
+/// executable has not yet been cached.
+pub type ExecutableSlot = LeakedBoxPtr<VersionedLeakedBoxPtr<Executable>>;
+
+/// What a loaded executable says about its mandatory dependencies, keyed by
+/// the loading policy that built it. Always excludes self.
+pub enum MandatoryDependencies {
+    /// This executable has been loaded lazily. There are no mandatory
+    /// dependencies.
+    None,
+    /// This executable has been loaded under package policy. The list includes
+    /// every other member of the executable's package; together with self they
+    /// form a package bundle.
+    Package(Arc<[ExecutableSlot]>),
+    /// This executable has been loaded under lazy policy with transitive
+    /// structs. The inner value is **not set** when the executable was loaded
+    /// as a sub-member of another executable's closure (its own closure was
+    /// not computed). It is **set once** when the executable is loaded as a
+    /// target and its transitive-struct closure is computed.
+    TransitiveStructClosure(OnceLock<Box<[ExecutableSlot]>>),
+}
+
+impl MandatoryDependencies {
+    pub fn transitive_unset() -> Self {
+        Self::TransitiveStructClosure(OnceLock::new())
+    }
+
+    pub fn transitive_from_slots(slots: Box<[ExecutableSlot]>) -> Self {
+        let cell = OnceLock::new();
+        let _ = cell.set(slots);
+        Self::TransitiveStructClosure(cell)
+    }
+
+    /// Slots of the other modules this executable pins. Returns
+    /// [`Some`] for `None`/`Package` (the slice is always known), and for
+    /// `TransitiveStructClosure` only once the closure has been computed.
+    /// Returns [`None`] for a `TransitiveStructClosure` whose closure has
+    /// not yet been filled in — callers must compute it and call
+    /// [`MandatoryDependencies::set_struct_closure`] before using it.
+    pub fn slots(&self) -> Option<&[ExecutableSlot]> {
+        match self {
+            Self::None => Some(&[]),
+            Self::Package(slots) => Some(slots),
+            Self::TransitiveStructClosure(cell) => cell.get().map(|boxed| &boxed[..]),
+        }
+    }
+
+    /// Installs the closure on a `TransitiveStructClosure` variant. No-op
+    /// if already set, or if the variant is `None` / `Package`. Since
+    /// struct-def closures are a deterministic function of the module's
+    /// bytecode, any two concurrent computers produce identical slot
+    /// lists, so losers on a race drop their value on the floor.
+    pub fn set_struct_closure(&self, slots: Box<[ExecutableSlot]>) {
+        if let Self::TransitiveStructClosure(cell) = self {
+            let _ = cell.set(slots);
+        }
     }
 }
 
@@ -116,6 +182,12 @@ pub struct Executable {
 struct ExecutableData {
     /// Executable ID which uniquely identifies this executable.
     id: GlobalArenaPtr<ExecutableId>,
+    /// Deterministic load cost for this executable.
+    cost: u64,
+    /// Slots of every other module in this executable's mandatory-dependency
+    /// set. Slots are aliases of the leaked-box slots owned by the cache;
+    /// dropping these aliases does not free any slot.
+    mandatory_dependencies: MandatoryDependencies,
     /// Non-generic struct definitions.
     structs: UnorderedMap<GlobalArenaPtr<str>, StructType>,
     /// Non-generic enum definitions.
@@ -136,6 +208,8 @@ impl Executable {
     // pointers backed by a different arena.
     pub fn new(
         id: GlobalArenaPtr<ExecutableId>,
+        cost: u64,
+        mandatory_dependencies: MandatoryDependencies,
         structs: UnorderedMap<GlobalArenaPtr<str>, StructType>,
         enums: UnorderedMap<GlobalArenaPtr<str>, EnumType>,
         functions: UnorderedMap<GlobalArenaPtr<str>, ExecutableArenaPtr<Function>>,
@@ -144,6 +218,8 @@ impl Executable {
         Box::new(Self {
             data: ExecutableData {
                 id,
+                cost,
+                mandatory_dependencies,
                 structs,
                 enums,
                 functions,
@@ -174,5 +250,16 @@ impl Executable {
     /// Returns the executable ID pointer.
     pub fn id(&self) -> GlobalArenaPtr<ExecutableId> {
         self.data.id
+    }
+
+    /// Returns the deterministic load cost for this executable.
+    pub fn cost(&self) -> u64 {
+        self.data.cost
+    }
+
+    /// Returns the slots of every other module in this executable's
+    /// mandatory dependencies.
+    pub fn mandatory_dependencies(&self) -> &MandatoryDependencies {
+        &self.data.mandatory_dependencies
     }
 }

@@ -18,8 +18,9 @@ fn add_executable<'guard>(guard: &'guard ExecutionGuard<'_>, source: &str) -> &'
     let executable = mono_move_orchestrator::build_executable(guard, &module)
         .expect("Building an executable should always succeed");
 
-    let id = guard.intern_address_name(module.self_addr(), module.self_name());
-    guard.insert_executable(id, executable)
+    guard
+        .insert_executable(executable)
+        .expect("insert should succeed")
 }
 
 #[test]

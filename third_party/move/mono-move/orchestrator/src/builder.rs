@@ -12,8 +12,8 @@ use anyhow::{anyhow, bail};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     types::{align_up, EMPTY_TYPE_LIST},
-    EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp, SortedSafePointEntries,
-    StructType, VariantFields,
+    EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MandatoryDependencies, MicroOp,
+    SortedSafePointEntries, StructType, VariantFields,
 };
 use mono_move_global_context::{
     struct_info_at, walk_sig_token, ExecutionGuard, FieldLayout, InternedType, StructResolver,
@@ -41,6 +41,10 @@ pub struct ExecutableBuilder<'a, 'guard, 'ctx> {
 
     /// Executable ID.
     id: GlobalArenaPtr<ExecutableId>,
+    /// Deterministic load cost recorded on the built executable.
+    cost: u64,
+    /// Mandatory-dependency descriptor recorded on the built executable.
+    mandatory_dependencies: MandatoryDependencies,
     /// Non-generic struct definitions being built.
     structs: UnorderedMap<GlobalArenaPtr<str>, StructType>,
     /// Non-generic enum definitions being built.
@@ -78,6 +82,8 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             module,
             struct_def_idx,
             id,
+            cost: 0,
+            mandatory_dependencies: MandatoryDependencies::None,
             structs: UnorderedMap::new(),
             enums: UnorderedMap::new(),
             functions: UnorderedMap::new(),
@@ -85,6 +91,19 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             arena: ExecutableArena::new(),
             guard,
         }
+    }
+
+    /// Sets the deterministic load cost for the built executable.
+    pub fn with_cost(mut self, cost: u64) -> Self {
+        self.cost = cost;
+        self
+    }
+
+    /// Sets the mandatory-dependency descriptor for the built executable.
+    /// The contained slots must exclude this executable's own slot.
+    pub fn with_mandatory_dependencies(mut self, deps: MandatoryDependencies) -> Self {
+        self.mandatory_dependencies = deps;
+        self
     }
 
     /// Resolve all struct and enum type definitions in the module.
@@ -153,6 +172,20 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         self.func_ptrs[lowered.handle_idx.0 as usize] = Some(ptr);
     }
 
+    /// Runs the full build pipeline (resolve types → run specializer → add
+    /// every lowered function → finish). Use this when callers don't need to
+    /// interleave additional work between stages.
+    pub fn build(mut self) -> anyhow::Result<Box<Executable>> {
+        self.resolve_types()?;
+        let struct_types = self.struct_type_table();
+        let lowered =
+            specializer::destack_and_lower_module(self.module.clone(), self.guard, &struct_types)?;
+        for lowered_fn in lowered.functions {
+            self.add_function(lowered_fn);
+        }
+        self.finish()
+    }
+
     /// Finishes building the executable. Call after every function definition
     /// has been recorded via `add_function`.
     pub fn finish(self) -> anyhow::Result<Box<Executable>> {
@@ -160,6 +193,8 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
 
         Ok(Executable::new(
             self.id,
+            self.cost,
+            self.mandatory_dependencies,
             self.structs,
             self.enums,
             self.functions,

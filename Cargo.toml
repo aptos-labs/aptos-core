@@ -211,6 +211,7 @@ members = [
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/gas",
     "third_party/move/mono-move/global-context",
+    "third_party/move/mono-move/loader",
     "third_party/move/mono-move/orchestrator",
     "third_party/move/mono-move/programs",
     "third_party/move/mono-move/runtime",
@@ -887,6 +888,7 @@ mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-gas = { path = "third_party/move/mono-move/gas" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
+mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-programs = { path = "third_party/move/mono-move/programs" }
 mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 mono-move-testsuite = { path = "third_party/move/mono-move/testsuite" }

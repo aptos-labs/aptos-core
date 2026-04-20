@@ -22,14 +22,5 @@ pub fn build_executable(
     guard: &ExecutionGuard<'_>,
     module: &CompiledModule,
 ) -> Result<Box<Executable>> {
-    let mut builder = ExecutableBuilder::new(guard, module);
-    builder.resolve_types()?;
-    let struct_types = builder.struct_type_table();
-    let lowered = specializer::destack_and_lower_module(module.clone(), guard, &struct_types)?;
-
-    for lowered_fn in lowered.functions {
-        builder.add_function(lowered_fn);
-    }
-
-    builder.finish()
+    ExecutableBuilder::new(guard, module).build()
 }
