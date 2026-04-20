@@ -73,7 +73,7 @@ module 0x66::calculator {
         aborts_if [inferred] (State[address_of_0] is Empty) && (input is Add | Sub);
         aborts_if [inferred] (input is Add | Sub) && (State[address_of_0] is Empty);
         aborts_if [inferred] !exists<State>(address_of_0);
-        aborts_if [inferred] aborts_of<0x1::signer::address_of>(s);
+        aborts_if [inferred] aborts_of<signer::address_of>(s);
     }
 
 
@@ -121,8 +121,8 @@ module 0x66::calculator {
         use 0x1::signer;
         pragma opaque = true;
         modifies State[signer::address_of(s)];
-        ensures [inferred] ensures_of<0x66::calculator::process>(s, Input::Number(x));
-        aborts_if [inferred] aborts_of<0x66::calculator::process>(s, Input::Number(x));
+        ensures [inferred] ensures_of<process>(s, Input::Number(x));
+        aborts_if [inferred] aborts_of<process>(s, Input::Number(x));
     } proof {
         split State[address_of(s)];
     }
@@ -134,8 +134,8 @@ module 0x66::calculator {
         use 0x1::signer;
         pragma opaque = true;
         modifies State[signer::address_of(s)];
-        ensures [inferred] ensures_of<0x66::calculator::process>(s, Input::Add{});
-        aborts_if [inferred] aborts_of<0x66::calculator::process>(s, Input::Add{});
+        ensures [inferred] ensures_of<process>(s, Input::Add{});
+        aborts_if [inferred] aborts_of<process>(s, Input::Add{});
     }
 
 
@@ -146,8 +146,8 @@ module 0x66::calculator {
         use 0x1::signer;
         pragma opaque = true;
         modifies State[signer::address_of(s)];
-        ensures [inferred] ensures_of<0x66::calculator::process>(s, Input::Sub{});
-        aborts_if [inferred] aborts_of<0x66::calculator::process>(s, Input::Sub{});
+        ensures [inferred] ensures_of<process>(s, Input::Sub{});
+        aborts_if [inferred] aborts_of<process>(s, Input::Sub{});
     }
 
 
@@ -164,7 +164,7 @@ module 0x66::calculator {
         ensures [inferred] result == State[address_of_0].Value.0;
         aborts_if [inferred] State[address_of_0] is Empty | Continuation;
         aborts_if [inferred] !exists<State>(address_of_0);
-        aborts_if [inferred] aborts_of<0x1::signer::address_of>(s);
+        aborts_if [inferred] aborts_of<signer::address_of>(s);
     }
 
 }

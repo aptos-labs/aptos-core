@@ -658,6 +658,7 @@ impl<'env> BoogieTranslator<'env> {
                 fun_param_infos,
                 struct_field_infos,
                 &translated_memory,
+                &mono_info,
             )
         }
 
@@ -681,6 +682,7 @@ impl<'env> BoogieTranslator<'env> {
         fun_param_infos: &BTreeSet<FunParamInfo>,
         struct_field_infos: &BTreeSet<StructFieldInfo>,
         memory: &[(QualifiedInstId<StructId>, String)],
+        mono_info: &mono_analysis::MonoInfo,
     ) {
         emitln!(
             self.writer,
@@ -980,7 +982,12 @@ impl<'env> BoogieTranslator<'env> {
             } else {
                 format!("{result_str} := ")
             };
-            if fun_env.is_opaque() {
+            let has_inline = mono_info
+                .funs
+                .get(&(info.fun.to_qualified_id(), FunctionVariant::Baseline))
+                .map(|insts| !insts.is_empty())
+                .unwrap_or(false);
+            if fun_env.is_opaque() || !has_inline {
                 self.emit_opaque_closure_body(
                     info,
                     fun_env,
@@ -1658,10 +1665,10 @@ impl<'env> BoogieTranslator<'env> {
         }
 
         // Assume ensures_of with post-state args and result values
-        let ensures_args = if ensures_result_args.is_empty() {
-            result_bp_args.clone()
-        } else {
-            format!("{}, {}", result_bp_args, ensures_result_args.join(", "))
+        let ensures_args = match (result_bp_args.is_empty(), ensures_result_args.is_empty()) {
+            (_, true) => result_bp_args.clone(),
+            (true, false) => ensures_result_args.join(", "),
+            (false, false) => format!("{}, {}", result_bp_args, ensures_result_args.join(", ")),
         };
         emitln!(self.writer, "assume {}({});", ensures_name, ensures_args);
 
@@ -2279,20 +2286,22 @@ impl<'env> BoogieTranslator<'env> {
                 );
 
                 // Connecting axiom: result_fun satisfies ensures_of
-                let ensures_of_with_result = format!(
-                    "{}({}, {}({}))",
-                    ensures_fun_name,
-                    all_input_arg_names.join(", "),
-                    result_fun_name,
-                    input_args_str
-                );
-                emitln!(
-                    self.writer,
-                    "axiom (forall {} :: {{{}}} {});",
-                    input_param_decls.join(", "),
-                    result_fun_app,
-                    ensures_of_with_result
-                );
+                let ensures_of_with_result = {
+                    let mut call_args = all_input_arg_names.clone();
+                    call_args.push(format!("{}({})", result_fun_name, input_args_str));
+                    format!("{}({})", ensures_fun_name, call_args.join(", "))
+                };
+                if input_param_decls.is_empty() {
+                    emitln!(self.writer, "axiom {};", ensures_of_with_result);
+                } else {
+                    emitln!(
+                        self.writer,
+                        "axiom (forall {} :: {{{}}} {});",
+                        input_param_decls.join(", "),
+                        result_fun_app,
+                        ensures_of_with_result
+                    );
+                }
             } else if all_result_types.len() >= 2 {
                 // Multiple results: generate tuple-returning result function
                 let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, true);
@@ -2337,21 +2346,28 @@ impl<'env> BoogieTranslator<'env> {
                 let tuple_projections: Vec<String> = (0..all_result_types.len())
                     .map(|i| format!("_r->${}", i))
                     .collect();
-                let ensures_of_with_result = format!(
-                    "(var _r := {}({}); {}({}, {}))",
-                    result_fun_name,
-                    input_args_str,
-                    ensures_fun_name,
-                    all_input_arg_names.join(", "),
-                    tuple_projections.join(", ")
-                );
-                emitln!(
-                    self.writer,
-                    "axiom (forall {} :: {{{}}} {});",
-                    input_param_decls.join(", "),
-                    result_fun_app,
-                    ensures_of_with_result
-                );
+                let ensures_of_with_result = {
+                    let mut call_args = all_input_arg_names.clone();
+                    call_args.extend(tuple_projections);
+                    format!(
+                        "(var _r := {}({}); {}({}))",
+                        result_fun_name,
+                        input_args_str,
+                        ensures_fun_name,
+                        call_args.join(", ")
+                    )
+                };
+                if input_param_decls.is_empty() {
+                    emitln!(self.writer, "axiom {};", ensures_of_with_result);
+                } else {
+                    emitln!(
+                        self.writer,
+                        "axiom (forall {} :: {{{}}} {});",
+                        input_param_decls.join(", "),
+                        result_fun_app,
+                        ensures_of_with_result
+                    );
+                }
             } else {
                 // No return values: still translate ensures body for state-change conditions
                 let ensures_body = self.translate_fun_spec_conditions(
@@ -2930,6 +2946,7 @@ impl<'env> BoogieTranslator<'env> {
     fn behavioral_output_types(params: &[Type], results: &[Type]) -> Vec<Type> {
         let mut outputs = results
             .iter()
+            // Strip ALL references from results — spec predicates work on values, not refs.
             .map(|ty| ty.skip_reference().clone())
             .collect::<Vec<_>>();
         outputs.extend(
@@ -3000,14 +3017,18 @@ impl<'env> BoogieTranslator<'env> {
         let result_ty_for_validity = result_ty.skip_reference();
         let result_validity =
             boogie_well_formed_expr(self.env, result_fun_app, result_ty_for_validity, false);
-        emitln!(
-            self.writer,
-            "axiom (forall {} :: {{{}}} {} ==> {});",
-            input_param_decls.join(", "),
-            result_fun_app,
-            precond,
-            result_validity
-        );
+        if input_param_decls.is_empty() {
+            emitln!(self.writer, "axiom {} ==> {};", precond, result_validity);
+        } else {
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} {} ==> {});",
+                input_param_decls.join(", "),
+                result_fun_app,
+                precond,
+                result_validity
+            );
+        }
     }
 
     /// Emit a tuple-result validity axiom:
@@ -3029,14 +3050,18 @@ impl<'env> BoogieTranslator<'env> {
             result_fun_app,
             result_validities.join(" && ")
         );
-        emitln!(
-            self.writer,
-            "axiom (forall {} :: {{{}}} {} ==> {});",
-            input_param_decls.join(", "),
-            result_fun_app,
-            precond,
-            result_validity
-        );
+        if input_param_decls.is_empty() {
+            emitln!(self.writer, "axiom {} ==> {};", precond, result_validity);
+        } else {
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} {} ==> {});",
+                input_param_decls.join(", "),
+                result_fun_app,
+                precond,
+                result_validity
+            );
+        }
     }
 
     /// Generate uninterpreted spec functions for behavioral predicates on function-typed parameters.

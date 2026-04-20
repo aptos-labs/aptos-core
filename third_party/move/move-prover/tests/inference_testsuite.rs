@@ -46,7 +46,17 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
         .path()
         .join(path.with_extension("enriched.move").file_name().unwrap());
 
-    let mut inf_options = make_options(path)?;
+    // If a companion .spec.move exists next to the source, include it in both
+    // the inference and verification steps.  This exercises Bug 8b: output_unified
+    // must check file_id before using a spec block's byte position.
+    let companion_spec = path.with_extension("spec.move");
+    let extra_sources: Vec<PathBuf> = if companion_spec.exists() {
+        vec![companion_spec]
+    } else {
+        vec![]
+    };
+
+    let mut inf_options = make_options(path, &extra_sources)?;
     inf_options.inference = InferenceOptions {
         inference: true,
         inference_output: InferenceOutput::Unified,
@@ -107,7 +117,7 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
     let verify_result = (|| -> anyhow::Result<()> {
         let no_tools = read_env_var("BOOGIE_EXE").is_empty() || read_env_var("Z3_EXE").is_empty();
 
-        let mut verify_options = make_options(verify_source)?;
+        let mut verify_options = make_options(verify_source, &extra_sources)?;
         verify_options.setup_logging_for_test();
         verify_options.prover.stable_test_output = true;
         verify_options.backend.stable_test_output = true;
@@ -161,7 +171,8 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Build prover `Options` for the given Move source.
-fn make_options(path: &Path) -> anyhow::Result<Options> {
+/// `extra_sources` lists additional source files (e.g. companion `.spec.move`) to include.
+fn make_options(path: &Path, extra_sources: &[PathBuf]) -> anyhow::Result<Options> {
     let temp_dir = tempfile::TempDir::new()?;
     std::fs::create_dir_all(temp_dir.path())?;
     let base_name = format!("{}.bpl", path.file_stem().unwrap().to_str().unwrap());
@@ -193,8 +204,11 @@ fn make_options(path: &Path) -> anyhow::Result<Options> {
     // Add flags specified in the source via `// flag:` directives.
     flags.extend(extract_test_directives(path, "// flag:")?);
 
-    // The source file itself.
+    // The source file itself, then any extra sources (e.g. companion .spec.move).
     flags.push(path.to_string_lossy().to_string());
+    for src in extra_sources {
+        flags.push(src.to_string_lossy().to_string());
+    }
 
     let mut options = Options::create_from_args(&flags)?;
     options.language_version = Some(LanguageVersion::latest());

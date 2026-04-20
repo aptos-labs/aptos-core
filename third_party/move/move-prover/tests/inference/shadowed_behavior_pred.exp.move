@@ -39,11 +39,28 @@ module 0x42::shadowed_behavior_pred {
     spec do_set {
         let set_value = 0u64; // shadows the function 'set_value'
         pragma opaque = true;
-        ensures [inferred] s == result_of<0x42::shadowed_behavior_pred::set_value>(old(s), v);
-        ensures [inferred] ensures_of<0x42::shadowed_behavior_pred::set_value>(old(s), v, result_of<0x42::shadowed_behavior_pred::set_value>(old(s), v));
-        aborts_if [inferred] aborts_of<0x42::shadowed_behavior_pred::set_value>(s, v);
+        ensures [inferred] s == result_of<set_value>(old(s), v);
+        ensures [inferred] ensures_of<set_value>(old(s), v, result_of<set_value>(old(s), v));
+        aborts_if [inferred] aborts_of<set_value>(s, v);
     }
 }
 /*
-Verification: Succeeded.
+Verification: exiting with compilation errors
+error: behavior predicate target must have function type, found `u64`
+   ┌─ shadowed_behavior_pred.enriched.move:42:33
+   │
+42 │         ensures [inferred] s == result_of<set_value>(old(s), v);
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavior predicate target must have function type, found `u64`
+   ┌─ shadowed_behavior_pred.enriched.move:43:28
+   │
+43 │         ensures [inferred] ensures_of<set_value>(old(s), v, result_of<set_value>(old(s), v));
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavior predicate target must have function type, found `u64`
+   ┌─ shadowed_behavior_pred.enriched.move:44:30
+   │
+44 │         aborts_if [inferred] aborts_of<set_value>(s, v);
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
 */

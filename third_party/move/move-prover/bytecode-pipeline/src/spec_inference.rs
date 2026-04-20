@@ -114,6 +114,7 @@ use move_model::{
         CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD, CONDITION_INFERRED_VACUOUS,
         INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
+    pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     sourcifier::Sourcifier,
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
@@ -3719,6 +3720,10 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         {
             return None;
         }
+        // Must have an associated spec function with a body and no memory use.
+        // `spec_rewriter` removes the body (`body = None`) for any spec function that
+        // contains imperative expressions (Loop, Assign, Mutate, Return, LoopCont), so
+        // a callee whose spec fun has side-effects or a while-loop body is rejected here.
         let (spec_fun_id, decl) = callee.find_spec_fun()?;
         // Non-native functions without a derived body cannot be expressed as a
         // spec call — typical of effectful operations like `move_to`/`move_from`.
@@ -3730,6 +3735,23 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         // Must not access global memory.
         if !decl.used_memory.is_empty() {
             return None;
+        }
+        // Additionally check the Move function body for specification-mode purity:
+        // no Assign, Return, uninitialized let, or mutable borrows.
+        // `FunctionPurenessChecker` traverses all sub-expressions including those
+        // nested inside Loop nodes, so a while-loop body containing Assign is caught.
+        if let Some(def) = callee.get_def() {
+            let mut is_pure = true;
+            let mut checker = FunctionPurenessChecker::new(
+                FunctionPurenessCheckerMode::Specification,
+                |_, _, _| {
+                    is_pure = false;
+                },
+            );
+            checker.check_exp(self.global_env(), def);
+            if !is_pure {
+                return None;
+            }
         }
         let result_type = callee.get_result_type().instantiate(type_inst);
         Some((spec_fun_id, result_type))

@@ -43,11 +43,11 @@ module 0x42::sequential_mutation {
     }
     spec add_twice(c: &mut Counter, a: u64, b: u64) {
         pragma opaque = true;
-        ensures [inferred] S1.. |~ c == result_of<0x42::sequential_mutation::add_amount>(..S1 |~ result_of<0x42::sequential_mutation::add_amount>(old(c), a), b);
-        ensures [inferred] S1.. |~ ensures_of<0x42::sequential_mutation::add_amount>(..S1 |~ result_of<0x42::sequential_mutation::add_amount>(old(c), a), b, S1.. |~ result_of<0x42::sequential_mutation::add_amount>(result_of<0x42::sequential_mutation::add_amount>(old(c), a), b));
-        ensures [inferred] ..S1 |~ ensures_of<0x42::sequential_mutation::add_amount>(old(c), a, ..S1 |~ result_of<0x42::sequential_mutation::add_amount>(old(c), a));
-        aborts_if [inferred] S1 |~ aborts_of<0x42::sequential_mutation::add_amount>(..S1 |~ result_of<0x42::sequential_mutation::add_amount>(c, a), b);
-        aborts_if [inferred] aborts_of<0x42::sequential_mutation::add_amount>(c, a);
+        ensures [inferred] S1.. |~ c == result_of<add_amount>(..S1 |~ result_of<add_amount>(old(c), a), b);
+        ensures [inferred] S1.. |~ ensures_of<add_amount>(..S1 |~ result_of<add_amount>(old(c), a), b, S1.. |~ result_of<add_amount>(result_of<add_amount>(old(c), a), b));
+        ensures [inferred] ..S1 |~ ensures_of<add_amount>(old(c), a, ..S1 |~ result_of<add_amount>(old(c), a));
+        aborts_if [inferred] S1 |~ aborts_of<add_amount>(..S1 |~ result_of<add_amount>(c, a), b);
+        aborts_if [inferred] aborts_of<add_amount>(c, a);
     }
 
 }

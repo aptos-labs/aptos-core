@@ -6304,14 +6304,29 @@ impl ExpTranslator<'_, '_, '_> {
     ) -> Vec<Type> {
         match kind {
             BehaviorKind::RequiresOf | BehaviorKind::AbortsOf | BehaviorKind::ResultOf => {
-                // requires_of, aborts_of, and result_of take only input parameters
-                arg_ty.clone().flatten()
+                // requires_of, aborts_of, and result_of take the VALUES of input parameters.
+                // In spec language, references are transparent: a caller writing
+                // `result_of<f>(self.shares, shareholder)` passes value-typed expressions
+                // regardless of whether `f` declares `&T` or `&mut T` params. Strip all
+                // reference wrappers so the expected type for each arg slot is the value type T.
+                arg_ty
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .map(|ty| ty.skip_reference().clone())
+                    .collect()
             },
             BehaviorKind::EnsuresOf => {
-                // ensures_of takes input parameters + result + modified mut ref values
-                let mut types = arg_ty.clone().flatten();
+                // ensures_of takes the VALUES of input parameters + result + modified mut ref values.
+                // Input param expected types: strip all references (same rationale as above).
+                let mut types: Vec<Type> = arg_ty
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .map(|ty| ty.skip_reference().clone())
+                    .collect();
                 types.extend(result_ty.clone().flatten());
-                // Add mutable reference parameters as outputs (their modified values)
+                // Add mutable reference parameters as outputs (their post-state values).
                 for ty in arg_ty.clone().flatten() {
                     if ty.is_mutable_reference() {
                         types.push(ty.skip_reference().clone());

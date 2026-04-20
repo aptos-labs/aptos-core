@@ -343,12 +343,9 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                 .lines()
                 .filter_map(|line| {
                     let trimmed = line.trim();
-                    trimmed.strip_prefix("use ").and_then(|rest| {
-                        rest.trim_end_matches(';')
-                            .rsplit("::")
-                            .next()
-                            .map(str::to_string)
-                    })
+                    trimmed
+                        .strip_prefix("use ")
+                        .map(|rest| use_decl_module_path(rest.trim_end_matches(';').trim()))
                 })
                 .collect();
 
@@ -462,7 +459,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                     let spec_text = generate_full_spec_block(env, &fun, inferred_sym, indent);
                     // Filter duplicate `use` declarations from the new spec block
                     // using the same tracking set as existing-block insertions.
-                    let filtered_spec: String = spec_text
+                    let mut filtered_spec: String = spec_text
                         .lines()
                         .filter(|line| {
                             let trimmed = line.trim();
@@ -475,6 +472,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                         })
                         .collect::<Vec<_>>()
                         .join("\n");
+                    filtered_spec.push('\n');
                     insertions.push((insert_pos, format!("{}\n", filtered_spec)));
                 }
             }
@@ -820,8 +818,29 @@ fn filter_redundant_uses(source: &str, use_text: &str) -> String {
 
 /// Filter `use_text` to only include `use` lines whose module names have not
 /// been seen before, then record those new module names in `seen`. This
-/// prevents duplicate `use` declarations when the same module is referenced
-/// from multiple function spec blocks in the same spec file.
+/// Normalise a `use` declaration's path to a canonical dedup key.
+/// Strips any alias (`… as Foo`) and brace-group (`…::{Self, Bar}`),
+/// returning the bare module path (e.g. `"0x1::signer"` or `"0x2::utils"`).
+fn use_decl_module_path(path: &str) -> String {
+    // Strip alias suffix: "0x1::foo as F" → "0x1::foo"
+    let path = if let Some(pos) = path.find(" as ") {
+        path[..pos].trim()
+    } else {
+        path
+    };
+    // Strip brace-group suffix: "0x1::foo::{Self, Bar}" → "0x1::foo"
+    let path = if let Some(pos) = path.find("::{") {
+        path[..pos].trim()
+    } else {
+        path
+    };
+    path.to_string()
+}
+
+/// Filter `use` lines in `use_text` that are already present in `seen`,
+/// adding newly emitted ones to `seen` so later blocks don't repeat them.
+/// Uses the full module path as the dedup key so distinct modules that share
+/// only a leaf name (e.g. `0x1::utils` vs `0x2::utils`) are kept separate.
 fn filter_new_uses(use_text: &str, seen: &mut std::collections::BTreeSet<String>) -> String {
     if use_text.is_empty() {
         return String::new();
@@ -831,10 +850,9 @@ fn filter_new_uses(use_text: &str, seen: &mut std::collections::BTreeSet<String>
         .filter(|line| {
             let trimmed = line.trim();
             if let Some(rest) = trimmed.strip_prefix("use ") {
-                if let Some(module_name) = rest.trim_end_matches(';').rsplit("::").next() {
-                    // `insert` returns true if the module was not already present.
-                    return seen.insert(module_name.to_string());
-                }
+                let key = use_decl_module_path(rest.trim_end_matches(';').trim());
+                // `insert` returns true if the key was not already present.
+                return seen.insert(key);
             }
             true
         })
