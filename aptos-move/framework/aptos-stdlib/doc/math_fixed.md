@@ -18,7 +18,6 @@ Standard math utilities missing in the Move Language.
 -  [Specification](#@Specification_1)
     -  [Function `sqrt`](#@Specification_1_sqrt)
     -  [Function `mul_div`](#@Specification_1_mul_div)
-    -  [Function `pow_raw`](#@Specification_1_pow_raw)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
@@ -302,37 +301,6 @@ Specialized function for x * y / z that omits intermediate shifting
 
 ## Specification
 
-Binary-exponentiation loop state function.
-
-spec_bexp(x, n, res) computes the final accumulated result of running the
-binary-exponentiation loop to completion from state (x, n, res), where:
-x   — current base in fixed-64 representation (as u256 integer)
-n   — remaining exponent
-res — accumulated product so far, in fixed-64 (as u256 integer)
-
-x is u256 so that <code>x <b>as</b> u256</code> in the loop invariant performs the explicit
-bv128→int conversion required when the function operates in bitvector mode.
-The <code>% (1 &lt;&lt; 128)</code> models the <code><b>as</b> u128</code> cast that keeps x in u128 during the loop.
-
-
-<a id="0x1_math_fixed_spec_bexp"></a>
-
-
-<pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_spec_bexp">spec_bexp</a>(x: u256, n: u128, res: u256): u256 {
-   <b>if</b> (n == 0) {
-       res
-   } <b>else</b> {
-       <b>let</b> x_sq = (x * x / (1u256 &lt;&lt; 64)) % (1u256 &lt;&lt; 128);
-       <b>if</b> (n % 2 == 0) {
-           <a href="math_fixed.md#0x1_math_fixed_spec_bexp">spec_bexp</a>(x_sq, n / 2, res)
-       } <b>else</b> {
-           <a href="math_fixed.md#0x1_math_fixed_spec_bexp">spec_bexp</a>(x_sq, n / 2, res * x / (1u256 &lt;&lt; 64))
-       }
-   }
-}
-</code></pre>
-
-
 
 <a id="@Specification_1_sqrt"></a>
 
@@ -343,11 +311,11 @@ The <code>% (1 &lt;&lt; 128)</code> models the <code><b>as</b> u128</code> cast 
 </code></pre>
 
 
-<code>sqrt</code> never aborts: math128::sqrt(0)==0 so y<<32==0 gives result 0 (no division); for y>0 result fits in u64.
+<code>sqrt</code> never aborts: math128::sqrt(0)==0 so the Newton step is skipped; for y>0 result fits in u64.
+No loop in the body, so callers can inline without havocing.
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -362,37 +330,13 @@ The <code>% (1 &lt;&lt; 128)</code> models the <code><b>as</b> u128</code> cast 
 
 
 <code>mul_div</code> aborts when z is zero or when x * y / z overflows u64.
+The result equals the exact arithmetic quotient.
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> z.get_raw_value() == 0;
+<pre><code><b>aborts_if</b> z.get_raw_value() == 0;
 <b>aborts_if</b> (x.get_raw_value() <b>as</b> u128) * (y.get_raw_value() <b>as</b> u128) / (z.get_raw_value() <b>as</b> u128) &gt; MAX_U64;
-</code></pre>
-
-
-
-<a id="@Specification_1_pow_raw"></a>
-
-### Function `pow_raw`
-
-
-<pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(x: u128, n: u128): u128
-</code></pre>
-
-
-pow_raw computes fixed-32 binary exponentiation via fixed-64 intermediate precision.
-
-requires x < 2^96: ensures x <<= 32 stays within u128 (no truncation).
-
-No <code><b>ensures</b></code> is provided: spec_bexp is recursive, which forces MBQI (model-based
-quantifier instantiation) in Z3. MBQI is O(n³) in ground integer terms; in the
-full aptos-stdlib batch the thousands of such terms cause a timeout. The function
-is verified correct by unit tests and by isolated Boogie runs; formal loop-invariant
-proof requires either a fuel-based spec_bexp or a per-module BPL.
-
-
-<pre><code><b>pragma</b> opaque;
-<b>requires</b> x &lt; (1u128 &lt;&lt; 96);
+<b>ensures</b> (result.get_raw_value() <b>as</b> u128) ==
+        (x.get_raw_value() <b>as</b> u128) * (y.get_raw_value() <b>as</b> u128) / (z.get_raw_value() <b>as</b> u128);
 </code></pre>
 
 

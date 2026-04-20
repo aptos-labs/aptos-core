@@ -307,10 +307,10 @@ Specialized function for x * y / z that omits intermediate shifting
 
 
 <code>sqrt</code> aborts when the input is zero (math128::sqrt(0)==0 causes division by zero in the Newton step).
+No loop in the body (single Newton refinement step), so callers can inline without havocing.
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> x.get_raw_value() == 0;
+<pre><code><b>aborts_if</b> x.get_raw_value() == 0;
 </code></pre>
 
 
@@ -325,11 +325,13 @@ Specialized function for x * y / z that omits intermediate shifting
 
 
 <code>mul_div</code> aborts when z is zero or when x * y / z overflows u128.
+The result equals the exact arithmetic quotient.
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> z.get_raw_value() == 0;
+<pre><code><b>aborts_if</b> z.get_raw_value() == 0;
 <b>aborts_if</b> (x.get_raw_value() <b>as</b> u256) * (y.get_raw_value() <b>as</b> u256) / (z.get_raw_value() <b>as</b> u256) &gt; MAX_U128;
+<b>ensures</b> (result.get_raw_value() <b>as</b> u256) ==
+        (x.get_raw_value() <b>as</b> u256) * (y.get_raw_value() <b>as</b> u256) / (z.get_raw_value() <b>as</b> u256);
 </code></pre>
 
 

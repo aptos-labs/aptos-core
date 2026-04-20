@@ -114,7 +114,6 @@ use move_model::{
         CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD, CONDITION_INFERRED_VACUOUS,
         INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
-    pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     sourcifier::Sourcifier,
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
@@ -3553,22 +3552,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         let (spec_fun_id, decl) = callee.find_spec_fun()?;
         if decl.body.is_none() || !decl.used_memory.is_empty() {
             return None;
-        }
-        // Must be pure under specification semantics: no Assign, Return, uninitialized
-        // let, or mutable borrows in the function body. A while loop, for example,
-        // compiles to Assign operations and would be rejected by the spec compiler.
-        if let Some(def) = callee.get_def() {
-            let mut is_pure = true;
-            let mut checker = FunctionPurenessChecker::new(
-                FunctionPurenessCheckerMode::Specification,
-                |_, _, _| {
-                    is_pure = false;
-                },
-            );
-            checker.check_exp(self.global_env(), def);
-            if !is_pure {
-                return None;
-            }
         }
         let result_type = callee.get_result_type().instantiate(type_inst);
         Some((spec_fun_id, result_type))
