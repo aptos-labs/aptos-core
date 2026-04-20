@@ -704,6 +704,9 @@ impl ExpRewriterFunctions for CalleeRewriter<'_> {
             Pattern::Var(_, symbol) => Some(Pattern::Var(new_id, *symbol)),
             Pattern::Wildcard(_) => Some(Pattern::Wildcard(new_id)),
             Pattern::LiteralValue(_, val) => Some(Pattern::LiteralValue(new_id, val.clone())),
+            Pattern::Range(_, lo, hi, inc) => {
+                Some(Pattern::Range(new_id, lo.clone(), hi.clone(), *inc))
+            },
             Pattern::Error(_) => None,
         }
     }

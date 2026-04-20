@@ -51,7 +51,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
-        state::{LedgerState, State},
+        state::{HotStateMetadata, LedgerState, State},
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
@@ -156,7 +156,7 @@ pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
     pub hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub _hot_state_kv_db: Option<Arc<StateKvDb>>,
+    pub hot_state_kv_db: Option<Arc<StateKvDb>>,
     pub state_kv_db: Arc<StateKvDb>,
     pub state_pruner: StatePruner,
     pub skip_usage: bool,
@@ -399,7 +399,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
-            _hot_state_kv_db: hot_state_kv_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage,
@@ -408,7 +408,14 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             hot_state_config,
         )));
-        let persisted_state = PersistedState::new_empty(hot_state_config);
+        let (persisted_state, hot_state_metadata) = if empty_buffered_state_for_restore {
+            (
+                PersistedState::new_empty(hot_state_config),
+                Default::default(),
+            )
+        } else {
+            Self::load_hot_state_or_empty(&state_db, hot_state_config)
+        };
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
@@ -425,6 +432,7 @@ impl StateStore {
                 /*check_max_versions_after_snapshot=*/ true,
                 current_state.clone(),
                 persisted_state.clone(),
+                hot_state_metadata,
                 hot_state_config,
             )
             .expect("buffered state creation failed.")
@@ -491,17 +499,9 @@ impl StateStore {
             overall_commit_progress,
             crash_if_difference_is_too_large,
         );
-        Self::sync_state_merkle_commit_progress(
-            ledger_metadata_db,
-            &state_merkle_db,
-            overall_commit_progress,
-            crash_if_difference_is_too_large,
-        );
-
         // When `delete_on_restart` in config is flipped from true to false, the node will have been
         // running for a while, so its hot_state_kv_db is extremely unlikely to not have a progress
-        // marker and `sync_state_kv_commit_progress` should work. Same for hot_state_merkle_db
-        // below.
+        // marker and `sync_state_kv_commit_progress` should work.
         if !delete_hot_state_on_restart && let Some(db) = &hot_state_kv_db {
             Self::sync_state_kv_commit_progress(
                 db,
@@ -509,13 +509,41 @@ impl StateStore {
                 crash_if_difference_is_too_large,
             );
         }
+
+        // Find truncation targets for both state merkle DBs independently.
+        let cold_merkle_target = Self::find_state_merkle_truncation_target(
+            ledger_metadata_db,
+            &state_merkle_db,
+            overall_commit_progress,
+            crash_if_difference_is_too_large,
+        );
+        let hot_merkle_target =
+            if !delete_hot_state_on_restart && let Some(db) = &hot_state_merkle_db {
+                Some(Self::find_state_merkle_truncation_target(
+                    ledger_metadata_db,
+                    db,
+                    overall_commit_progress,
+                    crash_if_difference_is_too_large,
+                ))
+            } else {
+                None
+            };
+
+        // Truncate both merkle DBs to the min of their targets so they end up at the
+        // same snapshot version. After a partial-commit crash one DB may be one snapshot
+        // ahead of the other; using the min guarantees they are consistent on restart.
+        let merkle_target = hot_merkle_target.map_or(cold_merkle_target, |hot| {
+            std::cmp::min(cold_merkle_target, hot)
+        });
+        info!(
+            cold_merkle_target = cold_merkle_target,
+            hot_merkle_target = hot_merkle_target,
+            merkle_target = merkle_target,
+            "State merkle truncation targets.",
+        );
+        Self::truncate_state_merkle_if_needed(&state_merkle_db, merkle_target);
         if !delete_hot_state_on_restart && let Some(db) = &hot_state_merkle_db {
-            Self::sync_state_merkle_commit_progress(
-                ledger_metadata_db,
-                db,
-                overall_commit_progress,
-                crash_if_difference_is_too_large,
-            );
+            Self::truncate_state_merkle_if_needed(db, merkle_target);
         }
     }
 
@@ -553,14 +581,14 @@ impl StateStore {
         .expect("Failed to truncate state K/V db.");
     }
 
-    /// Reads the state merkle max version and truncates the state merkle DB back to
-    /// the tree root at or before `overall_commit_progress`.
-    fn sync_state_merkle_commit_progress(
+    /// Validates the state merkle DB commit progress and returns the tree root version
+    /// at or before `overall_commit_progress`.
+    fn find_state_merkle_truncation_target(
         ledger_metadata_db: &LedgerMetadataDb,
         state_merkle_db: &StateMerkleDb,
         overall_commit_progress: Version,
         crash_if_difference_is_too_large: bool,
-    ) {
+    ) -> Version {
         let state_merkle_max_version = get_max_version_in_state_merkle_db(state_merkle_db)
             .expect("Failed to get state merkle max version.")
             .expect("State merkle max version cannot be None.");
@@ -570,25 +598,29 @@ impl StateStore {
                 assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
         }
-        let state_merkle_target_version = find_tree_root_at_or_before(
-            ledger_metadata_db,
-            state_merkle_db,
-            overall_commit_progress,
-        )
-        .expect("DB read failed.")
-        .unwrap_or_else(|| {
-            panic!(
-                "Could not find a valid root before or at version {}, maybe it was pruned?",
-                overall_commit_progress
-            )
-        });
-        if state_merkle_target_version < state_merkle_max_version {
+        find_tree_root_at_or_before(ledger_metadata_db, state_merkle_db, overall_commit_progress)
+            .expect("DB read failed.")
+            .unwrap_or_else(|| {
+                panic!(
+                    "Could not find a valid root before or at version {}, maybe it was pruned?",
+                    overall_commit_progress
+                )
+            })
+    }
+
+    /// Truncates the state merkle DB back to `target_version` if the DB is ahead.
+    fn truncate_state_merkle_if_needed(state_merkle_db: &StateMerkleDb, target_version: Version) {
+        let state_merkle_max_version = get_max_version_in_state_merkle_db(state_merkle_db)
+            .expect("Failed to get state merkle max version.")
+            .expect("State merkle max version cannot be None.");
+        if target_version < state_merkle_max_version {
             info!(
+                is_hot = state_merkle_db.is_hot(),
                 state_merkle_max_version = state_merkle_max_version,
-                target_version = state_merkle_target_version,
+                target_version = target_version,
                 "Start state merkle truncation..."
             );
-            truncate_state_merkle_db(state_merkle_db, state_merkle_target_version)
+            truncate_state_merkle_db(state_merkle_db, target_version)
                 .expect("Failed to truncate state merkle db.");
         }
     }
@@ -612,7 +644,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
-            _hot_state_kv_db: hot_state_kv_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage: false,
@@ -620,20 +652,26 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             HotStateConfig::default(),
         )));
-        let persisted_state = PersistedState::new_empty(HotStateConfig::default());
+        // TODO(HotState): When hot state persistence is needed for this path, load hot state
+        // KV from DB via `load_hot_state_or_empty` and pass the real persisted state and
+        // metadata, instead of empty defaults. This will let both `hot_state_merkle_db` and
+        // `state_merkle_db` catch up correctly during replay.
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
             0,
             /*hack_for_tests=*/ false,
             /*check_max_versions_after_snapshot=*/ false,
             current_state.clone(),
-            persisted_state,
+            PersistedState::new_empty(HotStateConfig::default()),
+            Default::default(),
             HotStateConfig::default(),
         )?;
         let base_version = current_state.lock().version();
         Ok(base_version)
     }
 
+    /// Creates a `BufferedState` from the latest state snapshot, replaying write sets
+    /// between the snapshot and the committed version.
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
         buffered_state_target_items: usize,
@@ -641,6 +679,7 @@ impl StateStore {
         check_max_versions_after_snapshot: bool,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         hot_state_config: HotStateConfig,
     ) -> Result<BufferedState> {
         let num_transactions = state_db
@@ -659,7 +698,6 @@ impl StateStore {
             latest_snapshot_version = latest_snapshot_version,
             "Initializing BufferedState."
         );
-        // TODO(HotState): read hot root hash from DB.
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
                 .state_merkle_db
@@ -668,13 +706,24 @@ impl StateStore {
         } else {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
+        let hot_state_root_hash = if !hot_state_config.delete_on_restart
+            && let Some(version) = latest_snapshot_version
+            && let Some(db) = &state_db.hot_state_merkle_db
+        {
+            db.get_root_hash(version)
+                .expect("Failed to query hot state root hash on initialization.")
+        } else {
+            *SPARSE_MERKLE_PLACEHOLDER_HASH
+        };
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
-        let state = StateWithSummary::new_at_version(
+
+        let state = StateWithSummary::new_at_version_with_hot_state_metadata(
             latest_snapshot_version,
-            *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
+            hot_state_root_hash,
             latest_snapshot_root_hash,
             usage,
             hot_state_config,
+            hot_state_metadata,
         );
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
@@ -701,27 +750,15 @@ impl StateStore {
             );
         }
 
-        if snapshot_next_version > 0
+        if hot_state_root_hash == *SPARSE_MERKLE_PLACEHOLDER_HASH
+            && snapshot_next_version > 0
             && let Some(db) = &state_db.hot_state_merkle_db
         {
             // TODO(HotState): this is needed while starting with an empty hot state during
             // development.
-            let prev_version = snapshot_next_version - 1;
-            let tree_update_batch = TreeUpdateBatch {
-                node_batch: vec![vec![(NodeKey::new_empty_path(prev_version), Node::Null)]],
-                stale_node_index_batch: vec![],
-            };
-            let raw_batch = db.create_jmt_commit_batch_for_shard(
-                prev_version,
-                /* shard_id = */ None,
-                &tree_update_batch,
-                /* previous_epoch_ending_version = */ None,
-            )?;
-            db.commit_top_levels(prev_version, raw_batch)?;
-            info!("Wrote null node for hot state at version {prev_version}");
+            Self::write_hot_state_null_node(db, snapshot_next_version - 1)?;
         }
 
-        // Replaying the committed write sets after the latest snapshot.
         if snapshot_next_version < num_transactions {
             if check_max_versions_after_snapshot {
                 ensure!(
@@ -731,47 +768,13 @@ impl StateStore {
                     num_transactions,
                 );
             }
-            info!("Replaying writesets from {snapshot_next_version} to {num_transactions} to let state Merkle DB catch up.");
-
-            let write_sets = state_db
-                .ledger_db
-                .write_set_db()
-                .get_write_sets(snapshot_next_version, num_transactions)?;
-            let txn_info_iter = state_db
-                .ledger_db
-                .transaction_info_db()
-                .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
-            let all_checkpoint_indices = txn_info_iter
-                .into_iter()
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .positions(|txn_info| txn_info.has_state_checkpoint_hash())
-                .collect();
-
-            let state_update_refs = StateUpdateRefs::index_write_sets(
-                state.next_version(),
-                &write_sets,
-                write_sets.len(),
-                all_checkpoint_indices,
-            );
-            let current_state = out_current_state.lock().clone();
-            let (hot_state, state) = out_persisted_state.get_state();
-            let (new_state, _state_reads, hot_state_updates) = current_state
-                .ledger_state()
-                .update_with_db_reader(&state, hot_state, &state_update_refs, state_db.clone())?;
-            let state_summary = out_persisted_state.get_state_summary();
-            let new_state_summary = current_state.ledger_state_summary().update(
-                &ProvableStateSummary::new(state_summary, state_db.as_ref()),
-                &hot_state_updates,
-                &state_update_refs,
-            )?;
-            let updated =
-                LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
-
-            // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
-            buffered_state.update(
-                updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
-                true, /* sync_commit */
+            Self::replay_write_sets_after_snapshot(
+                state_db,
+                snapshot_next_version,
+                num_transactions,
+                &mut buffered_state,
+                &out_current_state,
+                &out_persisted_state,
             )?;
         }
 
@@ -789,8 +792,144 @@ impl StateStore {
         Ok(buffered_state)
     }
 
+    /// Writes a null node for the hot state merkle tree at the given version.
+    fn write_hot_state_null_node(db: &StateMerkleDb, version: Version) -> Result<()> {
+        let tree_update_batch = TreeUpdateBatch {
+            node_batch: vec![vec![(NodeKey::new_empty_path(version), Node::Null)]],
+            stale_node_index_batch: vec![],
+        };
+        let raw_batch = db.create_jmt_commit_batch_for_shard(
+            version,
+            /* shard_id = */ None,
+            &tree_update_batch,
+            /* previous_epoch_ending_version = */ None,
+        )?;
+        db.commit_top_levels(version, raw_batch)?;
+        info!("Wrote null node for hot state merkle db at version {version}");
+        Ok(())
+    }
+
+    /// Replays all write sets after the previously committed snapshot until things have caught up.
+    fn replay_write_sets_after_snapshot(
+        state_db: &Arc<StateDb>,
+        snapshot_next_version: Version,
+        num_transactions: u64,
+        buffered_state: &mut BufferedState,
+        out_current_state: &Mutex<LedgerStateWithSummary>,
+        persisted_state: &PersistedState,
+    ) -> Result<()> {
+        info!("Replaying writesets from {snapshot_next_version} to {num_transactions} to let state Merkle DB catch up.");
+
+        let write_sets = state_db
+            .ledger_db
+            .write_set_db()
+            .get_write_sets(snapshot_next_version, num_transactions)?;
+        let txn_info_iter = state_db
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
+        let all_checkpoint_indices = txn_info_iter
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .positions(|txn_info| txn_info.has_state_checkpoint_hash())
+            .collect();
+
+        let state_update_refs = StateUpdateRefs::index_write_sets(
+            snapshot_next_version,
+            &write_sets,
+            write_sets.len(),
+            all_checkpoint_indices,
+        );
+        let current_state = out_current_state.lock().clone();
+        let (hot_state, state) = persisted_state.get_state();
+        let (new_state, _state_reads, hot_state_updates) = current_state
+            .ledger_state()
+            .update_with_db_reader(&state, hot_state, &state_update_refs, state_db.clone())?;
+        let state_summary = persisted_state.get_state_summary();
+        let new_state_summary = current_state.ledger_state_summary().update(
+            &ProvableStateSummary::new(state_summary, state_db.as_ref()),
+            &hot_state_updates,
+            &state_update_refs,
+        )?;
+        let updated = LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
+
+        // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
+        buffered_state.update(
+            updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
+            true, /* sync_commit */
+        )?;
+        Ok(())
+    }
+
+    /// Tries to load the hot state from DB at the latest snapshot version. Returns an empty
+    /// persisted state when loading is not applicable (disabled, no DB, no snapshot).
+    ///
+    /// Returns:
+    ///   - `PersistedState` — fed into `BufferedState` as the base hot state.
+    ///   - `[HotStateMetadata; NUM_STATE_SHARDS]` — per-shard LRU metadata for seeding
+    ///     the speculative `State` (which diverges from the `PersistedState`'s `State`
+    ///     during replay).
+    fn load_hot_state_or_empty(
+        state_db: &Arc<StateDb>,
+        hot_state_config: HotStateConfig,
+    ) -> (PersistedState, [HotStateMetadata; NUM_STATE_SHARDS]) {
+        let empty = || {
+            (
+                PersistedState::new_empty(hot_state_config),
+                Default::default(),
+            )
+        };
+
+        if hot_state_config.delete_on_restart {
+            return empty();
+        }
+        let hot_kv_db = match &state_db.hot_state_kv_db {
+            Some(db) => db,
+            None => return empty(),
+        };
+        let snapshot_version = match state_db
+            .state_merkle_db
+            .get_state_snapshot_version_before(Version::MAX)
+            .expect("Failed to query latest snapshot on initialization.")
+        {
+            Some(v) => v,
+            None => return empty(),
+        };
+
+        let loaded = hot_kv_db
+            .load_hot_state_kvs(snapshot_version)
+            .expect("Failed to load hot state KVs from DB.");
+        let metadata = std::array::from_fn(|i| {
+            HotStateMetadata::new(
+                loaded[i].head,
+                loaded[i].tail,
+                loaded[i].num_items,
+                loaded[i].total_value_bytes,
+            )
+        });
+        let dashmaps = loaded.map(|s| s.map);
+        let usage = state_db
+            .get_state_storage_usage(Some(snapshot_version))
+            .expect("Failed to query state storage usage on initialization.");
+        let state = State::new_at_version_with_hot_state_metadata(
+            Some(snapshot_version),
+            usage,
+            hot_state_config,
+            metadata.clone(),
+        );
+
+        (
+            PersistedState::new_from_loaded(state, hot_state_config, dashmaps),
+            metadata,
+        )
+    }
+
     pub fn reset(&self) {
         self.buffered_state.lock().quit();
+        // TODO(HotState): restore does not reconstruct the hot state yet, so we pass empty
+        // metadata here. This is safe because callers (restore / state-sync) open the DB with
+        // `empty_buffered_state_for_restore`, so the DashMaps are always empty.
         *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,
@@ -798,6 +937,7 @@ impl StateStore {
             true,
             self.current_state.clone(),
             self.persisted_state.clone(),
+            Default::default(),
             self.hot_state_config,
         )
         .expect("buffered state creation failed.");

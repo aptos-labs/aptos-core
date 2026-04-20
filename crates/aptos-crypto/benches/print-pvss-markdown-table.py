@@ -171,8 +171,8 @@ def parse_setup(ident, parameter):
         else:
             continue
         
-        # Strip /transcript_bytes=NNN if present
-        setup = re.sub(r"(/|_)transcript_bytes=\d+$", "", setup)
+        # Strip /transcript_bytes=NNN or bare /transcript_bytes suffix if present
+        setup = re.sub(r"(/|_)transcript_bytes(=\d+)?$", "", setup)
         return setup
     
     return ident
@@ -192,12 +192,12 @@ def build_folder_map():
                 subentry_path = os.path.join(group_path, subentry)
                 if os.path.isdir(subentry_path):
                     for op in OPERATIONS:
-                        if subentry.startswith(op) and "_transcript_bytes=" in subentry:
+                        if subentry.startswith(op) and "_transcript_bytes" in subentry:
                             # Extract setup from folder name: "serialize_SETUP_transcript_bytes=NNN" -> "SETUP"
                             # Remove operation prefix
                             setup_part = subentry[len(op) + 1:]  # +1 for the underscore
-                            # Remove transcript_bytes suffix
-                            setup = re.sub(r"_transcript_bytes=\d+$", "", setup_part)
+                            # Remove transcript_bytes suffix (with or without =NNN)
+                            setup = re.sub(r"_transcript_bytes(=\d+)?$", "", setup_part)
                             key = (group_name, op, setup)
                             # Store the full path relative to current directory
                             folder_path = os.path.join(group_name, subentry)

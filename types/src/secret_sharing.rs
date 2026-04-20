@@ -164,7 +164,9 @@ impl SecretShareConfig {
             .address_to_validator_index()
             .iter()
             .map(|(author, &index)| {
-                let weight = config.get_player_weight(&Player { id: index });
+                let weight = config
+                    .get_player_weight(&Player { id: index })
+                    .expect("validator index maps to player id in config");
                 (*author, weight as u64)
             })
             .collect();

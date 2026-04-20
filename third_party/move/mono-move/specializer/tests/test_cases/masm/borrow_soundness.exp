@@ -7,6 +7,7 @@ fun borrow_loc_no_source_subst(r0): u64 {
     r2: &u64
     r3: u64
   code:
+  L0:
     0: r1 := copy r0
     1: r2 := imm_borrow_loc r1
     2: r3 := read_ref r2
@@ -20,6 +21,7 @@ fun imm_borrow_value_prop(r0): u64 {
     r2: &u64
     r3: u64
   code:
+  L0:
     0: r1 := copy r0
     1: r2 := imm_borrow_loc r1
     2: r3 := read_ref r2
@@ -34,6 +36,7 @@ fun mut_borrow_kills_subst(r0): u64 {
     r2: u64
     r3: &mut u64
   code:
+  L0:
     0: r1 := copy r0
     1: r2 := ld_u64 42
     2: r3 := mut_borrow_loc r1
@@ -48,6 +51,7 @@ fun mut_borrow_kills_reverse(r0): u64 {
     r2: u64
     r3: &mut u64
   code:
+  L0:
     0: r1 := copy r0
     1: r2 := ld_u64 99
     2: r3 := mut_borrow_loc r0

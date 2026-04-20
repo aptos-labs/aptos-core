@@ -33,7 +33,10 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
+    well_known::{
+        BORROW_GLOBAL, BORROW_GLOBAL_MUT, UNSPECIFIED_ABORT_CODE,
+        VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE,
+    },
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -2404,7 +2407,11 @@ impl ExpTranslator<'_, '_, '_> {
         result_exp.visit_pre_order(&mut |e| {
             if let ExpData::Call(id, Operation::Borrow(ReferenceKind::Mutable), args) = &e {
                 debug_assert!(args.len() == 1);
-                if let ExpData::Call(_, Operation::Select(_, _, _), ref_targets) = args[0].as_ref()
+                if let ExpData::Call(
+                    _,
+                    Operation::Select(_, _, _) | Operation::SelectVariants(_, _, _),
+                    ref_targets,
+                ) = args[0].as_ref()
                 {
                     debug_assert!(ref_targets.len() == 1);
                     if self
@@ -2931,6 +2938,49 @@ impl ExpTranslator<'_, '_, '_> {
                 } else {
                     self.new_error_pat(loc)
                 }
+            },
+            EA::LValue_::Range(lo_val, hi_val, inclusive) => {
+                // Translate range pattern. Strip reference from expected type.
+                let inner_expected = expected_type.skip_reference();
+                // Range patterns only allowed on concrete integer types.
+                // Reject PrimitiveType::Num (unresolved spec numeric supertype)
+                // because get_min_value/get_max_value return None for it,
+                // which would silently disable range bound validation.
+                if matches!(inner_expected, Type::Primitive(PrimitiveType::Num)) {
+                    self.error(loc, "range patterns require a concrete integer type");
+                    return self.new_error_pat(loc);
+                }
+                if !inner_expected.is_number() {
+                    self.error(
+                        loc,
+                        &format!(
+                            "range patterns are only allowed on integer types, found `{}`",
+                            inner_expected.display(&self.type_display_context())
+                        ),
+                    );
+                    return self.new_error_pat(loc);
+                }
+                let lo = lo_val
+                    .as_ref()
+                    .map(|v| self.translate_value(v, inner_expected, context));
+                let hi = hi_val
+                    .as_ref()
+                    .map(|v| self.translate_value(v, inner_expected, context));
+                // Check if any bound translation failed.
+                if lo.as_ref().is_some_and(|r| r.is_none())
+                    || hi.as_ref().is_some_and(|r| r.is_none())
+                {
+                    return self.new_error_pat(loc);
+                }
+                let lo_value = lo.and_then(|r| r.map(|(v, _)| v));
+                let hi_value = hi.and_then(|r| r.map(|(v, _)| v));
+                let pat_ty = if expected_type.is_reference() {
+                    expected_type.clone()
+                } else {
+                    inner_expected.clone()
+                };
+                let id = self.new_node_id_with_type_loc(&pat_ty, loc);
+                Pattern::Range(id, lo_value, hi_value, *inclusive)
             },
         }
     }
@@ -4138,11 +4188,11 @@ impl ExpTranslator<'_, '_, '_> {
         let type_opt = convert_name_to_type(&resource_ty_exp.loc, resource_ty_exp.clone().value);
         if let Some(ty) = type_opt {
             let name = if mutable {
-                self.symbol_pool().make("borrow_global_mut")
+                self.symbol_pool().make(BORROW_GLOBAL_MUT)
             } else {
-                self.symbol_pool().make("borrow_global")
+                self.symbol_pool().make(BORROW_GLOBAL)
             };
-            self.translate_call(
+            let result = self.translate_call(
                 loc,
                 &self.to_loc(&resource_ty_exp.loc),
                 CallKind::Regular,
@@ -4152,7 +4202,18 @@ impl ExpTranslator<'_, '_, '_> {
                 &[addr_exp],
                 expected_type,
                 context,
-            )
+            );
+            // translate_call may wrap the result in a Freeze node when the
+            // expected type is an immutable reference. Set the surface syntax
+            // on the inner node so it is attached to the actual operation.
+            let target_id = if let ExpData::Call(_, Operation::Freeze(_), args) = &result {
+                args[0].node_id()
+            } else {
+                result.node_id()
+            };
+            self.env()
+                .set_surface_syntax(target_id, SurfaceSyntax::IndexNotation);
+            result
         } else {
             self.new_error_exp()
         }
@@ -4303,10 +4364,6 @@ impl ExpTranslator<'_, '_, '_> {
                 .parent
                 .spec_schema_table
                 .contains_key(&global_var_sym)
-                && self
-                    .env()
-                    .language_version
-                    .is_at_least(LanguageVersion::V2_0)
             {
                 self.error(loc, "indexing can only be applied to a vector or a resource type (a struct type which has key ability)");
                 call = Some(self.new_error_exp());

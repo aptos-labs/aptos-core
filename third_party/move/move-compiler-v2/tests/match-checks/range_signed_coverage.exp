@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/match-checks/range_signed_coverage.move:27:16
+   │
+27 │         match (x) {
+   │                ^
+   │
+   = missing at least `..0`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/range_signed_coverage.move:34:16
+   │
+34 │         match (x) {
+   │                ^
+   │
+   = missing at least `-10..10`

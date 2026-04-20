@@ -639,7 +639,7 @@ impl ModuleBuilder<'_, '_> {
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
         let kind = if def.entry.is_some() {
-            if et.env().language_version.is_at_least(LanguageVersion::V2_0) && def.inline {
+            if def.inline {
                 et.error(&et.to_loc(&def.loc), "An entry function cannot be inlined.");
             }
             FunctionKind::Entry
@@ -2754,14 +2754,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_params(loc, &entry.type_params, false);
                 if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
-                    let lang_ver_ge_2 =
-                        et.env().language_version.is_at_least(LanguageVersion::V2_0);
                     for f in fields.values() {
-                        // In Aptos Move 2.0 and above, field `self` is omitted from local bindings
-                        // so `self` can be used to refer to `self` parameter.
-                        if lang_ver_ge_2
-                            && f.name.display(et.symbol_pool()).to_string()
-                                == well_known::RECEIVER_PARAM_NAME
+                        // Field `self` is omitted from local bindings
+                        // so `self` can be used to refer to the `self` parameter.
+                        if f.name.display(et.symbol_pool()).to_string()
+                            == well_known::RECEIVER_PARAM_NAME
                         {
                             continue;
                         }
@@ -2777,20 +2774,16 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             None,
                         );
                     }
-                    if lang_ver_ge_2 {
-                        let receiver_param_name =
-                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
-                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
-                        et.define_local(loc, receiver_param_name, struct_type, None, None);
-                    }
+                    let receiver_param_name =
+                        et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                    let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                    et.define_local(loc, receiver_param_name, struct_type, None, None);
                 } else if let StructLayout::Variants(_) = &entry.layout {
                     et.enter_scope();
-                    if et.env().language_version.is_at_least(LanguageVersion::V2_0) {
-                        let receiver_param_name =
-                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
-                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
-                        et.define_local(loc, receiver_param_name, struct_type, None, None);
-                    }
+                    let receiver_param_name =
+                        et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                    let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                    et.define_local(loc, receiver_param_name, struct_type, None, None);
                 }
 
                 et

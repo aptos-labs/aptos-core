@@ -1,0 +1,208 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    enum E {
+        V1 {
+            0: u64,
+        }
+        V2,
+    }
+    enum Inner {
+        A {
+            0: u64,
+        }
+        B,
+    }
+    enum Outer {
+        W {
+            0: Inner,
+        }
+        X,
+    }
+    enum Pair {
+        P {
+            0: u64,
+            1: u64,
+        }
+        Q,
+    }
+    private fun multi_range_in_enum(p: Pair): u64 {
+        match (p) {
+          m::Pair::P{ 0: _$nlit_0, 1: _$nlit_1 } if And(And(Ge(_$nlit_0, 0), Lt(_$nlit_0, 10)), And(Ge(_$nlit_1, 0), Lt(_$nlit_1, 10))) => {
+            1
+          }
+          m::Pair::P{ 0: _, 1: _ } => {
+            2
+          }
+          m::Pair::Q => {
+            3
+          }
+        }
+
+    }
+    private fun nested_range(o: Outer): u64 {
+        match (o) {
+          m::Outer::W{ 0: m::Inner::A{ 0: _$nlit_0 } } if And(Ge(_$nlit_0, 1), Lt(_$nlit_0, 100)) => {
+            1
+          }
+          m::Outer::W{ 0: m::Inner::A{ 0: _ } } => {
+            2
+          }
+          m::Outer::W{ 0: m::Inner::B } => {
+            3
+          }
+          m::Outer::X => {
+            4
+          }
+        }
+
+    }
+    private fun range_and_literal_in_enum(p: Pair): u64 {
+        match (p) {
+          m::Pair::P{ 0: _$nlit_0, 1: _$nlit_1 } if And(And(Ge(_$nlit_0, 1), Lt(_$nlit_0, 10)), Eq(_$nlit_1, 42)) => {
+            1
+          }
+          m::Pair::P{ 0: _, 1: _ } => {
+            2
+          }
+          m::Pair::Q => {
+            3
+          }
+        }
+
+    }
+    private fun range_and_var_in_enum(p: Pair): u64 {
+        match (p) {
+          m::Pair::P{ 0: _$nlit_0, 1: y } if And(Ge(_$nlit_0, 1), Lt(_$nlit_0, 10)) => {
+            y
+          }
+          m::Pair::P{ 0: _, 1: _ } => {
+            0
+          }
+          m::Pair::Q => {
+            0
+          }
+        }
+
+    }
+    private fun range_in_enum(e: E): u64 {
+        match (e) {
+          m::E::V1{ 0: _$nlit_0 } if And(Ge(_$nlit_0, 1), Lt(_$nlit_0, 10)) => {
+            1
+          }
+          m::E::V1{ 0: _ } => {
+            2
+          }
+          m::E::V2 => {
+            3
+          }
+        }
+
+    }
+    private fun range_with_guard(e: E): u64 {
+        match (e) {
+          m::E::V1{ 0: _$nlit_0 } if And(And(Ge(_$nlit_0, 1), Lt(_$nlit_0, 10)), true) => {
+            1
+          }
+          m::E::V1{ 0: _ } => {
+            2
+          }
+          m::E::V2 => {
+            3
+          }
+        }
+
+    }
+    private fun ref_range_in_enum(e: &E): u64 {
+        match (e) {
+          m::E::V1{ 0: _$nlit_0 } if And(Ge(Deref(_$nlit_0), 0), Lt(Deref(_$nlit_0), 5)) => {
+            1
+          }
+          m::E::V1{ 0: _ } => {
+            2
+          }
+          m::E::V2 => {
+            3
+          }
+        }
+
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    enum E has drop {
+        V1 {
+            0: u64,
+        }
+        V2,
+    }
+    enum Inner has drop {
+        A {
+            0: u64,
+        }
+        B,
+    }
+    enum Outer has drop {
+        W {
+            0: Inner,
+        }
+        X,
+    }
+    enum Pair has drop {
+        P {
+            0: u64,
+            1: u64,
+        }
+        Q,
+    }
+    fun multi_range_in_enum(p: Pair): u64 {
+        match (p) {
+            Pair::P(__nlit_0, __nlit_1) if __nlit_0 >= 0 && __nlit_0 < 10 && (__nlit_1 >= 0 && __nlit_1 < 10) => 1,
+            Pair::P(_, _) => 2,
+            Pair::Q{} => 3,
+        }
+    }
+    fun nested_range(o: Outer): u64 {
+        match (o) {
+            Outer::W(Inner::A(__nlit_0)) if __nlit_0 >= 1 && __nlit_0 < 100 => 1,
+            Outer::W(Inner::A(_)) => 2,
+            Outer::W(Inner::B{}) => 3,
+            Outer::X{} => 4,
+        }
+    }
+    fun range_and_literal_in_enum(p: Pair): u64 {
+        match (p) {
+            Pair::P(__nlit_0, __nlit_1) if __nlit_0 >= 1 && __nlit_0 < 10 && __nlit_1 == 42 => 1,
+            Pair::P(_, _) => 2,
+            Pair::Q{} => 3,
+        }
+    }
+    fun range_and_var_in_enum(p: Pair): u64 {
+        match (p) {
+            Pair::P(__nlit_0, y) if __nlit_0 >= 1 && __nlit_0 < 10 => y,
+            Pair::P(_, _) => 0,
+            Pair::Q{} => 0,
+        }
+    }
+    fun range_in_enum(e: E): u64 {
+        match (e) {
+            E::V1(__nlit_0) if __nlit_0 >= 1 && __nlit_0 < 10 => 1,
+            E::V1(_) => 2,
+            E::V2{} => 3,
+        }
+    }
+    fun range_with_guard(e: E): u64 {
+        match (e) {
+            E::V1(__nlit_0) if __nlit_0 >= 1 && __nlit_0 < 10 && true => 1,
+            E::V1(_) => 2,
+            E::V2{} => 3,
+        }
+    }
+    fun ref_range_in_enum(e: &E): u64 {
+        match (e) {
+            E::V1(__nlit_0) if *__nlit_0 >= 0 && *__nlit_0 < 5 => 1,
+            E::V1(_) => 2,
+            E::V2{} => 3,
+        }
+    }
+}

@@ -1479,6 +1479,9 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
             },
             Pattern::Wildcard(_) => Some(Pattern::Wildcard(new_id)),
             Pattern::LiteralValue(_, val) => Some(Pattern::LiteralValue(new_id, val.clone())),
+            Pattern::Range(_, lo, hi, inc) => {
+                Some(Pattern::Range(new_id, lo.clone(), hi.clone(), *inc))
+            },
             Pattern::Error(_) => None,
         }
     }

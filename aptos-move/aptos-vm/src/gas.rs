@@ -13,7 +13,7 @@ use aptos_logger::{enabled, Level};
 use aptos_memory_usage_tracker::{
     MemoryAlgebra, MemoryTrackedGasMeter, MemoryTrackedGasMeterImpl, StandardMemoryAlgebra,
 };
-use aptos_types::on_chain_config::Features;
+use aptos_types::{on_chain_config::Features, transaction::TxnLimitsRequest};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
 use aptos_vm_types::{
     resolver::BlockSynchronizationKillSwitch,
@@ -31,37 +31,37 @@ pub type ProdGasMeter<'a, T> = MemoryTrackedGasMeter<StandardGasMeter<StandardGa
 /// Creates a gas meter intended for executing transactions in the production.
 ///
 /// The current setup consists of the standard gas meter & algebra + the memory usage tracker.
-pub fn make_prod_gas_meter<T: BlockSynchronizationKillSwitch>(
+pub fn make_prod_gas_meter<'a, T: BlockSynchronizationKillSwitch>(
     gas_feature_version: u64,
     vm_gas_params: VMGasParameters,
     storage_gas_params: StorageGasParameters,
-    is_approved_gov_script: bool,
+    txn_limits_request: Option<&TxnLimitsRequest>,
     meter_balance: Gas,
-    block_synchronization_kill_switch: &T,
-) -> ProdGasMeter<'_, T> {
+    block_synchronization_kill_switch: &'a T,
+) -> ProdGasMeter<'a, T> {
     make_prod_gas_meter_impl::<T, StandardMemoryAlgebra>(
         gas_feature_version,
         vm_gas_params,
         storage_gas_params,
-        is_approved_gov_script,
+        txn_limits_request,
         meter_balance,
         block_synchronization_kill_switch,
     )
 }
 
-pub fn make_prod_gas_meter_impl<T: BlockSynchronizationKillSwitch, M: MemoryAlgebra>(
+pub fn make_prod_gas_meter_impl<'a, T: BlockSynchronizationKillSwitch, M: MemoryAlgebra>(
     gas_feature_version: u64,
     vm_gas_params: VMGasParameters,
     storage_gas_params: StorageGasParameters,
-    is_approved_gov_script: bool,
+    txn_limits_request: Option<&TxnLimitsRequest>,
     meter_balance: Gas,
-    block_synchronization_kill_switch: &T,
-) -> MemoryTrackedGasMeterImpl<StandardGasMeter<StandardGasAlgebra<'_, T>>, M> {
+    block_synchronization_kill_switch: &'a T,
+) -> MemoryTrackedGasMeterImpl<StandardGasMeter<StandardGasAlgebra<'a, T>>, M> {
     MemoryTrackedGasMeterImpl::new(StandardGasMeter::new(StandardGasAlgebra::new(
         gas_feature_version,
         vm_gas_params,
         storage_gas_params,
-        is_approved_gov_script,
+        txn_limits_request,
         meter_balance,
         block_synchronization_kill_switch,
     )))
@@ -74,13 +74,12 @@ pub(crate) fn check_gas(
     module_storage: &impl ModuleStorage,
     txn_metadata: &TransactionMetadata,
     features: &Features,
-    is_approved_gov_script: bool,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
     let txn_gas_params = &gas_params.vm.txn;
     let txn_bytes_len = txn_metadata.transaction_size;
 
-    if is_approved_gov_script {
+    if txn_metadata.is_approved_gov_script() {
         let max_txn_size_gov = if gas_feature_version >= RELEASE_V1_13 {
             gas_params.vm.txn.max_transaction_size_in_bytes_gov
         } else {
@@ -188,6 +187,24 @@ pub(crate) fn check_gas(
             StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
             None,
         ));
+    }
+
+    if matches!(
+        &txn_metadata.txn_limits,
+        Some(TxnLimitsRequest::Staking(..))
+    ) {
+        if txn_metadata.gas_unit_price() < txn_gas_params.high_limit_txn_min_price_per_gas_unit {
+            let msg = format!(
+                "[VM] High-limit txn gas price too low; min {}, submitted {}",
+                txn_gas_params.high_limit_txn_min_price_per_gas_unit,
+                txn_metadata.gas_unit_price(),
+            );
+            speculative_warn!(log_context, msg.clone());
+            return Err(VMStatus::error(
+                StatusCode::HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+                Some(msg),
+            ));
+        }
     }
 
     // The submitted gas price is greater than the maximum gas unit price set by the VM.

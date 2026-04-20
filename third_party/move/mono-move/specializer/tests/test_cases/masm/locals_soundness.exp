@@ -7,6 +7,7 @@ fun local_across_blocks(r0, r1): u64 {
     r2: u64
     r3: u64
   code:
+  L2:
     0: r2 := copy r1
     1: br_true L0, r0
   L1:
@@ -23,6 +24,7 @@ fun borrow_written_local(r0): u64 {
     r2: &u64
     r3: u64
   code:
+  L0:
     0: r1 := copy r0
     1: r2 := imm_borrow_loc r1
     2: r3 := read_ref r2

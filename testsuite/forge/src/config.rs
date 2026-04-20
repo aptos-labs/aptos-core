@@ -72,8 +72,11 @@ pub struct ForgeConfig {
     /// Retain debug logs and above for all nodes instead of just the first 5 nodes
     pub retain_debug_logs: bool,
 
-    /// URL to download the trusted setup blob for chunky DKG into the validator init-container
-    pub decryption_setup_blob_url: Option<String>,
+    /// URL to download the chunky DKG digest key blob into the validator init-container
+    pub digest_key_blob_url: Option<String>,
+
+    /// URL to download the chunky DKG public parameters blob into the validator init-container
+    pub public_parameters_blob_url: Option<String>,
 }
 
 impl ForgeConfig {
@@ -194,8 +197,13 @@ impl ForgeConfig {
             .collect()
     }
 
-    pub fn with_decryption_setup_blob_url(mut self, url: impl Into<String>) -> Self {
-        self.decryption_setup_blob_url = Some(url.into());
+    pub fn with_digest_key_blob_url(mut self, url: impl Into<String>) -> Self {
+        self.digest_key_blob_url = Some(url.into());
+        self
+    }
+
+    pub fn with_public_parameters_blob_url(mut self, url: impl Into<String>) -> Self {
+        self.public_parameters_blob_url = Some(url.into());
         self
     }
 
@@ -243,7 +251,8 @@ impl ForgeConfig {
         let existing_db_tag = self.existing_db_tag.clone();
         let validator_resource_override = self.validator_resource_override;
         let fullnode_resource_override = self.fullnode_resource_override;
-        let decryption_setup_blob_url = self.decryption_setup_blob_url.clone();
+        let digest_key_blob_url = self.digest_key_blob_url.clone();
+        let public_parameters_blob_url = self.public_parameters_blob_url.clone();
 
         // Override specific helm values. See reference: terraform/helm/aptos-node/values.yaml
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
@@ -330,8 +339,11 @@ impl ForgeConfig {
             helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
                 ["gas_limit"] = serde_yaml::to_value(&gas_limit_backpressure).unwrap();
 
-            if let Some(url) = &decryption_setup_blob_url {
-                helm_values["decryption_setup_blob_url"] = url.clone().into();
+            if let Some(url) = &digest_key_blob_url {
+                helm_values["digest_key_blob_url"] = url.clone().into();
+            }
+            if let Some(url) = &public_parameters_blob_url {
+                helm_values["public_parameters_blob_url"] = url.clone().into();
             }
         }))
     }
@@ -434,7 +446,8 @@ impl Default for ForgeConfig {
             validator_resource_override: NodeResourceOverride::default(),
             fullnode_resource_override: NodeResourceOverride::default(),
             retain_debug_logs: false,
-            decryption_setup_blob_url: None,
+            digest_key_blob_url: None,
+            public_parameters_blob_url: None,
         }
     }
 }

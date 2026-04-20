@@ -530,6 +530,7 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
                     Pattern::Var(_, _)
                     | Pattern::Wildcard(_)
                     | Pattern::LiteralValue(_, _)
+                    | Pattern::Range(_, _, _, _)
                     | Pattern::Error(_) => vec![],
                 };
                 for sub_pat in sub_pats {

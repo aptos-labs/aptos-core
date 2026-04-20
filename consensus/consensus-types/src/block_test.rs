@@ -313,3 +313,11 @@ fn test_failed_authors_well_formed() {
         .verify_well_formed()
         .is_err());
 }
+
+#[test]
+fn test_nil_block_overflow_returns_error() {
+    let nil_block = Block::new_nil(u64::MAX, certificate_for_genesis(), vec![]);
+
+    let err = nil_block.verify_well_formed().unwrap_err();
+    assert!(err.to_string().contains("Block round overflow"));
+}

@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 
 import argparse
+import os
 import requests
 
 
 def humio_secret():
+    token = os.environ.get("HUMIO_READ_TOKEN", "").strip()
+    if token:
+        return token
+
     print(
         "trying to get a humio secret from gcloud. if it asks for a password, abort and run `gcloud auth login --update-adc` first"
     )

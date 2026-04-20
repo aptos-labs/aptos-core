@@ -95,15 +95,14 @@ fn display_function(
 
     // Instructions
     let mut instr_num = 0;
-    for instr in &func.instrs {
-        if let Instr::Label(label) = instr {
-            writeln!(f, "  L{}:", label.0)?;
-            continue;
+    for block in &func.blocks {
+        writeln!(f, "  L{}:", block.label.0)?;
+        for instr in &block.instrs {
+            write!(f, "    {}: ", instr_num)?;
+            display_instr(f, module, instr)?;
+            writeln!(f)?;
+            instr_num += 1;
         }
-        write!(f, "    {}: ", instr_num)?;
-        display_instr(f, module, instr)?;
-        writeln!(f)?;
-        instr_num += 1;
     }
 
     writeln!(f, "}}")?;
@@ -767,7 +766,6 @@ fn display_instr(
         },
 
         // --- Control flow (no destinations) ---
-        Instr::Label(l) => write!(f, "L{}:", l.0),
         Instr::Branch(l) => write!(f, "branch L{}", l.0),
         Instr::BrTrue(l, c) => write!(f, "br_true L{}, {}", l.0, slot_name(*c)),
         Instr::BrFalse(l, c) => write!(f, "br_false L{}, {}", l.0, slot_name(*c)),

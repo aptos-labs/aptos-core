@@ -1,0 +1,35 @@
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xcafe::Module0
+// Function definition at index 0
+#[persistent] public fun f1(l0: &bool, l1: bool)
+    move_loc l0
+    pop
+    ret
+
+// Function definition at index 1
+#[persistent] public fun f2(l0: bool)
+    local l1: bool
+    local l2: &bool
+    local l3: bool
+    borrow_loc l0
+    copy_loc l0
+    st_loc l1
+    st_loc l2
+    move_loc l1
+    // @5
+    br_false l0
+    ld_true
+    st_loc l3
+    branch l1
+l0: ld_true
+    // @10
+    st_loc l3
+l1: move_loc l2
+    move_loc l3
+    call f1
+    ret
+
+
+============ bytecode verification succeeded ========

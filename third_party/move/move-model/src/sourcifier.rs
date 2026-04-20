@@ -16,7 +16,7 @@ use crate::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
-    well_known::UNSPECIFIED_ABORT_CODE,
+    well_known::{BORROW_GLOBAL, BORROW_GLOBAL_MUT, UNSPECIFIED_ABORT_CODE},
 };
 use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
@@ -2451,9 +2451,9 @@ impl<'a> ExpSourcifier<'a> {
             },
             Operation::BorrowGlobal(kind) => self.parenthesize(context_prio, Prio::Postfix, || {
                 if *kind == ReferenceKind::Mutable {
-                    emit!(self.wr(), "borrow_global_mut")
+                    emit!(self.wr(), BORROW_GLOBAL_MUT)
                 } else {
-                    emit!(self.wr(), "borrow_global")
+                    emit!(self.wr(), BORROW_GLOBAL)
                 }
                 self.print_node_inst(id);
                 self.print_exp_list("(", ")", args)
@@ -3211,7 +3211,23 @@ impl<'a> ExpSourcifier<'a> {
             },
             Pattern::LiteralValue(node_id, val) => {
                 let ty = self.env().get_node_type(*node_id);
-                self.parent.print_value(val, Some(&ty), self.for_spec);
+                let ty = ty.skip_reference();
+                self.parent.print_value(val, Some(ty), self.for_spec);
+            },
+            Pattern::Range(node_id, lo, hi, inclusive) => {
+                let ty = self.env().get_node_type(*node_id);
+                let ty = ty.skip_reference();
+                if let Some(l) = lo {
+                    self.parent.print_value(l, Some(ty), self.for_spec);
+                }
+                if *inclusive {
+                    emit!(self.wr(), "..=");
+                } else {
+                    emit!(self.wr(), "..");
+                }
+                if let Some(h) = hi {
+                    self.parent.print_value(h, Some(ty), self.for_spec);
+                }
             },
             Pattern::Error(_) => emit!(self.wr(), "*error*"),
         }

@@ -227,13 +227,23 @@ pub enum Instr {
     VecSwap(SignatureIndex, Slot, Slot, Slot),
 
     // --- Control flow ---
-    Label(Label),
     Branch(Label),
     BrTrue(Label, Slot),
     BrFalse(Label, Slot),
     Ret(Vec<Slot>),
     Abort(Slot),
     AbortMsg(Slot, Slot),
+}
+
+/// A basic block of instructions.
+///
+/// Every block has a label. The last instruction is a terminator.
+/// (`Branch`, `BrTrue`, `BrFalse`, `Ret`, `Abort`, `AbortMsg`).
+pub struct BasicBlock {
+    /// Label identifying this block.
+    pub label: Label,
+    /// Instructions in this block.
+    pub instrs: Vec<Instr>,
 }
 
 /// IR for a single function.
@@ -250,11 +260,23 @@ pub struct FunctionIR {
     pub num_home_slots: u16,
     /// Maximum number of Xfer slots needed across all call sites in this function.
     pub num_xfer_slots: u16,
-    /// The instruction stream.
-    pub instrs: Vec<Instr>,
+    /// Basic blocks of the function.
+    pub blocks: Vec<BasicBlock>,
     /// Type of each Home slot (indexed by Home slot index, 0..num_home_slots-1).
     /// Xfer slots have no entry here — their types are inferred from call signatures.
     pub home_slot_types: Vec<Type>,
+}
+
+impl FunctionIR {
+    /// Iterate over all instructions across all blocks.
+    pub fn instrs(&self) -> impl Iterator<Item = &Instr> {
+        self.blocks.iter().flat_map(|b| b.instrs.iter())
+    }
+
+    /// Iterate mutably over all instructions across all blocks.
+    pub fn instrs_mut(&mut self) -> impl Iterator<Item = &mut Instr> {
+        self.blocks.iter_mut().flat_map(|b| b.instrs.iter_mut())
+    }
 }
 
 /// IR for a module (wraps the original CompiledModule for pool access).

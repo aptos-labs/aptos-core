@@ -92,6 +92,8 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     vote_back_pressure_limit: Round,
+    max_commit_gap: u64,
+    skip_sync_small_gap_rounds: Option<u64>,
     payload_manager: Arc<dyn TPayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
@@ -111,11 +113,13 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
+        max_commit_gap: u64,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         window_size: Option<u64>,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
+        skip_sync_small_gap_rounds: Option<u64>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -130,12 +134,14 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             time_service,
             vote_back_pressure_limit,
+            max_commit_gap,
             payload_manager,
             order_vote_enabled,
             window_size,
             pending_blocks,
             pipeline_builder,
             None,
+            skip_sync_small_gap_rounds,
         ));
         block_on(block_store.try_send_for_execution());
         block_store
@@ -172,12 +178,14 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
+        max_commit_gap: u64,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         window_size: Option<u64>,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
         tree_to_replace: Option<Arc<RwLock<BlockTree>>>,
+        skip_sync_small_gap_rounds: Option<u64>,
     ) -> Self {
         let (commit_root_block, window_root_block, root_qc, root_ordered_cert, root_commit_cert) = (
             root.commit_root_block,
@@ -269,6 +277,7 @@ impl BlockStore {
             storage,
             time_service,
             vote_back_pressure_limit,
+            max_commit_gap,
             payload_manager,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
@@ -277,6 +286,7 @@ impl BlockStore {
             pipeline_builder,
             window_size,
             pre_commit_status,
+            skip_sync_small_gap_rounds,
         };
 
         for block in blocks {
@@ -382,12 +392,14 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
+            self.max_commit_gap,
             self.payload_manager.clone(),
             self.order_vote_enabled,
             self.window_size,
             self.pending_blocks.clone(),
             self.pipeline_builder.clone(),
             Some(self.inner.clone()),
+            self.skip_sync_small_gap_rounds,
         )
         .await;
 

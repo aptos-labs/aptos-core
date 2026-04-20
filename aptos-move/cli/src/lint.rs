@@ -169,7 +169,6 @@ impl CliCommand<&'static str> for LintPackage {
         let more_experiments = vec![
             Experiment::LINT_CHECKS.to_string(),
             Experiment::SPEC_CHECK.to_string(),
-            Experiment::SEQS_IN_BINOPS_CHECK.to_string(),
             Experiment::ACCESS_CHECK.to_string(),
             Experiment::STOP_AFTER_EXTENDED_CHECKS.to_string(),
         ];

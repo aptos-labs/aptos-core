@@ -697,7 +697,9 @@ impl RandConfig {
         let player = Player {
             id: self.get_id(peer),
         };
-        self.wconfig.get_player_weight(&player) as u64
+        self.wconfig
+            .get_player_weight(&player)
+            .expect("peer's player id is in bounds") as u64
     }
 
     pub fn threshold(&self) -> u64 {

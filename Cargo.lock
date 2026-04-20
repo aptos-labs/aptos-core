@@ -300,6 +300,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-backup-cli",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-build-info",
  "aptos-cached-packages",
@@ -443,6 +444,7 @@ dependencies = [
  "anyhow",
  "aptos-api-test-context",
  "aptos-api-types",
+ "aptos-batch-encryption",
  "aptos-bcs-utils",
  "aptos-build-info",
  "aptos-cached-packages",
@@ -685,6 +687,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "thiserror 1.0.69",
 ]
 
@@ -17861,6 +17864,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "shared-dsa"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 2.1.1",
+]
+
+[[package]]
 name = "shell-words"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18244,6 +18254,8 @@ dependencies = [
  "move-model",
  "move-prover-test-utils",
  "move-vm-types",
+ "shared-dsa",
+ "smallvec",
  "triomphe",
 ]
 

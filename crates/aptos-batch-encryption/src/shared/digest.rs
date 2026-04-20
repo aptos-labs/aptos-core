@@ -9,9 +9,7 @@ use crate::{
     shared::{algebra::fk_algorithm::FKDomain, ids::UncomputedCoeffs},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::arkworks::serialization::{
-    ark_de, ark_de_uncompressed_no_validate, ark_se, ark_se_uncompressed,
-};
+use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ark_std::{
     rand::{CryptoRng, RngCore},
@@ -25,17 +23,9 @@ use std::{
 };
 
 /// The digest public parameters.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DigestKey {
-    #[serde(
-        serialize_with = "ark_se_uncompressed",
-        deserialize_with = "ark_de_uncompressed_no_validate"
-    )]
     pub tau_g2: G2Affine,
-    #[serde(
-        serialize_with = "ark_se_uncompressed",
-        deserialize_with = "ark_de_uncompressed_no_validate"
-    )]
     pub tau_powers_g1: Vec<Vec<G1Affine>>,
     pub fk_domain: FKDomain<Fr, G1Projective>,
 }
@@ -105,6 +95,9 @@ impl DigestKey {
             .iter()
             .map(|gs| gs.iter().map(|g| G1Projective::from(*g)).collect())
             .collect();
+
+        debug_assert_eq!(tau_powers_g1[0].len(), batch_size + 1);
+        debug_assert_eq!(tau_powers_g1_projective[0].len(), batch_size + 1);
 
         let tau_g2: G2Affine = (G2Affine::generator() * tau).into();
 

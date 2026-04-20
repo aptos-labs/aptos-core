@@ -910,11 +910,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
+            self.config.max_commit_gap,
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
             Some(pipeline_builder),
+            self.config.skip_sync_small_gap_rounds,
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
@@ -1169,6 +1171,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
         if !onchain_chunky_dkg_config.chunky_dkg_enabled() {
             return Err(NoSecretSharingReason::FeatureDisabled);
+        }
+        if onchain_chunky_dkg_config.is_shadow_mode() {
+            return Err(NoSecretSharingReason::ShadowMode);
         }
 
         let dkg_state =
@@ -2124,6 +2129,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 pub enum NoSecretSharingReason {
     VTxnDisabled,
     FeatureDisabled,
+    ShadowMode,
     ChunkyDKGStateResourceMissing(anyhow::Error),
     DKGCompletedSessionResourceMissing,
     CompletedSessionTooOld,

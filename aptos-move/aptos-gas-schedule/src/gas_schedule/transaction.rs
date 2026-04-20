@@ -8,7 +8,7 @@ use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_10, RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
-        RELEASE_V1_41,
+        RELEASE_V1_41, RELEASE_V1_46,
     },
 };
 use aptos_gas_algebra::{
@@ -60,6 +60,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
             min_price_per_gas_unit: FeePerGasUnit,
             "min_price_per_gas_unit",
             aptos_global_constants::GAS_UNIT_PRICE
+        ],
+        [
+            high_limit_txn_min_price_per_gas_unit: FeePerGasUnit,
+            { RELEASE_V1_46.. => "high_limit_txn_min_price_per_gas_unit" },
+            // 10x of the min_price_per_gas_unit (100).
+            1000
         ],
         // The maximum gas unit price that a transaction can be submitted with.
         [

@@ -22,7 +22,11 @@ use aptos_metrics_core::IntGauge;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_types::{
     chain_id::ChainId,
-    dkg::chunky_dkg::{initialize_digest_key, set_digest_key_path, DigestKeySource, DIGEST_KEY},
+    dkg::chunky_dkg::{
+        initialize_digest_key, initialize_public_parameters, set_digest_key_path,
+        set_public_parameters_path, DigestKeySource, PublicParametersSource, DIGEST_KEY,
+        PUBLIC_PARAMETERS,
+    },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
@@ -95,6 +99,39 @@ pub fn initialize_digest_key_with_counters(
         },
         DigestKeySource::NotAvailable => {
             counters::DIGEST_KEY_SOURCE
+                .with_label_values(&["none"])
+                .set(1);
+        },
+    }
+}
+
+/// Initialize the PublicParameters and emit Prometheus counters for the source.
+/// Spawns a background thread to eagerly load from file and record load duration.
+pub fn initialize_public_parameters_with_counters(blob_path: Option<&PathBuf>, chain_id: ChainId) {
+    if let Some(path) = blob_path {
+        set_public_parameters_path(path.clone());
+    }
+    let source = initialize_public_parameters(chain_id);
+    match &source {
+        PublicParametersSource::WillLoadFromFile { file_size } => {
+            counters::PUBLIC_PARAMS_FILE_SIZE_BYTES.set(*file_size as i64);
+            counters::PUBLIC_PARAMS_SOURCE
+                .with_label_values(&["file"])
+                .set(1);
+            std::thread::spawn(|| {
+                let start = Instant::now();
+                let _ = &*PUBLIC_PARAMETERS;
+                counters::PUBLIC_PARAMS_LOAD_DURATION_SECONDS
+                    .observe(start.elapsed().as_secs_f64());
+            });
+        },
+        PublicParametersSource::TestKeyFallback => {
+            counters::PUBLIC_PARAMS_SOURCE
+                .with_label_values(&["test_fallback"])
+                .set(1);
+        },
+        PublicParametersSource::NotAvailable => {
+            counters::PUBLIC_PARAMS_SOURCE
                 .with_label_values(&["none"])
                 .set(1);
         },

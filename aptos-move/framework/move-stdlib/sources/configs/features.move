@@ -846,6 +846,18 @@ module std::features {
         is_enabled(ENCRYPTED_TRANSACTIONS)
     }
 
+    /// Whether the transaction limits feature is enabled. Allows transactions
+    /// to request higher execution/IO gas limits backed by staking voting power.
+    const TRANSACTION_LIMITS: u64 = 111;
+
+    public fun get_transaction_limits_feature(): u64 {
+        TRANSACTION_LIMITS
+    }
+
+    public fun is_transaction_limits_enabled(): bool {
+        is_enabled(TRANSACTION_LIMITS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -82,19 +82,19 @@ module 0xc0ffee::n {
     }
 
     public fun test_no_warn_1(addr: address) acquires R {
-        let r = borrow_global_mut<R>(addr);
+        let r = &mut R[addr];
         r.x = 5;
     }
 
     public fun test_no_warn_2(addr: address): u64 acquires R {
-        let r = borrow_global_mut<R>(addr);
+        let r = &mut R[addr];
         let y = &mut r.x;
         *y = 5;
         *y
     }
 
     public fun test_no_warn_3(addr: address) acquires S {
-        let s = borrow_global_mut<S>(addr);
+        let s = &mut S[addr];
         let y = &mut s.r;
         y.x = 5;
     }
@@ -106,7 +106,7 @@ module 0xc0ffee::n {
     fun helper_immut(_r: &R) {}
 
     public fun test_no_warn_4(addr: address, p: bool) acquires R {
-        let r = borrow_global_mut<R>(addr);
+        let r = &mut R[addr];
         if (p) {
             helper_mut(r);
         } else {
@@ -115,19 +115,19 @@ module 0xc0ffee::n {
     }
 
     public fun test_warn_1(addr: address) acquires R {
-        let r = borrow_global_mut<R>(addr);
+        let r = &mut R[addr];
         helper_immut(r);
     }
 
     public fun test_warn_2(addr: address): u64 acquires R {
-        let r = borrow_global_mut<R>(addr);
+        let r = &mut R[addr];
         let y = r.x;
         y
     }
 
     #[lint::skip(unused_function)]
     fun test_warn_3(s: &mut S, p: bool, addr: address): u64 acquires S {
-        let ref = borrow_global_mut<S>(addr);
+        let ref = &mut S[addr];
         if (p) {
             ref = s;
         };
@@ -137,7 +137,7 @@ module 0xc0ffee::n {
     #[lint::skip(unused_function)]
     fun test_no_warn_5(p: bool, a: address, s: &S): u64 acquires S {
         if (p) {
-            s = borrow_global<S>(a);
+            s = &S[a];
         };
         let y = &s.r;
         y.x

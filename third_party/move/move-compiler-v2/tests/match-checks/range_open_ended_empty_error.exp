@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: empty range pattern
+  ┌─ tests/match-checks/range_open_ended_empty_error.move:5:13
+  │
+5 │             ..0 => 1,
+  │             ^^^
+
+error: empty range pattern
+   ┌─ tests/match-checks/range_open_ended_empty_error.move:13:13
+   │
+13 │             ..-128i8 => 1,
+   │             ^^^^^^^^
+
+error: empty range pattern
+   ┌─ tests/match-checks/range_open_ended_empty_error.move:21:13
+   │
+21 │             ..0 => 1,
+   │             ^^^
+
+error: empty range pattern
+   ┌─ tests/match-checks/range_open_ended_empty_error.move:29:13
+   │
+29 │             ..0u16 => 1,
+   │             ^^^^^^

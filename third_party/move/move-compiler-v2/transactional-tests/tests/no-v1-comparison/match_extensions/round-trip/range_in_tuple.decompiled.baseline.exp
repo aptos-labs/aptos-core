@@ -1,0 +1,25 @@
+processed 9 tasks
+task 0 lines 3-40:  publish [module 0xc0ffee::m {]
+warning: Unused value of parameter `p1`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p1`), or binding to `_`
+   ┌─ TEMPFILE:34:55
+   │
+34 │     public fun test_tuple_range_and_wildcard(p0: u64, p1: u64): u64 {
+   │                                                       ^^
+
+
+task 1 lines 43-43:  run 0xc0ffee::m::test_tuple_both_ranges --args 3u64 15u64
+return values: 1
+task 2 lines 45-45:  run 0xc0ffee::m::test_tuple_both_ranges --args 3u64 25u64
+return values: 0
+task 3 lines 47-47:  run 0xc0ffee::m::test_tuple_both_ranges --args 0u64 15u64
+return values: 0
+task 4 lines 49-49:  run 0xc0ffee::m::test_tuple_range_and_literal --args 5u64 42u64
+return values: 1
+task 5 lines 51-51:  run 0xc0ffee::m::test_tuple_range_and_literal --args 5u64 99u64
+return values: 2
+task 6 lines 53-53:  run 0xc0ffee::m::test_tuple_range_and_literal --args 50u64 42u64
+return values: 0
+task 7 lines 55-55:  run 0xc0ffee::m::test_tuple_range_and_wildcard --args 50u64 999u64
+return values: 1
+task 8 lines 57-57:  run 0xc0ffee::m::test_tuple_range_and_wildcard --args 200u64 999u64
+return values: 2

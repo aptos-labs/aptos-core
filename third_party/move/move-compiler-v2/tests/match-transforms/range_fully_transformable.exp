@@ -1,0 +1,123 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun exclusive_ranges(p: u8): u8 {
+        {
+          let _$disc: u8 = p;
+          if And(Ge(_$disc, 0), Lt(_$disc, 5)) {
+            1
+          } else {
+            if And(Ge(_$disc, 5), Lt(_$disc, 10)) {
+              2
+            } else {
+              3
+            }
+          }
+        }
+    }
+    public fun inclusive_range(p: u64): u64 {
+        {
+          let _$disc: u64 = p;
+          if And(Ge(_$disc, 1), Le(_$disc, 5)) {
+            1
+          } else {
+            if And(Ge(_$disc, 6), Le(_$disc, 10)) {
+              2
+            } else {
+              3
+            }
+          }
+        }
+    }
+    public fun mixed_range_literal(p: u8): u8 {
+        {
+          let _$disc: u8 = p;
+          if Eq(_$disc, 0) {
+            1
+          } else {
+            if And(Ge(_$disc, 1), Lt(_$disc, 10)) {
+              2
+            } else {
+              if Eq(_$disc, 10) {
+                3
+              } else {
+                4
+              }
+            }
+          }
+        }
+    }
+    public fun open_end_range(p: u64): u64 {
+        {
+          let _$disc: u64 = p;
+          if Lt(_$disc, 5) {
+            1
+          } else {
+            if Ge(_$disc, 5) {
+              2
+            } else {
+              Abort(14566554180833181697)
+            }
+          }
+        }
+    }
+    public fun open_start_inclusive(p: u64): u64 {
+        {
+          let _$disc: u64 = p;
+          if Le(_$disc, 5) {
+            1
+          } else {
+            if Ge(_$disc, 6) {
+              2
+            } else {
+              Abort(14566554180833181697)
+            }
+          }
+        }
+    }
+    public fun signed_range(p: i64): u64 {
+        {
+          let _$disc: i64 = p;
+          if And(Ge(_$disc, -100), Lt(_$disc, -1)) {
+            1
+          } else {
+            if And(Ge(_$disc, 0), Le(_$disc, 0)) {
+              2
+            } else {
+              if And(Ge(_$disc, 1), Lt(_$disc, 100)) {
+                3
+              } else {
+                4
+              }
+            }
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun exclusive_ranges(p: u8): u8 {
+        let __disc = p;
+        if (__disc >= 0u8 && __disc < 5u8) 1u8 else if (__disc >= 5u8 && __disc < 10u8) 2u8 else 3u8
+    }
+    public fun inclusive_range(p: u64): u64 {
+        let __disc = p;
+        if (__disc >= 1 && __disc <= 5) 1 else if (__disc >= 6 && __disc <= 10) 2 else 3
+    }
+    public fun mixed_range_literal(p: u8): u8 {
+        let __disc = p;
+        if (__disc == 0u8) 1u8 else if (__disc >= 1u8 && __disc < 10u8) 2u8 else if (__disc == 10u8) 3u8 else 4u8
+    }
+    public fun open_end_range(p: u64): u64 {
+        let __disc = p;
+        if (__disc < 5) 1 else if (__disc >= 5) 2 else abort 14566554180833181697
+    }
+    public fun open_start_inclusive(p: u64): u64 {
+        let __disc = p;
+        if (__disc <= 5) 1 else if (__disc >= 6) 2 else abort 14566554180833181697
+    }
+    public fun signed_range(p: i64): u64 {
+        let __disc = p;
+        if (__disc >= -100i64 && __disc < -1i64) 1 else if (__disc >= 0i64 && __disc <= 0i64) 2 else if (__disc >= 1i64 && __disc < 100i64) 3 else 4
+    }
+}

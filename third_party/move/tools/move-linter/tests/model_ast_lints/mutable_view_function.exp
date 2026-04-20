@@ -1,0 +1,109 @@
+
+Diagnostics:
+warning: [lint] view function `unsafe_view_indirect` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+   ┌─ tests/model_ast_lints/mutable_view_function.move:13:16
+   │
+13 │     public fun unsafe_view_indirect(): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_view_direct_borrow` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+   ┌─ tests/model_ast_lints/mutable_view_function.move:20:16
+   │
+20 │     public fun unsafe_view_direct_borrow(): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_view_move_from` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+   ┌─ tests/model_ast_lints/mutable_view_function.move:28:16
+   │
+28 │     public fun unsafe_view_move_from(): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_view_move_from_indirect` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+   ┌─ tests/model_ast_lints/mutable_view_function.move:40:16
+   │
+40 │     public fun unsafe_view_move_from_indirect(): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `private_view_mutates` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+   ┌─ tests/model_ast_lints/mutable_view_function.move:54:9
+   │
+54 │     fun private_view_mutates(): u64 {
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_view_recursive` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+   ┌─ tests/model_ast_lints/mutable_view_function.move:76:16
+   │
+76 │     public fun unsafe_view_recursive(): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_view_mutual_recursive` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+    ┌─ tests/model_ast_lints/mutable_view_function.move:110:16
+    │
+110 │     public fun unsafe_view_mutual_recursive(): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `first_view_reaches_x` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+    ┌─ tests/model_ast_lints/mutable_view_function.move:130:16
+    │
+130 │     public fun first_view_reaches_x(): bool {
+    │                ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `second_view_reaches_y` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+    ┌─ tests/model_ast_lints/mutable_view_function.move:137:16
+    │
+137 │     public fun second_view_reaches_y(): bool {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_view_deep_chain` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+    ┌─ tests/model_ast_lints/mutable_view_function.move:175:16
+    │
+175 │     public fun unsafe_view_deep_chain(): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_friend_view_mutates` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+    ┌─ tests/model_ast_lints/mutable_view_function.move:193:16
+    │
+193 │     friend fun unsafe_friend_view_mutates(): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.
+
+warning: [lint] view function `unsafe_package_view_mutates` performs global state mutations (via `borrow_global_mut`, `move_to`, or `move_from`), either directly or through a callee. These mutations are silently discarded when called via the view API, but applied when called from Move code. This inconsistency can lead to unexpected behavior, reconsider the implementation.
+    ┌─ tests/model_ast_lints/mutable_view_function.move:207:17
+    │
+207 │     package fun unsafe_package_view_mutates(): u64 {
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(mutable_view_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#mutable_view_function.

@@ -554,3 +554,12 @@ pub fn make_all(
 
     builder.make_named_natives(natives)
 }
+
+pub fn make_batch_verify_native(
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
+    builder.make_named_natives(vec![(
+        "verify_batch_range_proof_internal",
+        native_verify_batch_range_proof,
+    )])
+}

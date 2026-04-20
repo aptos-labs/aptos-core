@@ -1,0 +1,238 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct P {
+        q: Q,
+    }
+    struct Q {
+        r: u64,
+    }
+    private inline fun update(p: P): P {
+        {
+          let (p: &mut P): (&mut P) = Tuple(Borrow(Mutable)(p));
+          Borrow(Mutable)(select m::Q.r<Q>(select m::P.q<&mut P>(p)))
+        } = 20;
+        p
+    }
+    private inline fun derive(p: &mut P): &mut u64 {
+        Borrow(Mutable)(select m::Q.r<Q>(select m::P.q<&mut P>(p)))
+    }
+    public fun main() {
+        if Eq<u64>(select m::Q.r<Q>(select m::P.q<P>({
+          let (p: P): (P) = Tuple(pack m::P(pack m::Q(0)));
+          {
+            let (p: &mut P): (&mut P) = Tuple(Borrow(Mutable)(p));
+            Borrow(Mutable)(select m::Q.r<Q>(select m::P.q<&mut P>(p)))
+          } = 20;
+          p
+        })), 20) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct P has copy, drop {
+        q: Q,
+    }
+    struct Q has copy, drop {
+        r: u64,
+    }
+    inline fun update(p: P): P {
+        *{
+            let p = &mut p;
+            &mut p.q.r
+        } = 20;
+        p
+    }
+    inline fun derive(p: &mut P): &mut u64 {
+        &mut p.q.r
+    }
+    public fun main() {
+        if ({
+            let p = P{q: Q{r: 0}};
+            *{
+                let p = &mut p;
+                &mut p.q.r
+            } = 20;
+            p
+        }.q.r == 20) () else abort 0;
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::main() {
+     var $t0: bool
+     var $t1: u64
+     var $t2: &0xc0ffee::m::Q
+     var $t3: 0xc0ffee::m::P
+     var $t4: 0xc0ffee::m::P
+     var $t5: 0xc0ffee::m::P
+     var $t6: 0xc0ffee::m::Q
+     var $t7: u64
+     var $t8: u64
+     var $t9: &mut u64
+     var $t10: &mut 0xc0ffee::m::P
+     var $t11: &mut 0xc0ffee::m::P
+     var $t12: &mut 0xc0ffee::m::Q
+     var $t13: &0xc0ffee::m::P
+     var $t14: &u64
+     var $t15: u64
+     var $t16: u64
+  0: $t7 := 0
+  1: $t6 := pack 0xc0ffee::m::Q($t7)
+  2: $t5 := pack 0xc0ffee::m::P($t6)
+  3: $t4 := infer($t5)
+  4: $t8 := 20
+  5: $t11 := borrow_local($t4)
+  6: $t10 := infer($t11)
+  7: $t12 := borrow_field<0xc0ffee::m::P>.q($t10)
+  8: $t9 := borrow_field<0xc0ffee::m::Q>.r($t12)
+  9: write_ref($t9, $t8)
+ 10: $t3 := infer($t4)
+ 11: $t13 := borrow_local($t3)
+ 12: $t2 := borrow_field<0xc0ffee::m::P>.q($t13)
+ 13: $t14 := borrow_field<0xc0ffee::m::Q>.r($t2)
+ 14: $t1 := read_ref($t14)
+ 15: $t15 := 20
+ 16: $t0 := ==($t1, $t15)
+ 17: if ($t0) goto 18 else goto 20
+ 18: label L0
+ 19: goto 23
+ 20: label L1
+ 21: $t16 := 0
+ 22: abort($t16)
+ 23: label L2
+ 24: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    struct P {
+        q: Q,
+    }
+    struct Q {
+        r: u64,
+    }
+    private inline fun update(p: P): P {
+        {
+          let (p: &mut P): (&mut P) = Tuple(Borrow(Mutable)(p));
+          Borrow(Mutable)(select m::Q.r<Q>(select m::P.q<&mut P>(p)))
+        } = 20;
+        p
+    }
+    private inline fun derive(p: &mut P): &mut u64 {
+        Borrow(Mutable)(select m::Q.r<Q>(select m::P.q<&mut P>(p)))
+    }
+    public fun main() {
+        if Eq<u64>(select m::Q.r<Q>(select m::P.q<P>({
+          let (p: P): (P) = Tuple(pack m::P(pack m::Q(0)));
+          {
+            let (p: &mut P): (&mut P) = Tuple(Borrow(Mutable)(p));
+            Borrow(Mutable)(select m::Q.r<Q>(select m::P.q<&mut P>(p)))
+          } = 20;
+          p
+        })), 20) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::main() {
+     var $t0: bool
+     var $t1: u64
+     var $t2: &0xc0ffee::m::Q
+     var $t3: 0xc0ffee::m::P
+     var $t4: 0xc0ffee::m::P
+     var $t5: 0xc0ffee::m::P
+     var $t6: 0xc0ffee::m::Q
+     var $t7: u64
+     var $t8: u64
+     var $t9: &mut u64
+     var $t10: &mut 0xc0ffee::m::P
+     var $t11: &mut 0xc0ffee::m::P
+     var $t12: &mut 0xc0ffee::m::Q
+     var $t13: &0xc0ffee::m::P
+     var $t14: &u64
+     var $t15: u64
+     var $t16: u64
+  0: $t7 := 0
+  1: $t6 := pack 0xc0ffee::m::Q($t7)
+  2: $t5 := pack 0xc0ffee::m::P($t6)
+  3: $t4 := infer($t5)
+  4: $t8 := 20
+  5: $t11 := borrow_local($t4)
+  6: $t10 := infer($t11)
+  7: $t12 := borrow_field<0xc0ffee::m::P>.q($t10)
+  8: $t9 := borrow_field<0xc0ffee::m::Q>.r($t12)
+  9: write_ref($t9, $t8)
+ 10: $t3 := infer($t4)
+ 11: $t13 := borrow_local($t3)
+ 12: $t2 := borrow_field<0xc0ffee::m::P>.q($t13)
+ 13: $t14 := borrow_field<0xc0ffee::m::Q>.r($t2)
+ 14: $t1 := read_ref($t14)
+ 15: $t15 := 20
+ 16: $t0 := ==($t1, $t15)
+ 17: if ($t0) goto 18 else goto 20
+ 18: label L0
+ 19: goto 23
+ 20: label L1
+ 21: $t16 := 0
+ 22: abort($t16)
+ 23: label L2
+ 24: return ()
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xc0ffee::m
+struct P has copy + drop
+  q: Q
+
+struct Q has copy + drop
+  r: u64
+
+// Function definition at index 0
+#[persistent] public fun main()
+    local l0: P
+    local l1: P
+    ld_u64 0
+    pack Q
+    pack P
+    st_loc l0
+    ld_u64 20
+    // @5
+    mut_borrow_loc l0
+    mut_borrow_field P, q
+    mut_borrow_field Q, r
+    write_ref
+    move_loc l0
+    // @10
+    st_loc l1
+    borrow_loc l1
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    // @15
+    ld_u64 20
+    eq
+    br_false l0
+    ret
+l0: ld_u64 0
+    // @20
+    abort
+
+
+============ bytecode verification succeeded ========
