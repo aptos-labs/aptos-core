@@ -438,6 +438,16 @@ class TaskStats:
     def increment_retry_count(self) -> None:
         self.retry_count += 1
 
+    def reset_timing(self) -> None:
+        """Reset start_time to now; clear end_time.
+
+        Called when a retried task is re-dispatched, so the reported
+        duration reflects only the final attempt (not queue wait time
+        or earlier failed attempts).
+        """
+        self.start_time = time.time()
+        self.end_time = None
+
     def set_succeeded(self):
         self.succeeded = True
 
@@ -779,6 +789,10 @@ class ReplayScheduler:
                     worker_pod.start()
                     if worker_pod.name not in self.task_stats:
                         self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
+                    else:
+                        # Retry dispatch: reset timing so duration reflects
+                        # only this attempt, not earlier ones or queue wait.
+                        self.task_stats[worker_pod.name].reset_timing()
 
             # --- Periodic status summary ---
             # Every 5 min while dispatching, every 60s while waiting.
@@ -817,6 +831,7 @@ class ReplayScheduler:
                     f"status=Failed({reason}), duration={duration}s, "
                     f"rescheduling (attempt {retries}/{MAX_RETRIES})"
                 )
+                # Don't set end_time — task will be re-dispatched
                 self.kill_pod_and_reschedule_task(worker_pod, worker_idx)
             else:
                 logger.info(
@@ -825,6 +840,7 @@ class ReplayScheduler:
                 )
                 self.failed_workpod_logs.append(worker_pod.get_humio_log_link())
                 self.current_workers[worker_idx] = None
+                self.task_stats[worker_pod.name].set_end_time()
         else:
             logger.info(
                 f"Worker {worker_idx} completed: {worker_pod.name}, "
@@ -832,8 +848,7 @@ class ReplayScheduler:
             )
             self.task_stats[worker_pod.name].set_succeeded()
             self.current_workers[worker_idx] = None
-
-        self.task_stats[worker_pod.name].set_end_time()
+            self.task_stats[worker_pod.name].set_end_time()
 
     def cleanup(self):
         self.kill_all_pods()
