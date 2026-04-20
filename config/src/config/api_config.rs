@@ -192,6 +192,51 @@ impl ConfigSanitizer for ApiConfig {
             ));
         }
 
+        // Validate basic API pagination properties
+        if api_config.max_transactions_page_size == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "max_transactions_page_size must be greater than 0".into(),
+            ));
+        }
+
+        if api_config.max_block_transactions_page_size == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "max_block_transactions_page_size must be greater than 0".into(),
+            ));
+        }
+
+        if api_config.max_events_page_size == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "max_events_page_size must be greater than 0".into(),
+            ));
+        }
+
+        if api_config.max_account_resources_page_size == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "max_account_resources_page_size must be greater than 0".into(),
+            ));
+        }
+
+        if api_config.max_account_modules_page_size == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "max_account_modules_page_size must be greater than 0".into(),
+            ));
+        }
+
+        if let Some(limit) = api_config.content_length_limit {
+            if limit == 0 {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "content_length_limit must be greater than 0 when set".into(),
+                ));
+            }
+        }
+
         // Sanitize the gas estimation config
         GasEstimationConfig::sanitize(node_config, node_type, chain_id)?;
 
@@ -306,5 +351,131 @@ mod tests {
             ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_zero_max_transactions_page_size() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                max_transactions_page_size: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_zero_max_block_transactions_page_size() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                max_block_transactions_page_size: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_zero_max_events_page_size() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                max_events_page_size: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_zero_max_account_resources_page_size() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                max_account_resources_page_size: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_zero_max_account_modules_page_size() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                max_account_modules_page_size: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_zero_content_length_limit() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                content_length_limit: Some(0),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let error =
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
+        match error {
+            Error::ConfigSanitizerFailed(_, message) => {
+                assert_eq!(message, "content_length_limit must be greater than 0 when set");
+            },
+            _ => panic!("unexpected error variant"),
+        }
+    }
+
+    #[test]
+    fn test_sanitize_valid_limits() {
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                max_transactions_page_size: 1,
+                max_block_transactions_page_size: 1,
+                max_events_page_size: 1,
+                max_account_resources_page_size: 1,
+                max_account_modules_page_size: 1,
+                content_length_limit: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet())).unwrap();
     }
 }
