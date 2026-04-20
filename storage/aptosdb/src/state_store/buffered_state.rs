@@ -6,16 +6,23 @@
 use crate::{
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
-        persisted_state::PersistedState, state_snapshot_committer::StateSnapshotCommitter, StateDb,
+        persisted_state::PersistedState,
+        state_snapshot_committer::{SnapshotToCommit, StateSnapshotCommitter},
+        StateDb,
     },
 };
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
-    state_store::state_with_summary::{LedgerStateWithSummary, StateWithSummary},
+    state_store::{
+        empty_hot_state_updates,
+        state_with_summary::{LedgerStateWithSummary, StateWithSummary},
+        HotStateShardUpdates, HotStateUpdates,
+    },
     Result,
 };
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
+use itertools::Itertools;
 use std::{
     sync::{
         mpsc,
@@ -37,11 +44,18 @@ pub struct BufferedState {
     /// The most recent checkpoint sent for persistence, not guaranteed to have committed already.
     last_snapshot: StateWithSummary,
     /// channel to send a checkpoint for persistence asynchronously
-    state_commit_sender: SyncSender<CommitMessage<StateWithSummary>>,
+    state_commit_sender: SyncSender<CommitMessage<SnapshotToCommit>>,
     /// Estimated number of items in the buffer.
     estimated_items: usize,
     /// The target number of items in the buffer between commits.
     target_items: usize,
+    /// Hot state updates covering `[last_snapshot, current_state.last_checkpoint()]`.
+    /// Drained into the committer on every snapshot flush.
+    pending_hot_state_updates: [HotStateShardUpdates; NUM_STATE_SHARDS],
+    /// Hot state updates covering `(current_state.last_checkpoint(), current_state.latest()]`.
+    /// Folded into `pending_hot_state_updates` once a later chunk advances the checkpoint past
+    /// them.
+    post_checkpoint_hot_state_updates: [HotStateShardUpdates; NUM_STATE_SHARDS],
     join_handle: Option<JoinHandle<()>>,
 }
 
@@ -88,8 +102,20 @@ impl BufferedState {
             state_commit_sender,
             estimated_items: 0,
             target_items,
+            pending_hot_state_updates: empty_hot_state_updates(),
+            post_checkpoint_hot_state_updates: empty_hot_state_updates(),
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
+        }
+    }
+
+    /// Merges `incoming` into `target` per-shard.
+    fn merge_hot_state_updates(
+        target: &mut [HotStateShardUpdates; NUM_STATE_SHARDS],
+        incoming: [HotStateShardUpdates; NUM_STATE_SHARDS],
+    ) {
+        for (t, i) in target.iter_mut().zip_eq(incoming.into_iter()) {
+            t.merge(i);
         }
     }
 
@@ -123,8 +149,15 @@ impl BufferedState {
     fn enqueue_commit(&mut self, checkpoint: StateWithSummary) {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___enqueue_commit"]);
 
+        let hot_state_updates = std::mem::replace(
+            &mut self.pending_hot_state_updates,
+            empty_hot_state_updates(),
+        );
         self.state_commit_sender
-            .send(CommitMessage::Data(checkpoint.clone()))
+            .send(CommitMessage::Data(SnapshotToCommit {
+                snapshot: checkpoint.clone(),
+                hot_state_updates,
+            }))
             .unwrap();
         // n.b. if the latest state is not a (the latest) checkpoint, the items between them are
         // not counted towards the next commit. If this becomes a concern we can count the items
@@ -156,6 +189,7 @@ impl BufferedState {
     pub fn update(
         &mut self,
         new_state: LedgerStateWithSummary,
+        hot_state_updates: HotStateUpdates,
         estimated_new_items: usize,
         sync_commit: bool,
     ) -> Result<()> {
@@ -173,7 +207,30 @@ impl BufferedState {
         let checkpoint_to_commit_opt =
             (old_state.next_version() < last_checkpoint.next_version()).then_some(last_checkpoint);
         *self.current_state_locked() = new_state;
+
+        // When a new checkpoint advances past earlier chunks' post-checkpoint updates,
+        // those updates are now pre-(new-)checkpoint and become eligible for the next
+        // snapshot flush. Fold them into `pending_hot_state_updates` first.
+        if checkpoint_to_commit_opt.is_some() {
+            let prev_post_checkpoint = std::mem::replace(
+                &mut self.post_checkpoint_hot_state_updates,
+                empty_hot_state_updates(),
+            );
+            Self::merge_hot_state_updates(
+                &mut self.pending_hot_state_updates,
+                prev_post_checkpoint,
+            );
+        }
+        // Merge this chunk's pre-checkpoint portion before potentially flushing.
+        if let Some(shards) = hot_state_updates.for_last_checkpoint {
+            Self::merge_hot_state_updates(&mut self.pending_hot_state_updates, shards);
+        }
         self.maybe_commit(checkpoint_to_commit_opt, sync_commit);
+        // The post-checkpoint portion of this chunk goes into `post_checkpoint` so it is
+        // NOT flushed at the current checkpoint — its versions are past the snapshot.
+        if let Some(shards) = hot_state_updates.for_latest {
+            Self::merge_hot_state_updates(&mut self.post_checkpoint_hot_state_updates, shards);
+        }
         Self::report_last_checkpoint_version(version);
         Ok(())
     }
