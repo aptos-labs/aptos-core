@@ -15,7 +15,7 @@ use crate::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
         storage::interface::RandStorage,
-        types::{FastShare, PathType, RandConfig, RequestShare, TAugmentedData, TShare},
+        types::{FastShare, PathType, RandConfig, RandShare, RequestShare, TAugmentedData, TShare},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -218,6 +218,30 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .into()));
     }
 
+    /// Insert a share into the local store iff its embedded author truly
+    /// matches the network peer that sent it. The same invariant is enforced
+    /// in `RandMessage::verify`; this re-check is defense-in-depth so that a
+    /// regression up the call stack cannot let one validator overwrite
+    /// another's slot in the share aggregator.
+    fn admit_peer_share(
+        &self,
+        share: RandShare<S>,
+        path: PathType,
+        peer: &Author,
+        kind: &'static str,
+    ) {
+        if share.author() != peer {
+            warn!(
+                "[RandManager] refusing {} - claimed author {} differs from delivering peer {}",
+                kind,
+                share.author(),
+                peer,
+            );
+        } else if let Err(e) = self.rand_store.lock().add_share(share, path) {
+            warn!("[RandManager] {} could not be admitted: {}", kind, e)
+        }
+    }
+
     async fn verification_task(
         epoch_state: Arc<EpochState>,
         mut incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
@@ -235,17 +259,19 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 .spawn(async move {
                     match bcs::from_bytes::<RandMessage<S, D>>(rand_gen_msg.req.data()) {
                         Ok(msg) => {
+                            let peer = rand_gen_msg.sender;
                             if msg
                                 .verify(
                                     &epoch_state_clone,
                                     &config_clone,
                                     &fast_config_clone,
-                                    rand_gen_msg.sender,
+                                    peer,
                                 )
                                 .is_ok()
                             {
                                 let _ = tx.unbounded_send(RpcRequest {
                                     req: msg,
+                                    sender: peer,
                                     protocol: rand_gen_msg.protocol,
                                     response_sender: rand_gen_msg.response_sender,
                                 });
@@ -390,6 +416,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {
                         req: rand_gen_msg,
+                        sender: authenticated_peer,
                         protocol,
                         response_sender,
                     } = request;
@@ -418,9 +445,12 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round)
                                 .remote_peer(*share.author()));
 
-                            if let Err(e) = self.rand_store.lock().add_share(share, PathType::Slow) {
-                                warn!("[RandManager] Failed to add share: {}", e);
-                            }
+                            self.admit_peer_share(
+                                share,
+                                PathType::Slow,
+                                &authenticated_peer,
+                                "Share",
+                            );
                         }
                         RandMessage::FastShare(share) => {
                             trace!(LogSchema::new(LogEvent::ReceiveRandShareFastPath)
@@ -429,9 +459,12 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round)
                                 .remote_peer(*share.share.author()));
 
-                            if let Err(e) = self.rand_store.lock().add_share(share.rand_share(), PathType::Fast) {
-                                warn!("[RandManager] Failed to add share for fast path: {}", e);
-                            }
+                            self.admit_peer_share(
+                                share.rand_share(),
+                                PathType::Fast,
+                                &authenticated_peer,
+                                "FastShare",
+                            );
                         }
                         RandMessage::AugData(aug_data) => {
                             info!(LogSchema::new(LogEvent::ReceiveAugData)
