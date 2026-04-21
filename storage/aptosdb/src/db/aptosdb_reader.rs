@@ -32,6 +32,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::HotStateValue,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -544,6 +545,19 @@ impl DbReader for AptosDB {
 
             self.state_store
                 .get_state_value_with_version_by_version(state_key, version)
+        })
+    }
+
+    fn get_hot_state_value_by_version(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+    ) -> Result<Option<HotStateValue>> {
+        gauged_api("get_hot_state_value_by_version", || {
+            self.error_if_state_kv_pruned("HotStateValue", version)?;
+
+            self.state_store
+                .get_hot_state_value_by_version(key_hash, version)
         })
     }
 
