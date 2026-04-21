@@ -1,6 +1,9 @@
 # Cross-compile smoke test for the Aptos CLI release path. Runs on pull requests
 # only when the `aptos` crate version in crates/aptos/Cargo.toml is strictly
 # higher than on the PR base (ignores downgrades / old versions).
+#
+# Uses `pull_request` (not `pull_request_target`), so checkout of the PR head is
+# the standard untrusted-PR pattern; no repository-permission action required.
 
 name: "Test CLI build for release"
 
@@ -14,8 +17,6 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
   check-aptos-cli-version-changed:
@@ -25,32 +26,24 @@ jobs:
       should_run: ${{ steps.compare.outputs.should_run }}
       cli_version: ${{ steps.compare.outputs.cli_version }}
     steps:
-      - name: Compare aptos crate version to base branch (GitHub API, no checkout)
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Compare aptos crate version to base branch
         id: compare
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          REPO="${GITHUB_REPOSITORY}"
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
 
-          fetch_toml() {
-            local sha="$1"
-            curl -fsS \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${REPO}/contents/crates%2Faptos%2FCargo.toml?ref=${sha}" \
-              | python3 -c "import sys,json,base64; j=json.load(sys.stdin); print(base64.b64decode(j['content']).decode())"
-          }
-
           version_from_toml() {
-            printf '%s' "$1" | awk -F'"' '/^version = / { print $2; exit }'
+            git show "$1:crates/aptos/Cargo.toml" | awk -F'"' '/^version = / { print $2; exit }'
           }
 
-          BASE_VER="$(version_from_toml "$(fetch_toml "$BASE_SHA")")"
-          HEAD_VER="$(version_from_toml "$(fetch_toml "$HEAD_SHA")")"
+          BASE_VER="$(version_from_toml "$BASE_SHA")"
+          HEAD_VER="$(version_from_toml "$HEAD_SHA")"
 
           echo "Base aptos version: $BASE_VER"
           echo "Head aptos version: $HEAD_VER"
@@ -65,32 +58,9 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # Require write access before checkout only when the matrix will run (aptos version bump).
-  # When there is no bump, skip the action entirely so fork / read-only PRs pass policy
-  # without relying on `relax` string coercion.
-  permission-check:
-    name: Check repository permission for release build matrix
-    needs: [check-aptos-cli-version-changed]
-    runs-on: 2cpu-gh-ubuntu24-x64
-    steps:
-      - name: Check repository permission (strict — release matrix will run)
-        if: needs.check-aptos-cli-version-changed.outputs.should_run == 'true'
-        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
-        with:
-          required-permission: write
-          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
-
-      - name: Check repository permission (relaxed — no release matrix)
-        if: needs.check-aptos-cli-version-changed.outputs.should_run != 'true'
-        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
-        with:
-          required-permission: write
-          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
-          relax: "true"
-
   test-cli-build-for-release:
     name: test-cli-build-for-release (${{ matrix.platform }})
-    needs: [check-aptos-cli-version-changed, permission-check]
+    needs: check-aptos-cli-version-changed
     if: needs.check-aptos-cli-version-changed.outputs.should_run == 'true'
     env:
       CLI_VERSION: ${{ needs.check-aptos-cli-version-changed.outputs.cli_version }}
@@ -120,7 +90,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
