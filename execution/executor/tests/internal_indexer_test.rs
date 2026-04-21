@@ -408,7 +408,6 @@ fn test_db_indexer_data() {
         (false, "0x1::aggregator_factory::AggregatorFactory"),
         (false, "0x1::transaction_fee::AptosCoinMintCapability"),
         (false, "0x1::transaction_fee::AptosFABurnCapabilities"),
-        (false, "0x1::jwk_consensus_config::JWKConsensusConfig"),
         (false, "0x1::aptos_governance::ApprovedExecutionHashes"),
         (false, "0x1::aptos_governance::GovernanceResponsbility"),
         (false, "0x1::randomness_api_v0_config::RequiredGasDeposit"),
