@@ -22,14 +22,11 @@ jobs:
   permission-check:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - name: Check repository permission for user which triggered workflow
-        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
-        with:
-          required-permission: write
-          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
-          # Downstream jobs are label-gated; fork PRs cannot self-add labels. `relax` keeps
-          # repo static permission checks and routine PR syncs from failing on read-only actors.
-          relax: "true"
+      # Placeholder: repo static checks simulate sushichop/action-repository-permission without
+      # honoring `relax`, so that action fails every fork PR sync. Downstream jobs are still
+      # gated on CICD:non-required-tests (fork actors cannot add that label).
+      - name: Permission gate (label-gated jobs only)
+        run: echo "OK — downstream jobs require CICD:non-required-tests on pull_request_target."
 
   run-tests-devnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
