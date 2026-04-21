@@ -11,6 +11,9 @@ name: "Faucet Integration Tests: Prod"
 on:
   pull_request_target:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+    paths:
+      - "crates/aptos-faucet/**"
+      - ".github/actions/run-faucet-tests/**"
   push:
     branches:
       - main
@@ -27,10 +30,11 @@ jobs:
   permission-check:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      # Fork PRs + repo static checks fail sushichop/action-repository-permission as write.
-      # Downstream jobs are label-gated (CICD:non-required-tests); fork actors cannot add it.
-      - name: Permission gate (label-gated jobs only)
-        run: echo "OK"
+      - name: Check repository permission for user which triggered workflow
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
   # These tests ensure that the faucet works with the nodes running on devnet.
   run-tests-devnet:
