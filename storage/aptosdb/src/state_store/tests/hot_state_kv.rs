@@ -14,7 +14,7 @@ use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::batch::WriteBatch;
 use aptos_storage_interface::state_store::{
-    HotEvictionOp, HotInsertionOp, HotStateShardUpdates, HotStateUpdates,
+    empty_hot_state_updates, HotEvictionOp, HotInsertionOp, HotStateUpdates,
 };
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -27,11 +27,6 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use std::collections::HashMap;
-
-fn new_empty_shard_updates() -> [HotStateShardUpdates; NUM_STATE_SHARDS] {
-    std::array::from_fn(|_| HotStateShardUpdates::new(HashMap::new(), HashMap::new()))
-}
 
 fn create_hot_state_kv_db(path: &TempPath) -> StateKvDb {
     StateKvDb::new(
@@ -510,12 +505,13 @@ fn test_load_write_then_load_roundtrip() {
     let val1 = make_state_value(10);
     let key2 = make_state_key(20);
 
-    let mut shards = new_empty_shard_updates();
+    let mut shards = empty_hot_state_updates();
 
     // key1: occupied at hot_since_version=100, value_version=50
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
             superseded_version: None,
@@ -525,6 +521,7 @@ fn test_load_write_then_load_roundtrip() {
     shards[key2.get_shard_id()]
         .insertions
         .insert(*key2.crypto_hash_ref(), HotInsertionOp {
+            state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
             superseded_version: None,
@@ -633,12 +630,13 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     let key2 = make_state_key(20);
     let key3 = make_state_key(30);
 
-    let mut shards = new_empty_shard_updates();
+    let mut shards = empty_hot_state_updates();
 
     // key1: first write (no superseded version) at hot_since_version=100
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
             superseded_version: None,
@@ -648,6 +646,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     shards[key2.get_shard_id()]
         .insertions
         .insert(*key2.crypto_hash_ref(), HotInsertionOp {
+            state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
             superseded_version: Some(80),
@@ -780,10 +779,11 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
     let val_new = make_state_value(2);
 
     // First batch: write old entry at hot_since=100
-    let mut shards = new_empty_shard_updates();
+    let mut shards = empty_hot_state_updates();
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val_old.clone()), 100),
             value_version: Some(100),
             superseded_version: None,
@@ -800,10 +800,11 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
     hot_state_kv_db.commit(100, None, batches).unwrap();
 
     // Second batch: write new entry at hot_since=200 superseding 100
-    let mut shards2 = new_empty_shard_updates();
+    let mut shards2 = empty_hot_state_updates();
     shards2[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val_new.clone()), 200),
             value_version: Some(200),
             superseded_version: Some(100),
