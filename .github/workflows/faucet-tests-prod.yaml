@@ -25,11 +25,6 @@ jobs:
   # triggered the workflow or on 'pull_request's which have set auto_merge=true
   # or have the label "CICD:run-e2e-tests".
   permission-check:
-    # Only enforce write access when downstream jobs would run; otherwise fork PRs
-    # fail here on every sync (those jobs are gated on CICD:non-required-tests).
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -37,6 +32,9 @@ jobs:
         with:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+          # Downstream jobs are label-gated; fork PRs cannot self-add labels. `relax` keeps
+          # repo static permission checks and routine PR syncs from failing on read-only actors.
+          relax: "true"
 
   # These tests ensure that the faucet works with the nodes running on devnet.
   run-tests-devnet:
