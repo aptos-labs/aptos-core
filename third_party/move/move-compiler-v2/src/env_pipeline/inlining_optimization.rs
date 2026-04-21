@@ -594,12 +594,15 @@ fn has_cross_module_event_emit(caller_mid: ModuleId, callee: &FunctionEnv) -> bo
     let Some(body) = callee.get_def() else {
         return false;
     };
+    let stdlib_address = env.get_stdlib_address();
     body.any(&mut |exp: &ExpData| {
         let ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) = exp else {
             return false;
         };
         let call = env.get_function(mid.qualified(*fid));
-        if call.get_full_name_with_address() != well_known::EVENT_EMIT {
+        if call.module_env.get_name().addr() != &stdlib_address
+            || call.get_full_name_str() != well_known::EVENT_EMIT
+        {
             return false;
         }
 
