@@ -398,21 +398,21 @@ impl StateKvDb {
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
     }
 
-    /// Returns the latest hot state entry for the given key at or before the
-    /// given version. Outer `None` means no entry found; inner `None` means the
-    /// key was evicted at that version.
-    #[cfg(test)]
+    /// Returns the latest hot state entry for the given key hash at or before
+    /// the given version. Outer `None` means no entry found; inner `None` means
+    /// the key was evicted at that version.
     pub(crate) fn get_hot_state_entry_by_version(
         &self,
-        state_key: &StateKey,
+        key_hash: HashValue,
         version: Version,
     ) -> Result<Option<(Version, Option<HotStateEntry>)>> {
         let mut read_opts = ReadOptions::default();
         read_opts.set_prefix_same_as_start(true);
+        let shard_id = usize::from(key_hash.nibble(0));
         let mut iter = self
-            .db_shard(state_key.get_shard_id())
+            .db_shard(shard_id)
             .iter_with_opts::<HotStateValueByKeyHashSchema>(read_opts)?;
-        iter.seek(&(state_key.hash(), version))?;
+        iter.seek(&(key_hash, version))?;
         Ok(iter
             .next()
             .transpose()?
