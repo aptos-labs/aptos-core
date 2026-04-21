@@ -24,7 +24,7 @@ Match the requested bump type to the version field and to how you group notes un
 
 1. Under `# Unreleased`, collect bullet notes for changes since the last tagged CLI release (or move existing unreleased bullets).
 2. When releasing, add `## [<new version>]` immediately below `# Unreleased` and move the bullets for this release under it (newest release section stays directly under `Unreleased`).
-3. Leave `# Unreleased` empty or with a placeholder only if there is nothing pending.
+3. If nothing is pending after a release, keep one placeholder bullet under `# Unreleased` (for example `- _No changes yet._`) so the section is clearly intentional, not an oversight.
 
 ## Verification
 

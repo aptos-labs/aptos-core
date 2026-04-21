@@ -4,6 +4,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- _No changes yet._
+
 ## [9.2.0]
 - Update boogie from 3.5.1 to 3.5.6.
 - Update z3 from 4.11.2 to 4.13.0.
