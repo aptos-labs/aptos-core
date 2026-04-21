@@ -65,20 +65,28 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # Same pattern as docker-build-test / rust-client-tests: require write access before
-  # checking out PR head for expensive builds. `relax` skips the strict check when there
-  # is no version bump (e.g. fork PRs that only touch the workflow file).
+  # Require write access before checkout only when the matrix will run (aptos version bump).
+  # When there is no bump, skip the action entirely so fork / read-only PRs pass policy
+  # without relying on `relax` string coercion.
   permission-check:
     name: Check repository permission for release build matrix
     needs: [check-aptos-cli-version-changed]
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - name: Check repository permission for user which triggered workflow
+      - name: Check repository permission (strict — release matrix will run)
+        if: needs.check-aptos-cli-version-changed.outputs.should_run == 'true'
         uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
         with:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
-          relax: ${{ needs.check-aptos-cli-version-changed.outputs.should_run != 'true' }}
+
+      - name: Check repository permission (relaxed — no release matrix)
+        if: needs.check-aptos-cli-version-changed.outputs.should_run != 'true'
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+          relax: "true"
 
   test-cli-build-for-release:
     name: test-cli-build-for-release (${{ matrix.platform }})
