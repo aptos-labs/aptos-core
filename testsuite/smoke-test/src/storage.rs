@@ -20,7 +20,6 @@ use itertools::Itertools;
 use std::{
     fs,
     path::Path,
-    process::Command,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -181,12 +180,11 @@ async fn test_db_restore() {
 fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     info!("---------- running aptos-debugger aptos-db backup-verify");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
-    let mut cmd = Command::new(bin_path.as_path());
+    let mut cmd = workspace_builder::get_aptos_debugger_command();
     cmd.args(["aptos-db", "backup", "verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
@@ -212,13 +210,12 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
 fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     info!("---------- running replay-verify");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
     let target_db_dir = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
-    let mut cmd = Command::new(bin_path.as_path());
+    let mut cmd = workspace_builder::get_aptos_debugger_command();
     cmd.args(["aptos-db", "replay-verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
@@ -256,7 +253,6 @@ fn wait_for_backups(
     target_epoch: u64,
     target_version: u64,
     now: Instant,
-    bin_path: &Path,
     metadata_cache_path: &Path,
     backup_path: &Path,
     trusted_waypoints: &[Waypoint],
@@ -266,7 +262,7 @@ fn wait_for_backups(
             "{}th wait for the backup to reach epoch {}, version {}.",
             i, target_epoch, target_version,
         );
-        let state = get_backup_storage_state(bin_path, metadata_cache_path, backup_path)?;
+        let state = get_backup_storage_state(metadata_cache_path, backup_path)?;
         if let Some(epoch_ending) = state.latest_epoch_ending_epoch
             && let Some(txn_version) = state.latest_transaction_version
             && state.latest_state_snapshot_epoch.is_some()
@@ -298,11 +294,10 @@ fn wait_for_backups(
 }
 
 fn get_backup_storage_state(
-    bin_path: &Path,
     metadata_cache_path: &Path,
     backup_path: &Path,
 ) -> Result<BackupStorageState> {
-    let output = Command::new(bin_path)
+    let output = workspace_builder::get_aptos_debugger_command()
         .current_dir(workspace_root())
         .args([
             "aptos-db",
@@ -332,7 +327,6 @@ pub(crate) fn db_backup(
 ) -> (TempPath, Version) {
     info!("---------- running aptos db tool backup");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path1 = TempPath::new();
     let metadata_cache_path2 = TempPath::new();
     let backup_path = TempPath::new();
@@ -343,10 +337,10 @@ pub(crate) fn db_backup(
 
     // Initialize backup storage, avoid race between the coordinator and wait_for_backups to create
     // the identity file.
-    get_backup_storage_state(&bin_path, metadata_cache_path2.path(), backup_path.path()).unwrap();
+    get_backup_storage_state(metadata_cache_path2.path(), backup_path.path()).unwrap();
 
     // spawn the backup coordinator
-    let mut backup_coordinator = Command::new(bin_path.as_path())
+    let mut backup_coordinator = workspace_builder::get_aptos_debugger_command()
         .current_dir(workspace_root())
         .args([
             "aptos-db",
@@ -373,14 +367,13 @@ pub(crate) fn db_backup(
         target_epoch,
         target_version,
         now,
-        bin_path.as_path(),
         metadata_cache_path2.path(),
         backup_path.path(),
         trusted_waypoints,
     );
 
     // start the backup compaction
-    let compaction = Command::new(bin_path.as_path())
+    let compaction = workspace_builder::get_aptos_debugger_command()
         .current_dir(workspace_root())
         .args([
             "aptos-db",
@@ -419,12 +412,11 @@ pub(crate) fn db_restore(
     target_verion: Option<Version>, /* target version should be same as epoch ending version to start a node */
 ) {
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
-    let mut cmd = Command::new(bin_path.as_path());
+    let mut cmd = workspace_builder::get_aptos_debugger_command();
     cmd.args(["aptos-db", "restore", "bootstrap-db"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");

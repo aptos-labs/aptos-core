@@ -44,7 +44,7 @@ pub mod block_test;
 
 #[derive(Serialize, Clone, PartialEq, Eq)]
 /// Block has the core data of a consensus block that should be persistent when necessary.
-/// Each block must know the id of its parent and keep the QuorurmCertificate to that parent.
+/// Each block must know the id of its parent and keep the QuorumCertificate to that parent.
 pub struct Block {
     /// This block's id as a hash value, it is generated at call time
     #[serde(skip)]

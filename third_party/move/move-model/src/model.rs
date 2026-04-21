@@ -140,6 +140,11 @@ impl Loc {
         self.inlined_from_loc.is_some()
     }
 
+    /// Returns the immediate `inlined-from` link of this location, if any.
+    pub fn inlined_from_loc(&self) -> Option<&Loc> {
+        self.inlined_from_loc.as_deref()
+    }
+
     // If `self` is an inlined `Loc`, then add the same
     // inlining info to the parameter `loc`.
     fn inline_if_needed(&self, loc: Loc) -> Loc {
@@ -2229,6 +2234,7 @@ impl GlobalEnv {
         *data.using_funs.borrow_mut() = None;
         *data.transitive_closure_of_used_funs.borrow_mut() = None;
         *data.used_functions_with_transitive_inline.borrow_mut() = None;
+        *data.using_functions_with_transitive_inline.borrow_mut() = None;
         // Set the new function definition.
         data.def = Some(def);
     }
@@ -2303,6 +2309,7 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            using_functions_with_transitive_inline: RefCell::new(None),
             used_structs: RefCell::new(None),
         };
         assert!(self
@@ -2375,6 +2382,7 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            using_functions_with_transitive_inline: RefCell::new(None),
             used_structs: RefCell::new(None),
         }
     }
@@ -4923,6 +4931,11 @@ pub struct FunctionData {
     /// A cache for used functions including ones obtained by transitively traversing used inline functions.
     pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 
+    /// A cache for using functions with direct inline callers replaced by their (transitive) callers,
+    /// reflecting the post-inlining call graph.
+    pub(crate) using_functions_with_transitive_inline:
+        RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
     /// A cache for used structs.
     pub(crate) used_structs: RefCell<Option<BTreeSet<QualifiedId<StructId>>>>,
 }
@@ -4958,6 +4971,7 @@ impl FunctionData {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            using_functions_with_transitive_inline: RefCell::new(None),
             used_structs: RefCell::new(None),
         }
     }
@@ -5811,6 +5825,39 @@ impl<'env> FunctionEnv<'env> {
         }
         *self.data.used_functions_with_transitive_inline.borrow_mut() = Some(set.clone());
         set
+    }
+
+    /// Get the functions that effectively use (call) this one after inline expansion.
+    /// Direct callers that are themselves inline functions are replaced by their
+    /// (transitive) callers, because after inlining those inline callers no longer
+    /// contain a call site — their callers do.
+    pub fn get_using_functions_with_transitive_inline(&self) -> BTreeSet<QualifiedId<FunId>> {
+        if let Some(using) = &*self.data.using_functions_with_transitive_inline.borrow() {
+            return using.clone();
+        }
+        let mut result = BTreeSet::new();
+        let mut visited = BTreeSet::new();
+        visited.insert(self.get_qualified_id());
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            for user in fnc.get_using_functions().expect("call info available") {
+                if !visited.insert(user) {
+                    continue;
+                }
+                let user_fun = self.module_env.env.get_function(user);
+                if user_fun.is_inline() {
+                    reachable_funcs.push_back(user_fun);
+                } else {
+                    result.insert(user);
+                }
+            }
+        }
+        *self
+            .data
+            .using_functions_with_transitive_inline
+            .borrow_mut() = Some(result.clone());
+        result
     }
 
     /// Get used structs/enums including ones obtained by transitively traversing used inline functions
