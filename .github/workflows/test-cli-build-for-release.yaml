@@ -1,0 +1,107 @@
+# Cross-compile smoke test for the Aptos CLI release path. Runs on pull requests
+# only when the `aptos` crate version in crates/aptos/Cargo.toml is changed
+# relative to the PR base (typical release version bumps).
+
+name: "Test CLI build for release"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-aptos-cli-version-changed:
+    name: Check aptos crate version bump
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.compare.outputs.should_run }}
+      cli_version: ${{ steps.compare.outputs.cli_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Compare aptos crate version to base branch
+        id: compare
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          version_from_toml() {
+            git show "$1:crates/aptos/Cargo.toml" | awk -F'"' '/^version = / { print $2; exit }'
+          }
+
+          BASE_VER="$(version_from_toml "$BASE_SHA")"
+          HEAD_VER="$(version_from_toml "$HEAD_SHA")"
+
+          echo "Base aptos version: $BASE_VER"
+          echo "Head aptos version: $HEAD_VER"
+
+          echo "cli_version=$HEAD_VER" >> "$GITHUB_OUTPUT"
+
+          if [ "$HEAD_VER" != "$BASE_VER" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  test-cli-build-for-release:
+    name: test-cli-build-for-release (${{ matrix.platform }})
+    needs: check-aptos-cli-version-changed
+    if: needs.check-aptos-cli-version-changed.outputs.should_run == 'true'
+    env:
+      CLI_VERSION: ${{ needs.check-aptos-cli-version-changed.outputs.cli_version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Third argument "true" = skip GitHub release / strict version checks; fourth = Linux compatibility (generic CPU) mode
+          - platform: linux-x86_64
+            runs-on: ubuntu-22.04
+            build_cmd: scripts/cli/build_cli_release.sh "Linux" "$CLI_VERSION" "true" "true"
+          - platform: linux-aarch64
+            runs-on: ubuntu-22.04-arm
+            build_cmd: scripts/cli/build_cli_release.sh "Linux" "$CLI_VERSION" "true" "false"
+          - platform: macos-arm64
+            runs-on: macos-latest
+            build_cmd: scripts/cli/build_cli_release.sh "macOS" "$CLI_VERSION" "true" "false"
+          - platform: macos-x86_64
+            runs-on: macos-15-intel
+            build_cmd: scripts/cli/build_cli_release.sh "macOS" "$CLI_VERSION" "true" "false"
+          - platform: windows-x86_64
+            runs-on: windows-2025
+            build_cmd: ""
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up CLI build (Unix)
+        if: matrix.platform != 'windows-x86_64'
+        uses: ./.github/actions/cli-rust-setup
+
+      - name: Build CLI (Unix)
+        if: matrix.platform != 'windows-x86_64'
+        run: ${{ matrix.build_cmd }}
+
+      - name: Ensure long paths work (Windows)
+        if: matrix.platform == 'windows-x86_64'
+        run: git config --global core.longpaths true
+
+      - name: Build CLI (Windows)
+        if: matrix.platform == 'windows-x86_64'
+        shell: pwsh
+        run: scripts\cli\build_cli_release.ps1
