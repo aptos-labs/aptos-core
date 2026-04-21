@@ -67,6 +67,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
+        hot_state::HotStateValue,
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
@@ -270,6 +271,34 @@ impl DbReader for StateDb {
         ))
     }
 
+    /// Reads the persisted hot-state KV and assembles the live `HotStateValue`
+    /// for `key_hash` at `version`. Returns `None` when no live entry exists
+    /// (key was never hot, or was evicted at/before `version`).
+    fn get_hot_state_value_by_version(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+    ) -> Result<Option<HotStateValue>> {
+        let db = self
+            .hot_state_kv_db
+            .as_ref()
+            .ok_or(AptosDbError::HotStateError)?;
+        Ok(
+            match db.get_hot_state_entry_by_version(*key_hash, version)? {
+                // No row at or before `version` — key was never hot.
+                None => None,
+                // Eviction tombstone — no live hot entry at `version`.
+                Some((_, None)) => None,
+                Some((hot_since_version, Some(HotStateEntry::Occupied { value, .. }))) => {
+                    Some(HotStateValue::new(Some(value), hot_since_version))
+                },
+                Some((hot_since_version, Some(HotStateEntry::Vacant))) => {
+                    Some(HotStateValue::new(None, hot_since_version))
+                },
+            },
+        )
+    }
+
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
             Ok(match self.ledger_db.metadata_db().get_usage(version) {
@@ -348,6 +377,15 @@ impl DbReader for StateStore {
             root_depth,
             use_hot_state,
         )
+    }
+
+    fn get_hot_state_value_by_version(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+    ) -> Result<Option<HotStateValue>> {
+        self.deref()
+            .get_hot_state_value_by_version(key_hash, version)
     }
 }
 
