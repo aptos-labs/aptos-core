@@ -1,6 +1,6 @@
 # Cross-compile smoke test for the Aptos CLI release path. Runs on pull requests
-# only when the `aptos` crate version in crates/aptos/Cargo.toml is changed
-# relative to the PR base (typical release version bumps).
+# only when the `aptos` crate version in crates/aptos/Cargo.toml is strictly
+# higher than on the PR base (ignores downgrades / old versions).
 
 name: "Test CLI build for release"
 
@@ -47,7 +47,9 @@ jobs:
 
           echo "cli_version=$HEAD_VER" >> "$GITHUB_OUTPUT"
 
-          if [ "$HEAD_VER" != "$BASE_VER" ]; then
+          # Run only on a version bump (head strictly greater than base). Ignore downgrades.
+          if [ "$HEAD_VER" != "$BASE_VER" ] && \
+             [ "$(printf '%s\n' "$BASE_VER" "$HEAD_VER" | sort -V | tail -n 1)" = "$HEAD_VER" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
