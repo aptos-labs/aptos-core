@@ -97,12 +97,13 @@ impl InboundMessageRateLimiter {
 
 /// Returns the message count and bytes for the given multiplex message
 fn get_message_count_and_bytes(message: &Result<MultiplexMessage, ReadError>) -> (u64, u64) {
-    // Calculate the number of messages (required to handle stream messages)
+    // Every inbound frame consumes parser and bookkeeping work, even if it is
+    // just a stream fragment or a malformed payload. Transport-level IO errors
+    // do not correspond to a frame, and should bypass rate limiting so the peer
+    // can be shut down immediately.
     let message_count: u64 = match message {
-        Ok(MultiplexMessage::Message(_)) => 1,
-        Ok(MultiplexMessage::Stream(StreamMessage::Header(_))) => 1,
-        Ok(MultiplexMessage::Stream(StreamMessage::Fragment(_))) => 0,
-        Err(_) => 0,
+        Ok(_) | Err(ReadError::DeserializeError(_, _, _)) => 1,
+        Err(ReadError::IoError(_)) => 0,
     };
 
     // Calculate the number of bytes in the message
@@ -114,7 +115,8 @@ fn get_message_count_and_bytes(message: &Result<MultiplexMessage, ReadError>) ->
         Ok(MultiplexMessage::Stream(StreamMessage::Fragment(fragment))) => {
             fragment.raw_data.len() as u64
         },
-        Err(_) => 0,
+        Err(ReadError::DeserializeError(_, frame_len, _)) => *frame_len as u64,
+        Err(ReadError::IoError(_)) => 0,
     };
 
     (message_count, message_bytes)
@@ -165,6 +167,7 @@ mod tests {
         },
         ProtocolId,
     };
+    use bytes::Bytes;
     use aptos_time_service::MockTimeService;
     use std::io;
 
@@ -188,13 +191,20 @@ mod tests {
     fn test_get_message_count_and_bytes_stream_fragment() {
         let msg = create_stream_fragment(15);
         let (count, bytes) = get_message_count_and_bytes(&msg);
-        assert_eq!(count, 0);
+        assert_eq!(count, 1);
         assert_eq!(bytes, 15);
     }
 
     #[test]
-    fn test_get_message_count_and_bytes_error_message() {
-        // Error messages should contribute 0 to both counts
+    fn test_get_message_count_and_bytes_deserialize_error() {
+        let frame_len = 31;
+        let (count, bytes) = get_message_count_and_bytes(&create_deserialize_error(frame_len));
+        assert_eq!(count, 1);
+        assert_eq!(bytes, frame_len as u64);
+    }
+
+    #[test]
+    fn test_get_message_count_and_bytes_io_error() {
         let io_err = io::Error::other("test error");
         let (count, bytes) = get_message_count_and_bytes(&Err(ReadError::IoError(io_err)));
         assert_eq!(count, 0);
@@ -318,19 +328,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_stream_fragment_does_not_count_as_message() {
+    async fn test_stream_fragment_exceeds_message_capacity() {
         // Create an inbound message rate limiter
         let messages_per_sec = 0; // Don't allow any messages
         let bytes_per_sec = 1000;
         let (mut rate_limiter, _) = create_rate_limiter(messages_per_sec, bytes_per_sec);
 
-        // Multiple fragments should pass without consuming message tokens
-        for _ in 0..10 {
-            rate_limiter
-                .throttle(&create_stream_fragment(0))
-                .await
-                .unwrap();
-        }
+        // Stream fragments should still consume message tokens
+        let result = rate_limiter.throttle(&create_stream_fragment(0)).await;
+        assert!(matches!(
+            result,
+            Err(PeerManagerError::RateLimitCapacityExceeded)
+        ));
     }
 
     #[tokio::test]
@@ -356,6 +365,47 @@ mod tests {
         mock_time.advance_secs_async(1).await;
 
         // Verify that the message now passes
+        throttle_task.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_deserialize_error_exceeds_message_capacity() {
+        // Create an inbound message rate limiter
+        let messages_per_sec = 0; // Don't allow any messages
+        let bytes_per_sec = 1000;
+        let (mut rate_limiter, _) = create_rate_limiter(messages_per_sec, bytes_per_sec);
+
+        // Deserialize errors should still consume message tokens
+        let result = rate_limiter.throttle(&create_deserialize_error(10)).await;
+        assert!(matches!(
+            result,
+            Err(PeerManagerError::RateLimitCapacityExceeded)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_deserialize_error_byte_accounting() {
+        // Create an inbound message rate limiter
+        let messages_per_sec = 1000;
+        let bytes_per_sec = 50;
+        let (mut rate_limiter, mock_time) = create_rate_limiter(messages_per_sec, bytes_per_sec);
+
+        // Drain the byte bucket and then block on the next malformed frame
+        let throttle_task = tokio::spawn(async move {
+            rate_limiter
+                .throttle(&create_deserialize_error(50))
+                .await
+                .unwrap();
+            rate_limiter.throttle(&create_deserialize_error(50)).await
+        });
+
+        // Yield so the spawned task runs and blocks on the sleep
+        tokio::task::yield_now().await;
+
+        // Advance 1 second to refill
+        mock_time.advance_secs_async(1).await;
+
+        // Verify that the malformed frame now passes
         throttle_task.await.unwrap().unwrap();
     }
 
@@ -395,6 +445,16 @@ mod tests {
                 raw_data: vec![0u8; num_bytes],
             },
         )))
+    }
+
+    /// Creates a deserialize error with the given frame length
+    fn create_deserialize_error(frame_len: usize) -> Result<MultiplexMessage, ReadError> {
+        let err = bcs::from_bytes::<NetworkMessage>(&[]).unwrap_err();
+        Err(ReadError::DeserializeError(
+            err,
+            frame_len,
+            Bytes::from(vec![0u8; frame_len.min(4)]),
+        ))
     }
 
     /// Creates a rate limiter with a mock time service
