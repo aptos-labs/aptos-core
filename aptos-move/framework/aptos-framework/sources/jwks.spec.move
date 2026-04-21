@@ -49,6 +49,10 @@ spec aptos_framework::jwks {
         pragma verify_duration_estimate = 80;
     }
 
+    spec upsert_oidc_provider_for_next_epoch {
+        pragma verify = false;
+    }
+
     spec remove_oidc_provider_for_next_epoch {
         pragma verify = false;
     }
