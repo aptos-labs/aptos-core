@@ -32,6 +32,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::HotStateValue,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -569,20 +570,31 @@ impl DbReader for AptosDB {
 
     fn get_state_value_with_proof_by_version_ext(
         &self,
-        key_hash: &HashValue,
+        key_hash: HashValue,
         version: Version,
         root_depth: usize,
-        use_hot_state: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         gauged_api("get_state_value_with_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
-            self.state_store.get_state_value_with_proof_by_version_ext(
-                key_hash,
-                version,
-                root_depth,
-                use_hot_state,
-            )
+            self.state_store
+                .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
+        })
+    }
+
+    fn get_hot_state_value_with_proof_by_version_ext(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
+        gauged_api("get_hot_state_value_with_proof_by_version_ext", || {
+            // TODO(HotState): check `hot_state_kv_pruner` / `hot_state_merkle_pruner` instead.
+            self.error_if_state_kv_pruned("HotStateValue", version)?;
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+
+            self.state_store
+                .get_hot_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
         })
     }
 
