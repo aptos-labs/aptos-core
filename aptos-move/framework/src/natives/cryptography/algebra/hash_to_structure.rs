@@ -4,9 +4,10 @@
 use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        AlgebraContext, HashToStructureSuite, Structure, E_TOO_MUCH_MEMORY_USED,
-        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        MOVE_ABORT_CODE_TYPE_TAG_CONVERSION_FAILED,
+        AlgebraContext, HashToStructureSuite, Structure, E_HASH_TO_BLS12381_G1_HASH_FAILED,
+        E_HASH_TO_BLS12381_G1_MAPPER_FAILED, E_HASH_TO_BLS12381_G2_HASH_FAILED,
+        E_HASH_TO_BLS12381_G2_MAPPER_FAILED, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+        MOVE_ABORT_CODE_NOT_IMPLEMENTED, MOVE_ABORT_CODE_TYPE_TAG_CONVERSION_FAILED,
     },
     store_element, structure_from_ty_arg,
 };
@@ -14,7 +15,7 @@ use aptos_gas_schedule::gas_params::natives::{aptos_framework::*, move_stdlib::*
 use aptos_native_interface::{
     safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
-use aptos_types::on_chain_config::{FeatureFlag, TimedFeatureFlag};
+use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::hashing::HashToCurve;
 use either::Either;
 use move_core_types::gas_algebra::{InternalGas, NumBytes};
@@ -49,17 +50,12 @@ fn suite_from_ty_arg(
     context: &SafeNativeContext,
     ty: &Type,
 ) -> SafeNativeResult<Option<HashToStructureSuite>> {
-    if context.timed_feature_enabled(TimedFeatureFlag::FixCryptoAlgebraNativesTypeTagConversion) {
-        if let Ok(type_tag) = context.type_to_type_tag(ty) {
-            Ok(HashToStructureSuite::try_from(type_tag).ok())
-        } else {
-            Err(SafeNativeError::Abort {
-                abort_code: MOVE_ABORT_CODE_TYPE_TAG_CONVERSION_FAILED,
-            })
-        }
-    } else {
-        let type_tag = context.type_to_type_tag(ty).unwrap();
+    if let Ok(type_tag) = context.type_to_type_tag(ty) {
         Ok(HashToStructureSuite::try_from(type_tag).ok())
+    } else {
+        Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_TYPE_TAG_CONVERSION_FAILED,
+        })
     }
 }
 
@@ -120,8 +116,13 @@ pub fn hash_to_internal(
                 ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
                 ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g1::Config>,
             >::new(dst)
-            .unwrap();
-            let new_element = <ark_bls12_381::G1Projective>::from(mapper.hash(msg).unwrap());
+            .map_err(|_| SafeNativeError::Abort {
+                abort_code: E_HASH_TO_BLS12381_G1_MAPPER_FAILED,
+            })?;
+            let hashed = mapper.hash(msg).map_err(|_| SafeNativeError::Abort {
+                abort_code: E_HASH_TO_BLS12381_G1_HASH_FAILED,
+            })?;
+            let new_element = <ark_bls12_381::G1Projective>::from(hashed);
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
@@ -139,8 +140,13 @@ pub fn hash_to_internal(
                 ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
                 ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g2::Config>,
             >::new(dst)
-            .unwrap();
-            let new_element = <ark_bls12_381::G2Projective>::from(mapper.hash(msg).unwrap());
+            .map_err(|_| SafeNativeError::Abort {
+                abort_code: E_HASH_TO_BLS12381_G2_MAPPER_FAILED,
+            })?;
+            let hashed = mapper.hash(msg).map_err(|_| SafeNativeError::Abort {
+                abort_code: E_HASH_TO_BLS12381_G2_HASH_FAILED,
+            })?;
+            let new_element = <ark_bls12_381::G2Projective>::from(hashed);
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },

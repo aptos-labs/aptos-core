@@ -11,7 +11,7 @@ fn deep_type_tag(harness: &mut MoveHarness) -> TransactionStatus {
     let account = harness.new_account_at(AccountAddress::from_hex_literal("0x42").unwrap());
     assert_success!(harness.publish_package(
         &account,
-        &common::test_dir_path("cryptoalgebra.data/large_type_tag"),
+        &common::test_dir_path("cryptoalgebra.data/p"),
     ));
     harness.run_entry_function(
         &account,
@@ -22,20 +22,20 @@ fn deep_type_tag(harness: &mut MoveHarness) -> TransactionStatus {
 }
 
 #[test]
-#[should_panic]
-fn deep_type_tag_panic_regression() {
-    let mut h = MoveHarness::new();
-    deep_type_tag(&mut h);
-}
-
-#[test]
 fn test_deep_type_tag() {
-    let mut h = MoveHarness::new();
-    h.new_epoch();
-    let result = deep_type_tag(&mut h);
+    let builder = std::thread::Builder::new().stack_size(16 * 1024 * 1024);
+    builder
+        .spawn(|| {
+            let mut h = MoveHarness::new();
+            h.new_epoch();
+            let result = deep_type_tag(&mut h);
 
-    assert!(matches!(
-        result,
-        TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
-    ),);
+            assert!(matches!(
+                result,
+                TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
+            ),);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }

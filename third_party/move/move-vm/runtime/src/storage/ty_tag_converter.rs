@@ -13,10 +13,6 @@ use parking_lot::RwLock;
 use std::hash::{Hash, Hasher};
 
 struct PseudoGasContext {
-    // Parameters for metering type tag construction:
-    //   - maximum allowed cost,
-    //   - base cost for any type to tag conversion,
-    //   - cost for size of a struct tag.
     max_cost: u64,
     cost: u64,
     cost_base: u64,

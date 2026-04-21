@@ -51,19 +51,20 @@ gaps.
 ## Notes
 
 
-* Make sure LargePackages is deployed to your network of choice, you can currently find it both on
-mainnet and testnet at <code>0xa29df848eebfe5d981f708c2a5b06d31af2be53bbd8ddc94c8523f4b903f7adb</code>, and
-in 0x7 (aptos-experimental) on devnet/localnet.
+* Make sure LargePackages is deployed to your network of choice.
 * Ensure that <code>code_indices</code> have no gaps. For example, if code_indices are
-provided as [0, 1, 3] (skipping index 2), the inline function <code>assemble_module_code</code> will abort
-since <code><a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a>.last_module_idx</code> is set as the max value of the provided index
-from <code>code_indices</code>, and <code>assemble_module_code</code> will lookup the <code><a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a>.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a></code> SmartTable from
-0 to <code><a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a>.last_module_idx</code> in turn.
+provided as [0, 1, 3] (skipping index 2), <code>assemble_module_code</code> aborts with
+<code><a href="large_packages.md#0x7_large_packages_EINDEX_GAP">EINDEX_GAP</a></code> (invalid state) once it reaches the missing index, instead of an opaque table error.
+* Staging, publish, upgrade, and cleanup emit module events for indexers and monitoring.
 
 
 -  [Aptos Large Packages Framework](#@Aptos_Large_Packages_Framework_0)
 -  [Usage](#@Usage_1)
 -  [Notes](#@Notes_2)
+-  [Struct `ChunkStaged`](#0x7_large_packages_ChunkStaged)
+-  [Struct `PackagePublished`](#0x7_large_packages_PackagePublished)
+-  [Struct `PackageUpgraded`](#0x7_large_packages_PackageUpgraded)
+-  [Struct `StagingCleanedUp`](#0x7_large_packages_StagingCleanedUp)
 -  [Resource `StagingArea`](#0x7_large_packages_StagingArea)
 -  [Constants](#@Constants_3)
 -  [Function `stage_code_chunk`](#0x7_large_packages_stage_code_chunk)
@@ -80,6 +81,7 @@ from <code>code_indices</code>, and <code>assemble_module_code</code> will looku
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/code.md#0x1_code">0x1::code</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-framework/doc/object_code_deployment.md#0x1_object_code_deployment">0x1::object_code_deployment</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
@@ -88,6 +90,164 @@ from <code>code_indices</code>, and <code>assemble_module_code</code> will looku
 </code></pre>
 
 
+
+<a id="0x7_large_packages_ChunkStaged"></a>
+
+## Struct `ChunkStaged`
+
+Emitted after each successful staging call (including the final chunk before publish/upgrade).
+
+
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="large_packages.md#0x7_large_packages_ChunkStaged">ChunkStaged</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>module_indices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u16&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>current_last_idx: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_large_packages_PackagePublished"></a>
+
+## Struct `PackagePublished`
+
+Emitted after a chunked package is published to an account or to a new object.
+
+
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="large_packages.md#0x7_large_packages_PackagePublished">PackagePublished</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>publisher: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>target: <b>address</b></code>
+</dt>
+<dd>
+ For account publish, the package address. For object publish, same as publisher (see <code><a href="../../aptos-framework/doc/object_code_deployment.md#0x1_object_code_deployment_Publish">object_code_deployment::Publish</a></code> for the new object address).
+</dd>
+<dt>
+<code>is_object: bool</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>module_count: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_large_packages_PackageUpgraded"></a>
+
+## Struct `PackageUpgraded`
+
+Emitted after a chunked upgrade of object-hosted package code.
+
+
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="large_packages.md#0x7_large_packages_PackageUpgraded">PackageUpgraded</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>publisher: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>code_object_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>module_count: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_large_packages_StagingCleanedUp"></a>
+
+## Struct `StagingCleanedUp`
+
+Emitted when a staging area is removed via <code>cleanup_staging_area</code>.
+
+
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="large_packages.md#0x7_large_packages_StagingCleanedUp">StagingCleanedUp</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a id="0x7_large_packages_StagingArea"></a>
 
@@ -139,6 +299,26 @@ code_indices and code_chunks should be the same length.
 
 
 <pre><code><b>const</b> <a href="large_packages.md#0x7_large_packages_ECODE_MISMATCH">ECODE_MISMATCH</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x7_large_packages_EEMPTY_CODE"></a>
+
+Code chunk must be non-empty.
+
+
+<pre><code><b>const</b> <a href="large_packages.md#0x7_large_packages_EEMPTY_CODE">EEMPTY_CODE</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x7_large_packages_EINDEX_GAP"></a>
+
+Assembly expected module index <code>i</code> in <code>0..=last_module_idx</code> but chunk <code>i</code> was never staged (gap in indices).
+
+
+<pre><code><b>const</b> <a href="large_packages.md#0x7_large_packages_EINDEX_GAP">EINDEX_GAP</a>: u64 = 3;
 </code></pre>
 
 
@@ -203,8 +383,16 @@ Object reference should be provided when upgrading object code.
     code_indices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u16&gt;,
     code_chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
 ) <b>acquires</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
+    <b>let</b> owner_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>let</b> staging_area = <a href="large_packages.md#0x7_large_packages_stage_code_chunk_internal">stage_code_chunk_internal</a>(owner, metadata_chunk, code_indices, code_chunks);
+    <b>let</b> module_count = staging_area.last_module_idx + 1;
     <a href="large_packages.md#0x7_large_packages_publish_to_account">publish_to_account</a>(owner, staging_area);
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="large_packages.md#0x7_large_packages_PackagePublished">PackagePublished</a> {
+        publisher: owner_address,
+        target: owner_address,
+        is_object: <b>false</b>,
+        module_count,
+    });
     <a href="large_packages.md#0x7_large_packages_cleanup_staging_area">cleanup_staging_area</a>(owner);
 }
 </code></pre>
@@ -234,8 +422,16 @@ Object reference should be provided when upgrading object code.
     code_indices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u16&gt;,
     code_chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
 ) <b>acquires</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
+    <b>let</b> owner_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>let</b> staging_area = <a href="large_packages.md#0x7_large_packages_stage_code_chunk_internal">stage_code_chunk_internal</a>(owner, metadata_chunk, code_indices, code_chunks);
+    <b>let</b> module_count = staging_area.last_module_idx + 1;
     <a href="large_packages.md#0x7_large_packages_publish_to_object">publish_to_object</a>(owner, staging_area);
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="large_packages.md#0x7_large_packages_PackagePublished">PackagePublished</a> {
+        publisher: owner_address,
+        target: owner_address,
+        is_object: <b>true</b>,
+        module_count,
+    });
     <a href="large_packages.md#0x7_large_packages_cleanup_staging_area">cleanup_staging_area</a>(owner);
 }
 </code></pre>
@@ -266,8 +462,16 @@ Object reference should be provided when upgrading object code.
     code_chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     code_object: Object&lt;PackageRegistry&gt;,
 ) <b>acquires</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
+    <b>let</b> owner_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>let</b> code_object_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&code_object);
     <b>let</b> staging_area = <a href="large_packages.md#0x7_large_packages_stage_code_chunk_internal">stage_code_chunk_internal</a>(owner, metadata_chunk, code_indices, code_chunks);
+    <b>let</b> module_count = staging_area.last_module_idx + 1;
     <a href="large_packages.md#0x7_large_packages_upgrade_object_code">upgrade_object_code</a>(owner, staging_area, code_object);
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="large_packages.md#0x7_large_packages_PackageUpgraded">PackageUpgraded</a> {
+        publisher: owner_address,
+        code_object_address,
+        module_count,
+    });
     <a href="large_packages.md#0x7_large_packages_cleanup_staging_area">cleanup_staging_area</a>(owner);
 }
 </code></pre>
@@ -321,6 +525,10 @@ Object reference should be provided when upgrading object code.
     <b>let</b> i = 0;
     <b>while</b> (i &lt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&code_chunks)) {
         <b>let</b> inner_code = *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&code_chunks, i);
+        <b>assert</b>!(
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&inner_code) &gt; 0,
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="large_packages.md#0x7_large_packages_EEMPTY_CODE">EEMPTY_CODE</a>),
+        );
         <b>let</b> idx = (*<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&code_indices, i) <b>as</b> u64);
 
         <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, idx)) {
@@ -333,6 +541,12 @@ Object reference should be provided when upgrading object code.
         };
         i = i + 1;
     };
+
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="large_packages.md#0x7_large_packages_ChunkStaged">ChunkStaged</a> {
+        owner: owner_address,
+        module_indices: code_indices,
+        current_last_idx: staging_area.last_module_idx,
+    });
 
     staging_area
 }
@@ -449,6 +663,10 @@ Object reference should be provided when upgrading object code.
     <b>let</b> <a href="../../aptos-framework/doc/code.md#0x1_code">code</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> i = 0;
     <b>while</b> (i &lt;= last_module_idx) {
+        <b>assert</b>!(
+            <a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, i),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="large_packages.md#0x7_large_packages_EINDEX_GAP">EINDEX_GAP</a>),
+        );
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(
             &<b>mut</b> <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>,
             *<a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(&staging_area.<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>, i)
@@ -479,12 +697,16 @@ Object reference should be provided when upgrading object code.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="large_packages.md#0x7_large_packages_cleanup_staging_area">cleanup_staging_area</a>(owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
-    <b>let</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
-        metadata_serialized: _,
-        <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>,
-        last_module_idx: _,
-    } = <b>move_from</b>&lt;<a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a>&gt;(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
-    <a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_destroy">smart_table::destroy</a>(<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>);
+    <b>let</b> owner_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>if</b> (<b>exists</b>&lt;<a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a>&gt;(owner_address)) {
+        <b>let</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
+            metadata_serialized: _,
+            <a href="../../aptos-framework/doc/code.md#0x1_code">code</a>,
+            last_module_idx: _,
+        } = <b>move_from</b>&lt;<a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a>&gt;(owner_address);
+        <a href="../../aptos-framework/../aptos-stdlib/doc/smart_table.md#0x1_smart_table_destroy">smart_table::destroy</a>(<a href="../../aptos-framework/doc/code.md#0x1_code">code</a>);
+        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="large_packages.md#0x7_large_packages_StagingCleanedUp">StagingCleanedUp</a> { owner: owner_address });
+    };
 }
 </code></pre>
 
