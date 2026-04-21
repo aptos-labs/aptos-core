@@ -17,6 +17,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::HotStateValue,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -361,6 +362,16 @@ pub trait DbReader: Send + Sync {
             root_depth: usize,
             use_hot_state: bool,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
+
+        /// Returns the `HotStateValue` (including `hot_since_version`) that the hot
+        /// state SMT hashes at `version` for `key_hash`, if the key is present in
+        /// the hot SMT at that version. Returns `None` when the key has no live
+        /// hot entry (either never hot, or evicted at/before `version`).
+        fn get_hot_state_value_by_version(
+            &self,
+            key_hash: &HashValue,
+            version: Version,
+        ) -> Result<Option<HotStateValue>>;
 
         /// Gets the latest LedgerView no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
