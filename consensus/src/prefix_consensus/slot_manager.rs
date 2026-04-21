@@ -946,32 +946,15 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             return; // SPC already running
         }
 
-        // Timer is the quorum fallback: if all n proposals haven't arrived yet
-        // but we have >= 2f+1 (quorum), start SPC with what we have.
-        // If < 2f+1, keep waiting for more proposals.
-        if self.has_quorum_proposals(slot) {
-            SLOT_START_TRIGGER
-                .with_label_values(&["timer_expired_with_quorum"])
-                .inc();
-            info!(
-                epoch = self.epoch,
-                slot = slot,
-                "Timer expired with quorum met, starting SPC"
-            );
-            self.run_spc(slot).await;
-        } else {
-            let proposal_count = self.slot_states
-                .get(&slot)
-                .map_or(0, |s| s.proposal_buffer().proposal_count());
-            let n = self.ranking_manager.validator_count();
-            warn!(
-                epoch = self.epoch,
-                slot = slot,
-                proposals_received = proposal_count,
-                validators = n,
-                "Timer expired but quorum not met, waiting for more proposals"
-            );
-        }
+        SLOT_START_TRIGGER
+            .with_label_values(&["timer_expired"])
+            .inc();
+        info!(
+            epoch = self.epoch,
+            slot = slot,
+            "Timer expired, starting SPC with available proposals"
+        );
+        self.run_spc(slot).await;
     }
 
     // ========================================================================
