@@ -1765,7 +1765,7 @@ module aptos_framework::stake {
         new_validator_set
     }
 
-    public fun validator_consensus_infos_from_validator_set(
+    friend fun validator_consensus_infos_from_validator_set(
         validator_set: &ValidatorSet
     ): vector<ValidatorConsensusInfo> {
         let validator_consensus_infos = vector[];
