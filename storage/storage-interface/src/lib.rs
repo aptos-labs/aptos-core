@@ -338,6 +338,17 @@ pub trait DbReader: Send + Sync {
             version: Version,
         ) -> Result<Option<(Version, StateValue)>>;
 
+        /// Returns the live `HotStateValue` for `key_hash` at `version` — i.e.
+        /// the most recent non-tombstone hot-state entry with `hot_since_version
+        /// <= version`, with that `hot_since_version` carried in the returned
+        /// value. Returns `None` when the key was never hot, or was evicted at
+        /// or before `version`.
+        fn get_hot_state_value_by_version(
+            &self,
+            key_hash: &HashValue,
+            version: Version,
+        ) -> Result<Option<HotStateValue>>;
+
         /// Returns the proof of the given state key and version.
         fn get_state_proof_by_version_ext(
             &self,

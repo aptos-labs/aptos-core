@@ -548,6 +548,19 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_hot_state_value_by_version(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+    ) -> Result<Option<HotStateValue>> {
+        gauged_api("get_hot_state_value_by_version", || {
+            self.error_if_state_kv_pruned("HotStateValue", version)?;
+
+            self.state_store
+                .get_hot_state_value_by_version(key_hash, version)
+        })
+    }
+
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
