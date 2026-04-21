@@ -125,7 +125,7 @@ fn test_eviction_write_read() {
 
     // The latest entry should be the eviction.
     let (found_version, found_value) = db
-        .get_hot_state_entry_by_version(&key, Version::MAX)
+        .get_hot_state_entry_by_version(*key.crypto_hash_ref(), Version::MAX)
         .unwrap()
         .unwrap();
     assert_eq!(found_version, 20);
@@ -154,14 +154,17 @@ fn test_multiple_versions() {
 
     // Querying at Version::MAX should return the latest (V2).
     let (latest_version, latest_entry) = db
-        .get_hot_state_entry_by_version(&key, Version::MAX)
+        .get_hot_state_entry_by_version(*key.crypto_hash_ref(), Version::MAX)
         .unwrap()
         .unwrap();
     assert_eq!(latest_version, 2);
     assert_eq!(latest_entry, expected_entry);
 
     // Querying at V1 should return the older entry.
-    let (older_version, older_entry) = db.get_hot_state_entry_by_version(&key, 1).unwrap().unwrap();
+    let (older_version, older_entry) = db
+        .get_hot_state_entry_by_version(*key.crypto_hash_ref(), 1)
+        .unwrap()
+        .unwrap();
     assert_eq!(older_version, 1);
     assert_eq!(older_entry, expected_entry);
 }
