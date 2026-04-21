@@ -11,9 +11,6 @@ name: "Faucet Integration Tests: Prod"
 on:
   pull_request_target:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
-    paths:
-      - "crates/aptos-faucet/**"
-      - ".github/actions/run-faucet-tests/**"
   push:
     branches:
       - main

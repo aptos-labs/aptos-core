@@ -6,11 +6,6 @@ name: "Rust SDK Client Tests"
 on:
   pull_request_target:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
-    # Limit fork PR runs: omit this workflow file from paths so PRs that only change
-    # GitHub workflow YAML (e.g. new CI) do not trigger pull_request_target + secrets.
-    paths:
-      - "crates/aptos-rest-client/**"
-      - ".github/actions/run-rust-client-tests/**"
   push:
     branches:
       - main
