@@ -23,4 +23,4 @@ mod read_set;
 
 pub use loader::{Loader, LoadingPolicy, LoweringPolicy};
 pub use module_provider::ModuleProvider;
-pub use read_set::ExecutableReadSet;
+pub use read_set::{ExecutableRead, ExecutableReadSet};

@@ -9,12 +9,17 @@ use crate::{
     read_set::{ExecutableRead, ExecutableReadSet},
 };
 use anyhow::{anyhow, bail};
-use fxhash::FxHashMap;
+use fxhash::{FxHashMap, FxHashSet};
 use mono_move_core::{Executable, ExecutableId, ExecutableSlot, MandatoryDependencies};
 use mono_move_gas::GasMeter;
-use mono_move_global_context::{ArenaRef, ExecutionGuard};
+use mono_move_global_context::{struct_info_at, ArenaRef, ExecutionGuard};
 use mono_move_orchestrator::ExecutableBuilder;
-use move_binary_format::{access::ModuleAccess, CompiledModule};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{SignatureToken, StructFieldInformation, StructHandleIndex},
+    CompiledModule,
+};
+use std::collections::hash_map::Entry;
 
 /// Describes the lowering policy for converting execution IR to micro-ops.
 pub enum LoweringPolicy {
@@ -104,7 +109,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 use LoweringPolicy::*;
                 match lowering {
                     Lazy => self.load_lazy_with_lazy_lowering(read_set, gas_meter, id),
-                    Eager => bail!("Eager lowering is currently not supported"),
+                    Eager => self.load_lazy_with_eager_lowering(read_set, gas_meter, id),
                 }
             },
             LoadingPolicy::Package => self.load_package(read_set, gas_meter, id),
@@ -157,7 +162,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             let mut members = Vec::with_capacity(slots.len());
             let mut all_present = true;
             for slot in slots {
-                match load_content(self.guard, *slot) {
+                match load_content(self.guard, slot) {
                     Some(member) => members.push(member),
                     None => {
                         all_present = false;
@@ -183,6 +188,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             .module_provider
             .get_same_package_modules(id.address(), id.name())?;
 
+        let mut total = 0u64;
         let mut pending = Vec::with_capacity(names.len());
         for name in names {
             let member_id = self
@@ -190,8 +196,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 .intern_address_name(id.address(), name.as_ident_str());
             let slot = self.guard.get_or_create_slot(member_id);
             let (module, cost) = self.get_verified_module_from_storage(member_id)?;
+            total = total.saturating_add(cost);
             pending.push((slot, module, cost));
         }
+
         let pending = self.topological_ordering(pending);
 
         let package_slots = pending.iter().map(|(slot, _, _)| *slot).collect::<Vec<_>>();
@@ -210,6 +218,57 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         Ok(read_set
             .get(id)
             .expect("Every executable was recorded in read-set"))
+    }
+
+    /// Loads the code corresponding to the specified ID together with the
+    /// transitive closure of modules reachable through its struct
+    /// definitions. Enum modules referenced from the target's struct
+    /// handles join the closure but their variants are not walked.
+    fn load_lazy_with_eager_lowering(
+        &self,
+        read_set: &mut ExecutableReadSet<'guard>,
+        gas_meter: &mut impl GasMeter,
+        id: ArenaRef<'guard, ExecutableId>,
+    ) -> anyhow::Result<&'guard Executable> {
+        // TODO: the simplified `MandatoryDependencies` API cannot distinguish
+        // "closure not yet computed" from "empty closure". We conservatively
+        // treat any non-empty set as the installed closure. When the eager
+        // policy stabilises, restore the deferred closure state so closure
+        // members can be upgraded in place instead of being rebuilt.
+        if let Some(executable) = self.guard.get_executable(id)
+            && !executable.mandatory_dependencies().slots().is_empty()
+        {
+            return self.record_and_charge_mandatory_deps(read_set, gas_meter, executable);
+        }
+
+        let (pending, target_slots) = self.walk_struct_closure(id)?;
+        let pending = self.topological_ordering(pending);
+
+        // Build non-target members first so the target can be built last
+        // with its closure already set. Non-target members are inserted
+        // with empty mandatory deps — they will be rebuilt if later loaded
+        // as their own eager target.
+        // TODO: rebuild is wasted work. Revisit once the deferred closure
+        // state is restored or the cache can upgrade a member's deps in
+        // place.
+        let mut target_module_cost = None;
+        for (_, module, cost) in pending {
+            let module_id = self
+                .guard
+                .intern_address_name(module.self_addr(), module.self_name());
+            if module_id == id {
+                target_module_cost = Some((module, cost));
+                continue;
+            }
+            self.build_and_insert(&module, cost, MandatoryDependencies::empty())?;
+        }
+
+        let (target_module, target_cost) =
+            target_module_cost.expect("walk_struct_closure always includes the target in pending");
+        let target_deps = MandatoryDependencies::package(target_slots.into_vec());
+        let target = self.build_and_insert(&target_module, target_cost, target_deps)?;
+
+        self.record_and_charge_mandatory_deps(read_set, gas_meter, target)
     }
 
     /// Orders modules leaves-first by inter-member import dependencies,
@@ -328,6 +387,144 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter.charge(executable.cost())?;
         Ok(())
     }
+
+    /// Records `target` as `Charged` together with every member of its
+    /// transitive struct closure as `Cached`. Charges target's cost only
+    /// if it was not already in the read-set; charges each closure member
+    /// only if it was not already in the read-set.
+    ///
+    /// If `target` was previously recorded as `Cached` (sub-member of an
+    /// earlier `EagerLowering` target), recording it again as `Charged`
+    /// upgrades the entry in place without double-charging.
+    fn record_and_charge_mandatory_deps(
+        &self,
+        read_set: &mut ExecutableReadSet<'guard>,
+        gas_meter: &mut impl GasMeter,
+        target: &'guard Executable,
+    ) -> anyhow::Result<&'guard Executable> {
+        let id = self.guard.arena_ref_for_executable_id(target.id());
+
+        // TODO: the simplified read-set has a single `Loaded` variant and no
+        // `contains` / upgrade path, so we cannot distinguish a prior cached
+        // record from a charged record. We skip re-recording entries already
+        // in the set and avoid double-charging them. Restore the Cached /
+        // Charged variants (with an upgrade op) when the eager policy lands.
+        let mut total: u64 = 0;
+        if read_set.get(id).is_none() {
+            total = total.saturating_add(target.cost());
+            read_set.record(id, ExecutableRead::Loaded(target))?;
+        }
+
+        for slot in target.mandatory_dependencies().slots() {
+            let member = load_content(self.guard, slot).expect("closure member must be loaded");
+            let member_id = self.guard.arena_ref_for_executable_id(member.id());
+            if read_set.get(member_id).is_none() {
+                total = total.saturating_add(member.cost());
+                read_set.record(member_id, ExecutableRead::Loaded(member))?;
+            }
+        }
+        gas_meter.charge(total)?;
+        Ok(target)
+    }
+
+    /// Walks the target's transitive struct-definition closure and returns
+    /// everything `load_lazy_with_eager_lowering` needs after the walk:
+    ///
+    /// - `pending` — cache-miss members paired with their slot, compiled
+    ///   form, and cost. The caller orders these leaves-first via
+    ///   [`Self::topological_ordering`] and then builds each. Cache-hit
+    ///   members are not included (their executables already exist).
+    /// - `target_slots` — the closure's member slots, target excluded. The
+    ///   caller passes this to the target's
+    ///   `MandatoryDependencies::set_struct_closure`.
+    ///
+    /// The walk recurses into struct field signatures only. When it reaches
+    /// an enum, the enum's module stays in the closure (so its `Type::Enum`
+    /// identity is interned when the module is built and charged like any
+    /// other member), but the walk does not descend into the enum's
+    /// variant fields — enums are pointer-sized and the target's layout
+    /// doesn't depend on variant content.
+    fn walk_struct_closure(
+        &self,
+        target_id: ArenaRef<'guard, ExecutableId>,
+    ) -> anyhow::Result<(
+        Vec<(ExecutableSlot, CompiledModule, u64)>,
+        Box<[ExecutableSlot]>,
+    )> {
+        let mut closure = FxHashMap::default();
+        let mut visited_structs = FxHashSet::default();
+        let mut stack = vec![];
+
+        let (target, target_cost) = self.get_verified_module_from_storage(target_id)?;
+        for (i, handle) in target.struct_handles().iter().enumerate() {
+            if handle.module == target.self_handle_idx() {
+                continue;
+            }
+            let idx = StructHandleIndex::new(i as u16);
+            let (addr, module_name, struct_name) = struct_info_at(&target, idx);
+            let dep_id = self.guard.intern_address_name(addr, module_name);
+            let dep_struct_name = self.guard.intern_identifier(struct_name);
+            stack.push((dep_id, dep_struct_name));
+        }
+        closure.insert(target_id, (target, target_cost));
+
+        while let Some((mod_id, struct_name)) = stack.pop() {
+            if !visited_structs.insert((mod_id, struct_name)) {
+                continue;
+            }
+
+            let (module, _) = match closure.entry(mod_id) {
+                Entry::Occupied(e) => e.into_mut(),
+                Entry::Vacant(e) => {
+                    let (compiled, cost) = self.get_verified_module_from_storage(mod_id)?;
+                    e.insert((compiled, cost))
+                },
+            };
+
+            let Some(struct_def) = module.struct_defs().iter().find(|def| {
+                let handle = module.struct_handle_at(def.struct_handle);
+                module.identifier_at(handle.name).as_str() == struct_name.as_str()
+            }) else {
+                continue;
+            };
+
+            let fields = match &struct_def.field_information {
+                StructFieldInformation::Declared(fields) => fields,
+                StructFieldInformation::DeclaredVariants(_) => continue,
+                StructFieldInformation::Native => {
+                    bail!("Native fields are deprecated");
+                },
+            };
+
+            let mut indices = vec![];
+            for field in fields {
+                collect_struct_handle_indices(&field.signature.0, &mut indices);
+            }
+            for idx in indices {
+                let (addr, module_name, struct_name) = struct_info_at(module, idx);
+                let dep_id = self.guard.intern_address_name(addr, module_name);
+                let dep_struct_name = self.guard.intern_identifier(struct_name);
+                stack.push((dep_id, dep_struct_name));
+            }
+        }
+
+        // Every reached module goes into `pending` and (unless it is the
+        // target) also contributes its slot to `target_slots`. Cache-hit
+        // members are rebuilt redundantly; `insert_executable` is
+        // idempotent and returns the canonical pointer on race-loss.
+        // TODO: optimize by filtering cache-hit members out of `pending`.
+        let mut pending = Vec::with_capacity(closure.len());
+        let mut target_slots = Vec::with_capacity(closure.len().saturating_sub(1));
+        for (mod_id, (module, cost)) in closure {
+            let slot = self.guard.get_or_create_slot(mod_id);
+            if mod_id != target_id {
+                target_slots.push(slot);
+            }
+            pending.push((slot, module, cost));
+        }
+
+        Ok((pending, target_slots.into_boxed_slice()))
+    }
 }
 
 /// Loads the current executable content behind `slot`, or `None` if the
@@ -336,7 +533,50 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 /// reference anchors `'guard` so the returned reference cannot outlive it.
 fn load_content<'guard, 'ctx>(
     _guard: &'guard ExecutionGuard<'ctx>,
-    slot: ExecutableSlot,
+    slot: &ExecutableSlot,
 ) -> Option<&'guard Executable> {
     unsafe { slot.as_ref_unchecked().load().map(|p| p.as_ref_unchecked()) }
+}
+
+/// Walks signature token and records every struct handle index it transitively
+/// references.
+fn collect_struct_handle_indices(token: &SignatureToken, out: &mut Vec<StructHandleIndex>) {
+    // TODO: Reimplement non-recursively.
+    match token {
+        SignatureToken::Struct(idx) => {
+            out.push(*idx);
+        },
+        SignatureToken::StructInstantiation(idx, ty_args) => {
+            out.push(*idx);
+            for ty in ty_args.iter() {
+                collect_struct_handle_indices(ty, out);
+            }
+        },
+        SignatureToken::Vector(ty)
+        | SignatureToken::Reference(ty)
+        | SignatureToken::MutableReference(ty) => {
+            collect_struct_handle_indices(ty, out);
+        },
+        SignatureToken::Function(args, rets, _) => {
+            for ty in args.iter().chain(rets.iter()) {
+                collect_struct_handle_indices(ty, out);
+            }
+        },
+        SignatureToken::Bool
+        | SignatureToken::U8
+        | SignatureToken::U16
+        | SignatureToken::U32
+        | SignatureToken::U64
+        | SignatureToken::U128
+        | SignatureToken::U256
+        | SignatureToken::I8
+        | SignatureToken::I16
+        | SignatureToken::I32
+        | SignatureToken::I64
+        | SignatureToken::I128
+        | SignatureToken::I256
+        | SignatureToken::Address
+        | SignatureToken::Signer
+        | SignatureToken::TypeParameter(_) => (),
+    }
 }
