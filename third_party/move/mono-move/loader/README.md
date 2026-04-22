@@ -4,7 +4,7 @@
 
 The MonoMove runtime uses a long-living module cache that satisfies the following requirements.
 
-- Stores executable IR and lowered code to avoid repeated deserializion, verification and translaction.
+- Stores executable IR and lowered code to avoid repeated deserialization, verification and translation.
 - Supports upgrades: 1) within same block, 2) between speculative block trees (with Zaptos, blocks with published code may not be committed immediately).
   Because of speculation and concurrent upgrades, newer or speculative code can co-exist with older versions at the same time.
 
@@ -15,7 +15,7 @@ This is needed to avoid cases where some transaction upgrades module `A`, and ot
 Loading a module can either be a hit in long-living module cache or a miss.
 On a miss, loader fetches the module from storage, deserializes it, verifies, translates to execution IR, and adds it to the long-living cache.
 To cover for the worst case, every module load has to be charged gas.
-Importantny, the charging must be **deterministic** irrespective of the cache state that may be different on different validators due to speculation.
+Importantly, the charging must be **deterministic** irrespective of the cache state that may be different on different validators due to speculation.
 
 Transaction may need to load modules for multiple reasons.
 
@@ -27,7 +27,7 @@ Note that (2) and (3) also cover cases like 1) deserializing data on global stor
 
 ## 2. Challenges
 
-1. **Loading costs are determinisitc.**
+1. **Loading costs are deterministic.**
    Two executions of the same transaction must charge the same cost regardless of what the long-living cache stores.
    As a result, transactions need to enforce cache hit has the same gas charging semantics as the cache miss.
 
@@ -223,9 +223,9 @@ Depending on the policy, module loading may be more or less expensive, making fu
 The best policy is workload dependent.
 Interpreter can also use inline caches to avoid repeated set intersection checks, if they are expensive.
 
-The important proerty of mandatory sets is that they cannot change size because of upgrade.
+The important property of mandatory sets is that they cannot change size because of upgrade.
 This makes them particularly atractive because they can be cached per each module instance.
-For example, if module `a` is cached in long-living cache, there is no need to re-traverse its depndencies in some complex way to simulate EL loading and metering.
+For example, if module `a` is cached in long-living cache, there is no need to re-traverse its dependencies in some complex way to simulate EL loading and metering.
 It is sufficient to check modules in `MS(a)`, which can be implemented lock-free.
 
 #### Implementation of Mandatory Sets

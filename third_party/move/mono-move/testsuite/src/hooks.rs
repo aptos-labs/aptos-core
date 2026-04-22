@@ -97,13 +97,11 @@ impl LoaderHooks for InMemoryHooks {
         address: &AccountAddress,
         module_name: &str,
     ) -> anyhow::Result<Vec<Identifier>> {
-        let Ok(ident) = Identifier::new(module_name) else {
-            return Ok(Vec::new());
-        };
-        Ok(self
-            .packages
+        let ident = Identifier::new(module_name)
+            .map_err(|e| anyhow::anyhow!("invalid module name {module_name:?}: {e}"))?;
+        self.packages
             .get(&(*address, ident))
             .cloned()
-            .unwrap_or_default())
+            .ok_or_else(|| anyhow::anyhow!("no package declared for {address}::{module_name}"))
     }
 }

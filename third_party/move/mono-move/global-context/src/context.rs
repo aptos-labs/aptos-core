@@ -293,13 +293,10 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Returns an error only if the cache detects an invariant violation
     /// during install. Under normal operation this method always returns
     /// `Ok`.
-    pub fn insert_executable<'guard>(
-        &'guard self,
+    pub fn insert_executable(
+        &self,
         executable: Box<Executable>,
-    ) -> anyhow::Result<&'guard Executable>
-    where
-        'ctx: 'guard,
-    {
+    ) -> anyhow::Result<&Executable> {
         let ptr = self
             .ctx
             .executable_cache
@@ -317,10 +314,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     pub fn get_executable<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
-    ) -> Option<&'guard Executable>
-    where
-        'ctx: 'guard,
-    {
+    ) -> Option<&'guard Executable> {
         let ptr = self.ctx.executable_cache.get(key.into_global_arena_ptr())?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
