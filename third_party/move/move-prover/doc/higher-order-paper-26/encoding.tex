@@ -1,0 +1,237 @@
+\Section{Encoding}
+\label{sec:enc}
+
+We describe the implementation of function values as a translation into an imperative intermediate verification language (IVL) inspired by Boogie \cite{thisisboogie2}.
+The encoding is given at the IVL level because this is where the interesting design decisions become visible --- the subsequent step to pure SMT is straightforward and uses standard techniques.
+The fragment of the IVL used in this section is familiar: procedures with $\HAVOC$, $\ASSUME$, $\ASSERT$, pure functions, \emph{algebraic datatypes} (tagged unions with selectors, like Rust enums), universal \emph{axioms} with \emph{triggers}, and polymorphic map types.
+State is represented by Boogie-style maps; in particular, each resource type $\tau$ yields a map $M_\tau \in \Addr \rightarrow \tau$, with $\Addr$ being the domain of addresses in Move (256-bit integers).
+The representation is similar to that in the earlier \MVP paper~\cite{DillGPQXZ22}.
+
+In the following we focus on the aspects specific to function values: the representation of function values (Sec.~\ref{sec:enc-fvals}), the encoding of invocation of function values, the encoding of behavioral predicates via axioms (Sec.~\ref{sec:enc-bp}), how the state labels of Sec.~\ref{sec:move-hof} materialize as extra memory parameters (Sec.~\ref{sec:enc-mem}), and finally the frame-condition (Sec.~\ref{sec:enc-frame}).
+Everything in this section operates \emph{after} monomorphization, so type parameters have been specialized and the set of closure, parameter, and field variants reaching a given function type is known statically~\cite{DillGPQXZ22}.
+
+\SubSection{Representing Function Values}
+\label{sec:enc-fvals}
+For each function type $\tau = (T_1,\ldots,T_n) \to T$ that occurs in the monomorphized program, we create a datatype in the IVL which represents all the potential \emph{sources} of function values in a given program.
+To this end, \MVP's mono-analysis records three sets: the set $\Clo_\tau$ of concrete functions $f$ constructing closures of type $\tau$, the set $\Par_\tau$ of function-typed parameters of verification targets, and the set $\Fld_\tau$ of storable function-typed struct fields whose type is $\tau$.
+The union of these three sets is materialized as an algebraic datatype in the IVL --- one constructor per variant:
+
+\begin{ivl}
+\DATATYPE \tau\ \{\\
+\t1 C_{f}(\sq{c : T}), \ldots, P_{g,x}(), \ldots, F_{S.x}(n : \nat), \ldots \\
+\}
+\end{ivl}
+
+\noindent where $\sq{T}$ are the parameter types of $f$ that are captured by a closure.
+Parameter variants are nullary because, in a well-typed VC, the value of an entrypoint function-typed parameter is a skolem constant pinned to its variant at entry (see below); no runtime payload is required.
+Field variants carry an integer discriminator $n$ so that two locations in memory holding distinct field values are not forced to be equal --- datatypes with a single nullary constructor would otherwise collapse.
+
+Notice that this representation captures \emph{all} possible functions of type $\tau$ relevant for a given VC.
+So we do not actually need to deal with an arbitrary number of function values when it comes to higher-order function verification, but only those which can be derived from the program.
+The representation is further narrowed if the function value of a given type is not stored in a structure which ends in global memory.
+Storing a function value amounts to dynamic dispatch (think of building a 'vtable' explicitly), and this additional complexity is reflected by the $n$ in $F_{S.x}(n)$. Nevertheless, we are able to pinpoint a specification to $F_{S.x}(n)$, as has been seen for the AMM example (cf. Sec.~\ref{sec:amm}).
+
+\SubSection{Invoking Function Values}
+\label{sec:enc-invoke}
+
+When a function value is invoked, we are looking at either a concrete closure value $C_{g}$ or a parameter or field selection as described above.
+In the former case, one can simply delegate to calling the actual underlying function $f$, by composing the captured and provided arguments into a full argument list.
+
+In the other cases of parameters and field selections, we use the behavioral predicates as defined for the function value, using the standard schema for encoding a call to a Move function via the function's specification.
+This reduces the problem of invocation to how those behavioral predicates are encoded.
+\begin{ivl}
+\PROC invoke_\tau(x: \tau, \sq{p:T}) \RETURNS (\sq{r: T}) \\
+\t1 \IF x \IS\ C_{f}(\sq{c}) \\
+\t2    \sq{r} := \CALL f(\sq{c}, \sq{p}) \\
+\t1 \ELSE \\
+\t2    \ASSERT requires_\tau(x, \Mem_\tau, \sq{p}) \\
+\t2    \IF\ aborts_\tau(x, \Mem_\tau, \sq{p}) \\
+\t3       abort\_flag := \TRUE \\
+\t2    \ELSE \\
+\t3       \LET \Mem'_\tau := \Mem_\tau \\
+\t3       \HAVOC \Mod_\tau(\sq{p}),\ \bar{r} \\
+\t3       \ASSUME ensures_\tau(x, \Mem'_\tau, \Mem_\tau, \sq{p}, \sq{r}) \\
+\end{ivl}
+
+\noindent See below for $\Mem$ and $\Mod$ definitions.
+Notice that the representation of the else branch is very similar to how opaque functions are mapped down to the solver.
+In fact, for an opaque function and provided $len(c) = 0$, the if-else branches are semantically identical.
+The translation of the IVL to SMT takes care of converting the $\CALL f$ of an opaque $f$ into exactly what we find in the else branch here, so we can omit this detail.
+
+\SubSection{Computing Memory Accesses}
+\label{sec:enc-mem}
+
+In order to express $invoke_\tau$, we need to reason about the memory usage of a function value type $\tau$, $\Mem_\tau$, as well as that subset of memory locations which are modified, $\Mod_\tau(\sq{p})$.
+To recall, in the Move language, persistent global storage, or memory, can be accessed via type indexing.
+For instance, if !R! is a resource type, we write !&mut R[addr]! in the language to obtain a mutable reference to the memory which can then be subsequently mutated.
+
+\MVP's representation of memory uses type-indexed maps $M_\rho \in \Addr \fun \rho$, with $\rho$ a resource type (a !struct! in Move with the !key! ability).
+In the imperative procedures of the IVL, those maps are implicitly available as global variables.
+But in pure expressions like behavioral predicates, they need to be made explicit as parameters; this is the reason why we have been passing $\Mem_\tau$ to behavioral predicates earlier.
+
+A few definitions for memory maps are needed.
+Note that these are definitions on the meta level of the description here and not part of the IVL; they are used to describe pseudo code in terms of the IVL.
+
+First, with $\Mem_R = \{ M \in \Addr \fun \rho \mid \rho \in R\}$ we denote a set of memory maps for the resource types in $R$.
+The $R$ can be omitted if it is clear from the context. For convenience, with $\Type(\Mem)$ the set of all types $\rho$ used in the memory maps of $\Mem$ is described.
+With $\Mem_R \downarrow S$, where $S \subseteq R$, the projection $\{ M \in \Mem_R \mid \rho(M) \in S \}$ is denoted.
+
+In addition to memory, we also need to reason about modifications.
+A modification is a set of pairs of a type and an expression of the IVL of type $\Addr$, $\Mod \in \power (\Type \cross \Expr)$.
+We write $\Mod(\sq{p})$ for a set of modifications built on expressions referencing parameters in $\sq{p}$.
+
+
+\Paragraph{General Access}
+Memory access $\Mem_\tau$ is computed as the union of all the accesses in the variants of $\tau$, $\Mem_{C_f} \cup \Mem_{P_{f,x}} \cup \Mem_{F_{S.x}}$.
+For a closure, $\Mem_{C_f}$  can be statically derived from the code.
+For parameters and fields, the information is declared in the spec block:
+
+% @formatter:off
+\begin{MoveBox}
+  spec foo(f: |T|S, g: |T|S) {
+    reads_of<f> R; // f can read resource R
+    reads_of<g> *; // g can read any resource
+                   // in scope of the VC
+  }
+\end{MoveBox}
+% @formatter:on
+
+\noindent For the wildcard operator !*!, all memory which is read or written as part of the currently generated VC is included, and in addition an abstract memory map for any 'unknown' memory the function may depend on.
+The unknown memory is needed for a sound encoding.
+For instance, if we verify function !foo! above in a context where there is no memory involved anywhere, we must not assume that !g(x)! delivers the same value in different states, as it may depend on this unknown additional memory.
+However, we can still know that the specification of !g! holds in every possible state.
+
+\Paragraph{Write Accesses}
+Similarly to general access, the modifies set $\Mod_\tau$ is computed as the union of all the modifications in the variants of $\tau$, $\Mod_{C_f} \cup \Mod_{P_{f,x}} \cup \Mod_{F_{S.x}}$.
+
+For closures, $\Mod_{C_f}$ is derived from the code and, if present, the !modifies R[a]! declaration in the language.
+These existed before higher-order functions, for specifying what functions modify.
+
+For parameters and fields, the information is declared in the spec block, where for the !modifies_of<f>! clause, the parameters of the function value itself are passed:
+
+% @formatter:off
+\begin{MoveBox}
+  spec foo(f: |address|) {
+    // f can modify resource R[a]
+    modifies_of<f>(a: address) R[a];
+  }
+\end{MoveBox}
+% @formatter:on
+
+\noindent If no !modifies_of! is declared, it is assumed that the function does not modify global memory.
+
+Notice that a wildcard (!modifies_of<f> *!) is not supported, since the invocation of !f! would render the memory as arbitrary (no effective frame condition).
+This is a notable restriction on what we can specify with higher-order functions in Move and is left for future work.
+
+\SubSection{Behavioral Predicates}
+\label{sec:enc-bp}
+
+Behavioral predicates are derived by switching over the variants of the function value representation $\tau$, similarly to the $invoke_\tau$ procedure above, delegating extraction of the underlying predicates to per-variant functions.
+
+Below, the definition for ensures is given.
+The other predicates are defined similarly.
+Specific to ensures is that it needs to take care of the frame condition: the caller havoced the full modification set, but only a subset of that is constrained by the given variant.
+The handling needs to account for that addresses in $\Delta$ are only symbolic expressions with unknown aliasing:
+
+\begin{ivl}
+  \FUN ensures_\tau[\Mem', \Mem](x: \tau, \sq{p: T}, \sq{r: S}): \BOOL \\
+\t1  \bigwedge_{(\rho, a) \in \Mod_\tau}( \\
+\t2    \IF \rho \notin \Type(\Mod_x) \\
+\t3       \Mem(\rho) = \Mem(\rho') \\
+\t2    \ELSE \\
+\t3       (\bigwedge_{(\rho, a') \in \Mod_x} a' \neq a) \\
+\t4          \implies \Mem(\rho)[a] = \Mem(\rho')[a] \\
+\t1  ) \land ensures_x[\Mem'_x, \Mem_x](p, r)
+\end {ivl}
+
+The relational representation of a function via ensures does not guarantee proper functional behavior.
+This is achieved by introducing $result_\tau$ as an uninterpreted function, connected via an axiom:
+\begin{ivl}
+  \FUN result_\tau[\Mem', \Mem](x: \tau, \sq{p: T}) \fun \sq{S} \\
+  \AXIOM \forall x, \sq{p}, \sq{r} @ \\
+\quad  ensures_\tau[\Mem', \Mem](x, \sq{p}, \sq{r}) \iff
+        \sq{r} = result_\tau[\Mem', \Mem](x, \sq{p})
+\end {ivl}
+
+The actual conditions extracted depend on the variant.
+For closures, they are directly extracted from the spec block.
+For parameters and fields, we introduce uninterpreted functions.
+
+\begin{ivl}
+  \FUN ensures_{C_f(\sq{c})}[\Mem', \Mem](\sq{p: T}, \sq{r: S}): \BOOL \\
+\t1    \langle \textit{extract from spec block of}~~f(\sq{c}, \sq{p}) \rangle \\
+  \FUN ensures_{P_{f,x}}[\Mem', \Mem](\sq{p: T}, \sq{r: S}): \BOOL \\
+  \FUN ensures_{F_{S.x}}[\Mem', \Mem](\sq{p: T}, \sq{r: S}): \BOOL \\
+\end{ivl}
+
+\noindent The meaning of the uninterpreted functions is determined by how they are injected into a VC via the regular mechanism by which pre/post conditions and invariants are handled.
+Consider a precondition like !requires aborts_if<param>(x)!, where !param! is a function-value parameter of a function !foo!.
+This will be injected in the VC as $\ASSUME \lnot aborts_{P_{foo, param}}(x)$.
+Similarly, for a data invariant of a field an assumption will be generated when the field is selected.
+
+
+\SubSection{Intermediate State Labels}
+\label{sec:enc-frame}
+
+Consider the following specification using intermediate state labels:
+
+% @formatter:off
+\begin{MoveBox}
+  struct R(u64) has key;
+  spec foo(f: |address|, g: |address|, a: address) {
+    ensures ..S |~ ensures_of<f>(a)
+    ensures S |~ R[a].0 > 0;
+    aborts_if S |~ aborts_of<g>(a);
+    ensures S.. |~ ensures_of<g>(a)
+  }
+\end{MoveBox}
+% @formatter:on
+
+\noindent As outlined in the last section, we want to be able to extract behavioral predicate functions from this specification.
+For the ensures we can come up with the following, which simply replicates part of the spec:
+
+\begin{ivl}
+  \FUN ensures_{C_foo}[\Mem', \Mem](a) \\
+\t1  \exists \Mem^S @
+      \<ensures_\tau(f,\Mem',\Mem^S,a) \land R[\Mem^S][a].0 > 0 \land \\
+        ensures_{\tau'}(g,\Mem^S,\Mem,a)\>
+\end{ivl}
+
+\noindent However, for the aborts which happens at the intermediate state !S! the situation is not that straightforward.
+The state !S! needs to be first established before the aborts condition can be checked for !g!.
+To achieve this, one could take all ensures conditions which reach !S! and then evaluate the aborts condition, as in:
+
+
+\begin{ivl}
+  \FUN aborts_{C_foo}[\Mem', \Mem](a) \\
+\t1  \exists \Mem^S @
+      \<ensures_\tau(f,\Mem',\Mem^S,a) \land R[\Mem^S][a].0 > 0 \land \\
+        aborts_{\tau'}(g,\Mem^S,a)\>
+\end{ivl}
+
+\noindent But this is \emph{not} correct. To see this, consider that $f$ leaves the resource in a state such that $R[\Mem^S][a].0 > 0$ does not hold.
+In this case, the $aborts_{C_foo}$ above returns false, indicating that $foo$ would not abort.
+Yet it may very well abort if $g$ aborts in $\Mem^S$.
+
+The problem here is to differentiate between conditions which \emph{define} and which \emph{constrain} intermediate states.
+The current implementation in \MVP employs a heuristic to determine this:
+
+\begin{itemize}
+\item Two-state behavioral predicates (!ensures_of! and !result_of!) are considered defining predicates.
+Also, a set of builtin predicates for publishing, updating, and removing resources are in this category.
+\item Everything else is considered a constraining predicate.
+\end{itemize}
+
+\noindent In order to extract the condition for an aborts, \MVP will extract all conjuncts in the spec defining the state which reaches the aborts condition, stripping out conditions which are only constraining.
+This defining fragment of the spec is then combined with the aborts predicate.
+Practically, for the example above, we get:
+
+\begin{ivl}
+  \FUN aborts_{C_{foo}}[\Mem', \Mem](a) \\
+\t1  \exists \Mem^S @
+      \<ensures_\tau(f,\Mem',\Mem^S,a) \land aborts_{\tau'}(g,\Mem^S,a)\>
+\end{ivl}
+
+We point out that the heuristic used here is potentially unsound.
+If $aborts_{C_{foo}}$ underapproximates and returns false where it should not, valid aborts scenarios can be missed in verification.
+This is a problem which requires future work and refinement.

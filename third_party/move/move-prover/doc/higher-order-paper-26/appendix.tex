@@ -1,0 +1,30 @@
+\appendix[AI-Based Development Approach]
+\label{sec:ai-development}
+
+The implementation described in this paper was developed in close collaboration with AI coding assistants --- primarily Claude Code, with Codex consulted as a second opinion on critical design decisions.
+The approach relied on a self-validating feedback loop: verification and specification inference (Sec.~\ref{sec:validation}) were developed in parallel, so that any change to the encoding immediately had a baseline of test cases against which the AI could check itself --- the inferred specs must verify end-to-end, with no human in the loop required to assess correctness.
+
+\Paragraph{What went well}
+\begin{itemize}
+    \item \emph{Specification language extensions in the frontend.}  Parser and type-checker changes for behavioral predicates and state labels were largely produced by the AI, with human effort limited to review.
+    \item \emph{Bug identification and fixing.}  Once a problematic example was unearthed --- typically by inference producing a spec that failed verification --- the AI was effective at diagnosing the root cause and proposing a principled fix.
+    \item AI was very code at diagnosing verification problems like timeouts, by analyzing generated Boogie and SMT code, using Z3's logging features to observe quantifier instantiation, etc.
+    \item \emph{Boilerplate and well-understood areas.}  Routine code such as expression simplification, AST traversals, and bytecode-level rewrites was handled essentially autonomously.
+\end{itemize}
+
+\Paragraph{What went less well}
+\begin{itemize}
+    \item \emph{Hand-holding in the complex parts.}  The Boogie encoding of behavioral predicates, the discrimination over closure variants, and the existential treatment of intermediate state labels all required substantial human guidance.
+    The AI's first attempts were rarely correct for the general case, and judgement calls about soundness needed to be made by the human.
+    \item \emph{Many iterations.}  Reaching a correct design often required dozens of iterations and significant elapsed time; in the most complex areas, the total effort approached that of manual implementation.
+    \item \emph{Token cost.}  Long-running iterative work over a large codebase accumulates substantial inference cost.
+\end{itemize}
+
+Overall, the experience was positive.
+The validation pipeline gave the AI an unambiguous correctness signal independent of human review, and the AI carried a disproportionate share of the work in areas where the design space was already well understood.
+The harder, design-novel parts remained human-driven --- but the AI made the surrounding work substantially less laborious.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

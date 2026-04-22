@@ -1,0 +1,45 @@
+\Section{Discussion and Conclusion}
+\label{sec:conclusion}
+
+\SubSection{Related work}
+Higher-order programs with side effects have been a long-standing concern in program verification.
+Our approach to behavioral predicates descends from the relational tradition of VDM~\cite{jones1990vdm}, Z~\cite{spivey1992z, grieskamp2000executablez}, and the B method~\cite{abrial1996bbook}, in which operations are specified by pre/post relations over an explicit state; state labels generalize this to intermediate snapshots and make the relational flavor composable.
+
+Among contemporary verifiers for imperative code with higher-order functions, \verus~\cite{verus} offers function-value specifications via \emph{spec closures} and phantom ghost state; the approach is state-passing, with state threaded as an extra argument to specifications rather than quantified over directly.
+Our treatment is more directly relational: state labels denote memory snapshots and are bound by quantifiers in the surface syntax, avoiding the encoding cost of an explicit state argument and matching the style in which Move developers already write pre/post specifications.
+
+\fstar~\cite{fstar2016} likewise verifies higher-order, effectful code, internalizing the WP calculus in its type system via Dijkstra monads~\cite{dm4all}.
+Both systems support pre/post specifications, quantifiers, behavioral abstraction over function values, and structured proof guidance --- in Move via \texttt{proof} blocks, \texttt{lemma} declarations, and \texttt{calc}, \texttt{split}, \texttt{apply} statements.
+\fstar's dependent type and effect system goes beyond Move's support, which is more minimal and focused on Rust-style references and effects on global memory.
+Move also favors separation of specification from program code, which is useful in environments where work itself is distributed along that axis (for example, a multi-agent system).
+
+Dafny~\cite{DAFNY} is the closest cousin of \MVP: it has a similar specification model of pre/post conditions, higher-order functions, and behavioral predicates.
+Differences lie in the treatment of state: Move's resource-separated global memory and alias-free mutable reference model versus Dafny's heap model.
+While both languages support state labels, Move state labels as described here can be used in abstract specifications via universal and existential quantification.
+
+Lean~4~\cite{lean4} is a dependently-typed interactive theorem prover in the tradition of older similar systems~\cite{Isabelle, COQ}, supporting higher-order functions.
+Verification is tactic-driven and kernel-checked.
+Lean does not directly work on a programming language as \MVP does, but requires the user to create an encoding of the language inside its meta logic.
+For modeling of stateful systems, one would typically use monads, though any other model can be simulated as well.
+In contrast, \MVP is directly integrated with the Move language and leverages Move's specific memory and reference model.
+Furthermore, \MVP aims at automated SMT-based verification, with optional proof scripts.
+
+In the smart-contract setting, dynamic dispatch is a central challenge for \solidity verifiers.
+\certora~\cite{certora} handles dispatch on Solidity by enumerating the possible callees of a virtual call (derived from the contracts in scope) and generating a case-split proof obligation per callee; summaries can be supplied by the user to abstract external calls.
+Other SMT-based Solidity tools~\cite{smtalt18,solcverify,DBLP:conf/esop/HajduJ20} handle dynamic dispatch through similar case-splitting, with varying degrees of abstraction.
+\MVP is more general: a call site's dispatch is explicit in the closure's datatype, and our encoding lets the prover automatically fall back from case-split (when the concrete function is known) to behavioral-predicate reasoning (when only the function type is known), without the user having to structure the specification differently.
+
+\SubSection{Future Work}
+
+
+\SubSection{Conclusion}
+
+We described the extension of the Move Prover to Move 2's higher-order functions and dynamic dispatch.
+The extension rests on two language additions --- behavioral predicates and state labels --- and on a Boogie encoding that discriminates closure invocations on the function-value variant reaching the call site.
+The design preserves \MVP's production-oriented cost model --- routine, predictable, counterexample-driven verification --- in the presence of dynamic dispatch.
+We validated the approach by extending \MVP's specification inference tool to closures and dynamic dispatch, which now computes weakest-preconditions over Move bytecode containing function values.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

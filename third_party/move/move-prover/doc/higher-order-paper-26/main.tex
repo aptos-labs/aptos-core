@@ -1,0 +1,45 @@
+\documentclass[letterpaper,conference]{fmcad}
+
+\input{prelude.tex}
+
+\begin{document}
+
+\title{Formal Verification of\\ Imperative Higher-Order Functions}
+
+\author{%
+	\IEEEauthorblockN{Wolfgang Grieskamp\IEEEauthorrefmark{1} and Teng Zhang
+	 and Vineeth Kashyap and Jake Silverman}
+	\IEEEauthorblockA{Aptos Labs, Palo Alto, USA\\
+		\IEEEauthorrefmark{1}Corresponding author: \texttt{wg@aptoslabs.com}}
+}
+
+\maketitle
+
+
+\begin{abstract}
+	The Move Prover (\MVP) is a formal verifier for smart contracts written in the Move programming language.
+	Recently, Move on Aptos was extended with \emph{higher-order functions}: function values that can be passed around, stored in data structs, and kept in persistent storage, enabling \emph{dynamic dispatch}.
+	This paper describes the novel representation of function values in the Move specification language and their implementation in \MVP.
+	We introduce \emph{behavioral predicates} which characterize Move functions (aborts and pre/post conditions) by single-state or two-state predicates.
+	We also introduce \emph{state labels} for naming intermediate memory states in which expressions are evaluated and which allow to compose behavioral predicates to describe sequences of state transitions.
+	On SMT level, function values are encoded by discriminating over the possible function values reaching a call site: when the concrete function is known, its effect is accounted for directly; when it is unknown (for example, a function parameter, or a closure loaded from storage), its behavioral predicates describe the effect.
+	We are able to automatically validate completeness and correctness of the AI-assisted implementation by using \emph{specification inference}: by synthesizing specs of arbitrary code with higher-order functions and then running \MVP on the result, a self-verifying feedback loop is realized, which significantly improved the ability of AI to support this work.
+\end{abstract}
+
+\input{intro}
+\input{move}
+\input{encoding}
+\input{validation}
+\input{conclusion}
+
+\bibliographystyle{IEEEtran}
+\bibliography{biblio}
+
+\input{appendix}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

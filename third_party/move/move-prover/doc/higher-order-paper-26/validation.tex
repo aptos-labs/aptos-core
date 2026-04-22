@@ -1,0 +1,78 @@
+\Section{Validation via Specification Inference}
+\label{sec:validation}
+
+\begin{WideTable}
+    \caption{Inference test categories that exercise behavioral predicates.}
+    \label{tab:inference-tests}
+    \centering
+    \small
+    \begin{tabularx}{\linewidth}{l X}
+      \hline
+      \textbf{Category} & \textbf{Representative cases} \\
+      \hline
+      Direct calls &
+        Single and chained calls to a spec'd helper; inferred specs use
+        \texttt{ensures\_of} and \texttt{aborts\_of} to abstract over the
+        callee's effect rather than inlining its body. \\
+      \hline
+      Mutual recursion &
+        Mutually recursive \texttt{is\_even}/\texttt{is\_odd}; inference
+        breaks the cycle by phrasing each spec in terms of the other's
+        behavioral predicate. \\
+      \hline
+      Higher-order parameters &
+        A function that takes a closure and applies it; the inferred spec
+        abstracts the closure via \texttt{ensures\_of}/\texttt{aborts\_of}
+        on the parameter, with no commitment to a particular implementation. \\
+      \hline
+      Stored-closure dispatch (enum) &
+        Calculator with an enum variant carrying a closure field;
+        dispatch through the variant is summarised by behavioral
+        predicates on that field. \\
+      \hline
+      Stored-closure dispatch (struct field) &
+        Vault with a \texttt{Strategy} closure stored in a struct field on
+        Aptos framework types; inference emits \texttt{modifies\_of} for
+        the field together with the field-form behavioral predicates. \\
+      \hline
+      Pre/post state labels &
+        \texttt{move\_to}, \texttt{move\_from}, mutable resource indexing;
+        inferred specs distinguish \texttt{@pre} from post-state on the
+        memory the predicate observes. \\
+      \hline
+      Intermediate state labels &
+        Sequenced state-modifying calls (e.g.\ remove-then-publish);
+        inferred specs introduce existentially quantified intermediate
+        labels and pin them to defining behavioral predicates. \\
+      \hline
+    \end{tabularx}
+\end{WideTable}
+
+Together with the introduction of behavioral predicates and function values, specification inference based on \emph{weakest precondition analysis} \cite{dijkstra1975wp} was added to \MVP.
+One can think of \WP computation as an inversion of verification: given arbitrary code, specifications are generated which are then supposed to pass verification, and precisely describe the code.
+This enables a validation pipeline where we go code $\leadsto$ code+specs $\leadsto$ VC, with verification expected to succeed.
+This pipeline is tremendously helpful in AI-supported development, as it gives a baseline to AI to validate correctness of generated or provided code.
+Tab.~\ref{tab:inference-tests} gives an overview of the current behavioral-predicate-related tests using this pipeline --- including function value parameters and struct fields.
+
+\WP uses behavioral predicates to specify the effect of calls to other functions.
+This enables formulating the \WP of one function in a modular fashion, abstracting from the called function.
+Here is a simple example:
+
+% @formatter:off
+\begin{MoveBox}
+  use account::other;
+  fun incr(x: u64): u64 {
+    other::func(x) + 1
+  }
+  spec incr {
+    pragma opaque;
+    ensures [inferred]
+      result == result_of<other::func>(x)
+  }
+\end{MoveBox}
+% @formatter:on
+
+\noindent Without behavioral predicates, \WP analysis results would have been impractical to represent in Move source code, as we could only inline specs, leading to an explosion of condition sizes.
+
+
+\noindent
