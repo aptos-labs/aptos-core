@@ -3,7 +3,10 @@
 
 pub(crate) mod vm_wrapper;
 
-use crate::counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS};
+use crate::{
+    counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
+    AptosVM,
+};
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
@@ -19,6 +22,7 @@ use aptos_block_executor::{
     txn_provider::TxnProvider,
     types::InputOutputKey,
 };
+use aptos_experimental_runtimes::common::physical_core_pin_hook;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::{
@@ -602,11 +606,28 @@ impl<
         let pool = match &mut *RAYON_EXEC_POOL.lock().unwrap() {
             Some((pool, n)) if *n == num_threads => Arc::clone(pool),
             slot => {
-                info!(num_threads = num_threads, "Creating par_exec thread pool");
+                let pin_enabled = AptosVM::get_pin_par_exec_to_physical_cores();
+                let (pin_plan, pin_hook) = if pin_enabled {
+                    let (plan, hook) = physical_core_pin_hook(num_threads);
+                    (Some(plan), Some(hook))
+                } else {
+                    (None, None)
+                };
+                info!(
+                    num_threads = num_threads,
+                    pin_enabled = pin_enabled,
+                    pin_plan = ?pin_plan,
+                    "Creating par_exec thread pool"
+                );
                 let pool = Arc::new(
                     rayon::ThreadPoolBuilder::new()
                         .num_threads(num_threads)
                         .thread_name(|index| format!("par_exec-{}", index))
+                        .start_handler(move |_| {
+                            if let Some(hook) = pin_hook.as_ref() {
+                                hook();
+                            }
+                        })
                         .build()
                         .unwrap(),
                 );

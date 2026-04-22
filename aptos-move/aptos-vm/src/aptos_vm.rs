@@ -162,6 +162,7 @@ static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 static ENABLE_PRE_WRITE: OnceCell<bool> = OnceCell::new();
+static PIN_PAR_EXEC_TO_PHYSICAL_CORES: OnceCell<bool> = OnceCell::new();
 
 macro_rules! deprecated_module_bundle {
     () => {
@@ -462,6 +463,21 @@ impl AptosVM {
     pub fn get_enable_pre_write() -> bool {
         match ENABLE_PRE_WRITE.get() {
             Some(enable_pre_write) => *enable_pre_write,
+            None => true,
+        }
+    }
+
+    /// Sets whether par_exec threads should be pinned to physical cores.
+    pub fn set_pin_par_exec_to_physical_cores_once(enabled: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        PIN_PAR_EXEC_TO_PHYSICAL_CORES.set(enabled).ok();
+    }
+
+    /// Returns whether par_exec threads should be pinned to physical cores.
+    /// Defaults to true when the flag has not been set, matching production behavior.
+    pub fn get_pin_par_exec_to_physical_cores() -> bool {
+        match PIN_PAR_EXEC_TO_PHYSICAL_CORES.get() {
+            Some(enabled) => *enabled,
             None => true,
         }
     }

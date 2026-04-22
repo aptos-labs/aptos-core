@@ -66,6 +66,9 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     );
     AptosVM::set_blockstm_v2_enabled_once(node_config.execution.blockstm_v2_enabled);
     AptosVM::set_enable_pre_write_once(node_config.execution.enable_pre_write);
+    AptosVM::set_pin_par_exec_to_physical_cores_once(
+        node_config.execution.pin_par_exec_to_physical_cores,
+    );
 
     if node_config
         .execution
