@@ -771,25 +771,35 @@ where
         while self.frames.len() > 1 {
             let cur = self.frames.pop().expect("frame must exist");
             let last = self.frames.last_mut().expect("frame must exist");
-            // A frame with non-zero native_gas belongs to a native function that
-            // accumulated costs via charge_native_execution but never reached
-            // charge_native_function (e.g. native returned Err after direct-meter
-            // charging hit a limit). Emit as CallNative so the cost is counted;
-            // otherwise emit as Call.
-            let event = match &cur.name {
+            // A frame with non-zero native_gas belongs to a native function
+            // that accumulated costs via charge_native_execution but never
+            // reached charge_native_function (e.g. native returned Err after
+            // direct-meter charging hit a limit). Emit as CallNative so the
+            // cost is counted, and hoist any child events into the parent
+            // first -- matching the normal charge_native_function path, which
+            // preserves events recorded while the native frame was live.
+            match cur.name {
                 FrameName::Function {
                     module_id,
                     name,
                     ty_args,
-                } if !cur.native_gas.is_zero() => ExecutionGasEvent::CallNative {
-                    module_id: module_id.clone(),
-                    fn_name: name.clone(),
-                    ty_args: ty_args.clone(),
-                    cost: cur.native_gas,
+                } if !cur.native_gas.is_zero() => {
+                    last.events.extend(cur.events);
+                    last.events.push(ExecutionGasEvent::CallNative {
+                        module_id,
+                        fn_name: name,
+                        ty_args,
+                        cost: cur.native_gas,
+                    });
                 },
-                _ => ExecutionGasEvent::Call(cur),
-            };
-            last.events.push(event);
+                name => {
+                    last.events.push(ExecutionGasEvent::Call(CallFrame {
+                        name,
+                        events: cur.events,
+                        native_gas: cur.native_gas,
+                    }));
+                },
+            }
         }
 
         let exec_io = ExecutionAndIOCosts {

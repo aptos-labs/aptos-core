@@ -186,7 +186,11 @@ impl AptosDebugger {
         // `log.exec_io.check_consistency()` and `log.storage.check_consistency()`
         // themselves; this lets user-facing tools (e.g. the CLI) format their
         // own error message and/or offer an opt-out flag.
-        Ok((status, output, gas_profiler.finish_without_consistency_check()))
+        Ok((
+            status,
+            output,
+            gas_profiler.finish_without_consistency_check(),
+        ))
     }
 
     pub async fn execute_past_transactions(

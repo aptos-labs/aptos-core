@@ -571,9 +571,12 @@ impl Session {
     /// A `gas-report` directory is generated under the transaction output directory containing
     /// an HTML report with flamegraphs and detailed gas breakdowns.
     ///
-    /// When the profiler is enabled, `skip_gas_profiler_consistency_check` controls whether a
-    /// gas-profiler consistency failure is reported as a warning (true) or panics (false).
-    /// Ignored when `profile_gas` is `false`.
+    /// When the profiler is enabled, `skip_gas_profiler_consistency_check = false` runs the
+    /// profiler's internal consistency check and panics on a discrepancy with the library's
+    /// generic "likely a bug in the gas profiler" message; `true` skips the check entirely
+    /// and emits no diagnostic. User-facing wrappers (such as the CLI) that want a custom
+    /// error message or a warn-vs-panic toggle should inspect the returned log themselves
+    /// rather than relying on this flag. Ignored when `profile_gas` is `false`.
     pub fn execute_transaction(
         &mut self,
         txn: SignedTransaction,
@@ -707,9 +710,12 @@ impl Session {
     /// A `gas-report` directory is generated under the output directory containing
     /// an HTML report with flamegraphs and detailed gas breakdowns.
     ///
-    /// When the profiler is enabled, `skip_gas_profiler_consistency_check` controls whether a
-    /// gas-profiler consistency failure is reported as a warning (true) or panics (false).
-    /// Ignored when `profile_gas` is `false`.
+    /// When the profiler is enabled, `skip_gas_profiler_consistency_check = false` runs the
+    /// profiler's internal consistency check and panics on a discrepancy with the library's
+    /// generic "likely a bug in the gas profiler" message; `true` skips the check entirely
+    /// and emits no diagnostic. User-facing wrappers (such as the CLI) that want a custom
+    /// error message or a warn-vs-panic toggle should inspect the returned log themselves
+    /// rather than relying on this flag. Ignored when `profile_gas` is `false`.
     pub fn execute_view_function(
         &mut self,
         module_id: ModuleId,

@@ -71,8 +71,7 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
             println!();
             println!("Simulating transaction locally using the gas profiler...");
             let fold_unique_stack = options.fold_unique_stack;
-            let skip_gas_profiler_consistency_check =
-                options.skip_gas_profiler_consistency_check;
+            let skip_gas_profiler_consistency_check = options.skip_gas_profiler_consistency_check;
             simulate_using_debugger(
                 options,
                 payload,

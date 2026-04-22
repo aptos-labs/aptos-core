@@ -61,6 +61,12 @@ async fn main() -> Result<()> {
         AuxiliaryInfo::new(aux_info, None),
     )?;
 
+    // The debugger returns the log unchecked (so user-facing tools can render
+    // custom errors). This binary has no such requirement, so just run the
+    // checks strictly.
+    gas_log.exec_io.check_consistency()?;
+    gas_log.storage.check_consistency()?;
+
     let txn_output =
         output.try_materialize_into_transaction_output(&debugger.state_view_at_version(version))?;
 
