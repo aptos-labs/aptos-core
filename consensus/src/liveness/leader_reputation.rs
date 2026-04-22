@@ -231,6 +231,9 @@ pub struct NewBlockEventAggregation {
     // dependig on how many failures we have.
     voter_window_size: usize,
     proposer_window_size: usize,
+    // Separate window for counting failed proposals. When larger than proposer_window_size,
+    // failures are remembered for longer, preventing oscillation between failed/inactive/active.
+    failure_window_size: usize,
     reputation_window_from_stale_end: bool,
 }
 
@@ -238,11 +241,13 @@ impl NewBlockEventAggregation {
     pub fn new(
         voter_window_size: usize,
         proposer_window_size: usize,
+        failure_window_size: usize,
         reputation_window_from_stale_end: bool,
     ) -> Self {
         Self {
             voter_window_size,
             proposer_window_size,
+            failure_window_size,
             reputation_window_from_stale_end,
         }
     }
@@ -433,7 +438,7 @@ impl NewBlockEventAggregation {
         Self::history_iter(
             history,
             epoch_to_candidates,
-            self.proposer_window_size,
+            self.failure_window_size,
             self.reputation_window_from_stale_end,
         )
         .fold(HashMap::new(), |mut map, meta| {
@@ -501,6 +506,7 @@ impl ProposerAndVoterHeuristic {
         failure_threshold_percent: u32,
         voter_window_size: usize,
         proposer_window_size: usize,
+        failure_window_size: usize,
         reputation_window_from_stale_end: bool,
     ) -> Self {
         Self {
@@ -512,6 +518,7 @@ impl ProposerAndVoterHeuristic {
             aggregation: NewBlockEventAggregation::new(
                 voter_window_size,
                 proposer_window_size,
+                failure_window_size,
                 reputation_window_from_stale_end,
             ),
         }
@@ -546,6 +553,128 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
                     self.active_weight
                 } else {
                     self.inactive_weight
+                }
+            })
+            .collect()
+    }
+}
+
+/// A heuristic that wraps `ProposerAndVoterHeuristic` but additionally scales active-validator
+/// weights by their historical round-time performance.  Validators that have been proposing
+/// fast rounds (i.e. collected quorum quickly) get a proportionally higher chance of being
+/// selected as leader, while validators with slow round times get a lower chance.
+///
+/// Concretely, for every active validator we compute the median interval between consecutive
+/// committed blocks in the history window.  The weight is then:
+///
+///   active_weight * (max_median_round_time_us / validator_median_round_time_us)^multiplier
+///
+/// Inactive / failed validators keep their base weights unchanged.
+/// If there is not enough history to compute a median the base active weight is used.
+pub struct LatencyWeightedHeuristic {
+    inner: ProposerAndVoterHeuristic,
+    active_weight: u64,
+    multiplier: f64,
+}
+
+impl LatencyWeightedHeuristic {
+    pub fn new(inner: ProposerAndVoterHeuristic, active_weight: u64, multiplier: f64) -> Self {
+        Self {
+            inner,
+            active_weight,
+            multiplier: if multiplier > 0.0 { multiplier } else { 1.0 },
+        }
+    }
+
+    /// Compute per-proposer round times from the history.
+    ///
+    /// History is ordered newest-first: `history[0]` is the latest block.
+    /// The round time for block `i` is `history[i].proposed_time() - history[i+1].proposed_time()`.
+    fn compute_round_times(history: &[NewBlockEvent]) -> HashMap<Author, Vec<u64>> {
+        let mut round_times: HashMap<Author, Vec<u64>> = HashMap::new();
+        for i in 0..history.len().saturating_sub(1) {
+            let newer = &history[i];
+            let older = &history[i + 1];
+            // Only compute within the same epoch to avoid epoch-boundary outliers.
+            if newer.epoch() != older.epoch() {
+                continue;
+            }
+            let interval = newer.proposed_time().saturating_sub(older.proposed_time());
+            if interval > 0 {
+                round_times.entry(newer.proposer()).or_default().push(interval);
+            }
+        }
+        round_times
+    }
+
+    fn median(values: &mut Vec<u64>) -> u64 {
+        if values.is_empty() {
+            return 0;
+        }
+        values.sort_unstable();
+        let mid = values.len() / 2;
+        if values.len() % 2 == 0 {
+            (values[mid - 1] + values[mid]) / 2
+        } else {
+            values[mid]
+        }
+    }
+}
+
+impl ReputationHeuristic for LatencyWeightedHeuristic {
+    fn get_weights(
+        &self,
+        epoch: u64,
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
+        history: &[NewBlockEvent],
+    ) -> Vec<u64> {
+        let base_weights = self.inner.get_weights(epoch, epoch_to_candidates, history);
+
+        let mut round_times = Self::compute_round_times(history);
+
+        // Compute per-validator median round time.
+        let mut medians: HashMap<Author, u64> = HashMap::new();
+        for (author, times) in round_times.iter_mut() {
+            let m = Self::median(times);
+            if m > 0 {
+                medians.insert(*author, m);
+            }
+        }
+
+        // We need at least a handful of data points to trust the medians.
+        // Require each candidate to have at least 2 observations; otherwise fall back to base.
+        let min_observations = 2usize;
+        let candidates = &epoch_to_candidates[&epoch];
+        let enough_data = candidates.iter().all(|author| {
+            round_times
+                .get(author)
+                .map_or(false, |v| v.len() >= min_observations)
+        });
+
+        if !enough_data || medians.is_empty() {
+            return base_weights;
+        }
+
+        // The slowest (highest) median round time is the reference — we scale all others
+        // relative to it so that the fastest proposer keeps `active_weight` and slower
+        // ones get a proportionally smaller share.
+        let max_median = *medians.values().max().expect("medians is non-empty");
+
+        epoch_to_candidates[&epoch]
+            .iter()
+            .zip(base_weights.iter())
+            .map(|(author, &base)| {
+                // Only adjust the weight for validators that received the active weight.
+                if base != self.active_weight {
+                    return base;
+                }
+                match medians.get(author) {
+                    Some(&median_rt) if median_rt > 0 => {
+                        // Scale by (max_median / median_rt)^multiplier.
+                        let ratio = (max_median as f64 / median_rt as f64).powf(self.multiplier);
+                        (self.active_weight as f64 * ratio) as u64
+                    },
+                    _ => base,
                 }
             })
             .collect()
