@@ -136,7 +136,11 @@ impl<'a> SsaConverter<'a> {
     /// Invariant: only Vid slots appear on the operand stack.
     fn vid_type(&self, slot: Slot) -> Result<Type> {
         match slot {
-            Slot::Vid(id) => Ok(self.vid_types[id as usize].clone()),
+            Slot::Vid(id) => self
+                .vid_types
+                .get(id as usize)
+                .cloned()
+                .with_context(|| format!("Vid id {} out of range", id)),
             other => bail!("expected Vid slot on operand stack, got {:?}", other),
         }
     }
