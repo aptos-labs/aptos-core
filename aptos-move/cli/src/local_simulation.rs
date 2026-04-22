@@ -181,6 +181,7 @@ pub fn profile_transaction_using_debugger(
     hash: HashValue,
     persisted_auxiliary_info: PersistedAuxiliaryInfo,
     fold_unique_stack: bool,
+    skip_gas_profiler_consistency_check: bool,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let (vm_status, vm_output, mut gas_log) = debugger
         .execute_transaction_at_version_with_gas_profiler(
@@ -191,6 +192,11 @@ pub fn profile_transaction_using_debugger(
         .map_err(|err| {
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
         })?;
+
+    aptos_gas_profiling::warn_or_panic_on_inconsistency(
+        &gas_log,
+        skip_gas_profiler_consistency_check,
+    );
 
     // Optionally fold the call graph by unique stack traces
     if fold_unique_stack {

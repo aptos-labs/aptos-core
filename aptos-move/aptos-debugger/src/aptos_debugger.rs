@@ -181,7 +181,12 @@ impl AptosDebugger {
             &auxiliary_info,
         )?;
 
-        Ok((status, output, gas_profiler.finish()))
+        // Note: we deliberately return the log without running the consistency
+        // check. Callers (typically the CLI) render a friendlier error and
+        // offer `--skip-gas-profiler-consistency-check` to bypass it; they are
+        // responsible for invoking
+        // `aptos_gas_profiling::warn_or_panic_on_inconsistency` on the result.
+        Ok((status, output, gas_profiler.finish_without_consistency_check()))
     }
 
     pub async fn execute_past_transactions(

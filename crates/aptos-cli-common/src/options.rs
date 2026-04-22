@@ -1026,6 +1026,12 @@ pub struct TransactionOptions {
     #[clap(long, requires("profile_gas"))]
     pub fold_unique_stack: bool,
 
+    /// If set, bypass the gas profiler's internal consistency check. The check failing
+    /// indicates a bug in the gas profiler itself; use this flag to still produce a
+    /// (possibly incomplete) gas report instead of aborting.
+    #[clap(long, requires("profile_gas"))]
+    pub skip_gas_profiler_consistency_check: bool,
+
     /// If this option is set, simulate the transaction using a local session.
     #[clap(long)]
     pub session: Option<PathBuf>,

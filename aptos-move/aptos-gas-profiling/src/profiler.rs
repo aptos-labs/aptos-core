@@ -211,12 +211,16 @@ where
     }
 
     fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()> {
+        // Delegate first so we can record the actual amount charged -- this matters
+        // when the base meter only partially charges (e.g. hitting OUT_OF_GAS).
+        let (cost, res) = self.delegate_charge(|base| base.charge_native_execution(amount));
+
         self.frames
             .last_mut()
             .expect("Native function must have recorded the frame")
-            .native_gas += amount;
+            .native_gas += cost;
 
-        self.base.charge_native_execution(amount)
+        res
     }
 }
 
@@ -747,11 +751,44 @@ impl<G> GasProfiler<G>
 where
     G: AptosGasMeter + PeakMemoryUsage,
 {
-    pub fn finish(mut self) -> TransactionGasLog {
+    /// Finalizes the profiler and produces a [`TransactionGasLog`]. Runs the
+    /// consistency checks and panics on failure. Used by tests and internal
+    /// tools that want strict behavior.
+    pub fn finish(self) -> TransactionGasLog {
+        let log = self.finish_without_consistency_check();
+        log.exec_io.assert_consistency();
+        log.storage.assert_consistency();
+        log
+    }
+
+    /// Finalizes the profiler and produces a [`TransactionGasLog`] *without*
+    /// running the consistency checks. Intended for CLI paths that want to
+    /// render a friendlier error and/or offer the user a way to bypass the
+    /// check; such callers should invoke
+    /// [`crate::warn_or_panic_on_inconsistency`] on the returned log.
+    pub fn finish_without_consistency_check(mut self) -> TransactionGasLog {
         while self.frames.len() > 1 {
             let cur = self.frames.pop().expect("frame must exist");
             let last = self.frames.last_mut().expect("frame must exist");
-            last.events.push(ExecutionGasEvent::Call(cur));
+            // A frame with non-zero native_gas belongs to a native function that
+            // accumulated costs via charge_native_execution but never reached
+            // charge_native_function (e.g. native returned Err after direct-meter
+            // charging hit a limit). Emit as CallNative so the cost is counted;
+            // otherwise emit as Call.
+            let event = match &cur.name {
+                FrameName::Function {
+                    module_id,
+                    name,
+                    ty_args,
+                } if !cur.native_gas.is_zero() => ExecutionGasEvent::CallNative {
+                    module_id: module_id.clone(),
+                    fn_name: name.clone(),
+                    ty_args: ty_args.clone(),
+                    cost: cur.native_gas,
+                },
+                _ => ExecutionGasEvent::Call(cur),
+            };
+            last.events.push(event);
         }
 
         let exec_io = ExecutionAndIOCosts {
@@ -772,7 +809,6 @@ where
             events_transient: self.events_transient,
             write_set_transient: self.write_set_transient,
         };
-        exec_io.assert_consistency();
 
         let storage = self.storage_fees.unwrap_or_else(|| StorageFees {
             total: Fee::zero(),
@@ -782,7 +818,6 @@ where
             event_discount: Fee::zero(),
             txn_storage: Fee::zero(),
         });
-        storage.assert_consistency();
 
         TransactionGasLog {
             exec_io,

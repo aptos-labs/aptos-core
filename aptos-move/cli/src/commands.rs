@@ -2467,6 +2467,12 @@ pub struct Replay {
     #[clap(long, requires("profile_gas"))]
     pub(crate) fold_unique_stack: bool,
 
+    /// If set, bypass the gas profiler's internal consistency check. The check failing
+    /// indicates a bug in the gas profiler itself; use this flag to still produce a
+    /// (possibly incomplete) gas report instead of aborting.
+    #[clap(long, requires("profile_gas"))]
+    pub(crate) skip_gas_profiler_consistency_check: bool,
+
     /// If present, skip the comparison against the expected transaction output.
     #[clap(long)]
     pub(crate) skip_comparison: bool,
@@ -2647,6 +2653,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 hash,
                 aux_info,
                 self.fold_unique_stack,
+                self.skip_gas_profiler_consistency_check,
             )?
         } else if self.benchmark {
             println!("Benchmarking transaction...");

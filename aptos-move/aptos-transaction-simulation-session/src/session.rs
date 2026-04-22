@@ -570,10 +570,15 @@ impl Session {
     /// If `profile_gas` is `true`, the transaction is executed with the gas profiler enabled.
     /// A `gas-report` directory is generated under the transaction output directory containing
     /// an HTML report with flamegraphs and detailed gas breakdowns.
+    ///
+    /// When the profiler is enabled, `skip_gas_profiler_consistency_check` controls whether a
+    /// gas-profiler consistency failure is reported as a warning (true) or panics (false).
+    /// Ignored when `profile_gas` is `false`.
     pub fn execute_transaction(
         &mut self,
         txn: SignedTransaction,
         profile_gas: bool,
+        skip_gas_profiler_consistency_check: bool,
     ) -> Result<(VMStatus, TransactionOutput)> {
         let env = AptosEnvironment::new(&self.state_store);
         let vm = AptosVM::new(&env);
@@ -605,7 +610,12 @@ impl Session {
                 )
                 .map_err(|e| anyhow::anyhow!("transaction execution failed: {:?}", e))?;
             let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
-            (vm_status, txn_output, Some(gas_profiler.finish()))
+            let gas_log = gas_profiler.finish_without_consistency_check();
+            aptos_gas_profiling::warn_or_panic_on_inconsistency(
+                &gas_log,
+                skip_gas_profiler_consistency_check,
+            );
+            (vm_status, txn_output, Some(gas_log))
         } else {
             let (vm_status, vm_output) = vm.execute_user_transaction(
                 &resolver,
@@ -691,6 +701,10 @@ impl Session {
     /// If `profile_gas` is `true`, the view function is executed with the gas profiler enabled.
     /// A `gas-report` directory is generated under the output directory containing
     /// an HTML report with flamegraphs and detailed gas breakdowns.
+    ///
+    /// When the profiler is enabled, `skip_gas_profiler_consistency_check` controls whether a
+    /// gas-profiler consistency failure is reported as a warning (true) or panics (false).
+    /// Ignored when `profile_gas` is `false`.
     pub fn execute_view_function(
         &mut self,
         module_id: ModuleId,
@@ -698,6 +712,7 @@ impl Session {
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
         profile_gas: bool,
+        skip_gas_profiler_consistency_check: bool,
     ) -> Result<Vec<serde_json::Value>> {
         let (output, gas_log) = if profile_gas {
             let (output, gas_profiler) = AptosVM::execute_view_function_with_modified_gas_meter(
@@ -716,7 +731,14 @@ impl Session {
                     )
                 },
             );
-            (output, gas_profiler.map(|p| p.finish()))
+            let gas_log = gas_profiler.map(|p| p.finish_without_consistency_check());
+            if let Some(log) = &gas_log {
+                aptos_gas_profiling::warn_or_panic_on_inconsistency(
+                    log,
+                    skip_gas_profiler_consistency_check,
+                );
+            }
+            (output, gas_log)
         } else {
             let output = AptosVM::execute_view_function(
                 &self.state_store,
