@@ -12,6 +12,18 @@ has_command() {
   command -v "$1" > /dev/null 2>&1
 }
 
+# Run a command with root privileges when needed (no `sudo` when already root).
+run_as_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif has_command sudo; then
+    sudo "$@"
+  else
+    echo "Error: root privileges are required for: $*. Rerun as root or install sudo." 1>&2
+    exit 1
+  fi
+}
+
 # Install native packages for the given package manager (self-contained; no external install scripts).
 minimal_install_pkgs() {
   pm="$1"
@@ -22,6 +34,10 @@ minimal_install_pkgs() {
 
   pre_cmd=""
   if [ "$(id -u)" -ne 0 ]; then
+    if ! has_command sudo; then
+      echo "Error: sudo is required to install packages when not running as root. Rerun as root or install sudo." 1>&2
+      exit 1
+    fi
     pre_cmd="sudo"
   fi
 
@@ -37,7 +53,8 @@ minimal_install_pkgs() {
       $pre_cmd yum install -y "$@"
       ;;
     pacman)
-      $pre_cmd pacman -Syu --noconfirm "$@"
+      $pre_cmd pacman -Sy --noconfirm
+      $pre_cmd pacman -S --noconfirm --needed "$@"
       ;;
     apk)
       $pre_cmd apk --update add --no-cache "$@"
@@ -52,7 +69,7 @@ minimal_install_pkgs() {
       brew install "$@"
       ;;
     port)
-      port install "$@"
+      $pre_cmd port install "$@"
       ;;
     xbps)
       $pre_cmd xbps-install -y "$@"
@@ -77,7 +94,7 @@ bootstrap_ssl_and_fetch_clients() {
   case "$os" in
     Linux)
       if has_command apt-get; then
-        sudo apt-get update
+        run_as_root apt-get update
         minimal_install_pkgs apt-get ca-certificates curl wget unzip
       elif has_command dnf; then
         minimal_install_pkgs dnf ca-certificates curl wget unzip
@@ -90,7 +107,7 @@ bootstrap_ssl_and_fetch_clients() {
       elif has_command zypper; then
         minimal_install_pkgs zypper ca-certificates curl wget unzip
       elif has_command emerge; then
-        sudo emerge --sync
+        run_as_root emerge --sync
         EMERGE_SYNC_DONE=1
         minimal_install_pkgs emerge app-misc/ca-certificates net-misc/curl net-misc/wget app-arch/unzip
       elif has_command xbps-install; then
@@ -121,22 +138,30 @@ bootstrap_ssl_and_fetch_clients() {
 }
 
 # Install rustup when cargo is missing (prefers curl, then wget, then FreeBSD fetch).
+# Download to a temp file so downloader failures are not masked by POSIX pipeline exit status.
 ensure_rustup() {
   if has_command cargo; then
     return 0
   fi
 
   rustup_url="https://sh.rustup.rs"
+  tmp="$(mktemp "${TMPDIR:-/tmp}/rustup-init.XXXXXX")"
+  trap 'rm -f "$tmp"' 0
+
   if has_command curl; then
-    curl --proto '=https' --tlsv1.2 -sSf "$rustup_url" | sh -s -- -y
+    curl --proto '=https' --tlsv1.2 -sSf "$rustup_url" -o "$tmp"
   elif has_command wget; then
-    wget -qO- "$rustup_url" | sh -s -- -y
+    wget -qO "$tmp" "$rustup_url"
   elif has_command fetch && [ "$(uname -s)" = "FreeBSD" ]; then
-    fetch -o - "$rustup_url" | sh -s -- -y
+    fetch -o "$tmp" "$rustup_url"
   else
     echo "Cannot install rustup: need curl or wget (install one with your package manager). Abort." 1>&2
     exit 1
   fi
+
+  sh "$tmp" -y
+  rm -f "$tmp"
+  trap - 0
 }
 
 # This script is used to set up a minimal environment for building the Aptos CLI and other tools.
@@ -150,7 +175,7 @@ case "$OS" in
   Linux)
     if has_command apt-get; then
       # Ubuntu / Debian based APT-GET
-      sudo apt-get update
+      run_as_root apt-get update
       minimal_install_pkgs apt-get ca-certificates curl wget unzip build-essential pkgconf libssl-dev git libudev-dev lld libdw-dev clang llvm cmake
     elif has_command dnf; then
       # RHEL / CentOS based DNF
@@ -180,7 +205,7 @@ case "$OS" in
     elif has_command emerge; then
       # Gentoo Emerge
       if [ "$EMERGE_SYNC_DONE" != 1 ]; then
-        sudo emerge --sync
+        run_as_root emerge --sync
       fi
       minimal_install_pkgs emerge app-misc/ca-certificates net-misc/curl net-misc/wget app-arch/unzip sys-devel/gcc dev-libs/openssl dev-vcs/git dev-lang/rust llvm-core/clang
     elif has_command xbps-install; then
