@@ -12,14 +12,16 @@ fn native() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use mono_move_core::NoopTransactionContext;
     use mono_move_gas::SimpleGasMeter;
     use mono_move_programs::match_sum::{micro_op_match_sum, MATCH_SUM_CASES};
     use mono_move_runtime::InterpreterContext;
 
     fn run(n: u64) -> u64 {
         let (functions, descriptors, _arena) = micro_op_match_sum();
+        let txn_ctx = NoopTransactionContext;
         let gas_meter = SimpleGasMeter::new(u64::MAX);
-        let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
             functions[0].as_ref_unchecked()
         });
         ctx.set_root_arg(0, &n.to_le_bytes());

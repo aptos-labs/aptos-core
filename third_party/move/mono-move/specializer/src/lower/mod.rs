@@ -7,7 +7,7 @@ pub mod context;
 pub mod display;
 mod translate;
 
-pub use context::{build_func_id_map, try_build_context, LoweringContext, SlotInfo};
+pub use context::{try_build_context, LoweringContext, SlotInfo};
 pub use display::MicroOpsFunctionDisplay;
 use mono_move_core::MicroOp;
 use move_binary_format::file_format::IdentifierIndex;

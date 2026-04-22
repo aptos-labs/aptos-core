@@ -12,4 +12,4 @@ pub use instruction::{
     CodeOffset, DescriptorId, FrameOffset, MicroOp, MicroOpGasSchedule, ENUM_DATA_OFFSET,
     ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
 };
-pub use transaction_context::{FunctionResolver, TransactionContext};
+pub use transaction_context::{FunctionResolver, NoopTransactionContext, TransactionContext};

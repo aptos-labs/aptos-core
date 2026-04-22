@@ -9,7 +9,7 @@ use move_model::metadata::LanguageVersion;
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 use specializer::{
     destack,
-    lower::{build_func_id_map, lower_function, try_build_context, MicroOpsFunctionDisplay},
+    lower::{lower_function, try_build_context, MicroOpsFunctionDisplay},
     stackless_exec_ir::ModuleIR,
 };
 use std::path::Path;
@@ -22,7 +22,6 @@ fn make_struct_name_table(module: &CompiledModule) -> Vec<StructNameIndex> {
 
 fn format_micro_ops(module_ir: &ModuleIR) -> String {
     let module = &module_ir.module;
-    let func_id_map = build_func_id_map(module);
     let self_handle = module.module_handle_at(module.self_module_handle_idx);
     let addr = module.address_identifier_at(self_handle.address);
     let mod_name = module.identifier_at(self_handle.name);
@@ -36,7 +35,7 @@ fn format_micro_ops(module_ir: &ModuleIR) -> String {
 
     for func_ir in module_ir.functions.iter().flatten() {
         let func_name = module.identifier_at(func_ir.name_idx).to_string();
-        match try_build_context(module, func_ir, &func_id_map) {
+        match try_build_context(module, func_ir) {
             Err(e) => {
                 out.push_str(&format!(
                     "\nfun {}(): skipped (context: {})\n",

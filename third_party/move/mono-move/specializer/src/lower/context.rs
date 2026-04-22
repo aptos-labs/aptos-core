@@ -112,11 +112,10 @@ pub struct LoweringContext {
 pub fn try_build_context(
     module: &CompiledModule,
     func_ir: &FunctionIR,
-    func_id_map: &[Option<u32>],
 ) -> Result<Option<LoweringContext>> {
     // Use an inner function that returns Option to keep `?` ergonomic for
     // non-concrete type checks, then wrap the result.
-    let inner = try_build_context_inner(module, func_ir, func_id_map);
+    let inner = try_build_context_inner(module, func_ir);
     match inner {
         Some(result) => result.map(Some),
         None => Ok(None),
@@ -128,7 +127,6 @@ pub fn try_build_context(
 fn try_build_context_inner(
     module: &CompiledModule,
     func_ir: &FunctionIR,
-    func_id_map: &[Option<u32>],
 ) -> Option<Result<LoweringContext>> {
     // 1. Compute home slot layout
     let mut home_slots = Vec::with_capacity(func_ir.num_home_slots as usize);
@@ -169,7 +167,7 @@ fn try_build_context_inner(
         };
 
         let callee_handle = module.function_handle_at(handle_idx);
-        let callee_func_id = func_id_map[handle_idx.0 as usize]?;
+        let callee_func_id = handle_idx.0 as u32;
 
         // Param layout
         let param_sig = &module.signature_at(callee_handle.parameters).0;
@@ -217,21 +215,4 @@ fn try_build_context_inner(
         return_slots,
         num_xfer_slots: func_ir.num_xfer_slots,
     }))
-}
-
-/// Build a func_id_map from the module: FunctionHandleIndex -> Option<u32>.
-/// For same-module definitions, maps to the definition index.
-/// For cross-module handles, maps to None.
-pub fn build_func_id_map(module: &CompiledModule) -> Vec<Option<u32>> {
-    let self_module_handle_idx = module.self_module_handle_idx;
-    let num_handles = module.function_handles.len();
-    let mut map: Vec<Option<u32>> = vec![None; num_handles];
-
-    for (def_idx, func_def) in module.function_defs.iter().enumerate() {
-        let handle = module.function_handle_at(func_def.function);
-        if handle.module == self_module_handle_idx {
-            map[func_def.function.0 as usize] = Some(def_idx as u32);
-        }
-    }
-    map
 }

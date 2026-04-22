@@ -9,6 +9,7 @@ mod helpers;
 const N: u64 = 25;
 
 fn bench_fib(c: &mut Criterion) {
+    use mono_move_core::NoopTransactionContext;
     use mono_move_gas::{NoOpGasMeter, SimpleGasMeter};
     use mono_move_programs::{
         fib::{micro_op_fib, move_bytecode_fib, native_fib},
@@ -31,12 +32,14 @@ fn bench_fib(c: &mut Criterion) {
         let (functions, descriptors, _arena) = micro_op_fib();
         // SAFETY: Exclusive access during bench setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions) };
+        let txn_ctx = NoopTransactionContext;
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&descriptors, NoOpGasMeter, unsafe {
-                        functions[0].unwrap().as_ref_unchecked()
-                    });
+                    let mut ctx =
+                        InterpreterContext::new(&txn_ctx, &descriptors, NoOpGasMeter, unsafe {
+                            functions[0].unwrap().as_ref_unchecked()
+                        });
                     ctx.set_root_arg(0, &N.to_le_bytes());
                     ctx
                 },
@@ -58,9 +61,10 @@ fn bench_fib(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let gas_meter = SimpleGasMeter::new(u64::MAX);
-                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
-                        functions_gas[0].unwrap().as_ref_unchecked()
-                    });
+                    let mut ctx =
+                        InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+                            functions_gas[0].unwrap().as_ref_unchecked()
+                        });
                     ctx.set_root_arg(0, &N.to_le_bytes());
                     ctx
                 },

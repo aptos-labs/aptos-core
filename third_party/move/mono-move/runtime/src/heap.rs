@@ -239,7 +239,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
 
         loop {
             // SAFETY: func_ptr is a valid, non-null pointer — set from
-            // `self.functions[]` or from `CallLocalFunc`, and saved/restored
+            // `self.functions[]` or from `CallDirect`, and saved/restored
             // via frame metadata. Arena pointers are valid for the lifetime
             // of the executable. `fp.sub` retrieves saved metadata written
             // by the call protocol.

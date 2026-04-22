@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::ExecutionGuard;
-use mono_move_alloc::ExecutableArenaPtr;
+use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{ExecutableId, Function, FunctionResolver, TransactionContext};
 
 // TODO:
@@ -24,9 +24,9 @@ impl<'ctx> PlaceholderContext<'ctx> {
 impl FunctionResolver for PlaceholderContext<'_> {
     fn resolve_function(
         &self,
-        _executable_id: ExecutableArenaPtr<ExecutableId>,
-        _name: ExecutableArenaPtr<str>,
-    ) -> Option<&Function> {
+        _executable_id: GlobalArenaPtr<ExecutableId>,
+        _name: GlobalArenaPtr<str>,
+    ) -> Option<ExecutableArenaPtr<Function>> {
         // TODO: implement once specializer support cross-module calls.
         todo!("PlaceholderContext::resolve_function")
     }
