@@ -564,27 +564,23 @@ module aptos_framework::stake {
         result
     }
 
-    /// Initialize validator set, validator performance, and precomputed validator set to the core resource account if they don't exist.
-    public entry fun initialize(aptos_framework: &signer) {
+    /// Initialize validator set to the core resource account.
+    public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        if (!exists<ValidatorSet>(@aptos_framework)) {
-            move_to(
-                aptos_framework,
-                ValidatorSet {
-                    consensus_scheme: 0,
-                    active_validators: vector::empty(),
-                    pending_active: vector::empty(),
-                    pending_inactive: vector::empty(),
-                    total_voting_power: 0,
-                    total_joining_power: 0
-                }
-            );
-        };
+        move_to(
+            aptos_framework,
+            ValidatorSet {
+                consensus_scheme: 0,
+                active_validators: vector::empty(),
+                pending_active: vector::empty(),
+                pending_inactive: vector::empty(),
+                total_voting_power: 0,
+                total_joining_power: 0
+            }
+        );
 
-        if (!exists<ValidatorPerformance>(@aptos_framework)) {
-            move_to(aptos_framework, ValidatorPerformance { validators: vector::empty() });
-        };
+        move_to(aptos_framework, ValidatorPerformance { validators: vector::empty() });
     }
 
     /// This is only called during Genesis, which is where MintCapability<AptosCoin> can be created.

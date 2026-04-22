@@ -2658,10 +2658,10 @@ Returns the pending transaction fee that is accumulated in current epoch.
 
 ## Function `initialize`
 
-Initialize validator set, validator performance, and precomputed validator set to the core resource account if they don't exist.
+Initialize validator set to the core resource account.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="stake.md#0x1_stake_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -2670,26 +2670,22 @@ Initialize validator set, validator performance, and precomputed validator set t
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="stake.md#0x1_stake_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
-    <b>if</b> (!<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework)) {
-        <b>move_to</b>(
-            aptos_framework,
-            <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
-                consensus_scheme: 0,
-                active_validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
-                pending_active: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
-                pending_inactive: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
-                total_voting_power: 0,
-                total_joining_power: 0
-            }
-        );
-    };
+    <b>move_to</b>(
+        aptos_framework,
+        <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
+            consensus_scheme: 0,
+            active_validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            pending_active: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            pending_inactive: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            total_voting_power: 0,
+            total_joining_power: 0
+        }
+    );
 
-    <b>if</b> (!<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework)) {
-        <b>move_to</b>(aptos_framework, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a> { validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>() });
-    };
+    <b>move_to</b>(aptos_framework, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a> { validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>() });
 }
 </code></pre>
 
@@ -5419,6 +5415,96 @@ pending_inactive has been settled to inactive (e.g. in on_new_epoch or join_vali
 
 
 
+
+<a id="0x1_stake_spec_get_reconfig_start_time_secs"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reconfig_start_time_secs">spec_get_reconfig_start_time_secs</a>(): u64 {
+   <b>if</b> (<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">reconfiguration_state::State</a>&gt;(@aptos_framework)) {
+       <a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_start_time_secs">reconfiguration_state::spec_start_time_secs</a>()
+   } <b>else</b> {
+       <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>()
+   }
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_spec_get_lockup_secs"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_lockup_secs">spec_get_lockup_secs</a>(pool_address: <b>address</b>): u64 {
+   <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address).locked_until_secs
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_spec_get_reward_rate_1"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reward_rate_1">spec_get_reward_rate_1</a>(config: StakingConfig): num {
+   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>()) {
+       <b>let</b> epoch_rewards_rate =
+           <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
+       <b>if</b> (epoch_rewards_rate.value == 0) { 0 }
+       <b>else</b> {
+           <b>let</b> denominator_0 =
+               aptos_std::fixed_point64::spec_divide_u128(
+                   <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">staking_config::MAX_REWARDS_RATE</a>, epoch_rewards_rate
+               );
+           <b>let</b> denominator =
+               <b>if</b> (denominator_0 &gt; <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>) {
+                   <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>
+               } <b>else</b> {
+                   denominator_0
+               };
+           <b>let</b> nominator =
+               aptos_std::fixed_point64::spec_multiply_u128(
+                   denominator, epoch_rewards_rate
+               );
+           nominator
+       }
+   } <b>else</b> {
+       config.rewards_rate
+   }
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_spec_get_reward_rate_2"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reward_rate_2">spec_get_reward_rate_2</a>(config: StakingConfig): num {
+   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>()) {
+       <b>let</b> epoch_rewards_rate =
+           <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
+       <b>if</b> (epoch_rewards_rate.value == 0) { 1 }
+       <b>else</b> {
+           <b>let</b> denominator_0 =
+               aptos_std::fixed_point64::spec_divide_u128(
+                   <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">staking_config::MAX_REWARDS_RATE</a>, epoch_rewards_rate
+               );
+           <b>let</b> denominator =
+               <b>if</b> (denominator_0 &gt; <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>) {
+                   <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>
+               } <b>else</b> {
+                   denominator_0
+               };
+           denominator
+       }
+   } <b>else</b> {
+       config.rewards_rate_denominator
+   }
+}
+</code></pre>
+
+
+
 <a id="@Specification_1_ValidatorSet"></a>
 
 ### Resource `ValidatorSet`
@@ -5627,7 +5713,7 @@ pending_inactive has been settled to inactive (e.g. in on_new_epoch or join_vali
 ### Function `initialize`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="stake.md#0x1_stake_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -5636,6 +5722,8 @@ pending_inactive has been settled to inactive (e.g. in on_new_epoch or join_vali
 <pre><code><b>pragma</b> disable_invariants_in_body;
 <b>let</b> aptos_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(aptos_addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(aptos_addr);
 <b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(aptos_addr);
 <b>ensures</b> <b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(aptos_addr).consensus_scheme == 0;
 <b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(aptos_addr);
@@ -6595,6 +6683,23 @@ pending_inactive has been settled to inactive (e.g. in on_new_epoch or join_vali
 
 
 
+
+<a id="0x1_stake_ResourceRequirement"></a>
+
+
+<pre><code><b>schema</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a> {
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;StakingConfig&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;StakingRewardsConfig&gt;(@aptos_framework)
+        || !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
+    <b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+}
+</code></pre>
+
+
+
 <a id="@Specification_1_update_stake_pool"></a>
 
 ### Function `update_stake_pool`
@@ -6714,32 +6819,6 @@ pending_inactive has been settled to inactive (e.g. in on_new_epoch or join_vali
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">GetReconfigStartTimeRequirement</a> {
     <b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
     <b>include</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_StartTimeSecsRequirement">reconfiguration_state::StartTimeSecsRequirement</a>;
-}
-</code></pre>
-
-
-
-
-<a id="0x1_stake_spec_get_reconfig_start_time_secs"></a>
-
-
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reconfig_start_time_secs">spec_get_reconfig_start_time_secs</a>(): u64 {
-   <b>if</b> (<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">reconfiguration_state::State</a>&gt;(@aptos_framework)) {
-       <a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_start_time_secs">reconfiguration_state::spec_start_time_secs</a>()
-   } <b>else</b> {
-       <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>()
-   }
-}
-</code></pre>
-
-
-
-
-<a id="0x1_stake_spec_get_lockup_secs"></a>
-
-
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_lockup_secs">spec_get_lockup_secs</a>(pool_address: <b>address</b>): u64 {
-   <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address).locked_until_secs
 }
 </code></pre>
 

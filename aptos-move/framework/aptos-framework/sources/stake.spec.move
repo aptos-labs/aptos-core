@@ -176,10 +176,13 @@ spec aptos_framework::stake {
             };
     }
 
+    // `Validator` is initialized once.
     spec initialize(aptos_framework: &signer) {
         pragma disable_invariants_in_body;
         let aptos_addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
+        aborts_if exists<ValidatorSet>(aptos_addr);
+        aborts_if exists<ValidatorPerformance>(aptos_addr);
         ensures exists<ValidatorSet>(aptos_addr);
         ensures global<ValidatorSet>(aptos_addr).consensus_scheme == 0;
         ensures exists<ValidatorPerformance>(aptos_addr);
