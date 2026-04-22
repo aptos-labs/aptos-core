@@ -225,21 +225,11 @@ impl CallFrame {
     }
 }
 
-/// Formats the standard "bug in the gas profiler" message used by both
-/// `ExecutionAndIOCosts::check_consistency` and `StorageFees::check_consistency`.
-/// The message is library-generic -- user-facing tools (e.g. CLIs) should wrap
-/// it with any tool-specific guidance (such as a flag to bypass the check).
-fn consistency_error(subtotal: &str, from_gas_meter: impl std::fmt::Display, calculated: impl std::fmt::Display) -> anyhow::Error {
-    anyhow::anyhow!(
-        "Gas profiler consistency check failed: {subtotal} do not add up. \
-         This is an unexpected condition that indicates a bug in the gas profiler \
-         (not in the transaction being profiled or in the gas meter). \
-         The generated gas report is likely incomplete or inaccurate. \
-         Please report this at https://github.com/aptos-labs/aptos-core/issues, \
-         including the transaction ID or payload along with the details below. \
-         From gas meter: {from_gas_meter}. Calculated: {calculated}."
-    )
-}
+/// Returns a boilerplate message that callers append to consistency errors
+/// returned from `check_consistency`. The message is intentionally generic --
+/// user-facing tools (e.g. CLIs) add any tool-specific guidance separately.
+const LIKELY_BUG_NOTE: &str = "This very likely indicates a bug in the gas profiler. \
+    Please report at https://github.com/aptos-labs/aptos-core/issues.";
 
 impl StorageFees {
     /// Returns `Ok(())` if the recorded storage fees and refunds sum to the
@@ -261,11 +251,15 @@ impl StorageFees {
         total += self.txn_storage;
 
         if total != self.total {
-            return Err(consistency_error("Storage fees", self.total, total));
+            return Err(anyhow::anyhow!(
+                "Storage fees do not add up (gas meter: {}, calculated: {}). {LIKELY_BUG_NOTE}",
+                self.total,
+                total,
+            ));
         }
         if total_refund != self.total_refund {
-            return Err(consistency_error(
-                "Storage refunds",
+            return Err(anyhow::anyhow!(
+                "Storage refunds do not add up (gas meter: {}, calculated: {}). {LIKELY_BUG_NOTE}",
                 self.total_refund,
                 total_refund,
             ));
@@ -335,8 +329,8 @@ impl ExecutionAndIOCosts {
         }
 
         if total != self.total() {
-            return Err(consistency_error(
-                "Execution & IO costs",
+            return Err(anyhow::anyhow!(
+                "Execution & IO costs do not add up (gas meter: {}, calculated: {}). {LIKELY_BUG_NOTE}",
                 self.total(),
                 total,
             ));
