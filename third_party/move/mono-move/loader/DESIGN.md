@@ -5,8 +5,12 @@
 The MonoMove runtime uses a long-living module cache that satisfies the following requirements.
 
 - Stores executable IR and lowered code to avoid repeated deserialization, verification and translation.
+  Note that executable IR already uses type pointers to the long-living interned type cache.
+
 - Supports upgrades: 1) within same block, 2) between speculative block trees (with Zaptos, blocks with published code may not be committed immediately).
   Because of speculation and concurrent upgrades, newer or speculative code can co-exist with older versions at the same time.
+
+- Does not evict modules during execution of transactions (only at safe points when no execution happens).
 
 When a single transaction executes, it may "load" modules into its local read-set.
 The read-set is used to cache a consistent local view of the cache for transaction.
@@ -22,6 +26,8 @@ Transaction may need to load modules for multiple reasons.
 1. When executing a cross-module call.
 2. When lowering non-generic function IR to micro-ops (struct layout information such as size, field offsets is needed).
 3. When monomorphizing generic function IR to micro-ops (same as for non-generics, layout information is needed).
+4. When resolving the function behind the closure (e.g., closure was deserialized from storage and have not been loaded yet).
+5. When walking enum values (layouts of variants need to be known, which may result in module loading).
 
 Note that (2) and (3) also cover cases like 1) deserializing data on global storage access, 2) walking VM values based on layouts (serialization, GC).
 
@@ -32,7 +38,8 @@ Note that (2) and (3) also cover cases like 1) deserializing data on global stor
    As a result, transactions need to enforce cache hit has the same gas charging semantics as the cache miss.
 
 2. **Loading costs are charged on first access.**
-   Multiple accesses to same module `A` should be charged on first access only.
+   Multiple accesses to same module `A` within same transaction should be charged once to cover its loading costs.
+   The charge should happen on the first access to such a module `A`.
    While repeated accessed can be overcharged by a small factor, it can easily become too restrictive for contracts.
    If there is a loop that calls into module `A`, gas must not be charged for `A` on every iteration.
    Similarly, if `A` is a hot library called from many places within a transaction, charging for all call sites would be prohibitively expensive for call-heavy Move programs.
@@ -46,7 +53,7 @@ Note that (2) and (3) also cover cases like 1) deserializing data on global stor
    As a result, semantics of gas charging may impact how efficient loading is.
 
 4. **Modules are upgradable.**
-   On upgrade, modules may change their code and size.
+   On upgrade, modules may change their code and size, more structs may be added, enums may gain new variants.
    Because the gas charge is proportional to module size in bytes, transactions that loaded upgraded module must be invalidated and re-executed by Block-STM.
    Again, semantics of gas charging may impact validation and upgrade logic.
 
@@ -58,6 +65,7 @@ To handle module upgrades, Block-STM may use push- or pull-based validation.
 For pull, transactions eagerly check freshness of loaded modules to detect upgrades.
 For push, on code upgrade, all cache entries that transitively depend on upgraded module need to be invalidated.
 Additionally, readers of that module or any derived cache entries must be invalidated.
+Derived cache entries can include struct layouts (constructed from multiple modules), sums of module sizes, etc.
 
 MonoMove runtime uses pull-based invalidation.
 It makes implementation simpler and more efficient.
@@ -115,7 +123,7 @@ module 0x23::d {
 }
 ```
 
-In this design, we propose three loadig policies.
+In this design, we propose three loading policies.
 Policies try to balance between the two:
 
 1. Load and charge more modules upfront (more work), no loading / charging when resolving calls (less work).
@@ -177,7 +185,12 @@ However, if `a`, `b` and `c` are in the same package, both `f1` and `f2` can be 
 
 ### Loading framework
 
-A single version of framework is always cached, its functions lowered and layouts available.
+Framework code is treated separately.
+While framework can upgrade, these upgrades are controlled and rare (around every 2 weeks).
+At the same time, framework is widely used by ecosystem modules, with the majority of cross-module calls resolving to the framework.
+Hence, it is a strong requirement to ensure such calls dispatch fast, ideally via direct pointers.
+
+In this design, a single version of framework is always cached, its functions lowered and layouts available.
 In addition, gas is never charge for loading of any framework module.
 As a result, any module using framework dependencies can use them freely for its own lowering.
 In Example 3, when module `a` below is loaded, `f` is lowered eagerly because string layout is always available.
@@ -219,12 +232,13 @@ In order to make metering deterministic:
 Here, (2) also handles metering for generic calls because type argument layouts are in mandatory set of the caller.
 
 The goal of mandatory sets is to enforce determinism under a particular loading policy.
-Depending on the policy, module loading may be more or less expensive, making function call resultion less or more expensive.
+Depending on the policy, module loading may be more or less expensive, making function call resolution less or more expensive.
 The best policy is workload dependent.
 Interpreter can also use inline caches to avoid repeated set intersection checks, if they are expensive.
 
 The important property of mandatory sets is that they cannot change size because of upgrade.
-This makes them particularly atractive because they can be cached per each module instance.
+That is, if `MS(a) = {a, b, c}`, it is not possible that it becomes `{a, b}` or `{a, b, c, d}` after some downstream upgrade.
+This makes them particularly attractive because they can be cached per each module instance.
 For example, if module `a` is cached in long-living cache, there is no need to re-traverse its dependencies in some complex way to simulate EL loading and metering.
 It is sufficient to check modules in `MS(a)`, which can be implemented lock-free.
 
@@ -259,7 +273,7 @@ In order to enforce correctness, loader splits "loading", "linking" and "inserti
    The modules can still be in compiled, file-format representation.
 2. Modules are translated to execution IR.
    Non-generic functions are lowered when possible.
-3. Modules are ordered in reversed topological order.
+3. Modules are ordered in reversed topological order based on their dependencies.
    Then, they are inserted one by one into cache.
    This is critical for correctness under concurrent loads: it is possible that other thread may insert module into cache.
    The cache resolves the race returning the *canonical* pointer, which can be now linked against.

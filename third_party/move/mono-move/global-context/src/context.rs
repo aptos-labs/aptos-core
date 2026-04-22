@@ -293,10 +293,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Returns an error only if the cache detects an invariant violation
     /// during install. Under normal operation this method always returns
     /// `Ok`.
-    pub fn insert_executable(
-        &self,
-        executable: Box<Executable>,
-    ) -> anyhow::Result<&Executable> {
+    pub fn insert_executable(&self, executable: Box<Executable>) -> anyhow::Result<&Executable> {
         let ptr = self
             .ctx
             .executable_cache

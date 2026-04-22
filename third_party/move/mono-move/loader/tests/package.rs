@@ -41,9 +41,9 @@ fn load_package_cache_miss_loads_all_members() {
     // Both package members must be in the read-set.
     assert_eq!(read_set.len(), 2);
 
-    // mandatory_dependencies contains the other package members (self
-    // excluded). For a 2-module package, that's a single sibling slot.
-    assert_eq!(exec.mandatory_dependencies().slots().len(), 1);
+    // mandatory_dependencies covers every package member, including
+    // self. For a 2-module package, that's both slots.
+    assert_eq!(exec.mandatory_dependencies().slots().len(), 2);
 
     // The sibling must also be loadable from the read-set directly.
     let id_b = ModuleId::new(AccountAddress::ONE, ident_str!("b").to_owned());

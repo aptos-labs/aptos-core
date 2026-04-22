@@ -146,19 +146,19 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         id: ArenaRef<'guard, ExecutableId>,
     ) -> anyhow::Result<&'guard Executable> {
         if let Some(executable) = self.guard.get_executable(id) {
-            let slots = executable.mandatory_dependencies().slots();
-
-            // Probe every sibling slot before touching the read-set. A
-            // concurrent miss-path worker may have populated `id`'s slot
-            // but not yet all sibling slots; in that window we fall
-            // through to the miss path, which re-verifies and re-inserts.
+            // `slots` covers all package members, including self. Probe
+            // every slot before touching the read-set: a concurrent
+            // miss-path worker may have populated `id`'s slot but not yet
+            // all sibling slots. In that window we fall through to the
+            // miss path, which re-verifies and re-inserts.
             // `insert_executable` returns the canonical winner on CAS
-            // loss, so already-cached siblings are not duplicated.
-            let mut siblings = Vec::with_capacity(slots.len());
+            // loss, so already-cached members are not duplicated.
+            let slots = executable.mandatory_dependencies().slots();
+            let mut members = Vec::with_capacity(slots.len());
             let mut all_present = true;
             for slot in slots {
                 match load_content(self.guard, *slot) {
-                    Some(other) => siblings.push(other),
+                    Some(member) => members.push(member),
                     None => {
                         all_present = false;
                         break;
@@ -167,12 +167,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             }
 
             if all_present {
-                let mut total = executable.cost();
-                read_set.record(id, ExecutableRead::Loaded(executable));
-                for other in siblings {
-                    let other_id = self.guard.arena_ref_for_executable_id(other.id());
-                    total = total.saturating_add(other.cost());
-                    read_set.record(other_id, ExecutableRead::Loaded(other));
+                let mut total = 0u64;
+                for member in members {
+                    let member_id = self.guard.arena_ref_for_executable_id(member.id());
+                    total = total.saturating_add(member.cost());
+                    read_set.record(member_id, ExecutableRead::Loaded(member));
                 }
                 gas_meter.charge(total)?;
                 return Ok(executable);
