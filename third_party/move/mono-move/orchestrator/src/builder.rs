@@ -83,7 +83,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             struct_def_idx,
             id,
             cost: 0,
-            mandatory_dependencies: MandatoryDependencies::None,
+            mandatory_dependencies: MandatoryDependencies::empty(),
             structs: UnorderedMap::new(),
             enums: UnorderedMap::new(),
             functions: UnorderedMap::new(),

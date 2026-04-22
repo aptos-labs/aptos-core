@@ -12782,11 +12782,13 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "legacy-move-compiler",
  "libtest-mimic",
  "mono-move-core",
  "mono-move-gas",
  "mono-move-global-context",
+ "mono-move-loader",
  "mono-move-orchestrator",
  "mono-move-runtime",
  "move-binary-format",

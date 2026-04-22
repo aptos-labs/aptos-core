@@ -3,12 +3,10 @@
 
 //! Integration tests for the Lazy loading policy.
 
-mod common;
-
-use common::InMemoryHooks;
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{ExecutableReadSet, Loader, LoadingPolicy};
+use mono_move_loader::{ExecutableReadSet, Loader, LoadingPolicy, LoweringPolicy};
+use mono_move_testsuite::InMemoryHooks;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 const TEST_SOURCE: &str = r#"
@@ -25,7 +23,7 @@ fn load_lazy_cache_miss_and_hit() {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &hooks, LoadingPolicy::Lazy);
+    let loader = Loader::new_with_policy(&guard, &hooks, LoadingPolicy::Lazy(LoweringPolicy::Lazy));
 
     let id_module = ModuleId::new(AccountAddress::ONE, ident_str!("test").to_owned());
     let id = guard.intern_module_id(&id_module);
@@ -40,7 +38,7 @@ fn load_lazy_cache_miss_and_hit() {
     assert_eq!(gas_before - gas.balance(), first_cost);
     assert_eq!(read_set.len(), 1);
     // Lazy policy: no dependency slots (self is handled separately).
-    assert!(exec.mandatory_dependencies().slots().unwrap().is_empty());
+    assert!(exec.mandatory_dependencies().slots().is_empty());
 
     // Second call on a fresh read-set is a cache hit: charges the same
     // cost, records without fetching.

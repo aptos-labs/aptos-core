@@ -5,13 +5,8 @@
 //!
 //! Provides an in-memory [`LoaderHooks`] backed by a `HashMap` of module
 //! bytes plus a per-package sibling index. Tests compile Move sources via
-//! `mono_move_testsuite::compile_move_modules`, serialize the resulting
+//! [`crate::compile_move_modules`], serialize the resulting
 //! [`CompiledModule`]s, and populate the hooks.
-
-// Each integration-test binary compiles `common/mod.rs` independently, so
-// a helper used only by some binaries (e.g. `declare_package` used by
-// `package.rs` but not `lazy.rs`) trips dead-code warnings in the others.
-#![allow(dead_code)]
 
 use bytes::Bytes;
 use mono_move_loader::LoaderHooks;

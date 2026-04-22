@@ -3,12 +3,10 @@
 
 //! Integration tests for the Package loading policy.
 
-mod common;
-
-use common::InMemoryHooks;
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{ExecutableReadSet, Loader, LoadingPolicy};
+use mono_move_testsuite::InMemoryHooks;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 const TEST_SOURCE: &str = r#"
@@ -45,7 +43,7 @@ fn load_package_cache_miss_loads_all_members() {
 
     // mandatory_dependencies contains the other package members (self
     // excluded). For a 2-module package, that's a single sibling slot.
-    assert_eq!(exec.mandatory_dependencies().slots().unwrap().len(), 1);
+    assert_eq!(exec.mandatory_dependencies().slots().len(), 1);
 
     // The sibling must also be loadable from the read-set directly.
     let id_b = ModuleId::new(AccountAddress::ONE, ident_str!("b").to_owned());

@@ -11,7 +11,7 @@ use mono_move_alloc::{
 use move_core_types::account_address::AccountAddress;
 use parking_lot::Mutex;
 use shared_dsa::UnorderedMap;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 /// Identifies an executable (module or script) by its address and name.
 ///   - For modules, constructed from module address and name.
@@ -56,55 +56,24 @@ pub type ExecutableSlot = LeakedBoxPtr<VersionedLeakedBoxPtr<Executable>>;
 
 /// What a loaded executable says about its mandatory dependencies, keyed by
 /// the loading policy that built it. Always excludes self.
-pub enum MandatoryDependencies {
-    /// This executable has been loaded lazily. There are no mandatory
-    /// dependencies.
-    None,
-    /// This executable has been loaded under package policy. The list includes
-    /// every other member of the executable's package; together with self they
-    /// form a package bundle.
-    Package(Arc<[ExecutableSlot]>),
-    /// This executable has been loaded under lazy policy with transitive
-    /// structs. The inner value is **not set** when the executable was loaded
-    /// as a sub-member of another executable's closure (its own closure was
-    /// not computed). It is **set once** when the executable is loaded as a
-    /// target and its transitive-struct closure is computed.
-    TransitiveStructClosure(OnceLock<Box<[ExecutableSlot]>>),
+#[derive(Clone)]
+pub struct MandatoryDependencies {
+    inner: Option<Arc<[ExecutableSlot]>>,
 }
 
 impl MandatoryDependencies {
-    pub fn transitive_unset() -> Self {
-        Self::TransitiveStructClosure(OnceLock::new())
+    /// Slots of the modules this executable loaded together with.
+    pub fn slots(&self) -> &[ExecutableSlot] {
+        self.inner.as_ref().map(|r| r.as_ref()).unwrap_or(&[])
     }
 
-    pub fn transitive_from_slots(slots: Box<[ExecutableSlot]>) -> Self {
-        let cell = OnceLock::new();
-        let _ = cell.set(slots);
-        Self::TransitiveStructClosure(cell)
+    pub fn empty() -> MandatoryDependencies {
+        MandatoryDependencies { inner: None }
     }
 
-    /// Slots of the other modules this executable pins. Returns
-    /// [`Some`] for `None`/`Package` (the slice is always known), and for
-    /// `TransitiveStructClosure` only once the closure has been computed.
-    /// Returns [`None`] for a `TransitiveStructClosure` whose closure has
-    /// not yet been filled in — callers must compute it and call
-    /// [`MandatoryDependencies::set_struct_closure`] before using it.
-    pub fn slots(&self) -> Option<&[ExecutableSlot]> {
-        match self {
-            Self::None => Some(&[]),
-            Self::Package(slots) => Some(slots),
-            Self::TransitiveStructClosure(cell) => cell.get().map(|boxed| &boxed[..]),
-        }
-    }
-
-    /// Installs the closure on a `TransitiveStructClosure` variant. No-op
-    /// if already set, or if the variant is `None` / `Package`. Since
-    /// struct-def closures are a deterministic function of the module's
-    /// bytecode, any two concurrent computers produce identical slot
-    /// lists, so losers on a race drop their value on the floor.
-    pub fn set_struct_closure(&self, slots: Box<[ExecutableSlot]>) {
-        if let Self::TransitiveStructClosure(cell) = self {
-            let _ = cell.set(slots);
+    pub fn package(package_slots: Vec<ExecutableSlot>) -> MandatoryDependencies {
+        MandatoryDependencies {
+            inner: Some(Arc::from(package_slots)),
         }
     }
 }

@@ -7,11 +7,12 @@
 use fxhash::FxHashMap;
 use mono_move_core::ExecutableId;
 use mono_move_global_context::{ArenaRef, Executable};
+use std::collections::hash_map::Entry;
 
 /// Tracks how this read depends on a particular executable.
 #[derive(Copy, Clone)]
-pub struct ExecutableRead<'guard> {
-    executable: &'guard Executable,
+pub enum ExecutableRead<'guard> {
+    Loaded(&'guard Executable),
 }
 
 /// Maps from executable ID to the version the transaction is using for the
@@ -31,7 +32,9 @@ impl<'guard> ExecutableReadSet<'guard> {
 
     /// Returns the recorded executable or [`None`] otherwise.
     pub fn get(&self, key: ArenaRef<'guard, ExecutableId>) -> Option<&'guard Executable> {
-        Some(self.inner.get(&key)?.executable)
+        match self.inner.get(&key)? {
+            ExecutableRead::Loaded(executable) => Some(*executable),
+        }
     }
 
     /// Records executable version this transaction will use. Panics if the
@@ -39,10 +42,16 @@ impl<'guard> ExecutableReadSet<'guard> {
     pub(crate) fn record(
         &mut self,
         key: ArenaRef<'guard, ExecutableId>,
-        executable: &'guard Executable,
+        read: ExecutableRead<'guard>,
     ) {
-        let prev = self.inner.insert(key, ExecutableRead { executable });
-        assert!(prev.is_none());
+        match self.inner.entry(key) {
+            Entry::Vacant(e) => {
+                e.insert(read);
+            },
+            Entry::Occupied(_) => {
+                panic!("Read is already recorded")
+            },
+        }
     }
 
     /// Number of entries.

@@ -1,31 +1,63 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Policy-driven loader over the executable cache.
-//!
-//! Each entry point drives one of the loading policies described in the
-//! crate `README.md`: [`Loader::load_lazy`] and [`Loader::load_package`].
-//! Both accept an already-interned [`ArenaRef<ExecutableId>`]; the caller
-//! is responsible for interning.
-//!
-//! A third policy, `LazyWithTransitiveStructs`, is specified in the design
-//! and will be added in a follow-up change.
+//! Implementation of loader to load modules from storage into the long-living
+//! cache and per-transaction read-set with deterministic gas charging.
 
-use crate::{hooks::LoaderHooks, read_set::ExecutableReadSet};
-use anyhow::{anyhow, Result};
+use crate::{
+    hooks::LoaderHooks,
+    read_set::{ExecutableRead, ExecutableReadSet},
+};
+use anyhow::{anyhow, bail};
 use fxhash::FxHashMap;
 use mono_move_core::{Executable, ExecutableId, ExecutableSlot, MandatoryDependencies};
 use mono_move_gas::GasMeter;
 use mono_move_global_context::{ArenaRef, ExecutionGuard};
 use mono_move_orchestrator::ExecutableBuilder;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
-use std::sync::Arc;
 
-/// Describes how modules are loaded from storage.
-pub enum LoadingPolicy {
-    /// Loads one module at a time.
+/// Describes the lowering policy for converting execution IR to micro-ops.
+pub enum LoweringPolicy {
+    /// No extra modules loaded. Lowering of any function that needs external
+    /// size information is deferred to first call.
     Lazy,
-    /// Loads one package at a time.
+    /// Additionally loads modules that form the transitive closure reachable
+    /// from the target's module struct definitions. This makes loading of any
+    /// non-generic function possible at load-time.
+    ///
+    /// ## Example
+    ///
+    /// ```move
+    /// module m0 {
+    ///   struct M0 { x: m1::M1, y: u8 }
+    ///   fun f(x: &M0): u8 { x.y }
+    /// }
+    ///
+    /// module m1 {
+    ///   struct M1 { x: u64, y: u8 }
+    ///   struct N1 { x: m2::N2, y: u8 }
+    /// }
+    ///
+    /// module m2 {
+    ///   struct N2 { x: u64, y: u8 }
+    /// }
+    /// ```
+    ///
+    /// Under eager policy, when loading `m0`, module `m1` is also loaded so
+    /// that `f` can be lowered (layout of `M1` needs to be known). Note that
+    /// functions in `m1` may not be lowered because it is loaded only to be
+    /// able to compute the layout.
+    Eager,
+}
+
+/// Describes the loading policy for modules.
+pub enum LoadingPolicy {
+    /// Loads one module at a time. More modules can be loaded based on the
+    /// lowering policy.
+    Lazy(LoweringPolicy),
+    /// Loads all modules in the same package as a single atomic unit. For now,
+    /// supports only lazy lowering where functions are lowered only when the
+    /// information for lowering is accessible in the package.
     Package,
 }
 
@@ -66,9 +98,15 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ExecutableReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ExecutableId>,
-    ) -> Result<&'guard Executable> {
-        match self.policy {
-            LoadingPolicy::Lazy => self.load_lazy(read_set, gas_meter, id),
+    ) -> anyhow::Result<&'guard Executable> {
+        match &self.policy {
+            LoadingPolicy::Lazy(lowering) => {
+                use LoweringPolicy::*;
+                match lowering {
+                    Lazy => self.load_lazy_with_lazy_lowering(read_set, gas_meter, id),
+                    Eager => bail!("Eager lowering is currently not supported"),
+                }
+            },
             LoadingPolicy::Package => self.load_package(read_set, gas_meter, id),
         }
     }
@@ -81,20 +119,20 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// Loads only the code corresponding to the specified ID and charges
     /// gas for this code instance.
-    fn load_lazy(
+    fn load_lazy_with_lazy_lowering(
         &self,
         read_set: &mut ExecutableReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ExecutableId>,
-    ) -> Result<&'guard Executable> {
+    ) -> anyhow::Result<&'guard Executable> {
         if let Some(executable) = self.guard.get_executable(id) {
-            self.record_and_charge(read_set, gas_meter, executable)?;
+            self.record_loaded_and_charge(read_set, gas_meter, executable)?;
             return Ok(executable);
         }
 
         let (module, cost) = self.get_verified_module_from_storage(id)?;
-        let executable = self.build_and_insert(&module, cost, MandatoryDependencies::None)?;
-        self.record_and_charge(read_set, gas_meter, executable)?;
+        let executable = self.build_and_insert(&module, cost, MandatoryDependencies::empty())?;
+        self.record_loaded_and_charge(read_set, gas_meter, executable)?;
         Ok(executable)
     }
 
@@ -106,26 +144,40 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ExecutableReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ExecutableId>,
-    ) -> Result<&'guard Executable> {
+    ) -> anyhow::Result<&'guard Executable> {
         if let Some(executable) = self.guard.get_executable(id) {
-            let slots = executable
-                .mandatory_dependencies()
-                .slots()
-                .ok_or_else(|| anyhow!("Package policy must always set its slots at build time"))?;
-            read_set.record(id, executable);
-            let mut total = executable.cost();
+            let slots = executable.mandatory_dependencies().slots();
+
+            // Probe every sibling slot before touching the read-set. A
+            // concurrent miss-path worker may have populated `id`'s slot
+            // but not yet all sibling slots; in that window we fall
+            // through to the miss path, which re-verifies and re-inserts.
+            // `insert_executable` returns the canonical winner on CAS
+            // loss, so already-cached siblings are not duplicated.
+            let mut siblings = Vec::with_capacity(slots.len());
+            let mut all_present = true;
             for slot in slots {
-                // SAFETY: every cached package member has every sibling
-                // slot populated, because Package loading installs the
-                // whole member set before recording any of them.
-                let other =
-                    load_content(self.guard, *slot).expect("Package member slot must exist");
-                let other_id = self.guard.arena_ref_for_executable_id(other.id());
-                total = total.saturating_add(other.cost());
-                read_set.record(other_id, other);
+                match load_content(self.guard, *slot) {
+                    Some(other) => siblings.push(other),
+                    None => {
+                        all_present = false;
+                        break;
+                    },
+                }
             }
-            gas_meter.charge(total)?;
-            return Ok(executable);
+
+            if all_present {
+                let mut total = executable.cost();
+                read_set.record(id, ExecutableRead::Loaded(executable));
+                for other in siblings {
+                    let other_id = self.guard.arena_ref_for_executable_id(other.id());
+                    total = total.saturating_add(other.cost());
+                    read_set.record(other_id, ExecutableRead::Loaded(other));
+                }
+                gas_meter.charge(total)?;
+                return Ok(executable);
+            }
+            // Fall through to the miss path.
         }
 
         let names = self
@@ -143,32 +195,18 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
         let pending = self.topological_ordering(pending);
 
-        // Charge for the whole package up front, before any executable is
-        // built or inserted into the cache. Otherwise a transaction with
-        // budget just under the package cost would get all build work done
-        // for free, leaving the results cached for future transactions.
-        let total = pending
-            .iter()
-            .fold(0u64, |acc, (_, _, cost)| acc.saturating_add(*cost));
-        gas_meter.charge(total)?;
+        let package_slots = pending.iter().map(|(slot, _, _)| *slot).collect::<Vec<_>>();
+        let mandatory_deps = MandatoryDependencies::package(package_slots);
 
-        for i in 0..pending.len() {
-            let siblings = pending
-                .iter()
-                .enumerate()
-                .filter(|(j, _)| *j != i)
-                .map(|(_, (slot, _, _))| *slot)
-                .collect::<Vec<_>>();
-            let (_, module, cost) = &pending[i];
-            let executable = self.build_and_insert(
-                module,
-                *cost,
-                // TODO: maybe it is better to actually include self.
-                MandatoryDependencies::Package(Arc::from(siblings)),
-            )?;
-            let exec_id = self.guard.arena_ref_for_executable_id(executable.id());
-            read_set.record(exec_id, executable);
+        let mut total = 0u64;
+        for (_, module, cost) in &pending {
+            let executable = self.build_and_insert(module, *cost, mandatory_deps.clone())?;
+            let id = self.guard.arena_ref_for_executable_id(executable.id());
+            read_set.record(id, ExecutableRead::Loaded(executable));
+            total = total.saturating_add(executable.cost());
         }
+
+        gas_meter.charge(total)?;
 
         Ok(read_set
             .get(id)
@@ -177,7 +215,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
     /// Orders modules leaves-first by inter-member import dependencies,
     /// so that building in sequence finds each referenced sibling already
-    /// interned. Edges into modules outside the gven modules are ignored.
+    /// interned. Edges into modules outside the given modules are ignored.
     fn topological_ordering(
         &self,
         modules: Vec<(ExecutableSlot, CompiledModule, u64)>,
@@ -240,7 +278,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         module: &CompiledModule,
         cost: u64,
         deps: MandatoryDependencies,
-    ) -> Result<&'guard Executable> {
+    ) -> anyhow::Result<&'guard Executable> {
         let executable = ExecutableBuilder::new(self.guard, module)
             .with_cost(cost)
             .with_mandatory_dependencies(deps)
@@ -253,7 +291,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn get_verified_module_from_storage(
         &self,
         id: ArenaRef<'guard, ExecutableId>,
-    ) -> Result<(CompiledModule, u64)> {
+    ) -> anyhow::Result<(CompiledModule, u64)> {
         let bytes = self
             .hooks
             .get_module_bytes(id.address(), id.name())?
@@ -265,14 +303,16 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     }
 
     /// Records a single executable in the read-set and charges its cost.
-    fn record_and_charge(
+    fn record_loaded_and_charge(
         &self,
         read_set: &mut ExecutableReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         executable: &'guard Executable,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let id = self.guard.arena_ref_for_executable_id(executable.id());
-        read_set.record(id, executable);
+        // Always record the read before charging, so that if charging fails,
+        // the read is part of the set for later Block-STM validation.
+        read_set.record(id, ExecutableRead::Loaded(executable));
         gas_meter.charge(executable.cost())?;
         Ok(())
     }

@@ -93,17 +93,17 @@ That in turn requires modules `b` and `c`.
 // Example 1
 
 module 0x23::a {
-    struct A1 { x: 0x23::b::B1, y: u64 }
-    struct A2 { x: u64, y: u64 }
-    public fun f1(x: &A1): u64 { x.y }
-    public fun f2(x: &A2): u64 { x.y }
+   struct A1 { x: 0x23::b::B1, y: u64 }
+   struct A2 { x: u64, y: u64 }
+   public fun f1(x: &A1): u64 { x.y }
+   public fun f2(x: &A2): u64 { x.y }
 }
 
 module 0x23::b {
-    struct B1 { x: 0x23::c::C, y: u64 }
-    struct B2 { x: 0x23::d::D, y: u64 }
-    public fun g(x: &B2): u64 { x.y }
-    
+   struct B1 { x: 0x23::c::C, y: u64 }
+   struct B2 { x: 0x23::d::D, y: u64 }
+   public fun g(x: &B2): u64 { x.y }
+
 }
 
 module 0x23::c {
@@ -111,7 +111,7 @@ module 0x23::c {
 }
 
 module 0x23::d {
-    struct D { x: bool }
+   struct D { x: bool }
 }
 ```
 
@@ -137,6 +137,35 @@ Additionally, modules `b` and `c` are loaded to compute layout information of `A
 An important observation is that the set of loaded modules is not a superset of modules loaded for dependencies.
 For example, when loading `b`, modules `c` and `d` are loaded.
 
+**Implementation detail.**
+Because it is not possible to distinguish imported enums from structs, EL also include modules where used enums are defined.
+In Example 2, when loading `a`, it also needs modules `b` and `c` to lower `f`.
+While `c` is not strictly needed for lowering (field `y` has a known size), it is not possible to know if `y` is a struct or an enum until `c` is loaded.
+
+```move
+// Example 2
+
+module 0x23::a {
+    struct A1 { x: 0x23::b::B, y: 0x23::c::C, z: u64 }
+    public fun f(x: &A1): u64 { x.z }
+}
+
+module 0x23::b {
+    struct B { x: u64 }
+}
+
+module 0x23::c {
+    enum C {
+        V1 { x: u64 },
+        V2 { x: 0x23::d::D },
+    }
+}
+
+module 0x34::d {
+    struct D { x: u8 }
+}
+```
+
 #### Package Loading (PL)
 
 The module is loaded together with all other modules that belong to the same package.
@@ -151,10 +180,10 @@ However, if `a`, `b` and `c` are in the same package, both `f1` and `f2` can be 
 A single version of framework is always cached, its functions lowered and layouts available.
 In addition, gas is never charge for loading of any framework module.
 As a result, any module using framework dependencies can use them freely for its own lowering.
-In Example 2, when module `a` below is loaded, `f` is lowered eagerly because string layout is always available.
+In Example 3, when module `a` below is loaded, `f` is lowered eagerly because string layout is always available.
 
 ```move
-// Example 2
+// Example 3
 
 module 0x23::a {
     struct A { x: 0x1::std::String, y: u64 }
@@ -181,7 +210,7 @@ In Example 1, under LL policy `MS(a) = {a}`, `MS(f1) = {b, c}`, and `MS(f2) = {}
 Under EL policy, `MS(a) = {a, b, c}`, `MS(f1) = {}`, and `MS(f2) = {}`.
 Under PL policy, mandatory set is all modules in the package.
 
-In order to make metering determinsitic:
+In order to make metering deterministic:
 
 1. When module `m` is loaded, gas is charged for all modules in `MS(m)` not in current read-set.
 2. When function `f` is called (after its module has been loaded), gas is charged for all modules in `MS(f)` not in current read-set.
@@ -202,7 +231,7 @@ It is sufficient to check modules in `MS(a)`, which can be implemented lock-free
 #### Implementation of Mandatory Sets
 
 For every module, long-living cache stores a pointer to the slot.
-Slot serves as a versioning primitve (for future Zaptos support).
+Slot serves as a versioning primitive (for future Zaptos support).
 
 ```rust
 pub struct Slot<T> {
@@ -217,8 +246,8 @@ pub struct Slot<T> {
 }
 ```
 
-Mandatory sets are implemented as a slice of pointers to `Slot` inctances in the cache.
-Slots are stable and never claimed by garbage collection unless the cahce is flushed.
+Mandatory sets are implemented as a slice of pointers to `Slot` instances in the cache.
+Slots are stable and never claimed by garbage collection unless the cache is flushed.
 
 ### Handling Cache Misses for Loading Policies
 
@@ -231,10 +260,10 @@ In order to enforce correctness, loader splits "loading", "linking" and "inserti
 2. Modules are translated to execution IR.
    Non-generic functions are lowered when possible.
 3. Modules are ordered in reversed topological order.
-   Then, they are isnerted one by one into cache.
+   Then, they are inserted one by one into cache.
    This is critical for correctness under concurrent loads: it is possible that other thread may insert module into cache.
    The cache resolves the race returning the *canonical* pointer, which can be now linked against.
-4. Other modules linked agains the just inserted module. Once done, the insertion repeats.
+4. Other modules linked again the just inserted module. Once done, the insertion repeats.
 
 Steps (3) and (4) allow to safely store direct pointers between modules.
 Cache only needs to enforce GC does not evict modules before modules that point to them.
