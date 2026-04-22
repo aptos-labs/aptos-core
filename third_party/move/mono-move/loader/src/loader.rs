@@ -118,7 +118,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 // SAFETY: every cached package member has every sibling
                 // slot populated, because Package loading installs the
                 // whole member set before recording any of them.
-                let other = load_content(*slot).expect("Package member slot must exist");
+                let other =
+                    load_content(self.guard, *slot).expect("Package member slot must exist");
                 let other_id = self.guard.arena_ref_for_executable_id(other.id());
                 total = total.saturating_add(other.cost());
                 read_set.record(other_id, other);
@@ -142,7 +143,15 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
         let pending = self.topological_ordering(pending);
 
-        let mut total: u64 = 0;
+        // Charge for the whole package up front, before any executable is
+        // built or inserted into the cache. Otherwise a transaction with
+        // budget just under the package cost would get all build work done
+        // for free, leaving the results cached for future transactions.
+        let total = pending
+            .iter()
+            .fold(0u64, |acc, (_, _, cost)| acc.saturating_add(*cost));
+        gas_meter.charge(total)?;
+
         for i in 0..pending.len() {
             let siblings = pending
                 .iter()
@@ -159,9 +168,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             )?;
             let exec_id = self.guard.arena_ref_for_executable_id(executable.id());
             read_set.record(exec_id, executable);
-            total = total.saturating_add(*cost);
         }
-        gas_meter.charge(total)?;
 
         Ok(read_set
             .get(id)
@@ -273,7 +280,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
 /// Loads the current executable content behind `slot`, or `None` if the
 /// slot is empty. Safe while an execution guard is held: slot and content
-/// are freed only under maintenance, which execution excludes.
-fn load_content<'guard>(slot: ExecutableSlot) -> Option<&'guard Executable> {
+/// are freed only under maintenance, which execution excludes. The guard
+/// reference anchors `'guard` so the returned reference cannot outlive it.
+fn load_content<'guard, 'ctx>(
+    _guard: &'guard ExecutionGuard<'ctx>,
+    slot: ExecutableSlot,
+) -> Option<&'guard Executable> {
     unsafe { slot.as_ref_unchecked().load().map(|p| p.as_ref_unchecked()) }
 }

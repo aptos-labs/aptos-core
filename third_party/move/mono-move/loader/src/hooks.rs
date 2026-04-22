@@ -26,6 +26,9 @@ pub trait LoaderHooks {
 
     /// Returns **all** module names that belong to the same package as the
     /// given module. The returned list **includes** the module itself.
+    ///
+    /// Names in the returned list must be unique. Callers rely on this for
+    /// correctness; duplicates will cause a double-record into the read-set.
     fn get_same_package_modules(
         &self,
         address: &AccountAddress,
