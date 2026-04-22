@@ -762,10 +762,11 @@ where
     }
 
     /// Finalizes the profiler and produces a [`TransactionGasLog`] *without*
-    /// running the consistency checks. Intended for CLI paths that want to
-    /// render a friendlier error and/or offer the user a way to bypass the
-    /// check; such callers should invoke
-    /// [`crate::warn_or_panic_on_inconsistency`] on the returned log.
+    /// running the consistency checks. Intended for callers that want to
+    /// render a custom error for consistency failures and/or offer their own
+    /// way to bypass the check; such callers should invoke
+    /// [`TransactionGasLog::exec_io`]'s `check_consistency` and
+    /// [`TransactionGasLog::storage`]'s `check_consistency` themselves.
     pub fn finish_without_consistency_check(mut self) -> TransactionGasLog {
         while self.frames.len() > 1 {
             let cur = self.frames.pop().expect("frame must exist");

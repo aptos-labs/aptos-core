@@ -182,10 +182,10 @@ impl AptosDebugger {
         )?;
 
         // Note: we deliberately return the log without running the consistency
-        // check. Callers (typically the CLI) render a friendlier error and
-        // offer `--skip-gas-profiler-consistency-check` to bypass it; they are
-        // responsible for invoking
-        // `aptos_gas_profiling::warn_or_panic_on_inconsistency` on the result.
+        // check. Callers are responsible for invoking
+        // `log.exec_io.check_consistency()` and `log.storage.check_consistency()`
+        // themselves; this lets user-facing tools (e.g. the CLI) format their
+        // own error message and/or offer an opt-out flag.
         Ok((status, output, gas_profiler.finish_without_consistency_check()))
     }
 

@@ -225,63 +225,27 @@ impl CallFrame {
     }
 }
 
-/// Describes a mismatch between the gas meter's totals and the sum of the
-/// itemized costs the profiler recorded.
-///
-/// Reaching this state always indicates a bug in the gas profiler itself --
-/// the underlying transaction execution and gas accounting are unaffected.
-#[derive(Debug, Clone)]
-pub struct ConsistencyError {
-    /// Which subtotal failed to add up.
-    pub kind: ConsistencyErrorKind,
-    /// The total reported by the gas meter (source of truth).
-    pub from_gas_meter: u128,
-    /// The total the profiler computed by summing the recorded items.
-    pub calculated: u128,
+/// Formats the standard "bug in the gas profiler" message used by both
+/// `ExecutionAndIOCosts::check_consistency` and `StorageFees::check_consistency`.
+/// The message is library-generic -- user-facing tools (e.g. CLIs) should wrap
+/// it with any tool-specific guidance (such as a flag to bypass the check).
+fn consistency_error(subtotal: &str, from_gas_meter: impl std::fmt::Display, calculated: impl std::fmt::Display) -> anyhow::Error {
+    anyhow::anyhow!(
+        "Gas profiler consistency check failed: {subtotal} do not add up. \
+         This is an unexpected condition that indicates a bug in the gas profiler \
+         (not in the transaction being profiled or in the gas meter). \
+         The generated gas report is likely incomplete or inaccurate. \
+         Please report this at https://github.com/aptos-labs/aptos-core/issues, \
+         including the transaction ID or payload along with the details below. \
+         From gas meter: {from_gas_meter}. Calculated: {calculated}."
+    )
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConsistencyErrorKind {
-    ExecutionAndIo,
-    StorageFee,
-    StorageRefund,
-}
-
-impl ConsistencyErrorKind {
-    fn label(self) -> &'static str {
-        match self {
-            Self::ExecutionAndIo => "Execution & IO costs",
-            Self::StorageFee => "Storage fees",
-            Self::StorageRefund => "Storage refunds",
-        }
-    }
-}
-
-impl std::fmt::Display for ConsistencyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Gas profiler consistency check failed: {} do not add up. \
-             This is an unexpected condition that indicates a bug in the gas profiler \
-             (not in the transaction being profiled or in the gas meter). \
-             The generated gas report is likely incomplete or inaccurate. \
-             Please report this at https://github.com/aptos-labs/aptos-core/issues, \
-             including the transaction ID or payload along with the details below. \
-             From gas meter: {}. Calculated: {}.",
-            self.kind.label(),
-            self.from_gas_meter,
-            self.calculated,
-        )
-    }
-}
-
-impl std::error::Error for ConsistencyError {}
 
 impl StorageFees {
     /// Returns `Ok(())` if the recorded storage fees and refunds sum to the
     /// totals reported by the gas meter, otherwise returns the first detected
     /// inconsistency.
-    pub fn check_consistency(&self) -> Result<(), ConsistencyError> {
+    pub fn check_consistency(&self) -> anyhow::Result<()> {
         let mut total = Fee::zero();
         let mut total_refund = Fee::zero();
 
@@ -297,18 +261,14 @@ impl StorageFees {
         total += self.txn_storage;
 
         if total != self.total {
-            return Err(ConsistencyError {
-                kind: ConsistencyErrorKind::StorageFee,
-                from_gas_meter: u64::from(self.total).into(),
-                calculated: u64::from(total).into(),
-            });
+            return Err(consistency_error("Storage fees", self.total, total));
         }
         if total_refund != self.total_refund {
-            return Err(ConsistencyError {
-                kind: ConsistencyErrorKind::StorageRefund,
-                from_gas_meter: u64::from(self.total_refund).into(),
-                calculated: u64::from(total_refund).into(),
-            });
+            return Err(consistency_error(
+                "Storage refunds",
+                self.total_refund,
+                total_refund,
+            ));
         }
         Ok(())
     }
@@ -337,8 +297,8 @@ impl ExecutionAndIOCosts {
 
     /// Returns `Ok(())` if the itemized execution and IO costs recorded by the
     /// profiler sum to the totals reported by the gas meter, otherwise returns
-    /// a structured error describing the discrepancy.
-    pub fn check_consistency(&self) -> Result<(), ConsistencyError> {
+    /// an error describing the discrepancy.
+    pub fn check_consistency(&self) -> anyhow::Result<()> {
         use ExecutionGasEvent::{Bytecode, Call, CallNative, CreateTy, LoadResource, Loc};
 
         let mut total = InternalGas::zero();
@@ -375,11 +335,11 @@ impl ExecutionAndIOCosts {
         }
 
         if total != self.total() {
-            return Err(ConsistencyError {
-                kind: ConsistencyErrorKind::ExecutionAndIo,
-                from_gas_meter: u64::from(self.total()).into(),
-                calculated: u64::from(total).into(),
-            });
+            return Err(consistency_error(
+                "Execution & IO costs",
+                self.total(),
+                total,
+            ));
         }
         Ok(())
     }

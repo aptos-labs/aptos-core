@@ -174,6 +174,41 @@ pub fn benchmark_transaction_using_debugger(
     Ok((vm_status, vm_output))
 }
 
+/// Runs the gas profiler's consistency checks on `log` and reports any
+/// discrepancies using CLI-flavored messaging (including a pointer to
+/// `--skip-gas-profiler-consistency-check`).
+///
+/// When `skip` is true, inconsistencies are emitted as warnings on stderr so
+/// the user still gets a (potentially incomplete) gas report. Otherwise, the
+/// first inconsistency causes a panic so the failure is loud.
+fn handle_gas_profiler_consistency_check(
+    log: &aptos_gas_profiling::TransactionGasLog,
+    skip: bool,
+) {
+    for err in [
+        log.exec_io.check_consistency(),
+        log.storage.check_consistency(),
+    ]
+    .into_iter()
+    .filter_map(Result::err)
+    {
+        if skip {
+            eprintln!(
+                "warning: {}\n\
+                 (consistency check was bypassed via --skip-gas-profiler-consistency-check; \
+                 the generated gas report may be incomplete or inaccurate.)",
+                err
+            );
+        } else {
+            panic!(
+                "{}\n\nRerun with --skip-gas-profiler-consistency-check to bypass this \
+                 check and still produce a (possibly incomplete) gas report.",
+                err
+            );
+        }
+    }
+}
+
 pub fn profile_transaction_using_debugger(
     debugger: &dyn MoveDebugger,
     version: u64,
@@ -193,10 +228,7 @@ pub fn profile_transaction_using_debugger(
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
         })?;
 
-    aptos_gas_profiling::warn_or_panic_on_inconsistency(
-        &gas_log,
-        skip_gas_profiler_consistency_check,
-    );
+    handle_gas_profiler_consistency_check(&gas_log, skip_gas_profiler_consistency_check);
 
     // Optionally fold the call graph by unique stack traces
     if fold_unique_stack {

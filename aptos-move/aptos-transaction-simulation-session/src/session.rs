@@ -610,11 +610,16 @@ impl Session {
                 )
                 .map_err(|e| anyhow::anyhow!("transaction execution failed: {:?}", e))?;
             let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
-            let gas_log = gas_profiler.finish_without_consistency_check();
-            aptos_gas_profiling::warn_or_panic_on_inconsistency(
-                &gas_log,
-                skip_gas_profiler_consistency_check,
-            );
+            // `finish` panics on a consistency failure with the library's generic
+            // bug-report message; `finish_without_consistency_check` skips the
+            // check entirely. User-facing tools that want a custom error (or to
+            // run the check themselves) can call `finish_without_consistency_check`
+            // and invoke `check_consistency` on the returned log.
+            let gas_log = if skip_gas_profiler_consistency_check {
+                gas_profiler.finish_without_consistency_check()
+            } else {
+                gas_profiler.finish()
+            };
             (vm_status, txn_output, Some(gas_log))
         } else {
             let (vm_status, vm_output) = vm.execute_user_transaction(
@@ -731,13 +736,13 @@ impl Session {
                     )
                 },
             );
-            let gas_log = gas_profiler.map(|p| p.finish_without_consistency_check());
-            if let Some(log) = &gas_log {
-                aptos_gas_profiling::warn_or_panic_on_inconsistency(
-                    log,
-                    skip_gas_profiler_consistency_check,
-                );
-            }
+            let gas_log = gas_profiler.map(|p| {
+                if skip_gas_profiler_consistency_check {
+                    p.finish_without_consistency_check()
+                } else {
+                    p.finish()
+                }
+            });
             (output, gas_log)
         } else {
             let output = AptosVM::execute_view_function(
