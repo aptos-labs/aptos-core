@@ -10,16 +10,16 @@
 
 use super::instr_utils::{extract_imm_value, is_commutative};
 use crate::stackless_exec_ir::{BasicBlock, BinaryOp, Instr};
-use move_vm_types::loaded_data::runtime_types::Type;
+use mono_move_core::types::InternedType;
 
 /// Intermediate SSA representation of a single function, before slot allocation.
 pub(crate) struct SSAFunction {
     /// Basic blocks in SSA form.
     pub blocks: Vec<BasicBlock>,
     /// Type of each value ID, indexed directly by the value ID number.
-    pub vid_types: Vec<Type>,
+    pub vid_types: Vec<InternedType>,
     /// Types of all locals (params ++ declared locals).
-    pub local_types: Vec<Type>,
+    pub local_types: Vec<InternedType>,
 }
 
 impl SSAFunction {

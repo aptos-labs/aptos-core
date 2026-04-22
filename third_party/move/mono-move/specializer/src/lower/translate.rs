@@ -6,8 +6,10 @@
 use super::context::{LoweringContext, SlotInfo};
 use crate::stackless_exec_ir::{BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot};
 use anyhow::{bail, Result};
-use mono_move_core::{CodeOffset, FrameOffset, MicroOp};
-use move_vm_types::loaded_data::runtime_types::Type;
+use mono_move_core::{
+    types::{view_type, InternedType, Type},
+    CodeOffset, FrameOffset, MicroOp,
+};
 
 pub fn lower_function(func_ir: &FunctionIR, ctx: &LoweringContext) -> Result<Vec<MicroOp>> {
     let mut state = LoweringState::new(func_ir, ctx);
@@ -29,19 +31,30 @@ struct LoweringState<'a> {
     /// Indices into ops that need target patching
     branch_fixups: Vec<usize>,
     call_site_cursor: usize,
-    home_slot_types: &'a [Type],
+    home_slot_types: &'a [InternedType],
     /// Per-position slot info for Xfer slots, updated lazily.
     active_xfer_slots: Vec<SlotInfo>,
     /// Per-position types for Xfer slots, updated lazily.
-    active_xfer_types: Vec<Type>,
+    active_xfer_types: Vec<InternedType>,
 }
 
 impl<'a> LoweringState<'a> {
     fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext) -> Self {
-        // Initialize active_xfer_slots/types from first callsite's arg_write_slots
+        // `active_xfer_slots` / `active_xfer_types` track the *current* meaning
+        // of each Xfer slot (which changes across call sites). Each position is
+        // overwritten by `def_slot` before it's read in valid IR, so the initial
+        // values below are benign placeholders that should never be observed.
+        // TODO: revisit this design.
         let num_xfer_slots = ctx.num_xfer_slots as usize;
-        let mut active_xfer_slots = vec![SlotInfo { offset: 0, size: 0 }; num_xfer_slots];
-        let mut active_xfer_types = vec![Type::U64; num_xfer_slots];
+        let mut active_xfer_slots = vec![
+            SlotInfo {
+                offset: 0,
+                size: 0,
+                align: 1
+            };
+            num_xfer_slots
+        ];
+        let mut active_xfer_types = vec![mono_move_core::types::U64_TY; num_xfer_slots];
         if !ctx.call_sites.is_empty() {
             let first = &ctx.call_sites[0];
             let n = num_xfer_slots.min(first.arg_write_slots.len());
@@ -110,28 +123,22 @@ impl<'a> LoweringState<'a> {
     }
 
     fn slot_type(&self, slot: Slot) -> &Type {
-        match slot {
-            Slot::Home(i) => &self.home_slot_types[i as usize],
-            Slot::Xfer(j) => &self.active_xfer_types[j as usize],
+        let ptr = match slot {
+            Slot::Home(i) => self.home_slot_types[i as usize],
+            Slot::Xfer(j) => self.active_xfer_types[j as usize],
             Slot::Vid(_) => unreachable!("Vid slot in post-allocation IR"),
-        }
+        };
+        view_type(ptr)
     }
 
-    fn is_u64_type(ty: &Type) -> bool {
-        matches!(
-            ty,
-            Type::U64
-                | Type::Bool
-                | Type::U8
-                | Type::I8
-                | Type::U16
-                | Type::I16
-                | Type::U32
-                | Type::I32
-                | Type::I64
-                | Type::Address
-                | Type::Signer
-        )
+    /// Returns true if the type fits in 8 bytes or fewer (can use u64 micro-ops).
+    /// TODO: this is only a temporary heuristic until we have proper type-specific
+    /// micro-ops.
+    fn fits_in_u64(ty: &Type) -> bool {
+        match ty.size_and_align() {
+            Some((size, _)) => size <= 8,
+            None => false,
+        }
     }
 
     /// Lower one IR instruction.
@@ -219,7 +226,7 @@ impl<'a> LoweringState<'a> {
             // --- Binary ops ---
             Instr::BinaryOp(dst, op, lhs, rhs) => {
                 let lhs_ty = self.slot_type(*lhs);
-                if Self::is_u64_type(lhs_ty) {
+                if Self::fits_in_u64(lhs_ty) {
                     let l = self.slot(*lhs);
                     let r = self.slot(*rhs);
                     let d = self.def_slot(*dst);
@@ -239,7 +246,7 @@ impl<'a> LoweringState<'a> {
             // --- Binary ops with immediate ---
             Instr::BinaryOpImm(dst, op, src, imm) => {
                 let src_ty = self.slot_type(*src);
-                if Self::is_u64_type(src_ty) {
+                if Self::fits_in_u64(src_ty) {
                     let s = self.slot(*src);
                     let d = self.def_slot(*dst);
                     let v = imm_to_u64(imm);
@@ -296,7 +303,7 @@ impl<'a> LoweringState<'a> {
             // --- Fused compare+branch ---
             Instr::BrCmp(Label(l), op, lhs, rhs) => {
                 let lhs_ty = self.slot_type(*lhs);
-                if Self::is_u64_type(lhs_ty) {
+                if Self::fits_in_u64(lhs_ty) {
                     let l_slot = self.slot(*lhs);
                     let r_slot = self.slot(*rhs);
                     let idx = self.ops.len();
@@ -339,7 +346,7 @@ impl<'a> LoweringState<'a> {
             },
             Instr::BrCmpImm(Label(l), op, src, imm) => {
                 let src_ty = self.slot_type(*src);
-                if Self::is_u64_type(src_ty) {
+                if Self::fits_in_u64(src_ty) {
                     let s = self.slot(*src);
                     let v = imm_to_u64(imm);
                     let idx = self.ops.len();
@@ -392,7 +399,7 @@ impl<'a> LoweringState<'a> {
                 self.emit(MicroOp::Return);
             },
 
-            _ => bail!("instruction {:?} not yet lowered", instr),
+            _ => bail!("instruction {} not yet lowered", instr.opcode_name()),
         }
         Ok(())
     }

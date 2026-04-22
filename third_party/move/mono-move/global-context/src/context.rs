@@ -33,9 +33,11 @@
 //!   - Trade-off: minor memory waste for lower lock contention.
 
 use crate::maintenance_config::MaintenanceConfig;
+use anyhow::{bail, Result};
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::ExecutableId;
+use mono_move_core::{types::StructLayout, ExecutableId};
+use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},
@@ -47,12 +49,16 @@ mod identifiers;
 use identifiers::IdentifierInternerKey;
 mod executable_ids;
 use executable_ids::ExecutableIdInternerKey;
-mod executable;
-pub use executable::{Executable, ExecutableBuilder};
+pub use mono_move_core::Executable;
 mod executable_cache;
 use executable_cache::ExecutableCache;
+mod sig_walk;
+pub use sig_walk::{walk_sig_token, StructResolver};
 mod types;
-pub use types::{FieldLayout, Type};
+pub use types::{
+    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, FieldLayout,
+    InternedType, InternedTypeList, Type,
+};
 use types::{TypeInternerKey, TypeListInternerKey};
 
 /// Global execution context with a two-phase state machine.
@@ -89,9 +95,8 @@ struct Context {
     identifiers: DashMap<IdentifierInternerKey, GlobalArenaPtr<str>, ahash::RandomState>,
     executable_ids:
         DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
-    types: DashMap<TypeInternerKey, GlobalArenaPtr<Type>, ahash::RandomState>,
-    type_lists:
-        DashMap<TypeListInternerKey, GlobalArenaPtr<[GlobalArenaPtr<Type>]>, ahash::RandomState>,
+    types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
+    type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
     executable_cache: ExecutableCache,
 }
 
@@ -318,6 +323,136 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // the execution phase (guard is alive).
         Some(unsafe { ptr.as_ref_unchecked() })
     }
+
+    // ====================================================================
+    // Public type construction helpers
+    // ====================================================================
+
+    /// Interns an immutable reference type wrapping `inner`.
+    pub fn intern_immut_ref(&self, inner: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::ImmutRef { inner });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Interns a mutable reference type wrapping `inner`.
+    pub fn intern_mut_ref(&self, inner: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::MutRef { inner });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Converts `&mut T` to `&T` by interning the immutable counterpart.
+    /// Errors if `mut_ref` is not a mutable reference type.
+    pub fn convert_mut_to_immut_ref(&self, mut_ref: InternedType) -> Result<InternedType> {
+        match self.type_data(mut_ref) {
+            Type::MutRef { inner } => Ok(self.intern_immut_ref(*inner)),
+            _ => bail!("convert_mut_to_immut_ref: expected MutRef"),
+        }
+    }
+
+    /// Strips the reference from `&T` or `&mut T`, returning `T`.
+    /// Errors if `ref_ty` is not a reference type.
+    pub fn strip_ref(&self, ref_ty: InternedType) -> Result<InternedType> {
+        match self.type_data(ref_ty) {
+            Type::ImmutRef { inner } | Type::MutRef { inner } => Ok(*inner),
+            _ => bail!("strip_ref: expected reference type"),
+        }
+    }
+
+    /// Interns a vector type with element type `elem`.
+    pub fn intern_vector(&self, elem: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Vector { elem });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Interns a type parameter with the given index.
+    pub fn intern_type_param(&self, idx: u16) -> InternedType {
+        let ty = self.global_arena.alloc(Type::TypeParam { idx });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Interns a function type.
+    pub fn intern_function_type(
+        &self,
+        args: InternedTypeList,
+        results: InternedTypeList,
+        abilities: move_core_types::ability::AbilitySet,
+    ) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Function {
+            args,
+            results,
+            abilities,
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Interns a list of type pointers. Empty lists return a static pointer.
+    pub fn intern_type_list(&self, types: &[InternedType]) -> InternedTypeList {
+        if types.is_empty() {
+            return types::EMPTY_TYPE_LIST;
+        }
+        let ptr = self.global_arena.alloc_slice_copy(types);
+        self.insert_allocated_type_list_internal(ptr)
+    }
+
+    /// Safely dereferences a type pointer. Returns a reference to the
+    /// underlying [`Type`] data. The reference is valid for the guard's
+    /// lifetime.
+    ///
+    /// This localizes `unsafe` to this method.
+    pub fn type_data(&self, ptr: InternedType) -> &Type {
+        // SAFETY: All type pointers are valid during the execution phase
+        // because the arena is not reset while any ExecutionGuard is alive.
+        unsafe { ptr.as_ref_unchecked() }
+    }
+
+    /// Interns a struct type with its layout. The field-layout slice is
+    /// allocated in the global arena.
+    pub fn intern_struct_type(
+        &self,
+        executable_id: GlobalArenaPtr<ExecutableId>,
+        name: GlobalArenaPtr<str>,
+        ty_args: InternedTypeList,
+        size: u32,
+        align: u32,
+        fields: &[FieldLayout],
+    ) -> InternedType {
+        let fields_ptr = self.global_arena.alloc_slice_copy(fields);
+        let layout = StructLayout::new(size, align, fields_ptr);
+        let ty = self.global_arena.alloc(Type::Struct {
+            executable_id,
+            name,
+            ty_args,
+            layout: Some(layout),
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Interns an enum type. Enum size/align is fixed metadata, so no
+    /// field-layout slice is carried on the type.
+    pub fn intern_enum_type(
+        &self,
+        executable_id: GlobalArenaPtr<ExecutableId>,
+        name: GlobalArenaPtr<str>,
+        ty_args: InternedTypeList,
+    ) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Enum {
+            executable_id,
+            name,
+            ty_args,
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Looks up a type previously interned from a signature token of `module`.
+    /// Returns `None` if the token has not yet been interned in this module's
+    /// context.
+    pub fn try_intern_for_module(
+        &self,
+        token: &SignatureToken,
+        module: &CompiledModule,
+    ) -> Option<InternedType> {
+        self.get_interned_type_pointer_internal(token, module)
+    }
 }
 
 //
@@ -384,7 +519,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
 impl<'guard, T: ?Sized> ArenaRef<'guard, T> {
     /// Returns the underlying [`GlobalArenaPtr`] for this arena reference.
-    pub(crate) fn into_global_arena_ptr(self) -> GlobalArenaPtr<T> {
+    pub fn into_global_arena_ptr(self) -> GlobalArenaPtr<T> {
         self.ptr
     }
 

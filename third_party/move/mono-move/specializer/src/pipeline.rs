@@ -8,19 +8,19 @@ use crate::{
     lower::{lower_function, try_build_context, LoweredFunction, LoweredModule},
 };
 use anyhow::Result;
-use mono_move_core::{MicroOpGasSchedule, FRAME_METADATA_SIZE};
+use mono_move_core::{types::InternedType, MicroOpGasSchedule, FRAME_METADATA_SIZE};
 use mono_move_gas::GasInstrumentor;
+use mono_move_global_context::ExecutionGuard;
 use move_binary_format::CompiledModule;
-use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 
 /// Run the full specializer pipeline: destack → lower → gas instrument → frame layout.
 // TODO: extend with additional passes (e.g., monomorphization, GC safe-point layout).
-pub fn destack_and_lower_module(module: CompiledModule) -> Result<LoweredModule> {
-    // Identity mapping: valid when loading a single module in isolation.
-    let struct_name_table: Vec<StructNameIndex> = (0..module.struct_handles.len())
-        .map(|i| StructNameIndex::new(i as u32))
-        .collect();
-    let module_ir = destack(module, &struct_name_table)?;
+pub fn destack_and_lower_module(
+    module: CompiledModule,
+    guard: &ExecutionGuard<'_>,
+    struct_types: &[InternedType],
+) -> Result<LoweredModule> {
+    let module_ir = destack(module, guard, struct_types)?;
 
     let mut functions = Vec::with_capacity(module_ir.functions.len());
     for func_ir in &module_ir.functions {
@@ -28,7 +28,7 @@ pub fn destack_and_lower_module(module: CompiledModule) -> Result<LoweredModule>
             functions.push(None);
             continue;
         };
-        let lowered = match try_build_context(&module_ir.module, func_ir)? {
+        let lowered = match try_build_context(&module_ir, func_ir)? {
             Some(ctx) => {
                 let micro_ops = lower_function(func_ir, &ctx)?;
                 let code = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);

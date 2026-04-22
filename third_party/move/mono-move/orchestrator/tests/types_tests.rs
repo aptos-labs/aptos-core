@@ -15,9 +15,7 @@ fn add_executable<'guard>(guard: &'guard ExecutionGuard<'_>, source: &str) -> &'
         .left()
         .expect("Only modules are expected");
 
-    let executable = guard
-        .executable_builder_for_module(&module)
-        .build()
+    let executable = mono_move_orchestrator::build_executable(guard, &module)
         .expect("Building an executable should always succeed");
 
     let id = guard.intern_address_name(module.self_addr(), module.self_name());
@@ -64,7 +62,7 @@ struct D
 
     let name = guard.intern_identifier(ident_str!("B"));
     let layout = executable
-        .get_struct(name)
+        .get_struct(name.into_global_arena_ptr())
         .unwrap()
         .struct_layout()
         .unwrap();
@@ -79,7 +77,7 @@ struct D
 
     let name = guard.intern_identifier(ident_str!("D"));
     let layout = executable
-        .get_struct(name)
+        .get_struct(name.into_global_arena_ptr())
         .unwrap()
         .struct_layout()
         .unwrap();
@@ -93,5 +91,7 @@ struct D
     assert_eq!(offsets, vec![0, 1, 8, 16, 32, 48, 64, 160]);
 
     let name = guard.intern_identifier(ident_str!("E"));
-    assert!(executable.get_struct(name).is_none());
+    assert!(executable
+        .get_struct(name.into_global_arena_ptr())
+        .is_none());
 }

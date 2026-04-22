@@ -14,9 +14,7 @@ fn add_executable(guard: &ExecutionGuard<'_>, source: &str) {
     let modules = mono_move_testsuite::compile_move_modules(source);
     for module in &modules {
         let id = guard.intern_address_name(module.self_addr(), module.self_name());
-        let executable = guard
-            .executable_builder_for_module(module)
-            .build()
+        let executable = mono_move_orchestrator::build_executable(guard, module)
             .expect("Building an executable should always succeed");
         guard.insert_executable(id, executable);
     }
@@ -42,7 +40,7 @@ module 0x1::test {
     let fib_name = guard.intern_identifier(ident_str!("fib"));
     let fib = guard
         .get_executable(id)
-        .and_then(|e| e.get_function(fib_name))
+        .and_then(|e| e.get_function(fib_name.into_global_arena_ptr()))
         .expect("fib should exist");
 
     let txn_ctx = NoopTransactionContext;

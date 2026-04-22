@@ -62,10 +62,10 @@ fun mut_borrow_kills_reverse(r0): u64 {
 === micro-ops ===
 === Module 0x66::borrow_soundness ===
 
-fun borrow_loc_no_source_subst(): skipped (lowering: instruction ImmBorrowLoc(Home(2), Home(1)) not yet lowered)
+fun borrow_loc_no_source_subst(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
 
-fun imm_borrow_value_prop(): skipped (lowering: instruction ImmBorrowLoc(Home(2), Home(1)) not yet lowered)
+fun imm_borrow_value_prop(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
 
-fun mut_borrow_kills_subst(): skipped (lowering: instruction MutBorrowLoc(Home(3), Home(1)) not yet lowered)
+fun mut_borrow_kills_subst(): skipped (lowering: instruction MutBorrowLoc not yet lowered)
 
-fun mut_borrow_kills_reverse(): skipped (lowering: instruction MutBorrowLoc(Home(3), Home(0)) not yet lowered)
+fun mut_borrow_kills_reverse(): skipped (lowering: instruction MutBorrowLoc not yet lowered)

@@ -25,8 +25,11 @@ impl<T: ?Sized> GlobalArenaPtr<T> {
     /// Unlike arena-allocated pointers, the result is never invalidated by
     /// arena reset or arena drop: the static data lives for the entire
     /// lifetime of a program.
-    pub fn from_static(data: &'static T) -> Self {
-        GlobalArenaPtr(NonNull::from(data))
+    ///
+    /// `const fn` so that wrappers (e.g. interned primitive-type constants)
+    /// can be declared as compile-time constants without a runtime init.
+    pub const fn from_static(data: &'static T) -> Self {
+        GlobalArenaPtr(NonNull::from_ref(data))
     }
 
     /// Unsafely casts this arena pointer to a reference with the specified

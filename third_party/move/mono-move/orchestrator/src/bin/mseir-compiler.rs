@@ -6,8 +6,9 @@
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use mono_move_global_context::GlobalContext;
+use mono_move_orchestrator::ExecutableBuilder;
 use move_binary_format::{access::ModuleAccess, file_format::CompiledModule};
-use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 use specializer::destack;
 use std::path::PathBuf;
 
@@ -35,11 +36,16 @@ fn main() -> Result<()> {
     let module = CompiledModule::deserialize(&bytes)
         .map_err(|e| anyhow::anyhow!("failed to deserialize module: {:?}", e))?;
 
-    let struct_name_table: Vec<StructNameIndex> = (0..module.struct_handles.len())
-        .map(|i| StructNameIndex::new(i as u32))
-        .collect();
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx.try_execution_context(0).unwrap();
 
-    let module_ir = destack(module, &struct_name_table)?;
+    let struct_types = {
+        let mut builder = ExecutableBuilder::new(&guard, &module);
+        builder.resolve_types()?;
+        builder.struct_type_table()
+    };
+
+    let module_ir = destack(module, &guard, &struct_types)?;
 
     if args.verbose {
         print_stats(&module_ir);

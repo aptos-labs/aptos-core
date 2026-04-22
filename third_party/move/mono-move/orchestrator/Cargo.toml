@@ -1,0 +1,43 @@
+[package]
+name = "mono-move-orchestrator"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+mono-move-alloc = { workspace = true }
+mono-move-core = { workspace = true }
+mono-move-global-context = { workspace = true }
+move-binary-format = { workspace = true }
+shared-dsa = { workspace = true }
+specializer = { workspace = true }
+
+[[bin]]
+name = "mseir-compiler"
+path = "src/bin/mseir-compiler.rs"
+
+[dev-dependencies]
+codespan-reporting = { workspace = true }
+datatest-stable = { workspace = true }
+legacy-move-compiler = { workspace = true }
+move-asm = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
+move-prover-test-utils = { workspace = true }
+
+[[test]]
+name = "testsuite"
+harness = false
+
+[lib]
+doctest = false

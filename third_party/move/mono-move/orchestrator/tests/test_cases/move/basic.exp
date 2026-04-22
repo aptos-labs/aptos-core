@@ -98,9 +98,9 @@ fun add() {
     2: Return
 }
 
-fun get_x(): skipped (lowering: instruction ReadField(Home(1), FieldHandleIndex(0), Home(0)) not yet lowered)
+fun get_x(): skipped (lowering: instruction ReadField not yet lowered)
 
-fun make_point(): skipped (not all types are concrete)
+fun make_point(): skipped (lowering: instruction Pack not yet lowered)
 
 fun max() {
   frame_data_size: 16

@@ -15,3 +15,5 @@ rust-version = { workspace = true }
 mono-move-alloc = { workspace = true }
 mono-move-gas = { workspace = true }
 move-core-types = { workspace = true }
+parking_lot = { workspace = true }
+shared-dsa = { workspace = true }

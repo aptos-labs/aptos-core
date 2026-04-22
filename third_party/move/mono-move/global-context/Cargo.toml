@@ -21,10 +21,3 @@ mono-move-core = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 parking_lot = { workspace = true }
-specializer = { workspace = true }
-
-[dev-dependencies]
-mono-move-gas = { workspace = true }
-mono-move-runtime = { workspace = true }
-mono-move-testsuite = { workspace = true }
-move-asm = { workspace = true }

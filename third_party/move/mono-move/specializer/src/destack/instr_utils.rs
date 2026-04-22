@@ -124,15 +124,15 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::BinaryOp(_, _, _, _)
         | Instr::BinaryOpImm(_, _, _, _)
         | Instr::Pack(_, _, _)
-        | Instr::PackGeneric(_, _, _)
+        | Instr::PackGeneric(_, _, _, _)
         | Instr::Unpack(_, _, _)
-        | Instr::UnpackGeneric(_, _, _)
-        | Instr::PackVariant(_, _, _)
-        | Instr::PackVariantGeneric(_, _, _)
-        | Instr::UnpackVariant(_, _, _)
-        | Instr::UnpackVariantGeneric(_, _, _)
-        | Instr::TestVariant(_, _, _)
-        | Instr::TestVariantGeneric(_, _, _)
+        | Instr::UnpackGeneric(_, _, _, _)
+        | Instr::PackVariant(_, _, _, _)
+        | Instr::PackVariantGeneric(_, _, _, _, _)
+        | Instr::UnpackVariant(_, _, _, _)
+        | Instr::UnpackVariantGeneric(_, _, _, _, _)
+        | Instr::TestVariant(_, _, _, _)
+        | Instr::TestVariantGeneric(_, _, _, _, _)
         | Instr::ImmBorrowLoc(_, _)
         | Instr::MutBorrowLoc(_, _)
         | Instr::ImmBorrowField(_, _, _)
@@ -154,15 +154,15 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::WriteVariantField(_, _, _)
         | Instr::WriteVariantFieldGeneric(_, _, _)
         | Instr::Exists(_, _, _)
-        | Instr::ExistsGeneric(_, _, _)
+        | Instr::ExistsGeneric(_, _, _, _)
         | Instr::MoveFrom(_, _, _)
-        | Instr::MoveFromGeneric(_, _, _)
+        | Instr::MoveFromGeneric(_, _, _, _)
         | Instr::MoveTo(_, _, _)
-        | Instr::MoveToGeneric(_, _, _)
+        | Instr::MoveToGeneric(_, _, _, _)
         | Instr::ImmBorrowGlobal(_, _, _)
-        | Instr::ImmBorrowGlobalGeneric(_, _, _)
+        | Instr::ImmBorrowGlobalGeneric(_, _, _, _)
         | Instr::MutBorrowGlobal(_, _, _)
-        | Instr::MutBorrowGlobalGeneric(_, _, _)
+        | Instr::MutBorrowGlobalGeneric(_, _, _, _)
         | Instr::Call(_, _, _)
         | Instr::CallGeneric(_, _, _)
         | Instr::PackClosure(_, _, _, _)
@@ -281,21 +281,35 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*lhs, &mut f);
         },
 
-        Instr::Pack(dst, _, fields)
-        | Instr::PackGeneric(dst, _, fields)
-        | Instr::PackVariant(dst, _, fields)
-        | Instr::PackVariantGeneric(dst, _, fields) => {
+        Instr::Pack(dst, _, fields) => {
             def::<DEFS>(*dst, &mut f);
             uses::<USES>(fields, &mut f);
         },
-        Instr::Unpack(dsts, _, src)
-        | Instr::UnpackGeneric(dsts, _, src)
-        | Instr::UnpackVariant(dsts, _, src)
-        | Instr::UnpackVariantGeneric(dsts, _, src) => {
+        Instr::PackGeneric(dst, _, _, fields) | Instr::PackVariant(dst, _, _, fields) => {
+            def::<DEFS>(*dst, &mut f);
+            uses::<USES>(fields, &mut f);
+        },
+        Instr::PackVariantGeneric(dst, _, _, _, fields) => {
+            def::<DEFS>(*dst, &mut f);
+            uses::<USES>(fields, &mut f);
+        },
+        Instr::Unpack(dsts, _, src) => {
             defs::<DEFS>(dsts, &mut f);
             used::<USES>(*src, &mut f);
         },
-        Instr::TestVariant(dst, _, src) | Instr::TestVariantGeneric(dst, _, src) => {
+        Instr::UnpackGeneric(dsts, _, _, src) | Instr::UnpackVariant(dsts, _, _, src) => {
+            defs::<DEFS>(dsts, &mut f);
+            used::<USES>(*src, &mut f);
+        },
+        Instr::UnpackVariantGeneric(dsts, _, _, _, src) => {
+            defs::<DEFS>(dsts, &mut f);
+            used::<USES>(*src, &mut f);
+        },
+        Instr::TestVariant(dst, _, _, src) => {
+            def::<DEFS>(*dst, &mut f);
+            used::<USES>(*src, &mut f);
+        },
+        Instr::TestVariantGeneric(dst, _, _, _, src) => {
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*src, &mut f);
         },
@@ -334,21 +348,28 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*val, &mut f);
         },
 
-        Instr::Exists(dst, _, addr)
-        | Instr::ExistsGeneric(dst, _, addr)
-        | Instr::MoveFrom(dst, _, addr)
-        | Instr::MoveFromGeneric(dst, _, addr) => {
+        Instr::Exists(dst, _, addr) | Instr::MoveFrom(dst, _, addr) => {
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*addr, &mut f);
         },
-        Instr::MoveTo(_, signer, val) | Instr::MoveToGeneric(_, signer, val) => {
+        Instr::ExistsGeneric(dst, _, _, addr) | Instr::MoveFromGeneric(dst, _, _, addr) => {
+            def::<DEFS>(*dst, &mut f);
+            used::<USES>(*addr, &mut f);
+        },
+        Instr::MoveTo(_, signer, val) => {
             used::<USES>(*signer, &mut f);
             used::<USES>(*val, &mut f);
         },
-        Instr::ImmBorrowGlobal(dst, _, addr)
-        | Instr::ImmBorrowGlobalGeneric(dst, _, addr)
-        | Instr::MutBorrowGlobal(dst, _, addr)
-        | Instr::MutBorrowGlobalGeneric(dst, _, addr) => {
+        Instr::MoveToGeneric(_, _, signer, val) => {
+            used::<USES>(*signer, &mut f);
+            used::<USES>(*val, &mut f);
+        },
+        Instr::ImmBorrowGlobal(dst, _, addr) | Instr::MutBorrowGlobal(dst, _, addr) => {
+            def::<DEFS>(*dst, &mut f);
+            used::<USES>(*addr, &mut f);
+        },
+        Instr::ImmBorrowGlobalGeneric(dst, _, _, addr)
+        | Instr::MutBorrowGlobalGeneric(dst, _, _, addr) => {
             def::<DEFS>(*dst, &mut f);
             used::<USES>(*addr, &mut f);
         },
@@ -483,10 +504,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC
             }
         },
 
-        Instr::Pack(dst, _, fields)
-        | Instr::PackGeneric(dst, _, fields)
-        | Instr::PackVariant(dst, _, fields)
-        | Instr::PackVariantGeneric(dst, _, fields) => {
+        Instr::Pack(dst, _, fields) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -494,10 +512,23 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC
                 rewrite_slots(fields, &mut f);
             }
         },
-        Instr::Unpack(dsts, _, src)
-        | Instr::UnpackGeneric(dsts, _, src)
-        | Instr::UnpackVariant(dsts, _, src)
-        | Instr::UnpackVariantGeneric(dsts, _, src) => {
+        Instr::PackGeneric(dst, _, _, fields) | Instr::PackVariant(dst, _, _, fields) => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES {
+                rewrite_slots(fields, &mut f);
+            }
+        },
+        Instr::PackVariantGeneric(dst, _, _, _, fields) => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES {
+                rewrite_slots(fields, &mut f);
+            }
+        },
+        Instr::Unpack(dsts, _, src) => {
             if DEFS {
                 rewrite_slots(dsts, &mut f);
             }
@@ -505,7 +536,31 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC
                 rewrite_slot(src, &mut f);
             }
         },
-        Instr::TestVariant(dst, _, src) | Instr::TestVariantGeneric(dst, _, src) => {
+        Instr::UnpackGeneric(dsts, _, _, src) | Instr::UnpackVariant(dsts, _, _, src) => {
+            if DEFS {
+                rewrite_slots(dsts, &mut f);
+            }
+            if USES {
+                rewrite_slot(src, &mut f);
+            }
+        },
+        Instr::UnpackVariantGeneric(dsts, _, _, _, src) => {
+            if DEFS {
+                rewrite_slots(dsts, &mut f);
+            }
+            if USES {
+                rewrite_slot(src, &mut f);
+            }
+        },
+        Instr::TestVariant(dst, _, _, src) => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES {
+                rewrite_slot(src, &mut f);
+            }
+        },
+        Instr::TestVariantGeneric(dst, _, _, _, src) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -568,10 +623,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC
             }
         },
 
-        Instr::Exists(dst, _, addr)
-        | Instr::ExistsGeneric(dst, _, addr)
-        | Instr::MoveFrom(dst, _, addr)
-        | Instr::MoveFromGeneric(dst, _, addr) => {
+        Instr::Exists(dst, _, addr) | Instr::MoveFrom(dst, _, addr) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -579,16 +631,36 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC
                 rewrite_slot(addr, &mut f);
             }
         },
-        Instr::MoveTo(_, signer, val) | Instr::MoveToGeneric(_, signer, val) => {
+        Instr::ExistsGeneric(dst, _, _, addr) | Instr::MoveFromGeneric(dst, _, _, addr) => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES {
+                rewrite_slot(addr, &mut f);
+            }
+        },
+        Instr::MoveTo(_, signer, val) => {
             if USES {
                 rewrite_slot(signer, &mut f);
                 rewrite_slot(val, &mut f);
             }
         },
-        Instr::ImmBorrowGlobal(dst, _, addr)
-        | Instr::ImmBorrowGlobalGeneric(dst, _, addr)
-        | Instr::MutBorrowGlobal(dst, _, addr)
-        | Instr::MutBorrowGlobalGeneric(dst, _, addr) => {
+        Instr::MoveToGeneric(_, _, signer, val) => {
+            if USES {
+                rewrite_slot(signer, &mut f);
+                rewrite_slot(val, &mut f);
+            }
+        },
+        Instr::ImmBorrowGlobal(dst, _, addr) | Instr::MutBorrowGlobal(dst, _, addr) => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES {
+                rewrite_slot(addr, &mut f);
+            }
+        },
+        Instr::ImmBorrowGlobalGeneric(dst, _, _, addr)
+        | Instr::MutBorrowGlobalGeneric(dst, _, _, addr) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }

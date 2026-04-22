@@ -59,9 +59,7 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
 
                     // V2 path.
                     let id = guard.intern_address_name(module.self_addr(), module.self_name());
-                    let executable = guard
-                        .executable_builder_for_module(module)
-                        .build()
+                    let executable = mono_move_orchestrator::build_executable(&guard, module)
                         .map_err(|err| anyhow!("Failed to build executable: {}", err))?;
                     guard.insert_executable(id, executable);
                 }
@@ -219,7 +217,7 @@ fn execute_function_v2(
     let function_name = guard.intern_identifier(function_name);
     let function = guard
         .get_executable(id)
-        .and_then(|executable| executable.get_function(function_name))
+        .and_then(|executable| executable.get_function(function_name.into_global_arena_ptr()))
         .unwrap_or_else(|| panic!("Failed to load function or find executable"));
 
     let txn_ctx = NoopTransactionContext;

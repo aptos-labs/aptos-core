@@ -1,24 +1,33 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! End-to-end specializer + orchestrator baseline tests.
+//!
+//! Each `.masm` / `.move` input goes through the full pipeline:
+//!
+//!   assemble/compile → [`ExecutableBuilder::resolve_types`] → struct_type_table
+//!     → [`specializer::destack`] → format stackless IR → per-function micro-op lowering
+//!
+//! The resulting output is compared against a matching `.exp` baseline.
+//! Running with `UPBL=1` refreshes baselines in place.
+//!
+//! Tests live here (rather than in the specializer crate) so that struct
+//! references render with real names — resolved via the orchestrator's
+//! [`ExecutableBuilder`] rather than a placeholder table.
+
 use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use mono_move_orchestrator::ExecutableBuilder;
 use move_asm::assembler::{self, Options as AsmOptions};
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_model::metadata::LanguageVersion;
-use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 use specializer::{
     destack,
     lower::{lower_function, try_build_context, MicroOpsFunctionDisplay},
     stackless_exec_ir::ModuleIR,
 };
 use std::path::Path;
-
-fn make_struct_name_table(module: &CompiledModule) -> Vec<StructNameIndex> {
-    (0..module.struct_handles.len())
-        .map(|i| StructNameIndex::new(i as u32))
-        .collect()
-}
 
 fn format_micro_ops(module_ir: &ModuleIR) -> String {
     let module = &module_ir.module;
@@ -35,7 +44,7 @@ fn format_micro_ops(module_ir: &ModuleIR) -> String {
 
     for func_ir in module_ir.functions.iter().flatten() {
         let func_name = module.identifier_at(func_ir.name_idx).to_string();
-        match try_build_context(module, func_ir) {
+        match try_build_context(module_ir, func_ir) {
             Err(e) => {
                 out.push_str(&format!(
                     "\nfun {}(): skipped (context: {})\n",
@@ -69,6 +78,17 @@ fn format_micro_ops(module_ir: &ModuleIR) -> String {
     out
 }
 
+/// Resolve types via the orchestrator's builder and return the
+/// struct_type_table that the specializer expects.
+fn resolve_struct_types(
+    guard: &ExecutionGuard<'_>,
+    module: &CompiledModule,
+) -> Result<Vec<mono_move_core::types::InternedType>, String> {
+    let mut builder = ExecutableBuilder::new(guard, module);
+    builder.resolve_types().map_err(|e| format!("{:#}", e))?;
+    Ok(builder.struct_type_table())
+}
+
 const EXP_EXT: &str = "exp";
 
 datatest_stable::harness!(
@@ -86,18 +106,21 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
     let result = assembler::assemble(&options, &input, std::iter::empty())
         .map_err(|e| format!("{:?}", e))?;
     let module = result.left().ok_or("expected module, got script")?;
-    let table = make_struct_name_table(&module);
 
-    let ir = destack(module, &table).map_err(|e| format!("{:#}", e))?;
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx.try_execution_context(0).unwrap();
+    let struct_types = resolve_struct_types(&guard, &module)?;
+
+    let ir = destack(module, &guard, &struct_types).map_err(|e| format!("{:#}", e))?;
     let mut output = format!("{}", ir);
     output.push_str("\n=== micro-ops ===\n");
     output.push_str(&format_micro_ops(&ir));
+
     let baseline_path = path.with_extension(EXP_EXT);
     move_prover_test_utils::baseline_test::verify_or_update_baseline(
         baseline_path.as_path(),
         &output,
     )?;
-
     Ok(())
 }
 
@@ -140,12 +163,16 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         })
         .collect();
 
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx.try_execution_context(0).unwrap();
+
     let mut output = String::new();
     for module in &modules {
-        let table = make_struct_name_table(module);
+        let struct_types = resolve_struct_types(&guard, module)?;
         let masm_output = move_asm::disassembler::disassemble_module(String::new(), module)
             .map_err(|e| format!("disassembly failed: {:#}", e))?;
-        let module_ir = destack(module.clone(), &table).map_err(|e| format!("{:#}", e))?;
+        let module_ir =
+            destack(module.clone(), &guard, &struct_types).map_err(|e| format!("{:#}", e))?;
         let ir_output = format!("{}", module_ir);
         output.push_str("=== masm ===\n");
         output.push_str(&masm_output);
@@ -159,6 +186,5 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         baseline_path.as_path(),
         &output,
     )?;
-
     Ok(())
 }

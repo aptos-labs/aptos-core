@@ -8,12 +8,12 @@
 
 mod display;
 
+use mono_move_core::types::{InternedType, InternedTypeList};
 use move_binary_format::{
     file_format::{
         ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
-        FunctionInstantiationIndex, IdentifierIndex, SignatureIndex, StructDefInstantiationIndex,
-        StructDefinitionIndex, StructVariantHandleIndex, StructVariantInstantiationIndex,
-        VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+        FunctionInstantiationIndex, IdentifierIndex, VariantFieldHandleIndex,
+        VariantFieldInstantiationIndex,
     },
     CompiledModule,
 };
@@ -21,7 +21,6 @@ use move_core_types::{
     function::ClosureMask,
     int256::{I256, U256},
 };
-use move_vm_types::loaded_data::runtime_types::Type;
 
 /// Named slot operand.
 ///
@@ -140,7 +139,7 @@ pub enum ImmValue {
 }
 
 /// A stackless IR instruction with explicit named-slot operands.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Instr {
     // --- Loads ---
     LdConst(Slot, ConstantPoolIndex),
@@ -173,19 +172,21 @@ pub enum Instr {
     /// `dst = op(lhs_slot, immediate)` — binary op with immediate right operand
     BinaryOpImm(Slot, BinaryOp, Slot, ImmValue),
 
-    // --- Struct ---
-    Pack(Slot, StructDefinitionIndex, Vec<Slot>),
-    PackGeneric(Slot, StructDefInstantiationIndex, Vec<Slot>),
-    Unpack(Vec<Slot>, StructDefinitionIndex, Slot),
-    UnpackGeneric(Vec<Slot>, StructDefInstantiationIndex, Slot),
+    // --- Struct (second field is the interned struct `Type`; generic
+    // variants additionally carry an interned type-argument list) ---
+    Pack(Slot, InternedType, Vec<Slot>),
+    PackGeneric(Slot, InternedType, InternedTypeList, Vec<Slot>),
+    Unpack(Vec<Slot>, InternedType, Slot),
+    UnpackGeneric(Vec<Slot>, InternedType, InternedTypeList, Slot),
 
-    // --- Variant ---
-    PackVariant(Slot, StructVariantHandleIndex, Vec<Slot>),
-    PackVariantGeneric(Slot, StructVariantInstantiationIndex, Vec<Slot>),
-    UnpackVariant(Vec<Slot>, StructVariantHandleIndex, Slot),
-    UnpackVariantGeneric(Vec<Slot>, StructVariantInstantiationIndex, Slot),
-    TestVariant(Slot, StructVariantHandleIndex, Slot),
-    TestVariantGeneric(Slot, StructVariantInstantiationIndex, Slot),
+    // --- Variant (enum type + variant ordinal; generic variants also
+    // carry an interned type-argument list) ---
+    PackVariant(Slot, InternedType, u16, Vec<Slot>),
+    PackVariantGeneric(Slot, InternedType, u16, InternedTypeList, Vec<Slot>),
+    UnpackVariant(Vec<Slot>, InternedType, u16, Slot),
+    UnpackVariantGeneric(Vec<Slot>, InternedType, u16, InternedTypeList, Slot),
+    TestVariant(Slot, InternedType, u16, Slot),
+    TestVariantGeneric(Slot, InternedType, u16, InternedTypeList, Slot),
 
     // --- References ---
     ImmBorrowLoc(Slot, Slot),
@@ -214,18 +215,19 @@ pub enum Instr {
     WriteVariantField(VariantFieldHandleIndex, Slot, Slot),
     WriteVariantFieldGeneric(VariantFieldInstantiationIndex, Slot, Slot),
 
-    // --- Globals ---
-    Exists(Slot, StructDefinitionIndex, Slot),
-    ExistsGeneric(Slot, StructDefInstantiationIndex, Slot),
-    MoveFrom(Slot, StructDefinitionIndex, Slot),
-    MoveFromGeneric(Slot, StructDefInstantiationIndex, Slot),
-    /// `(def, signer, val)`
-    MoveTo(StructDefinitionIndex, Slot, Slot),
-    MoveToGeneric(StructDefInstantiationIndex, Slot, Slot),
-    ImmBorrowGlobal(Slot, StructDefinitionIndex, Slot),
-    ImmBorrowGlobalGeneric(Slot, StructDefInstantiationIndex, Slot),
-    MutBorrowGlobal(Slot, StructDefinitionIndex, Slot),
-    MutBorrowGlobalGeneric(Slot, StructDefInstantiationIndex, Slot),
+    // --- Globals (struct type is the interned `Type` for the named resource;
+    // generic variants additionally carry an interned type-argument list) ---
+    Exists(Slot, InternedType, Slot),
+    ExistsGeneric(Slot, InternedType, InternedTypeList, Slot),
+    MoveFrom(Slot, InternedType, Slot),
+    MoveFromGeneric(Slot, InternedType, InternedTypeList, Slot),
+    /// `(struct_ty, signer, val)`
+    MoveTo(InternedType, Slot, Slot),
+    MoveToGeneric(InternedType, InternedTypeList, Slot, Slot),
+    ImmBorrowGlobal(Slot, InternedType, Slot),
+    ImmBorrowGlobalGeneric(Slot, InternedType, InternedTypeList, Slot),
+    MutBorrowGlobal(Slot, InternedType, Slot),
+    MutBorrowGlobalGeneric(Slot, InternedType, InternedTypeList, Slot),
 
     // --- Calls ---
     Call(Vec<Slot>, FunctionHandleIndex, Vec<Slot>),
@@ -234,17 +236,20 @@ pub enum Instr {
     // --- Closures ---
     PackClosure(Slot, FunctionHandleIndex, ClosureMask, Vec<Slot>),
     PackClosureGeneric(Slot, FunctionInstantiationIndex, ClosureMask, Vec<Slot>),
-    CallClosure(Vec<Slot>, SignatureIndex, Vec<Slot>),
+    /// `CallClosure(rets, signature_types, args)` — `signature_types` is the
+    /// interned list of types from the closure's signature (arg types followed
+    /// by result types, matching the source `SignatureIndex`).
+    CallClosure(Vec<Slot>, InternedTypeList, Vec<Slot>),
 
-    // --- Vector ---
-    VecPack(Slot, SignatureIndex, u16, Vec<Slot>),
-    VecLen(Slot, SignatureIndex, Slot),
-    VecImmBorrow(Slot, SignatureIndex, Slot, Slot),
-    VecMutBorrow(Slot, SignatureIndex, Slot, Slot),
-    VecPushBack(SignatureIndex, Slot, Slot),
-    VecPopBack(Slot, SignatureIndex, Slot),
-    VecUnpack(Vec<Slot>, SignatureIndex, u16, Slot),
-    VecSwap(SignatureIndex, Slot, Slot, Slot),
+    // --- Vector (second field is the vector's element type) ---
+    VecPack(Slot, InternedType, u16, Vec<Slot>),
+    VecLen(Slot, InternedType, Slot),
+    VecImmBorrow(Slot, InternedType, Slot, Slot),
+    VecMutBorrow(Slot, InternedType, Slot, Slot),
+    VecPushBack(InternedType, Slot, Slot),
+    VecPopBack(Slot, InternedType, Slot),
+    VecUnpack(Vec<Slot>, InternedType, u16, Slot),
+    VecSwap(InternedType, Slot, Slot, Slot),
 
     // --- Control flow ---
     Branch(Label),
@@ -259,6 +264,96 @@ pub enum Instr {
     AbortMsg(Slot, Slot),
 }
 
+impl Instr {
+    /// Returns the variant tag as a static string. Useful for terse error
+    /// messages that don't need the full operand dump.
+    pub fn opcode_name(&self) -> &'static str {
+        match self {
+            Instr::LdConst(..) => "LdConst",
+            Instr::LdTrue(..) => "LdTrue",
+            Instr::LdFalse(..) => "LdFalse",
+            Instr::LdU8(..) => "LdU8",
+            Instr::LdU16(..) => "LdU16",
+            Instr::LdU32(..) => "LdU32",
+            Instr::LdU64(..) => "LdU64",
+            Instr::LdU128(..) => "LdU128",
+            Instr::LdU256(..) => "LdU256",
+            Instr::LdI8(..) => "LdI8",
+            Instr::LdI16(..) => "LdI16",
+            Instr::LdI32(..) => "LdI32",
+            Instr::LdI64(..) => "LdI64",
+            Instr::LdI128(..) => "LdI128",
+            Instr::LdI256(..) => "LdI256",
+            Instr::Copy(..) => "Copy",
+            Instr::Move(..) => "Move",
+            Instr::UnaryOp(..) => "UnaryOp",
+            Instr::BinaryOp(..) => "BinaryOp",
+            Instr::BinaryOpImm(..) => "BinaryOpImm",
+            Instr::Pack(..) => "Pack",
+            Instr::PackGeneric(..) => "PackGeneric",
+            Instr::Unpack(..) => "Unpack",
+            Instr::UnpackGeneric(..) => "UnpackGeneric",
+            Instr::PackVariant(..) => "PackVariant",
+            Instr::PackVariantGeneric(..) => "PackVariantGeneric",
+            Instr::UnpackVariant(..) => "UnpackVariant",
+            Instr::UnpackVariantGeneric(..) => "UnpackVariantGeneric",
+            Instr::TestVariant(..) => "TestVariant",
+            Instr::TestVariantGeneric(..) => "TestVariantGeneric",
+            Instr::ImmBorrowLoc(..) => "ImmBorrowLoc",
+            Instr::MutBorrowLoc(..) => "MutBorrowLoc",
+            Instr::ImmBorrowField(..) => "ImmBorrowField",
+            Instr::MutBorrowField(..) => "MutBorrowField",
+            Instr::ImmBorrowFieldGeneric(..) => "ImmBorrowFieldGeneric",
+            Instr::MutBorrowFieldGeneric(..) => "MutBorrowFieldGeneric",
+            Instr::ImmBorrowVariantField(..) => "ImmBorrowVariantField",
+            Instr::MutBorrowVariantField(..) => "MutBorrowVariantField",
+            Instr::ImmBorrowVariantFieldGeneric(..) => "ImmBorrowVariantFieldGeneric",
+            Instr::MutBorrowVariantFieldGeneric(..) => "MutBorrowVariantFieldGeneric",
+            Instr::ReadRef(..) => "ReadRef",
+            Instr::WriteRef(..) => "WriteRef",
+            Instr::ReadField(..) => "ReadField",
+            Instr::ReadFieldGeneric(..) => "ReadFieldGeneric",
+            Instr::WriteField(..) => "WriteField",
+            Instr::WriteFieldGeneric(..) => "WriteFieldGeneric",
+            Instr::ReadVariantField(..) => "ReadVariantField",
+            Instr::ReadVariantFieldGeneric(..) => "ReadVariantFieldGeneric",
+            Instr::WriteVariantField(..) => "WriteVariantField",
+            Instr::WriteVariantFieldGeneric(..) => "WriteVariantFieldGeneric",
+            Instr::Exists(..) => "Exists",
+            Instr::ExistsGeneric(..) => "ExistsGeneric",
+            Instr::MoveFrom(..) => "MoveFrom",
+            Instr::MoveFromGeneric(..) => "MoveFromGeneric",
+            Instr::MoveTo(..) => "MoveTo",
+            Instr::MoveToGeneric(..) => "MoveToGeneric",
+            Instr::ImmBorrowGlobal(..) => "ImmBorrowGlobal",
+            Instr::ImmBorrowGlobalGeneric(..) => "ImmBorrowGlobalGeneric",
+            Instr::MutBorrowGlobal(..) => "MutBorrowGlobal",
+            Instr::MutBorrowGlobalGeneric(..) => "MutBorrowGlobalGeneric",
+            Instr::Call(..) => "Call",
+            Instr::CallGeneric(..) => "CallGeneric",
+            Instr::PackClosure(..) => "PackClosure",
+            Instr::PackClosureGeneric(..) => "PackClosureGeneric",
+            Instr::CallClosure(..) => "CallClosure",
+            Instr::VecPack(..) => "VecPack",
+            Instr::VecLen(..) => "VecLen",
+            Instr::VecImmBorrow(..) => "VecImmBorrow",
+            Instr::VecMutBorrow(..) => "VecMutBorrow",
+            Instr::VecPushBack(..) => "VecPushBack",
+            Instr::VecPopBack(..) => "VecPopBack",
+            Instr::VecUnpack(..) => "VecUnpack",
+            Instr::VecSwap(..) => "VecSwap",
+            Instr::Branch(..) => "Branch",
+            Instr::BrTrue(..) => "BrTrue",
+            Instr::BrFalse(..) => "BrFalse",
+            Instr::BrCmp(..) => "BrCmp",
+            Instr::BrCmpImm(..) => "BrCmpImm",
+            Instr::Ret(..) => "Ret",
+            Instr::Abort(..) => "Abort",
+            Instr::AbortMsg(..) => "AbortMsg",
+        }
+    }
+}
+
 /// A basic block of instructions.
 ///
 /// Every block has a label. The last instruction is a terminator.
@@ -268,6 +363,13 @@ pub struct BasicBlock {
     pub label: Label,
     /// Instructions in this block.
     pub instrs: Vec<Instr>,
+}
+
+/// Parameter and return types of a function (or function instantiation),
+/// resolved to [`InternedType`].
+pub struct FuncSignature {
+    pub param_types: Vec<InternedType>,
+    pub ret_types: Vec<InternedType>,
 }
 
 /// IR for a single function.
@@ -288,7 +390,7 @@ pub struct FunctionIR {
     pub blocks: Vec<BasicBlock>,
     /// Type of each Home slot (indexed by Home slot index, 0..num_home_slots-1).
     /// Xfer slots have no entry here — their types are inferred from call signatures.
-    pub home_slot_types: Vec<Type>,
+    pub home_slot_types: Vec<InternedType>,
 }
 
 impl FunctionIR {
@@ -309,4 +411,10 @@ pub struct ModuleIR {
     pub module: CompiledModule,
     /// Indexed by `FunctionDefinitionIndex`. `None` for native functions.
     pub functions: Vec<Option<FunctionIR>>,
+    /// Signatures for non-generic calls, indexed by `FunctionHandleIndex`.
+    pub handle_signatures: Vec<FuncSignature>,
+    /// Signatures for generic calls, indexed by `FunctionInstantiationIndex`.
+    /// Today these mirror the base handle's signature; when proper generic
+    /// instantiation substitution lands, they will hold substituted types.
+    pub instantiation_signatures: Vec<FuncSignature>,
 }

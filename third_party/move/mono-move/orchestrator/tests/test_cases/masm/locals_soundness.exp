@@ -46,4 +46,4 @@ fun local_across_blocks() {
     6: Return
 }
 
-fun borrow_written_local(): skipped (lowering: instruction ImmBorrowLoc(Home(2), Home(1)) not yet lowered)
+fun borrow_written_local(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)

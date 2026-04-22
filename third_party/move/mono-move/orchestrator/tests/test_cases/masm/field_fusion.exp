@@ -88,12 +88,12 @@ fun identity() {
     0: Return
 }
 
-fun add_two_fields(): skipped (not all types are concrete)
+fun add_two_fields(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
 
-fun field_to_call(): skipped (not all types are concrete)
+fun field_to_call(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
 
-fun two_fields_to_call(): skipped (not all types are concrete)
+fun two_fields_to_call(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
 
-fun field_plus_constant(): skipped (not all types are concrete)
+fun field_plus_constant(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
 
-fun increment_field(): skipped (lowering: instruction ReadField(Home(1), FieldHandleIndex(0), Home(0)) not yet lowered)
+fun increment_field(): skipped (lowering: instruction ReadField not yet lowered)

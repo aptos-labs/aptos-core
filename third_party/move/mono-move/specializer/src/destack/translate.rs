@@ -4,10 +4,11 @@
 //! Conversion pipeline: Bytecode → SSA → instruction fusion → slot allocation.
 
 use super::{ssa_conversion::SsaConverter, type_conversion::convert_sig_tokens};
-use crate::stackless_exec_ir::{FunctionIR, ModuleIR};
+use crate::stackless_exec_ir::{FuncSignature, FunctionIR, ModuleIR};
 use anyhow::Result;
+use mono_move_core::types::InternedType;
+use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
-use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 
 /// Convert an entire compiled module to stackless IR.
 ///
@@ -39,7 +40,8 @@ use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 ///   truly hold dead values, so type-keyed slot recycling is sound.
 pub fn translate_module(
     module: CompiledModule,
-    struct_name_table: &[StructNameIndex],
+    guard: &ExecutionGuard<'_>,
+    struct_types: &[InternedType],
 ) -> Result<ModuleIR> {
     let functions = module
         .function_defs
@@ -60,12 +62,10 @@ pub fn translate_module(
                 .chain(local_sig_toks.iter())
                 .cloned()
                 .collect();
-            // [TODO]: we currently convert signature tokens into the runtime type representation, but
-            // this will change to use more efficient cached type representations.
-            let local_types = convert_sig_tokens(&module, &all_sig_toks, struct_name_table);
+            let local_types = convert_sig_tokens(&all_sig_toks, guard, struct_types)?;
 
             // Pass: Bytecode -> Intra-Block SSA -> Fusion
-            let converter = SsaConverter::new(local_types, struct_name_table);
+            let converter = SsaConverter::new(local_types, guard, struct_types);
             let ssa = converter
                 .convert_function(&module, &code.code)?
                 .with_fusion_passes();
@@ -86,5 +86,69 @@ pub fn translate_module(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    Ok(ModuleIR { module, functions })
+    // Module-level signature caches. The lowering pass reads these directly
+    // instead of re-walking signature tokens per call site.
+    let handle_signatures = collect_handle_signatures(&module, guard, struct_types)?;
+    let instantiation_signatures = collect_instantiation_signatures(&module, guard, struct_types)?;
+
+    Ok(ModuleIR {
+        module,
+        functions,
+        handle_signatures,
+        instantiation_signatures,
+    })
+}
+
+/// Pre-computes `FuncSignature` for every function handle in the module.
+fn collect_handle_signatures(
+    module: &CompiledModule,
+    guard: &ExecutionGuard<'_>,
+    struct_types: &[InternedType],
+) -> Result<Vec<FuncSignature>> {
+    module
+        .function_handles
+        .iter()
+        .map(|handle| {
+            let param_types = convert_sig_tokens(
+                &module.signature_at(handle.parameters).0,
+                guard,
+                struct_types,
+            )?;
+            let ret_types =
+                convert_sig_tokens(&module.signature_at(handle.return_).0, guard, struct_types)?;
+            Ok(FuncSignature {
+                param_types,
+                ret_types,
+            })
+        })
+        .collect()
+}
+
+/// Pre-computes `FuncSignature` for every function instantiation in the module.
+/// Today this mirrors the base handle's signature; future work (generic
+/// instantiation substitution) will replace each entry with the concrete
+/// substituted signature.
+fn collect_instantiation_signatures(
+    module: &CompiledModule,
+    guard: &ExecutionGuard<'_>,
+    struct_types: &[InternedType],
+) -> Result<Vec<FuncSignature>> {
+    module
+        .function_instantiations
+        .iter()
+        .map(|inst| {
+            let handle = module.function_handle_at(inst.handle);
+            let param_types = convert_sig_tokens(
+                &module.signature_at(handle.parameters).0,
+                guard,
+                struct_types,
+            )?;
+            let ret_types =
+                convert_sig_tokens(&module.signature_at(handle.return_).0, guard, struct_types)?;
+            Ok(FuncSignature {
+                param_types,
+                ret_types,
+            })
+        })
+        .collect()
 }
