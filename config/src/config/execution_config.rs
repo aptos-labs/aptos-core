@@ -59,6 +59,16 @@ pub struct ExecutionConfig {
     pub async_runtime_checks: bool,
     /// Enables pre-write optimization for parallel execution.
     pub enable_pre_write: bool,
+    /// If true, the block-executor `par_exec` thread pool is pinned at
+    /// startup so threads schedule onto one logical CPU per physical core —
+    /// avoiding hyperthread siblings of the same physical core. Each thread
+    /// may still run on any physical core in the allowed set. The allowed set
+    /// respects `sched_getaffinity` (so taskset / numactl / cgroup cpuset
+    /// restrictions are honored). Pinning is automatically skipped when the
+    /// number of available physical cores is less than the concurrency level
+    /// (oversubscribing the pinned set would hurt performance). Linux-only;
+    /// no-op elsewhere.
+    pub pin_par_exec_to_physical_cores: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -94,6 +104,7 @@ impl Default for ExecutionConfig {
             layout_caches_enabled: true,
             async_runtime_checks: true,
             enable_pre_write: true,
+            pin_par_exec_to_physical_cores: true,
         }
     }
 }

@@ -3,10 +3,13 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 
+#[path = "helpers.rs"]
+mod helpers;
+
 const N: u64 = 1000;
 
 fn bench_nested_loop(c: &mut Criterion) {
-    use mono_move_gas::SimpleGasMeter;
+    use mono_move_gas::{NoOpGasMeter, SimpleGasMeter};
     use mono_move_programs::{
         nested_loop::{micro_op_nested_loop, move_bytecode_nested_loop, native_nested_loop},
         testing,
@@ -24,12 +27,12 @@ fn bench_nested_loop(c: &mut Criterion) {
             b.iter(|| black_box(native_nested_loop(N)));
         });
 
+        // plain (no gas instrumentation)
         let (functions, descriptors, _arena) = micro_op_nested_loop();
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let gas_meter = SimpleGasMeter::new(u64::MAX);
-                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+                    let mut ctx = InterpreterContext::new(&descriptors, NoOpGasMeter, unsafe {
                         functions[0].as_ref_unchecked()
                     });
                     ctx.set_root_arg(0, &N.to_le_bytes());
@@ -42,6 +45,30 @@ fn bench_nested_loop(c: &mut Criterion) {
                 BatchSize::SmallInput,
             );
         });
+
+        // with gas instrumentation
+        let (functions, _, _arena) = micro_op_nested_loop();
+        let wrapped = functions.iter().map(|f| Some(*f)).collect::<Vec<_>>();
+        // SAFETY: Exclusive access during bench setup; arena is alive.
+        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&wrapped) };
+        group.bench_function("micro_op/gas", |b| {
+            b.iter_batched(
+                || {
+                    let gas_meter = SimpleGasMeter::new(u64::MAX);
+                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+                        functions_gas[0].unwrap().as_ref_unchecked()
+                    });
+                    ctx.set_root_arg(0, &N.to_le_bytes());
+                    ctx
+                },
+                |mut ctx| {
+                    ctx.run().unwrap();
+                    black_box(ctx.root_result())
+                },
+                BatchSize::SmallInput,
+            );
+        });
+
         group.finish();
     }
 

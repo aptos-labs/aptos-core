@@ -99,6 +99,16 @@ impl Debug for OIDCProvider {
             .finish()
     }
 }
+
+impl AsMoveValue for OIDCProvider {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            MoveValue::Vector(self.name.iter().copied().map(MoveValue::U8).collect()),
+            MoveValue::Vector(self.config_url.iter().copied().map(MoveValue::U8).collect()),
+        ]))
+    }
+}
+
 /// Move type `0x1::jwks::SupportedOIDCProviders` in rust.
 /// See its doc in Move for more details.
 #[derive(Debug, Default, Serialize, Deserialize)]

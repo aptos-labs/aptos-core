@@ -439,6 +439,16 @@ module aptos_framework::jwks {
         move_to(fx, PatchedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
     }
 
+    /// Initialize some JWK resources. Should only be invoked by genesis.
+    public fun initialize_with_defaults(fx: &signer, providers: vector<OIDCProvider>, patches: vector<Patch>) {
+        system_addresses::assert_aptos_framework(fx);
+        move_to(fx, SupportedOIDCProviders { providers });
+        move_to(fx, ObservedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
+        move_to(fx, Patches { patches });
+        move_to(fx, PatchedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
+        regenerate_patched_jwks();
+    }
+
     /// Helper function that removes an OIDC provider from the `SupportedOIDCProviders`.
     /// Returns the old config URL of the provider, if any, as an `Option`.
     fun remove_oidc_provider_internal(provider_set: &mut SupportedOIDCProviders, name: vector<u8>): Option<vector<u8>> {
